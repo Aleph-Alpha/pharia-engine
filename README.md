@@ -19,12 +19,12 @@ Pharia Kernel is a single process running in a docker container, running actors 
 * **Context Message Bus**: Exposes the combined API of all drivers via channel to the **Skill Executer** and handles messaging between drivers.
 * **Drivers**: Act as ports for the various exteternal systems.
 
+## Deploying Pharia Kernel on Customer side
+
+**Pharia Kernel** is intended to be installed **on premise** by the customer it. It is deployed, as are all other modules of the **Pharia OS**, to the JFrog Artifactory. Our colleagues at the Phario OS Team are going to develop tooling for deploying tooling for rolling it out. Until they come up with a name it is here called "Pharia Up".
+
+![Block Diagram Pharia OS deploy](./tam/pharia-os-deployment.drawio.svg)
+
 ## Contributing
 
 In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
-
-## Deployment
-
-Releases will be deployed to JFrog docker registry.
-
-![Block Diagram Deployment](./tam/deployment.drawio.svg)
