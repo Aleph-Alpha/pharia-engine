@@ -2,7 +2,7 @@
 
 Pharia Kernel allows you to execute Cognitive Buisness Units written in Python and handles their interaction with other modules of Pharia like inference and search.
 
-![Block Diagram Kernel Overview](./kernel-block.drawio.svg)
+![Block Diagram Kernel Overview](./tam/kernel-block.drawio.svg)
 
 ## Contributing
 
@@ -12,4 +12,4 @@ In this repository we stick to Conventional commits. See: <https://www.conventio
 
 Releases will be deployed to JFrog docker registry.
 
-![Block Diagram Deployment](./deployment.drawio.svg)
+![Block Diagram Deployment](./tam/deployment.drawio.svg)
