@@ -1,0 +1,21 @@
+
+# all jobs can be interrupted, e.g. when a newer pipeline for the same branch starts
+default:
+  interruptible: true
+
+stages:
+  - test
+
+cargo_clippy:
+  stage: test
+  image: rust:latest
+  script:
+    - rustup component add clippy;
+    - cargo clippy --workspace --all-targets --all-features
+
+cargo_test:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo test
+
