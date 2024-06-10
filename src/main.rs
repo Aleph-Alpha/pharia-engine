@@ -3,7 +3,7 @@ use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() {
-    let listener = TcpListener::bind("localhost:8081")
+    let listener = TcpListener::bind("0.0.0.0:8081")
         .await
         .expect("Could not bind server, please check host and port"); //todo:
                                                                       //error handling
