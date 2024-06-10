@@ -33,7 +33,7 @@ If you are building on Apple Silicon, set
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 ```
 
-To build the iamge, run
+To build the image, run
 
 ```bash
 docker build --tag 'pharia-kernel' .
