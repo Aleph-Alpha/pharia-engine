@@ -25,6 +25,20 @@ Pharia Kernel is a single process running in a docker container, running actors 
 
 ![Block Diagram Pharia OS deploy](./tam/pharia-os-deployment.drawio.svg)
 
+## Developing
+
+To build the iamge, run
+
+```bash
+docker build --tag 'pharia-kernel' .
+```
+
+Then, run the image with
+
+```bash
+docker run pharia-kernel
+```
+
 ## Contributing
 
-In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
+In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>. 
