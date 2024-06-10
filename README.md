@@ -27,6 +27,12 @@ Pharia Kernel is a single process running in a docker container, running actors 
 
 ## Developing
 
+If you are building on Apple Silicon, set
+
+```bash
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
 To build the iamge, run
 
 ```bash
@@ -36,7 +42,7 @@ docker build --tag 'pharia-kernel' .
 Then, run the image with
 
 ```bash
-docker run pharia-kernel
+docker run -p 8081:8081 pharia-kernel
 ```
 
 ## Contributing
