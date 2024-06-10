@@ -1,9 +1,17 @@
 use axum::{routing::get, Router};
 use tokio::net::TcpListener;
+use std::env;
+
 
 #[tokio::main]
 async fn main() {
-    let listener = TcpListener::bind("0.0.0.0:8081")
+    // .env files are optional
+    let _ = dotenvy::dotenv();
+
+    let host = env::var("HOST").expect("HOST variable not set");
+    let port = env::var("PORT").expect("PORT variable not set");
+    let bind = format!("{host}:{port}");
+    let listener = TcpListener::bind(bind)
         .await
         .expect("Could not bind server, please check host and port"); //todo:
                                                                       //error handling
