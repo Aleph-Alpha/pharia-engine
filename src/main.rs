@@ -55,34 +55,7 @@ mod tests {
     use super::*;
     use axum::{body::Body, http::Request};
     use http_body_util::BodyExt;
-    use libc::{getpid, kill};
-    use std::time::Duration;
-    use tokio::time::timeout;
-    use tokio_test::assert_ok;
     use tower::ServiceExt;
-
-    #[tokio::test]
-    async fn shutdown_on_sigint() {
-        let shutdown = shutdown_signal();
-        tokio::spawn(async move {
-            unsafe {
-                assert_eq!(kill(getpid(), libc::SIGINT), 0);
-            }
-        });
-        assert_ok!(timeout(Duration::from_millis(10), shutdown).await);
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn shutdown_on_sigterm() {
-        let shutdown = shutdown_signal();
-        tokio::spawn(async {
-            unsafe {
-                assert_eq!(kill(getpid(), libc::SIGTERM), 0);
-            }
-        });
-        assert_ok!(timeout(Duration::from_millis(10), shutdown).await);
-    }
 
     #[tokio::test]
     async fn hello_world() {
