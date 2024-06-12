@@ -90,7 +90,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn complete_text() {
+    async fn i_complete_text() {
         let http = http(Inference::new().api());
         let ctp = CompleteTextParameters {
             prompt: "An apple a day".to_owned(),

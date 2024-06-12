@@ -30,7 +30,7 @@ cargo_test:
   stage: test
   image: rust:latest
   script:
-    - cargo test
+    - cargo test -- --skip i_
 
 image_build:
   stage: image_build
