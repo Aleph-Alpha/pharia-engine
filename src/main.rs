@@ -91,8 +91,9 @@ mod tests {
         assert_eq!(&body[..], b"Hello, world!");
     }
 
+    #[cfg_attr(not(feature = "test_inference"), ignore)]
     #[tokio::test]
-    async fn i_complete_text() {
+    async fn complete_text() {
         let http = http(Inference::new().api());
         let ctp = CompleteTextParameters {
             prompt: "An apple a day".to_owned(),
