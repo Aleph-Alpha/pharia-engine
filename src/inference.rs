@@ -1,23 +1,34 @@
 use aleph_alpha_client::{Client, How, TaskCompletion};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 
 pub struct Inference {
     sender: mpsc::Sender<InferenceMessage>,
+    handle: JoinHandle<()>,
 }
 
 impl Inference {
     pub fn new() -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<InferenceMessage>(1);
-        tokio::spawn(async {
+        let handle = tokio::spawn(async {
             InferenceActor::new(recv).run().await;
         });
-        Inference { sender: send }
+        Inference {
+            sender: send,
+            handle,
+        }
     }
     pub fn api(&self) -> InferenceApi {
         InferenceApi {
             sender: self.sender.clone(),
         }
+    }
+    pub async fn shutdown(self) {
+        drop(self.sender);
+        self.handle.await.unwrap();
     }
 }
 

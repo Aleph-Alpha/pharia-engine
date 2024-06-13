@@ -27,6 +27,8 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("Could not start server!"); //todo: error handling
+
+    inference.shutdown().await;
 }
 
 fn http(inference_api: InferenceApi) -> Router {
