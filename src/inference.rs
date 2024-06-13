@@ -6,7 +6,7 @@ use tokio::{
 };
 
 pub struct Inference {
-    sender: mpsc::Sender<InferenceMessage>,
+    send: mpsc::Sender<InferenceMessage>,
     handle: JoinHandle<()>,
 }
 
@@ -16,32 +16,29 @@ impl Inference {
         let handle = tokio::spawn(async {
             InferenceActor::new(recv).run().await;
         });
-        Inference {
-            sender: send,
-            handle,
-        }
+        Inference { send, handle }
     }
     pub fn api(&self) -> InferenceApi {
         InferenceApi {
-            sender: self.sender.clone(),
+            send: self.send.clone(),
         }
     }
     pub async fn shutdown(self) {
-        drop(self.sender);
+        drop(self.send);
         self.handle.await.unwrap();
     }
 }
 
 #[derive(Clone)]
 pub struct InferenceApi {
-    sender: mpsc::Sender<InferenceMessage>,
+    send: mpsc::Sender<InferenceMessage>,
 }
 
 impl InferenceApi {
     pub async fn complete_text(&mut self, params: CompleteTextParameters) -> String {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::CompleteText(params, send);
-        self.sender
+        self.send
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
