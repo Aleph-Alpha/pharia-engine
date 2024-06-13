@@ -1,3 +1,13 @@
+include:
+  - project: "engineering/vulnerability-scanner"
+    file: "pipeline-templates/sbom_vulnerability_scan.v1.yml"
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    - when: always
+
 # all jobs can be interrupted, e.g. when a newer pipeline for the same branch starts
 default:
   interruptible: true
@@ -35,6 +45,9 @@ cargo_test:
 image_build:
   stage: image_build
   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
     - podman login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
@@ -54,6 +67,19 @@ image_build:
         .
     - podman push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
     - echo -e "\e[0Ksection_end:`date +%s`:my_section\r\e[0K"
+
+sbom_vulnerability_scan:
+  extends: .sbom_vulnerability_scan
+  stage: image_test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      variables:
+        ARTIFACT_NAME: $CI_PROJECT_NAME
+        FULL_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_SECURITY_SCAN == "true"
+      variables:
+        ARTIFACT_NAME: $CI_PROJECT_NAME:latest
+        FULL_IMAGE_NAME: $CI_REGISTRY_IMAGE:latest
 
 container_test:
   stage: image_test
