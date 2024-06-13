@@ -78,13 +78,26 @@ async fn shutdown_signal() {
 #[cfg(test)]
 mod tests {
 
+    use std::sync::OnceLock;
+
     use super::*;
     use axum::{
         body::Body,
         http::{self, header, Request},
     };
+    use dotenvy::dotenv;
     use http_body_util::BodyExt;
     use tower::ServiceExt;
+
+    static API_TOKEN: OnceLock<String> = OnceLock::new();
+
+    /// API Token used by tests to authenticate requests
+    fn api_token() -> &'static str {
+        API_TOKEN.get_or_init(||{
+            let _ = dotenv();
+            env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
+        })
+    }
 
     #[tokio::test]
     async fn hello_world() {
@@ -127,7 +140,7 @@ mod tests {
     #[cfg_attr(not(feature = "test_inference"), ignore)]
     #[tokio::test]
     async fn complete_text() {
-        let api_token = std::env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set");
+        let api_token = api_token();
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
 
