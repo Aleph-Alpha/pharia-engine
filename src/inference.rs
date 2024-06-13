@@ -35,9 +35,17 @@ pub struct InferenceApi {
 }
 
 impl InferenceApi {
-    pub async fn complete_text(&mut self, params: CompleteTextParameters) -> String {
+    pub async fn complete_text(
+        &mut self,
+        params: CompleteTextParameters,
+        api_token: String,
+    ) -> String {
         let (send, recv) = oneshot::channel();
-        let msg = InferenceMessage::CompleteText(params, send);
+        let msg = InferenceMessage::CompleteText {
+            params,
+            send,
+            api_token,
+        };
         self.send
             .send(msg)
             .await
@@ -60,8 +68,7 @@ struct InferenceActor {
 
 impl InferenceActor {
     fn new(recv: mpsc::Receiver<InferenceMessage>) -> Self {
-        let aa_api_token = std::env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set");
-        let client = Client::new(&aa_api_token).unwrap();
+        let client = Client::new("DUMMY").unwrap();
         InferenceActor { client, recv }
     }
     async fn run(&mut self) {
@@ -72,19 +79,34 @@ impl InferenceActor {
 }
 
 enum InferenceMessage {
-    CompleteText(CompleteTextParameters, oneshot::Sender<String>),
+    CompleteText {
+        params: CompleteTextParameters,
+        send: oneshot::Sender<String>,
+        api_token: String,
+    },
 }
 
 impl InferenceMessage {
     async fn act(self, client: &Client) {
         let _ = match self {
-            InferenceMessage::CompleteText(params, out) => {
+            InferenceMessage::CompleteText {
+                params,
+                send,
+                api_token,
+            } => {
                 let task = TaskCompletion::from_text(&params.prompt, params.max_tokens);
                 let response = client
-                    .completion(&task, &params.model, &How::default())
+                    .completion(
+                        &task,
+                        &params.model,
+                        &How {
+                            api_token: Some(api_token),
+                            ..Default::default()
+                        },
+                    )
                     .await
                     .unwrap();
-                out.send(response.completion)
+                send.send(response.completion)
             }
         };
     }
