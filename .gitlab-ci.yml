@@ -24,15 +24,6 @@ variables:
   ARTIFACTORY_REPO: pharia-kernel-images
   CONTAINER_PORT: 8081
 
-generate_version:
-  stage: test
-  image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
-  script:
-    - echo VERSION=$(date "+%Y_%m_%d_%H_%M_%S") >> build.env
-  artifacts:
-    reports:
-      dotenv: build.env
-
 cargo_clippy:
   stage: test
   image: rust:latest
@@ -65,7 +56,7 @@ image_build:
         --cache-ttl=24h \
         -f Containerfile \
         --label "com.aleph-alpha.git-hash"=$CI_COMMIT_SHORT_SHA \
-        --label "com.aleph-alpha.image-id"=$VERSION \
+        --label "com.aleph-alpha.image-id"=$(image_id) \
         -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA \
         --progress=plain \
         .
@@ -114,9 +105,12 @@ image_publish:
   script:
     - podman login --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - podman pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - IMAGE_ID=$(podman inspect $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
     - podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
+    - podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
     - podman logout $CI_REGISTRY
     - JFROG_ACCESS_TOKEN=$(get_jfrog_access_token $GITLAB_OIDC_TOKEN)
     - JFROG_ACCESS_TOKEN_SUBJECT=$(extract_access_token_subject $JFROG_ACCESS_TOKEN)
     - podman login --username "$JFROG_ACCESS_TOKEN_SUBJECT" --password $JFROG_ACCESS_TOKEN $ARTIFACTORY_URL/$ARTIFACTORY_REPO
     - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
+    - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
