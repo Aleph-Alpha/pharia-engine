@@ -16,8 +16,12 @@ stages:
   - test
   - image_build
   - image_test
+  - image_publish
 
 variables:
+  ARTIFACTORY_HOST: "alephalpha.jfrog.io"
+  ARTIFACTORY_URL: "https://${ARTIFACTORY_HOST}"
+  ARTIFACTORY_REPO: pharia-kernel-images
   CONTAINER_PORT: 8081
 
 generate_version:
@@ -89,7 +93,7 @@ container_test:
   script:
     - sh -x ./tests/test-container.sh $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
 
-# TODO: replace with actual integraton tests
+# TODO: replace with actual integration tests
 integration_test:
   stage: image_test
   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
@@ -98,3 +102,21 @@ integration_test:
       alias: $CI_PROJECT_NAME
   script:
     - sh -x ./tests/test-image.sh $CONTAINER_PORT $CI_PROJECT_NAME
+
+image_publish:
+  stage: image_publish
+  image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: $ARTIFACTORY_URL
+  script:
+    - podman login --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - podman pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
+    - podman logout $CI_REGISTRY
+    - JFROG_ACCESS_TOKEN=$(get_jfrog_access_token $GITLAB_OIDC_TOKEN)
+    - JFROG_ACCESS_TOKEN_SUBJECT=$(extract_access_token_subject $JFROG_ACCESS_TOKEN)
+    - podman login --username "$JFROG_ACCESS_TOKEN_SUBJECT" --password $JFROG_ACCESS_TOKEN $ARTIFACTORY_URL/$ARTIFACTORY_REPO
+    - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
