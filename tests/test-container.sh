@@ -24,7 +24,9 @@ ELAPSED_TIME=$SECONDS
 
 podman rm $INTERNAL_NAME
 
-if [ "$ELAPSED_TIME" -gt 1 ]; then
+# if the container does not shut down on SIGTERM properly,
+# podman will send SIGKILL after 10sec to force the shutdown 
+if [ "$ELAPSED_TIME" -gt 9 ]; then
     echo "shutdown time is longer than expected"
     exit 1
 fi

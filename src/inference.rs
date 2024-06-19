@@ -19,9 +19,7 @@ impl Inference {
         Inference { send, handle }
     }
     pub fn api(&self) -> InferenceApi {
-        InferenceApi {
-            send: self.send.clone(),
-        }
+        InferenceApi::new(self.send.clone())
     }
     pub async fn shutdown(self) {
         drop(self.send);
@@ -35,6 +33,9 @@ pub struct InferenceApi {
 }
 
 impl InferenceApi {
+    pub fn new(send: mpsc::Sender<InferenceMessage>) -> InferenceApi {
+        InferenceApi { send }
+    }
     pub async fn complete_text(
         &mut self,
         params: CompleteTextParameters,
@@ -78,7 +79,7 @@ impl InferenceActor {
     }
 }
 
-enum InferenceMessage {
+pub enum InferenceMessage {
     CompleteText {
         params: CompleteTextParameters,
         send: oneshot::Sender<String>,

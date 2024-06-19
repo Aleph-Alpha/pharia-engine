@@ -1339,6 +1339,7 @@ name = "pharia-kernel"
 version = "0.1.0"
 dependencies = [
  "aleph-alpha-client",
+ "anyhow",
  "axum",
  "axum-extra",
  "dotenvy",
