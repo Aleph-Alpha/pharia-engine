@@ -1,4 +1,7 @@
-use crate::inference::{CompleteTextParameters, InferenceApi};
+use crate::{
+    inference::{CompleteTextParameters, InferenceApi},
+    skills::runtime::Runtime,
+};
 
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -57,6 +60,7 @@ impl SkillExecutorApi {
 }
 
 struct SkillExecutorActor {
+    _runtime: Runtime,
     inference_api: InferenceApi,
     recv: mpsc::Receiver<SkillExecutorMessage>,
 }
@@ -64,6 +68,7 @@ struct SkillExecutorActor {
 impl SkillExecutorActor {
     fn new(recv: mpsc::Receiver<SkillExecutorMessage>, inference_api: InferenceApi) -> Self {
         SkillExecutorActor {
+            _runtime: Runtime::new(),
             inference_api,
             recv,
         }
