@@ -29,19 +29,19 @@ Pharia Kernel is a single process running in a docker container, running actors 
 
 You can build the image with
 
-```bash
+```shell
 podman build . --tag pharia-kernel
 ```
 
 On Apple Silicon, you need to specify the target platform
 
-```bash
+```shell
 podman build . --tag pharia-kernel --platform linux/arm64
 ```
 
 Then, run the image with
 
-```bash
+```shell
 podman run -p 8081:8081 pharia-kernel
 ```
 
@@ -56,7 +56,11 @@ In this repository we stick to Conventional commits. See: <https://www.conventio
 
 Install wasm-tools used to build the example skills:
 
-```bash
+```shell
 cargo install wasm-tools
 ```
 
+```shell
+cargo build -p greet-skill --target wasm32-wasi
+wasm-tools component new ./target/wasm32-wasi/debug/greet_skill.wasm -o ./skills/greet_skill.wasm --adapt ./wasi_snapshot_preview1.reactor-21.0.1.wasm
+```
