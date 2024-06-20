@@ -28,13 +28,15 @@ cargo_clippy:
   stage: test
   image: rust:latest
   script:
-    - rustup component add clippy;
+    - rustup component add clippy
     - cargo clippy --workspace --all-targets --all-features
-
+    
 cargo_test:
   stage: test
   image: rust:latest
   script:
+    - rustup target add wasm32-wasi
+    - ./build-skill.sh
     - cargo test
 
 image_build:
