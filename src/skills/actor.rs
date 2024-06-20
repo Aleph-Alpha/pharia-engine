@@ -1,7 +1,4 @@
-use crate::{
-    inference::{CompleteTextParameters, InferenceApi},
-    skills::runtime::Runtime,
-};
+use crate::{inference::InferenceApi, skills::runtime::Runtime};
 
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -60,7 +57,7 @@ impl SkillExecutorApi {
 }
 
 struct SkillExecutorActor {
-    _runtime: Runtime,
+    runtime: Runtime,
     inference_api: InferenceApi,
     recv: mpsc::Receiver<SkillExecutorMessage>,
 }
@@ -68,7 +65,7 @@ struct SkillExecutorActor {
 impl SkillExecutorActor {
     fn new(recv: mpsc::Receiver<SkillExecutorMessage>, inference_api: InferenceApi) -> Self {
         SkillExecutorActor {
-            _runtime: Runtime::new(),
+            runtime: Runtime::new(),
             inference_api,
             recv,
         }
@@ -81,23 +78,9 @@ impl SkillExecutorActor {
     async fn act(&mut self, msg: SkillExecutorMessage) {
         let _ = match msg.skill {
             Skill::Greet { name } => {
-                let prompt = format!(
-                    "### Instruction:
-                Provide a nice greeting for the person utilizing its given name
-
-                ### Input:
-                Name: {name}
-
-                ### Response:"
-                );
-                let params = CompleteTextParameters {
-                    prompt,
-                    model: "luminous-nextgen-7b".to_owned(),
-                    max_tokens: 10,
-                };
                 let response = self
-                    .inference_api
-                    .complete_text(params, msg.api_token)
+                    .runtime
+                    .run_greet(name, msg.api_token, &mut self.inference_api)
                     .await;
                 msg.send.send(response)
             }

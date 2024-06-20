@@ -6,7 +6,7 @@ impl Runtime {
     pub fn new() -> Self {
         Self {}
     }
-    pub async fn _run_greet(
+    pub async fn run_greet(
         &self,
         name: String,
         api_token: String,
