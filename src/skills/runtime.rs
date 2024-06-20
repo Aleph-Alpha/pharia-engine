@@ -1,5 +1,7 @@
 use std::future::Future;
 
+use wasmtime::{component::Linker, Config, Engine, Store};
+
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
 pub trait Runtime {
@@ -18,6 +20,38 @@ pub trait Runtime {
         api_token: String,
         inference_api: &mut InferenceApi,
     ) -> impl Future<Output = String> + Send;
+}
+
+#[allow(dead_code)]
+pub struct WasmRuntime {
+    engine: Engine,
+    store: Store<()>,
+    linker: Linker<()>,
+}
+
+impl WasmRuntime {
+    #[allow(dead_code)]
+    pub fn new() -> Self {
+        let engine = Engine::new(Config::new().async_support(true)).expect("config must be valid");
+        let store = Store::new(&engine, ());
+        let mut linker = Linker::<()>::new(&engine);
+        linker
+            .instance("csi")
+            .unwrap()
+            .func_wrap_async(
+                "complete_text",
+                |_store, (_model, _prompt): (String, String)| {
+                    Box::new(async move { Ok(("dummy response",)) })
+                },
+            )
+            .unwrap();
+
+        Self {
+            engine,
+            store,
+            linker,
+        }
+    }
 }
 
 pub struct RustRuntime {}
@@ -54,28 +88,14 @@ impl Runtime for RustRuntime {
 
 #[cfg(test)]
 mod tests {
-    use wasmtime::{
-        component::{Component, Linker},
-        Config, Engine, Store,
-    };
+    use wasmtime::component::Component;
+
+    use super::WasmRuntime;
 
     #[test]
     fn greet_skill_component() {
-        let engine = Engine::new(Config::new().async_support(true)).unwrap();
-        let _store = Store::new(&engine, ());
-        let mut linker = Linker::<()>::new(&engine);
-
-        linker
-            .instance("csi")
-            .unwrap()
-            .func_wrap_async(
-                "complete_text",
-                |_store, (_model, _prompt): (String, String)| {
-                    Box::new(async move { Ok(("dummy response",)) })
-                },
-            )
-            .unwrap();
-        Component::from_file(&engine, "./skills/greet_skill.wasm")
+        let runtime = WasmRuntime::new();
+        Component::from_file(&runtime.engine, "./skills/greet_skill.wasm")
             .expect("Loading greet-skill component failed. Please run 'build-skill.sh' first.");
     }
 }
