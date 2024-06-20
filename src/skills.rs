@@ -5,10 +5,6 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use wasmtime::{
-    component::{Component, Linker},
-    Config, Engine, Store,
-};
 
 pub struct SkillExecutor {
     send: mpsc::Sender<SkillExecutorMessage>,
@@ -118,6 +114,11 @@ mod tests {
     };
     use tokio::{sync::mpsc, task::JoinHandle};
 
+    use wasmtime::{
+        component::{Component, Linker},
+        Config, Engine, Store,
+    };
+
     struct InferenceStub {
         send: mpsc::Sender<InferenceMessage>,
         join_handle: JoinHandle<()>,
@@ -169,22 +170,22 @@ mod tests {
         // Then
         assert_eq!("Hello", result);
     }
-}
-#[test]
-fn greet_skill_component() {
-    let engine = Engine::new(Config::new().async_support(true)).unwrap();
-    let _store = Store::new(&engine, ());
-    let mut linker = Linker::<()>::new(&engine);
+    #[test]
+    fn greet_skill_component() {
+        let engine = Engine::new(Config::new().async_support(true)).unwrap();
+        let _store = Store::new(&engine, ());
+        let mut linker = Linker::<()>::new(&engine);
 
-    linker
-        .instance("csi")
-        .unwrap()
-        .func_wrap_async(
-            "complete_text",
-            |_store, (_model, _prompt): (String, String)| {
-                Box::new(async move { Ok(("dummy response",)) })
-            },
-        )
-        .unwrap();
-    Component::from_file(&engine, "./skills/greet_skill.wasm").expect("Loading greet-skill component failed. Please run 'cargo build -p greet-skill --target wasm32-wasi' first.");
+        linker
+            .instance("csi")
+            .unwrap()
+            .func_wrap_async(
+                "complete_text",
+                |_store, (_model, _prompt): (String, String)| {
+                    Box::new(async move { Ok(("dummy response",)) })
+                },
+            )
+            .unwrap();
+        Component::from_file(&engine, "./skills/greet_skill.wasm").expect("Loading greet-skill component failed. Please run 'cargo build -p greet-skill --target wasm32-wasi' first.");
+    }
 }
