@@ -3,7 +3,6 @@ use std::future::Future;
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
 pub trait Runtime {
-
     // We are returning a Future explicitly here instead of using the `async` syntax. This has the
     // following reason: The async syntax is ambiguous with regards to whether or not the Future is
     // `Send`. The Rust compiler figures out the lifetime and `Send`ness of the future implicitly
@@ -50,5 +49,33 @@ impl Runtime for RustRuntime {
             max_tokens: 10,
         };
         inference_api.complete_text(params, api_token).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wasmtime::{
+        component::{Component, Linker},
+        Config, Engine, Store,
+    };
+
+    #[test]
+    fn greet_skill_component() {
+        let engine = Engine::new(Config::new().async_support(true)).unwrap();
+        let _store = Store::new(&engine, ());
+        let mut linker = Linker::<()>::new(&engine);
+
+        linker
+            .instance("csi")
+            .unwrap()
+            .func_wrap_async(
+                "complete_text",
+                |_store, (_model, _prompt): (String, String)| {
+                    Box::new(async move { Ok(("dummy response",)) })
+                },
+            )
+            .unwrap();
+        Component::from_file(&engine, "./skills/greet_skill.wasm")
+            .expect("Loading greet-skill component failed. Please run 'build-skill.sh' first.");
     }
 }
