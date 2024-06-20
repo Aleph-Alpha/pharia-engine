@@ -70,20 +70,11 @@ impl SkillExecutorActor {
     }
     async fn run(&mut self) {
         while let Some(msg) = self.recv.recv().await {
-            msg.act(&mut self.inference_api).await;
+            self.act(msg).await;
         }
     }
-}
-
-struct SkillExecutorMessage {
-    skill: Skill,
-    send: oneshot::Sender<String>,
-    api_token: String,
-}
-
-impl SkillExecutorMessage {
-    async fn act(self, inference_api: &mut InferenceApi) {
-        let _ = match self.skill {
+    async fn act(&mut self, msg: SkillExecutorMessage) {
+        let _ = match msg.skill {
             Skill::Greet { name } => {
                 let prompt = format!(
                     "### Instruction:
@@ -99,11 +90,20 @@ impl SkillExecutorMessage {
                     model: "luminous-nextgen-7b".to_owned(),
                     max_tokens: 10,
                 };
-                let response = inference_api.complete_text(params, self.api_token).await;
-                self.send.send(response)
+                let response = self
+                    .inference_api
+                    .complete_text(params, msg.api_token)
+                    .await;
+                msg.send.send(response)
             }
         };
     }
+}
+
+struct SkillExecutorMessage {
+    skill: Skill,
+    send: oneshot::Sender<String>,
+    api_token: String,
 }
 
 #[cfg(test)]
