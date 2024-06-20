@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use wasmtime::{component::Linker, Config, Engine, Store};
+use wasmtime_wasi::WasiView;
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
@@ -25,16 +26,29 @@ pub trait Runtime {
 #[allow(dead_code)]
 pub struct WasmRuntime {
     engine: Engine,
-    store: Store<()>,
-    linker: Linker<()>,
+    store: Store<WasmRuntimeState>,
+    linker: Linker<WasmRuntimeState>,
+}
+
+struct WasmRuntimeState;
+
+impl WasiView for WasmRuntimeState {
+    fn table(&mut self) -> &mut wasmtime_wasi::ResourceTable {
+        todo!()
+    }
+
+    fn ctx(&mut self) -> &mut wasmtime_wasi::WasiCtx {
+        todo!()
+    }
 }
 
 impl WasmRuntime {
     #[allow(dead_code)]
     pub fn new() -> Self {
         let engine = Engine::new(Config::new().async_support(true)).expect("config must be valid");
-        let store = Store::new(&engine, ());
-        let mut linker = Linker::<()>::new(&engine);
+        let store = Store::new(&engine, WasmRuntimeState);
+        let mut linker = Linker::<WasmRuntimeState>::new(&engine);
+        wasmtime_wasi::add_to_linker_async(&mut linker);
         linker
             .instance("csi")
             .unwrap()
@@ -92,10 +106,25 @@ mod tests {
 
     use super::WasmRuntime;
 
-    #[test]
-    fn greet_skill_component() {
-        let runtime = WasmRuntime::new();
-        Component::from_file(&runtime.engine, "./skills/greet_skill.wasm")
+    #[tokio::test]
+    async fn greet_skill_component() {
+        let mut runtime = WasmRuntime::new();
+        let component = Component::from_file(&runtime.engine, "./skills/greet_skill.wasm")
             .expect("Loading greet-skill component failed. Please run 'build-skill.sh' first.");
+        let instance = runtime
+            .linker
+            .instantiate_async(&mut runtime.store, &component)
+            .await
+            .unwrap();
+        let run = instance
+            .get_typed_func::<(&str,), (String,)>(&mut runtime.store, "run")
+            .unwrap();
+
+        let (resp,) = run
+            .call_async(&mut runtime.store, ("Pharia",))
+            .await
+            .unwrap();
+        run.post_return_async(&mut runtime.store).await.unwrap();
+        assert_eq!("Hello, Pharia", resp);
     }
 }
