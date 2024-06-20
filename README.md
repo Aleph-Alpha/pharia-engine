@@ -48,3 +48,15 @@ podman run -p 8081:8081 pharia-kernel
 ## Contributing
 
 In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>. 
+
+
+### local test execution
+
+#### prerequisites
+
+Install wasm-tools used to build the example skills:
+
+```bash
+cargo install wasm-tools
+```
+

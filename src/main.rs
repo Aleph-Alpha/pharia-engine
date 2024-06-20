@@ -1,11 +1,10 @@
 mod config;
 mod inference;
 mod shell;
-mod skill_executor;
-
+mod skills;
 use std::future::Future;
 
-use crate::skill_executor::SkillExecutor;
+use crate::skills::SkillExecutor;
 
 use crate::inference::Inference;
 use config::AppConfig;

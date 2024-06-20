@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use crate::skill_executor::{Skill, SkillExecutorApi};
+use crate::skills::{Skill, SkillExecutorApi};
 use anyhow::{Context, Error};
 use axum::extract::{Json, State};
 use axum_extra::headers::authorization::Bearer;
@@ -45,7 +45,7 @@ async fn execute_skill(
 
 #[cfg(test)]
 mod tests {
-    use crate::skill_executor::SkillExecutor;
+    use crate::skills::SkillExecutor;
 
     use super::*;
 
