@@ -5,18 +5,15 @@ use tokio::{
     task::JoinHandle,
 };
 
-use super::RustRuntime;
-
 pub struct SkillExecutor {
     send: mpsc::Sender<SkillExecutorMessage>,
     handle: JoinHandle<()>,
 }
 
 impl SkillExecutor {
-    pub fn new<R: Runtime>(inference_api: InferenceApi) -> Self {
+    pub fn new<R: Runtime + Send + 'static>(runtime: R, inference_api: InferenceApi) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
-            let runtime = RustRuntime::new();
             SkillExecutorActor::new(runtime, recv, inference_api)
                 .run()
                 .await;
@@ -152,7 +149,8 @@ mod tests {
         let inference_api = inference.api();
 
         // When
-        let executor = SkillExecutor::new::<RustRuntime>(inference_api);
+        let runtime = RustRuntime::new();
+        let executor = SkillExecutor::new(runtime, inference_api);
         let skill = Skill::Greet {
             name: "".to_owned(),
         };

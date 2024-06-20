@@ -1,21 +1,24 @@
+use std::future::Future;
+
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
 pub trait Runtime {
-    fn new() -> Self;
-    async fn run_greet(
+    fn run_greet(
         &self,
         name: String,
         api_token: String,
         inference_api: &mut InferenceApi,
-    ) -> String;
+    ) -> impl Future<Output = String> + Send;
 }
 
 pub struct RustRuntime {}
 
-impl Runtime for RustRuntime {
-    fn new() -> Self {
+impl RustRuntime {
+    pub fn new() -> Self {
         Self {}
     }
+}
+impl Runtime for RustRuntime {
     async fn run_greet(
         &self,
         name: String,

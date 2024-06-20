@@ -79,7 +79,9 @@ mod tests {
 
         let inference = Inference::new();
         let inference_api = inference.api();
-        let http = http(SkillExecutor::new::<RustRuntime>(inference_api).api());
+
+        let runtime = RustRuntime::new();
+        let http = http(SkillExecutor::new(runtime, inference_api).api());
 
         let skill = Skill::Greet {
             name: "Homer".to_owned(),
@@ -108,7 +110,8 @@ mod tests {
         let inference = Inference::new();
         let inference_api = inference.api();
 
-        let http = http(SkillExecutor::new::<RustRuntime>(inference_api).api());
+        let runtime = RustRuntime::new();
+        let http = http(SkillExecutor::new(runtime, inference_api).api());
         let skill = Skill::Greet {
             name: "Homer".to_owned(),
         };
@@ -136,7 +139,8 @@ mod tests {
         let inference = Inference::new();
         let inference_api = inference.api();
 
-        let http = http(SkillExecutor::new::<RustRuntime>(inference_api).api());
+        let runtime = RustRuntime::new();
+        let http = http(SkillExecutor::new(runtime, inference_api).api());
         let resp = http
             .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await
