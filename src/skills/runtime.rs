@@ -1,12 +1,22 @@
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
-pub struct Runtime {}
+pub trait Runtime {
+    fn new() -> Self;
+    async fn run_greet(
+        &self,
+        name: String,
+        api_token: String,
+        inference_api: &mut InferenceApi,
+    ) -> String;
+}
 
-impl Runtime {
-    pub fn new() -> Self {
+pub struct RustRuntime {}
+
+impl Runtime for RustRuntime {
+    fn new() -> Self {
         Self {}
     }
-    pub async fn run_greet(
+    async fn run_greet(
         &self,
         name: String,
         api_token: String,
@@ -26,7 +36,6 @@ impl Runtime {
             model: "luminous-nextgen-7b".to_owned(),
             max_tokens: 10,
         };
-        let response = inference_api.complete_text(params, api_token).await;
-        response
+        inference_api.complete_text(params, api_token).await
     }
 }

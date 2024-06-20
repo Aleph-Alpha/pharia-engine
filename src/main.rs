@@ -4,9 +4,8 @@ mod shell;
 mod skills;
 use std::future::Future;
 
-use crate::skills::SkillExecutor;
-
 use crate::inference::Inference;
+use crate::skills::SkillExecutor;
 use config::AppConfig;
 use tokio::signal;
 

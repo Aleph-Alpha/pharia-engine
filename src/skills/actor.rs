@@ -1,10 +1,11 @@
 use crate::{inference::InferenceApi, skills::runtime::Runtime};
-
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
+
+use super::RustRuntime;
 
 pub struct SkillExecutor {
     send: mpsc::Sender<SkillExecutorMessage>,
@@ -57,7 +58,7 @@ impl SkillExecutorApi {
 }
 
 struct SkillExecutorActor {
-    runtime: Runtime,
+    runtime: RustRuntime,
     inference_api: InferenceApi,
     recv: mpsc::Receiver<SkillExecutorMessage>,
 }
@@ -65,7 +66,7 @@ struct SkillExecutorActor {
 impl SkillExecutorActor {
     fn new(recv: mpsc::Receiver<SkillExecutorMessage>, inference_api: InferenceApi) -> Self {
         SkillExecutorActor {
-            runtime: Runtime::new(),
+            runtime: RustRuntime::new(),
             inference_api,
             recv,
         }
