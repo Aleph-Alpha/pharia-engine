@@ -13,10 +13,12 @@ pub struct SkillExecutor {
 }
 
 impl SkillExecutor {
-    pub fn new(inference_api: InferenceApi) -> Self {
+    pub fn new<R: Runtime>(inference_api: InferenceApi) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
-            SkillExecutorActor::<RustRuntime>::new(recv, inference_api).run().await;
+            SkillExecutorActor::<RustRuntime>::new(recv, inference_api)
+                .run()
+                .await;
         });
         SkillExecutor { send, handle }
     }
@@ -99,7 +101,7 @@ struct SkillExecutorMessage {
 mod tests {
     use crate::{
         inference::{InferenceApi, InferenceMessage},
-        skills::{Skill, SkillExecutor},
+        skills::{RustRuntime, Skill, SkillExecutor},
     };
     use tokio::{sync::mpsc, task::JoinHandle};
 
@@ -145,7 +147,7 @@ mod tests {
         let inference_api = inference.api();
 
         // When
-        let executor = SkillExecutor::new(inference_api);
+        let executor = SkillExecutor::new::<RustRuntime>(inference_api);
         let skill = Skill::Greet {
             name: "".to_owned(),
         };

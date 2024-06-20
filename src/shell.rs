@@ -45,7 +45,7 @@ async fn execute_skill(
 
 #[cfg(test)]
 mod tests {
-    use crate::skills::SkillExecutor;
+    use crate::skills::{RustRuntime, SkillExecutor};
 
     use super::*;
 
@@ -79,7 +79,7 @@ mod tests {
 
         let inference = Inference::new();
         let inference_api = inference.api();
-        let http = http(SkillExecutor::new(inference_api).api());
+        let http = http(SkillExecutor::new::<RustRuntime>(inference_api).api());
 
         let skill = Skill::Greet {
             name: "Homer".to_owned(),
@@ -108,7 +108,7 @@ mod tests {
         let inference = Inference::new();
         let inference_api = inference.api();
 
-        let http = http(SkillExecutor::new(inference_api).api());
+        let http = http(SkillExecutor::new::<RustRuntime>(inference_api).api());
         let skill = Skill::Greet {
             name: "Homer".to_owned(),
         };
@@ -136,7 +136,7 @@ mod tests {
         let inference = Inference::new();
         let inference_api = inference.api();
 
-        let http = http(SkillExecutor::new(inference_api).api());
+        let http = http(SkillExecutor::new::<RustRuntime>(inference_api).api());
         let resp = http
             .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await
