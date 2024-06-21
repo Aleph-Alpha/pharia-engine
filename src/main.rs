@@ -73,7 +73,9 @@ mod tests {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
         };
 
-        let r = tokio::time::timeout(Duration::from_secs(1), super::run(config, ready(()))).await;
+        //wasm runtime needs some time to shutdown (at least on Daniel's maschine), so the time out
+        //has been increased to 2sec
+        let r = tokio::time::timeout(Duration::from_secs(2), super::run(config, ready(()))).await;
         assert_ok!(r)
     }
 }
