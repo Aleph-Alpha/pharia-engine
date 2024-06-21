@@ -1,4 +1,4 @@
-use crate::skills::runtime::Runtime;
+use crate::{inference::InferenceApi, skills::runtime::Runtime};
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot},
@@ -11,10 +11,12 @@ pub struct SkillExecutor {
 }
 
 impl SkillExecutor {
-    pub fn new<R: Runtime + Send + 'static>(runtime: R) -> Self {
+    pub fn new<R: Runtime + Send + 'static>(runtime: R, inference_api: InferenceApi) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
-            SkillExecutorActor::new(runtime, recv).run().await;
+            SkillExecutorActor::new(runtime, recv, inference_api)
+                .run()
+                .await;
         });
         SkillExecutor { send, handle }
     }
@@ -58,11 +60,20 @@ impl SkillExecutorApi {
 struct SkillExecutorActor<R: Runtime> {
     runtime: R,
     recv: mpsc::Receiver<SkillExecutorMessage>,
+    inference_api: InferenceApi,
 }
 
 impl<R: Runtime> SkillExecutorActor<R> {
-    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMessage>) -> Self {
-        SkillExecutorActor { runtime, recv }
+    fn new(
+        runtime: R,
+        recv: mpsc::Receiver<SkillExecutorMessage>,
+        inference_api: InferenceApi,
+    ) -> Self {
+        SkillExecutorActor {
+            runtime,
+            recv,
+            inference_api,
+        }
     }
     async fn run(&mut self) {
         while let Some(msg) = self.recv.recv().await {
@@ -72,7 +83,10 @@ impl<R: Runtime> SkillExecutorActor<R> {
     async fn act(&mut self, msg: SkillExecutorMessage) {
         let _ = match msg.skill {
             Skill::Greet { name } => {
-                let response = self.runtime.run_greet(name, msg.api_token).await;
+                let response = self
+                    .runtime
+                    .run_greet(name, msg.api_token, self.inference_api.clone())
+                    .await;
                 msg.send.send(response)
             }
         };
@@ -99,7 +113,7 @@ mod tests {
 
         // When
         let runtime = RustRuntime::new(inference.api());
-        let executor = SkillExecutor::new(runtime);
+        let executor = SkillExecutor::new(runtime, inference.api());
         let skill = Skill::Greet {
             name: "".to_owned(),
         };

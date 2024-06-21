@@ -18,8 +18,12 @@ pub trait Runtime {
     // `fn async f() -> i32` could be a shortcut for both `fn f() -> impl Future<Output=i32>` **or**
     // `fn f() -> impl Future<Output=i32> + Send`. It is also ambiguous over lifetime and `Sync`ness
     // of the future, but we do not need these traits here.
-    fn run_greet(&mut self, name: String, api_token: String)
-        -> impl Future<Output = String> + Send;
+    fn run_greet(
+        &mut self,
+        name: String,
+        api_token: String,
+        inference_api: InferenceApi,
+    ) -> impl Future<Output = String> + Send;
 }
 
 struct InvocationCtx {
@@ -96,8 +100,13 @@ impl WasmRuntime {
 }
 
 impl Runtime for WasmRuntime {
-    async fn run_greet(&mut self, name: String, api_token: String) -> String {
-        let invocation_ctx = InvocationCtx::new(self.inference_api.clone(), api_token);
+    async fn run_greet(
+        &mut self,
+        name: String,
+        api_token: String,
+        inference_api: InferenceApi,
+    ) -> String {
+        let invocation_ctx = InvocationCtx::new(inference_api, api_token);
         let mut store = Store::new(&self.engine, invocation_ctx);
         let instance = self
             .linker
@@ -124,7 +133,12 @@ impl RustRuntime {
     }
 }
 impl Runtime for RustRuntime {
-    async fn run_greet(&mut self, name: String, api_token: String) -> String {
+    async fn run_greet(
+        &mut self,
+        name: String,
+        api_token: String,
+        mut inference_api: InferenceApi,
+    ) -> String {
         let prompt = format!(
             "### Instruction:
                 Provide a nice greeting for the person utilizing its given name
@@ -139,14 +153,17 @@ impl Runtime for RustRuntime {
             model: "luminous-nextgen-7b".to_owned(),
             max_tokens: 10,
         };
-        self.inference_api.complete_text(params, api_token).await
+        inference_api.complete_text(params, api_token).await
     }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{inference::tests::InferenceStub, skills::runtime::Runtime};
+    use crate::{
+        inference::{self, tests::InferenceStub},
+        skills::runtime::Runtime,
+    };
 
     use super::WasmRuntime;
 
@@ -155,7 +172,7 @@ mod tests {
         let inference = InferenceStub::new("Hello".to_owned());
         let mut runtime = WasmRuntime::new(inference.api());
         let resp = runtime
-            .run_greet("name".to_owned(), "api_token".to_owned())
+            .run_greet("name".to_owned(), "api_token".to_owned(), inference.api())
             .await;
         assert_eq!("Hello", resp);
     }

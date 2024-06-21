@@ -21,7 +21,7 @@ async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + 
     let inference = Inference::new();
 
     let runtime = WasmRuntime::new(inference.api());
-    let skill_executor = SkillExecutor::new(runtime);
+    let skill_executor = SkillExecutor::new(runtime, inference.api());
     let skill_executor_api = skill_executor.api();
 
     if let Err(e) = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await {
