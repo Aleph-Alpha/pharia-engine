@@ -13,6 +13,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
 COPY . .
 RUN cargo auditable build --release
+RUN rustup target add wasm32-wasi
 RUN ./build-skill.sh
 
 # Move rust binary in optimized runtime container
