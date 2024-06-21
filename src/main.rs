@@ -19,10 +19,9 @@ async fn main() {
 
 async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + Send + 'static) {
     let inference = Inference::new();
-    let inference_api = inference.api();
 
     let runtime = RustRuntime::new(inference.api());
-    let skill_executor = SkillExecutor::new(runtime, inference_api);
+    let skill_executor = SkillExecutor::new(runtime);
     let skill_executor_api = skill_executor.api();
 
     if let Err(e) = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await {

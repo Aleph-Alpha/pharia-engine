@@ -78,10 +78,9 @@ mod tests {
         auth_value.set_sensitive(true);
 
         let inference = Inference::new();
-        let inference_api = inference.api();
 
         let runtime = RustRuntime::new(inference.api());
-        let http = http(SkillExecutor::new(runtime, inference_api).api());
+        let http = http(SkillExecutor::new(runtime).api());
 
         let skill = Skill::Greet {
             name: "Homer".to_owned(),
@@ -108,10 +107,9 @@ mod tests {
     #[tokio::test]
     async fn api_token_missing() {
         let inference = Inference::new();
-        let inference_api = inference.api();
 
         let runtime = RustRuntime::new(inference.api());
-        let http = http(SkillExecutor::new(runtime, inference_api).api());
+        let http = http(SkillExecutor::new(runtime).api());
         let skill = Skill::Greet {
             name: "Homer".to_owned(),
         };
@@ -137,10 +135,9 @@ mod tests {
     #[tokio::test]
     async fn hello_world() {
         let inference = Inference::new();
-        let inference_api = inference.api();
 
         let runtime = RustRuntime::new(inference.api());
-        let http = http(SkillExecutor::new(runtime, inference_api).api());
+        let http = http(SkillExecutor::new(runtime).api());
         let resp = http
             .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await

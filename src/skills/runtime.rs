@@ -25,14 +25,16 @@ pub trait Runtime {
 struct InvocationCtx {
     wasi_ctx: WasiP1Ctx,
     inference_api: InferenceApi,
+    api_token: String,
 }
 
 impl InvocationCtx {
-    fn new(inference_api: InferenceApi) -> Self {
+    fn new(inference_api: InferenceApi, api_token: String) -> Self {
         let mut builder = WasiCtxBuilder::new();
         InvocationCtx {
             wasi_ctx: builder.build_p1(),
             inference_api,
+            api_token,
         }
     }
 }
@@ -73,12 +75,11 @@ impl WasmRuntime {
                         model,
                         max_tokens: 10,
                     };
-                    let mut inference_api_cloned = store.data_mut().inference_api.clone();
-                    Box::new(async move {
-                        Ok((inference_api_cloned
-                            .complete_text(params, "dummy token".to_owned())
-                            .await,))
-                    })
+                    let mut inference_api = store.data_mut().inference_api.clone();
+                    let api_token = store.data().api_token.clone();
+                    Box::new(
+                        async move { Ok((inference_api.complete_text(params, api_token).await,)) },
+                    )
                 },
             )
             .unwrap();
@@ -95,8 +96,8 @@ impl WasmRuntime {
 }
 
 impl Runtime for WasmRuntime {
-    async fn run_greet(&mut self, name: String, _api_token: String) -> String {
-        let invocation_ctx = InvocationCtx::new(self.inference_api.clone());
+    async fn run_greet(&mut self, name: String, api_token: String) -> String {
+        let invocation_ctx = InvocationCtx::new(self.inference_api.clone(), api_token);
         let mut store = Store::new(&self.engine, invocation_ctx);
         let instance = self
             .linker

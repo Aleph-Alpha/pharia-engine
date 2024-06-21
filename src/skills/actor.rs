@@ -1,4 +1,4 @@
-use crate::{inference::InferenceApi, skills::runtime::Runtime};
+use crate::skills::runtime::Runtime;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot},
@@ -11,7 +11,7 @@ pub struct SkillExecutor {
 }
 
 impl SkillExecutor {
-    pub fn new<R: Runtime + Send + 'static>(runtime: R, inference_api: InferenceApi) -> Self {
+    pub fn new<R: Runtime + Send + 'static>(runtime: R) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv).run().await;
@@ -96,11 +96,10 @@ mod tests {
     async fn greeting_skill() {
         // Given
         let inference = InferenceStub::new("Hello".to_owned());
-        let inference_api = inference.api();
 
         // When
         let runtime = RustRuntime::new(inference.api());
-        let executor = SkillExecutor::new(runtime, inference_api);
+        let executor = SkillExecutor::new(runtime);
         let skill = Skill::Greet {
             name: "".to_owned(),
         };
