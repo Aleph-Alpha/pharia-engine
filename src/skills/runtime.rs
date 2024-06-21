@@ -4,7 +4,7 @@ use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store,
 };
-use wasmtime_wasi::{preview1::WasiP1Ctx, WasiCtxBuilder, WasiView};
+use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
@@ -27,7 +27,8 @@ pub trait Runtime {
 }
 
 struct InvocationCtx {
-    wasi_ctx: WasiP1Ctx,
+    wasi_ctx: WasiCtx,
+    resource_table: ResourceTable,
     inference_api: InferenceApi,
     api_token: String,
 }
@@ -36,7 +37,8 @@ impl InvocationCtx {
     fn new(inference_api: InferenceApi, api_token: String) -> Self {
         let mut builder = WasiCtxBuilder::new();
         InvocationCtx {
-            wasi_ctx: builder.build_p1(),
+            wasi_ctx: builder.build(),
+            resource_table: ResourceTable::new(),
             inference_api,
             api_token,
         }
@@ -44,12 +46,12 @@ impl InvocationCtx {
 }
 
 impl WasiView for InvocationCtx {
-    fn table(&mut self) -> &mut wasmtime_wasi::ResourceTable {
-        self.wasi_ctx.table()
+    fn table(&mut self) -> &mut ResourceTable {
+        &mut self.resource_table
     }
 
-    fn ctx(&mut self) -> &mut wasmtime_wasi::WasiCtx {
-        self.wasi_ctx.ctx()
+    fn ctx(&mut self) -> &mut WasiCtx {
+        &mut self.wasi_ctx
     }
 }
 
