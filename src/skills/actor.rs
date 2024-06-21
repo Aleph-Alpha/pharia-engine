@@ -83,10 +83,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
     async fn act(&mut self, msg: SkillExecutorMessage) {
         let _ = match msg.skill {
             Skill::Greet { name } => {
-                let response = self
-                    .runtime
-                    .run_greet(name, msg.api_token, &mut self.inference_api)
-                    .await;
+                let response = self.runtime.run_greet(name, msg.api_token).await;
                 msg.send.send(response)
             }
         };

@@ -18,12 +18,8 @@ pub trait Runtime {
     // `fn async f() -> i32` could be a shortcut for both `fn f() -> impl Future<Output=i32>` **or**
     // `fn f() -> impl Future<Output=i32> + Send`. It is also ambiguous over lifetime and `Sync`ness
     // of the future, but we do not need these traits here.
-    fn run_greet(
-        &mut self,
-        name: String,
-        api_token: String,
-        inference_api: &mut InferenceApi,
-    ) -> impl Future<Output = String> + Send;
+    fn run_greet(&mut self, name: String, api_token: String)
+        -> impl Future<Output = String> + Send;
 }
 
 #[allow(dead_code)]
@@ -64,12 +60,7 @@ impl WasmRuntime {
 }
 
 impl Runtime for WasmRuntime {
-    async fn run_greet(
-        &mut self,
-        name: String,
-        api_token: String,
-        inference_api: &mut InferenceApi,
-    ) -> String {
+    async fn run_greet(&mut self, name: String, api_token: String) -> String {
         let mut builder = WasiCtxBuilder::new();
         let ctx = builder.build_p1();
         let mut store = Store::new(&self.engine, ctx);
@@ -98,12 +89,7 @@ impl RustRuntime {
     }
 }
 impl Runtime for RustRuntime {
-    async fn run_greet(
-        &mut self,
-        name: String,
-        api_token: String,
-        inference_api: &mut InferenceApi,
-    ) -> String {
+    async fn run_greet(&mut self, name: String, api_token: String) -> String {
         let prompt = format!(
             "### Instruction:
                 Provide a nice greeting for the person utilizing its given name
@@ -118,7 +104,7 @@ impl Runtime for RustRuntime {
             model: "luminous-nextgen-7b".to_owned(),
             max_tokens: 10,
         };
-        inference_api.complete_text(params, api_token).await
+        self.inference_api.complete_text(params, api_token).await
     }
 }
 
@@ -135,11 +121,7 @@ mod tests {
         let mut inference_api = inference.api();
         let mut runtime = WasmRuntime::new(inference.api());
         let resp = runtime
-            .run_greet(
-                "name".to_owned(),
-                "api_token".to_owned(),
-                &mut inference_api,
-            )
+            .run_greet("name".to_owned(), "api_token".to_owned())
             .await;
         assert_eq!("Hello, Pharia", resp);
     }
