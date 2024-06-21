@@ -14,10 +14,10 @@ Pharia Kernel is a single process running in a docker container, running actors 
 
 ![Block Diagram Kernel Overview](./tam/kernel-block.drawio.svg)
 
-* **Shell**: Exposes interface for applications. Handles http requests.
-* **Skill Executer**: Invokes skill in green threads. Forwards their input and output to the shell. Exposes the **C**ognitive **System** **I**nterface (CSI) to the skills.
-* **Context Message Bus**: Exposes the combined API of all drivers via channel to the **Skill Executer** and handles messaging between drivers.
-* **Drivers**: Act as ports for the various external systems.
+- **Shell**: Exposes interface for applications. Handles http requests.
+- **Skill Executer**: Invokes skill in green threads. Forwards their input and output to the shell. Exposes the **C**ognitive **System** **I**nterface (CSI) to the skills.
+- **Context Message Bus**: Exposes the combined API of all drivers via channel to the **Skill Executer** and handles messaging between drivers.
+- **Drivers**: Act as ports for the various external systems.
 
 ## Deploying Pharia Kernel on Customer side
 
@@ -47,8 +47,7 @@ podman run -p 8081:8081 pharia-kernel
 
 ## Contributing
 
-In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>. 
-
+In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
 
 ### local test execution
 
@@ -62,5 +61,5 @@ cargo install wasm-tools
 
 ```shell
 cargo build -p greet-skill --target wasm32-wasi
-wasm-tools component new ./target/wasm32-wasi/debug/greet_skill.wasm -o ./skills/greet_skill.wasm --adapt ./wasi_snapshot_preview1.reactor-21.0.1.wasm
+wasm-tools component new ./target/wasm32-wasi/debug/greet_skill.wasm -o ./skills/greet_skill.wasm --adapt ./wasi_snapshot_preview1.reactor-22.0.0.wasm
 ```
