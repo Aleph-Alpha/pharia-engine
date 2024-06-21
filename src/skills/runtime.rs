@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use wasmtime::{component::Linker, Config, Engine, Store};
-use wasmtime_wasi::WasiView;
+use wasmtime_wasi::{preview1::WasiP1Ctx, WasiCtxBuilder};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
@@ -26,29 +26,20 @@ pub trait Runtime {
 #[allow(dead_code)]
 pub struct WasmRuntime {
     engine: Engine,
-    store: Store<WasmRuntimeState>,
-    linker: Linker<WasmRuntimeState>,
-}
-
-struct WasmRuntimeState;
-
-impl WasiView for WasmRuntimeState {
-    fn table(&mut self) -> &mut wasmtime_wasi::ResourceTable {
-        todo!()
-    }
-
-    fn ctx(&mut self) -> &mut wasmtime_wasi::WasiCtx {
-        todo!()
-    }
+    store: Store<WasiP1Ctx>,
+    linker: Linker<WasiP1Ctx>,
 }
 
 impl WasmRuntime {
     #[allow(dead_code)]
     pub fn new() -> Self {
         let engine = Engine::new(Config::new().async_support(true)).expect("config must be valid");
-        let store = Store::new(&engine, WasmRuntimeState);
-        let mut linker = Linker::<WasmRuntimeState>::new(&engine);
-        wasmtime_wasi::add_to_linker_async(&mut linker);
+        let mut builder = WasiCtxBuilder::new();
+        let ctx = builder.build_p1();
+        let store = Store::new(&engine, ctx);
+        let mut linker = Linker::new(&engine);
+        // provide host implementation of WASI interfaces required by the component with wit-bindgen
+        wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
         linker
             .instance("csi")
             .unwrap()
