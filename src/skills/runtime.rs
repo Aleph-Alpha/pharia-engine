@@ -37,13 +37,24 @@ impl WasmRuntime {
         let mut linker = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
+        let inference_api_cloned = inference_api.clone();
         linker
-            .instance("csi")
+            .instance("pharia:skill/csi")
             .unwrap()
             .func_wrap_async(
-                "complete_text",
-                |_store, (_model, _prompt): (String, String)| {
-                    Box::new(async move { Ok(("dummy response",)) })
+                "complete-text",
+                move |_store, (prompt, model): (String, String)| {
+                    let params = CompleteTextParameters {
+                        prompt,
+                        model,
+                        max_tokens: 10,
+                    };
+                    let mut inference_api_cloned = inference_api_cloned.clone();
+                    Box::new(async move {
+                        Ok((inference_api_cloned
+                            .complete_text(params, "dummy token".to_owned())
+                            .await,))
+                    })
                 },
             )
             .unwrap();
@@ -73,7 +84,7 @@ impl Runtime for WasmRuntime {
             .get_typed_func::<(&str,), (String,)>(&mut store, "run")
             .unwrap();
 
-        let (resp,) = run.call_async(&mut store, ("Pharia",)).await.unwrap();
+        let (resp,) = run.call_async(&mut store, (&name,)).await.unwrap();
         run.post_return_async(&mut store).await.unwrap();
         resp
     }
@@ -122,6 +133,6 @@ mod tests {
         let resp = runtime
             .run_greet("name".to_owned(), "api_token".to_owned())
             .await;
-        assert_eq!("Hello, Pharia", resp);
+        assert_eq!("Hello", resp);
     }
 }
