@@ -22,6 +22,19 @@ pub trait Runtime {
         -> impl Future<Output = String> + Send;
 }
 
+struct InvocationCtx {
+    wasi_ctx: WasiP1Ctx,
+}
+
+impl InvocationCtx {
+    fn new() -> Self {
+        let mut builder = WasiCtxBuilder::new();
+        InvocationCtx {
+            wasi_ctx: builder.build_p1(),
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub struct WasmRuntime {
     engine: Engine,
@@ -71,10 +84,9 @@ impl WasmRuntime {
 }
 
 impl Runtime for WasmRuntime {
-    async fn run_greet(&mut self, name: String, api_token: String) -> String {
-        let mut builder = WasiCtxBuilder::new();
-        let ctx = builder.build_p1();
-        let mut store = Store::new(&self.engine, ctx);
+    async fn run_greet(&mut self, name: String, _api_token: String) -> String {
+        let invocation_ctx = InvocationCtx::new();
+        let mut store = Store::new(&self.engine, invocation_ctx.wasi_ctx);
         let instance = self
             .linker
             .instantiate_async(&mut store, &self.component)
