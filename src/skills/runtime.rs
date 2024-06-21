@@ -1,6 +1,9 @@
 use std::future::Future;
 
-use wasmtime::{component::Linker, Config, Engine, Store};
+use wasmtime::{
+    component::{Component, Linker},
+    Config, Engine, Store,
+};
 use wasmtime_wasi::{preview1::WasiP1Ctx, WasiCtxBuilder};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
@@ -16,7 +19,7 @@ pub trait Runtime {
     // `fn f() -> impl Future<Output=i32> + Send`. It is also ambiguous over lifetime and `Sync`ness
     // of the future, but we do not need these traits here.
     fn run_greet(
-        &self,
+        &mut self,
         name: String,
         api_token: String,
         inference_api: &mut InferenceApi,
@@ -26,17 +29,14 @@ pub trait Runtime {
 #[allow(dead_code)]
 pub struct WasmRuntime {
     engine: Engine,
-    store: Store<WasiP1Ctx>,
     linker: Linker<WasiP1Ctx>,
+    component: Component,
 }
 
 impl WasmRuntime {
     #[allow(dead_code)]
     pub fn new() -> Self {
         let engine = Engine::new(Config::new().async_support(true)).expect("config must be valid");
-        let mut builder = WasiCtxBuilder::new();
-        let ctx = builder.build_p1();
-        let store = Store::new(&engine, ctx);
         let mut linker = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
@@ -50,12 +50,39 @@ impl WasmRuntime {
                 },
             )
             .unwrap();
+        let component = Component::from_file(&engine, "./skills/greet_skill.wasm")
+            .expect("Loading greet-skill component failed. Please run 'build-skill.sh' first.");
 
         Self {
             engine,
-            store,
             linker,
+            component,
         }
+    }
+}
+
+impl Runtime for WasmRuntime {
+    async fn run_greet(
+        &mut self,
+        name: String,
+        api_token: String,
+        inference_api: &mut InferenceApi,
+    ) -> String {
+        let mut builder = WasiCtxBuilder::new();
+        let ctx = builder.build_p1();
+        let mut store = Store::new(&self.engine, ctx);
+        let instance = self
+            .linker
+            .instantiate_async(&mut store, &self.component)
+            .await
+            .unwrap();
+        let run = instance
+            .get_typed_func::<(&str,), (String,)>(&mut store, "run")
+            .unwrap();
+
+        let (resp,) = run.call_async(&mut store, ("Pharia",)).await.unwrap();
+        run.post_return_async(&mut store).await.unwrap();
+        resp
     }
 }
 
@@ -68,7 +95,7 @@ impl RustRuntime {
 }
 impl Runtime for RustRuntime {
     async fn run_greet(
-        &self,
+        &mut self,
         name: String,
         api_token: String,
         inference_api: &mut InferenceApi,
@@ -93,29 +120,24 @@ impl Runtime for RustRuntime {
 
 #[cfg(test)]
 mod tests {
-    use wasmtime::component::Component;
+    use tokio::sync::mpsc;
+
+    use crate::{inference::InferenceApi, skills::runtime::Runtime};
 
     use super::WasmRuntime;
 
     #[tokio::test]
     async fn greet_skill_component() {
         let mut runtime = WasmRuntime::new();
-        let component = Component::from_file(&runtime.engine, "./skills/greet_skill.wasm")
-            .expect("Loading greet-skill component failed. Please run 'build-skill.sh' first.");
-        let instance = runtime
-            .linker
-            .instantiate_async(&mut runtime.store, &component)
-            .await
-            .unwrap();
-        let run = instance
-            .get_typed_func::<(&str,), (String,)>(&mut runtime.store, "run")
-            .unwrap();
-
-        let (resp,) = run
-            .call_async(&mut runtime.store, ("Pharia",))
-            .await
-            .unwrap();
-        run.post_return_async(&mut runtime.store).await.unwrap();
+        let (send, _) = mpsc::channel(1);
+        let mut inference_api = InferenceApi::new(send);
+        let resp = runtime
+            .run_greet(
+                "name".to_owned(),
+                "api_token".to_owned(),
+                &mut inference_api,
+            )
+            .await;
         assert_eq!("Hello, Pharia", resp);
     }
 }
