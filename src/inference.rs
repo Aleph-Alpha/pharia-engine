@@ -112,3 +112,41 @@ impl InferenceMessage {
         };
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use tokio::{sync::mpsc, task::JoinHandle};
+
+    use super::{InferenceApi, InferenceMessage};
+
+    /// Always return the same completion
+    pub struct InferenceStub {
+        send: mpsc::Sender<InferenceMessage>,
+        join_handle: JoinHandle<()>,
+    }
+
+    impl InferenceStub {
+        pub fn new(completion: String) -> Self {
+            let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
+
+            let join_handle = tokio::spawn(async move {
+                match recv.recv().await.unwrap() {
+                    InferenceMessage::CompleteText { send, .. } => {
+                        send.send(completion).unwrap();
+                    }
+                }
+            });
+
+            Self { send, join_handle }
+        }
+
+        pub async fn shutdown(self) {
+            drop(self.send);
+            self.join_handle.await.unwrap()
+        }
+
+        pub fn api(&self) -> InferenceApi {
+            InferenceApi::new(self.send.clone())
+        }
+    }
+}

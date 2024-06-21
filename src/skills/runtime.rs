@@ -120,17 +120,16 @@ impl Runtime for RustRuntime {
 
 #[cfg(test)]
 mod tests {
-    use tokio::sync::mpsc;
 
-    use crate::{inference::InferenceApi, skills::runtime::Runtime};
+    use crate::{inference::tests::InferenceStub, skills::runtime::Runtime};
 
     use super::WasmRuntime;
 
     #[tokio::test]
     async fn greet_skill_component() {
         let mut runtime = WasmRuntime::new();
-        let (send, _) = mpsc::channel(1);
-        let mut inference_api = InferenceApi::new(send);
+        let inference = InferenceStub::new("Hello".to_owned());
+        let mut inference_api = inference.api();
         let resp = runtime
             .run_greet(
                 "name".to_owned(),

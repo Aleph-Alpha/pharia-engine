@@ -102,40 +102,9 @@ struct SkillExecutorMessage {
 #[cfg(test)]
 mod tests {
     use crate::{
-        inference::{InferenceApi, InferenceMessage},
+        inference::tests::InferenceStub,
         skills::{RustRuntime, Skill, SkillExecutor},
     };
-    use tokio::{sync::mpsc, task::JoinHandle};
-
-    struct InferenceStub {
-        send: mpsc::Sender<InferenceMessage>,
-        join_handle: JoinHandle<()>,
-    }
-
-    impl InferenceStub {
-        fn new(completion: String) -> Self {
-            let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
-
-            let join_handle = tokio::spawn(async move {
-                match recv.recv().await.unwrap() {
-                    InferenceMessage::CompleteText { send, .. } => {
-                        send.send(completion).unwrap();
-                    }
-                }
-            });
-
-            Self { send, join_handle }
-        }
-
-        async fn shutdown(self) {
-            drop(self.send);
-            self.join_handle.await.unwrap()
-        }
-
-        fn api(&self) -> InferenceApi {
-            InferenceApi::new(self.send.clone())
-        }
-    }
 
     #[tokio::test]
     async fn greeting_skill() {
