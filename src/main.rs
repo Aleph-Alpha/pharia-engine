@@ -7,7 +7,7 @@ use std::future::Future;
 use crate::inference::Inference;
 use crate::skills::SkillExecutor;
 use config::AppConfig;
-use skills::RustRuntime;
+use skills::WasmRuntime;
 use tokio::signal;
 
 #[tokio::main]
@@ -20,7 +20,7 @@ async fn main() {
 async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + Send + 'static) {
     let inference = Inference::new();
 
-    let runtime = RustRuntime::new(inference.api());
+    let runtime = WasmRuntime::new(inference.api());
     let skill_executor = SkillExecutor::new(runtime);
     let skill_executor_api = skill_executor.api();
 

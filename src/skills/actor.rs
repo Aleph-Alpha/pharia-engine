@@ -89,7 +89,7 @@ struct SkillExecutorMessage {
 mod tests {
     use crate::{
         inference::tests::InferenceStub,
-        skills::{RustRuntime, Skill, SkillExecutor},
+        skills::{tests::RustRuntime, Skill, SkillExecutor},
     };
 
     #[tokio::test]
