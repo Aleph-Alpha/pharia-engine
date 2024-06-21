@@ -4,7 +4,7 @@ use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store,
 };
-use wasmtime_wasi::{preview1::WasiP1Ctx, WasiCtxBuilder};
+use wasmtime_wasi::{preview1::WasiP1Ctx, WasiCtxBuilder, WasiView};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
@@ -24,21 +24,33 @@ pub trait Runtime {
 
 struct InvocationCtx {
     wasi_ctx: WasiP1Ctx,
+    inference_api: InferenceApi,
 }
 
 impl InvocationCtx {
-    fn new() -> Self {
+    fn new(inference_api: InferenceApi) -> Self {
         let mut builder = WasiCtxBuilder::new();
         InvocationCtx {
             wasi_ctx: builder.build_p1(),
+            inference_api,
         }
+    }
+}
+
+impl WasiView for InvocationCtx {
+    fn table(&mut self) -> &mut wasmtime_wasi::ResourceTable {
+        self.wasi_ctx.table()
+    }
+
+    fn ctx(&mut self) -> &mut wasmtime_wasi::WasiCtx {
+        self.wasi_ctx.ctx()
     }
 }
 
 #[allow(dead_code)]
 pub struct WasmRuntime {
     engine: Engine,
-    linker: Linker<WasiP1Ctx>,
+    linker: Linker<InvocationCtx>,
     component: Component,
     inference_api: InferenceApi,
 }
@@ -47,22 +59,21 @@ impl WasmRuntime {
     #[allow(dead_code)]
     pub fn new(inference_api: InferenceApi) -> Self {
         let engine = Engine::new(Config::new().async_support(true)).expect("config must be valid");
-        let mut linker = Linker::new(&engine);
+        let mut linker: Linker<InvocationCtx> = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
-        let inference_api_cloned = inference_api.clone();
         linker
             .instance("pharia:skill/csi")
             .unwrap()
             .func_wrap_async(
                 "complete-text",
-                move |_store, (prompt, model): (String, String)| {
+                move |mut store, (prompt, model): (String, String)| {
                     let params = CompleteTextParameters {
                         prompt,
                         model,
                         max_tokens: 10,
                     };
-                    let mut inference_api_cloned = inference_api_cloned.clone();
+                    let mut inference_api_cloned = store.data_mut().inference_api.clone();
                     Box::new(async move {
                         Ok((inference_api_cloned
                             .complete_text(params, "dummy token".to_owned())
@@ -85,8 +96,8 @@ impl WasmRuntime {
 
 impl Runtime for WasmRuntime {
     async fn run_greet(&mut self, name: String, _api_token: String) -> String {
-        let invocation_ctx = InvocationCtx::new();
-        let mut store = Store::new(&self.engine, invocation_ctx.wasi_ctx);
+        let invocation_ctx = InvocationCtx::new(self.inference_api.clone());
+        let mut store = Store::new(&self.engine, invocation_ctx);
         let instance = self
             .linker
             .instantiate_async(&mut store, &self.component)
