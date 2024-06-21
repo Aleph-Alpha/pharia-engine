@@ -8,24 +8,29 @@ The entire Stack including Kernel, Inference, Document Index, etc is called **Ph
 
 ![Block Diagram Pharia OS](./tam/pharia-os-running.drawio.svg)
 
-## Design Pharia Kernel
+## Contributing
 
-Pharia Kernel is a single process running in a docker container, running actors in a tokio runtime.
+In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>. 
 
-![Block Diagram Kernel Overview](./tam/kernel-block.drawio.svg)
 
-- **Shell**: Exposes interface for applications. Handles http requests.
-- **Skill Executer**: Invokes skill in green threads. Forwards their input and output to the shell. Exposes the **C**ognitive **System** **I**nterface (CSI) to the skills.
-- **Context Message Bus**: Exposes the combined API of all drivers via channel to the **Skill Executer** and handles messaging between drivers.
-- **Drivers**: Act as ports for the various external systems.
+### Local Development setup
 
-## Deploying Pharia Kernel on Customer side
+There are some prerequisites you need to install once
 
-**Pharia Kernel** is intended to be installed **on premise** by the customer it. It is deployed, as are all other modules of the **Pharia OS**, to the JFrog Artifactory. Our colleagues at the Pharia OS Team are going to develop tooling for deploying tooling for rolling it out. Until they come up with a name it is here called "Pharia Up".
+```shell
+# We need the Was target to be able to compile the skills
+rustup target add wasm32-wasi
+# The wasm-tools are also required for our skill build tooling
+cargo install wasm-tools
+```
 
-![Block Diagram Pharia OS deploy](./tam/pharia-os-deployment.drawio.svg)
+Every time we change the example skill we need to rebuild them.
 
-## Getting Started
+```shell
+./build-skill.sh
+```
+
+## Building and running the kernel container using Podman
 
 You can build the image with
 
@@ -45,21 +50,19 @@ Then, run the image with
 podman run -p 8081:8081 pharia-kernel
 ```
 
-## Contributing
+## Design Pharia Kernel
 
-In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
+Pharia Kernel is a single process running in a docker container, running actors in a tokio runtime.
 
-### local test execution
+![Block Diagram Kernel Overview](./tam/kernel-block.drawio.svg)
 
-#### prerequisites
+* **Shell**: Exposes interface for applications. Handles http requests.
+* **Skill Executer**: Invokes skill in green threads. Forwards their input and output to the shell. Exposes the **C**ognitive **System** **I**nterface (CSI) to the skills.
+* **Context Message Bus**: Exposes the combined API of all drivers via channel to the **Skill Executer** and handles messaging between drivers.
+* **Drivers**: Act as ports for the various external systems.
 
-Install wasm-tools used to build the example skills:
+## Deploying Pharia Kernel on Customer side
 
-```shell
-cargo install wasm-tools
-```
+**Pharia Kernel** is intended to be installed **on premise** by the customer it. It is deployed, as are all other modules of the **Pharia OS**, to the JFrog Artifactory. Our colleagues at the Pharia OS Team are going to develop tooling for deploying tooling for rolling it out. Until they come up with a name it is here called "Pharia Up".
 
-```shell
-cargo build -p greet-skill --target wasm32-wasi
-wasm-tools component new ./target/wasm32-wasi/debug/greet_skill.wasm -o ./skills/greet_skill.wasm --adapt ./wasi_snapshot_preview1.reactor-22.0.0.wasm
-```
+![Block Diagram Pharia OS deploy](./tam/pharia-os-deployment.drawio.svg)
