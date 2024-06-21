@@ -45,10 +45,7 @@ async fn execute_skill(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        inference::InferenceApi,
-        skills::{SkillExecutor, WasmRuntime},
-    };
+    use crate::skills::{SkillExecutor, WasmRuntime};
 
     use super::*;
 
@@ -82,7 +79,7 @@ mod tests {
 
         let inference = Inference::new();
 
-        let runtime = WasmRuntime::new(inference.api());
+        let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
 
         let skill = Skill::Greet {
@@ -111,7 +108,7 @@ mod tests {
     async fn api_token_missing() {
         let inference = Inference::new();
 
-        let runtime = WasmRuntime::new(inference.api());
+        let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
         let skill = Skill::Greet {
             name: "Homer".to_owned(),
@@ -139,7 +136,7 @@ mod tests {
     async fn hello_world() {
         let inference = Inference::new();
 
-        let runtime = WasmRuntime::new(inference.api());
+        let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
         let resp = http
             .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())

@@ -53,17 +53,14 @@ impl WasiView for InvocationCtx {
     }
 }
 
-#[allow(dead_code)]
 pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<InvocationCtx>,
     component: Component,
-    inference_api: InferenceApi,
 }
 
 impl WasmRuntime {
-    #[allow(dead_code)]
-    pub fn new(inference_api: InferenceApi) -> Self {
+    pub fn new() -> Self {
         let engine = Engine::new(Config::new().async_support(true)).expect("config must be valid");
         let mut linker: Linker<InvocationCtx> = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
@@ -81,9 +78,10 @@ impl WasmRuntime {
                     };
                     let mut inference_api = store.data_mut().inference_api.clone();
                     let api_token = store.data().api_token.clone();
-                    Box::new(
-                        async move { Ok((inference_api.complete_text(params, api_token).await,)) },
-                    )
+                    Box::new(async move {
+                        let completion = inference_api.complete_text(params, api_token).await;
+                        Ok((completion,))
+                    })
                 },
             )
             .unwrap();
@@ -94,7 +92,6 @@ impl WasmRuntime {
             engine,
             linker,
             component,
-            inference_api,
         }
     }
 }
@@ -123,54 +120,52 @@ impl Runtime for WasmRuntime {
     }
 }
 
-pub struct RustRuntime {
-    inference_api: InferenceApi,
-}
+#[cfg(test)]
+pub mod tests {
 
-impl RustRuntime {
-    pub fn new(inference_api: InferenceApi) -> Self {
-        Self { inference_api }
+    use crate::{
+        inference::{tests::InferenceStub, CompleteTextParameters, InferenceApi},
+        skills::runtime::Runtime,
+    };
+
+    use super::WasmRuntime;
+
+    pub struct RustRuntime {}
+
+    impl RustRuntime {
+        pub fn new() -> Self {
+            Self {}
+        }
     }
-}
-impl Runtime for RustRuntime {
-    async fn run_greet(
-        &mut self,
-        name: String,
-        api_token: String,
-        mut inference_api: InferenceApi,
-    ) -> String {
-        let prompt = format!(
-            "### Instruction:
+    impl Runtime for RustRuntime {
+        async fn run_greet(
+            &mut self,
+            name: String,
+            api_token: String,
+            mut inference_api: InferenceApi,
+        ) -> String {
+            let prompt = format!(
+                "### Instruction:
                 Provide a nice greeting for the person utilizing its given name
 
                 ### Input:
                 Name: {name}
 
                 ### Response:"
-        );
-        let params = CompleteTextParameters {
-            prompt,
-            model: "luminous-nextgen-7b".to_owned(),
-            max_tokens: 10,
-        };
-        inference_api.complete_text(params, api_token).await
+            );
+            let params = CompleteTextParameters {
+                prompt,
+                model: "luminous-nextgen-7b".to_owned(),
+                max_tokens: 10,
+            };
+            inference_api.complete_text(params, api_token).await
+        }
     }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use crate::{
-        inference::{self, tests::InferenceStub},
-        skills::runtime::Runtime,
-    };
-
-    use super::WasmRuntime;
 
     #[tokio::test]
     async fn greet_skill_component() {
         let inference = InferenceStub::new("Hello".to_owned());
-        let mut runtime = WasmRuntime::new(inference.api());
+        let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run_greet("name".to_owned(), "api_token".to_owned(), inference.api())
             .await;

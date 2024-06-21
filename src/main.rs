@@ -20,7 +20,7 @@ async fn main() {
 async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + Send + 'static) {
     let inference = Inference::new();
 
-    let runtime = WasmRuntime::new(inference.api());
+    let runtime = WasmRuntime::new();
     let skill_executor = SkillExecutor::new(runtime, inference.api());
     let skill_executor_api = skill_executor.api();
 
