@@ -14,9 +14,7 @@ impl SkillExecutor {
     pub fn new<R: Runtime + Send + 'static>(runtime: R, inference_api: InferenceApi) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
-            SkillExecutorActor::new(runtime, recv, inference_api)
-                .run()
-                .await;
+            SkillExecutorActor::new(runtime, recv).run().await;
         });
         SkillExecutor { send, handle }
     }
@@ -59,21 +57,12 @@ impl SkillExecutorApi {
 
 struct SkillExecutorActor<R: Runtime> {
     runtime: R,
-    inference_api: InferenceApi,
     recv: mpsc::Receiver<SkillExecutorMessage>,
 }
 
 impl<R: Runtime> SkillExecutorActor<R> {
-    fn new(
-        runtime: R,
-        recv: mpsc::Receiver<SkillExecutorMessage>,
-        inference_api: InferenceApi,
-    ) -> Self {
-        SkillExecutorActor {
-            runtime,
-            inference_api,
-            recv,
-        }
+    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMessage>) -> Self {
+        SkillExecutorActor { runtime, recv }
     }
     async fn run(&mut self) {
         while let Some(msg) = self.recv.recv().await {

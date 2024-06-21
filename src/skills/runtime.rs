@@ -118,7 +118,6 @@ mod tests {
     #[tokio::test]
     async fn greet_skill_component() {
         let inference = InferenceStub::new("Hello".to_owned());
-        let mut inference_api = inference.api();
         let mut runtime = WasmRuntime::new(inference.api());
         let resp = runtime
             .run_greet("name".to_owned(), "api_token".to_owned())
