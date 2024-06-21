@@ -46,6 +46,7 @@ image_build:
     - if: $CI_COMMIT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
+    - rustup target add wasm32-wasi
     - podman login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - echo -e "\e[0Ksection_start:`date +%s`:my_section[collapsed=true]\r\e[0KBuild image"
