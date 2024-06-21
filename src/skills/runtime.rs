@@ -31,11 +31,12 @@ pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<WasiP1Ctx>,
     component: Component,
+    inference_api: InferenceApi,
 }
 
 impl WasmRuntime {
     #[allow(dead_code)]
-    pub fn new() -> Self {
+    pub fn new(inference_api: InferenceApi) -> Self {
         let engine = Engine::new(Config::new().async_support(true)).expect("config must be valid");
         let mut linker = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
@@ -57,6 +58,7 @@ impl WasmRuntime {
             engine,
             linker,
             component,
+            inference_api,
         }
     }
 }
@@ -86,11 +88,13 @@ impl Runtime for WasmRuntime {
     }
 }
 
-pub struct RustRuntime {}
+pub struct RustRuntime {
+    inference_api: InferenceApi,
+}
 
 impl RustRuntime {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(inference_api: InferenceApi) -> Self {
+        Self { inference_api }
     }
 }
 impl Runtime for RustRuntime {
@@ -127,9 +131,9 @@ mod tests {
 
     #[tokio::test]
     async fn greet_skill_component() {
-        let mut runtime = WasmRuntime::new();
         let inference = InferenceStub::new("Hello".to_owned());
         let mut inference_api = inference.api();
+        let mut runtime = WasmRuntime::new(inference.api());
         let resp = runtime
             .run_greet(
                 "name".to_owned(),

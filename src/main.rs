@@ -21,7 +21,7 @@ async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + 
     let inference = Inference::new();
     let inference_api = inference.api();
 
-    let runtime = RustRuntime::new();
+    let runtime = RustRuntime::new(inference.api());
     let skill_executor = SkillExecutor::new(runtime, inference_api);
     let skill_executor_api = skill_executor.api();
 

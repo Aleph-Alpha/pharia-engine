@@ -80,7 +80,7 @@ mod tests {
         let inference = Inference::new();
         let inference_api = inference.api();
 
-        let runtime = RustRuntime::new();
+        let runtime = RustRuntime::new(inference.api());
         let http = http(SkillExecutor::new(runtime, inference_api).api());
 
         let skill = Skill::Greet {
@@ -110,7 +110,7 @@ mod tests {
         let inference = Inference::new();
         let inference_api = inference.api();
 
-        let runtime = RustRuntime::new();
+        let runtime = RustRuntime::new(inference.api());
         let http = http(SkillExecutor::new(runtime, inference_api).api());
         let skill = Skill::Greet {
             name: "Homer".to_owned(),
@@ -139,7 +139,7 @@ mod tests {
         let inference = Inference::new();
         let inference_api = inference.api();
 
-        let runtime = RustRuntime::new();
+        let runtime = RustRuntime::new(inference.api());
         let http = http(SkillExecutor::new(runtime, inference_api).api());
         let resp = http
             .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())

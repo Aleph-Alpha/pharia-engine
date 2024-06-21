@@ -113,7 +113,7 @@ mod tests {
         let inference_api = inference.api();
 
         // When
-        let runtime = RustRuntime::new();
+        let runtime = RustRuntime::new(inference.api());
         let executor = SkillExecutor::new(runtime, inference_api);
         let skill = Skill::Greet {
             name: "".to_owned(),
