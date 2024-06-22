@@ -1,12 +1,14 @@
 use std::future::Future;
 
 use wasmtime::{
-    component::{Component, Linker},
+    component::{bindgen, Component, Linker},
     Config, Engine, Store,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
+
+bindgen!({ world: "skill", async: true });
 
 pub trait Runtime {
     // We are returning a Future explicitly here instead of using the `async` syntax. This has the
@@ -45,6 +47,20 @@ impl InvocationCtx {
     }
 }
 
+#[async_trait::async_trait]
+impl pharia::skill::csi::Host for InvocationCtx {
+    #[must_use]
+    async fn complete_text(&mut self, prompt: String, model: String) -> String {
+        let params = CompleteTextParameters {
+            prompt,
+            model,
+            max_tokens: 10,
+        };
+        let api_token = self.api_token.clone();
+        self.inference_api.complete_text(params, api_token).await
+    }
+}
+
 impl WasiView for InvocationCtx {
     fn table(&mut self) -> &mut ResourceTable {
         &mut self.resource_table
@@ -63,30 +79,15 @@ pub struct WasmRuntime {
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        let engine = Engine::new(Config::new().async_support(true)).expect("config must be valid");
+        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
+            .expect("config must be valid");
         let mut linker: Linker<InvocationCtx> = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
-        linker
-            .instance("pharia:skill/csi")
-            .unwrap()
-            .func_wrap_async(
-                "complete-text",
-                move |mut store, (prompt, model): (String, String)| {
-                    let params = CompleteTextParameters {
-                        prompt,
-                        model,
-                        max_tokens: 10,
-                    };
-                    let mut inference_api = store.data_mut().inference_api.clone();
-                    let api_token = store.data().api_token.clone();
-                    Box::new(async move {
-                        let completion = inference_api.complete_text(params, api_token).await;
-                        Ok((completion,))
-                    })
-                },
-            )
-            .unwrap();
+        // Skill world from bindgen
+        Skill::add_to_linker(&mut linker, |state: &mut InvocationCtx| state)
+            .expect("linking to skill world must work");
+
         let component = Component::from_file(&engine, "./skills/greet_skill.wasm")
             .expect("Loading greet-skill component failed. Please run 'build-skill.sh' first.");
 
@@ -107,18 +108,13 @@ impl Runtime for WasmRuntime {
     ) -> String {
         let invocation_ctx = InvocationCtx::new(inference_api, api_token);
         let mut store = Store::new(&self.engine, invocation_ctx);
-        let instance = self
-            .linker
-            .instantiate_async(&mut store, &self.component)
+        let (bindings, _) = Skill::instantiate_async(&mut store, &self.component, &self.linker)
             .await
-            .unwrap();
-        let run = instance
-            .get_typed_func::<(&str,), (String,)>(&mut store, "run")
-            .unwrap();
-
-        let (resp,) = run.call_async(&mut store, (&name,)).await.unwrap();
-        run.post_return_async(&mut store).await.unwrap();
-        resp
+            .expect("failed to instantiate skill");
+        bindings
+            .call_run(&mut store, &name)
+            .await
+            .expect("failed to run skill")
     }
 }
 

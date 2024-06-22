@@ -1,6 +1,6 @@
 use pharia::skill::csi::complete_text;
 
-wit_bindgen::generate!({world: "skill"});
+wit_bindgen::generate!({ path: "../wit", world: "skill" });
 
 struct Skill {}
 
