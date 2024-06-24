@@ -39,8 +39,11 @@ async fn execute_skill(
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(skill): Json<Skill>,
 ) -> (StatusCode, String) {
+    let (skill_name, input) = match skill {
+        Skill::Greet { name } => ("greet".to_owned(), name),
+    };
     let result = skill_executor_api
-        .execute_skill(skill, bearer.token().to_owned())
+        .execute_skill(skill_name, input, bearer.token().to_owned())
         .await;
     match result {
         Ok(response) => (StatusCode::OK, response),

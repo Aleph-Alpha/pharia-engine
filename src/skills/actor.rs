@@ -45,14 +45,16 @@ pub enum Skill {
 impl SkillExecutorApi {
     pub async fn execute_skill(
         &mut self,
-        skill: Skill,
+        skill: String,
+        input: String,
         api_token: String,
     ) -> Result<String, Error> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage {
+            skill,
+            input,
             send,
             api_token,
-            skill,
         };
         self.send
             .send(msg)
@@ -86,20 +88,22 @@ impl<R: Runtime> SkillExecutorActor<R> {
         }
     }
     async fn act(&mut self, msg: SkillExecutorMessage) {
-        let _ = match msg.skill {
-            Skill::Greet { name } => {
-                let response = self
-                    .runtime
-                    .run("greet", name, msg.api_token, self.inference_api.clone())
-                    .await;
-                msg.send.send(response)
-            }
-        };
+        let response = self
+            .runtime
+            .run(
+                &msg.skill,
+                msg.input,
+                msg.api_token,
+                self.inference_api.clone(),
+            )
+            .await;
+        let _ = msg.send.send(response);
     }
 }
 
 struct SkillExecutorMessage {
-    skill: Skill,
+    skill: String,
+    input: String,
     send: oneshot::Sender<Result<String, Error>>,
     api_token: String,
 }
@@ -110,7 +114,7 @@ mod tests {
         inference::tests::InferenceStub,
         skills::{
             tests::{RustRuntime, SaboteurRuntime},
-            Skill, SkillExecutor,
+            SkillExecutor,
         },
     };
 
@@ -120,13 +124,14 @@ mod tests {
         let inference = InferenceStub::new("Hello".to_owned());
         let runtime = SaboteurRuntime::new(error_msg.clone());
         let executor = SkillExecutor::new(runtime, inference.api());
-        let skill = Skill::Greet {
-            name: "".to_owned(),
-        };
 
         let result = executor
             .api()
-            .execute_skill(skill, "TOKEN_NOT_REQUIRED".to_owned())
+            .execute_skill(
+                "greet".to_owned(),
+                "".to_owned(),
+                "TOKEN_NOT_REQUIRED".to_owned(),
+            )
             .await;
 
         assert_eq!(result.unwrap_err().to_string(), error_msg);
@@ -140,12 +145,13 @@ mod tests {
         // When
         let runtime = RustRuntime::new();
         let executor = SkillExecutor::new(runtime, inference.api());
-        let skill = Skill::Greet {
-            name: "".to_owned(),
-        };
         let result = executor
             .api()
-            .execute_skill(skill, "TOKEN_NOT_REQUIRED".to_owned())
+            .execute_skill(
+                "greet".to_owned(),
+                "".to_owned(),
+                "TOKEN_NOT_REQUIRED".to_owned(),
+            )
             .await;
         executor.shutdown().await;
         inference.shutdown().await;
