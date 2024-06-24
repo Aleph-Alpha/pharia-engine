@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     fs,
     future::Future,
-    io,
     path::{Path, PathBuf},
 };
 
@@ -131,16 +130,17 @@ impl WasmRuntime {
         Ok(components)
     }
 
-    fn list_component_files(skill_dir: &str) -> impl Iterator<Item = PathBuf> {
-        let entries = fs::read_dir(skill_dir).expect("./skill folder must exist");
-
-        entries.filter_map(|e| {
-            let p = e.unwrap().path();
-            if p.is_file() && p.extension().map_or(false, |ext| ext == "wasm") {
-                Some(p)
-            } else {
-                None
-            }
+    fn list_component_files(skill_dir: &Path) -> impl Iterator<Item = PathBuf> {
+        let entries = fs::read_dir(skill_dir);
+        entries.into_iter().flat_map(|d| {
+            d.filter_map(|e| {
+                let p = e.unwrap().path();
+                if p.is_file() && p.extension().map_or(false, |ext| ext == "wasm") {
+                    Some(p)
+                } else {
+                    None
+                }
+            })
         })
     }
 }
@@ -174,7 +174,10 @@ impl Runtime for WasmRuntime {
 #[cfg(test)]
 pub mod tests {
 
+    use std::{collections::HashSet, fs::File, path::PathBuf, str::FromStr};
+
     use anyhow::{anyhow, Error};
+    use tempfile::tempdir;
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters, InferenceApi},
@@ -212,6 +215,7 @@ pub mod tests {
             Self {}
         }
     }
+
     impl Runtime for RustRuntime {
         async fn run(
             &mut self,
@@ -241,6 +245,40 @@ pub mod tests {
         }
     }
 
+    #[test]
+    fn skill_dir_does_not_exist() {
+        // given a directory that does not exist
+        let dir = PathBuf::from_str("non-existing-dir").unwrap();
+
+        // when listing all the skills
+        let mut it = WasmRuntime::list_component_files(dir.as_path());
+
+        // then
+        assert!(it.next().is_none())
+    }
+
+    #[test]
+    fn load_skills() {
+        // given a directory with 2 skills and 1 readme
+        let dir = tempdir().unwrap();
+        File::create(dir.path().join("skill1.wasm")).unwrap();
+        File::create(dir.path().join("skill2.wasm")).unwrap();
+        File::create(dir.path().join("README.md")).unwrap();
+
+        // when listing all the skills
+        let it = WasmRuntime::list_component_files(dir.path());
+
+        // then
+        let skills = it
+            .map(|p| p.file_name().unwrap().to_str().unwrap().to_owned())
+            .collect::<HashSet<_>>();
+        let expected = ["skill1.wasm", "skill2.wasm"]
+            .iter()
+            .map(|&s| s.to_owned())
+            .collect::<HashSet<_>>();
+        assert_eq!(skills, expected);
+    }
+
     #[tokio::test]
     async fn greet_skill_component() {
         let inference = InferenceStub::new("Hello".to_owned());
@@ -256,6 +294,7 @@ pub mod tests {
 
         assert_eq!(resp.unwrap(), "Hello");
     }
+
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
         let inference = InferenceStub::new("Hello".to_owned());
