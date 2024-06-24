@@ -123,7 +123,7 @@ mod tests {
             .api()
             .execute_skill(
                 "greet".to_owned(),
-                "".to_owned(),
+                String::new(),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;
@@ -143,7 +143,7 @@ mod tests {
             .api()
             .execute_skill(
                 "greet".to_owned(),
-                "".to_owned(),
+                String::new(),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;

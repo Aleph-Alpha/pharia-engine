@@ -142,7 +142,7 @@ pub mod tests {
 
         pub async fn shutdown(self) {
             drop(self.send);
-            self.join_handle.await.unwrap()
+            self.join_handle.await.unwrap();
         }
 
         pub fn api(&self) -> InferenceApi {

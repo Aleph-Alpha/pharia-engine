@@ -14,7 +14,7 @@ use tokio::signal;
 async fn main() {
     let app_config = AppConfig::from_env();
 
-    run(app_config, shutdown_signal()).await
+    run(app_config, shutdown_signal()).await;
 }
 
 async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + Send + 'static) {
@@ -25,7 +25,7 @@ async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + 
     let skill_executor_api = skill_executor.api();
 
     if let Err(e) = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await {
-        eprintln!("Could not boot shell: {}", e);
+        eprintln!("Could not boot shell: {e}");
     }
 
     skill_executor.shutdown().await;
@@ -51,8 +51,8 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
 }
 
@@ -76,6 +76,6 @@ mod tests {
         //wasm runtime needs some time to shutdown (at least on Daniel's maschine), so the time out
         //has been increased to 2sec
         let r = tokio::time::timeout(Duration::from_secs(2), super::run(config, ready(()))).await;
-        assert_ok!(r)
+        assert_ok!(r);
     }
 }

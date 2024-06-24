@@ -198,7 +198,7 @@ pub mod tests {
             _api_token: String,
             _inference_api: InferenceApi,
         ) -> Result<String, Error> {
-            Err(anyhow!(self.err_msg.to_owned()))
+            Err(anyhow!(self.err_msg.clone()))
         }
     }
 
@@ -218,9 +218,7 @@ pub mod tests {
             api_token: String,
             mut inference_api: InferenceApi,
         ) -> Result<String, Error> {
-            if skill != "greet" {
-                panic!("RustRuntime only supports greet skill")
-            }
+            assert!(skill == "greet", "RustRuntime only supports greet skill");
             let prompt = format!(
                 "### Instruction:
                 Provide a nice greeting for the person utilizing its given name
@@ -248,7 +246,7 @@ pub mod tests {
         let mut it = WasmRuntime::list_component_files(dir.as_path());
 
         // then
-        assert!(it.next().is_none())
+        assert!(it.next().is_none());
     }
 
     #[test]
