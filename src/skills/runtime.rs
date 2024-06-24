@@ -188,7 +188,7 @@ pub mod tests {
             )
             .await;
 
-        assert_eq!("Hello", resp.unwrap());
+        assert_eq!(resp.unwrap(), "Hello");
     }
     #[tokio::test]
     async fn errors_for_non_existing_skill() {

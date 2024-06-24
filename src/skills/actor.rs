@@ -43,7 +43,11 @@ pub enum Skill {
 }
 
 impl SkillExecutorApi {
-    pub async fn execute_skill(&mut self, skill: Skill, api_token: String) -> Result<String, Error> {
+    pub async fn execute_skill(
+        &mut self,
+        skill: Skill,
+        api_token: String,
+    ) -> Result<String, Error> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage {
             send,
@@ -126,6 +130,6 @@ mod tests {
         inference.shutdown().await;
 
         // Then
-        assert_eq!("Hello", result.unwrap());
+        assert_eq!(result.unwrap(), "Hello");
     }
 }
