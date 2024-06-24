@@ -87,7 +87,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
                     .runtime
                     .run("greet", name, msg.api_token, self.inference_api.clone())
                     .await;
-                msg.send.send(response)
+                msg.send.send(response.expect("response must be Ok()"))
             }
         };
     }

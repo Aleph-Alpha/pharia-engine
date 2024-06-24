@@ -1,5 +1,6 @@
 use std::{collections::HashMap, future::Future};
 
+use anyhow::{anyhow, Error};
 use wasmtime::{
     component::{bindgen, Component, Linker},
     Config, Engine, Store,
@@ -26,7 +27,7 @@ pub trait Runtime {
         name: String,
         api_token: String,
         inference_api: InferenceApi,
-    ) -> impl Future<Output = String> + Send;
+    ) -> impl Future<Output = Result<String, Error>> + Send;
 }
 
 struct InvocationCtx {
@@ -110,27 +111,26 @@ impl Runtime for WasmRuntime {
         name: String,
         api_token: String,
         inference_api: InferenceApi,
-    ) -> String {
+    ) -> Result<String, Error> {
         let invocation_ctx = InvocationCtx::new(inference_api, api_token);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let greet_component = self
             .components
             .get(skill)
-            .expect("greet component must exist");
+            .ok_or_else(|| anyhow!("skill not installed"))?;
 
         let (bindings, _) = Skill::instantiate_async(&mut store, greet_component, &self.linker)
             .await
             .expect("failed to instantiate skill");
-        bindings
-            .call_run(&mut store, &name)
-            .await
-            .expect("failed to run skill")
+        bindings.call_run(&mut store, &name).await
     }
 }
 
 #[cfg(test)]
 pub mod tests {
+
+    use anyhow::Error;
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters, InferenceApi},
@@ -153,7 +153,7 @@ pub mod tests {
             name: String,
             api_token: String,
             mut inference_api: InferenceApi,
-        ) -> String {
+        ) -> Result<String, Error> {
             if skill != "greet" {
                 panic!("RustRuntime only supports greet skill")
             }
@@ -171,7 +171,7 @@ pub mod tests {
                 model: "luminous-nextgen-7b".to_owned(),
                 max_tokens: 10,
             };
-            inference_api.complete_text(params, api_token).await
+            Ok(inference_api.complete_text(params, api_token).await)
         }
     }
 
@@ -187,6 +187,21 @@ pub mod tests {
                 inference.api(),
             )
             .await;
-        assert_eq!("Hello", resp);
+
+        assert_eq!("Hello", resp.unwrap());
+    }
+    #[tokio::test]
+    async fn errors_on_uninstalled_skill() {
+        let inference = InferenceStub::new("Hello".to_owned());
+        let mut runtime = WasmRuntime::new();
+        let resp = runtime
+            .run(
+                "bad-skill-name",
+                "name".to_owned(),
+                "api_token".to_owned(),
+                inference.api(),
+            )
+            .await;
+        assert!(resp.is_err());
     }
 }
