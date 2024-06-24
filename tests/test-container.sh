@@ -29,6 +29,7 @@ function time_shutdown () {
         if [ "$ELAPSED_TIME" -lt 10 ]; then
             return 0
         fi
+        echo "retrying shutdown"
     done
 
     echo "shutdown time is longer than expected"
