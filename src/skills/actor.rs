@@ -1,6 +1,5 @@
 use crate::{inference::InferenceApi, skills::runtime::Runtime};
 use anyhow::Error;
-use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
@@ -35,11 +34,6 @@ impl SkillExecutor {
 #[derive(Clone)]
 pub struct SkillExecutorApi {
     send: mpsc::Sender<SkillExecutorMessage>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum Skill {
-    Greet { name: String },
 }
 
 impl SkillExecutorApi {

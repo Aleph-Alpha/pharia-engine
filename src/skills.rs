@@ -1,6 +1,6 @@
 mod actor;
 mod runtime;
-pub use actor::{Skill, SkillExecutor, SkillExecutorApi};
+pub use actor::{SkillExecutor, SkillExecutorApi};
 pub use runtime::WasmRuntime;
 
 #[cfg(test)]

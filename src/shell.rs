@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use crate::skills::{Skill, SkillExecutorApi};
+use crate::skills::SkillExecutorApi;
 use anyhow::{Context, Error};
 use axum::extract::{Json, State};
 use axum::http::StatusCode;
@@ -10,6 +10,7 @@ use axum_extra::TypedHeader;
 
 use axum::routing::post;
 use axum::{routing::get, Router};
+use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
 
 pub async fn run(
@@ -34,16 +35,19 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
         .route("/", get(|| async { "Hello, world!" }))
 }
 
+#[derive(Deserialize, Serialize)]
+struct ExecuteSkillArgs {
+    skill: String,
+    input: String,
+}
+
 async fn execute_skill(
     State(mut skill_executor_api): State<SkillExecutorApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
-    Json(skill): Json<Skill>,
+    Json(args): Json<ExecuteSkillArgs>,
 ) -> (StatusCode, String) {
-    let (skill_name, input) = match skill {
-        Skill::Greet { name } => ("greet".to_owned(), name),
-    };
     let result = skill_executor_api
-        .execute_skill(skill_name, input, bearer.token().to_owned())
+        .execute_skill(args.skill, args.input, bearer.token().to_owned())
         .await;
     match result {
         Ok(response) => (StatusCode::OK, response),
@@ -90,10 +94,10 @@ mod tests {
         let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
 
-        let skill = Skill::Greet {
-            name: "Homer".to_owned(),
+        let args = ExecuteSkillArgs {
+            skill: "greet".to_owned(),
+            input: "Homer".to_owned(),
         };
-        dbg!(serde_json::to_string(&skill).unwrap());
         let resp = http
             .oneshot(
                 Request::builder()
@@ -101,7 +105,7 @@ mod tests {
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(header::AUTHORIZATION, auth_value)
                     .uri("/execute_skill")
-                    .body(Body::from(serde_json::to_string(&skill).unwrap()))
+                    .body(Body::from(serde_json::to_string(&args).unwrap()))
                     .unwrap(),
             )
             .await
@@ -118,8 +122,9 @@ mod tests {
 
         let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
-        let skill = Skill::Greet {
-            name: "Homer".to_owned(),
+        let args = ExecuteSkillArgs {
+            skill: "greet".to_owned(),
+            input: "Homer".to_owned(),
         };
         let resp = http
             .oneshot(
@@ -127,7 +132,7 @@ mod tests {
                     .method(http::Method::POST)
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .uri("/execute_skill")
-                    .body(Body::from(serde_json::to_string(&skill).unwrap()))
+                    .body(Body::from(serde_json::to_string(&args).unwrap()))
                     .unwrap(),
             )
             .await
