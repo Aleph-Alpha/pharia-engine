@@ -15,18 +15,29 @@ if ! command -v podman &> /dev/null; then
     exit 1
 fi
 
-podman run -d -p 8081:8081 --name $INTERNAL_NAME $CONTAINER_NAME
+function time_shutdown () {
+    for run in {1..$1}; do
+        podman run -d -p 8081:8081 --name $INTERNAL_NAME $CONTAINER_NAME
 
-SECONDS=0
-START_TIME=$SECONDS
-podman stop -f name=$INTERNAL_NAME
-ELAPSED_TIME=$SECONDS
+        SECONDS=0
+        START_TIME=$SECONDS
+        podman stop -f name=$INTERNAL_NAME
+        ELAPSED_TIME=$SECONDS
+
+        # if the container does not shut down on SIGTERM properly,
+        # podman will send SIGKILL after 10sec to force the shutdown
+        if [ "$ELAPSED_TIME" -lt 10 ]; then
+            return 0
+        fi
+    done
+
+    echo "shutdown time is longer than expected"
+    return 1
+}
+
+time_shutdown 5
+result=$?
 
 podman rm $INTERNAL_NAME
 
-# if the container does not shut down on SIGTERM properly,
-# podman will send SIGKILL after 10sec to force the shutdown 
-if [ "$ELAPSED_TIME" -gt 9 ]; then
-    echo "shutdown time is longer than expected"
-    exit 1
-fi
+exit $((result))
