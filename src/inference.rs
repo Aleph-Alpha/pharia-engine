@@ -89,7 +89,7 @@ pub enum InferenceMessage {
 
 impl InferenceMessage {
     async fn act(self, client: &Client) {
-        let _ = match self {
+        match self {
             InferenceMessage::CompleteText {
                 params,
                 send,
@@ -107,9 +107,9 @@ impl InferenceMessage {
                     )
                     .await
                     .unwrap();
-                send.send(response.completion)
+                drop(send.send(response.completion));
             }
-        };
+        }
     }
 }
 

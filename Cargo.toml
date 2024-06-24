@@ -1,4 +1,17 @@
-workspace = { members = ["greet-skill"] }
+[workspace]
+members = ["greet-skill"]
+
+[workspace.lints.rust]
+future-incompatible = "warn"
+keyword-idents = "warn"
+let-underscore = "warn"
+nonstandard-style = "warn"
+refining-impl-trait = "warn"
+rust-2018-compatibility = "warn"
+rust-2018-idioms = "warn"
+rust-2021-compatibility = "warn"
+rust-2024-compatibility = "warn"
+unused = "warn"
 
 [package]
 name = "pharia-kernel"
@@ -34,3 +47,6 @@ tower = "0.4.13"
 [features]
 test_inference = []
 default = ["test_inference"]
+
+[lints]
+workspace = true

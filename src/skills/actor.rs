@@ -91,7 +91,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 self.inference_api.clone(),
             )
             .await;
-        let _ = msg.send.send(response);
+        drop(msg.send.send(response));
     }
 }
 

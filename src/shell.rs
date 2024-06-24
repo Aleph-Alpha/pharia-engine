@@ -77,7 +77,7 @@ mod tests {
     /// API Token used by tests to authenticate requests
     fn api_token() -> &'static str {
         API_TOKEN.get_or_init(|| {
-            let _ = dotenv();
+            drop(dotenv());
             env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
         })
     }

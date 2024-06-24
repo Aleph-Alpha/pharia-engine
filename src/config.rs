@@ -6,7 +6,7 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn from_env() -> Self {
-        let _ = dotenvy::dotenv();
+        drop(dotenvy::dotenv());
 
         let host = env::var("HOST").expect("HOST variable not set");
         let port = env::var("PORT").expect("PORT variable not set");

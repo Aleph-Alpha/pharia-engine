@@ -11,3 +11,5 @@ wit-bindgen = "0.26.0"
 [lib]
 crate-type = ["cdylib"]
 
+[lints]
+workspace = true
