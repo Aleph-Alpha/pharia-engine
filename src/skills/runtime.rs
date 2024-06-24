@@ -191,14 +191,14 @@ pub mod tests {
         assert_eq!("Hello", resp.unwrap());
     }
     #[tokio::test]
-    async fn errors_on_uninstalled_skill() {
+    async fn errors_for_non_existing_skill() {
         let inference = InferenceStub::new("Hello".to_owned());
         let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run(
-                "bad-skill-name",
+                "non-existing-skill",
                 "name".to_owned(),
-                "api_token".to_owned(),
+                "dummy-token".to_owned(),
                 inference.api(),
             )
             .await;

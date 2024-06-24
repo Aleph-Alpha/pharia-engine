@@ -1,4 +1,5 @@
 use crate::{inference::InferenceApi, skills::runtime::Runtime};
+use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot},
@@ -42,7 +43,7 @@ pub enum Skill {
 }
 
 impl SkillExecutorApi {
-    pub async fn execute_skill(&mut self, skill: Skill, api_token: String) -> String {
+    pub async fn execute_skill(&mut self, skill: Skill, api_token: String) -> Result<String, Error> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage {
             send,
@@ -87,7 +88,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
                     .runtime
                     .run("greet", name, msg.api_token, self.inference_api.clone())
                     .await;
-                msg.send.send(response.expect("response must be Ok()"))
+                msg.send.send(response)
             }
         };
     }
@@ -95,7 +96,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
 struct SkillExecutorMessage {
     skill: Skill,
-    send: oneshot::Sender<String>,
+    send: oneshot::Sender<Result<String, Error>>,
     api_token: String,
 }
 
@@ -125,6 +126,6 @@ mod tests {
         inference.shutdown().await;
 
         // Then
-        assert_eq!("Hello", result);
+        assert_eq!("Hello", result.unwrap());
     }
 }

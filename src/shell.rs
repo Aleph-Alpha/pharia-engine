@@ -41,6 +41,7 @@ async fn execute_skill(
     skill_executor_api
         .execute_skill(skill, bearer.token().to_owned())
         .await
+        .expect("todo")
 }
 
 #[cfg(test)]
