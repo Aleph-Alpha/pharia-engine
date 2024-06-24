@@ -1,4 +1,10 @@
-use std::{collections::HashMap, future::Future};
+use std::{
+    collections::HashMap,
+    fs,
+    future::Future,
+    io,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{anyhow, Error};
 use wasmtime::{
@@ -101,6 +107,41 @@ impl WasmRuntime {
             linker,
             components,
         }
+    }
+
+    fn load_components(engine: &Engine) -> Result<HashMap<String, Component>, Error> {
+        let entries = fs::read_dir("./skills").expect("./skill folder must exist");
+        let components = entries
+            .map(|e| e.unwrap().path())
+            .filter(|p| {
+                p.is_file() && p.extension().and_then(std::ffi::OsStr::to_str) == Some("wasm")
+            })
+            .map(|p| {
+                let skill_name = p
+                    .to_str()
+                    .expect("skill path must have a name")
+                    .strip_suffix(".wasm")
+                    .unwrap();
+                let component = Component::from_file(engine, p.to_str().unwrap())
+                    .expect("Loading component failed. Please run 'build-skill.sh' first.");
+                (skill_name.to_owned(), component)
+            })
+            .collect();
+
+        Ok(components)
+    }
+
+    fn list_component_files(skill_dir: &str) -> impl Iterator<Item = PathBuf> {
+        let entries = fs::read_dir(skill_dir).expect("./skill folder must exist");
+
+        entries.filter_map(|e| {
+            let p = e.unwrap().path();
+            if p.is_file() && p.extension().map_or(false, |ext| ext == "wasm") {
+                Some(p)
+            } else {
+                None
+            }
+        })
     }
 }
 
