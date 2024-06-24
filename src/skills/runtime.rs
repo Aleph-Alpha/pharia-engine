@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{collections::HashMap, future::Future};
 
 use wasmtime::{
     component::{bindgen, Component, Linker},
@@ -74,7 +74,7 @@ impl WasiView for InvocationCtx {
 pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<InvocationCtx>,
-    component: Component,
+    components: HashMap<String, Component>,
 }
 
 impl WasmRuntime {
@@ -91,10 +91,13 @@ impl WasmRuntime {
         let component = Component::from_file(&engine, "./skills/greet_skill.wasm")
             .expect("Loading greet-skill component failed. Please run 'build-skill.sh' first.");
 
+        let mut components = HashMap::new();
+        components.insert("greet".to_owned(), component);
+
         Self {
             engine,
             linker,
-            component,
+            components,
         }
     }
 }
@@ -108,7 +111,13 @@ impl Runtime for WasmRuntime {
     ) -> String {
         let invocation_ctx = InvocationCtx::new(inference_api, api_token);
         let mut store = Store::new(&self.engine, invocation_ctx);
-        let (bindings, _) = Skill::instantiate_async(&mut store, &self.component, &self.linker)
+
+        let greet_component = self
+            .components
+            .get("greet")
+            .expect("greet component must exist");
+
+        let (bindings, _) = Skill::instantiate_async(&mut store, greet_component, &self.linker)
             .await
             .expect("failed to instantiate skill");
         bindings
