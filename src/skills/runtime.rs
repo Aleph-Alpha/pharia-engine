@@ -123,14 +123,17 @@ impl Runtime for WasmRuntime {
         let (bindings, _) = Skill::instantiate_async(&mut store, greet_component, &self.linker)
             .await
             .expect("failed to instantiate skill");
-        bindings.call_run(&mut store, &name).await
+        Ok(bindings
+            .call_run(&mut store, &name)
+            .await
+            .expect("need error handling for this"))
     }
 }
 
 #[cfg(test)]
 pub mod tests {
 
-    use anyhow::Error;
+    use anyhow::{anyhow, Error};
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters, InferenceApi},
@@ -138,6 +141,28 @@ pub mod tests {
     };
 
     use super::WasmRuntime;
+
+    pub struct SaboteurRuntime {
+        err_msg: String,
+    }
+
+    impl SaboteurRuntime {
+        pub fn new(err_msg: String) -> Self {
+            Self { err_msg }
+        }
+    }
+
+    impl Runtime for SaboteurRuntime {
+        async fn run(
+            &mut self,
+            _skill: &str,
+            _name: String,
+            _api_token: String,
+            _inference_api: InferenceApi,
+        ) -> Result<String, Error> {
+            Err(anyhow!(self.err_msg.to_owned()))
+        }
+    }
 
     pub struct RustRuntime {}
 

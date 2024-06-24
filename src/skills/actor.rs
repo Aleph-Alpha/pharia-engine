@@ -108,8 +108,29 @@ struct SkillExecutorMessage {
 mod tests {
     use crate::{
         inference::tests::InferenceStub,
-        skills::{tests::RustRuntime, Skill, SkillExecutor},
+        skills::{
+            tests::{RustRuntime, SaboteurRuntime},
+            Skill, SkillExecutor,
+        },
     };
+
+    #[tokio::test]
+    async fn skill_executor_forwards_runtime_errors() {
+        let error_msg = "out-of-cheese".to_owned();
+        let inference = InferenceStub::new("Hello".to_owned());
+        let runtime = SaboteurRuntime::new(error_msg.clone());
+        let executor = SkillExecutor::new(runtime, inference.api());
+        let skill = Skill::Greet {
+            name: "".to_owned(),
+        };
+
+        let result = executor
+            .api()
+            .execute_skill(skill, "TOKEN_NOT_REQUIRED".to_owned())
+            .await;
+
+        assert_eq!(result.unwrap_err().to_string(), error_msg);
+    }
 
     #[tokio::test]
     async fn greeting_skill() {

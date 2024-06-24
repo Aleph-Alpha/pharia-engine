@@ -5,5 +5,5 @@ pub use runtime::WasmRuntime;
 
 #[cfg(test)]
 pub mod tests {
-    pub use super::runtime::tests::RustRuntime;
+    pub use super::runtime::tests::{RustRuntime, SaboteurRuntime};
 }
