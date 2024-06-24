@@ -27,13 +27,19 @@ variables:
 cargo_clippy:
   stage: test
   image: rust:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   script:
     - rustup component add clippy
     - cargo clippy --workspace --all-targets --all-features
-    
+
 cargo_test:
   stage: test
   image: rust:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   script:
     - rustup target add wasm32-wasi
     - ./build-skill.sh
@@ -43,7 +49,7 @@ image_build:
   stage: image_build
   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
     - podman login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -81,6 +87,9 @@ sbom_vulnerability_scan:
 container_test:
   stage: image_test
   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
     - podman login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
@@ -90,6 +99,9 @@ container_test:
 integration_test:
   stage: image_test
   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   services:
     - name: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
       alias: $CI_PROJECT_NAME
@@ -101,6 +113,8 @@ image_publish:
   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_SECURITY_SCAN == "true"
+      when: never
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: $ARTIFACTORY_URL
