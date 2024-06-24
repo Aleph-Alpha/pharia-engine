@@ -16,7 +16,7 @@ if ! command -v podman &> /dev/null; then
 fi
 
 function time_shutdown () {
-    for run in {1..5}; do
+    for run in {1..10}; do
         podman run -d -p 8081:8081 --name $INTERNAL_NAME $CONTAINER_NAME
         SECONDS=0
         START_TIME=$SECONDS
