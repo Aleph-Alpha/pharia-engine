@@ -85,7 +85,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
             Skill::Greet { name } => {
                 let response = self
                     .runtime
-                    .run_greet(name, msg.api_token, self.inference_api.clone())
+                    .run("greet", name, msg.api_token, self.inference_api.clone())
                     .await;
                 msg.send.send(response)
             }

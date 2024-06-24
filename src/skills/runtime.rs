@@ -20,8 +20,9 @@ pub trait Runtime {
     // `fn async f() -> i32` could be a shortcut for both `fn f() -> impl Future<Output=i32>` **or**
     // `fn f() -> impl Future<Output=i32> + Send`. It is also ambiguous over lifetime and `Sync`ness
     // of the future, but we do not need these traits here.
-    fn run_greet(
+    fn run(
         &mut self,
+        skill: &str,
         name: String,
         api_token: String,
         inference_api: InferenceApi,
@@ -103,8 +104,9 @@ impl WasmRuntime {
 }
 
 impl Runtime for WasmRuntime {
-    async fn run_greet(
+    async fn run(
         &mut self,
+        skill: &str,
         name: String,
         api_token: String,
         inference_api: InferenceApi,
@@ -114,7 +116,7 @@ impl Runtime for WasmRuntime {
 
         let greet_component = self
             .components
-            .get("greet")
+            .get(skill)
             .expect("greet component must exist");
 
         let (bindings, _) = Skill::instantiate_async(&mut store, greet_component, &self.linker)
@@ -145,12 +147,16 @@ pub mod tests {
         }
     }
     impl Runtime for RustRuntime {
-        async fn run_greet(
+        async fn run(
             &mut self,
+            skill: &str,
             name: String,
             api_token: String,
             mut inference_api: InferenceApi,
         ) -> String {
+            if skill != "greet" {
+                panic!("RustRuntime only supports greet skill")
+            }
             let prompt = format!(
                 "### Instruction:
                 Provide a nice greeting for the person utilizing its given name
@@ -174,7 +180,12 @@ pub mod tests {
         let inference = InferenceStub::new("Hello".to_owned());
         let mut runtime = WasmRuntime::new();
         let resp = runtime
-            .run_greet("name".to_owned(), "api_token".to_owned(), inference.api())
+            .run(
+                "greet",
+                "name".to_owned(),
+                "api_token".to_owned(),
+                inference.api(),
+            )
             .await;
         assert_eq!("Hello", resp);
     }
