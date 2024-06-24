@@ -95,7 +95,7 @@ mod tests {
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
 
         let args = ExecuteSkillArgs {
-            skill: "greet".to_owned(),
+            skill: "greet_skill".to_owned(),
             input: "Homer".to_owned(),
         };
         let resp = http

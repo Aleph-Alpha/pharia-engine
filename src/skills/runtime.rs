@@ -95,11 +95,7 @@ impl WasmRuntime {
         Skill::add_to_linker(&mut linker, |state: &mut InvocationCtx| state)
             .expect("linking to skill world must work");
 
-        let component = Component::from_file(&engine, "./skills/greet_skill.wasm")
-            .expect("Loading greet-skill component failed. Please run 'build-skill.sh' first.");
-
-        let mut components = HashMap::new();
-        components.insert("greet".to_owned(), component);
+        let components = WasmRuntime::load_components(&engine);
 
         Self {
             engine,
@@ -108,29 +104,28 @@ impl WasmRuntime {
         }
     }
 
-    fn load_components(engine: &Engine) -> Result<HashMap<String, Component>, Error> {
-        let entries = fs::read_dir("./skills").expect("./skill folder must exist");
-        let components = entries
-            .map(|e| e.unwrap().path())
-            .filter(|p| {
-                p.is_file() && p.extension().and_then(std::ffi::OsStr::to_str) == Some("wasm")
-            })
-            .map(|p| {
+    fn load_components(engine: &Engine) -> HashMap<String, Component> {
+        WasmRuntime::list_component_files("./skills")
+            .filter_map(|p| {
                 let skill_name = p
-                    .to_str()
-                    .expect("skill path must have a name")
-                    .strip_suffix(".wasm")
-                    .unwrap();
-                let component = Component::from_file(engine, p.to_str().unwrap())
-                    .expect("Loading component failed. Please run 'build-skill.sh' first.");
-                (skill_name.to_owned(), component)
+                    .file_name()
+                    .and_then(|f| f.to_str().and_then(|f| f.strip_suffix(".wasm")));
+                if let Some(s) = skill_name {
+                    if let Some(path) = p.to_str() {
+                        let component = Component::from_file(engine, path)
+                            .expect("Loading component failed. Please run 'build-skill.sh' first.");
+                        Some((s.to_owned(), component))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             })
-            .collect();
-
-        Ok(components)
+            .collect()
     }
 
-    fn list_component_files(skill_dir: &Path) -> impl Iterator<Item = PathBuf> {
+    fn list_component_files<P: AsRef<Path>>(skill_dir: P) -> impl Iterator<Item = PathBuf> {
         let entries = fs::read_dir(skill_dir);
         entries.into_iter().flat_map(|d| {
             d.filter_map(|e| {
@@ -285,7 +280,7 @@ pub mod tests {
         let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run(
-                "greet",
+                "greet_skill",
                 "name".to_owned(),
                 "api_token".to_owned(),
                 inference.api(),
