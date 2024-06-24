@@ -106,20 +106,19 @@ impl WasmRuntime {
 
     fn load_components(engine: &Engine) -> HashMap<String, Component> {
         WasmRuntime::list_component_files("./skills")
-            .filter_map(|p| {
-                let skill_name = p
+            .filter_map(|path| {
+                let skill_name = path
                     .file_name()
-                    .and_then(|f| f.to_str().and_then(|f| f.strip_suffix(".wasm")));
-                if let Some(s) = skill_name {
-                    if let Some(path) = p.to_str() {
+                    .and_then(|f| f.to_str())
+                    .and_then(|f| f.strip_suffix(".wasm"));
+
+                match (skill_name, path.to_str()) {
+                    (Some(skill_name), Some(path)) => {
                         let component = Component::from_file(engine, path)
                             .expect("Loading component failed. Please run 'build-skill.sh' first.");
-                        Some((s.to_owned(), component))
-                    } else {
-                        None
+                        Some((skill_name.to_owned(), component))
                     }
-                } else {
-                    None
+                    _ => None,
                 }
             })
             .collect()
@@ -129,9 +128,9 @@ impl WasmRuntime {
         let entries = fs::read_dir(skill_dir);
         entries.into_iter().flat_map(|d| {
             d.filter_map(|e| {
-                let p = e.unwrap().path();
-                if p.is_file() && p.extension().map_or(false, |ext| ext == "wasm") {
-                    Some(p)
+                let path = e.ok()?.path();
+                if path.is_file() && path.extension().map_or(false, |ext| ext == "wasm") {
+                    Some(path)
                 } else {
                     None
                 }
