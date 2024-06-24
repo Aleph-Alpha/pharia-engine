@@ -3,6 +3,7 @@ use std::future::Future;
 use crate::skills::{Skill, SkillExecutorApi};
 use anyhow::{Context, Error};
 use axum::extract::{Json, State};
+use axum::http::StatusCode;
 use axum_extra::headers::authorization::Bearer;
 use axum_extra::headers::Authorization;
 use axum_extra::TypedHeader;
@@ -37,11 +38,14 @@ async fn execute_skill(
     State(mut skill_executor_api): State<SkillExecutorApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(skill): Json<Skill>,
-) -> String {
-    skill_executor_api
+) -> (StatusCode, String) {
+    let result = skill_executor_api
         .execute_skill(skill, bearer.token().to_owned())
-        .await
-        .expect("todo")
+        .await;
+    match result {
+        Ok(response) => (StatusCode::OK, response),
+        Err(err) => (StatusCode::BAD_REQUEST, err.to_string()),
+    }
 }
 
 #[cfg(test)]
