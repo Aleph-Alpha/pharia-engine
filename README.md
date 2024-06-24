@@ -10,7 +10,7 @@ The entire Stack including Kernel, Inference, Document Index, etc is called **Ph
 
 ## Contributing
 
-In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>. 
+In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
 
 
 ### Local Development setup
@@ -30,7 +30,7 @@ Every time we change the example skill we need to rebuild them.
 ./build-skill.sh
 ```
 
-## Building and running the kernel container using Podman
+### Building and running the kernel container using Podman
 
 You can build the image with
 
