@@ -82,10 +82,15 @@ pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<InvocationCtx>,
     components: HashMap<String, Component>,
+    skill_dir: PathBuf,
 }
 
 impl WasmRuntime {
     pub fn new() -> Self {
+        Self::with_dir("./skills")
+    }
+
+    pub fn with_dir(skill_dir: impl Into<PathBuf>) -> Self {
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
         let mut linker: Linker<InvocationCtx> = Linker::new(&engine);
@@ -95,17 +100,19 @@ impl WasmRuntime {
         Skill::add_to_linker(&mut linker, |state: &mut InvocationCtx| state)
             .expect("linking to skill world must work");
 
-        let components = WasmRuntime::load_components(&engine);
+        let skill_dir = skill_dir.into();
+        let components = WasmRuntime::load_components(&skill_dir, &engine);
 
         Self {
             engine,
             linker,
             components,
+            skill_dir,
         }
     }
 
-    fn load_components(engine: &Engine) -> HashMap<String, Component> {
-        WasmRuntime::list_component_files("./skills")
+    fn load_components(skill_path: &Path, engine: &Engine) -> HashMap<String, Component> {
+        WasmRuntime::list_component_files(skill_path)
             .filter_map(|path| {
                 let skill_name = path
                     .file_name()
@@ -124,7 +131,7 @@ impl WasmRuntime {
             .collect()
     }
 
-    fn list_component_files<P: AsRef<Path>>(skill_dir: P) -> impl Iterator<Item = PathBuf> {
+    fn list_component_files(skill_dir: &Path) -> impl Iterator<Item = PathBuf> {
         let entries = fs::read_dir(skill_dir);
         entries.into_iter().flat_map(|d| {
             d.filter_map(|e| {
