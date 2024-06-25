@@ -124,6 +124,8 @@ image_publish:
   script:
     - podman login --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - podman pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - podman tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" "$CI_REGISTRY_IMAGE:latest"
+    - podman push "$CI_REGISTRY_IMAGE:latest"
     - IMAGE_ID=$(podman inspect $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
     - podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
     - podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
