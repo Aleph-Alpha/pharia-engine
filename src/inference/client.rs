@@ -25,7 +25,7 @@ impl InferenceClient for Client {
                 &task,
                 &params.model,
                 &How {
-                    api_token: Some(api_token.clone()),
+                    api_token: Some(api_token),
                     ..Default::default()
                 },
             )
