@@ -1,4 +1,5 @@
 use aleph_alpha_client::Client;
+use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot},
@@ -49,7 +50,7 @@ impl InferenceApi {
         &mut self,
         params: CompleteTextParameters,
         api_token: String,
-    ) -> String {
+    ) -> Result<String, Error> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::CompleteText {
             params,
@@ -60,7 +61,8 @@ impl InferenceApi {
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
-        recv.await.unwrap()
+        recv.await
+            .expect("sender must be alive when awaiting for answers")
     }
 }
 
@@ -93,7 +95,7 @@ impl<C> InferenceActor<C> {
 pub enum InferenceMessage {
     CompleteText {
         params: CompleteTextParameters,
-        send: oneshot::Sender<String>,
+        send: oneshot::Sender<Result<String, Error>>,
         api_token: String,
     },
 }
@@ -106,7 +108,15 @@ impl InferenceMessage {
                 send,
                 api_token,
             } => {
-                let result = client.complete_text(&params, api_token).await;
+                let mut remaining_retries = 5;
+                let result = loop {
+                    match client.complete_text(&params, api_token.clone()).await {
+                        Ok(value) => break Ok(value),
+                        Err(e) if remaining_retries <= 0 => break Err(e),
+                        Err(_) => (),
+                    };
+                    remaining_retries -= 1;
+                };
                 drop(send.send(result));
             }
         }
@@ -115,9 +125,12 @@ impl InferenceMessage {
 
 #[cfg(test)]
 pub mod tests {
+    use anyhow::{anyhow, Error};
     use tokio::{sync::mpsc, task::JoinHandle};
 
-    use super::{InferenceApi, InferenceMessage};
+    use crate::inference::client::InferenceClient;
+
+    use super::{CompleteTextParameters, Inference, InferenceApi, InferenceMessage};
 
     /// Always return the same completion
     pub struct InferenceStub {
@@ -133,7 +146,7 @@ pub mod tests {
                 while let Some(msg) = recv.recv().await {
                     match msg {
                         InferenceMessage::CompleteText { send, .. } => {
-                            send.send(completion.clone()).unwrap();
+                            send.send(Ok(completion.clone())).unwrap();
                         }
                     }
                 }
@@ -150,5 +163,51 @@ pub mod tests {
         pub fn api(&self) -> InferenceApi {
             InferenceApi::new(self.send.clone())
         }
+    }
+
+    struct SaboteurClient {
+        remaining_failures: usize,
+    }
+
+    impl SaboteurClient {
+        fn new(remaining_failures: usize) -> Self {
+            Self { remaining_failures }
+        }
+    }
+
+    impl InferenceClient for SaboteurClient {
+        async fn complete_text(
+            &mut self,
+            _params: &super::CompleteTextParameters,
+            _api_token: String,
+        ) -> Result<String, Error> {
+            if self.remaining_failures > 0 {
+                self.remaining_failures -= 1;
+                Err(anyhow!("Inference error"))
+            } else {
+                Ok("Completion succeeded".to_owned())
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn recover_from_connection_loss() {
+        // given
+        let client = SaboteurClient::new(2);
+        let inference = Inference::with_client(client);
+        let mut inference_api = inference.api();
+        let params = CompleteTextParameters {
+            prompt: "dummy_prompt".to_owned(),
+            model: "dummy_model".to_owned(),
+            max_tokens: 42,
+        };
+
+        // when
+        let result = inference_api
+            .complete_text(params, "dummy_api".to_owned())
+            .await;
+
+        // then
+        assert!(result.is_ok());
     }
 }

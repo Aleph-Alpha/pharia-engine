@@ -59,7 +59,10 @@ impl pharia::skill::csi::Host for InvocationCtx {
             max_tokens: 10,
         };
         let api_token = self.api_token.clone();
-        self.inference_api.complete_text(params, api_token).await
+        self.inference_api
+            .complete_text(params, api_token)
+            .await
+            .expect("completion must succeed")
     }
 }
 
@@ -211,7 +214,7 @@ pub mod tests {
                 model: "luminous-nextgen-7b".to_owned(),
                 max_tokens: 10,
             };
-            Ok(inference_api.complete_text(params, api_token).await)
+            inference_api.complete_text(params, api_token).await
         }
     }
 
