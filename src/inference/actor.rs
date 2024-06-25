@@ -5,6 +5,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
+use tracing::error;
 
 use super::client::InferenceClient;
 
@@ -112,8 +113,12 @@ impl InferenceMessage {
                 let result = loop {
                     match client.complete_text(&params, api_token.clone()).await {
                         Ok(value) => break Ok(value),
-                        Err(e) if remaining_retries <= 0 => break Err(e),
-                        Err(_) => (),
+                        Err(e) => {
+                            error!("Error in completion: {e}");
+                            if remaining_retries <= 0 {
+                                break Err(e);
+                            }
+                        }
                     };
                     remaining_retries -= 1;
                 };
