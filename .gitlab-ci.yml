@@ -41,6 +41,8 @@ cargo_test:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   script:
+    - apt-get update
+    - apt-get -y install python3-venv
     - rustup target add wasm32-wasi
     - ./build-skill.sh
     - ./build-skill-py.sh
