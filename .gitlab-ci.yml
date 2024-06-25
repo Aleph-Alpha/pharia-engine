@@ -43,6 +43,7 @@ cargo_test:
   script:
     - rustup target add wasm32-wasi
     - ./build-skill.sh
+    - ./build-skill-py.sh
     - cargo test
 
 image_build:

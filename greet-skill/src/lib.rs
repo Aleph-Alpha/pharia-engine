@@ -10,12 +10,12 @@ impl Guest for Skill {
     fn run(name: String) -> String {
         let prompt = format!(
             "### Instruction:
-                Provide a nice greeting for the person utilizing its given name
+Provide a nice greeting for the person utilizing its given name
 
-                ### Input:
-                Name: {name}
+### Input:
+Name: {name}
 
-                ### Response:"
+### Response:"
         );
         complete_text(&prompt, "luminous-nextgen-7b")
     }
