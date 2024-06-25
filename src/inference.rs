@@ -78,6 +78,26 @@ impl InferenceActor {
         }
     }
 }
+trait InferenceClient {
+    async fn complete_text(&self, params: &CompleteTextParameters, api_token: String) -> String;
+}
+
+impl InferenceClient for Client {
+    async fn complete_text(&self, params: &CompleteTextParameters, api_token: String) -> String {
+        let task = TaskCompletion::from_text(&params.prompt, params.max_tokens);
+        self.completion(
+            &task,
+            &params.model,
+            &How {
+                api_token: Some(api_token.clone()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .completion
+    }
+}
 
 pub enum InferenceMessage {
     CompleteText {
@@ -95,19 +115,8 @@ impl InferenceMessage {
                 send,
                 api_token,
             } => {
-                let task = TaskCompletion::from_text(&params.prompt, params.max_tokens);
-                let response = client
-                    .completion(
-                        &task,
-                        &params.model,
-                        &How {
-                            api_token: Some(api_token),
-                            ..Default::default()
-                        },
-                    )
-                    .await
-                    .unwrap();
-                drop(send.send(response.completion));
+                let result = client.complete_text(&params, api_token).await;
+                drop(send.send(result));
             }
         }
     }
