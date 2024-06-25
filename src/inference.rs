@@ -130,9 +130,11 @@ pub mod tests {
             let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
             let completion = completion.into();
             let join_handle = tokio::spawn(async move {
-                match recv.recv().await.unwrap() {
-                    InferenceMessage::CompleteText { send, .. } => {
-                        send.send(completion).unwrap();
+                while let Some(msg) = recv.recv().await {
+                    match msg {
+                        InferenceMessage::CompleteText { send, .. } => {
+                            send.send(completion.clone()).unwrap();
+                        }
                     }
                 }
             });
