@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Error};
+use anyhow::Error;
 use wasmtime::{
     component::{bindgen, Component, Linker},
     Config, Engine, Store,
@@ -144,6 +144,15 @@ impl WasmRuntime {
             })
         })
     }
+
+    fn load_component(&mut self, skill_name: String) -> Result<(), Error> {
+        let mut skill_path = self.skill_dir.join(&skill_name);
+        skill_path.set_extension("wasm");
+
+        let component = Component::from_file(&self.engine, skill_path)?;
+        self.components.insert(skill_name, component);
+        Ok(())
+    }
 }
 
 impl Runtime for WasmRuntime {
@@ -157,12 +166,14 @@ impl Runtime for WasmRuntime {
         let invocation_ctx = InvocationCtx::new(inference_api, api_token);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
-        let greet_component = self
-            .components
-            .get(skill)
-            .ok_or_else(|| anyhow!("skill not installed"))?;
+        let component = if let Some(c) = self.components.get(skill) {
+            c
+        } else {
+            self.load_component(skill.to_owned())?;
+            self.components.get(skill).unwrap()
+        };
 
-        let (bindings, _) = Skill::instantiate_async(&mut store, greet_component, &self.linker)
+        let (bindings, _) = Skill::instantiate_async(&mut store, component, &self.linker)
             .await
             .expect("failed to instantiate skill");
         Ok(bindings
@@ -175,7 +186,12 @@ impl Runtime for WasmRuntime {
 #[cfg(test)]
 pub mod tests {
 
-    use std::{collections::HashSet, fs::File, path::PathBuf, str::FromStr};
+    use std::{
+        collections::HashSet,
+        fs::{self, File},
+        path::PathBuf,
+        str::FromStr,
+    };
 
     use anyhow::{anyhow, Error};
     use tempfile::tempdir;
@@ -280,7 +296,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn greet_skill_component() {
-        let inference = InferenceStub::new("Hello".to_owned());
+        let inference = InferenceStub::new("Hello");
         let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run(
@@ -296,7 +312,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
-        let inference = InferenceStub::new("Hello".to_owned());
+        let inference = InferenceStub::new("Hello");
         let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run(
@@ -307,5 +323,28 @@ pub mod tests {
             )
             .await;
         assert!(resp.is_err());
+    }
+
+    #[tokio::test]
+    async fn lazy_skill_loading() {
+        // Giving and empty skill directory to the WasmRuntime
+        let skill_dir = tempdir().unwrap();
+        let mut runtime = WasmRuntime::with_dir(skill_dir.path());
+        let inference = InferenceStub::new("Hello");
+
+        // When adding a new skill component
+        let skill_path = skill_dir.path().join("greet_skill.wasm");
+        fs::copy("./skills/greet_skill.wasm", skill_path).unwrap();
+
+        // Then the skill can be invoked
+        let greet = runtime
+            .run(
+                "greet_skill",
+                "Homer".to_owned(),
+                "dummy_token".to_owned(),
+                inference.api(),
+            )
+            .await;
+        assert!(greet.is_ok());
     }
 }

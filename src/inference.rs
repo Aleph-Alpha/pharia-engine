@@ -126,9 +126,9 @@ pub mod tests {
     }
 
     impl InferenceStub {
-        pub fn new(completion: String) -> Self {
+        pub fn new(completion: impl Into<String>) -> Self {
             let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
-
+            let completion = completion.into();
             let join_handle = tokio::spawn(async move {
                 match recv.recv().await.unwrap() {
                     InferenceMessage::CompleteText { send, .. } => {
