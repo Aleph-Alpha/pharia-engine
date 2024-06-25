@@ -9,10 +9,17 @@ use crate::skills::SkillExecutor;
 use config::AppConfig;
 use skills::WasmRuntime;
 use tokio::signal;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() {
     let app_config = AppConfig::from_env();
+    // Set up tracing subscriber that behaves like env_logger
+    // Can switch to some other subscriber in the future
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     run(app_config, shutdown_signal()).await;
 }

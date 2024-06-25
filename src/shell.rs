@@ -2,8 +2,8 @@ use std::future::Future;
 
 use crate::skills::SkillExecutorApi;
 use anyhow::{Context, Error};
-use axum::extract::{Json, State};
-use axum::http::StatusCode;
+use axum::extract::{Json, MatchedPath, State};
+use axum::http::{Request, StatusCode};
 use axum_extra::headers::authorization::Bearer;
 use axum_extra::headers::Authorization;
 use axum_extra::TypedHeader;
@@ -12,6 +12,8 @@ use axum::routing::post;
 use axum::{routing::get, Router};
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
+use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tracing::{info_span, Level};
 
 pub async fn run(
     addr: impl ToSocketAddrs,
@@ -33,6 +35,26 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
         .route("/execute_skill", post(execute_skill))
         .with_state(skill_executor_api)
         .route("/", get(|| async { "Hello, world!" }))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &Request<_>| {
+                    // Log the matched route's path (with placeholders not filled in).
+                    // Use request.uri() or OriginalUri if you want the real path.
+                    let matched_path = request
+                        .extensions()
+                        .get::<MatchedPath>()
+                        .map(MatchedPath::as_str);
+
+                    info_span!(
+                        "http_request",
+                        method = ?request.method(),
+                        matched_path,
+                        some_other_field = tracing::field::Empty,
+                    )
+                })
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
 }
 
 #[derive(Deserialize, Serialize)]
