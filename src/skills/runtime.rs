@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    future::Future,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, future::Future, path::PathBuf};
 
 use anyhow::Error;
 use wasmtime::{
@@ -101,48 +96,13 @@ impl WasmRuntime {
             .expect("linking to skill world must work");
 
         let skill_dir = skill_dir.into();
-        let components = WasmRuntime::load_components(&skill_dir, &engine);
 
         Self {
             engine,
             linker,
-            components,
+            components: HashMap::new(),
             skill_dir,
         }
-    }
-
-    fn load_components(skill_path: &Path, engine: &Engine) -> HashMap<String, Component> {
-        WasmRuntime::list_component_files(skill_path)
-            .filter_map(|path| {
-                let skill_name = path
-                    .file_name()
-                    .and_then(|f| f.to_str())
-                    .and_then(|f| f.strip_suffix(".wasm"));
-
-                match (skill_name, path.to_str()) {
-                    (Some(skill_name), Some(path)) => {
-                        let component = Component::from_file(engine, path)
-                            .expect("Loading component failed. Please run 'build-skill.sh' first.");
-                        Some((skill_name.to_owned(), component))
-                    }
-                    _ => None,
-                }
-            })
-            .collect()
-    }
-
-    fn list_component_files(skill_dir: &Path) -> impl Iterator<Item = PathBuf> {
-        let entries = fs::read_dir(skill_dir);
-        entries.into_iter().flat_map(|d| {
-            d.filter_map(|e| {
-                let path = e.ok()?.path();
-                if path.is_file() && path.extension().map_or(false, |ext| ext == "wasm") {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-        })
     }
 
     fn load_component(&mut self, skill_name: String) -> Result<(), Error> {
@@ -186,12 +146,7 @@ impl Runtime for WasmRuntime {
 #[cfg(test)]
 pub mod tests {
 
-    use std::{
-        collections::HashSet,
-        fs::{self, File},
-        path::PathBuf,
-        str::FromStr,
-    };
+    use std::fs;
 
     use anyhow::{anyhow, Error};
     use tempfile::tempdir;
@@ -258,40 +213,6 @@ pub mod tests {
             };
             Ok(inference_api.complete_text(params, api_token).await)
         }
-    }
-
-    #[test]
-    fn skill_dir_does_not_exist() {
-        // given a directory that does not exist
-        let dir = PathBuf::from_str("non-existing-dir").unwrap();
-
-        // when listing all the skills
-        let mut it = WasmRuntime::list_component_files(dir.as_path());
-
-        // then
-        assert!(it.next().is_none());
-    }
-
-    #[test]
-    fn load_skills() {
-        // given a directory with 2 skills and 1 readme
-        let dir = tempdir().unwrap();
-        File::create(dir.path().join("skill1.wasm")).unwrap();
-        File::create(dir.path().join("skill2.wasm")).unwrap();
-        File::create(dir.path().join("README.md")).unwrap();
-
-        // when listing all the skills
-        let it = WasmRuntime::list_component_files(dir.path());
-
-        // then
-        let skills = it
-            .map(|p| p.file_name().unwrap().to_str().unwrap().to_owned())
-            .collect::<HashSet<_>>();
-        let expected = ["skill1.wasm", "skill2.wasm"]
-            .iter()
-            .map(|&s| s.to_owned())
-            .collect::<HashSet<_>>();
-        assert_eq!(skills, expected);
     }
 
     #[tokio::test]
