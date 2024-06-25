@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use aleph_alpha_client::{Client, How, TaskCompletion};
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -12,15 +14,21 @@ pub struct Inference {
 
 impl Inference {
     pub fn new() -> Self {
+        let client = Client::new("DUMMY").unwrap();
+        Self::with_client(client)
+    }
+
+    pub fn with_client(client: impl InferenceClient + Send + 'static) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<InferenceMessage>(1);
-        let handle = tokio::spawn(async {
-            InferenceActor::new(recv).run().await;
-        });
+        let mut actor = InferenceActor::new(client, recv);
+        let handle = tokio::spawn(async move { actor.run().await });
         Inference { send, handle }
     }
+
     pub fn api(&self) -> InferenceApi {
         InferenceApi::new(self.send.clone())
     }
+
     pub async fn shutdown(self) {
         drop(self.send);
         self.handle.await.unwrap();
@@ -36,6 +44,7 @@ impl InferenceApi {
     pub fn new(send: mpsc::Sender<InferenceMessage>) -> InferenceApi {
         InferenceApi { send }
     }
+
     pub async fn complete_text(
         &mut self,
         params: CompleteTextParameters,
@@ -62,24 +71,31 @@ pub struct CompleteTextParameters {
     pub max_tokens: u32,
 }
 
-struct InferenceActor {
-    client: Client,
+struct InferenceActor<C> {
+    client: C,
     recv: mpsc::Receiver<InferenceMessage>,
 }
 
-impl InferenceActor {
-    fn new(recv: mpsc::Receiver<InferenceMessage>) -> Self {
-        let client = Client::new("DUMMY").unwrap();
+impl<C> InferenceActor<C> {
+    fn new(client: C, recv: mpsc::Receiver<InferenceMessage>) -> Self {
         InferenceActor { client, recv }
     }
-    async fn run(&mut self) {
+    async fn run(&mut self)
+    where
+        C: InferenceClient,
+    {
         while let Some(msg) = self.recv.recv().await {
-            msg.act(&self.client).await;
+            msg.act(&mut self.client).await;
         }
     }
 }
-trait InferenceClient {
-    async fn complete_text(&self, params: &CompleteTextParameters, api_token: String) -> String;
+
+pub trait InferenceClient {
+    fn complete_text(
+        &self,
+        params: &CompleteTextParameters,
+        api_token: String,
+    ) -> impl Future<Output = String> + Send;
 }
 
 impl InferenceClient for Client {
@@ -108,7 +124,7 @@ pub enum InferenceMessage {
 }
 
 impl InferenceMessage {
-    async fn act(self, client: &Client) {
+    async fn act(self, client: &mut impl InferenceClient) {
         match self {
             InferenceMessage::CompleteText {
                 params,
