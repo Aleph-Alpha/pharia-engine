@@ -64,7 +64,17 @@ impl SkillRegistry for FileRegistry {
     }
 }
 
-pub struct OciRegistry {}
+pub struct OciRegistry {
+    client: Client,
+}
+
+impl OciRegistry {
+    fn new() -> Self {
+        let client = Client::new(ClientConfig::default());
+
+        Self { client }
+    }
+}
 
 impl SkillRegistry for OciRegistry {
     fn load_skill<'a>(
@@ -72,26 +82,20 @@ impl SkillRegistry for OciRegistry {
         name: &'a str,
         engine: &'a Engine,
     ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
-        let client = Client::new(ClientConfig::default());
-
         let registry = "registry.gitlab.aleph-alpha.de".to_owned();
+        let repository = format!("engineering/pharia-kernel/skills/{name}");
         let tag = "v1".to_owned();
-        let reference = Reference::with_tag(
-            registry,
-            format!("engineering/pharia-kernel/skills/{name}"),
-            tag,
-        );
-        dbg!(reference.whole());
+        let reference = Reference::with_tag(registry, repository, tag);
 
         let username =
             env::var("SKILL_REGISTRY_USER").expect("SKILL_REGISTRY_USER variable not set");
         let password =
             env::var("SKILL_REGISTRY_PASSWORD").expect("SKILL_REGISTRY_PASSWORD variable not set");
-
         let auth = RegistryAuth::Basic(username, password);
 
         Box::pin(async move {
-            let image = client
+            let image = self
+                .client
                 .pull(
                     &reference,
                     &auth,
@@ -113,7 +117,7 @@ mod tests {
     #[tokio::test]
     async fn oci_skill_is_loaded() {
         drop(dotenvy::dotenv());
-        let registry = OciRegistry {};
+        let registry = OciRegistry::new();
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
         let component = registry.load_skill("greet-py", &engine).await;
