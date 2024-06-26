@@ -3,6 +3,28 @@ use oci_distribution::{client::ClientConfig, secrets::RegistryAuth, Client, Refe
 use std::{env, future::Future, path::PathBuf, pin::Pin};
 use wasmtime::{component::Component, Engine};
 
+pub struct CombinedRegistry {
+    file_registry: FsSkillRegistry,
+}
+
+impl CombinedRegistry {
+    pub fn new() -> Self {
+        Self {
+            file_registry: FsSkillRegistry::new(),
+        }
+    }
+}
+
+impl SkillRegistry for CombinedRegistry {
+    fn load_skill<'a>(
+        &'a self,
+        name: &'a str,
+        engine: &'a Engine,
+    ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
+        self.file_registry.load_skill(name, engine)
+    }
+}
+
 pub trait SkillRegistry {
     fn load_skill<'a>(
         &'a self,
