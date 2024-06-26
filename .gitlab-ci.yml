@@ -40,6 +40,9 @@ cargo_test:
   rules:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    SKILL_REGISTRY_USER: $CI_REGISTRY_USER
+    SKILL_REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
   script:
     - apt-get update
     - apt-get -y install python3-venv

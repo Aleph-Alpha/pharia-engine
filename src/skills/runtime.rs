@@ -108,8 +108,11 @@ impl WasmRuntime {
         }
     }
 
-    fn load_component(&mut self, skill_name: String) -> Result<(), Error> {
-        let component = self.skill_registry.load_skill(&skill_name, &self.engine)?;
+    async fn load_component(&mut self, skill_name: String) -> Result<(), Error> {
+        let component = self
+            .skill_registry
+            .load_skill(&skill_name, &self.engine)
+            .await?;
         self.components.insert(skill_name, component);
         Ok(())
     }
@@ -129,7 +132,7 @@ impl Runtime for WasmRuntime {
         let component = if let Some(c) = self.components.get(skill) {
             c
         } else {
-            self.load_component(skill.to_owned())?;
+            self.load_component(skill.to_owned()).await?;
             self.components.get(skill).unwrap()
         };
 
