@@ -1,5 +1,6 @@
-use anyhow::Error;
-use oci_distribution::{client::ClientConfig, secrets::RegistryAuth, Client, Reference};
+use anyhow::{Error, Result};
+use oci_distribution::{secrets::RegistryAuth, Reference};
+use oci_wasm::WasmClient;
 use std::{env, future::Future, path::PathBuf, pin::Pin};
 use wasmtime::{component::Component, Engine};
 
@@ -65,15 +66,7 @@ impl SkillRegistry for FileRegistry {
 }
 
 pub struct OciRegistry {
-    client: Client,
-}
-
-impl OciRegistry {
-    fn new() -> Self {
-        let client = Client::new(ClientConfig::default());
-
-        Self { client }
-    }
+    client: WasmClient,
 }
 
 impl SkillRegistry for OciRegistry {
@@ -82,10 +75,10 @@ impl SkillRegistry for OciRegistry {
         name: &'a str,
         engine: &'a Engine,
     ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
-        let registry = "registry.gitlab.aleph-alpha.de".to_owned();
+        let registry = "registry.gitlab.aleph-alpha.de";
         let repository = format!("engineering/pharia-kernel/skills/{name}");
-        let tag = "v1".to_owned();
-        let reference = Reference::with_tag(registry, repository, tag);
+        let tag = "latest";
+        let image = Reference::with_tag(registry.to_owned(), repository, tag.to_owned());
 
         let username =
             env::var("SKILL_REGISTRY_USER").expect("SKILL_REGISTRY_USER variable not set");
@@ -94,14 +87,7 @@ impl SkillRegistry for OciRegistry {
         let auth = RegistryAuth::Basic(username, password);
 
         Box::pin(async move {
-            let image = self
-                .client
-                .pull(
-                    &reference,
-                    &auth,
-                    vec!["application/vnd.wasm.content.layer.v1+wasm"],
-                )
-                .await?;
+            let image = self.client.pull(&image, &auth).await?;
             let binary = &image.layers.first().unwrap().data;
             Component::from_binary(engine, binary)
         })
@@ -110,18 +96,59 @@ impl SkillRegistry for OciRegistry {
 
 #[cfg(test)]
 mod tests {
+    use std::{env, path::Path};
+
+    use oci_distribution::{client::ClientConfig, secrets::RegistryAuth, Client, Reference};
+    use oci_wasm::{WasmClient, WasmConfig};
     use wasmtime::{Config, Engine};
 
     use super::{OciRegistry, SkillRegistry};
 
+    impl OciRegistry {
+        fn new() -> Self {
+            let client = Client::new(ClientConfig::default());
+            let client = WasmClient::new(client);
+
+            Self { client }
+        }
+
+        async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str) {
+            let registry = "registry.gitlab.aleph-alpha.de";
+            let repository = format!("engineering/pharia-kernel/skills/{skill_name}");
+            let tag = "latest";
+            let image = Reference::with_tag(registry.to_owned(), repository, tag.to_owned());
+            let (config, component_layer) = WasmConfig::from_component(path, None)
+                .await
+                .expect("component must be valid");
+
+            let username =
+                env::var("SKILL_REGISTRY_USER").expect("SKILL_REGISTRY_USER variable not set");
+            let password = env::var("SKILL_REGISTRY_PASSWORD")
+                .expect("SKILL_REGISTRY_PASSWORD variable not set");
+            let auth = RegistryAuth::Basic(username, password);
+
+            self.client
+                .push(&image, &auth, component_layer, config, None)
+                .await
+                .expect("must be able to push component");
+        }
+    }
+
     #[tokio::test]
-    async fn oci_skill_is_loaded() {
+    async fn oci_push_and_pull_skill() {
+        // given skill in local directory is pushed to registry
         drop(dotenvy::dotenv());
         let registry = OciRegistry::new();
+        registry
+            .store_skill("./skills/greet_skill.wasm", "greet_skill")
+            .await;
+
+        // when pulled from registry
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
-        let component = registry.load_skill("greet-py", &engine).await;
+        let component = registry.load_skill("greet_skill", &engine).await;
 
+        // then skill can be loaded
         assert!(component.is_ok());
     }
 }
