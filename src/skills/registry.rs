@@ -4,13 +4,13 @@ use std::{env, future::Future, path::PathBuf, pin::Pin};
 use wasmtime::{component::Component, Engine};
 
 pub struct CombinedRegistry {
-    file_registry: FsSkillRegistry,
+    file_registry: FileRegistry,
 }
 
 impl CombinedRegistry {
     pub fn new() -> Self {
         Self {
-            file_registry: FsSkillRegistry::new(),
+            file_registry: FileRegistry::new(),
         }
     }
 }
@@ -33,22 +33,23 @@ pub trait SkillRegistry {
     ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>>;
 }
 
-pub struct FsSkillRegistry {
+pub struct FileRegistry {
     skill_dir: PathBuf,
 }
 
-impl FsSkillRegistry {
+impl FileRegistry {
     pub fn new() -> Self {
         Self::with_dir("./skills")
     }
 
     pub fn with_dir(skill_dir: impl Into<PathBuf>) -> Self {
-        FsSkillRegistry {
+        FileRegistry {
             skill_dir: skill_dir.into(),
         }
     }
 }
-impl SkillRegistry for FsSkillRegistry {
+
+impl SkillRegistry for FileRegistry {
     fn load_skill<'a>(
         &'a self,
         name: &'a str,
@@ -63,9 +64,9 @@ impl SkillRegistry for FsSkillRegistry {
     }
 }
 
-pub struct OciSkillRegistry {}
+pub struct OciRegistry {}
 
-impl SkillRegistry for OciSkillRegistry {
+impl SkillRegistry for OciRegistry {
     fn load_skill<'a>(
         &'a self,
         name: &'a str,
@@ -112,12 +113,12 @@ impl SkillRegistry for OciSkillRegistry {
 mod tests {
     use wasmtime::{Config, Engine};
 
-    use super::{OciSkillRegistry, SkillRegistry};
+    use super::{OciRegistry, SkillRegistry};
 
     #[tokio::test]
     async fn oci_skill_is_loaded() {
         drop(dotenvy::dotenv());
-        let registry = OciSkillRegistry {};
+        let registry = OciRegistry {};
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
         let component = registry.load_skill("greet-py", &engine).await;

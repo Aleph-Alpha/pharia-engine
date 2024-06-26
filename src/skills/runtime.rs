@@ -156,7 +156,7 @@ pub mod tests {
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters, InferenceApi},
-        skills::{registry::FsSkillRegistry, runtime::Runtime},
+        skills::{registry::FileRegistry, runtime::Runtime},
     };
 
     use super::WasmRuntime;
@@ -253,7 +253,7 @@ pub mod tests {
     async fn lazy_skill_loading() {
         // Giving and empty skill directory to the WasmRuntime
         let skill_dir = tempdir().unwrap();
-        let registry = FsSkillRegistry::with_dir(skill_dir.path());
+        let registry = FileRegistry::with_dir(skill_dir.path());
         let mut runtime = WasmRuntime::with_registry(registry);
 
         let inference = InferenceStub::new("Hello");
