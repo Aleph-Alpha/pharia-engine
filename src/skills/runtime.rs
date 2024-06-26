@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::Future, path::PathBuf};
+use std::{collections::HashMap, future::Future};
 
 use anyhow::Error;
 use wasmtime::{
@@ -8,6 +8,8 @@ use wasmtime::{
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
+
+use super::registry::{FsSkillRegistry, SkillRegistry};
 
 bindgen!({ world: "skill", async: true });
 
@@ -80,15 +82,15 @@ pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<InvocationCtx>,
     components: HashMap<String, Component>,
-    skill_dir: PathBuf,
+    skill_registry: Box<dyn SkillRegistry + Send>,
 }
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        Self::with_dir("./skills")
+        Self::with_registry(FsSkillRegistry::new())
     }
 
-    pub fn with_dir(skill_dir: impl Into<PathBuf>) -> Self {
+    pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
         let mut linker: Linker<InvocationCtx> = Linker::new(&engine);
@@ -98,21 +100,16 @@ impl WasmRuntime {
         Skill::add_to_linker(&mut linker, |state: &mut InvocationCtx| state)
             .expect("linking to skill world must work");
 
-        let skill_dir = skill_dir.into();
-
         Self {
             engine,
             linker,
             components: HashMap::new(),
-            skill_dir,
+            skill_registry: Box::new(skill_registry),
         }
     }
 
     fn load_component(&mut self, skill_name: String) -> Result<(), Error> {
-        let mut skill_path = self.skill_dir.join(&skill_name);
-        skill_path.set_extension("wasm");
-
-        let component = Component::from_file(&self.engine, skill_path)?;
+        let component = self.skill_registry.load_skill(&skill_name, &self.engine)?;
         self.components.insert(skill_name, component);
         Ok(())
     }
@@ -156,7 +153,7 @@ pub mod tests {
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters, InferenceApi},
-        skills::runtime::Runtime,
+        skills::{registry::FsSkillRegistry, runtime::Runtime},
     };
 
     use super::WasmRuntime;
@@ -253,7 +250,9 @@ pub mod tests {
     async fn lazy_skill_loading() {
         // Giving and empty skill directory to the WasmRuntime
         let skill_dir = tempdir().unwrap();
-        let mut runtime = WasmRuntime::with_dir(skill_dir.path());
+        let registry = FsSkillRegistry::with_dir(skill_dir.path());
+        let mut runtime = WasmRuntime::with_registry(registry);
+
         let inference = InferenceStub::new("Hello");
 
         // When adding a new skill component

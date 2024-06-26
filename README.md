@@ -49,6 +49,22 @@ Then, run the image with
 ```shell
 podman run -p 8081:8081 pharia-kernel
 ```
+## pushing skill oci
+
+login to container registry:
+```shell
+podman login registry.gitlab.aleph-alpha.de
+```
+
+push container:
+```shell
+wasm-to-oci push skills/greet-py.wasm registry.gitlab.aleph-alpha.de/engineering/pharia-kernel/skills/greet-py:v1
+```
+
+pull container:
+```shell
+wasm-to-oci pull registry.gitlab.aleph-alpha.de/engineering/pharia-kernel/skills/greet-py:v1 --out skills/oci.wasm
+```
 
 ## Design Pharia Kernel
 
