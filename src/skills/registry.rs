@@ -72,12 +72,7 @@ impl SkillRegistry for OciRegistry {
         name: &'a str,
         engine: &'a Engine,
     ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
-        let protocol = oci_distribution::client::ClientProtocol::Https;
-        let config = ClientConfig {
-            protocol,
-            ..Default::default()
-        };
-        let client = Client::new(config);
+        let client = Client::new(ClientConfig::default());
 
         let registry = "registry.gitlab.aleph-alpha.de".to_owned();
         let tag = "v1".to_owned();
