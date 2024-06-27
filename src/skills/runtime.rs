@@ -1,6 +1,6 @@
 use std::{collections::HashMap, future::Future};
 
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use wasmtime::{
     component::{bindgen, Component, Linker},
     Config, Engine, Store,
@@ -113,8 +113,8 @@ impl WasmRuntime {
             .skill_registry
             .load_skill(&skill_name, &self.engine)
             .await?;
-        self.components
-            .insert(skill_name, component.expect("component must not be None"));
+        let component = component.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
+        self.components.insert(skill_name, component);
         Ok(())
     }
 }
