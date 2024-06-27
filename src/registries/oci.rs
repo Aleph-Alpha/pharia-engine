@@ -46,10 +46,7 @@ mod tests {
     }
 
     impl OciRegistry {
-        fn new() -> Self {
-            let repository =
-                env::var("SKILL_REPOSITORY").expect("SKILL_REPOSITORY variable not set");
-            let registry = env::var("SKILL_REGISTRY").expect("SKILL_REGISTRY variable not set");
+        fn new(repository: String, registry: String) -> Self {
             let client = Client::new(ClientConfig::default());
             let client = WasmClient::new(client);
 
@@ -57,6 +54,14 @@ mod tests {
                 client,
                 registry,
                 repository,
+            }
+        }
+        fn from_env() -> Option<Self> {
+            let maybe_repository = env::var("SKILL_REPOSITORY");
+            let maybe_registry = env::var("SKILL_REGISTRY");
+            match (maybe_repository, maybe_registry) {
+                (Ok(repository), Ok(registry)) => Some(OciRegistry::new(repository, registry)),
+                _ => None,
             }
         }
 
@@ -86,7 +91,8 @@ mod tests {
     async fn oci_push_and_pull_skill() {
         // given skill in local directory is pushed to registry
         drop(dotenvy::dotenv());
-        let registry = OciRegistry::new();
+        let registry =
+            OciRegistry::from_env().expect("Please configure registry, see .env.example");
         registry
             .store_skill("./skills/greet_skill.wasm", "greet_skill")
             .await;
