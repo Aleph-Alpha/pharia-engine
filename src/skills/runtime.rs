@@ -9,7 +9,7 @@ use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
-use super::registry::{CombinedRegistry, SkillRegistry};
+use super::registry::{FileRegistry, SkillRegistry};
 
 bindgen!({ world: "skill", async: true });
 
@@ -87,7 +87,7 @@ pub struct WasmRuntime {
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        Self::with_registry(CombinedRegistry::new())
+        Self::with_registry(FileRegistry::new())
     }
 
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {

@@ -1,30 +1,8 @@
-use anyhow::{Error, Result};
+use anyhow::{anyhow, bail, Error, Result};
 use oci_distribution::{secrets::RegistryAuth, Reference};
 use oci_wasm::WasmClient;
 use std::{env, future::Future, path::PathBuf, pin::Pin};
 use wasmtime::{component::Component, Engine};
-
-pub struct CombinedRegistry {
-    file_registry: FileRegistry,
-}
-
-impl CombinedRegistry {
-    pub fn new() -> Self {
-        Self {
-            file_registry: FileRegistry::new(),
-        }
-    }
-}
-
-impl SkillRegistry for CombinedRegistry {
-    fn load_skill<'a>(
-        &'a self,
-        name: &'a str,
-        engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
-        self.file_registry.load_skill(name, engine)
-    }
-}
 
 pub trait SkillRegistry {
     fn load_skill<'a>(
@@ -32,6 +10,16 @@ pub trait SkillRegistry {
         name: &'a str,
         engine: &'a Engine,
     ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>>;
+}
+
+impl<R> SkillRegistry for Vec<R> {
+    fn load_skill<'a>(
+        &'a self,
+        name: &'a str,
+        engine: &'a Engine,
+    ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
+        Box::pin(async move { bail!("skill not found in registry") })
+    }
 }
 
 pub struct FileRegistry {
@@ -150,5 +138,14 @@ mod tests {
 
         // then skill can be loaded
         assert!(component.is_ok());
+    }
+
+    #[tokio::test]
+    async fn empty_skill_registries() {
+        let registries = Vec::<Box<dyn SkillRegistry>>::new();
+        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
+            .expect("config must be valid");
+        let component = registries.load_skill("dummy skill name", &engine).await;
+        assert!(component.is_err());
     }
 }
