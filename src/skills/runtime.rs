@@ -87,7 +87,8 @@ pub struct WasmRuntime {
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        Self::with_registry(FileRegistry::new())
+        let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![Box::new(FileRegistry::new())];
+        Self::with_registry(registries)
     }
 
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
@@ -274,4 +275,6 @@ pub mod tests {
             .await;
         assert!(greet.is_ok());
     }
+    #[tokio::test]
+    async fn oci_registry_is_setup_from_runtime() {}
 }

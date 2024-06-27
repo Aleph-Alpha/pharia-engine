@@ -12,7 +12,7 @@ pub trait SkillRegistry {
     ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>>;
 }
 
-impl SkillRegistry for Box<dyn SkillRegistry> {
+impl SkillRegistry for Box<dyn SkillRegistry + Send> {
     fn load_skill<'a>(
         &'a self,
         name: &'a str,
@@ -79,6 +79,8 @@ impl SkillRegistry for FileRegistry {
 
 pub struct OciRegistry {
     client: WasmClient,
+    registry: String,
+    repository: String,
 }
 
 impl SkillRegistry for OciRegistry {
@@ -87,10 +89,9 @@ impl SkillRegistry for OciRegistry {
         name: &'a str,
         engine: &'a Engine,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
-        let registry = "registry.gitlab.aleph-alpha.de";
-        let repository = format!("engineering/pharia-kernel/skills/{name}");
+        let repository = format!("{}/{name}", self.repository);
         let tag = "latest";
-        let image = Reference::with_tag(registry.to_owned(), repository, tag.to_owned());
+        let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
 
         let username =
             env::var("SKILL_REGISTRY_USER").expect("SKILL_REGISTRY_USER variable not set");
@@ -154,10 +155,17 @@ mod tests {
 
     impl OciRegistry {
         fn new() -> Self {
+            let repository =
+                env::var("SKILL_REPOSITORY").expect("SKILL_REPOSITORY variable not set");
+            let registry = env::var("SKILL_REGISTRY").expect("SKILL_REGISTRY variable not set");
             let client = Client::new(ClientConfig::default());
             let client = WasmClient::new(client);
 
-            Self { client }
+            Self {
+                client,
+                registry,
+                repository,
+            }
         }
 
         async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str) {
@@ -239,7 +247,7 @@ mod tests {
         let component = Component::new(&engine, &r#"(component)"#).unwrap();
 
         // when
-        let registries: Vec<Box<dyn SkillRegistry>> = vec![
+        let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(NoneRegistry {}),
             Box::new(SomeRegistry::new(component)),
         ];
@@ -258,7 +266,7 @@ mod tests {
         let component = Component::new(&engine, &r#"(component)"#).unwrap();
 
         // when
-        let registries: Vec<Box<dyn SkillRegistry>> = vec![
+        let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(SomeRegistry::new(component)),
             Box::new(NoneRegistry {}),
         ];
