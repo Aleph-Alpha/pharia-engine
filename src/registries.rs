@@ -1,4 +1,5 @@
 use anyhow::{Error, Result};
+use futures::{stream::FuturesOrdered, StreamExt};
 use oci::OciRegistry;
 use std::{future::Future, pin::Pin};
 use wasmtime::{component::Component, Engine};
@@ -40,14 +41,21 @@ impl<R: SkillRegistry> SkillRegistry for Vec<R> {
         name: &'a str,
         engine: &'a Engine,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
-        let futures: Vec<_> = self.iter().map(|r| r.load_skill(name, engine)).collect();
+        // Collect all the futures into an ordered stream that will run the futures concurrently,
+        // but will return the results in the order they were added.
+        let mut futures = self
+            .iter()
+            .map(|r| r.load_skill(name, engine))
+            .collect::<FuturesOrdered<_>>();
         Box::pin(async move {
-            for fut in futures {
-                if let Ok(Some(component)) = fut.await {
+            while let Some(result) = futures.next().await {
+                // We found the component. Otherwise, we continue to the next registry.
+                // Bubble up any errors we find as well.
+                if let Some(component) = result? {
                     return Ok(Some(component));
                 }
             }
-
+            // We didn't find it anywhere
             Ok(None)
         })
     }
