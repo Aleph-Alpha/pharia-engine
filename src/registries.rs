@@ -132,7 +132,7 @@ mod tests {
     async fn one_none_one_some_registries() {
         // given
         let engine = make_engine();
-        let component = Component::new(&engine, &r#"(component)"#).unwrap();
+        let component = Component::new(&engine, "(component)").unwrap();
 
         // when
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
@@ -150,7 +150,7 @@ mod tests {
     async fn one_some_one_none_registries() {
         // given
         let engine = make_engine();
-        let component = Component::new(&engine, &r#"(component)"#).unwrap();
+        let component = Component::new(&engine, "(component)").unwrap();
 
         // when
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
