@@ -9,7 +9,7 @@ use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
-use super::registry::{FileRegistry, SkillRegistry};
+use crate::registries::{FileRegistry, SkillRegistry};
 
 bindgen!({ world: "skill", async: true });
 
@@ -158,7 +158,8 @@ pub mod tests {
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters, InferenceApi},
-        skills::{registry::FileRegistry, runtime::Runtime},
+        registries::FileRegistry,
+        skills::runtime::Runtime,
     };
 
     use super::WasmRuntime;

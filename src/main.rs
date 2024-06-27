@@ -1,5 +1,6 @@
 mod config;
 mod inference;
+mod registries;
 mod shell;
 mod skills;
 use std::future::Future;

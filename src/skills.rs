@@ -1,5 +1,4 @@
 mod actor;
-mod registry;
 mod runtime;
 pub use actor::{SkillExecutor, SkillExecutorApi};
 pub use runtime::WasmRuntime;
