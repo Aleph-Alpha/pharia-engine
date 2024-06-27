@@ -2083,6 +2083,10 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
+ "dotenvy",
+ "oci-distribution",
+ "oci-wasm",
+ "tokio",
 ]
 
 [[package]]
