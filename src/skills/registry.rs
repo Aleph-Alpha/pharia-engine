@@ -12,13 +12,22 @@ pub trait SkillRegistry {
     ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>>;
 }
 
-impl<R> SkillRegistry for Vec<R> {
+impl<R: SkillRegistry> SkillRegistry for Vec<R> {
     fn load_skill<'a>(
         &'a self,
         name: &'a str,
         engine: &'a Engine,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
-        Box::pin(async move { bail!("skill not found in registry") })
+        let futures: Vec<_> = self.iter().map(|r| r.load_skill(name, engine)).collect();
+        Box::pin(async move {
+            for fut in futures {
+                if let Ok(Some(component)) = fut.await {
+                    return Ok(Some(component));
+                }
+            }
+
+            Ok(None)
+        })
     }
 }
 
@@ -91,14 +100,27 @@ impl SkillRegistry for OciRegistry {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, path::Path};
+    use std::{env, future::Future, path::Path, pin::Pin};
 
+    use anyhow::Error;
     use oci_distribution::{client::ClientConfig, secrets::RegistryAuth, Client, Reference};
     use oci_wasm::{WasmClient, WasmConfig};
     use tempfile::tempdir;
-    use wasmtime::{Config, Engine};
+    use wasmtime::{component::Component, Config, Engine};
 
     use super::{FileRegistry, OciRegistry, SkillRegistry};
+
+    struct NoneRegistry;
+
+    impl SkillRegistry for NoneRegistry {
+        fn load_skill<'a>(
+            &'a self,
+            name: &'a str,
+            engine: &'a Engine,
+        ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+            Box::pin(async { Ok(None) })
+        }
+    }
 
     impl OciRegistry {
         fn new() -> Self {
@@ -161,10 +183,21 @@ mod tests {
 
     #[tokio::test]
     async fn empty_skill_registries() {
-        let registries = Vec::<Box<dyn SkillRegistry>>::new();
+        let registries = Vec::<NoneRegistry>::new();
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
-        let component = registries.load_skill("dummy skill name", &engine).await;
-        assert!(component.is_err());
+        let result = registries.load_skill("dummy skill name", &engine).await;
+        let component = result.unwrap();
+        assert!(component.is_none());
+    }
+
+    #[tokio::test]
+    async fn two_empty_registries() {
+        let registries = vec![NoneRegistry {}, NoneRegistry {}];
+        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
+            .expect("config must be valid");
+        let result = registries.load_skill("dummy skill name", &engine).await;
+        let component = result.unwrap();
+        assert!(component.is_none());
     }
 }
