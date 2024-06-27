@@ -1,10 +1,10 @@
 # Pharia Kernel
 
-Pharia Kernel allows you to execute Cognitive Business Units written in Python and handles their interaction with other modules of Pharia like inference and search.
-
-Pharia Kernel acts as an "opinionated message bus" between business applications, inference and retrieval. This enables for Retrieval Augmented Generation (RAG) among other things. In addition Kernel can be seen as a serverless lambda engine for cognitive business units called "skills".
+Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in a number of languages, including Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrival via the cognitive system interface. This enables to deploy RAG usecases serverless.
 
 The entire Stack including Kernel, Inference, Document Index, etc is called **Pharia OS**.
+
+The current prototyp is deployed at <https://pharia-kernel.aleph-alpha-playground.stackit.rocks/>
 
 ![Block Diagram Pharia OS](./tam/pharia-os-running.drawio.svg)
 
