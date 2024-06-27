@@ -95,12 +95,16 @@ mod tests {
         }
     }
 
+    fn make_engine() -> Engine {
+        Engine::new(Config::new().async_support(true).wasm_component_model(true))
+            .expect("config must be valid")
+    }
+
     #[tokio::test]
     async fn empty_file_registry() {
         let skill_dir = tempdir().unwrap();
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid");
+        let engine = make_engine();
         let result = registry.load_skill("dummy skill name", &engine).await;
         let component = result.unwrap();
         assert!(component.is_none());
@@ -109,8 +113,7 @@ mod tests {
     #[tokio::test]
     async fn empty_skill_registries() {
         let registries = Vec::<NoneRegistry>::new();
-        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid");
+        let engine = make_engine();
         let result = registries.load_skill("dummy skill name", &engine).await;
         let component = result.unwrap();
         assert!(component.is_none());
@@ -119,8 +122,7 @@ mod tests {
     #[tokio::test]
     async fn two_empty_registries() {
         let registries = vec![NoneRegistry {}, NoneRegistry {}];
-        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid");
+        let engine = make_engine();
         let result = registries.load_skill("dummy skill name", &engine).await;
         let component = result.unwrap();
         assert!(component.is_none());
@@ -129,8 +131,7 @@ mod tests {
     #[tokio::test]
     async fn one_none_one_some_registries() {
         // given
-        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid");
+        let engine = make_engine();
         let component = Component::new(&engine, &r#"(component)"#).unwrap();
 
         // when
@@ -148,8 +149,7 @@ mod tests {
     #[tokio::test]
     async fn one_some_one_none_registries() {
         // given
-        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid");
+        let engine = make_engine();
         let component = Component::new(&engine, &r#"(component)"#).unwrap();
 
         // when
