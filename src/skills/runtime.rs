@@ -113,7 +113,8 @@ impl WasmRuntime {
             .skill_registry
             .load_skill(&skill_name, &self.engine)
             .await?;
-        self.components.insert(skill_name, component);
+        self.components
+            .insert(skill_name, component.expect("component must not be None"));
         Ok(())
     }
 }

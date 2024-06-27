@@ -9,7 +9,7 @@ pub trait SkillRegistry {
         &'a self,
         name: &'a str,
         engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>>;
 }
 
 impl<R> SkillRegistry for Vec<R> {
@@ -17,7 +17,7 @@ impl<R> SkillRegistry for Vec<R> {
         &'a self,
         name: &'a str,
         engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
         Box::pin(async move { bail!("skill not found in registry") })
     }
 }
@@ -43,11 +43,12 @@ impl SkillRegistry for FileRegistry {
         &'a self,
         name: &'a str,
         engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
         let fut = async move {
             let mut skill_path = self.skill_dir.join(name);
             skill_path.set_extension("wasm");
-            Component::from_file(engine, skill_path)
+            let result = Component::from_file(engine, skill_path);
+            Some(result).transpose()
         };
         Box::pin(fut)
     }
@@ -62,7 +63,7 @@ impl SkillRegistry for OciRegistry {
         &'a self,
         name: &'a str,
         engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Component, Error>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
         let registry = "registry.gitlab.aleph-alpha.de";
         let repository = format!("engineering/pharia-kernel/skills/{name}");
         let tag = "latest";
@@ -75,9 +76,11 @@ impl SkillRegistry for OciRegistry {
         let auth = RegistryAuth::Basic(username, password);
 
         Box::pin(async move {
+            // TODO: return None if skill not found
             let image = self.client.pull(&image, &auth).await?;
             let binary = &image.layers.first().unwrap().data;
-            Component::from_binary(engine, binary)
+            let result = Component::from_binary(engine, binary);
+            Some(result).transpose()
         })
     }
 }
