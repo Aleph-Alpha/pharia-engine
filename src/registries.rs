@@ -68,8 +68,8 @@ mod tests {
     impl SkillRegistry for NoneRegistry {
         fn load_skill<'a>(
             &'a self,
-            name: &'a str,
-            engine: &'a Engine,
+            _name: &'a str,
+            _engine: &'a Engine,
         ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
             Box::pin(async { Ok(None) })
         }
@@ -88,8 +88,8 @@ mod tests {
     impl SkillRegistry for SomeRegistry {
         fn load_skill<'a>(
             &'a self,
-            name: &'a str,
-            engine: &'a Engine,
+            _name: &'a str,
+            _engine: &'a Engine,
         ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
             Box::pin(async move { Ok(Some(self.component.clone())) })
         }
