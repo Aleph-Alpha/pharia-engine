@@ -1,10 +1,20 @@
 use anyhow::{Error, Result};
+use oci::OciRegistry;
 use std::{future::Future, pin::Pin};
 use wasmtime::{component::Component, Engine};
 
 mod file;
 mod oci;
+
 pub use self::file::FileRegistry;
+
+pub fn registries() -> Vec<Box<dyn SkillRegistry + Send>> {
+    let mut registries: Vec<Box<dyn SkillRegistry + Send>> = vec![Box::new(FileRegistry::new())];
+    if let Some(oci_registry) = OciRegistry::from_env() {
+        registries.push(Box::new(oci_registry));
+    }
+    registries
+}
 
 pub trait SkillRegistry {
     fn load_skill<'a>(

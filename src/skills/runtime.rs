@@ -7,9 +7,12 @@ use wasmtime::{
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
-use crate::inference::{CompleteTextParameters, InferenceApi};
+use crate::{
+    inference::{CompleteTextParameters, InferenceApi},
+    registries::registries,
+};
 
-use crate::registries::{FileRegistry, SkillRegistry};
+use crate::registries::SkillRegistry;
 
 bindgen!({ world: "skill", async: true });
 
@@ -87,8 +90,7 @@ pub struct WasmRuntime {
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![Box::new(FileRegistry::new())];
-        Self::with_registry(registries)
+        Self::with_registry(registries())
     }
 
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
@@ -276,6 +278,4 @@ pub mod tests {
             .await;
         assert!(greet.is_ok());
     }
-    #[tokio::test]
-    async fn oci_registry_is_setup_from_runtime() {}
 }

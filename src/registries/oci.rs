@@ -1,75 +1,84 @@
+use crate::registries::SkillRegistry;
+use anyhow::{Error, Result};
+use oci_distribution::{secrets::RegistryAuth, Reference};
+use oci_wasm::WasmClient;
+use std::{env, future::Future, pin::Pin};
+use wasmtime::{component::Component, Engine};
+
+use oci_distribution::{client::ClientConfig, Client};
+
+pub struct OciRegistry {
+    client: WasmClient,
+    registry: String,
+    repository: String,
+}
+
+impl SkillRegistry for OciRegistry {
+    fn load_skill<'a>(
+        &'a self,
+        name: &'a str,
+        engine: &'a Engine,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+        let repository = format!("{}/{name}", self.repository);
+        let tag = "latest";
+        let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
+
+        let username =
+            env::var("SKILL_REGISTRY_USER").expect("SKILL_REGISTRY_USER variable not set");
+        let password =
+            env::var("SKILL_REGISTRY_PASSWORD").expect("SKILL_REGISTRY_PASSWORD variable not set");
+        let auth = RegistryAuth::Basic(username, password);
+
+        Box::pin(async move {
+            // TODO: return None if skill not found
+            let image = self.client.pull(&image, &auth).await?;
+            let binary = &image.layers.first().unwrap().data;
+            let result = Component::from_binary(engine, binary);
+            Some(result).transpose()
+        })
+    }
+}
+
+impl OciRegistry {
+    fn new(repository: String, registry: String) -> Self {
+        let client = Client::new(ClientConfig::default());
+        let client = WasmClient::new(client);
+
+        Self {
+            client,
+            registry,
+            repository,
+        }
+    }
+
+    pub fn from_env() -> Option<Self> {
+        let maybe_repository = env::var("SKILL_REPOSITORY");
+        let maybe_registry = env::var("SKILL_REGISTRY");
+        match (maybe_repository, maybe_registry) {
+            (Ok(repository), Ok(registry)) => Some(OciRegistry::new(repository, registry)),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::registries::SkillRegistry;
-    use anyhow::{Error, Result};
     use oci_distribution::{secrets::RegistryAuth, Reference};
-    use oci_wasm::WasmClient;
-    use std::{env, future::Future, pin::Pin};
-    use wasmtime::{component::Component, Engine};
+    use wasmtime::Engine;
 
+    use super::OciRegistry;
+    use std::env;
     use std::path::Path;
 
-    use oci_distribution::{client::ClientConfig, Client};
+    use crate::registries::SkillRegistry;
     use oci_wasm::WasmConfig;
     use wasmtime::Config;
 
-    pub struct OciRegistry {
-        client: WasmClient,
-        registry: String,
-        repository: String,
-    }
-
-    impl SkillRegistry for OciRegistry {
-        fn load_skill<'a>(
-            &'a self,
-            name: &'a str,
-            engine: &'a Engine,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
-            let repository = format!("{}/{name}", self.repository);
+    impl OciRegistry {
+        async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str) {
+            let repository = format!("{}/{skill_name}", self.repository);
             let tag = "latest";
             let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
-
-            let username =
-                env::var("SKILL_REGISTRY_USER").expect("SKILL_REGISTRY_USER variable not set");
-            let password = env::var("SKILL_REGISTRY_PASSWORD")
-                .expect("SKILL_REGISTRY_PASSWORD variable not set");
-            let auth = RegistryAuth::Basic(username, password);
-
-            Box::pin(async move {
-                // TODO: return None if skill not found
-                let image = self.client.pull(&image, &auth).await?;
-                let binary = &image.layers.first().unwrap().data;
-                let result = Component::from_binary(engine, binary);
-                Some(result).transpose()
-            })
-        }
-    }
-
-    impl OciRegistry {
-        fn new(repository: String, registry: String) -> Self {
-            let client = Client::new(ClientConfig::default());
-            let client = WasmClient::new(client);
-
-            Self {
-                client,
-                registry,
-                repository,
-            }
-        }
-        fn from_env() -> Option<Self> {
-            let maybe_repository = env::var("SKILL_REPOSITORY");
-            let maybe_registry = env::var("SKILL_REGISTRY");
-            match (maybe_repository, maybe_registry) {
-                (Ok(repository), Ok(registry)) => Some(OciRegistry::new(repository, registry)),
-                _ => None,
-            }
-        }
-
-        async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str) {
-            let registry = "registry.gitlab.aleph-alpha.de";
-            let repository = format!("engineering/pharia-kernel/skills/{skill_name}");
-            let tag = "latest";
-            let image = Reference::with_tag(registry.to_owned(), repository, tag.to_owned());
             let (config, component_layer) = WasmConfig::from_component(path, None)
                 .await
                 .expect("component must be valid");
