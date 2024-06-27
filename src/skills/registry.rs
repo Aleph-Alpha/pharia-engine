@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Error, Result};
+use anyhow::{Error, Result};
 use oci_distribution::{secrets::RegistryAuth, Reference};
 use oci_wasm::WasmClient;
 use std::{env, future::Future, path::PathBuf, pin::Pin};
@@ -10,6 +10,16 @@ pub trait SkillRegistry {
         name: &'a str,
         engine: &'a Engine,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>>;
+}
+
+impl SkillRegistry for Box<dyn SkillRegistry> {
+    fn load_skill<'a>(
+        &'a self,
+        name: &'a str,
+        engine: &'a Engine,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+        self.as_ref().load_skill(name, engine)
+    }
 }
 
 impl<R: SkillRegistry> SkillRegistry for Vec<R> {
@@ -122,6 +132,26 @@ mod tests {
         }
     }
 
+    struct SomeRegistry {
+        component: Component,
+    }
+
+    impl SomeRegistry {
+        fn new(component: Component) -> Self {
+            Self { component }
+        }
+    }
+
+    impl SkillRegistry for SomeRegistry {
+        fn load_skill<'a>(
+            &'a self,
+            name: &'a str,
+            engine: &'a Engine,
+        ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+            Box::pin(async move { Ok(Some(self.component.clone())) })
+        }
+    }
+
     impl OciRegistry {
         fn new() -> Self {
             let client = Client::new(ClientConfig::default());
@@ -199,5 +229,43 @@ mod tests {
         let result = registries.load_skill("dummy skill name", &engine).await;
         let component = result.unwrap();
         assert!(component.is_none());
+    }
+
+    #[tokio::test]
+    async fn one_none_one_some_registries() {
+        // given
+        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
+            .expect("config must be valid");
+        let component = Component::new(&engine, &r#"(component)"#).unwrap();
+
+        // when
+        let registries: Vec<Box<dyn SkillRegistry>> = vec![
+            Box::new(NoneRegistry {}),
+            Box::new(SomeRegistry::new(component)),
+        ];
+        let result = registries.load_skill("dummy skill name", &engine).await;
+        let component = result.unwrap();
+
+        // then
+        assert!(component.is_some());
+    }
+
+    #[tokio::test]
+    async fn one_some_one_none_registries() {
+        // given
+        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
+            .expect("config must be valid");
+        let component = Component::new(&engine, &r#"(component)"#).unwrap();
+
+        // when
+        let registries: Vec<Box<dyn SkillRegistry>> = vec![
+            Box::new(SomeRegistry::new(component)),
+            Box::new(NoneRegistry {}),
+        ];
+        let result = registries.load_skill("dummy skill name", &engine).await;
+        let component = result.unwrap();
+
+        // then
+        assert!(component.is_some());
     }
 }
