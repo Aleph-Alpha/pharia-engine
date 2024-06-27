@@ -47,8 +47,12 @@ impl SkillRegistry for FileRegistry {
         let fut = async move {
             let mut skill_path = self.skill_dir.join(name);
             skill_path.set_extension("wasm");
-            let result = Component::from_file(engine, skill_path);
-            Some(result).transpose()
+            if skill_path.exists() {
+                let result = Component::from_file(engine, skill_path);
+                Some(result).transpose()
+            } else {
+                Ok(None)
+            }
         };
         Box::pin(fut)
     }
@@ -91,9 +95,10 @@ mod tests {
 
     use oci_distribution::{client::ClientConfig, secrets::RegistryAuth, Client, Reference};
     use oci_wasm::{WasmClient, WasmConfig};
+    use tempfile::tempdir;
     use wasmtime::{Config, Engine};
 
-    use super::{OciRegistry, SkillRegistry};
+    use super::{FileRegistry, OciRegistry, SkillRegistry};
 
     impl OciRegistry {
         fn new() -> Self {
@@ -141,6 +146,17 @@ mod tests {
 
         // then skill can be loaded
         assert!(component.is_ok());
+    }
+
+    #[tokio::test]
+    async fn empty_file_registry() {
+        let skill_dir = tempdir().unwrap();
+        let registry = FileRegistry::with_dir(skill_dir.path());
+        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
+            .expect("config must be valid");
+        let result = registry.load_skill("dummy skill name", &engine).await;
+        let component = result.unwrap();
+        assert!(component.is_none());
     }
 
     #[tokio::test]
