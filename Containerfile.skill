@@ -12,7 +12,7 @@ COPY --from=planner /build/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
 COPY . .
-RUN cargo auditable build ./pharia-skill --release
+RUN cargo auditable build --manifest-path pharia-skill/Cargo.toml --release
 
 # Move rust binary in optimized runtime container
 FROM registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/artifact-base/rust-runtime
