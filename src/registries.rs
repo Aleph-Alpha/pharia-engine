@@ -65,7 +65,7 @@ impl<R: SkillRegistry> SkillRegistry for Vec<R> {
 mod tests {
     use std::{future::Future, pin::Pin};
 
-    use anyhow::Error;
+    use anyhow::{anyhow, Error};
     use tempfile::tempdir;
     use wasmtime::{component::Component, Config, Engine};
 
@@ -100,6 +100,19 @@ mod tests {
             _engine: &'a Engine,
         ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
             Box::pin(async move { Ok(Some(self.component.clone())) })
+        }
+    }
+
+    struct SaboteurRegistry;
+
+    impl SkillRegistry for SaboteurRegistry {
+        fn load_skill<'a>(
+            &'a self,
+            _name: &'a str,
+            _engine: &'a Engine,
+        ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Component>, Error>> + Send + 'a>>
+        {
+            Box::pin(async move { Err(anyhow!("out-of-cheese-error")) })
         }
     }
 
@@ -170,5 +183,38 @@ mod tests {
 
         // then
         assert!(component.is_some());
+    }
+
+    #[tokio::test]
+    async fn first_fails_and_second_succeeds() {
+        // given
+        let engine = make_engine();
+        let component = Component::new(&engine, "(component)").unwrap();
+        let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
+            Box::new(SaboteurRegistry),
+            Box::new(SomeRegistry::new(component)),
+        ];
+
+        // when
+        let result = registries.load_skill("dummy skill name", &engine).await;
+
+        // then
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn second_one_fails() {
+        let engine = make_engine();
+        let component = Component::new(&engine, "(component)").unwrap();
+        let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
+            Box::new(SomeRegistry::new(component)),
+            Box::new(SaboteurRegistry),
+        ];
+
+        // when
+        let result = registries.load_skill("dummy skill name", &engine).await;
+
+        // then
+        assert!(result.is_ok());
     }
 }
