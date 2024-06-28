@@ -173,20 +173,14 @@ image_publish:
   script:
     # login GitLab
     - podman login --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    # pull Pharia Kernel image
+    # pull Pharia Kernel image and tag as latest
     - podman pull $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
     - podman tag "$KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA" "$KERNEL_IMAGE:latest"
     - podman push "$KERNEL_IMAGE:latest"
-    - IMAGE_ID=$(podman inspect $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
-    - podman tag $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
-    - podman tag $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
-    # pull Pharia Skill image
+    # pull Pharia Skill image and tag as latest
     - podman pull $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA
     - podman tag "$SKILL_IMAGE:$CI_COMMIT_SHORT_SHA" "$SKILL_IMAGE:latest"
     - podman push "$SKILL_IMAGE:latest"
-    - SKILL_IMAGE_ID=$(podman inspect $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
-    - podman tag $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$SKILL_ARTIFACT_NAME:latest
-    - podman tag $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$SKILL_ARTIFACT_NAME:$SKILL_IMAGE_ID
     # logout GitLab
     - podman logout $CI_REGISTRY
     # login JFrog
@@ -194,8 +188,14 @@ image_publish:
     - JFROG_ACCESS_TOKEN_SUBJECT=$(extract_access_token_subject $JFROG_ACCESS_TOKEN)
     - podman login --username "$JFROG_ACCESS_TOKEN_SUBJECT" --password $JFROG_ACCESS_TOKEN $ARTIFACTORY_URL/$ARTIFACTORY_REPO
     # push Pharia Kernel image
+    - IMAGE_ID=$(podman inspect $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
+    - podman tag $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
+    - podman tag $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
     - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
     - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
     # push Pharia Skill image
+    - SKILL_IMAGE_ID=$(podman inspect $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
+    - podman tag $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$SKILL_ARTIFACT_NAME:latest
+    - podman tag $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$SKILL_ARTIFACT_NAME:$SKILL_IMAGE_ID
     - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$SKILL_ARTIFACT_NAME:latest
     - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$SKILL_ARTIFACT_NAME:$SKILL_IMAGE_ID
