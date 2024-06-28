@@ -1,8 +1,11 @@
 use std::path::PathBuf;
 
 use clap::Parser;
+use mime::APPLICATION_JSON;
 use oci_distribution::{client::ClientConfig, secrets::RegistryAuth, Client, Reference};
 use oci_wasm::{WasmClient, WasmConfig};
+use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use serde_json::json;
 
 #[derive(Parser)]
 #[clap(version)]
@@ -36,7 +39,27 @@ enum Command {
         #[arg(long, short = 'p', env = "SKILL_REGISTRY_PASSWORD")]
         password: String,
     },
+    /// Run a skill via Pharia Kernel
+    Run {
+        /// The Skill name
+        #[arg(long, short = 'n')]
+        name: String,
+        /// The Skill input
+        #[arg(long, short = 'i')]
+        input: String,
+        /// The API token
+        #[arg(long, short = 'a', env = "AA_API_TOKEN")]
+        token: String,
+        /// The Pharia Kernel instance
+        #[arg(
+            long,
+            short = 'l',
+            default_value = "https://pharia-kernel.aleph-alpha-playground.stackit.rocks"
+        )]
+        url: String,
+    },
 }
+
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
@@ -51,6 +74,12 @@ async fn main() {
             username,
             password,
         } => publish(skill, registry, repository, name, tag, username, password).await,
+        Command::Run {
+            name,
+            input,
+            token,
+            url,
+        } => run(name, input, token, url).await,
     }
 }
 
@@ -86,4 +115,26 @@ async fn publish(
         .push(&image, &auth, component_layer, config, None)
         .await
         .expect("Could not publish skill, please check command arguments.");
+}
+
+async fn run(name: String, input: String, token: String, url: String) {
+    let json_payload = json!({
+        "skill": name,
+        "input": input
+    });
+
+    let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
+    auth_value.set_sensitive(true);
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{url}/execute_skill"))
+        .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+        .header(AUTHORIZATION, auth_value)
+        .json(&json_payload)
+        .send()
+        .await
+        .unwrap();
+
+    println!("{}", resp.text().await.unwrap());
 }

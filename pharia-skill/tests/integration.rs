@@ -1,6 +1,7 @@
 use std::{env, fs::File, io::Write, path::Path};
 
 use assert_cmd::Command;
+use predicates::str::contains;
 
 #[test]
 fn invalid_args() {
@@ -54,4 +55,27 @@ fn publish_minimal_args() {
             env::var("SKILL_REGISTRY_PASSWORD").expect("SKILL_REGISTRY_PASSWORD must be set."),
         );
     cmd.assert().success();
+}
+
+#[test]
+fn run_skill() {
+    drop(dotenvy::dotenv());
+    let mut cmd = Command::cargo_bin("pharia-skill").unwrap();
+    let cmd = cmd
+        .arg("run")
+        .arg("-n")
+        .arg("greet_skill")
+        .arg("-i")
+        .arg("Homer")
+        .arg("-l")
+        .arg(format!(
+            "http://{}:{}",
+            env::var("HOST").expect("HOST must be set."),
+            env::var("PORT").expect("PORT must be set."),
+        ))
+        .env(
+            "AA_API_TOKEN",
+            env::var("AA_API_TOKEN").expect("AA_API_TOKEN must be set."),
+        );
+    cmd.assert().stdout(contains("Homer"));
 }
