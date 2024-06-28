@@ -23,6 +23,8 @@ variables:
   ARTIFACTORY_URL: "https://${ARTIFACTORY_HOST}"
   ARTIFACTORY_REPO: pharia-kernel-images
   CONTAINER_PORT: 8081
+  KERNEL_IMAGE: $CI_REGISTRY_IMAGE
+  SKILL_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAME/pharia-skill
 
 cargo_clippy:
   stage: test
@@ -51,6 +53,32 @@ cargo_test:
     - ./build-skill-py.sh
     - cargo test --workspace --all-features
 
+skill_image_build:
+  stage: image_build
+  image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - podman login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - echo -e "\e[0Ksection_start:`date +%s`:my_section[collapsed=true]\r\e[0KBuild image"
+    - >
+      podman build \
+        --ulimit nofile=$(ulimit -n):$(ulimit -n) \
+        --layers \
+        --cache-to $SKILL_IMAGE/cache \
+        --cache-from $SKILL_IMAGE/cache \
+        --cache-ttl=24h \
+        -f Containerfile.skill \
+        --label "com.aleph-alpha.git-hash"=$CI_COMMIT_SHORT_SHA \
+        --label "com.aleph-alpha.image-id"=$(image_id) \
+        -t $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA \
+        --progress=plain \
+        .
+    - podman push $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA
+    - echo -e "\e[0Ksection_end:`date +%s`:my_section\r\e[0K"
+
 image_build:
   stage: image_build
   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
@@ -65,16 +93,16 @@ image_build:
       podman build \
         --ulimit nofile=$(ulimit -n):$(ulimit -n) \
         --layers \
-        --cache-to $CI_REGISTRY_IMAGE/cache \
-        --cache-from $CI_REGISTRY_IMAGE/cache \
+        --cache-to $KERNEL_IMAGE/cache \
+        --cache-from $KERNEL_IMAGE/cache \
         --cache-ttl=24h \
         -f Containerfile \
         --label "com.aleph-alpha.git-hash"=$CI_COMMIT_SHORT_SHA \
         --label "com.aleph-alpha.image-id"=$(image_id) \
-        -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA \
+        -t $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA \
         --progress=plain \
         .
-    - podman push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - podman push $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
     - echo -e "\e[0Ksection_end:`date +%s`:my_section\r\e[0K"
 
 sbom_vulnerability_scan:
@@ -84,11 +112,11 @@ sbom_vulnerability_scan:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       variables:
         ARTIFACT_NAME: $CI_PROJECT_NAME
-        FULL_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+        FULL_IMAGE_NAME: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
     - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_SECURITY_SCAN == "true"
       variables:
         ARTIFACT_NAME: $CI_PROJECT_NAME:latest
-        FULL_IMAGE_NAME: $CI_REGISTRY_IMAGE:latest
+        FULL_IMAGE_NAME: $KERNEL_IMAGE:latest
 
 container_test:
   stage: image_test
@@ -99,7 +127,7 @@ container_test:
   before_script:
     - podman login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - sh -x ./tests/test-container.sh $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - sh -x ./tests/test-container.sh $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
 
 # TODO: replace with actual integration tests
 integration_test:
@@ -109,7 +137,7 @@ integration_test:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   services:
-    - name: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - name: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
       alias: $CI_PROJECT_NAME
   script:
     - sh -x ./tests/test-image.sh $CONTAINER_PORT $CI_PROJECT_NAME
@@ -126,12 +154,12 @@ image_publish:
       aud: $ARTIFACTORY_URL
   script:
     - podman login --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - podman pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-    - podman tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" "$CI_REGISTRY_IMAGE:latest"
-    - podman push "$CI_REGISTRY_IMAGE:latest"
-    - IMAGE_ID=$(podman inspect $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
-    - podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
-    - podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
+    - podman pull $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
+    - podman tag "$KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA" "$KERNEL_IMAGE:latest"
+    - podman push "$KERNEL_IMAGE:latest"
+    - IMAGE_ID=$(podman inspect $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
+    - podman tag $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
+    - podman tag $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
     - podman logout $CI_REGISTRY
     - JFROG_ACCESS_TOKEN=$(get_jfrog_access_token $GITLAB_OIDC_TOKEN)
     - JFROG_ACCESS_TOKEN_SUBJECT=$(extract_access_token_subject $JFROG_ACCESS_TOKEN)
