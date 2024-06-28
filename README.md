@@ -4,7 +4,9 @@ Pharia Kernel allows you to execute Cognitive Business Units called skills. Thes
 
 The entire Stack including Kernel, Inference, Document Index, etc is called **Pharia OS**.
 
-The current prototyp is deployed at <https://pharia-kernel.aleph-alpha-playground.stackit.rocks/>
+The current prototype is deployed at <https://pharia-kernel.aleph-alpha-playground.stackit.rocks/>
+
+The status page for uptime robot is found at: <https://stats.uptimerobot.com/gjXpoIPMnv>
 
 ![Block Diagram Pharia OS](./tam/pharia-os-running.drawio.svg)
 
