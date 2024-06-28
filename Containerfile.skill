@@ -18,4 +18,4 @@ RUN cargo auditable build --manifest-path pharia-skill/Cargo.toml --release
 FROM registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/artifact-base/rust-runtime
 COPY --from=builder /build/target/release/pharia-skill /usr/local/bin/pharia-skill
 
-ENTRYPOINT [ "./pharia-skill" ]
+ENTRYPOINT [ "pharia-skill" ]
