@@ -23,8 +23,8 @@ variables:
   ARTIFACTORY_URL: "https://${ARTIFACTORY_HOST}"
   ARTIFACTORY_REPO: pharia-kernel-images
   CONTAINER_PORT: 8081
-  KERNEL_IMAGE: $CI_REGISTRY/engineering/$CI_PROJECT_NAME
-  SKILL_IMAGE: $CI_REGISTRY/engineering/pharia-skill
+  KERNEL_IMAGE: $CI_REGISTRY_IMAGE
+  SKILL_IMAGE: $CI_REGISTRY_IMAGE/pharia-skill
 
 cargo_clippy:
   stage: test
