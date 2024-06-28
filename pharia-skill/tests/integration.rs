@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, fs::File, io::Write, path::Path};
 
 use assert_cmd::Command;
 
@@ -8,7 +8,7 @@ fn invalid_args() {
     let cmd = cmd
         .arg("publish")
         .arg("-R")
-        .arg("dummy-jegistry")
+        .arg("dummy-registry")
         .arg("-r")
         .arg("dummy-repo")
         .arg("-u")
@@ -19,13 +19,24 @@ fn invalid_args() {
     cmd.assert().failure();
 }
 
+fn wasm_file() -> &'static Path {
+    let path = Path::new("./tests/test-skill.wasm");
+    if !path.exists() {
+        let mut file = File::create(path).unwrap();
+        let content = wat::parse_str("(module)").unwrap();
+        file.write_all(&content).unwrap();
+    }
+    path
+}
+
 #[test]
 fn publish_minimal_args() {
     drop(dotenvy::dotenv());
+    let path = wasm_file();
     let mut cmd = Command::cargo_bin("pharia-skill").unwrap();
     let cmd = cmd
         .arg("publish")
-        .arg("../skills/greet-py.wasm")
+        .arg(path)
         .env(
             "SKILL_REGISTRY",
             env::var("SKILL_REGISTRY").expect("SKILL_REGISTRY must be set."),
