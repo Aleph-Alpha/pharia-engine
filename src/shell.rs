@@ -1,19 +1,30 @@
 use std::future::Future;
 
-use crate::skills::SkillExecutorApi;
+use aide::{
+    axum::{
+        routing::{get, post},
+        ApiRouter, IntoApiResponse,
+    },
+    openapi::{Info, OpenApi},
+    scalar::Scalar,
+};
 use anyhow::{Context, Error};
-use axum::extract::{Json, MatchedPath, State};
-use axum::http::{Request, StatusCode};
-use axum_extra::headers::authorization::Bearer;
-use axum_extra::headers::Authorization;
-use axum_extra::TypedHeader;
-
-use axum::routing::post;
-use axum::{routing::get, Router};
+use axum::{
+    extract::{Json, MatchedPath, State},
+    http::{Request, StatusCode},
+    Extension,
+};
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
+};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tracing::{info_span, Level};
+
+use crate::skills::SkillExecutorApi;
 
 pub async fn run(
     addr: impl ToSocketAddrs,
@@ -24,17 +35,35 @@ pub async fn run(
         "Could not bind a tcp listener to host '{}' and port '{}' \
             please check environment vars for HOST and PORT.",
     )?;
-    axum::serve(listener, http(skill_executor_api))
-        .with_graceful_shutdown(shutdown_signal)
-        .await?;
+
+    let mut api = OpenApi {
+        info: Info {
+            title: "Pharia Kernel".to_owned(),
+            version: "0.1.0".to_owned(),
+            ..Info::default()
+        },
+        ..OpenApi::default()
+    };
+
+    axum::serve(
+        listener,
+        http(skill_executor_api)
+            .finish_api(&mut api)
+            .layer(Extension(api))
+            .into_make_service(),
+    )
+    .with_graceful_shutdown(shutdown_signal)
+    .await?;
     Ok(())
 }
 
-pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
-    Router::new()
-        .route("/execute_skill", post(execute_skill))
+pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
+    ApiRouter::new()
+        .api_route("/execute_skill", post(execute_skill))
         .with_state(skill_executor_api)
         .route("/", get(|| async { "Hello, world!" }))
+        .route("/scalar", Scalar::new("/api.json").axum_route())
+        .route("/api.json", get(serve_api))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
@@ -57,7 +86,14 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
         )
 }
 
-#[derive(Deserialize, Serialize)]
+// Note that this clones the document on each request.
+// To be more efficient, we could wrap it into an Arc,
+// or even store it as a serialized string.
+async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
+    Json(api)
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct ExecuteSkillArgs {
     skill: String,
     input: String,
