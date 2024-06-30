@@ -4,6 +4,7 @@ use crate::skills::SkillExecutorApi;
 use anyhow::{Context, Error};
 use axum::extract::{Json, MatchedPath, State};
 use axum::http::{Request, StatusCode};
+use axum::response::Redirect;
 use axum_extra::headers::authorization::Bearer;
 use axum_extra::headers::Authorization;
 use axum_extra::TypedHeader;
@@ -39,7 +40,8 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
         .route("/execute_skill", post(execute_skill))
         .with_state(skill_executor_api)
         .nest_service("/docs", serve_dir.clone())
-        .route("/", get(|| async { "Hello, world!" }))
+        // .route("/", get(|| async { "Hello, world!" }))
+        .route("/", get(|| async { Redirect::permanent("/docs/") }))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
