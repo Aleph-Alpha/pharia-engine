@@ -12,6 +12,7 @@ use axum::routing::post;
 use axum::{routing::get, Router};
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tracing::{info_span, Level};
 
@@ -31,9 +32,13 @@ pub async fn run(
 }
 
 pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
+    let serve_dir =
+        ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
+
     Router::new()
         .route("/execute_skill", post(execute_skill))
         .with_state(skill_executor_api)
+        .nest_service("/docs", serve_dir.clone())
         .route("/", get(|| async { "Hello, world!" }))
         .layer(
             TraceLayer::new_for_http()
