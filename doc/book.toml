@@ -1,0 +1,24 @@
+[book]
+authors = ["Pharia Kernel Team"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Pharia Kernel"
+
+[preprocessor.plantuml]
+plantuml-cmd="plantuml"
+
+[preprocessor.pagetoc]
+
+[output.linkcheck]
+follow-web-links = false
+traverse-parent-directories = false
+warning-policy = "error"
+
+[output.html]
+additional-css = ["theme/pagetoc.css", "theme/pagetoc-style.css"]
+additional-js  = ["theme/pagetoc.js"] 
+fold.enable = true
+fold.level = 1
+
+
