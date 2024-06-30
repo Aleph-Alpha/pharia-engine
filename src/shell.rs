@@ -222,7 +222,7 @@ mod tests {
 
     #[cfg_attr(not(feature = "test_inference"), ignore)]
     #[tokio::test]
-    async fn python_and_rust_greet_skills_are_identical() {
+    async fn all_greet_skills_are_identical() {
         let api_token = api_token();
         let inference = Inference::new();
         let mut runtime = WasmRuntime::new();
@@ -247,6 +247,17 @@ mod tests {
             .await
             .unwrap();
 
+        let go_resp = runtime
+            .run(
+                "greet-go",
+                "name".to_owned(),
+                api_token.to_owned(),
+                inference.api(),
+            )
+            .await
+            .unwrap();
+
         assert_eq!(rust_resp, python_resp);
+        assert_eq!(rust_resp, go_resp);
     }
 }
