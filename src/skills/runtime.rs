@@ -38,7 +38,7 @@ pub trait Runtime {
 struct WasiInvocationCtx {
     wasi_ctx: WasiCtx,
     resource_table: ResourceTable,
-    skill_ctx: SkillInvocationCtx,
+    skill_ctx: Box<dyn Csi + Send>,
 }
 
 impl WasiInvocationCtx {
@@ -47,7 +47,7 @@ impl WasiInvocationCtx {
         WasiInvocationCtx {
             wasi_ctx: builder.build(),
             resource_table: ResourceTable::new(),
-            skill_ctx,
+            skill_ctx: Box::new(skill_ctx),
         }
     }
 }
