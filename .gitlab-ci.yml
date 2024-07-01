@@ -49,6 +49,7 @@ cargo_test:
   script:
     - apt-get update
     - apt-get -y install python3-venv
+    # download and install Go from the official release because the apt-get repo is usually out of sync
     - wget -nv https://go.dev/dl/go1.22.4.linux-amd64.tar.gz
     - rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
     - wget -nv https://github.com/tinygo-org/tinygo/releases/download/v0.32.0/tinygo_0.32.0_amd64.deb
