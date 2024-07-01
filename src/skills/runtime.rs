@@ -9,10 +9,10 @@ use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::{
     inference::{CompleteTextParameters, InferenceApi},
-    registries::registries,
+    registries::{registries, SkillRegistry},
 };
 
-use crate::registries::SkillRegistry;
+use super::csi::{Csi, SkillInvocationCtx};
 
 // trappable_imports enable failure capturing from host environment (csi functions)
 bindgen!({ world: "skill", async: true, trappable_imports: true });
@@ -36,11 +36,6 @@ pub trait Runtime {
     ) -> impl Future<Output = Result<String, Error>> + Send;
 }
 
-struct SkillInvocationCtx {
-    inference_api: InferenceApi,
-    api_token: String,
-}
-
 struct WasiInvocationCtx {
     wasi_ctx: WasiCtx,
     resource_table: ResourceTable,
@@ -50,10 +45,7 @@ struct WasiInvocationCtx {
 impl WasiInvocationCtx {
     fn new(inference_api: InferenceApi, api_token: String) -> Self {
         let mut builder = WasiCtxBuilder::new();
-        let skill_ctx = SkillInvocationCtx {
-            inference_api,
-            api_token,
-        };
+        let skill_ctx = SkillInvocationCtx::new(inference_api, api_token);
         WasiInvocationCtx {
             wasi_ctx: builder.build(),
             resource_table: ResourceTable::new(),
@@ -71,8 +63,7 @@ impl pharia::skill::csi::Host for WasiInvocationCtx {
             model,
             max_tokens: 10,
         };
-        let api_token = self.skill_ctx.api_token.clone();
-        self.skill_ctx.inference_api.complete_text(params, api_token).await
+        self.skill_ctx.complete_text(params).await
     }
 }
 
