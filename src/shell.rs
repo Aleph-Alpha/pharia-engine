@@ -17,8 +17,8 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
+use docs::{api_docs, docs_routes, open_api};
 use extractors::Json;
-use open_api::{api_docs, docs_routes, open_api};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
@@ -27,8 +27,8 @@ use tracing::{info_span, Level};
 
 use crate::skills::SkillExecutorApi;
 
+mod docs;
 mod extractors;
-mod open_api;
 
 pub async fn run(
     addr: impl ToSocketAddrs,
