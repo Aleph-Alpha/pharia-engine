@@ -70,5 +70,11 @@ default = ["test_inference"]
 [lints]
 workspace = true
 
+[profile.release]
+# panic should only be caused by bugs
+panic = 'abort'
+# link time optimizations
+lto = true
+
 [profile.dev.package."*"]
 opt-level = 3
