@@ -1,41 +1,67 @@
-use std::future::Future;
+use std::{future::Future, sync::Arc};
 
-use crate::skills::SkillExecutorApi;
+use aide::{
+    axum::{
+        routing::{get, post_with},
+        ApiRouter,
+    },
+    transform::TransformOperation,
+};
 use anyhow::{Context, Error};
-use axum::extract::{Json, MatchedPath, State};
-use axum::http::{Request, StatusCode};
-use axum::response::Redirect;
-use axum_extra::headers::authorization::Bearer;
-use axum_extra::headers::Authorization;
-use axum_extra::TypedHeader;
-
-use axum::routing::post;
-use axum::{routing::get, Router};
+use axum::{
+    extract::{MatchedPath, State},
+    http::{Request, StatusCode},
+    Extension,
+};
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
+};
+use extractors::Json;
+use openapi::{api_docs, open_api, openapi_routes};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tracing::{info_span, Level};
+
+use crate::skills::SkillExecutorApi;
+
+mod extractors;
+mod openapi;
 
 pub async fn run(
     addr: impl ToSocketAddrs,
     skill_executor_api: SkillExecutorApi,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> Result<(), Error> {
+    let mut open_api = open_api();
+
+    let app = http(skill_executor_api)
+        .finish_api_with(&mut open_api, api_docs)
+        .layer(Extension(Arc::new(open_api)))
+        .into_make_service();
+
     let listener = TcpListener::bind(addr).await.context(
         "Could not bind a tcp listener to host '{}' and port '{}' \
-            please check environment vars for HOST and PORT.",
+                please check environment vars for HOST and PORT.",
     )?;
-    axum::serve(listener, http(skill_executor_api))
+
+    axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal)
         .await?;
     Ok(())
 }
 
-pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
-    Router::new()
-        .route("/execute_skill", post(execute_skill))
+pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
+    ApiRouter::new()
+        .api_route(
+            "/execute_skill",
+            post_with(execute_skill, execute_skill_docs),
+        )
         .with_state(skill_executor_api)
         .route("/", get(|| async { "Hello, world!" }))
+        .merge(openapi_routes())
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
@@ -58,9 +84,11 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
         )
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct ExecuteSkillArgs {
+    /// The name of the skill to invoke from one of the configured repositories.
     skill: String,
+    /// The expected input for the skill.
     input: String,
 }
 
@@ -76,6 +104,16 @@ async fn execute_skill(
         Ok(response) => (StatusCode::OK, response),
         Err(err) => (StatusCode::BAD_REQUEST, err.to_string()),
     }
+}
+
+fn execute_skill_docs(op: TransformOperation<'_>) -> TransformOperation<'_> {
+    op.id("executeSkill")
+        .description("Execute a skill in the kernel from one of the available repositories.")
+        .response_with::<200, String, _>(|res| res.description("The Skill was executed."))
+        .response_with::<400, String, _>(|res| {
+            res.description("The Skill invocation failed.")
+                .example("Skill not found.")
+        })
 }
 
 #[cfg(test)]

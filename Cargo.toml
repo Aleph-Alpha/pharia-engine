@@ -21,16 +21,26 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+aide = { version = "0.13.4", features = [
+    "axum",
+    "axum-extra",
+    "axum-headers",
+    "macros",
+    "scalar",
+] }
 aleph-alpha-client = "0.9.0"
 anyhow = "1.0.86"
 async-trait = "0.1.80"
-axum = "0.7.5"
+axum = { version = "0.7.5", features = ["macros"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
+axum-jsonschema = { version = "0.8.0", features = ["aide"] }
+axum-macros = "0.4.1"
 dotenvy = "0.15.7"
 futures = "0.3.30"
 oci-distribution = "0.11.0"
 oci-wasm = "0.0.4"
-serde = { version = "1.0.203", features = ["derive"] }
+schemars = "0.8.21"
+serde = { version = "1.0.203", features = ["derive", "rc"] }
 serde_json = "1.0.117"
 tokio = { version = "1.38.0", features = [
     "macros",
