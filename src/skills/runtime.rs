@@ -36,17 +36,17 @@ pub trait Runtime {
     ) -> impl Future<Output = Result<String, Error>> + Send;
 }
 
-struct InvocationCtx {
+struct WasiInvocationCtx {
     wasi_ctx: WasiCtx,
     resource_table: ResourceTable,
     inference_api: InferenceApi,
     api_token: String,
 }
 
-impl InvocationCtx {
+impl WasiInvocationCtx {
     fn new(inference_api: InferenceApi, api_token: String) -> Self {
         let mut builder = WasiCtxBuilder::new();
-        InvocationCtx {
+        WasiInvocationCtx {
             wasi_ctx: builder.build(),
             resource_table: ResourceTable::new(),
             inference_api,
@@ -56,7 +56,7 @@ impl InvocationCtx {
 }
 
 #[async_trait::async_trait]
-impl pharia::skill::csi::Host for InvocationCtx {
+impl pharia::skill::csi::Host for WasiInvocationCtx {
     #[must_use]
     async fn complete_text(&mut self, prompt: String, model: String) -> wasmtime::Result<String> {
         let params = CompleteTextParameters {
@@ -69,7 +69,7 @@ impl pharia::skill::csi::Host for InvocationCtx {
     }
 }
 
-impl WasiView for InvocationCtx {
+impl WasiView for WasiInvocationCtx {
     fn table(&mut self) -> &mut ResourceTable {
         &mut self.resource_table
     }
@@ -81,7 +81,7 @@ impl WasiView for InvocationCtx {
 
 pub struct WasmRuntime {
     engine: Engine,
-    linker: Linker<InvocationCtx>,
+    linker: Linker<WasiInvocationCtx>,
     components: HashMap<String, Component>,
     skill_registry: Box<dyn SkillRegistry + Send>,
 }
@@ -94,11 +94,11 @@ impl WasmRuntime {
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
-        let mut linker: Linker<InvocationCtx> = Linker::new(&engine);
+        let mut linker: Linker<WasiInvocationCtx> = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
         // Skill world from bindgen
-        Skill::add_to_linker(&mut linker, |state: &mut InvocationCtx| state)
+        Skill::add_to_linker(&mut linker, |state: &mut WasiInvocationCtx| state)
             .expect("linking to skill world must work");
 
         Self {
@@ -128,7 +128,7 @@ impl Runtime for WasmRuntime {
         api_token: String,
         inference_api: InferenceApi,
     ) -> Result<String, Error> {
-        let invocation_ctx = InvocationCtx::new(inference_api, api_token);
+        let invocation_ctx = WasiInvocationCtx::new(inference_api, api_token);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let component = if let Some(c) = self.components.get(skill) {
