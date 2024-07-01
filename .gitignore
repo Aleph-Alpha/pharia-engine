@@ -23,8 +23,8 @@ mdbook-plantuml-img/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .env
-/skills
 .opt
 **/.DS_Store
 .venv
 **/*.wasm
+!wasi_snapshot*.wasm
