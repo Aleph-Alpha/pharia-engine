@@ -115,7 +115,7 @@ mod tests {
     #[tokio::test]
     async fn skill_executor_forwards_runtime_errors() {
         let error_msg = "out-of-cheese".to_owned();
-        let inference = InferenceStub::new("Hello".to_owned());
+        let inference = InferenceStub::with_completion("Hello".to_owned());
         let runtime = SaboteurRuntime::new(error_msg.clone());
         let executor = SkillExecutor::new(runtime, inference.api());
 
@@ -134,7 +134,7 @@ mod tests {
     #[tokio::test]
     async fn greeting_skill() {
         // Given
-        let inference = InferenceStub::new("Hello".to_owned());
+        let inference = InferenceStub::with_completion("Hello".to_owned());
 
         // When
         let runtime = RustRuntime::new();

@@ -14,7 +14,8 @@ use crate::{
 
 use crate::registries::SkillRegistry;
 
-bindgen!({ world: "skill", async: true });
+// trappable_imports enable failure capturing from host environment (csi functions)
+bindgen!({ world: "skill", async: true, trappable_imports: true });
 
 pub trait Runtime {
     // We are returning a Future explicitly here instead of using the `async` syntax. This has the
@@ -57,17 +58,14 @@ impl InvocationCtx {
 #[async_trait::async_trait]
 impl pharia::skill::csi::Host for InvocationCtx {
     #[must_use]
-    async fn complete_text(&mut self, prompt: String, model: String) -> String {
+    async fn complete_text(&mut self, prompt: String, model: String) -> wasmtime::Result<String> {
         let params = CompleteTextParameters {
             prompt,
             model,
             max_tokens: 10,
         };
         let api_token = self.api_token.clone();
-        self.inference_api
-            .complete_text(params, api_token)
-            .await
-            .expect("completion must succeed")
+        self.inference_api.complete_text(params, api_token).await
     }
 }
 
@@ -143,10 +141,7 @@ impl Runtime for WasmRuntime {
         let (bindings, _) = Skill::instantiate_async(&mut store, component, &self.linker)
             .await
             .expect("failed to instantiate skill");
-        Ok(bindings
-            .call_run(&mut store, &name)
-            .await
-            .expect("need error handling for this"))
+        bindings.call_run(&mut store, &name).await
     }
 }
 
@@ -224,8 +219,25 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn csi_invocation_failure() {
+        let err_msg = "csi invocation failure";
+        let inference = InferenceStub::new(|| Err(anyhow!(err_msg.to_owned())));
+        let mut runtime = WasmRuntime::new();
+
+        let resp = runtime
+            .run(
+                "greet_skill",
+                "name".to_owned(),
+                "api_token".to_owned(),
+                inference.api(),
+            )
+            .await;
+        assert!(resp.is_err());
+    }
+
+    #[tokio::test]
     async fn greet_skill_component() {
-        let inference = InferenceStub::new("Hello");
+        let inference = InferenceStub::with_completion("Hello");
         let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run(
@@ -241,7 +253,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
-        let inference = InferenceStub::new("Hello");
+        let inference = InferenceStub::with_completion("Hello");
         let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run(
@@ -261,7 +273,7 @@ pub mod tests {
         let registry = FileRegistry::with_dir(skill_dir.path());
         let mut runtime = WasmRuntime::with_registry(registry);
 
-        let inference = InferenceStub::new("Hello");
+        let inference = InferenceStub::with_completion("Hello");
 
         // When adding a new skill component
         let skill_path = skill_dir.path().join("greet_skill.wasm");
