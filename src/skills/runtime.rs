@@ -8,7 +8,7 @@ use wasmtime::{
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::{
-    inference::{CompleteTextParameters, InferenceApi},
+    inference::CompleteTextParameters,
     registries::{registries, SkillRegistry},
 };
 
@@ -31,8 +31,7 @@ pub trait Runtime {
         &mut self,
         skill: &str,
         name: String,
-        api_token: String,
-        inference_api: InferenceApi,
+        ctx: SkillInvocationCtx,
     ) -> impl Future<Output = Result<String, Error>> + Send;
 }
 
@@ -43,9 +42,8 @@ struct WasiInvocationCtx {
 }
 
 impl WasiInvocationCtx {
-    fn new(inference_api: InferenceApi, api_token: String) -> Self {
+    fn new(skill_ctx: SkillInvocationCtx) -> Self {
         let mut builder = WasiCtxBuilder::new();
-        let skill_ctx = SkillInvocationCtx::new(inference_api, api_token);
         WasiInvocationCtx {
             wasi_ctx: builder.build(),
             resource_table: ResourceTable::new(),
@@ -123,10 +121,9 @@ impl Runtime for WasmRuntime {
         &mut self,
         skill: &str,
         name: String,
-        api_token: String,
-        inference_api: InferenceApi,
+        ctx: SkillInvocationCtx,
     ) -> Result<String, Error> {
-        let invocation_ctx = WasiInvocationCtx::new(inference_api, api_token);
+        let invocation_ctx = WasiInvocationCtx::new(ctx);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let component = if let Some(c) = self.components.get(skill) {
@@ -146,15 +143,19 @@ impl Runtime for WasmRuntime {
 #[cfg(test)]
 pub mod tests {
 
-    use std::fs;
+    use std::{env, fs, sync::OnceLock};
 
     use anyhow::{anyhow, Error};
+    use dotenvy::dotenv;
     use tempfile::tempdir;
 
     use crate::{
-        inference::{tests::InferenceStub, CompleteTextParameters, InferenceApi},
+        inference::{tests::InferenceStub, CompleteTextParameters, Inference},
         registries::FileRegistry,
-        skills::runtime::Runtime,
+        skills::{
+            csi::{Csi, SkillInvocationCtx},
+            runtime::Runtime,
+        },
     };
 
     use super::WasmRuntime;
@@ -174,8 +175,7 @@ pub mod tests {
             &mut self,
             _skill: &str,
             _name: String,
-            _api_token: String,
-            _inference_api: InferenceApi,
+            _ctx: SkillInvocationCtx,
         ) -> Result<String, Error> {
             Err(anyhow!(self.err_msg.clone()))
         }
@@ -194,8 +194,7 @@ pub mod tests {
             &mut self,
             skill: &str,
             name: String,
-            api_token: String,
-            mut inference_api: InferenceApi,
+            mut ctx: SkillInvocationCtx,
         ) -> Result<String, Error> {
             assert!(skill == "greet", "RustRuntime only supports greet skill");
             let prompt = format!(
@@ -212,7 +211,7 @@ pub mod tests {
                 model: "luminous-nextgen-7b".to_owned(),
                 max_tokens: 10,
             };
-            inference_api.complete_text(params, api_token).await
+            ctx.complete_text(params).await
         }
     }
 
@@ -220,15 +219,11 @@ pub mod tests {
     async fn csi_invocation_failure() {
         let err_msg = "csi invocation failure";
         let inference = InferenceStub::new(|| Err(anyhow!(err_msg.to_owned())));
+        let skill_ctx = SkillInvocationCtx::new(inference.api(), "dummy api token".to_owned());
         let mut runtime = WasmRuntime::new();
 
         let resp = runtime
-            .run(
-                "greet_skill",
-                "name".to_owned(),
-                "api_token".to_owned(),
-                inference.api(),
-            )
+            .run("greet_skill", "name".to_owned(), skill_ctx)
             .await;
         assert!(resp.is_err());
     }
@@ -236,14 +231,10 @@ pub mod tests {
     #[tokio::test]
     async fn greet_skill_component() {
         let inference = InferenceStub::with_completion("Hello");
+        let skill_ctx = SkillInvocationCtx::new(inference.api(), "dummy api token".to_owned());
         let mut runtime = WasmRuntime::new();
         let resp = runtime
-            .run(
-                "greet_skill",
-                "name".to_owned(),
-                "api_token".to_owned(),
-                inference.api(),
-            )
+            .run("greet_skill", "name".to_owned(), skill_ctx)
             .await;
 
         assert_eq!(resp.unwrap(), "Hello");
@@ -252,14 +243,10 @@ pub mod tests {
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
         let inference = InferenceStub::with_completion("Hello");
+        let skill_ctx = SkillInvocationCtx::new(inference.api(), "dummy api token".to_owned());
         let mut runtime = WasmRuntime::new();
         let resp = runtime
-            .run(
-                "non-existing-skill",
-                "name".to_owned(),
-                "dummy-token".to_owned(),
-                inference.api(),
-            )
+            .run("non-existing-skill", "name".to_owned(), skill_ctx)
             .await;
         assert!(resp.is_err());
     }
@@ -270,8 +257,8 @@ pub mod tests {
         let skill_dir = tempdir().unwrap();
         let registry = FileRegistry::with_dir(skill_dir.path());
         let mut runtime = WasmRuntime::with_registry(registry);
-
         let inference = InferenceStub::with_completion("Hello");
+        let skill_ctx = SkillInvocationCtx::new(inference.api(), "dummy api token".to_owned());
 
         // When adding a new skill component
         let skill_path = skill_dir.path().join("greet_skill.wasm");
@@ -279,13 +266,46 @@ pub mod tests {
 
         // Then the skill can be invoked
         let greet = runtime
-            .run(
-                "greet_skill",
-                "Homer".to_owned(),
-                "dummy_token".to_owned(),
-                inference.api(),
-            )
+            .run("greet_skill", "Homer".to_owned(), skill_ctx)
             .await;
         assert!(greet.is_ok());
+    }
+
+    static API_TOKEN: OnceLock<String> = OnceLock::new();
+
+    /// API Token used by tests to authenticate requests
+    fn api_token() -> &'static str {
+        API_TOKEN.get_or_init(|| {
+            drop(dotenv());
+            env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
+        })
+    }
+
+    #[cfg_attr(not(feature = "test_inference"), ignore)]
+    #[tokio::test]
+    async fn all_greet_skills_are_identical() {
+        let inference = Inference::new();
+        let mut runtime = WasmRuntime::new();
+
+        let skill_ctx = SkillInvocationCtx::new(inference.api(), api_token().to_owned());
+        let rust_resp = runtime
+            .run("greet_skill", "name".to_owned(), skill_ctx)
+            .await
+            .unwrap();
+
+        let skill_ctx = SkillInvocationCtx::new(inference.api(), api_token().to_owned());
+        let python_resp = runtime
+            .run("greet-py", "name".to_owned(), skill_ctx)
+            .await
+            .unwrap();
+
+        let skill_ctx = SkillInvocationCtx::new(inference.api(), api_token().to_owned());
+        let go_resp = runtime
+            .run("greet-go", "name".to_owned(), skill_ctx)
+            .await
+            .unwrap();
+
+        assert_eq!(rust_resp, python_resp);
+        assert_eq!(rust_resp, go_resp);
     }
 }

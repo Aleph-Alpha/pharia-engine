@@ -118,7 +118,7 @@ fn execute_skill_docs(op: TransformOperation<'_>) -> TransformOperation<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::skills::{tests::Runtime, SkillExecutor, WasmRuntime};
+    use crate::skills::{SkillExecutor, WasmRuntime};
 
     use super::*;
 
@@ -218,46 +218,5 @@ mod tests {
             .unwrap();
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(&body[..], b"Hello, world!");
-    }
-
-    #[cfg_attr(not(feature = "test_inference"), ignore)]
-    #[tokio::test]
-    async fn all_greet_skills_are_identical() {
-        let api_token = api_token();
-        let inference = Inference::new();
-        let mut runtime = WasmRuntime::new();
-
-        let rust_resp = runtime
-            .run(
-                "greet_skill",
-                "name".to_owned(),
-                api_token.to_owned(),
-                inference.api(),
-            )
-            .await
-            .unwrap();
-
-        let python_resp = runtime
-            .run(
-                "greet-py",
-                "name".to_owned(),
-                api_token.to_owned(),
-                inference.api(),
-            )
-            .await
-            .unwrap();
-
-        let go_resp = runtime
-            .run(
-                "greet-go",
-                "name".to_owned(),
-                api_token.to_owned(),
-                inference.api(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(rust_resp, python_resp);
-        assert_eq!(rust_resp, go_resp);
     }
 }

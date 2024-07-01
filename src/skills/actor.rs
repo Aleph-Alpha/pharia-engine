@@ -5,6 +5,8 @@ use tokio::{
     task::JoinHandle,
 };
 
+use super::csi::SkillInvocationCtx;
+
 pub struct SkillExecutor {
     send: mpsc::Sender<SkillExecutorMessage>,
     handle: JoinHandle<()>,
@@ -82,13 +84,13 @@ impl<R: Runtime> SkillExecutorActor<R> {
         }
     }
     async fn act(&mut self, msg: SkillExecutorMessage) {
+        let ctx = SkillInvocationCtx::new(self.inference_api.clone(), msg.api_token);
         let response = self
             .runtime
             .run(
                 &msg.skill,
                 msg.input,
-                msg.api_token,
-                self.inference_api.clone(),
+                ctx,
             )
             .await;
         drop(msg.send.send(response));
