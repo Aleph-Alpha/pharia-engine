@@ -29,13 +29,12 @@ pub fn api_docs(api: TransformOpenApi<'_>) -> TransformOpenApi<'_> {
     api.title("Pharia Kernel")
         .version("0.1.0")
         .description("The best place to run serverless AI applications.")
-    // .description(include_str!("../../README.md"))
 }
 
-pub fn docs_routes() -> ApiRouter {
+pub fn openapi_routes() -> ApiRouter {
     ApiRouter::new()
-        .route("/", Scalar::new("/docs/api.json").axum_route())
-        .route("/api.json", get(serve_docs))
+        .route("/api-docs", Scalar::new("/openapi.json").axum_route())
+        .route("/openapi.json", get(serve_docs))
 }
 
 async fn serve_docs(Extension(api): Extension<Arc<OpenApi>>) -> impl IntoApiResponse {

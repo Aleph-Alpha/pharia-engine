@@ -17,8 +17,8 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
-use docs::{api_docs, docs_routes, open_api};
 use extractors::Json;
+use openapi::{api_docs, open_api, openapi_routes};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
@@ -27,8 +27,8 @@ use tracing::{info_span, Level};
 
 use crate::skills::SkillExecutorApi;
 
-mod docs;
 mod extractors;
+mod openapi;
 
 pub async fn run(
     addr: impl ToSocketAddrs,
@@ -61,7 +61,7 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
         )
         .with_state(skill_executor_api)
         .route("/", get(|| async { "Hello, world!" }))
-        .nest_service("/docs", docs_routes())
+        .merge(openapi_routes())
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
