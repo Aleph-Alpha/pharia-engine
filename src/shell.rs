@@ -61,7 +61,7 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
         )
         .with_state(skill_executor_api)
         .route("/", get(|| async { "Hello, world!" }))
-        .merge(docs_routes())
+        .nest_service("/docs", docs_routes())
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {

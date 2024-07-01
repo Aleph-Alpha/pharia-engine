@@ -34,7 +34,7 @@ pub fn api_docs(api: TransformOpenApi<'_>) -> TransformOpenApi<'_> {
 
 pub fn docs_routes() -> ApiRouter {
     ApiRouter::new()
-        .route("/scalar", Scalar::new("/api.json").axum_route())
+        .route("/", Scalar::new("/docs/api.json").axum_route())
         .route("/api.json", get(serve_docs))
 }
 
