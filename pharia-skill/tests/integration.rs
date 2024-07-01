@@ -67,12 +67,6 @@ fn run_skill() {
         .arg("greet_skill")
         .arg("-i")
         .arg("Homer")
-        .arg("-l")
-        .arg(format!(
-            "http://{}:{}",
-            env::var("HOST").expect("HOST must be set."),
-            env::var("PORT").expect("PORT must be set."),
-        ))
         .env(
             "AA_API_TOKEN",
             env::var("AA_API_TOKEN").expect("AA_API_TOKEN must be set."),
