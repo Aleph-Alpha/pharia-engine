@@ -67,7 +67,9 @@ mod tests {
 
     use anyhow::{anyhow, Error};
     use tempfile::tempdir;
-    use wasmtime::{component::Component, Config, Engine};
+    use wasmtime::{component::Component, Engine};
+
+    use crate::skills::WasmRuntime;
 
     use super::{FileRegistry, SkillRegistry};
 
@@ -116,16 +118,11 @@ mod tests {
         }
     }
 
-    fn make_engine() -> Engine {
-        Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid")
-    }
-
     #[tokio::test]
     async fn empty_file_registry() {
         let skill_dir = tempdir().unwrap();
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let engine = make_engine();
+        let engine = WasmRuntime::engine();
         let result = registry.load_skill("dummy skill name", &engine).await;
         let component = result.unwrap();
         assert!(component.is_none());
@@ -134,7 +131,7 @@ mod tests {
     #[tokio::test]
     async fn empty_skill_registries() {
         let registries = Vec::<NoneRegistry>::new();
-        let engine = make_engine();
+        let engine = WasmRuntime::engine();
         let result = registries.load_skill("dummy skill name", &engine).await;
         let component = result.unwrap();
         assert!(component.is_none());
@@ -143,7 +140,7 @@ mod tests {
     #[tokio::test]
     async fn two_empty_registries() {
         let registries = vec![NoneRegistry {}, NoneRegistry {}];
-        let engine = make_engine();
+        let engine = WasmRuntime::engine();
         let result = registries.load_skill("dummy skill name", &engine).await;
         let component = result.unwrap();
         assert!(component.is_none());
@@ -152,7 +149,7 @@ mod tests {
     #[tokio::test]
     async fn one_none_one_some_registries() {
         // given
-        let engine = make_engine();
+        let engine = WasmRuntime::engine();
         let component = Component::new(&engine, "(component)").unwrap();
 
         // when
@@ -170,7 +167,7 @@ mod tests {
     #[tokio::test]
     async fn one_some_one_none_registries() {
         // given
-        let engine = make_engine();
+        let engine = WasmRuntime::engine();
         let component = Component::new(&engine, "(component)").unwrap();
 
         // when
@@ -188,7 +185,7 @@ mod tests {
     #[tokio::test]
     async fn first_fails_and_second_succeeds() {
         // given
-        let engine = make_engine();
+        let engine = WasmRuntime::engine();
         let component = Component::new(&engine, "(component)").unwrap();
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(SaboteurRegistry),
@@ -204,7 +201,7 @@ mod tests {
 
     #[tokio::test]
     async fn second_one_fails() {
-        let engine = make_engine();
+        let engine = WasmRuntime::engine();
         let component = Component::new(&engine, "(component)").unwrap();
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(SomeRegistry::new(component)),

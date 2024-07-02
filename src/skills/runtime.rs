@@ -3,7 +3,7 @@ use std::{collections::HashMap, future::Future};
 use anyhow::{anyhow, Error};
 use wasmtime::{
     component::{bindgen, Component, Linker},
-    Config, Engine, Store,
+    Config, Engine, OptLevel, Store,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
@@ -87,9 +87,18 @@ impl WasmRuntime {
         Self::with_registry(registries())
     }
 
+    pub fn engine() -> Engine {
+        Engine::new(
+            Config::new()
+                .async_support(true)
+                .cranelift_opt_level(OptLevel::SpeedAndSize)
+                .wasm_component_model(true),
+        )
+        .expect("config must be valid")
+    }
+
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
-        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid");
+        let engine = Self::engine();
         let mut linker: Linker<WasiInvocationCtx> = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
@@ -275,7 +284,10 @@ pub mod tests {
         let registry = FileRegistry::with_dir(skill_dir.path());
         let mut runtime = WasmRuntime::with_registry(registry);
         let inference = InferenceStub::with_completion("Hello");
-        let skill_ctx = Box::new(SkillInvocationCtx::new(inference.api(), "dummy api token".to_owned()));
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            inference.api(),
+            "dummy api token".to_owned(),
+        ));
 
         // When adding a new skill component
         let skill_path = skill_dir.path().join("greet_skill.wasm");
@@ -304,19 +316,28 @@ pub mod tests {
         let inference = Inference::new();
         let mut runtime = WasmRuntime::new();
 
-        let skill_ctx = Box::new(SkillInvocationCtx::new(inference.api(), api_token().to_owned()));
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            inference.api(),
+            api_token().to_owned(),
+        ));
         let rust_resp = runtime
             .run("greet_skill", "name".to_owned(), skill_ctx)
             .await
             .unwrap();
 
-        let skill_ctx = Box::new(SkillInvocationCtx::new(inference.api(), api_token().to_owned()));
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            inference.api(),
+            api_token().to_owned(),
+        ));
         let python_resp = runtime
             .run("greet-py", "name".to_owned(), skill_ctx)
             .await
             .unwrap();
 
-        let skill_ctx = Box::new(SkillInvocationCtx::new(inference.api(), api_token().to_owned()));
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            inference.api(),
+            api_token().to_owned(),
+        ));
         let go_resp = runtime
             .run("greet-go", "name".to_owned(), skill_ctx)
             .await
