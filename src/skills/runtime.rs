@@ -42,12 +42,12 @@ struct WasiInvocationCtx {
 }
 
 impl WasiInvocationCtx {
-    fn new(skill_ctx: SkillInvocationCtx) -> Self {
+    fn new(skill_ctx: Box<dyn Csi + Send>) -> Self {
         let mut builder = WasiCtxBuilder::new();
         WasiInvocationCtx {
             wasi_ctx: builder.build(),
             resource_table: ResourceTable::new(),
-            skill_ctx: Box::new(skill_ctx),
+            skill_ctx,
         }
     }
 }
@@ -123,7 +123,7 @@ impl Runtime for WasmRuntime {
         name: String,
         ctx: SkillInvocationCtx,
     ) -> Result<String, Error> {
-        let invocation_ctx = WasiInvocationCtx::new(ctx);
+        let invocation_ctx = WasiInvocationCtx::new(Box::new(ctx));
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let component = if let Some(c) = self.components.get(skill) {
