@@ -11,6 +11,7 @@ use anyhow::{Context, Error};
 use axum::{
     extract::{MatchedPath, State},
     http::{Request, StatusCode},
+    response::Redirect,
     Extension,
 };
 use axum_extra::{
@@ -22,7 +23,10 @@ use openapi::{api_docs, open_api, openapi_routes};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
-use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
+};
 use tracing::{info_span, Level};
 
 use crate::skills::SkillExecutorApi;
@@ -54,13 +58,18 @@ pub async fn run(
 }
 
 pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
+    let serve_dir =
+        ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
+
     ApiRouter::new()
         .api_route(
             "/execute_skill",
             post_with(execute_skill, execute_skill_docs),
         )
         .with_state(skill_executor_api)
-        .route("/", get(|| async { "Hello, world!" }))
+        .nest_service("/docs", serve_dir.clone())
+        // .route("/", get(|| async { "Hello, world!" }))
+        .route("/", get(|| async { Redirect::permanent("/docs/") }))
         .merge(openapi_routes())
         .layer(
             TraceLayer::new_for_http()
