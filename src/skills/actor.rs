@@ -84,7 +84,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
         }
     }
     async fn act(&mut self, msg: SkillExecutorMessage) {
-        let ctx = SkillInvocationCtx::new(self.inference_api.clone(), msg.api_token);
+        let ctx = Box::new(SkillInvocationCtx::new(self.inference_api.clone(), msg.api_token));
         let response = self
             .runtime
             .run(
