@@ -11,7 +11,7 @@ use config::AppConfig;
 use skills::WasmRuntime;
 use tokio::signal;
 use tracing::error;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[tokio::main]
 async fn main() {
@@ -19,7 +19,7 @@ async fn main() {
     // Set up tracing subscriber that behaves like env_logger
     // Can switch to some other subscriber in the future
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(EnvFilter::from_env("PHARIA_KERNEL_LOG"))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
