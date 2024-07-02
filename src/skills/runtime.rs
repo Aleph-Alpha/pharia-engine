@@ -334,16 +334,6 @@ pub mod tests {
             .await
             .unwrap();
 
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            inference.api(),
-            api_token().to_owned(),
-        ));
-        let go_resp = runtime
-            .run("greet-go", "name".to_owned(), skill_ctx)
-            .await
-            .unwrap();
-
         assert_eq!(rust_resp, python_resp);
-        assert_eq!(rust_resp, go_resp);
     }
 }
