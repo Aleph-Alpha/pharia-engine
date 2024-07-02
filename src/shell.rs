@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hello_world() {
+    async fn index() {
         let inference = Inference::new();
 
         let runtime = WasmRuntime::new();
@@ -225,7 +225,6 @@ mod tests {
             .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await
             .unwrap();
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(&body[..], b"Hello, world!");
+        assert_eq!(resp.status(), axum::http::StatusCode::PERMANENT_REDIRECT);
     }
 }
