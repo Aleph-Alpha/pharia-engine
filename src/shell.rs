@@ -1,4 +1,4 @@
-use std::{future::Future, sync::Arc};
+use std::{future::Future, iter::once, sync::Arc};
 
 use aide::{
     axum::{
@@ -10,7 +10,7 @@ use aide::{
 use anyhow::{Context, Error};
 use axum::{
     extract::{MatchedPath, State},
-    http::{Request, StatusCode},
+    http::{header::AUTHORIZATION, Request, StatusCode},
     response::Redirect,
     Extension,
 };
@@ -23,7 +23,11 @@ use openapi::{api_docs, open_api, openapi_routes};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
+use tower::ServiceBuilder;
 use tower_http::{
+    compression::CompressionLayer,
+    decompression::DecompressionLayer,
+    sensitive_headers::SetSensitiveRequestHeadersLayer,
     services::{ServeDir, ServeFile},
     trace::{DefaultOnResponse, TraceLayer},
 };
@@ -72,22 +76,31 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
         .route("/", get(|| async { Redirect::permanent("/docs/") }))
         .merge(openapi_routes())
         .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(|request: &Request<_>| {
-                    // Log the matched route's path (with placeholders not filled in).
-                    // Use request.uri() or OriginalUri if you want the real path.
-                    let matched_path = request
-                        .extensions()
-                        .get::<MatchedPath>()
-                        .map(MatchedPath::as_str);
+            ServiceBuilder::new()
+                // Mark the `Authorization` request header as sensitive so it doesn't show in logs
+                .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION)))
+                // High level logging of requests and responses
+                .layer(
+                    TraceLayer::new_for_http()
+                        .make_span_with(|request: &Request<_>| {
+                            // Log the matched route's path (with placeholders not filled in).
+                            // Use request.uri() or OriginalUri if you want the real path.
+                            let matched_path = request
+                                .extensions()
+                                .get::<MatchedPath>()
+                                .map(MatchedPath::as_str);
 
-                    info_span!(
-                        "http_request",
-                        method = ?request.method(),
-                        matched_path,
-                    )
-                })
-                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                            info_span!(
+                                "http_request",
+                                method = ?request.method(),
+                                matched_path,
+                            )
+                        })
+                        .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                )
+                // Compress responses
+                .layer(CompressionLayer::new())
+                .layer(DecompressionLayer::new()),
         )
 }
 

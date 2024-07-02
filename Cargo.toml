@@ -48,7 +48,7 @@ tokio = { version = "1.38.0", features = [
     "signal",
 ] }
 tower = { version = "0.4.13", features = ["util"] }
-tower-http = { version = "0.5.2", features = ["fs", "trace"] }
+tower-http = { version = "0.5.2", features = ["compression-full", "decompression-full", "fs", "sensitive-headers", "trace"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 wasmtime = "22.0.0"
