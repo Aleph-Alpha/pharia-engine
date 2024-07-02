@@ -9,9 +9,9 @@ if [ -z $PORT ]; then
     exit 1
 fi
 
-BODY=$(curl -s http://$HOST:$PORT)
+BODY=$(curl -s http://$HOST:$PORT/healthcheck)
 
-if [ "$BODY" = "Hello, world!" ]; then
+if [ "$BODY" = "ok" ]; then
     exit 0
 else
     echo "unexpected response: BODY='$BODY'"

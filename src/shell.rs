@@ -68,7 +68,7 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
         )
         .with_state(skill_executor_api)
         .nest_service("/docs", serve_dir.clone())
-        // .route("/", get(|| async { "Hello, world!" }))
+        .route("/healthcheck", get(|| async { "ok" }))
         .route("/", get(|| async { Redirect::permanent("/docs/") }))
         .merge(openapi_routes())
         .layer(
@@ -216,15 +216,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn index() {
+    async fn healthcheck() {
         let inference = Inference::new();
 
         let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
         let resp = http
-            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/healthcheck")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
-        assert_eq!(resp.status(), axum::http::StatusCode::PERMANENT_REDIRECT);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"ok");
     }
 }
