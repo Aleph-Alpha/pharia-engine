@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tower_http::{
     services::{ServeDir, ServeFile},
-    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
+    trace::{DefaultOnResponse, TraceLayer},
 };
 use tracing::{info_span, Level};
 
@@ -85,10 +85,8 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
                         "http_request",
                         method = ?request.method(),
                         matched_path,
-                        some_other_field = tracing::field::Empty,
                     )
                 })
-                .on_request(DefaultOnRequest::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
 }
