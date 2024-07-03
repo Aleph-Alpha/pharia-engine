@@ -1,8 +1,7 @@
 use crate::{inference::InferenceApi, skills::runtime::Runtime};
 use anyhow::Error;
 use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
+    select, sync::{mpsc, oneshot}, task::JoinHandle
 };
 
 use super::csi::SkillInvocationCtx;
@@ -126,7 +125,11 @@ impl<R: Runtime> SkillExecutorActor<R> {
             self.inference_api.clone(),
             api_token,
         ));
-        self.runtime.run(&skill, input, ctx).await
+
+        select! {
+            result = self.runtime.run(&skill, input, ctx) => result,
+            Ok(error) = recv_rt_err => Err(error)
+        }
     }
 }
 
