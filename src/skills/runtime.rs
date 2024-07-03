@@ -59,7 +59,7 @@ impl pharia::skill::csi::Host for WasiInvocationCtx {
         let params = CompleteTextParameters {
             prompt,
             model,
-            max_tokens: 10,
+            max_tokens: 128,
         };
         self.skill_ctx.complete_text(params).await
     }
