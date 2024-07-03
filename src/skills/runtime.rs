@@ -238,6 +238,8 @@ pub mod tests {
         }
     }
 
+    /// A test double for a [`Csi`] implementation which returns an error for each method
+    /// invocation.
     struct CsiSaboteur;
 
     #[async_trait]
@@ -247,6 +249,19 @@ pub mod tests {
             _params: CompleteTextParameters,
         ) -> Result<String, anyhow::Error> {
             bail!("Test error from CSI Saboteur")
+        }
+    }
+
+    /// A test double for a [`Csi`] implementation which always completes with "Hello".
+    struct CsiGreetingStub;
+
+    #[async_trait]
+    impl Csi for CsiGreetingStub {
+        async fn complete_text(
+            &mut self,
+            _params: CompleteTextParameters,
+        ) -> Result<String, anyhow::Error> {
+            Ok("Hello".to_owned())
         }
     }
 
@@ -263,11 +278,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn greet_skill_component() {
-        let inference = InferenceStub::with_completion("Hello");
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            inference.api(),
-            "dummy api token".to_owned(),
-        ));
+        let skill_ctx = Box::new(CsiGreetingStub);
         let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run("greet_skill", "name".to_owned(), skill_ctx)
@@ -278,11 +289,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
-        let inference = InferenceStub::with_completion("Hello");
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            inference.api(),
-            "dummy api token".to_owned(),
-        ));
+        let skill_ctx = Box::new(CsiGreetingStub);
         let mut runtime = WasmRuntime::new();
         let resp = runtime
             .run("non-existing-skill", "name".to_owned(), skill_ctx)
@@ -305,12 +312,8 @@ pub mod tests {
     #[tokio::test]
     async fn skills_are_listed() {
         // given a runtime with two installed skills
-        let inference = InferenceStub::with_completion("hello");
         let mut runtime = WasmRuntime::new();
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            inference.api(),
-            api_token().to_owned(),
-        ));
+        let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
                 .run("greet_skill", "name".to_owned(), skill_ctx)
@@ -318,10 +321,7 @@ pub mod tests {
                 .unwrap(),
         );
 
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            inference.api(),
-            api_token().to_owned(),
-        ));
+        let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
                 .run("greet-py", "name".to_owned(), skill_ctx)
@@ -346,11 +346,7 @@ pub mod tests {
         let skill_dir = tempdir().unwrap();
         let registry = FileRegistry::with_dir(skill_dir.path());
         let mut runtime = WasmRuntime::with_registry(registry);
-        let inference = InferenceStub::with_completion("Hello");
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            inference.api(),
-            "dummy api token".to_owned(),
-        ));
+        let skill_ctx = Box::new(CsiGreetingStub);
 
         // When adding a new skill component
         let skill_path = skill_dir.path().join("greet_skill.wasm");
