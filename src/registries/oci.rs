@@ -30,11 +30,16 @@ impl SkillRegistry for OciRegistry {
         let auth = RegistryAuth::Basic(username, password);
 
         Box::pin(async move {
-            // TODO: return None if skill not found
-            let image = self.client.pull(&image, &auth).await?;
-            let binary = &image.layers.first().unwrap().data;
-            let result = Component::from_binary(engine, binary);
-            Some(result).transpose()
+            // TODO: we want to match on the specific type of result.
+            // If it is not found, return None, if it is a connection error, return an error
+            let result = self.client.pull(&image, &auth).await;
+            if let Ok(image) = result {
+                let binary = &image.layers.first().unwrap().data;
+                let result = Component::from_binary(engine, binary);
+                Some(result).transpose()
+            } else {
+                Ok(None)
+            }
         })
     }
 }
