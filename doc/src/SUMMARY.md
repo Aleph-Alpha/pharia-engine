@@ -3,9 +3,9 @@
 [Introduction](./introduction.md)
 ----------------------------------
 
-- [Cognitive System Interface](./csi.md)
-- [Skills](./skills.md)
-- [Kernel](./kernel.md)
+- [Operating Pharia Kernel](./operating-kernel.md))
+- [Developing and deploying Skills](./skills-development.md)
+- [Executing Skills](./skill-execution.md)
 
 ----------------------------------
 [Feedback](./feedback.md)
