@@ -1,3 +1,5 @@
+use std::future::pending;
+
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
 use anyhow::Error;
@@ -18,9 +20,22 @@ impl Csi for SkillInvocationCtx {
         &mut self,
         params: CompleteTextParameters,
     ) -> Result<String, anyhow::Error> {
-        self.inference_api
+        match self
+            .inference_api
             .complete_text(params, self.api_token.clone())
             .await
+        {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                self.send_rt_err
+                    .take()
+                    .expect("Only one error must be send during skill invocation")
+                    .send(error)
+                    .unwrap();
+                // Never return, we did report the error via the send error channel.
+                pending().await
+            }
+        }
     }
 }
 
@@ -28,7 +43,7 @@ pub struct SkillInvocationCtx {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriatly to user and
     /// operator.
-    send_rt_err: oneshot::Sender<Error>,
+    send_rt_err: Option<oneshot::Sender<Error>>,
     inference_api: InferenceApi,
     api_token: String,
 }
@@ -40,7 +55,7 @@ impl SkillInvocationCtx {
         api_token: String,
     ) -> Self {
         SkillInvocationCtx {
-            send_rt_err,
+            send_rt_err: Some(send_rt_err),
             inference_api,
             api_token,
         }
