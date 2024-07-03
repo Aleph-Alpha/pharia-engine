@@ -120,7 +120,9 @@ impl<R: Runtime> SkillExecutorActor<R> {
         input: String,
         api_token: String,
     ) -> Result<String, Error> {
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(
+            send_rt_err,
             self.inference_api.clone(),
             api_token,
         ));

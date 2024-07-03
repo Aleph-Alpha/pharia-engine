@@ -34,8 +34,11 @@ pub struct SkillInvocationCtx {
 }
 
 impl SkillInvocationCtx {
-    pub fn new(inference_api: InferenceApi, api_token: String) -> Self {
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
+    pub fn new(
+        send_rt_err: oneshot::Sender<Error>,
+        inference_api: InferenceApi,
+        api_token: String,
+    ) -> Self {
         SkillInvocationCtx {
             send_rt_err,
             inference_api,
