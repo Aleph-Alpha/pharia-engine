@@ -113,7 +113,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
             }
             SkillExecutorMessage::Skills { send } => {
                 let response = self.runtime.skills().map(str::to_owned).collect();
-                drop(send.send(response))
+                drop(send.send(response));
             }
         }
     }
