@@ -1,6 +1,8 @@
 use crate::inference::{CompleteTextParameters, InferenceApi};
 
+use anyhow::Error;
 use async_trait::async_trait;
+use tokio::sync::oneshot;
 
 #[async_trait]
 pub trait Csi {
@@ -23,13 +25,19 @@ impl Csi for SkillInvocationCtx {
 }
 
 pub struct SkillInvocationCtx {
+    /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
+    /// can drop the future invoking the skill, and report the error appropriatly to user and
+    /// operator.
+    send_rt_err: oneshot::Sender<Error>,
     inference_api: InferenceApi,
     api_token: String,
 }
 
 impl SkillInvocationCtx {
     pub fn new(inference_api: InferenceApi, api_token: String) -> Self {
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
         SkillInvocationCtx {
+            send_rt_err,
             inference_api,
             api_token,
         }
