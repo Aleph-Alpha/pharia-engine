@@ -1,7 +1,9 @@
 use crate::{inference::InferenceApi, skills::runtime::Runtime};
 use anyhow::Error;
 use tokio::{
-    select, sync::{mpsc, oneshot}, task::JoinHandle
+    select,
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
 };
 
 use super::csi::SkillInvocationCtx;
@@ -147,10 +149,12 @@ enum SkillExecutorMessage {
 
 #[cfg(test)]
 pub mod tests {
-    use anyhow::Error;
+    use std::iter;
+
+    use anyhow::{anyhow, Error};
 
     use crate::{
-        inference::tests::InferenceStub,
+        inference::{tests::InferenceStub, CompleteTextParameters},
         skills::{
             csi::Csi,
             runtime::Runtime,
@@ -158,6 +162,46 @@ pub mod tests {
             SkillExecutor,
         },
     };
+
+    #[tokio::test]
+    async fn inference_error_during_skill_execution() {
+        // Given
+        // This mock runtime expects that its skills never complete. The futures invoking them must
+        // be dropped
+        struct MockRuntime;
+
+        impl Runtime for MockRuntime {
+            async fn run(
+                &mut self,
+                _: &str,
+                _: String,
+                mut ctx: Box<dyn Csi + Send>,
+            ) -> Result<String, Error> {
+                ctx.complete_text(CompleteTextParameters {
+                    prompt: "dummy".to_owned(),
+                    model: "dummy".to_owned(),
+                    max_tokens: 128,
+                })
+                .await;
+                panic!("complete_text must pend forever in case of error")
+            }
+
+            fn skills(&self) -> impl Iterator<Item = &str> {
+                iter::once("Greet")
+            }
+        }
+        let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
+
+        // When
+        let executer = SkillExecutor::new(MockRuntime, inference_saboteur.api());
+        let mut api = executer.api();
+        let result = api.execute_skill("Dummy skill name".to_owned(), "Dummy input".to_owned(), "Dummy api token".to_owned()).await;
+
+        // Then
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert_eq!(error.to_string(), "Test inference error");
+    }
 
     #[tokio::test]
     async fn skill_executor_forwards_runtime_errors() {

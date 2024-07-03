@@ -63,7 +63,7 @@ impl pharia::skill::csi::Host for WasiInvocationCtx {
             model,
             max_tokens: 128,
         };
-        self.skill_ctx.complete_text(params).await
+        Ok(self.skill_ctx.complete_text(params).await)
     }
 }
 
@@ -161,7 +161,7 @@ pub mod tests {
     use async_trait::async_trait;
     use std::{collections::HashSet, fs};
 
-    use anyhow::{anyhow, bail, Error};
+    use anyhow::{anyhow, Error};
     use tempfile::tempdir;
 
     use crate::{
@@ -227,24 +227,10 @@ pub mod tests {
                 model: "luminous-nextgen-7b".to_owned(),
                 max_tokens: 10,
             };
-            ctx.complete_text(params).await
+            Ok(ctx.complete_text(params).await)
         }
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::once("greet")
-        }
-    }
-
-    /// A test double for a [`Csi`] implementation which returns an error for each method
-    /// invocation.
-    struct CsiSaboteur;
-
-    #[async_trait]
-    impl Csi for CsiSaboteur {
-        async fn complete_text(
-            &mut self,
-            _params: CompleteTextParameters,
-        ) -> Result<String, anyhow::Error> {
-            bail!("Test error from CSI Saboteur")
         }
     }
 
@@ -256,20 +242,9 @@ pub mod tests {
         async fn complete_text(
             &mut self,
             _params: CompleteTextParameters,
-        ) -> Result<String, anyhow::Error> {
-            Ok("Hello".to_owned())
+        ) -> String {
+            "Hello".to_owned()
         }
-    }
-
-    #[tokio::test]
-    async fn csi_invocation_failure() {
-        let skill_ctx = Box::new(CsiSaboteur);
-        let mut runtime = WasmRuntime::new();
-
-        let resp = runtime
-            .run("greet_skill", "name".to_owned(), skill_ctx)
-            .await;
-        assert!(resp.is_err());
     }
 
     #[tokio::test]
@@ -363,7 +338,7 @@ pub mod tests {
         async fn complete_text(
             &mut self,
             params: CompleteTextParameters,
-        ) -> Result<String, anyhow::Error> {
+        ) -> String {
             let expected_prompt = "### Instruction:\n\
                 Provide a nice greeting for the person utilizing its given name\n\
                 \n\
@@ -379,9 +354,9 @@ pub mod tests {
 
             if matches!(params, CompleteTextParameters{ prompt, model, max_tokens: 128 } if model == expected_model && prompt == expected_prompt)
             {
-                Ok("Hello Homer".to_owned())
+                "Hello Homer".to_owned()
             } else {
-                Ok("Mock expectation violated".to_owned())
+                "Mock expectation violated".to_owned()
             }
         }
     }

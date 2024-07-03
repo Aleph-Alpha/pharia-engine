@@ -11,7 +11,7 @@ pub trait Csi {
     async fn complete_text(
         &mut self,
         params: CompleteTextParameters,
-    ) -> Result<String, anyhow::Error>;
+    ) -> String;
 }
 
 #[async_trait]
@@ -19,13 +19,13 @@ impl Csi for SkillInvocationCtx {
     async fn complete_text(
         &mut self,
         params: CompleteTextParameters,
-    ) -> Result<String, anyhow::Error> {
+    ) -> String {
         match self
             .inference_api
             .complete_text(params, self.api_token.clone())
             .await
         {
-            Ok(value) => Ok(value),
+            Ok(value) => value,
             Err(error) => {
                 self.send_rt_err
                     .take()
