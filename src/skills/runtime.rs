@@ -159,19 +159,15 @@ impl Runtime for WasmRuntime {
 pub mod tests {
 
     use async_trait::async_trait;
-    use std::{collections::HashSet, env, fs, sync::OnceLock};
+    use std::{collections::HashSet, fs};
 
     use anyhow::{anyhow, bail, Error};
-    use dotenvy::dotenv;
     use tempfile::tempdir;
 
     use crate::{
-        inference::{tests::InferenceStub, CompleteTextParameters, Inference},
+        inference::CompleteTextParameters,
         registries::FileRegistry,
-        skills::{
-            csi::{Csi, SkillInvocationCtx},
-            runtime::Runtime,
-        },
+        skills::{csi::Csi, runtime::Runtime},
     };
 
     use super::WasmRuntime;
@@ -359,40 +355,60 @@ pub mod tests {
         assert!(greet.is_ok());
     }
 
-    static API_TOKEN: OnceLock<String> = OnceLock::new();
+    /// Asserts a specific prompt and model and returns a greeting message
+    struct CsiGreetingMock;
 
-    /// API Token used by tests to authenticate requests
-    fn api_token() -> &'static str {
-        API_TOKEN.get_or_init(|| {
-            drop(dotenv());
-            env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
-        })
+    #[async_trait]
+    impl Csi for CsiGreetingMock {
+        async fn complete_text(
+            &mut self,
+            params: CompleteTextParameters,
+        ) -> Result<String, anyhow::Error> {
+            let expected_prompt = "### Instruction:\n\
+                Provide a nice greeting for the person utilizing its given name\n\
+                \n\
+                ### Input:\n\
+                Name: Homer\n\
+                \n\
+                ### Response:";
+
+            let expected_model = "luminous-nextgen-7b";
+
+            // Print actual parameters in case of failure
+            eprintln!("{params:?}");
+
+            if matches!(params, CompleteTextParameters{ prompt, model, max_tokens: 128 } if model == expected_model && prompt == expected_prompt)
+            {
+                Ok("Hello Homer".to_owned())
+            } else {
+                Ok("Mock expectation violated".to_owned())
+            }
+        }
     }
 
-    #[cfg_attr(not(feature = "test_inference"), ignore)]
     #[tokio::test]
-    async fn all_greet_skills_are_identical() {
-        let inference = Inference::new();
+    async fn rust_greeting_skill() {
+        let skill_ctx = Box::new(CsiGreetingMock);
+
         let mut runtime = WasmRuntime::new();
-
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            inference.api(),
-            api_token().to_owned(),
-        ));
-        let rust_resp = runtime
-            .run("greet_skill", "name".to_owned(), skill_ctx)
+        let actual = runtime
+            .run("greet_skill", "Homer".to_owned(), skill_ctx)
             .await
             .unwrap();
 
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            inference.api(),
-            api_token().to_owned(),
-        ));
-        let python_resp = runtime
-            .run("greet-py", "name".to_owned(), skill_ctx)
+        assert_eq!(actual, "Hello Homer");
+    }
+
+    #[tokio::test]
+    async fn python_greeting_skill() {
+        let skill_ctx = Box::new(CsiGreetingMock);
+
+        let mut runtime = WasmRuntime::new();
+        let actual = runtime
+            .run("greet-py", "Homer".to_owned(), skill_ctx)
             .await
             .unwrap();
 
-        assert_eq!(rust_resp, python_resp);
+        assert_eq!(actual, "Hello Homer");
     }
 }
