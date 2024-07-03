@@ -104,11 +104,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 send,
                 api_token,
             } => {
-                let ctx = Box::new(SkillInvocationCtx::new(
-                    self.inference_api.clone(),
-                    api_token,
-                ));
-                let response = self.runtime.run(&skill, input, ctx).await;
+                let response = self.run_skill(skill, input, api_token).await;
                 drop(send.send(response));
             }
             SkillExecutorMessage::Skills { send } => {
@@ -116,6 +112,19 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 drop(send.send(response));
             }
         }
+    }
+
+    async fn run_skill(
+        &mut self,
+        skill: String,
+        input: String,
+        api_token: String,
+    ) -> Result<String, Error> {
+        let ctx = Box::new(SkillInvocationCtx::new(
+            self.inference_api.clone(),
+            api_token,
+        ));
+        self.runtime.run(&skill, input, ctx).await
     }
 }
 
