@@ -14,8 +14,7 @@ use crate::{
 
 use super::csi::Csi;
 
-// trappable_imports enable failure capturing from host environment (csi functions)
-bindgen!({ world: "skill", async: true, trappable_imports: true });
+bindgen!({ world: "skill", async: true });
 
 pub trait Runtime {
     // We are returning a Future explicitly here instead of using the `async` syntax. This has the
@@ -57,13 +56,13 @@ impl WasiInvocationCtx {
 #[async_trait::async_trait]
 impl pharia::skill::csi::Host for WasiInvocationCtx {
     #[must_use]
-    async fn complete_text(&mut self, prompt: String, model: String) -> wasmtime::Result<String> {
+    async fn complete_text(&mut self, prompt: String, model: String) -> String {
         let params = CompleteTextParameters {
             prompt,
             model,
             max_tokens: 128,
         };
-        Ok(self.skill_ctx.complete_text(params).await)
+        self.skill_ctx.complete_text(params).await
     }
 }
 
