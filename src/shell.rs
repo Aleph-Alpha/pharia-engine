@@ -2,7 +2,7 @@ use std::{future::Future, iter::once, sync::Arc};
 
 use aide::{
     axum::{
-        routing::{get, post_with},
+        routing::{get, get_with, post_with},
         ApiRouter,
     },
     transform::TransformOperation,
@@ -70,6 +70,10 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
             "/execute_skill",
             post_with(execute_skill, execute_skill_docs),
         )
+        .api_route(
+            "/cached_skills",
+            get_with(cached_skills, cached_skills_docs),
+        )
         .with_state(skill_executor_api)
         .nest_service("/docs", serve_dir.clone())
         .route("/healthcheck", get(|| async { "ok" }))
@@ -116,29 +120,51 @@ async fn execute_skill(
     State(mut skill_executor_api): State<SkillExecutorApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<ExecuteSkillArgs>,
-) -> (StatusCode, String) {
+) -> (StatusCode, Json<String>) {
     let result = skill_executor_api
         .execute_skill(args.skill, args.input, bearer.token().to_owned())
         .await;
     match result {
-        Ok(response) => (StatusCode::OK, response),
-        Err(err) => (StatusCode::BAD_REQUEST, err.to_string()),
+        Ok(response) => (StatusCode::OK, Json(response)),
+        Err(err) => (StatusCode::BAD_REQUEST, Json(err.to_string())),
     }
 }
 
 fn execute_skill_docs(op: TransformOperation<'_>) -> TransformOperation<'_> {
     op.id("executeSkill")
         .description("Execute a skill in the kernel from one of the available repositories.")
-        .response_with::<200, String, _>(|res| res.description("The Skill was executed."))
-        .response_with::<400, String, _>(|res| {
+        .response_with::<200, Json<String>, _>(|res| res.description("The Skill was executed."))
+        .response_with::<400, Json<String>, _>(|res| {
             res.description("The Skill invocation failed.")
                 .example("Skill not found.")
         })
 }
 
+async fn cached_skills(
+    State(mut skill_executor_api): State<SkillExecutorApi>,
+) -> (StatusCode, Json<Vec<String>>) {
+    let response = skill_executor_api.skills().await;
+    (StatusCode::OK, Json(response))
+}
+
+fn cached_skills_docs(op: TransformOperation<'_>) -> TransformOperation<'_> {
+    op.id("cachedSkills")
+        .description(
+            "List of all cached skills. These are skills that are already compiled \
+            and are faster because they do not have to be transpiled to machine code. \
+            When executing a skill which is not loaded yet, it will be cached."
+            )
+        .response_with::<200, Json<Vec<String>>, _>(|res| {
+            res.example(["first skill".to_owned(), "second skill".to_owned()])
+        })
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::skills::{SkillExecutor, WasmRuntime};
+    use crate::{
+        inference::tests::InferenceStub,
+        skills::{tests::LiarRuntime, SkillExecutor, WasmRuntime},
+    };
 
     use super::*;
 
@@ -224,6 +250,32 @@ mod tests {
             String::from_utf8(body.to_vec()).unwrap(),
             "Header of type `authorization` was missing".to_owned()
         );
+    }
+
+    #[tokio::test]
+    async fn cached_skills_are_returned() {
+        let skills = vec!["First skill".to_owned(), "Second skill".to_owned()];
+        let runtime = LiarRuntime::new(skills);
+        let inference = InferenceStub::with_completion("hello");
+
+        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::GET)
+                    .uri("/cached_skills")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = String::from_utf8(body.to_vec()).unwrap();
+
+        assert!(answer.contains("First skill"));
+        assert!(answer.contains("Second skill"));
     }
 
     #[tokio::test]

@@ -33,6 +33,8 @@ pub trait Runtime {
         name: String,
         ctx: Box<dyn Csi + Send>,
     ) -> impl Future<Output = Result<String, Error>> + Send;
+
+    fn skills(&self) -> impl Iterator<Item = &str>;
 }
 
 struct WasiInvocationCtx {
@@ -147,13 +149,17 @@ impl Runtime for WasmRuntime {
             .expect("failed to instantiate skill");
         bindings.call_run(&mut store, &name).await
     }
+
+    fn skills(&self) -> impl Iterator<Item = &str> {
+        self.components.keys().map(String::as_ref)
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
 
     use async_trait::async_trait;
-    use std::{env, fs, sync::OnceLock};
+    use std::{collections::HashSet, env, fs, sync::OnceLock};
 
     use anyhow::{anyhow, bail, Error};
     use dotenvy::dotenv;
@@ -189,6 +195,10 @@ pub mod tests {
         ) -> Result<String, Error> {
             Err(anyhow!(self.err_msg.clone()))
         }
+
+        fn skills(&self) -> impl Iterator<Item = &str> {
+            std::iter::empty()
+        }
     }
 
     pub struct RustRuntime {}
@@ -222,6 +232,9 @@ pub mod tests {
                 max_tokens: 10,
             };
             ctx.complete_text(params).await
+        }
+        fn skills(&self) -> impl Iterator<Item = &str> {
+            std::iter::once("greet")
         }
     }
 
@@ -275,6 +288,56 @@ pub mod tests {
             .run("non-existing-skill", "name".to_owned(), skill_ctx)
             .await;
         assert!(resp.is_err());
+    }
+
+    #[tokio::test]
+    async fn no_skills_are_listed() {
+        // given a fresh WasmRuntime
+        let runtime = WasmRuntime::new();
+
+        // when querying skills
+        let skill_count = runtime.skills().count();
+
+        // then an empty vec is returned
+        assert_eq!(skill_count, 0);
+    }
+
+    #[tokio::test]
+    async fn skills_are_listed() {
+        // given a runtime with two installed skills
+        let inference = InferenceStub::with_completion("hello");
+        let mut runtime = WasmRuntime::new();
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            inference.api(),
+            api_token().to_owned(),
+        ));
+        drop(
+            runtime
+                .run("greet_skill", "name".to_owned(), skill_ctx)
+                .await
+                .unwrap(),
+        );
+
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            inference.api(),
+            api_token().to_owned(),
+        ));
+        drop(
+            runtime
+                .run("greet-py", "name".to_owned(), skill_ctx)
+                .await
+                .unwrap(),
+        );
+
+        // when querying skills
+        let skills = runtime.skills();
+
+        // convert to a set
+        let skills: HashSet<String> = skills.map(str::to_owned).collect();
+        let expected: HashSet<String> = ["greet-py".to_owned(), "greet_skill".to_owned()]
+            .into_iter()
+            .collect();
+        assert_eq!(skills, expected);
     }
 
     #[tokio::test]

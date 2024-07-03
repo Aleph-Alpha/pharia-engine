@@ -46,12 +46,23 @@ impl SkillExecutorApi {
         api_token: String,
     ) -> Result<String, Error> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMessage {
+        let msg = SkillExecutorMessage::Execute {
             skill,
             input,
             send,
             api_token,
         };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await.unwrap()
+    }
+
+    pub async fn skills(&mut self) -> Vec<String> {
+        let (send, recv) = oneshot::channel();
+        let msg = SkillExecutorMessage::Skills { send };
+
         self.send
             .send(msg)
             .await
@@ -78,37 +89,57 @@ impl<R: Runtime> SkillExecutorActor<R> {
             inference_api,
         }
     }
+
     async fn run(&mut self) {
         while let Some(msg) = self.recv.recv().await {
             self.act(msg).await;
         }
     }
+
     async fn act(&mut self, msg: SkillExecutorMessage) {
-        let ctx = Box::new(SkillInvocationCtx::new(self.inference_api.clone(), msg.api_token));
-        let response = self
-            .runtime
-            .run(
-                &msg.skill,
-                msg.input,
-                ctx,
-            )
-            .await;
-        drop(msg.send.send(response));
+        match msg {
+            SkillExecutorMessage::Execute {
+                skill,
+                input,
+                send,
+                api_token,
+            } => {
+                let ctx = Box::new(SkillInvocationCtx::new(
+                    self.inference_api.clone(),
+                    api_token,
+                ));
+                let response = self.runtime.run(&skill, input, ctx).await;
+                drop(send.send(response));
+            }
+            SkillExecutorMessage::Skills { send } => {
+                let response = self.runtime.skills().map(str::to_owned).collect();
+                drop(send.send(response))
+            }
+        }
     }
 }
 
-struct SkillExecutorMessage {
-    skill: String,
-    input: String,
-    send: oneshot::Sender<Result<String, Error>>,
-    api_token: String,
+enum SkillExecutorMessage {
+    Execute {
+        skill: String,
+        input: String,
+        send: oneshot::Sender<Result<String, Error>>,
+        api_token: String,
+    },
+    Skills {
+        send: oneshot::Sender<Vec<String>>,
+    },
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
+    use anyhow::Error;
+
     use crate::{
         inference::tests::InferenceStub,
         skills::{
+            csi::Csi,
+            runtime::Runtime,
             tests::{RustRuntime, SaboteurRuntime},
             SkillExecutor,
         },
@@ -154,5 +185,49 @@ mod tests {
 
         // Then
         assert_eq!(result.unwrap(), "Hello");
+    }
+
+    // Tell that `skills` are installed
+    pub struct LiarRuntime {
+        skills: Vec<String>,
+    }
+
+    impl LiarRuntime {
+        pub fn new(skills: Vec<String>) -> Self {
+            Self { skills }
+        }
+    }
+
+    impl Runtime for LiarRuntime {
+        async fn run(
+            &mut self,
+            _skill: &str,
+            _name: String,
+            _ctx: Box<dyn Csi + Send>,
+        ) -> Result<String, Error> {
+            panic!("Liar runtime does not run skills")
+        }
+
+        fn skills(&self) -> impl Iterator<Item = &str> {
+            self.skills.iter().map(String::as_ref)
+        }
+    }
+
+    #[tokio::test]
+    async fn list_skills() {
+        // Given a runtime with five skills
+        let skills = vec!["First skill".to_owned(), "Second skill".to_owned()];
+        let inference = InferenceStub::with_completion("Hello".to_owned());
+        let runtime = LiarRuntime::new(skills.clone());
+
+        // When
+        let executor = SkillExecutor::new(runtime, inference.api());
+        let result = executor.api().skills().await;
+
+        executor.shutdown().await;
+        inference.shutdown().await;
+
+        // Then
+        assert_eq!(result.len(), skills.len());
     }
 }
