@@ -33,3 +33,11 @@ SKILL_REPOSITORY=engineering/pharia-kernel/skills
 
 Skills we be loaded lazily if invoked.
 
+
+## Logging
+
+By default, only logs of `ERROR` level are output. You can change this by setting the `PHARIA_KERNEL_LOG` environment variable to one of `debug`, `info`, `warn`, or `error` (default).
+
+```shell
+PHARIA_KERNEL_LOG=info
+```
