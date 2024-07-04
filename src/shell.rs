@@ -1,4 +1,4 @@
-use std::{future::Future, iter::once, sync::Arc};
+use std::{future::Future, iter::once, net::SocketAddr, sync::Arc};
 
 use aide::{
     axum::{
@@ -22,7 +22,7 @@ use extractors::Json;
 use openapi::{api_docs, open_api, openapi_routes};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tokio::net::{TcpListener, ToSocketAddrs};
+use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -39,7 +39,7 @@ mod extractors;
 mod openapi;
 
 pub async fn run(
-    addr: impl ToSocketAddrs,
+    addr: impl Into<SocketAddr>,
     skill_executor_api: SkillExecutorApi,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> Result<(), Error> {
@@ -50,9 +50,10 @@ pub async fn run(
         .layer(Extension(Arc::new(open_api)))
         .into_make_service();
 
+    let addr = addr.into();
     let listener = TcpListener::bind(addr).await.context(
-        "Could not bind a tcp listener to host '{}' and port '{}' \
-                please check environment vars for HOST and PORT.",
+        "Could not bind a tcp listener to '{addr}' please check environment vars for \
+        PHARIA_KERNEL_ADDRESS.",
     )?;
 
     axum::serve(listener, app)
