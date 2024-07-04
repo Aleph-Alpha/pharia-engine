@@ -162,8 +162,8 @@ mod tests {
 
     #[tokio::test]
     async fn skill_not_found() {
-        dotenv().unwrap();
         // given a OCI registry is available at localhost:5000
+        drop(dotenv());
         let registry = OciRegistry::from_env().unwrap();
 
         // when loading a skill that does not exist
