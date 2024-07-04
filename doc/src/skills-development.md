@@ -2,13 +2,13 @@
 
 ## Developing Skills
 
-A Skill is a Web Assembly Component compiled against WIT (Web Assembly Interface Types) - World we call the **C**ognitive **S**ystem **I**nterface. The good thing is that you can compile almost any language into Web Assembly.
+A Skill is a Web Assembly Component compiled against our WIT (**W**eb Assembly **I**nterface **T**ypes) we call the **C**ognitive **S**ystem **I**nterface. The good thing is that you can compile almost any language into Web Assembly. Here we explain only how it works for Python.
 
 ## Developing Skills in Python
 
 This is a step by step instruction of how to write skills. There is also an example repository at <https://gitlab.aleph-alpha.de/engineering/haiku-skill-python> for you to explore.
 
-First you need to create the Python bindings for the cognitive System interface. In order to this, copy this file in your directory:
+First you need to create the Python bindings for the Cognitive System Interface. In order to this, copy this file in your directory. We call it `skill.wit`:
 
 ```wit
 package pharia:skill;
@@ -35,7 +35,7 @@ With `componentize-py` installed, we can now generate the bindings:
 componentize-py -d skill.wit -w skill bindings .
 ```
 
-This will create a `skill` module containing bindings to the cognitive interface in the current directory. You can now import this module in your Python code. Here is an example of a Skill creating a Haiku using the `skill` module.
+This will create a `skill` module containing bindings to the Cognitive System Interface in the current directory. You can now import this module in your Python code. Here is an example of a Skill creating a Haiku using the `skill` module.
 
 ```Python
 import skill
@@ -77,6 +77,6 @@ With the tooling available we can now upload the skill.
 podman run -v ./haiku.wasm:/haiku.wasm pharia-skill publish -R registry.gitlab.aleph-alpha.de -r engineering/pharia-kernel/skills -u DUMMY_USER_NAME -p $GITLAB_TOKEN ./haiku.wasm
 ```
 
-With our Gitlab registry, any user name will work, as long as you use a token. You can generate a token on your profile page. It is important to give it the right to write into registries.
+With our Gitlab registry, any user name will work, as long as you use a token. You can generate a token on your profile page. It is important to give write privilege.
 
 Congratulations! Your skill is now deployed. You can now use the http API to call it.
