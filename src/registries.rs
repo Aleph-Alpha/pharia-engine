@@ -44,33 +44,31 @@ pub trait SkillRegistry {
 }
 
 impl SkillRegistry for Box<dyn SkillRegistry + Send> {
-    fn load_skill<'a>(
+    fn load_skill_new<'a>(
         &'a self,
         name: &'a str,
-        engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
-        self.as_ref().load_skill(name, engine)
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
+        self.as_ref().load_skill_new(name)
     }
 }
 
 impl<R: SkillRegistry> SkillRegistry for Vec<R> {
-    fn load_skill<'a>(
+    fn load_skill_new<'a>(
         &'a self,
         name: &'a str,
-        engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
         // Collect all the futures into an ordered stream that will run the futures concurrently,
         // but will return the results in the order they were added.
         let mut futures = self
             .iter()
-            .map(|r| r.load_skill(name, engine))
+            .map(|r| r.load_skill_new(name))
             .collect::<FuturesOrdered<_>>();
         Box::pin(async move {
             while let Some(result) = futures.next().await {
-                // We found the component. Otherwise, we continue to the next registry.
+                // We found the component bytes. Otherwise, we continue to the next registry.
                 // Bubble up any errors we find as well.
-                if let Some(component) = result? {
-                    return Ok(Some(component));
+                if let Some(bytes) = result? {
+                    return Ok(Some(bytes));
                 }
             }
             // We didn't find it anywhere
@@ -85,7 +83,6 @@ mod tests {
 
     use anyhow::{anyhow, Error};
     use tempfile::tempdir;
-    use wasmtime::{component::Component, Engine};
 
     use crate::skills::WasmRuntime;
 
@@ -125,11 +122,11 @@ mod tests {
     struct SaboteurRegistry;
 
     impl SkillRegistry for SaboteurRegistry {
-        fn load_skill<'a>(
+        fn load_skill_new<'a>(
             &'a self,
             _name: &'a str,
-            _engine: &'a Engine,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+        ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Vec<u8>>, Error>> + Send + 'a>>
+        {
             Box::pin(async move { Err(anyhow!("out-of-cheese-error")) })
         }
     }
