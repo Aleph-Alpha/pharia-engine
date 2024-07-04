@@ -152,8 +152,8 @@ fn cached_skills_docs(op: TransformOperation<'_>) -> TransformOperation<'_> {
         .description(
             "List of all cached skills. These are skills that are already compiled \
             and are faster because they do not have to be transpiled to machine code. \
-            When executing a skill which is not loaded yet, it will be cached."
-            )
+            When executing a skill which is not loaded yet, it will be cached.",
+        )
         .response_with::<200, Json<Vec<String>>, _>(|res| {
             res.example(["first skill".to_owned(), "second skill".to_owned()])
         })

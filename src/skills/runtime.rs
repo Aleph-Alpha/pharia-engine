@@ -238,10 +238,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiGreetingStub {
-        async fn complete_text(
-            &mut self,
-            _params: CompleteTextParameters,
-        ) -> String {
+        async fn complete_text(&mut self, _params: CompleteTextParameters) -> String {
             "Hello".to_owned()
         }
     }
@@ -334,10 +331,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiGreetingMock {
-        async fn complete_text(
-            &mut self,
-            params: CompleteTextParameters,
-        ) -> String {
+        async fn complete_text(&mut self, params: CompleteTextParameters) -> String {
             let expected_prompt = "### Instruction:\n\
                 Provide a nice greeting for the person utilizing its given name\n\
                 \n\

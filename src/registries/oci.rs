@@ -90,9 +90,8 @@ impl OciRegistry {
 }
 
 fn is_skill_not_found(error: &Error) -> bool {
-    let error = match error.downcast_ref::<OciDistributionError>() {
-        Some(error) => error,
-        None => return false,
+    let Some(error) = error.downcast_ref::<OciDistributionError>() else {
+        return false;
     };
 
     if let OciDistributionError::RegistryError { envelope, .. } = error {

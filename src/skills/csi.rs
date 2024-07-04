@@ -8,18 +8,12 @@ use tokio::sync::oneshot;
 
 #[async_trait]
 pub trait Csi {
-    async fn complete_text(
-        &mut self,
-        params: CompleteTextParameters,
-    ) -> String;
+    async fn complete_text(&mut self, params: CompleteTextParameters) -> String;
 }
 
 #[async_trait]
 impl Csi for SkillInvocationCtx {
-    async fn complete_text(
-        &mut self,
-        params: CompleteTextParameters,
-    ) -> String {
+    async fn complete_text(&mut self, params: CompleteTextParameters) -> String {
         match self
             .inference_api
             .complete_text(params, self.api_token.clone())

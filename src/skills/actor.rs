@@ -195,7 +195,13 @@ pub mod tests {
         // When
         let executer = SkillExecutor::new(MockRuntime, inference_saboteur.api());
         let mut api = executer.api();
-        let result = api.execute_skill("Dummy skill name".to_owned(), "Dummy input".to_owned(), "Dummy api token".to_owned()).await;
+        let result = api
+            .execute_skill(
+                "Dummy skill name".to_owned(),
+                "Dummy input".to_owned(),
+                "Dummy api token".to_owned(),
+            )
+            .await;
 
         // Then
         assert!(result.is_err());
