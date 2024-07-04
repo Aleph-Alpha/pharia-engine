@@ -179,13 +179,22 @@ mod tests {
     use std::sync::OnceLock;
     use tower::util::ServiceExt;
 
-    static API_TOKEN: OnceLock<String> = OnceLock::new();
-
     /// API Token used by tests to authenticate requests
     fn api_token() -> &'static str {
+        static API_TOKEN: OnceLock<String> = OnceLock::new();
         API_TOKEN.get_or_init(|| {
             drop(dotenv());
             env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
+        })
+    }
+
+    /// inference address used by test to call inference
+    fn inference_addr() -> &'static str {
+        static INFERENCE_ADDRESS: OnceLock<String> = OnceLock::new();
+        INFERENCE_ADDRESS.get_or_init(|| {
+            drop(dotenv());
+            env::var("INFERENCE_ADDRESS")
+                .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned())
         })
     }
 
@@ -196,7 +205,7 @@ mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
 
-        let inference = Inference::new();
+        let inference = Inference::new(inference_addr().to_owned());
 
         let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
@@ -225,7 +234,7 @@ mod tests {
 
     #[tokio::test]
     async fn api_token_missing() {
-        let inference = Inference::new();
+        let inference = Inference::new(inference_addr().to_owned());
 
         let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());
@@ -280,7 +289,7 @@ mod tests {
 
     #[tokio::test]
     async fn healthcheck() {
-        let inference = Inference::new();
+        let inference = Inference::new(inference_addr().to_owned());
 
         let runtime = WasmRuntime::new();
         let http = http(SkillExecutor::new(runtime, inference.api()).api());

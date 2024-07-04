@@ -27,7 +27,7 @@ async fn main() {
 }
 
 async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + Send + 'static) {
-    let inference = Inference::new();
+    let inference = Inference::new(app_config.inference_addr);
 
     let runtime = WasmRuntime::new();
     let skill_executor = SkillExecutor::new(runtime, inference.api());
@@ -80,6 +80,7 @@ mod tests {
     async fn shutdown() {
         let config = AppConfig {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
+            inference_addr: "https://api.aleph-alpha.com".to_owned(),
         };
 
         //wasm runtime needs some time to shutdown (at least on Daniel's maschine), so the time out

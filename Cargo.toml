@@ -28,7 +28,7 @@ aide = { version = "0.13.4", features = [
     "macros",
     "scalar",
 ] }
-aleph-alpha-client = "0.9.0"
+aleph-alpha-client = "0.10.1"
 anyhow = "1.0.86"
 async-trait = "0.1.80"
 axum = { version = "0.7.5", features = ["macros"] }

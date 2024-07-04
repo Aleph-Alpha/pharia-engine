@@ -15,8 +15,8 @@ pub struct Inference {
 }
 
 impl Inference {
-    pub fn new() -> Self {
-        let client = Client::new("DUMMY").unwrap();
+    pub fn new(inference_addr: String) -> Self {
+        let client = Client::new(inference_addr, None).unwrap();
         Self::with_client(client)
     }
 
