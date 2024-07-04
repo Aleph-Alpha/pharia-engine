@@ -51,10 +51,10 @@ pub async fn run(
         .into_make_service();
 
     let addr = addr.into();
-    let listener = TcpListener::bind(addr).await.context(
+    let listener = TcpListener::bind(addr).await.context(format!(
         "Could not bind a tcp listener to '{addr}' please check environment vars for \
-        PHARIA_KERNEL_ADDRESS.",
-    )?;
+        PHARIA_KERNEL_ADDRESS."
+    ))?;
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal)
