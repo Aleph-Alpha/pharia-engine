@@ -1,10 +1,10 @@
 # Operating Pharia Kernel
 
-Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in a number of languages, including Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrival via the cognitive system interface. This enables to deploy RAG usecases serverless.
+Pharia Kernel allows you to execute Cognitive Business Units called Skills. These Skills can be written in a number of languages, including Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the Cognitive System Interface. This enables to deploy RAG use cases serverless.
 
 ## How to get it
 
-We deploy Pharia Kernel as a Container image to JFrog. You can fetch them like this:
+We deploy Pharia Kernel as a container image to JFrog. You can fetch them like this:
 
 ```shell
 podman login alephalpha.jfrog.io/pharia-kernel-images
@@ -14,7 +14,7 @@ podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest pharia-
 
 ## Starting
 
-You can start the container and expose its shell at 8081 like this
+You can start the container and expose its shell at port 8081 like this
 
 ```shell
 podman run -p 8081:8081 pharia-kernel
@@ -22,7 +22,7 @@ podman run -p 8081:8081 pharia-kernel
 
 ## Deploying Skills
 
-Pharia Kernel will automatically serve any skill deployed at the `skills` subdirectory of its working directory. However, this is mostly intended for local development of Skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommened to use a container registry. At least if you want to deploy them dynamically. Pharia Kernel will look at the following Enviroment variables (here with example):
+Pharia Kernel will automatically serve any Skill deployed at the `skills` subdirectory of its working directory. However, this is mostly intended for local development of Skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommended to use a container registry. At least if you want to deploy them dynamically. Pharia Kernel will look at the following Enviroment variables (here with example):
 
 ```shell
 SKILL_REGISTRY_USER=Joe.Plumber
@@ -49,4 +49,3 @@ By default the kernel uses the Aleph Alpha SAAS [inference API](https://api.alep
 ```shell
 INFERENCE_ADDRESS=https://inference.acme.com
 ```
-
