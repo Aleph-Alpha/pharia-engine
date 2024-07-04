@@ -21,26 +21,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-aide = { version = "0.13.4", features = [
-    "axum",
-    "axum-extra",
-    "axum-headers",
-    "macros",
-    "scalar",
-] }
 aleph-alpha-client = "0.10.1"
 anyhow = "1.0.86"
 async-trait = "0.1.80"
 axum = { version = "0.7.5", features = ["macros"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
-axum-jsonschema = { version = "0.8.0", features = ["aide"] }
-axum-macros = "0.4.1"
 dotenvy = "0.15.7"
 futures = "0.3.30"
 oci-distribution = "0.11.0"
 oci-wasm = "0.0.4"
-schemars = "0.8.21"
-serde = { version = "1.0.203", features = ["derive", "rc"] }
+serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.120"
 tokio = { version = "1.38.0", features = [
     "macros",
@@ -48,9 +38,17 @@ tokio = { version = "1.38.0", features = [
     "signal",
 ] }
 tower = { version = "0.4.13", features = ["util"] }
-tower-http = { version = "0.5.2", features = ["compression-full", "decompression-full", "fs", "sensitive-headers", "trace"] }
+tower-http = { version = "0.5.2", features = [
+    "compression-full",
+    "decompression-full",
+    "fs",
+    "sensitive-headers",
+    "trace",
+] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+utoipa = { version = "4.2.3", features = ["axum_extras"] }
+utoipa-scalar = { version = "0.1.0", features = ["axum"] }
 wasmtime = "22.0.0"
 wasmtime-wasi = "22.0.0"
 

@@ -1,26 +1,17 @@
-use std::{future::Future, iter::once, net::SocketAddr, sync::Arc};
+use std::{future::Future, iter::once, net::SocketAddr};
 
-use aide::{
-    axum::{
-        routing::{get, get_with, post_with},
-        ApiRouter,
-    },
-    transform::TransformOperation,
-};
 use anyhow::{Context, Error};
 use axum::{
     extract::{MatchedPath, State},
     http::{header::AUTHORIZATION, Request, StatusCode},
     response::Redirect,
-    Extension,
+    routing::{get, post},
+    Json, Router,
 };
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
-use extractors::Json;
-use openapi::{api_docs, open_api, openapi_routes};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -32,54 +23,92 @@ use tower_http::{
     trace::{DefaultOnResponse, TraceLayer},
 };
 use tracing::{info_span, Level};
+use utoipa::{
+    openapi::{
+        self,
+        security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+    },
+    Modify, OpenApi, ToSchema,
+};
+use utoipa_scalar::{Scalar, Servable};
 
 use crate::skills::SkillExecutorApi;
 
-mod extractors;
-mod openapi;
+#[derive(OpenApi)]
+#[openapi(
+    info(description = "The best place to run serverless AI applications."),
+    paths(serve_docs, cached_skills, execute_skill),
+    modifiers(&SecurityAddon),
+    components(schemas(ExecuteSkillArgs)),
+    tags(
+        (name = "skills"),
+        (name = "docs"),
+    )
+)]
+struct ApiDoc;
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut openapi::OpenApi) {
+        let components = openapi.components.get_or_insert_with(Default::default);
+        components.add_security_scheme(
+            "api_token",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
+                    .build(),
+            ),
+        );
+    }
+}
+
+/// openapi.json
+///
+/// Return JSON version of an OpenAPI schema
+#[utoipa::path(
+    get,
+    path = "/openapi.json",
+    tag = "docs",
+    responses(
+        (status = 200, description = "JSON file", body = ())
+    ),
+)]
+async fn serve_docs() -> Json<openapi::OpenApi> {
+    Json(ApiDoc::openapi())
+}
 
 pub async fn run(
     addr: impl Into<SocketAddr>,
     skill_executor_api: SkillExecutorApi,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> Result<(), Error> {
-    let mut open_api = open_api();
-
-    let app = http(skill_executor_api)
-        .finish_api_with(&mut open_api, api_docs)
-        .layer(Extension(Arc::new(open_api)))
-        .into_make_service();
-
     let addr = addr.into();
     let listener = TcpListener::bind(addr).await.context(format!(
         "Could not bind a tcp listener to '{addr}' please check environment vars for \
         PHARIA_KERNEL_ADDRESS."
     ))?;
 
-    axum::serve(listener, app)
+    axum::serve(listener, http(skill_executor_api))
         .with_graceful_shutdown(shutdown_signal)
         .await?;
     Ok(())
 }
 
-pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
+pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
     let serve_dir =
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
 
-    ApiRouter::new()
-        .api_route(
-            "/execute_skill",
-            post_with(execute_skill, execute_skill_docs),
-        )
-        .api_route(
-            "/cached_skills",
-            get_with(cached_skills, cached_skills_docs),
-        )
+    Router::new()
+        .route("/execute_skill", post(execute_skill))
+        .route("/cached_skills", get(cached_skills))
         .with_state(skill_executor_api)
         .nest_service("/docs", serve_dir.clone())
+        .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
+        .route("/openapi.json", get(serve_docs))
         .route("/healthcheck", get(|| async { "ok" }))
         .route("/", get(|| async { Redirect::permanent("/docs/") }))
-        .merge(openapi_routes())
         .layer(
             ServiceBuilder::new()
                 // Mark the `Authorization` request header as sensitive so it doesn't show in logs
@@ -109,7 +138,7 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> ApiRouter {
         )
 }
 
-#[derive(Deserialize, Serialize, JsonSchema)]
+#[derive(Deserialize, Serialize, ToSchema)]
 struct ExecuteSkillArgs {
     /// The name of the skill to invoke from one of the configured repositories.
     skill: String,
@@ -117,6 +146,21 @@ struct ExecuteSkillArgs {
     input: String,
 }
 
+/// execute_skill
+///
+/// Execute a skill in the kernel from one of the available repositories.
+#[utoipa::path(
+    post,
+    operation_id = "execute_skill",
+    path = "/execute_skill",
+    request_body = ExecuteSkillArgs,
+    security(("api_token" = [])),
+    tag = "skills",
+    responses(
+        (status = 200, description = "The Skill was executed.", body=String, example = json!("Skill output")),
+        (status = 400, description = "The Skill invocation failed.", body=String, example = json!("Skill not found."))
+    ),
+)]
 async fn execute_skill(
     State(mut skill_executor_api): State<SkillExecutorApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
@@ -131,33 +175,25 @@ async fn execute_skill(
     }
 }
 
-fn execute_skill_docs(op: TransformOperation<'_>) -> TransformOperation<'_> {
-    op.id("executeSkill")
-        .description("Execute a skill in the kernel from one of the available repositories.")
-        .response_with::<200, Json<String>, _>(|res| res.description("The Skill was executed."))
-        .response_with::<400, Json<String>, _>(|res| {
-            res.description("The Skill invocation failed.")
-                .example("Skill not found.")
-        })
-}
-
+/// cached_skills
+///
+/// List of all cached skills. These are skills that are already compiled
+/// and are faster because they do not have to be transpiled to machine code.
+/// When executing a skill which is not loaded yet, it will be cached.
+#[utoipa::path(
+    post,
+    operation_id = "cached_skills",
+    path = "/cached_skills",
+    tag = "skills",
+    responses(
+        (status = 200, body=Vec<String>, example = json!(["first skill", "second skill"])),
+    ),
+)]
 async fn cached_skills(
     State(mut skill_executor_api): State<SkillExecutorApi>,
 ) -> (StatusCode, Json<Vec<String>>) {
     let response = skill_executor_api.skills().await;
     (StatusCode::OK, Json(response))
-}
-
-fn cached_skills_docs(op: TransformOperation<'_>) -> TransformOperation<'_> {
-    op.id("cachedSkills")
-        .description(
-            "List of all cached skills. These are skills that are already compiled \
-            and are faster because they do not have to be transpiled to machine code. \
-            When executing a skill which is not loaded yet, it will be cached.",
-        )
-        .response_with::<200, Json<Vec<String>>, _>(|res| {
-            res.example(["first skill".to_owned(), "second skill".to_owned()])
-        })
 }
 
 #[cfg(test)]
