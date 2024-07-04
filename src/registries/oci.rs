@@ -8,7 +8,6 @@ use oci_distribution::{
 use oci_wasm::WasmClient;
 use std::{env, future::Future, pin::Pin};
 use tracing::error;
-use wasmtime::{component::Component, Engine};
 
 use oci_distribution::{client::ClientConfig, Client};
 
@@ -21,15 +20,13 @@ pub struct OciRegistry {
 }
 
 impl SkillRegistry for OciRegistry {
-    fn load_skill<'a>(
+    fn load_skill_new<'a>(
         &'a self,
         name: &'a str,
-        engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
         let repository = format!("{}/{name}", self.repository);
         let tag = "latest";
         let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
-
         let auth = RegistryAuth::Basic(self.username.clone(), self.password.clone());
 
         Box::pin(async move {
@@ -38,9 +35,8 @@ impl SkillRegistry for OciRegistry {
             let result = self.client.pull(&image, &auth).await;
             match result {
                 Ok(image) => {
-                    let binary = &image.layers.first().unwrap().data;
-                    let result = Component::from_binary(engine, binary);
-                    Some(result).transpose()
+                    let binary = image.layers.into_iter().next().unwrap().data;
+                    Ok(Some(binary))
                 }
                 // We want to distinguish between a skill that is not there and runtime errors
                 Err(e) => {
