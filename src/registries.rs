@@ -27,16 +27,17 @@ pub trait SkillRegistry {
         Box::pin(async move {
             let binary = fut.await?;
             if let Some(binary) = binary {
-                Some(Component::from_binary(engine, &binary)).transpose()
+                Some(Component::new(engine, binary)).transpose()
             } else {
                 Ok(None)
             }
         })
     }
 
+    /// can return either the binary or WAT text format of a Wasm component
     fn load_skill_new<'a>(
         &'a self,
-        name: &'a str,
+        _name: &'a str,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
         todo!()
     }
@@ -93,32 +94,31 @@ mod tests {
     struct NoneRegistry;
 
     impl SkillRegistry for NoneRegistry {
-        fn load_skill<'a>(
+        fn load_skill_new<'a>(
             &'a self,
             _name: &'a str,
-            _engine: &'a Engine,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+        ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
             Box::pin(async { Ok(None) })
         }
     }
 
     struct SomeRegistry {
-        component: Component,
+        /// this could be binary or WAT
+        bytes: Vec<u8>,
     }
 
     impl SomeRegistry {
-        fn new(component: Component) -> Self {
-            Self { component }
+        fn new(bytes: Vec<u8>) -> Self {
+            Self { bytes }
         }
     }
 
     impl SkillRegistry for SomeRegistry {
-        fn load_skill<'a>(
+        fn load_skill_new<'a>(
             &'a self,
             _name: &'a str,
-            _engine: &'a Engine,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
-            Box::pin(async move { Ok(Some(self.component.clone())) })
+        ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
+            Box::pin(async move { Ok(Some(self.bytes.clone())) })
         }
     }
 
@@ -167,12 +167,11 @@ mod tests {
     async fn one_none_one_some_registries() {
         // given
         let engine = WasmRuntime::engine();
-        let component = Component::new(&engine, "(component)").unwrap();
 
         // when
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(NoneRegistry {}),
-            Box::new(SomeRegistry::new(component)),
+            Box::new(SomeRegistry::new(b"(component)".to_vec())),
         ];
         let result = registries.load_skill("dummy skill name", &engine).await;
         let component = result.unwrap();
@@ -185,11 +184,10 @@ mod tests {
     async fn one_some_one_none_registries() {
         // given
         let engine = WasmRuntime::engine();
-        let component = Component::new(&engine, "(component)").unwrap();
 
         // when
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
-            Box::new(SomeRegistry::new(component)),
+            Box::new(SomeRegistry::new(b"(component)".to_vec())),
             Box::new(NoneRegistry {}),
         ];
         let result = registries.load_skill("dummy skill name", &engine).await;
@@ -203,10 +201,9 @@ mod tests {
     async fn first_fails_and_second_succeeds() {
         // given
         let engine = WasmRuntime::engine();
-        let component = Component::new(&engine, "(component)").unwrap();
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(SaboteurRegistry),
-            Box::new(SomeRegistry::new(component)),
+            Box::new(SomeRegistry::new(b"(component)".to_vec())),
         ];
 
         // when
@@ -219,9 +216,8 @@ mod tests {
     #[tokio::test]
     async fn second_one_fails() {
         let engine = WasmRuntime::engine();
-        let component = Component::new(&engine, "(component)").unwrap();
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
-            Box::new(SomeRegistry::new(component)),
+            Box::new(SomeRegistry::new(b"(component)".to_vec())),
             Box::new(SaboteurRegistry),
         ];
 
