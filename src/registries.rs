@@ -22,7 +22,24 @@ pub trait SkillRegistry {
         &'a self,
         name: &'a str,
         engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
+        let fut = self.load_skill_new(name);
+        Box::pin(async move {
+            let binary = fut.await?;
+            if let Some(binary) = binary {
+                Some(Component::from_binary(engine, &binary)).transpose()
+            } else {
+                Ok(None)
+            }
+        })
+    }
+
+    fn load_skill_new<'a>(
+        &'a self,
+        name: &'a str,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
+        todo!()
+    }
 }
 
 impl SkillRegistry for Box<dyn SkillRegistry + Send> {
