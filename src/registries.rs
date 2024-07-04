@@ -129,8 +129,7 @@ mod tests {
             &'a self,
             _name: &'a str,
             _engine: &'a Engine,
-        ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Component>, Error>> + Send + 'a>>
-        {
+        ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
             Box::pin(async move { Err(anyhow!("out-of-cheese-error")) })
         }
     }
