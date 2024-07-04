@@ -1,6 +1,6 @@
 use std::{collections::HashMap, future::Future};
 
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Context, Error};
 use wasmtime::{
     component::{bindgen, Component, Linker},
     Config, Engine, OptLevel, Store,
@@ -116,11 +116,10 @@ impl WasmRuntime {
     }
 
     async fn load_component(&mut self, skill_name: String) -> Result<(), Error> {
-        let component = self
-            .skill_registry
-            .load_skill(&skill_name, &self.engine)
-            .await?;
-        let component = component.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
+        let bytes = self.skill_registry.load_skill(&skill_name).await?;
+        let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
+        let component = Component::new(&self.engine, bytes)
+            .with_context(|| format!("Failed to initialize {skill_name}."))?;
         self.components.insert(skill_name, component);
         Ok(())
     }

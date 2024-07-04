@@ -6,10 +6,12 @@ use oci_distribution::{
     Reference,
 };
 use oci_wasm::WasmClient;
-use std::{env, future::Future, pin::Pin};
+use std::env;
 use tracing::error;
 
 use oci_distribution::{client::ClientConfig, Client};
+
+use super::DynFuture;
 
 pub struct OciRegistry {
     client: WasmClient,
@@ -20,10 +22,7 @@ pub struct OciRegistry {
 }
 
 impl SkillRegistry for OciRegistry {
-    fn load_skill_new<'a>(
-        &'a self,
-        name: &'a str,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
+    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
         let repository = format!("{}/{name}", self.repository);
         let tag = "latest";
         let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
@@ -104,6 +103,7 @@ fn is_skill_not_found(error: &Error) -> bool {
 mod tests {
     use dotenvy::dotenv;
     use oci_distribution::{secrets::RegistryAuth, Reference};
+    use wasmtime::component::Component;
     use wasmtime::Engine;
 
     use super::OciRegistry;
@@ -149,7 +149,12 @@ mod tests {
         // when pulled from registry
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
-        let component = registry.load_skill("greet_skill", &engine).await;
+        let bytes = registry
+            .load_skill("greet_skill")
+            .await
+            .expect("must return okay")
+            .expect("component binaries must be found");
+        let component = Component::new(&engine, bytes);
 
         // then skill can be loaded
         assert!(component.is_ok());
@@ -162,15 +167,10 @@ mod tests {
         let registry = OciRegistry::from_env().unwrap();
 
         // when loading a skill that does not exist
-        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid");
-        let component = registry
-            .load_skill("not-existing-skill", &engine)
-            .await
-            .unwrap();
+        let bytes = registry.load_skill("not-existing-skill").await.unwrap();
 
         // then skill can not be found
-        assert!(component.is_none());
+        assert!(bytes.is_none());
     }
 
     #[tokio::test]
@@ -184,11 +184,9 @@ mod tests {
         );
 
         // when loading a skill that does not exist
-        let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
-            .expect("config must be valid");
-        let component = registry.load_skill("not-existing-skill", &engine).await;
+        let bytes = registry.load_skill("not-existing-skill").await;
 
         // then skill can not be found
-        assert!(component.is_err());
+        assert!(bytes.is_err());
     }
 }

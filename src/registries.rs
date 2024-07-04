@@ -2,7 +2,6 @@ use anyhow::{Error, Result};
 use futures::{stream::FuturesOrdered, StreamExt};
 use oci::OciRegistry;
 use std::{future::Future, pin::Pin};
-use wasmtime::{component::Component, Engine};
 
 mod file;
 mod oci;
@@ -17,51 +16,26 @@ pub fn registries() -> Vec<Box<dyn SkillRegistry + Send>> {
     registries
 }
 
-pub trait SkillRegistry {
-    fn load_skill<'a>(
-        &'a self,
-        name: &'a str,
-        engine: &'a Engine,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Component>, Error>> + Send + 'a>> {
-        let fut = self.load_skill_new(name);
-        Box::pin(async move {
-            let binary = fut.await?;
-            if let Some(binary) = binary {
-                Some(Component::new(engine, binary)).transpose()
-            } else {
-                Ok(None)
-            }
-        })
-    }
+type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+pub trait SkillRegistry {
     /// can return either the binary or WAT text format of a Wasm component
-    fn load_skill_new<'a>(
-        &'a self,
-        _name: &'a str,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
-        todo!()
-    }
+    fn load_skill<'a>(&'a self, _name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>>;
 }
 
 impl SkillRegistry for Box<dyn SkillRegistry + Send> {
-    fn load_skill_new<'a>(
-        &'a self,
-        name: &'a str,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
-        self.as_ref().load_skill_new(name)
+    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
+        self.as_ref().load_skill(name)
     }
 }
 
 impl<R: SkillRegistry> SkillRegistry for Vec<R> {
-    fn load_skill_new<'a>(
-        &'a self,
-        name: &'a str,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
+    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
         // Collect all the futures into an ordered stream that will run the futures concurrently,
         // but will return the results in the order they were added.
         let mut futures = self
             .iter()
-            .map(|r| r.load_skill_new(name))
+            .map(|r| r.load_skill(name))
             .collect::<FuturesOrdered<_>>();
         Box::pin(async move {
             while let Some(result) = futures.next().await {
@@ -79,22 +53,18 @@ impl<R: SkillRegistry> SkillRegistry for Vec<R> {
 
 #[cfg(test)]
 mod tests {
-    use std::{future::Future, pin::Pin};
-
     use anyhow::{anyhow, Error};
     use tempfile::tempdir;
 
-    use crate::skills::WasmRuntime;
-
-    use super::{FileRegistry, SkillRegistry};
+    use super::{DynFuture, FileRegistry, SkillRegistry};
 
     struct NoneRegistry;
 
     impl SkillRegistry for NoneRegistry {
-        fn load_skill_new<'a>(
+        fn load_skill<'a>(
             &'a self,
             _name: &'a str,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
+        ) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
             Box::pin(async { Ok(None) })
         }
     }
@@ -111,10 +81,10 @@ mod tests {
     }
 
     impl SkillRegistry for SomeRegistry {
-        fn load_skill_new<'a>(
+        fn load_skill<'a>(
             &'a self,
             _name: &'a str,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>, Error>> + Send + 'a>> {
+        ) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
             Box::pin(async move { Ok(Some(self.bytes.clone())) })
         }
     }
@@ -122,11 +92,10 @@ mod tests {
     struct SaboteurRegistry;
 
     impl SkillRegistry for SaboteurRegistry {
-        fn load_skill_new<'a>(
+        fn load_skill<'a>(
             &'a self,
             _name: &'a str,
-        ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Vec<u8>>, Error>> + Send + 'a>>
-        {
+        ) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
             Box::pin(async move { Err(anyhow!("out-of-cheese-error")) })
         }
     }
@@ -135,75 +104,69 @@ mod tests {
     async fn empty_file_registry() {
         let skill_dir = tempdir().unwrap();
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let engine = WasmRuntime::engine();
-        let result = registry.load_skill("dummy skill name", &engine).await;
-        let component = result.unwrap();
-        assert!(component.is_none());
+        let result = registry.load_skill("dummy skill name").await;
+        let bytes = result.unwrap();
+        assert!(bytes.is_none());
     }
 
     #[tokio::test]
     async fn empty_skill_registries() {
         let registries = Vec::<NoneRegistry>::new();
-        let engine = WasmRuntime::engine();
-        let result = registries.load_skill("dummy skill name", &engine).await;
-        let component = result.unwrap();
-        assert!(component.is_none());
+        let result = registries.load_skill("dummy skill name").await;
+        let bytes = result.unwrap();
+        assert!(bytes.is_none());
     }
 
     #[tokio::test]
     async fn two_empty_registries() {
         let registries = vec![NoneRegistry {}, NoneRegistry {}];
-        let engine = WasmRuntime::engine();
-        let result = registries.load_skill("dummy skill name", &engine).await;
-        let component = result.unwrap();
-        assert!(component.is_none());
+        let result = registries.load_skill("dummy skill name").await;
+        let bytes = result.unwrap();
+        assert!(bytes.is_none());
     }
 
     #[tokio::test]
-    async fn one_none_one_some_registries() {
+    async fn find_skill_in_second_registry() {
         // given
-        let engine = WasmRuntime::engine();
-
-        // when
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(NoneRegistry {}),
             Box::new(SomeRegistry::new(b"(component)".to_vec())),
         ];
-        let result = registries.load_skill("dummy skill name", &engine).await;
-        let component = result.unwrap();
+
+        // when
+        let result = registries.load_skill("dummy skill name").await;
+        let bytes = result.unwrap().unwrap();
 
         // then
-        assert!(component.is_some());
+        assert_eq!(bytes, b"(component)");
     }
 
     #[tokio::test]
-    async fn one_some_one_none_registries() {
+    async fn find_skill_in_first_registry() {
         // given
-        let engine = WasmRuntime::engine();
-
-        // when
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(SomeRegistry::new(b"(component)".to_vec())),
             Box::new(NoneRegistry {}),
         ];
-        let result = registries.load_skill("dummy skill name", &engine).await;
-        let component = result.unwrap();
+
+        // when
+        let result = registries.load_skill("dummy skill name").await;
+        let bytes = result.unwrap().unwrap();
 
         // then
-        assert!(component.is_some());
+        assert_eq!(bytes, b"(component)");
     }
 
     #[tokio::test]
     async fn first_fails_and_second_succeeds() {
         // given
-        let engine = WasmRuntime::engine();
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(SaboteurRegistry),
             Box::new(SomeRegistry::new(b"(component)".to_vec())),
         ];
 
         // when
-        let result = registries.load_skill("dummy skill name", &engine).await;
+        let result = registries.load_skill("dummy skill name").await;
 
         // then
         assert!(result.is_err());
@@ -211,14 +174,13 @@ mod tests {
 
     #[tokio::test]
     async fn second_one_fails() {
-        let engine = WasmRuntime::engine();
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(SomeRegistry::new(b"(component)".to_vec())),
             Box::new(SaboteurRegistry),
         ];
 
         // when
-        let result = registries.load_skill("dummy skill name", &engine).await;
+        let result = registries.load_skill("dummy skill name").await;
 
         // then
         assert!(result.is_ok());
