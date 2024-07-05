@@ -168,7 +168,7 @@ async fn execute_skill(
 ) -> (StatusCode, Json<String>) {
     if args.skill.trim().is_empty() {
         return (
-            StatusCode::BAD_REQUEST,
+            VALIDATION_ERROR_STATUS_CODE,
             Json("empty skill names are not allowed".to_owned()),
         );
     }
@@ -201,6 +201,11 @@ async fn cached_skills(
     let response = skill_executor_api.skills().await;
     (StatusCode::OK, Json(response))
 }
+
+/// We use BAD_REQUEST (400) for validation error as it is more commonly used.
+/// UNPROCESSABLE_ENTITY (422) is an alternative, but it may surprise users as
+/// it is less commonly known
+const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
 #[cfg(test)]
 mod tests {
