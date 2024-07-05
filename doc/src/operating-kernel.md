@@ -28,7 +28,7 @@ Pharia Kernel will automatically serve any Skill deployed at the `skills` subdir
 SKILL_REGISTRY_USER=Joe.Plumber
 SKILL_REGISTRY_PASSWORD=****
 SKILL_REGISTRY=registry.gitlab.aleph-alpha.de
-SKILL_REPOSITORY=engineering/pharia-kernel/skills
+SKILL_REPOSITORY=engineering/pharia-skills/skills
 ```
 
 Skills we be loaded lazily if invoked.

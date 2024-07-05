@@ -20,7 +20,7 @@ enum Command {
         /// The OCI registry the skill will be published to (e.g. 'registry.gitlab.aleph-alpha.de')
         #[arg(long, short = 'R', env = "SKILL_REGISTRY")]
         registry: String,
-        /// The OCI repository the skill will be published to (e.g. 'engineering/pharia-kernel/skills')
+        /// The OCI repository the skill will be published to (e.g. 'engineering/pharia-skills/skills')
         #[arg(long, short = 'r', env = "SKILL_REPOSITORY")]
         repository: String,
         /// Published skill name

@@ -61,7 +61,7 @@ This will create a file called `haiku.wasm`, which can now be deployed into Phar
 
 ## Deploying Skills to the Kernel
 
-Skills are not containers. Yet, we still publish them into container repositories. Ask your administrator which ones are linked to your instance of Pharia Kernel. At Aleph Alpha we are currently using the registry `registry.gitlab.aleph-alpha.de` and the repository `engineering/pharia-kernel/skills`. It is recommended to publish the Skill using the `pharia-skill` command line tool. `pharia-skill` is deployed as a container image to our Artifactory. You can acquire it with Podman like this.
+Skills are not containers. Yet, we still publish them into container repositories. Ask your administrator which ones are linked to your instance of Pharia Kernel. At Aleph Alpha we are currently using the registry `registry.gitlab.aleph-alpha.de` and the repository `engineering/pharia-skills/skills`. It is recommended to publish the Skill using the `pharia-skill` command line tool. `pharia-skill` is deployed as a container image to our Artifactory. You can acquire it with Podman like this.
 
 **Attention:** We are currently still in a closed beta. Which means people outside of Aleph Alpha can not download our Pharia Kernel images. You may need to request a JFrog account, or extend the permission of your JFrog account to see images internal to the Aleph Alpha Organization. You can do so, by reaching out to us via the Product Service Desk:
 
@@ -80,7 +80,7 @@ Feel free to use `docker` instead, if you are more familiar with that tooling.
 With the tooling available we can now upload the Skill.
 
 ```shell
-podman run -v ./haiku.wasm:/haiku.wasm pharia-skill publish -R registry.gitlab.aleph-alpha.de -r engineering/pharia-kernel/skills -u DUMMY_USER_NAME -p $GITLAB_TOKEN ./haiku.wasm
+podman run -v ./haiku.wasm:/haiku.wasm pharia-skill publish -R registry.gitlab.aleph-alpha.de -r engineering/pharia-skills/skills -u DUMMY_USER_NAME -p $GITLAB_TOKEN ./haiku.wasm
 ```
 
 With our Gitlab registry, any user name will work, as long as you use a token. You can generate a token on your profile page. It is important to give write privilege.
