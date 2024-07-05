@@ -1,4 +1,3 @@
-mod config;
 mod inference;
 mod registries;
 mod shell;
@@ -7,11 +6,12 @@ use std::future::Future;
 
 use crate::inference::Inference;
 use crate::skills::SkillExecutor;
-use config::AppConfig;
 use skills::WasmRuntime;
 use tokio::signal;
 use tracing::error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+use pharia_kernel::AppConfig;
 
 #[tokio::main]
 async fn main() {
