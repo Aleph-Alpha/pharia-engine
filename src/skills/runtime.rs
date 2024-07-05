@@ -34,6 +34,8 @@ pub trait Runtime {
     ) -> impl Future<Output = Result<String, Error>> + Send;
 
     fn skills(&self) -> impl Iterator<Item = &str>;
+
+    fn drop_from_cache(&mut self, skill: &str) -> Option<()>;
 }
 
 struct WasiInvocationCtx {
@@ -151,6 +153,9 @@ impl Runtime for WasmRuntime {
     fn skills(&self) -> impl Iterator<Item = &str> {
         self.components.keys().map(String::as_ref)
     }
+    fn drop_from_cache(&mut self, skill: &str) -> Option<()> {
+        self.components.remove(skill).map(|_| ())
+    }
 }
 
 #[cfg(test)]
@@ -193,6 +198,9 @@ pub mod tests {
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::empty()
         }
+        fn drop_from_cache(&mut self, _skill: &str) -> Option<()> {
+            panic!("SaboteurRuntime does not drop skills from cache")
+        }
     }
 
     pub struct RustRuntime {}
@@ -230,6 +238,12 @@ pub mod tests {
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::once("greet")
         }
+        fn drop_from_cache(&mut self, skill: &str) -> Option<()> {
+            match skill {
+                "greet" => Some(()),
+                _ => None,
+            }
+        }
     }
 
     /// A test double for a [`Csi`] implementation which always completes with "Hello".
@@ -261,6 +275,40 @@ pub mod tests {
             .run("non-existing-skill", "name".to_owned(), skill_ctx)
             .await;
         assert!(resp.is_err());
+    }
+
+    #[tokio::test]
+    async fn drop_non_existing_skill_from_cache() {
+        // Given a WasmRuntime with no cached skills
+        let mut runtime = WasmRuntime::new();
+
+        // When removing a skill from the runtime
+        let result = runtime.drop_from_cache("non-cached-skill");
+
+        // Then
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn drop_existing_skill_from_cache() {
+        // Given a WasmRuntime with a cached skill
+        let mut runtime = WasmRuntime::new();
+        let skill_ctx = Box::new(CsiGreetingStub);
+        drop(
+            runtime
+                .run("greet_skill", "name".to_owned(), skill_ctx)
+                .await
+                .unwrap(),
+        );
+
+        // When dropping a skill from the runtime
+        let result = runtime.drop_from_cache("greet_skill");
+
+        // Then the component is not cached anymore
+        assert_eq!(runtime.components.len(), 0);
+
+        // And some is returned
+        assert!(result.is_some());
     }
 
     #[tokio::test]

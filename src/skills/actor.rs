@@ -193,6 +193,12 @@ pub mod tests {
             fn skills(&self) -> impl Iterator<Item = &str> {
                 iter::once("Greet")
             }
+            fn drop_from_cache(&mut self, skill: &str) -> Option<()> {
+                match skill {
+                    "Greet" => Some(()),
+                    _ => None,
+                }
+            }
         }
         let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
 
@@ -278,6 +284,9 @@ pub mod tests {
 
         fn skills(&self) -> impl Iterator<Item = &str> {
             self.skills.iter().map(String::as_ref)
+        }
+        fn drop_from_cache(&mut self, _skill: &str) -> Option<()> {
+            panic!("Liar runtime does not remove skills from cache")
         }
     }
 
