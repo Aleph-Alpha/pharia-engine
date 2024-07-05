@@ -169,7 +169,7 @@ async fn execute_skill(
     if args.skill.trim().is_empty() {
         return (
             VALIDATION_ERROR_STATUS_CODE,
-            Json("empty skill names are not allowed".to_owned()),
+            Json("Empty skill names are not allowed.".to_owned()),
         );
     }
     let result = skill_executor_api
