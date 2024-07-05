@@ -75,7 +75,7 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn drop_from_cache(&mut self, skill: String) -> Option<()> {
+    pub async fn drop_from_cache(&mut self, skill: String) -> bool {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Drop { send, skill };
 
@@ -166,7 +166,7 @@ pub enum SkillExecutorMessage {
     },
     Drop {
         skill: String,
-        send: oneshot::Sender<Option<()>>,
+        send: oneshot::Sender<bool>,
     },
 }
 
@@ -212,11 +212,8 @@ pub mod tests {
             fn skills(&self) -> impl Iterator<Item = &str> {
                 iter::once("Greet")
             }
-            fn drop_from_cache(&mut self, skill: &str) -> Option<()> {
-                match skill {
-                    "Greet" => Some(()),
-                    _ => None,
-                }
+            fn drop_from_cache(&mut self, skill: &str) -> bool {
+                skill == "Greet"
             }
         }
         let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
@@ -304,8 +301,8 @@ pub mod tests {
         fn skills(&self) -> impl Iterator<Item = &str> {
             self.skills.iter().map(String::as_ref)
         }
-        fn drop_from_cache(&mut self, skill: &str) -> Option<()> {
-            self.skills.iter().any(|s| s == skill).then(|| ())
+        fn drop_from_cache(&mut self, skill: &str) -> bool {
+            self.skills.iter().any(|s| s == skill)
         }
     }
 
@@ -345,7 +342,7 @@ pub mod tests {
         inference.shutdown().await;
 
         // Then
-        assert!(result.is_some());
+        assert!(result);
     }
 
     #[tokio::test]
@@ -366,6 +363,6 @@ pub mod tests {
         inference.shutdown().await;
 
         // Then
-        assert!(result.is_none());
+        assert!(!result);
     }
 }

@@ -4,7 +4,7 @@ use anyhow::{Context, Error};
 use axum::{
     extract::{MatchedPath, Path, State},
     http::{header::AUTHORIZATION, Request, StatusCode},
-    response::{IntoResponse, Redirect, Response},
+    response::Redirect,
     routing::{delete, get, post},
     Json, Router,
 };
@@ -103,7 +103,7 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
     Router::new()
         .route("/execute_skill", post(execute_skill))
         .route("/cached_skills", get(cached_skills))
-        .route("/skills/:name", delete(drop_cached_skill))
+        .route("/cached_skills/:name", delete(drop_cached_skill))
         .with_state(skill_executor_api)
         .nest_service("/docs", serve_dir.clone())
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
@@ -212,27 +212,24 @@ async fn cached_skills(
 #[utoipa::path(
     post,
     operation_id = "drop_cached_skill",
-    path = "/skills",
+    path = "/cached_skills",
     tag = "skills",
     responses(
-        (status = 204),
-        (status = 404, body=String, example = json!("Skill `haiku` not found in cache.")),
+        (status = 200, body=String, example = json!("Skill removed from cache.")),
+        (status = 200, body=String, example = json!("Skill was not present in cache.")),
     ),
 )]
 async fn drop_cached_skill(
     State(mut skill_executor_api): State<SkillExecutorApi>,
     Path(name): Path<String>,
-) -> Response {
-    let response = skill_executor_api.drop_from_cache(name.clone()).await;
-    if response.is_some() {
-        (StatusCode::NO_CONTENT, ()).into_response()
+) -> (StatusCode, Json<String>) {
+    let skill_was_cached = skill_executor_api.drop_from_cache(name.clone()).await;
+    let msg = if skill_was_cached {
+        "Skill removed from cache".to_string()
     } else {
-        (
-            StatusCode::NOT_FOUND,
-            Json(format!("Skill `{}` not found in cache.", name)),
-        )
-            .into_response()
-    }
+        "Skill was not present in cache".to_string()
+    };
+    (StatusCode::OK, Json(msg))
 }
 
 /// We use BAD_REQUEST (400) for validation error as it is more commonly used.
@@ -382,7 +379,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri(format!("/skills/{}", skill_name))
+                    .uri(format!("/cached_skills/{}", skill_name))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -390,7 +387,10 @@ mod tests {
             .unwrap();
 
         // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::NO_CONTENT);
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = String::from_utf8(body.to_vec()).unwrap();
+        assert!(answer.contains("removed from cache"));
     }
 
     #[tokio::test]
@@ -405,7 +405,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri(format!("/skills/{}", "non-cached-skill"))
+                    .uri(format!("/cached_skills/{}", "non-cached-skill"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -413,7 +413,10 @@ mod tests {
             .unwrap();
 
         // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::NOT_FOUND);
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = String::from_utf8(body.to_vec()).unwrap();
+        assert!(answer.contains("not present"));
     }
 
     #[tokio::test]

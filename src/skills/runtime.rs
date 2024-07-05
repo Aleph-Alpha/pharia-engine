@@ -35,7 +35,7 @@ pub trait Runtime {
 
     fn skills(&self) -> impl Iterator<Item = &str>;
 
-    fn drop_from_cache(&mut self, skill: &str) -> Option<()>;
+    fn drop_from_cache(&mut self, skill: &str) -> bool;
 }
 
 struct WasiInvocationCtx {
@@ -153,8 +153,8 @@ impl Runtime for WasmRuntime {
     fn skills(&self) -> impl Iterator<Item = &str> {
         self.components.keys().map(String::as_ref)
     }
-    fn drop_from_cache(&mut self, skill: &str) -> Option<()> {
-        self.components.remove(skill).map(|_| ())
+    fn drop_from_cache(&mut self, skill: &str) -> bool {
+        self.components.remove(skill).is_some()
     }
 }
 
@@ -198,7 +198,7 @@ pub mod tests {
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::empty()
         }
-        fn drop_from_cache(&mut self, _skill: &str) -> Option<()> {
+        fn drop_from_cache(&mut self, _skill: &str) -> bool {
             panic!("SaboteurRuntime does not drop skills from cache")
         }
     }
@@ -238,11 +238,8 @@ pub mod tests {
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::once("greet")
         }
-        fn drop_from_cache(&mut self, skill: &str) -> Option<()> {
-            match skill {
-                "greet" => Some(()),
-                _ => None,
-            }
+        fn drop_from_cache(&mut self, skill: &str) -> bool {
+            skill == "greet"
         }
     }
 
@@ -286,7 +283,7 @@ pub mod tests {
         let result = runtime.drop_from_cache("non-cached-skill");
 
         // Then
-        assert!(result.is_none());
+        assert!(!result);
     }
 
     #[tokio::test]
@@ -304,11 +301,11 @@ pub mod tests {
         // When dropping a skill from the runtime
         let result = runtime.drop_from_cache("greet_skill");
 
-        // Then the component is not cached anymore
+        // Then the component hash map is empty
         assert_eq!(runtime.components.len(), 0);
 
-        // And some is returned
-        assert!(result.is_some());
+        // And result is a success
+        assert!(result);
     }
 
     #[tokio::test]
