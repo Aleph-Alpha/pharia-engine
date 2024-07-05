@@ -63,6 +63,12 @@ This will create a file called `haiku.wasm`, which can now be deployed into Phar
 
 Skills are not containers. Yet, we still publish them into container repositories. Ask your administrator which ones are linked to your instance of Pharia Kernel. At Aleph Alpha we are currently using the registry `registry.gitlab.aleph-alpha.de` and the repository `engineering/pharia-kernel/skills`. It is recommended to publish the Skill using the `pharia-skill` command line tool. `pharia-skill` is deployed as a container image to our Artifactory. You can acquire it with Podman like this.
 
+**Attention:** We are currently still in a closed beta. Which means people outside of Aleph Alpha can not download our Pharia Kernel images. You may need to request a JFrog account, or extend the permission of your JFrog account to see images internal to the Aleph Alpha Organization. You can do so, by reaching out to us via the Product Service Desk:
+
+* Service Desk: <https://aleph-alpha.atlassian.net/servicedesk/customer/portals>
+* How to create a ticket: <https://aleph-alpha.atlassian.net/wiki/spaces/EN/pages/847937592/Aleph+Alpha+Service+Desk+-+How+To>
+
+
 ```shell
 podman login alephalpha.jfrog.io/pharia-kernel-images -u $JFROG_USER -p $JFROG_PASSWORD
 podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-skill:latest
