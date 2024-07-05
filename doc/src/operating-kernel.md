@@ -1,6 +1,6 @@
 # Operating Pharia Kernel
 
-Pharia Kernel allows you to execute Cognitive Business Units called Skills. These Skills can be written in a number of languages, including Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the Cognitive System Interface. This enables to deploy RAG use cases serverless.
+This manual is for Operators running Pharia Kernel for their buisness or department. In case you are more interessted in developing Skills or interfacing with Pharia Kernel in order to invoke deployed skills you should consider the developer or user manual instead.
 
 ## How to get it
 
