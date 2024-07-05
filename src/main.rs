@@ -1,14 +1,4 @@
-mod inference;
-mod registries;
-mod shell;
-mod skills;
-use std::future::Future;
-
-use crate::inference::Inference;
-use crate::skills::SkillExecutor;
-use skills::WasmRuntime;
 use tokio::signal;
-use tracing::error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use pharia_kernel::AppConfig;
@@ -23,22 +13,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    run(app_config, shutdown_signal()).await;
-}
-
-async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + Send + 'static) {
-    let inference = Inference::new(app_config.inference_addr);
-
-    let runtime = WasmRuntime::new();
-    let skill_executor = SkillExecutor::new(runtime, inference.api());
-    let skill_executor_api = skill_executor.api();
-
-    if let Err(e) = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await {
-        error!("Could not boot shell: {}", e);
-    }
-
-    skill_executor.shutdown().await;
-    inference.shutdown().await;
+    pharia_kernel::run(app_config, shutdown_signal()).await;
 }
 
 async fn shutdown_signal() {
@@ -62,30 +37,5 @@ async fn shutdown_signal() {
     tokio::select! {
         () = ctrl_c => {},
         () = terminate => {},
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use std::future::ready;
-    use std::time::Duration;
-
-    use tokio_test::assert_ok;
-
-    use super::*;
-
-    // tests if the shutdown procedure is executed properly (not blocking)
-    #[tokio::test]
-    async fn shutdown() {
-        let config = AppConfig {
-            tcp_addr: "127.0.0.1:8888".parse().unwrap(),
-            inference_addr: "https://api.aleph-alpha.com".to_owned(),
-        };
-
-        //wasm runtime needs some time to shutdown (at least on Daniel's maschine), so the time out
-        //has been increased to 2sec
-        let r = tokio::time::timeout(Duration::from_secs(2), super::run(config, ready(()))).await;
-        assert_ok!(r);
     }
 }
