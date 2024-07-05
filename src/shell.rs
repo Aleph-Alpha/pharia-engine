@@ -232,9 +232,9 @@ async fn drop_cached_skill(
     (StatusCode::OK, Json(msg))
 }
 
-/// We use BAD_REQUEST (400) for validation error as it is more commonly used.
-/// UNPROCESSABLE_ENTITY (422) is an alternative, but it may surprise users as
-/// it is less commonly known
+/// We use `BAD_REQUEST` (400) for validation error as it is more commonly used.
+/// `UNPROCESSABLE_ENTITY` (422) is an alternative, but it may surprise users as it is less commonly
+/// known
 const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
 #[cfg(test)]
@@ -379,7 +379,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri(format!("/cached_skills/{}", skill_name))
+                    .uri(format!("/cached_skills/{skill_name}"))
                     .body(Body::empty())
                     .unwrap(),
             )
