@@ -241,7 +241,7 @@ const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 mod tests {
     use crate::{
         inference::tests::InferenceStub,
-        skills::{tests::LiarRuntime, SkillExecutor, WasmRuntime},
+        skills::{tests::LiarRuntime, SkillExecutor},
     };
 
     use super::*;
@@ -285,9 +285,7 @@ mod tests {
         auth_value.set_sensitive(true);
 
         let inference = Inference::new(inference_addr().to_owned());
-
-        let runtime = WasmRuntime::new();
-        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+        let http = http(SkillExecutor::new(inference.api()).api());
 
         let args = ExecuteSkillArgs {
             skill: "greet_skill".to_owned(),
@@ -315,8 +313,7 @@ mod tests {
     async fn api_token_missing() {
         let inference = Inference::new(inference_addr().to_owned());
 
-        let runtime = WasmRuntime::new();
-        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+        let http = http(SkillExecutor::new(inference.api()).api());
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
             input: "Homer".to_owned(),
@@ -346,7 +343,7 @@ mod tests {
         let runtime = LiarRuntime::new(skills);
         let inference = InferenceStub::with_completion("hello");
 
-        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+        let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
 
         let resp = http
             .oneshot(
@@ -372,7 +369,7 @@ mod tests {
         let skill_name = "haiku_skill".to_owned();
         let runtime = LiarRuntime::new(vec![skill_name.clone()]);
         let inference = InferenceStub::with_completion("hello");
-        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+        let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
 
         // When the skill is deleted
         let resp = http
@@ -398,7 +395,7 @@ mod tests {
         // Given a runtime without cached skills
         let runtime = LiarRuntime::new(vec![]);
         let inference = InferenceStub::with_completion("hello");
-        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+        let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
 
         // When a skills is deleted
         let resp = http
@@ -456,8 +453,7 @@ mod tests {
     async fn healthcheck() {
         let inference = Inference::new(inference_addr().to_owned());
 
-        let runtime = WasmRuntime::new();
-        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+        let http = http(SkillExecutor::new(inference.api()).api());
         let resp = http
             .oneshot(
                 Request::builder()

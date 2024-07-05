@@ -7,10 +7,7 @@ mod skills;
 use futures::Future;
 use tracing::error;
 
-use self::{
-    inference::Inference,
-    skills::{SkillExecutor, WasmRuntime},
-};
+use self::{inference::Inference, skills::SkillExecutor};
 
 pub use config::AppConfig;
 
@@ -19,15 +16,14 @@ pub async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()
     let inference = Inference::new(app_config.inference_addr);
 
     // Boot up runtime we need to execute Skills
-    let runtime = WasmRuntime::new();
-    let skill_executor = SkillExecutor::new(runtime, inference.api());
+    let skill_executor = SkillExecutor::new(inference.api());
     let skill_executor_api = skill_executor.api();
 
     // Make skills available via http interface. If we get the signal for shutdown the future
     // will complete.
     if let Err(e) = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await {
         // We do **not** want to bubble up an error during shell initialization or execution. We
-        // want to shutdown the other actors before fininishing this function.
+        // want to shutdown the other actors before finishing this function.
         error!("Could not boot shell: {e}");
     }
 

@@ -1,4 +1,4 @@
-use crate::{inference::InferenceApi, skills::runtime::Runtime};
+use crate::{inference::InferenceApi, skills::runtime::{WasmRuntime, Runtime}};
 use anyhow::Error;
 use tokio::{
     select,
@@ -14,7 +14,11 @@ pub struct SkillExecutor {
 }
 
 impl SkillExecutor {
-    pub fn new<R: Runtime + Send + 'static>(runtime: R, inference_api: InferenceApi) -> Self {
+    pub fn new(inference_api: InferenceApi) -> Self {
+        Self::with_runtime(WasmRuntime::new(), inference_api)
+    }
+
+    pub fn with_runtime<R: Runtime + Send + 'static>(runtime: R, inference_api: InferenceApi) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, inference_api)
@@ -181,7 +185,7 @@ pub mod tests {
         skills::{
             csi::Csi,
             runtime::Runtime,
-            tests::{RustRuntime, SaboteurRuntime},
+            runtime::tests::{RustRuntime, SaboteurRuntime},
             SkillExecutor,
         },
     };
@@ -219,7 +223,7 @@ pub mod tests {
         let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
 
         // When
-        let executer = SkillExecutor::new(MockRuntime, inference_saboteur.api());
+        let executer = SkillExecutor::with_runtime(MockRuntime, inference_saboteur.api());
         let mut api = executer.api();
         let result = api
             .execute_skill(
@@ -240,7 +244,7 @@ pub mod tests {
         let error_msg = "out-of-cheese".to_owned();
         let inference = InferenceStub::with_completion("Hello".to_owned());
         let runtime = SaboteurRuntime::new(error_msg.clone());
-        let executor = SkillExecutor::new(runtime, inference.api());
+        let executor = SkillExecutor::with_runtime(runtime, inference.api());
 
         let result = executor
             .api()
@@ -261,7 +265,7 @@ pub mod tests {
 
         // When
         let runtime = RustRuntime::new();
-        let executor = SkillExecutor::new(runtime, inference.api());
+        let executor = SkillExecutor::with_runtime(runtime, inference.api());
         let result = executor
             .api()
             .execute_skill(
@@ -314,7 +318,7 @@ pub mod tests {
         let runtime = LiarRuntime::new(skills.clone());
 
         // When
-        let executor = SkillExecutor::new(runtime, inference.api());
+        let executor = SkillExecutor::with_runtime(runtime, inference.api());
         let result = executor.api().skills().await;
 
         executor.wait_for_shutdown().await;
@@ -332,7 +336,7 @@ pub mod tests {
         let runtime = LiarRuntime::new(skills.clone());
 
         // When
-        let executor = SkillExecutor::new(runtime, inference.api());
+        let executor = SkillExecutor::with_runtime(runtime, inference.api());
         let result = executor
             .api()
             .drop_from_cache("haiku_skill".to_owned())
@@ -353,7 +357,7 @@ pub mod tests {
         let runtime = LiarRuntime::new(skills.clone());
 
         // When
-        let executor = SkillExecutor::new(runtime, inference.api());
+        let executor = SkillExecutor::with_runtime(runtime, inference.api());
         let result = executor
             .api()
             .drop_from_cache("a_different_skill".to_owned())
