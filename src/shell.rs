@@ -177,7 +177,7 @@ async fn execute_skill(
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(response)),
-        Err(err) => (StatusCode::BAD_REQUEST, Json(err.to_string())),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(err.to_string())),
     }
 }
 
