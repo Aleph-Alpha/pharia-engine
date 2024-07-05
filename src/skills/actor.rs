@@ -74,6 +74,17 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
+
+    pub async fn drop_from_cache(&mut self, skill: String) -> Option<()> {
+        let (send, recv) = oneshot::channel();
+        let msg = SkillExecutorMessage::Drop { send, skill };
+
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await.unwrap()
+    }
 }
 
 struct SkillExecutorActor<R: Runtime> {
@@ -116,6 +127,10 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 let response = self.runtime.skills().map(str::to_owned).collect();
                 drop(send.send(response));
             }
+            SkillExecutorMessage::Drop { skill, send } => {
+                let response = self.runtime.drop_from_cache(&skill);
+                let _ = send.send(response);
+            }
         }
     }
 
@@ -148,6 +163,10 @@ pub enum SkillExecutorMessage {
     },
     Skills {
         send: oneshot::Sender<Vec<String>>,
+    },
+    Drop {
+        skill: String,
+        send: oneshot::Sender<Option<()>>,
     },
 }
 
@@ -285,8 +304,8 @@ pub mod tests {
         fn skills(&self) -> impl Iterator<Item = &str> {
             self.skills.iter().map(String::as_ref)
         }
-        fn drop_from_cache(&mut self, _skill: &str) -> Option<()> {
-            panic!("Liar runtime does not remove skills from cache")
+        fn drop_from_cache(&mut self, skill: &str) -> Option<()> {
+            self.skills.iter().any(|s| s == skill).then(|| ())
         }
     }
 
@@ -306,5 +325,47 @@ pub mod tests {
 
         // Then
         assert_eq!(result.len(), skills.len());
+    }
+
+    #[tokio::test]
+    async fn drop_existing_skill() {
+        // Given a runtime with the greet skill
+        let skills = vec!["haiku_skill".to_owned()];
+        let inference = InferenceStub::with_completion("Hello".to_owned());
+        let runtime = LiarRuntime::new(skills.clone());
+
+        // When
+        let executor = SkillExecutor::new(runtime, inference.api());
+        let result = executor
+            .api()
+            .drop_from_cache("haiku_skill".to_owned())
+            .await;
+
+        executor.shutdown().await;
+        inference.shutdown().await;
+
+        // Then
+        assert!(result.is_some());
+    }
+
+    #[tokio::test]
+    async fn drop_non_existing_skill() {
+        // Given a runtime with the greet skill
+        let skills = vec!["haiku_skill".to_owned()];
+        let inference = InferenceStub::with_completion("Hello".to_owned());
+        let runtime = LiarRuntime::new(skills.clone());
+
+        // When
+        let executor = SkillExecutor::new(runtime, inference.api());
+        let result = executor
+            .api()
+            .drop_from_cache("a_different_skill".to_owned())
+            .await;
+
+        executor.shutdown().await;
+        inference.shutdown().await;
+
+        // Then
+        assert!(result.is_none());
     }
 }
