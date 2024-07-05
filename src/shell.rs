@@ -187,7 +187,7 @@ async fn execute_skill(
 /// and are faster because they do not have to be transpiled to machine code.
 /// When executing a skill which is not loaded yet, it will be cached.
 #[utoipa::path(
-    post,
+    get,
     operation_id = "cached_skills",
     path = "/cached_skills",
     tag = "skills",
@@ -202,8 +202,8 @@ async fn cached_skills(
     (StatusCode::OK, Json(response))
 }
 
-/// We use BAD_REQUEST (400) for validation error as it is more commonly used.
-/// UNPROCESSABLE_ENTITY (422) is an alternative, but it may surprise users as
+/// We use `BAD_REQUEST (400)` for validation error as it is more commonly used.
+/// `UNPROCESSABLE_ENTITY (422)` is an alternative, but it may surprise users as
 /// it is less commonly known
 const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 

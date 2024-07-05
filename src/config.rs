@@ -6,6 +6,10 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    /// # Panics
+    ///
+    /// Will panic if the `PHARIA_KERNEL_ADDRESS` environment variable is not parseable as a TCP Address.
+    #[must_use]
     pub fn from_env() -> Self {
         drop(dotenvy::dotenv());
 
