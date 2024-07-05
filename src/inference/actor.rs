@@ -9,12 +9,15 @@ use tracing::{error, warn};
 
 use super::client::InferenceClient;
 
+/// Handle to the inference actor. Spin this up in order to use the inference API.
 pub struct Inference {
     send: mpsc::Sender<InferenceMessage>,
     handle: JoinHandle<()>,
 }
 
 impl Inference {
+    /// Starts a new inference Actor. Calls to this method be balanced by calls to
+    /// [`Self::shutdown`].
     pub fn new(inference_addr: String) -> Self {
         let client = Client::new(inference_addr, None).unwrap();
         Self::with_client(client)
@@ -31,12 +34,16 @@ impl Inference {
         InferenceApi::new(self.send.clone())
     }
 
-    pub async fn shutdown(self) {
+    /// Inference is going to shutdown, as soon as the last instance of [`InferenceApi`] is dropped.
+    pub async fn wait_for_shutdown(self) {
         drop(self.send);
         self.handle.await.unwrap();
     }
 }
 
+/// Use this to execute tasks with the inference API. The existence of this API handle implies the
+/// actor is alive and running. This means this handle must be disposed of, before the inference
+/// actor can shut down.
 #[derive(Clone)]
 pub struct InferenceApi {
     send: mpsc::Sender<InferenceMessage>,
@@ -74,6 +81,7 @@ pub struct CompleteTextParameters {
     pub max_tokens: u32,
 }
 
+/// Private implementation of the inference actor running in its own dedicated green thread.
 struct InferenceActor<C> {
     client: C,
     recv: mpsc::Receiver<InferenceMessage>,
@@ -83,6 +91,7 @@ impl<C> InferenceActor<C> {
     fn new(client: C, recv: mpsc::Receiver<InferenceMessage>) -> Self {
         InferenceActor { client, recv }
     }
+
     async fn run(&mut self)
     where
         C: InferenceClient,

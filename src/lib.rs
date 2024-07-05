@@ -15,18 +15,26 @@ use self::{
 pub use config::AppConfig;
 
 pub async fn run(app_config: AppConfig, shutdown_signal: impl Future<Output = ()> + Send + 'static) {
+    // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr);
 
+    // Boot up runtime we need to execute Skills
     let runtime = WasmRuntime::new();
     let skill_executor = SkillExecutor::new(runtime, inference.api());
     let skill_executor_api = skill_executor.api();
 
+    // Make skills available via http interface. If we get the signal for shutdown the future
+    // will complete.
     if let Err(e) = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await {
-        error!("Could not boot shell: {}", e);
+        // We do **not** want to bubble up an error during shell initialization or execution. We
+        // want to shutdown the other actors before fininishing this function.
+        error!("Could not boot shell: {e}");
     }
 
-    skill_executor.shutdown().await;
-    inference.shutdown().await;
+    // Shutdown everything we started. We reverse the order for the shutdown so all the required
+    // actors are still answering for each component.
+    skill_executor.wait_for_shutdown().await;
+    inference.wait_for_shutdown().await;
 }
 
 #[cfg(test)]

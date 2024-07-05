@@ -28,7 +28,7 @@ impl SkillExecutor {
         SkillExecutorApi::new(self.send.clone())
     }
 
-    pub async fn shutdown(self) {
+    pub async fn wait_for_shutdown(self) {
         drop(self.send);
         self.handle.await.unwrap();
     }
@@ -270,7 +270,7 @@ pub mod tests {
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;
-        executor.shutdown().await;
+        executor.wait_for_shutdown().await;
         inference.shutdown().await;
 
         // Then
@@ -317,7 +317,7 @@ pub mod tests {
         let executor = SkillExecutor::new(runtime, inference.api());
         let result = executor.api().skills().await;
 
-        executor.shutdown().await;
+        executor.wait_for_shutdown().await;
         inference.shutdown().await;
 
         // Then
@@ -338,7 +338,7 @@ pub mod tests {
             .drop_from_cache("haiku_skill".to_owned())
             .await;
 
-        executor.shutdown().await;
+        executor.wait_for_shutdown().await;
         inference.shutdown().await;
 
         // Then
@@ -359,7 +359,7 @@ pub mod tests {
             .drop_from_cache("a_different_skill".to_owned())
             .await;
 
-        executor.shutdown().await;
+        executor.wait_for_shutdown().await;
         inference.shutdown().await;
 
         // Then
