@@ -23,11 +23,11 @@ impl SkillExecutor {
         });
         SkillExecutor { send, handle }
     }
+
     pub fn api(&self) -> SkillExecutorApi {
-        SkillExecutorApi {
-            send: self.send.clone(),
-        }
+        SkillExecutorApi::new(self.send.clone())
     }
+
     pub async fn shutdown(self) {
         drop(self.send);
         self.handle.await.unwrap();
@@ -40,6 +40,10 @@ pub struct SkillExecutorApi {
 }
 
 impl SkillExecutorApi {
+    pub fn new(send: mpsc::Sender<SkillExecutorMessage>) -> Self {
+        Self { send }
+    }
+
     pub async fn execute_skill(
         &mut self,
         skill: String,
@@ -135,7 +139,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
     }
 }
 
-enum SkillExecutorMessage {
+pub enum SkillExecutorMessage {
     Execute {
         skill: String,
         input: String,

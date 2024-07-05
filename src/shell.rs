@@ -166,6 +166,12 @@ async fn execute_skill(
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<ExecuteSkillArgs>,
 ) -> (StatusCode, Json<String>) {
+    if args.skill.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json("empty skill names are not allowed".to_owned()),
+        );
+    }
     let result = skill_executor_api
         .execute_skill(args.skill, args.input, bearer.token().to_owned())
         .await;
@@ -214,6 +220,7 @@ mod tests {
     use http_body_util::BodyExt;
     use std::env;
     use std::sync::OnceLock;
+    use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
     /// API Token used by tests to authenticate requests
@@ -322,6 +329,39 @@ mod tests {
 
         assert!(answer.contains("First skill"));
         assert!(answer.contains("Second skill"));
+    }
+
+    #[tokio::test]
+    async fn blank_skill_name_is_bad_request() {
+        // Given a shell with a skill executor API
+        // drop the receiver, we expect the shell to never try to execute a skill
+        let (send, _) = mpsc::channel(1);
+        let skill_executor_api = SkillExecutorApi::new(send);
+        let http = http(skill_executor_api);
+
+        // When executing a skill with a blank name
+        let api_token = api_token();
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let args = ExecuteSkillArgs {
+            skill: "\n\n".to_owned(),
+            input: "Homer".to_owned(),
+        };
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/execute_skill")
+                    .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
