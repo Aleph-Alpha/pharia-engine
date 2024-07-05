@@ -2,10 +2,10 @@ use std::{future::Future, iter::once, net::SocketAddr};
 
 use anyhow::{Context, Error};
 use axum::{
-    extract::{MatchedPath, State},
+    extract::{MatchedPath, Path, State},
     http::{header::AUTHORIZATION, Request, StatusCode},
-    response::Redirect,
-    routing::{get, post},
+    response::{IntoResponse, Redirect, Response},
+    routing::{delete, get, post},
     Json, Router,
 };
 use axum_extra::{
@@ -103,6 +103,7 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
     Router::new()
         .route("/execute_skill", post(execute_skill))
         .route("/cached_skills", get(cached_skills))
+        .route("/skills/:name", delete(drop_cached_skill))
         .with_state(skill_executor_api)
         .nest_service("/docs", serve_dir.clone())
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
@@ -202,8 +203,40 @@ async fn cached_skills(
     (StatusCode::OK, Json(response))
 }
 
-/// We use `BAD_REQUEST (400)` for validation error as it is more commonly used.
-/// `UNPROCESSABLE_ENTITY (422)` is an alternative, but it may surprise users as
+/// drop_cached_skill
+///
+/// Remove a loaded skill from the runtime. With a first invocation, skills are loaded to
+/// the runtime. This leads to faster execution on the second invocation. If a skill is
+/// updated in the repository, it needs to be removed from the cache so that the new version
+/// becomes available in the kernel.
+#[utoipa::path(
+    post,
+    operation_id = "drop_cached_skill",
+    path = "/skills",
+    tag = "skills",
+    responses(
+        (status = 204),
+        (status = 404, body=String, example = json!("Skill `haiku` not found in cache.")),
+    ),
+)]
+async fn drop_cached_skill(
+    State(mut skill_executor_api): State<SkillExecutorApi>,
+    Path(name): Path<String>,
+) -> Response {
+    let response = skill_executor_api.drop_from_cache(name.clone()).await;
+    if response.is_some() {
+        (StatusCode::NO_CONTENT, ()).into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(format!("Skill `{}` not found in cache.", name)),
+        )
+            .into_response()
+    }
+}
+
+/// We use BAD_REQUEST (400) for validation error as it is more commonly used.
+/// UNPROCESSABLE_ENTITY (422) is an alternative, but it may surprise users as
 /// it is less commonly known
 const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
@@ -334,6 +367,53 @@ mod tests {
 
         assert!(answer.contains("First skill"));
         assert!(answer.contains("Second skill"));
+    }
+
+    #[tokio::test]
+    async fn drop_cached_skill() {
+        // Given a runtime with one installed skill
+        let skill_name = "haiku_skill".to_owned();
+        let runtime = LiarRuntime::new(vec![skill_name.clone()]);
+        let inference = InferenceStub::with_completion("hello");
+        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+
+        // When the skill is deleted
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri(format!("/skills/{}", skill_name))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), axum::http::StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn drop_non_cached_skill() {
+        // Given a runtime without cached skills
+        let runtime = LiarRuntime::new(vec![]);
+        let inference = InferenceStub::with_completion("hello");
+        let http = http(SkillExecutor::new(runtime, inference.api()).api());
+
+        // When a skills is deleted
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri(format!("/skills/{}", "non-cached-skill"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), axum::http::StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
