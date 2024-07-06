@@ -35,7 +35,7 @@ impl Csi for SkillInvocationCtx {
 
 pub struct SkillInvocationCtx {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
-    /// can drop the future invoking the skill, and report the error appropriatly to user and
+    /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
     send_rt_err: Option<oneshot::Sender<Error>>,
     inference_api: InferenceApi,

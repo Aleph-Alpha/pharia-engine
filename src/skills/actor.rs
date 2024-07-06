@@ -8,16 +8,20 @@ use tokio::{
 
 use super::csi::SkillInvocationCtx;
 
+/// Starts and stops the execution of skills as it owns the skill executer actor.
 pub struct SkillExecutor {
     send: mpsc::Sender<SkillExecutorMessage>,
     handle: JoinHandle<()>,
 }
 
 impl SkillExecutor {
+
+    /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
         Self::with_runtime(WasmRuntime::new(), inference_api)
     }
 
+    /// You may want use this constructor if you want to use a double runtime for testing
     pub fn with_runtime<R: Runtime + Send + 'static>(runtime: R, inference_api: InferenceApi) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
@@ -28,6 +32,8 @@ impl SkillExecutor {
         SkillExecutor { send, handle }
     }
 
+    /// Retrieve a handle in order to interact with skills. All handles have to be dropped in order
+    /// for [`Self::wait_for_shutdown`] to complete.
     pub fn api(&self) -> SkillExecutorApi {
         SkillExecutorApi::new(self.send.clone())
     }
