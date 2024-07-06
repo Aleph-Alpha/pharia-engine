@@ -51,7 +51,7 @@ mod tests {
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
         };
 
-        //wasm runtime needs some time to shutdown (at least on Daniel's maschine), so the time out
+        //wasm runtime needs some time to shutdown (at least on Daniel's machine), so the time out
         //has been increased to 2sec
         let r = tokio::time::timeout(Duration::from_secs(2), super::run(config, ready(()))).await;
         assert_ok!(r);
