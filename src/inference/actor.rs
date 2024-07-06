@@ -173,7 +173,7 @@ pub mod tests {
             Self::new(move || Ok(completion.clone()))
         }
 
-        pub async fn shutdown(self) {
+        pub async fn wait_for_shutdown(self) {
             drop(self.send);
             self.join_handle.await.unwrap();
         }

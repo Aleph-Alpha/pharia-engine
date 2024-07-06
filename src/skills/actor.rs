@@ -271,7 +271,7 @@ pub mod tests {
             )
             .await;
         executor.wait_for_shutdown().await;
-        inference.shutdown().await;
+        inference.wait_for_shutdown().await;
 
         // Then
         assert_eq!(result.unwrap(), "Hello");
@@ -318,7 +318,7 @@ pub mod tests {
         let result = executor.api().skills().await;
 
         executor.wait_for_shutdown().await;
-        inference.shutdown().await;
+        inference.wait_for_shutdown().await;
 
         // Then
         assert_eq!(result.len(), skills.len());
@@ -339,7 +339,7 @@ pub mod tests {
             .await;
 
         executor.wait_for_shutdown().await;
-        inference.shutdown().await;
+        inference.wait_for_shutdown().await;
 
         // Then
         assert!(result);
@@ -360,7 +360,7 @@ pub mod tests {
             .await;
 
         executor.wait_for_shutdown().await;
-        inference.shutdown().await;
+        inference.wait_for_shutdown().await;
 
         // Then
         assert!(!result);
