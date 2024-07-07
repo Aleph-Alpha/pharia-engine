@@ -1,12 +1,18 @@
-use crate::{inference::InferenceApi, skills::runtime::{WasmRuntime, Runtime}};
+use std::future::pending;
+
+use crate::{
+    inference::{CompleteTextParameters, InferenceApi},
+    skills::runtime::{Runtime, WasmRuntime},
+};
 use anyhow::Error;
+use async_trait::async_trait;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
 
-use super::csi::SkillInvocationCtx;
+use super::csi::Csi;
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
 pub struct SkillExecutor {
@@ -15,14 +21,16 @@ pub struct SkillExecutor {
 }
 
 impl SkillExecutor {
-
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
         Self::with_runtime(WasmRuntime::new(), inference_api)
     }
 
     /// You may want use this constructor if you want to use a double runtime for testing
-    pub fn with_runtime<R: Runtime + Send + 'static>(runtime: R, inference_api: InferenceApi) -> Self {
+    pub fn with_runtime<R: Runtime + Send + 'static>(
+        runtime: R,
+        inference_api: InferenceApi,
+    ) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, inference_api)
@@ -180,6 +188,54 @@ pub enum SkillExecutorMessage {
     },
 }
 
+/// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
+/// calls to csi, to the respective drivers and forwarding runtime errors directly to the actor
+/// so the User defined code must not worry about accidential complexity.
+pub struct SkillInvocationCtx {
+    /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
+    /// can drop the future invoking the skill, and report the error appropriately to user and
+    /// operator.
+    send_rt_err: Option<oneshot::Sender<Error>>,
+    inference_api: InferenceApi,
+    api_token: String,
+}
+
+impl SkillInvocationCtx {
+    pub fn new(
+        send_rt_err: oneshot::Sender<Error>,
+        inference_api: InferenceApi,
+        api_token: String,
+    ) -> Self {
+        SkillInvocationCtx {
+            send_rt_err: Some(send_rt_err),
+            inference_api,
+            api_token,
+        }
+    }
+}
+
+#[async_trait]
+impl Csi for SkillInvocationCtx {
+    async fn complete_text(&mut self, params: CompleteTextParameters) -> String {
+        match self
+            .inference_api
+            .complete_text(params, self.api_token.clone())
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                self.send_rt_err
+                    .take()
+                    .expect("Only one error must be send during skill invocation")
+                    .send(error)
+                    .unwrap();
+                // Never return, we did report the error via the send error channel.
+                pending().await
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use std::iter;
@@ -190,8 +246,8 @@ pub mod tests {
         inference::{tests::InferenceStub, CompleteTextParameters},
         skills::{
             csi::Csi,
-            runtime::Runtime,
             runtime::tests::{RustRuntime, SaboteurRuntime},
+            runtime::Runtime,
             SkillExecutor,
         },
     };
