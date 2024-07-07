@@ -73,47 +73,4 @@ pub mod tests {
             panic!("SaboteurRuntime does not drop skills from cache")
         }
     }
-
-    /// Intended as a test double for the production runtime. This implementation features exactly
-    /// one hardcoded skill. The skill is called `greet` and it uses `luminous-nextgen-7b` to create
-    /// a greeting given a provided name as an input.
-    pub struct RustRuntime {}
-
-    impl RustRuntime {
-        pub fn new() -> Self {
-            Self {}
-        }
-    }
-
-    impl Runtime for RustRuntime {
-        async fn run(
-            &mut self,
-            skill: &str,
-            name: String,
-            mut ctx: Box<dyn Csi + Send>,
-        ) -> Result<String, Error> {
-            assert!(skill == "greet", "RustRuntime only supports greet skill");
-            let prompt = format!(
-                "### Instruction:
-                Provide a nice greeting for the person utilizing its given name
-
-                ### Input:
-                Name: {name}
-
-                ### Response:"
-            );
-            let params = CompleteTextParameters {
-                prompt,
-                model: "luminous-nextgen-7b".to_owned(),
-                max_tokens: 10,
-            };
-            Ok(ctx.complete_text(params).await)
-        }
-        fn skills(&self) -> impl Iterator<Item = &str> {
-            std::iter::once("greet")
-        }
-        fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
-            skill == "greet"
-        }
-    }
 }

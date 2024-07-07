@@ -242,7 +242,7 @@ pub mod tests {
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters},
-        skills::runtime::tests::{RustRuntime, SaboteurRuntime},
+        skills::runtime::tests::SaboteurRuntime,
     };
 
     #[tokio::test]
@@ -319,8 +319,7 @@ pub mod tests {
         let inference = InferenceStub::with_completion("Hello".to_owned());
 
         // When
-        let runtime = RustRuntime::new();
-        let executor = SkillExecutor::with_runtime(runtime, inference.api());
+        let executor = SkillExecutor::with_runtime(RustRuntime, inference.api());
         let result = executor
             .api()
             .execute_skill(
@@ -423,5 +422,42 @@ pub mod tests {
 
         // Then
         assert!(!result);
+    }
+
+        /// Intended as a test double for the production runtime. This implementation features exactly
+    /// one hardcoded skill. The skill is called `greet` and it uses `luminous-nextgen-7b` to create
+    /// a greeting given a provided name as an input.
+    pub struct RustRuntime;
+
+    impl Runtime for RustRuntime {
+        async fn run(
+            &mut self,
+            skill: &str,
+            name: String,
+            mut ctx: Box<dyn Csi + Send>,
+        ) -> Result<String, Error> {
+            assert!(skill == "greet", "RustRuntime only supports greet skill");
+            let prompt = format!(
+                "### Instruction:
+                Provide a nice greeting for the person utilizing its given name
+
+                ### Input:
+                Name: {name}
+
+                ### Response:"
+            );
+            let params = CompleteTextParameters {
+                prompt,
+                model: "luminous-nextgen-7b".to_owned(),
+                max_tokens: 10,
+            };
+            Ok(ctx.complete_text(params).await)
+        }
+        fn skills(&self) -> impl Iterator<Item = &str> {
+            std::iter::once("greet")
+        }
+        fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
+            skill == "greet"
+        }
     }
 }
