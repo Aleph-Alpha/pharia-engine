@@ -1,11 +1,12 @@
 mod wasm;
 
 use anyhow::Error;
+use async_trait::async_trait;
 use std::future::Future;
 
 pub use wasm::WasmRuntime;
 
-use super::csi::Csi;
+use crate::inference::CompleteTextParameters;
 
 /// Responsible for loading and executing skills.
 pub trait Runtime {
@@ -34,15 +35,16 @@ pub trait Runtime {
     fn invalidate_cached_skill(&mut self, skill: &str) -> bool;
 }
 
+#[async_trait]
+pub trait Csi {
+    async fn complete_text(&mut self, params: CompleteTextParameters) -> String;
+}
+
+
 #[cfg(test)]
 pub mod tests {
-
-    use anyhow::{anyhow, Error};
-
-    use crate::{
-        inference::CompleteTextParameters,
-        skills::{csi::Csi, runtime::Runtime},
-    };
+    use super::*;
+    use anyhow::anyhow;
 
     pub struct SaboteurRuntime {
         err_msg: String,

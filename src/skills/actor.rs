@@ -1,9 +1,8 @@
 use std::future::pending;
 
-use crate::{
-    inference::{CompleteTextParameters, InferenceApi},
-    skills::runtime::{Runtime, WasmRuntime},
-};
+use super::runtime::{Csi, Runtime, WasmRuntime};
+
+use crate::inference::{CompleteTextParameters, InferenceApi};
 use anyhow::Error;
 use async_trait::async_trait;
 use tokio::{
@@ -11,8 +10,6 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-
-use super::csi::Csi;
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
 pub struct SkillExecutor {
@@ -238,18 +235,14 @@ impl Csi for SkillInvocationCtx {
 
 #[cfg(test)]
 pub mod tests {
+    use super::*;
     use std::iter;
 
     use anyhow::{anyhow, Error};
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters},
-        skills::{
-            csi::Csi,
-            runtime::tests::{RustRuntime, SaboteurRuntime},
-            runtime::Runtime,
-            SkillExecutor,
-        },
+        skills::runtime::tests::{RustRuntime, SaboteurRuntime},
     };
 
     #[tokio::test]
