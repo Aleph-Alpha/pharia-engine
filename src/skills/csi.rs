@@ -33,6 +33,9 @@ impl Csi for SkillInvocationCtx {
     }
 }
 
+/// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
+/// calls to csi, to the respective drivers and forwarding runtime errors directly to the actor
+/// so the User defined code must not worry about accidential complexity.
 pub struct SkillInvocationCtx {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and

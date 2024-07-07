@@ -16,7 +16,9 @@ use super::csi::Csi;
 
 bindgen!({ world: "skill", async: true });
 
+/// Responsible for loading and executing skills.
 pub trait Runtime {
+
     // We are returning a Future explicitly here instead of using the `async` syntax. This has the
     // following reason: The async syntax is ambiguous with regards to whether or not the Future is
     // `Send`. The Rust compiler figures out the lifetime and `Send`ness of the future implicitly
@@ -26,6 +28,8 @@ pub trait Runtime {
     // `fn async f() -> i32` could be a shortcut for both `fn f() -> impl Future<Output=i32>` **or**
     // `fn f() -> impl Future<Output=i32> + Send`. It is also ambiguous over lifetime and `Sync`ness
     // of the future, but we do not need these traits here.
+
+    /// Executes a skill and return its result.
     fn run(
         &mut self,
         skill: &str,
@@ -35,19 +39,23 @@ pub trait Runtime {
 
     fn skills(&self) -> impl Iterator<Item = &str>;
 
-    fn drop_from_cache(&mut self, skill: &str) -> bool;
+    /// The runtime may handle cache invalidation of skills by itself in the future. For now we cut
+    /// it a bit of slack and just tell it that a skill might have changed.
+    fn invalidate_cached_skill(&mut self, skill: &str) -> bool;
 }
 
-struct WasiInvocationCtx {
+/// Linked against the skill by the wasm time. For the most part this gives the skill access to the
+/// CSI.
+struct LinkedCtx {
     wasi_ctx: WasiCtx,
     resource_table: ResourceTable,
     skill_ctx: Box<dyn Csi + Send>,
 }
 
-impl WasiInvocationCtx {
+impl LinkedCtx {
     fn new(skill_ctx: Box<dyn Csi + Send>) -> Self {
         let mut builder = WasiCtxBuilder::new();
-        WasiInvocationCtx {
+        LinkedCtx {
             wasi_ctx: builder.build(),
             resource_table: ResourceTable::new(),
             skill_ctx,
@@ -56,7 +64,7 @@ impl WasiInvocationCtx {
 }
 
 #[async_trait::async_trait]
-impl pharia::skill::csi::Host for WasiInvocationCtx {
+impl pharia::skill::csi::Host for LinkedCtx {
     #[must_use]
     async fn complete_text(&mut self, prompt: String, model: String) -> String {
         let params = CompleteTextParameters {
@@ -68,7 +76,7 @@ impl pharia::skill::csi::Host for WasiInvocationCtx {
     }
 }
 
-impl WasiView for WasiInvocationCtx {
+impl WasiView for LinkedCtx {
     fn table(&mut self) -> &mut ResourceTable {
         &mut self.resource_table
     }
@@ -80,7 +88,7 @@ impl WasiView for WasiInvocationCtx {
 
 pub struct WasmRuntime {
     engine: Engine,
-    linker: Linker<WasiInvocationCtx>,
+    linker: Linker<LinkedCtx>,
     components: HashMap<String, Component>,
     skill_registry: Box<dyn SkillRegistry + Send>,
 }
@@ -102,11 +110,11 @@ impl WasmRuntime {
 
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
         let engine = Self::engine();
-        let mut linker: Linker<WasiInvocationCtx> = Linker::new(&engine);
+        let mut linker: Linker<LinkedCtx> = Linker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
         // Skill world from bindgen
-        Skill::add_to_linker(&mut linker, |state: &mut WasiInvocationCtx| state)
+        Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)
             .expect("linking to skill world must work");
 
         Self {
@@ -134,7 +142,7 @@ impl Runtime for WasmRuntime {
         name: String,
         ctx: Box<dyn Csi + Send>,
     ) -> Result<String, Error> {
-        let invocation_ctx = WasiInvocationCtx::new(ctx);
+        let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let component = if let Some(c) = self.components.get(skill) {
@@ -153,7 +161,7 @@ impl Runtime for WasmRuntime {
     fn skills(&self) -> impl Iterator<Item = &str> {
         self.components.keys().map(String::as_ref)
     }
-    fn drop_from_cache(&mut self, skill: &str) -> bool {
+    fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
         self.components.remove(skill).is_some()
     }
 }
@@ -198,7 +206,7 @@ pub mod tests {
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::empty()
         }
-        fn drop_from_cache(&mut self, _skill: &str) -> bool {
+        fn invalidate_cached_skill(&mut self, _skill: &str) -> bool {
             panic!("SaboteurRuntime does not drop skills from cache")
         }
     }
@@ -238,7 +246,7 @@ pub mod tests {
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::once("greet")
         }
-        fn drop_from_cache(&mut self, skill: &str) -> bool {
+        fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
             skill == "greet"
         }
     }
@@ -280,7 +288,7 @@ pub mod tests {
         let mut runtime = WasmRuntime::new();
 
         // When removing a skill from the runtime
-        let result = runtime.drop_from_cache("non-cached-skill");
+        let result = runtime.invalidate_cached_skill("non-cached-skill");
 
         // Then
         assert!(!result);
@@ -299,7 +307,7 @@ pub mod tests {
         );
 
         // When dropping a skill from the runtime
-        let result = runtime.drop_from_cache("greet_skill");
+        let result = runtime.invalidate_cached_skill("greet_skill");
 
         // Then the component hash map is empty
         assert_eq!(runtime.components.len(), 0);
