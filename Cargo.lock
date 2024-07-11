@@ -2200,6 +2200,7 @@ dependencies = [
  "mime",
  "oci-distribution",
  "oci-wasm",
+ "pharia-kernel",
  "predicates",
  "reqwest",
  "serde_json",

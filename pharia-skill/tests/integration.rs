@@ -1,7 +1,9 @@
-use std::{env, fs::File, io::Write, path::Path};
+use std::{env, fs::File, io::Write, net::SocketAddr, path::Path, thread::sleep, time::Duration};
 
 use assert_cmd::Command;
+use pharia_kernel::{run, AppConfig};
 use predicates::str::contains;
+use tokio::sync::oneshot::{self};
 
 #[test]
 fn invalid_args() {
@@ -57,9 +59,21 @@ fn publish_minimal_args() {
     cmd.assert().success();
 }
 
-#[test]
-fn run_skill() {
-    drop(dotenvy::dotenv());
+#[tokio::test]
+async fn run_skill() {
+    // given a Pharia Kernel instance
+    let (send, recv) = oneshot::channel();
+    let shutdown_signal = async {
+        recv.await.unwrap();
+    };
+    let config = AppConfig::from_env();
+    let address = config.tcp_addr;
+    let handle = tokio::spawn(async {
+        run(config, shutdown_signal).await;
+    });
+    wait_until_kernel_ready(address).await;
+
+    // when running a skill
     let mut cmd = Command::cargo_bin("pharia-skill").unwrap();
     let cmd = cmd
         .arg("run")
@@ -67,9 +81,31 @@ fn run_skill() {
         .arg("greet_skill")
         .arg("-i")
         .arg("Homer")
+        .arg("-l")
+        .arg(format!("http://{address}"))
         .env(
             "AA_API_TOKEN",
             env::var("AA_API_TOKEN").expect("AA_API_TOKEN must be set."),
         );
+
+    // then the output must contain the expected value
     cmd.assert().stdout(contains("Homer"));
+
+    send.send(()).unwrap();
+    handle.await.unwrap();
+}
+
+async fn wait_until_kernel_ready(address: SocketAddr) {
+    let url = format!("http://{address}/healthcheck");
+    for _ in 0..10 {
+        if let Ok(resp) = reqwest::get(&url).await {
+            if let Ok(body) = resp.text().await {
+                if "ok".eq(&body) {
+                    return;
+                }
+            }
+        }
+        sleep(Duration::from_secs(1));
+    }
+    panic!("Kernel is not ready after waiting for 10 seconds.")
 }

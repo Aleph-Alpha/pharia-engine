@@ -24,3 +24,4 @@ assert_cmd = "2.0.14"
 dotenvy = "0.15.7"
 predicates = "3.1.0"
 wat = "1.212.0"
+pharia-kernel = { path = ".." }
