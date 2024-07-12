@@ -37,7 +37,7 @@ use crate::skills::SkillExecutorApi;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, cached_skills, execute_skill),
+    paths(serve_docs, cached_skills, execute_skill, drop_cached_skill),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs)),
     tags(
@@ -210,7 +210,7 @@ async fn cached_skills(
 /// updated in the repository, it needs to be removed from the cache so that the new version
 /// becomes available in the kernel.
 #[utoipa::path(
-    post,
+    delete,
     operation_id = "drop_cached_skill",
     path = "/cached_skills",
     tag = "skills",
