@@ -1,9 +1,9 @@
-use std::{env, fs::File, io::Write, net::SocketAddr, path::Path, thread::sleep, time::Duration};
+use std::{env, fs::File, io::Write, path::Path};
 
 use assert_cmd::Command;
 use pharia_kernel::{run, AppConfig};
 use predicates::str::contains;
-use tokio::sync::oneshot::{self};
+use tokio::{sync::oneshot, task::JoinHandle};
 
 #[test]
 fn invalid_args() {
@@ -59,19 +59,11 @@ fn publish_minimal_args() {
     cmd.assert().success();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn run_skill() {
     // given a Pharia Kernel instance
-    let (send, recv) = oneshot::channel();
-    let shutdown_signal = async {
-        recv.await.unwrap();
-    };
-    let config = AppConfig::from_env();
-    let address = config.tcp_addr;
-    let handle = tokio::spawn(async {
-        run(config, shutdown_signal).await;
-    });
-    wait_until_kernel_ready(address).await;
+    const PORT: u16 = 9_000;
+    let kernel = Kernel::with_port(PORT).await;
 
     // when running a skill
     let mut cmd = Command::cargo_bin("pharia-skill").unwrap();
@@ -82,7 +74,7 @@ async fn run_skill() {
         .arg("-i")
         .arg("Homer")
         .arg("-l")
-        .arg(format!("http://{address}"))
+        .arg(format!("http://127.0.0.1:{PORT}"))
         .env(
             "AA_API_TOKEN",
             env::var("AA_API_TOKEN").expect("AA_API_TOKEN must be set."),
@@ -91,21 +83,38 @@ async fn run_skill() {
     // then the output must contain the expected value
     cmd.assert().stdout(contains("Homer"));
 
-    send.send(()).unwrap();
-    handle.await.unwrap();
+    kernel.shutdown().await;
 }
 
-async fn wait_until_kernel_ready(address: SocketAddr) {
-    let url = format!("http://{address}/healthcheck");
-    for _ in 0..10 {
-        if let Ok(resp) = reqwest::get(&url).await {
-            if let Ok(body) = resp.text().await {
-                if "ok".eq(&body) {
-                    return;
-                }
-            }
+struct Kernel {
+    handle: JoinHandle<()>,
+    shutdown_trigger: oneshot::Sender<()>,
+}
+
+impl Kernel {
+    async fn new(app_config: AppConfig) -> Self {
+        let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
+        let shutdown_signal = async {
+            shutdown_capture.await.unwrap();
+        };
+        let wait_for_shutdown = run(app_config, shutdown_signal).await;
+        let handle = tokio::spawn(wait_for_shutdown);
+        Self {
+            handle,
+            shutdown_trigger,
         }
-        sleep(Duration::from_secs(1));
     }
-    panic!("Kernel is not ready after waiting for 10 seconds.")
+
+    async fn with_port(port: u16) -> Self {
+        let app_config = AppConfig {
+            tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
+            inference_addr: "https://api.aleph-alpha.com".to_owned(),
+        };
+        Self::new(app_config).await
+    }
+
+    async fn shutdown(self) {
+        self.shutdown_trigger.send(()).unwrap();
+        self.handle.await.unwrap();
+    }
 }
