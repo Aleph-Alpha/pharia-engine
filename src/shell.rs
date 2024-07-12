@@ -79,21 +79,27 @@ async fn serve_docs() -> Json<openapi::OpenApi> {
     Json(ApiDoc::openapi())
 }
 
+/// Start a shell listening to incoming requests at the given address.
+///
+/// The outer future awaits the bind operation of the listener.
+/// The inner future awaits the shutdown.
 pub async fn run(
     addr: impl Into<SocketAddr>,
     skill_executor_api: SkillExecutorApi,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
-) -> Result<(), Error> {
+) -> impl Future<Output = Result<(), Error>> {
     let addr = addr.into();
     let listener = TcpListener::bind(addr).await.context(format!(
         "Could not bind a tcp listener to '{addr}' please check environment vars for \
         PHARIA_KERNEL_ADDRESS."
-    ))?;
+    ));
 
-    axum::serve(listener, http(skill_executor_api))
-        .with_graceful_shutdown(shutdown_signal)
-        .await?;
-    Ok(())
+    async {
+        axum::serve(listener?, http(skill_executor_api))
+            .with_graceful_shutdown(shutdown_signal)
+            .await?;
+        Ok(())
+    }
 }
 
 pub fn http(skill_executor_api: SkillExecutorApi) -> Router {

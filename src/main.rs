@@ -13,7 +13,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    pharia_kernel::run(app_config, shutdown_signal()).await;
+    pharia_kernel::run(app_config, shutdown_signal())
+        .await
+        .await;
 }
 
 async fn shutdown_signal() {
