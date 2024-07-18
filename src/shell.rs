@@ -239,9 +239,11 @@ async fn drop_cached_skill(
     (StatusCode::OK, Json(msg))
 }
 
-/// execute_skill
+/// WIT (Webassembly Interface Types) of Skills
 ///
-/// Execute a skill in the kernel from one of the available repositories.
+/// Skills are web assembly components build against a wit world. This route returns this wit world.
+/// This allows you to build your own skill in many languages. We hope to provide higher level
+/// tooling for selected languages in the future though.
 #[utoipa::path(
     get,
     operation_id = "get_skill_wit",
@@ -474,9 +476,10 @@ mod tests {
 
     #[tokio::test]
     async fn healthcheck() {
-        let inference = Inference::new(inference_addr().to_owned());
+        let (send, _recv) = mpsc::channel(1);
+        let dummy_skill_executer_api = SkillExecutorApi::new(send);
 
-        let http = http(SkillExecutor::new(inference.api()).api());
+        let http = http(dummy_skill_executer_api);
         let resp = http
             .oneshot(
                 Request::builder()
