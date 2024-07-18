@@ -107,6 +107,7 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
 
     Router::new()
+        .route("/skill.wit", get(skill_wit()))
         .route("/execute_skill", post(execute_skill))
         .route("/cached_skills", get(cached_skills))
         .route("/cached_skills/:name", delete(drop_cached_skill))
@@ -236,6 +237,22 @@ async fn drop_cached_skill(
         "Skill was not present in cache".to_string()
     };
     (StatusCode::OK, Json(msg))
+}
+
+/// execute_skill
+///
+/// Execute a skill in the kernel from one of the available repositories.
+#[utoipa::path(
+    get,
+    operation_id = "get_skill_wit",
+    path = "/skill.wit",
+    tag = "skills",
+    responses(
+        (status = 200, description = "Ok", body=String),
+    ),
+)]
+fn skill_wit() -> &'static str {
+    include_str!("../wit/skill.wit")
 }
 
 /// We use `BAD_REQUEST` (400) for validation error as it is more commonly used.
@@ -471,5 +488,26 @@ mod tests {
             .unwrap();
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(&body[..], b"ok");
+    }
+
+    #[tokio::test]
+    async fn skill_wit_route_should_return_current_wit_world() {
+        let (send, _recv) = mpsc::channel(1);
+        let dummy_skill_executer_api = SkillExecutorApi::new(send);
+
+        let http = http(dummy_skill_executer_api);
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .uri("/skill.wit")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let actual = String::from_utf8(body.to_vec()).unwrap();
+
+        assert_eq!(actual, include_str!("../wit/skill.wit"));
     }
 }
