@@ -97,18 +97,18 @@ impl WasmRuntime {
 impl Runtime for WasmRuntime {
     async fn run(
         &mut self,
-        skill: &str,
-        name: String,
+        skill_name: &str,
+        argument: String,
         ctx: Box<dyn Csi + Send>,
     ) -> Result<String, Error> {
         let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
-        let component = self.skill_cache.fetch(skill, &self.engine).await?;
+        let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
         let (bindings, _) = Skill::instantiate_async(&mut store, &component, &self.linker)
             .await
             .expect("failed to instantiate skill");
-        bindings.call_run(&mut store, &name).await
+        bindings.call_run(&mut store, &argument).await
     }
 
     fn skills(&self) -> impl Iterator<Item = &str> {
