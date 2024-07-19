@@ -1,3 +1,4 @@
+mod cache;
 mod wasm;
 
 use anyhow::Error;

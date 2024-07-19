@@ -1,5 +1,3 @@
-use std::{collections::HashMap, future::Future};
-
 use anyhow::{anyhow, Context as _, Error};
 use wasmtime::{
     component::{bindgen, Component, Linker},
@@ -12,7 +10,7 @@ use crate::{
     registries::{registries, SkillRegistry},
 };
 
-use super::{Csi, Runtime};
+use super::{cache::SkillCache, Csi, Runtime};
 
 bindgen!({ world: "skill", async: true });
 
@@ -114,7 +112,8 @@ impl Runtime for WasmRuntime {
         let load_skill = async move {
             let bytes = registry_ref.load_skill(skill).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill} not found."))?;
-            Component::new(engine_ref, bytes).with_context(|| format!("Failed to initialize {skill}."))
+            Component::new(engine_ref, bytes)
+                .with_context(|| format!("Failed to initialize {skill}."))
         };
         let skill = self.skill_cache.fetch(skill, load_skill).await?;
 
@@ -130,35 +129,6 @@ impl Runtime for WasmRuntime {
 
     fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
         self.skill_cache.invalidate(skill)
-    }
-}
-
-pub struct SkillCache {
-    components: HashMap<String, Component>,
-}
-
-impl SkillCache {
-    pub fn new() -> Self {
-        SkillCache {
-            components: HashMap::new(),
-        }
-    }
-
-    pub fn skills(&self) -> impl Iterator<Item = &str> {
-        self.components.keys().map(String::as_ref)
-    }
-
-    pub fn invalidate(&mut self, skill: &str) -> bool {
-        self.components.remove(skill).is_some()
-    }
-
-    pub async fn fetch(&mut self, skill_name: &str, load_skill: impl Future<Output=Result<Component, Error>>) -> Result<&Component, Error> {
-        // Assert skill is in cache
-        if !self.components.contains_key(skill_name) {
-            let skill = load_skill.await?;
-            self.components.insert(skill_name.to_owned(), skill);
-        }
-        Ok(self.components.get(skill_name).unwrap())
     }
 }
 
@@ -221,7 +191,7 @@ mod tests {
         let result = runtime.invalidate_cached_skill("greet_skill");
 
         // Then the component hash map is empty
-        assert_eq!(runtime.skill_cache.components.len(), 0);
+        assert_eq!(runtime.skills().count(), 0);
 
         // And result is a success
         assert!(result);
