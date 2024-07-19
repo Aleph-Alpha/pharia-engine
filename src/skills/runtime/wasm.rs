@@ -133,6 +133,7 @@ impl Runtime for WasmRuntime {
     fn skills(&self) -> impl Iterator<Item = &str> {
         self.components.keys().map(String::as_ref)
     }
+
     fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
         self.components.remove(skill).is_some()
     }

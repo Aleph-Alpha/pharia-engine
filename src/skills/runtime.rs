@@ -40,7 +40,6 @@ pub trait Csi {
     async fn complete_text(&mut self, params: CompleteTextParameters) -> String;
 }
 
-
 #[cfg(test)]
 pub mod tests {
     use super::*;

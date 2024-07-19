@@ -28,7 +28,7 @@ impl SkillExecutor {
         runtime: R,
         inference_api: InferenceApi,
     ) -> Self {
-        let (send, recv) = tokio::sync::mpsc::channel::<SkillExecutorMessage>(1);
+        let (send, recv) = mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, inference_api)
                 .run()
@@ -424,7 +424,7 @@ pub mod tests {
         assert!(!result);
     }
 
-        /// Intended as a test double for the production runtime. This implementation features exactly
+    /// Intended as a test double for the production runtime. This implementation features exactly
     /// one hardcoded skill. The skill is called `greet` and it uses `luminous-nextgen-7b` to create
     /// a greeting given a provided name as an input.
     pub struct RustRuntime;

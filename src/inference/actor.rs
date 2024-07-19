@@ -145,7 +145,8 @@ pub mod tests {
     use anyhow::{anyhow, Error};
     use tokio::{
         sync::{mpsc, oneshot},
-        task::JoinHandle, time::timeout,
+        task::JoinHandle,
+        time::timeout,
     };
 
     use crate::inference::client::InferenceClient;
@@ -300,7 +301,7 @@ pub mod tests {
     /// We want to ensure that the actor invokes the client multiple times concurrently instead of
     /// only one inference request at a time.
     #[tokio::test]
-    #[should_panic] // Inference is not concurrent yet
+    #[should_panic(expected = "assertion failed: potential_timeout.is_ok()")] // Inference is not concurrent yet
     async fn concurrent_invocation_of_client() {
         // Given
         let (client, mut control) = LatchClient::new(2);
@@ -320,7 +321,7 @@ pub mod tests {
             api_two.complete_text(complete_text_params_dummy(), "dummy api token".to_owned());
 
         // Wait for the second one to be completed before answering the first one. This will block
-        // forever if inference 
+        // forever if inference
         let potential_timeout = timeout(Duration::from_secs(1), second).await;
 
         // Then: Second task did not timeout
