@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future};
 
 use anyhow::{anyhow, Context as _, Error};
 use wasmtime::{
@@ -108,18 +108,17 @@ impl Runtime for WasmRuntime {
         let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
-        let component = if let Some(c) = self.skill_cache.components.get(skill) {
-            c
-        } else {
-            let bytes = self.skill_registry.load_skill(skill).await?;
+        // Make borrow checker happy, by not using self within async block.
+        let registry_ref = &mut self.skill_registry;
+        let engine_ref = &self.engine;
+        let load_skill = async move {
+            let bytes = registry_ref.load_skill(skill).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill} not found."))?;
-            let component = Component::new(&self.engine, bytes)
-                .with_context(|| format!("Failed to initialize {skill}."))?;
-            self.skill_cache.components.insert(skill.to_owned(), component);
-            self.skill_cache.components.get(skill).unwrap()
+            Component::new(engine_ref, bytes).with_context(|| format!("Failed to initialize {skill}."))
         };
+        let skill = self.skill_cache.fetch(skill, load_skill).await?;
 
-        let (bindings, _) = Skill::instantiate_async(&mut store, component, &self.linker)
+        let (bindings, _) = Skill::instantiate_async(&mut store, skill, &self.linker)
             .await
             .expect("failed to instantiate skill");
         bindings.call_run(&mut store, &name).await
@@ -151,6 +150,15 @@ impl SkillCache {
 
     pub fn invalidate(&mut self, skill: &str) -> bool {
         self.components.remove(skill).is_some()
+    }
+
+    pub async fn fetch(&mut self, skill_name: &str, load_skill: impl Future<Output=Result<Component, Error>>) -> Result<&Component, Error> {
+        // Assert skill is in cache
+        if !self.components.contains_key(skill_name) {
+            let skill = load_skill.await?;
+            self.components.insert(skill_name.to_owned(), skill);
+        }
+        Ok(self.components.get(skill_name).unwrap())
     }
 }
 
