@@ -53,39 +53,23 @@ impl<R: SkillRegistry> SkillRegistry for Vec<R> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use anyhow::{anyhow, Error};
     use tempfile::tempdir;
 
     use super::{DynFuture, FileRegistry, SkillRegistry};
 
-    struct NoneRegistry;
-
-    impl SkillRegistry for NoneRegistry {
+    impl SkillRegistry for HashMap<String, Vec<u8>> {
         fn load_skill<'a>(
             &'a self,
-            _name: &'a str,
+            name: &'a str,
         ) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
-            Box::pin(async { Ok(None) })
-        }
-    }
-
-    struct SomeRegistry {
-        /// this could be binary or WAT
-        bytes: Vec<u8>,
-    }
-
-    impl SomeRegistry {
-        fn new(bytes: Vec<u8>) -> Self {
-            Self { bytes }
-        }
-    }
-
-    impl SkillRegistry for SomeRegistry {
-        fn load_skill<'a>(
-            &'a self,
-            _name: &'a str,
-        ) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
-            Box::pin(async move { Ok(Some(self.bytes.clone())) })
+            if let Some(bytes) = self.get(name) {
+                Box::pin(async move { Ok(Some(bytes.clone())) })
+            } else {
+                Box::pin(async { Ok(None) })
+            }
         }
     }
 
@@ -111,7 +95,7 @@ mod tests {
 
     #[tokio::test]
     async fn empty_skill_registries() {
-        let registries = Vec::<NoneRegistry>::new();
+        let registries = HashMap::new();
         let result = registries.load_skill("dummy skill name").await;
         let bytes = result.unwrap();
         assert!(bytes.is_none());
@@ -119,7 +103,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_empty_registries() {
-        let registries = vec![NoneRegistry {}, NoneRegistry {}];
+        let registries = vec![HashMap::new(), HashMap::new()];
         let result = registries.load_skill("dummy skill name").await;
         let bytes = result.unwrap();
         assert!(bytes.is_none());
@@ -129,8 +113,11 @@ mod tests {
     async fn find_skill_in_second_registry() {
         // given
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
-            Box::new(NoneRegistry {}),
-            Box::new(SomeRegistry::new(b"(component)".to_vec())),
+            Box::new(HashMap::new()),
+            Box::new(HashMap::from([(
+                "dummy skill name".to_owned(),
+                b"(component)".to_vec(),
+            )])),
         ];
 
         // when
@@ -145,8 +132,11 @@ mod tests {
     async fn find_skill_in_first_registry() {
         // given
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
-            Box::new(SomeRegistry::new(b"(component)".to_vec())),
-            Box::new(NoneRegistry {}),
+            Box::new(HashMap::from([(
+                "dummy skill name".to_owned(),
+                b"(component)".to_vec(),
+            )])),
+            Box::new(HashMap::new()),
         ];
 
         // when
@@ -162,7 +152,10 @@ mod tests {
         // given
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
             Box::new(SaboteurRegistry),
-            Box::new(SomeRegistry::new(b"(component)".to_vec())),
+            Box::new(HashMap::from([(
+                "dummy skill name".to_owned(),
+                b"(component)".to_vec(),
+            )])),
         ];
 
         // when
@@ -175,7 +168,10 @@ mod tests {
     #[tokio::test]
     async fn second_one_fails() {
         let registries: Vec<Box<dyn SkillRegistry + Send>> = vec![
-            Box::new(SomeRegistry::new(b"(component)".to_vec())),
+            Box::new(HashMap::from([(
+                "dummy skill name".to_owned(),
+                b"(component)".to_vec(),
+            )])),
             Box::new(SaboteurRegistry),
         ];
 
