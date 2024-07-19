@@ -92,18 +92,9 @@ impl WasmRuntime {
         Self {
             engine,
             linker,
-            skill_cache: SkillCache { components: HashMap::new() },
+            skill_cache: SkillCache::new(),
             skill_registry: Box::new(skill_registry),
         }
-    }
-
-    async fn load_component(&mut self, skill_name: String) -> Result<(), Error> {
-        let bytes = self.skill_registry.load_skill(&skill_name).await?;
-        let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
-        let component = Component::new(&self.engine, bytes)
-            .with_context(|| format!("Failed to initialize {skill_name}."))?;
-        self.skill_cache.components.insert(skill_name, component);
-        Ok(())
     }
 }
 
@@ -120,7 +111,11 @@ impl Runtime for WasmRuntime {
         let component = if let Some(c) = self.skill_cache.components.get(skill) {
             c
         } else {
-            self.load_component(skill.to_owned()).await?;
+            let bytes = self.skill_registry.load_skill(skill).await?;
+            let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill} not found."))?;
+            let component = Component::new(&self.engine, bytes)
+                .with_context(|| format!("Failed to initialize {skill}."))?;
+            self.skill_cache.components.insert(skill.to_owned(), component);
             self.skill_cache.components.get(skill).unwrap()
         };
 
@@ -131,16 +126,32 @@ impl Runtime for WasmRuntime {
     }
 
     fn skills(&self) -> impl Iterator<Item = &str> {
-        self.skill_cache.components.keys().map(String::as_ref)
+        self.skill_cache.skills()
     }
 
     fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
-        self.skill_cache.components.remove(skill).is_some()
+        self.skill_cache.invalidate(skill)
     }
 }
 
 pub struct SkillCache {
     components: HashMap<String, Component>,
+}
+
+impl SkillCache {
+    pub fn new() -> Self {
+        SkillCache {
+            components: HashMap::new(),
+        }
+    }
+
+    pub fn skills(&self) -> impl Iterator<Item = &str> {
+        self.components.keys().map(String::as_ref)
+    }
+
+    pub fn invalidate(&mut self, skill: &str) -> bool {
+        self.components.remove(skill).is_some()
+    }
 }
 
 #[cfg(test)]
