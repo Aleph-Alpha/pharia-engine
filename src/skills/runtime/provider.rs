@@ -5,14 +5,14 @@ use wasmtime::{component::Component, Engine};
 
 use crate::registries::SkillRegistry;
 
-pub struct SkillCache {
+pub struct SkillProvider {
     components: HashMap<String, CachedComponent>,
     skill_registry: Box<dyn SkillRegistry + Send>,
 }
 
-impl SkillCache {
+impl SkillProvider {
     pub fn new(skill_registry: Box<dyn SkillRegistry + Send>) -> Self {
-        SkillCache {
+        SkillProvider {
             components: HashMap::new(),
             skill_registry,
         }

@@ -1,4 +1,4 @@
-mod cache;
+mod provider;
 mod wasm;
 
 use anyhow::Error;

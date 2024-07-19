@@ -10,7 +10,7 @@ use crate::{
     registries::{registries, SkillRegistry},
 };
 
-use super::{cache::SkillCache, Csi, Runtime};
+use super::{provider::SkillProvider, Csi, Runtime};
 
 bindgen!({ world: "skill", async: true });
 
@@ -59,7 +59,7 @@ impl WasiView for LinkedCtx {
 pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<LinkedCtx>,
-    skill_cache: SkillCache,
+    skill_cache: SkillProvider,
 }
 
 impl WasmRuntime {
@@ -89,7 +89,7 @@ impl WasmRuntime {
         Self {
             engine,
             linker,
-            skill_cache: SkillCache::new(Box::new(skill_registry)),
+            skill_cache: SkillProvider::new(Box::new(skill_registry)),
         }
     }
 }
@@ -105,7 +105,7 @@ impl Runtime for WasmRuntime {
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
-        let (bindings, _) = Skill::instantiate_async(&mut store, &component, &self.linker)
+        let (bindings, _) = Skill::instantiate_async(&mut store, component, &self.linker)
             .await
             .expect("failed to instantiate skill");
         bindings.call_run(&mut store, &argument).await
