@@ -1,6 +1,6 @@
 use anyhow::Error;
 use wasmtime::{
-    component::{bindgen, Component, Linker},
+    component::{bindgen, Linker},
     Config, Engine, OptLevel, Store,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
@@ -56,16 +56,6 @@ impl WasiView for LinkedCtx {
     }
 }
 
-pub struct SkillComponent {
-    pub component: Component,
-}
-
-impl SkillComponent {
-    pub fn new(component: Component) -> Self {
-        Self { component }
-    }
-}
-
 pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<LinkedCtx>,
@@ -114,8 +104,8 @@ impl Runtime for WasmRuntime {
         let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
-        let skill = self.skill_cache.fetch(skill, &self.engine).await?;
-        let (bindings, _) = Skill::instantiate_async(&mut store, &skill.component, &self.linker)
+        let component = self.skill_cache.fetch(skill, &self.engine).await?;
+        let (bindings, _) = Skill::instantiate_async(&mut store, &component, &self.linker)
             .await
             .expect("failed to instantiate skill");
         bindings.call_run(&mut store, &name).await

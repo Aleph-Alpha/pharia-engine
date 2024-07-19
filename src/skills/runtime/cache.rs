@@ -5,10 +5,8 @@ use wasmtime::{component::Component, Engine};
 
 use crate::registries::SkillRegistry;
 
-use super::wasm::SkillComponent;
-
 pub struct SkillCache {
-    components: HashMap<String, SkillComponent>,
+    components: HashMap<String, CachedComponent>,
     skill_registry: Box<dyn SkillRegistry + Send>,
 }
 
@@ -28,22 +26,27 @@ impl SkillCache {
         self.components.remove(skill).is_some()
     }
 
-    pub async fn fetch(
-        &mut self,
-        skill_name: &str,
-        engine: &Engine,
-    ) -> Result<&SkillComponent, Error> {
-        // Assert skill is in cache
+    pub async fn fetch(&mut self, skill_name: &str, engine: &Engine) -> Result<&Component, Error> {
         if !self.components.contains_key(skill_name) {
             let bytes = self.skill_registry.load_skill(skill_name).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
             let component = Component::new(engine, bytes)
                 .with_context(|| format!("Failed to initialize {skill_name}."))?;
-            let skill = SkillComponent::new(component);
+            let skill = CachedComponent::new(component);
             self.components.insert(skill_name.to_owned(), skill);
         }
-        let c = self.components.get(skill_name).unwrap();
-        Ok(c)
+        let skill = self.components.get(skill_name).unwrap();
+        Ok(&skill.component)
+    }
+}
+
+pub struct CachedComponent {
+    component: Component,
+}
+
+impl CachedComponent {
+    pub fn new(component: Component) -> Self {
+        Self { component }
     }
 }
 
