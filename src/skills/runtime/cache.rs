@@ -1,10 +1,11 @@
 use std::{collections::HashMap, future::Future};
 
 use anyhow::Error;
-use wasmtime::component::Component;
+
+use super::wasm::SkillComponent;
 
 pub struct SkillCache {
-    components: HashMap<String, Component>,
+    components: HashMap<String, SkillComponent>,
 }
 
 impl SkillCache {
@@ -25,14 +26,18 @@ impl SkillCache {
     pub async fn fetch(
         &mut self,
         skill_name: &str,
-        load_skill: impl Future<Output = Result<Component, Error>>,
-    ) -> Result<&Component, Error> {
+        load_skill: impl Future<Output = Result<SkillComponent, Error>>,
+    ) -> Result<&SkillComponent, Error> {
         // Assert skill is in cache
         if !self.components.contains_key(skill_name) {
             let skill = load_skill.await?;
             self.components.insert(skill_name.to_owned(), skill);
         }
-        Ok(self.components.get(skill_name).unwrap())
+        let c = self.components.get(skill_name).unwrap();
+
+        //check for component update
+
+        Ok(c)
     }
 }
 

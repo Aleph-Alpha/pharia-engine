@@ -56,6 +56,10 @@ impl WasiView for LinkedCtx {
     }
 }
 
+pub struct SkillComponent {
+    pub component: Component,
+}
+
 pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<LinkedCtx>,
@@ -112,12 +116,13 @@ impl Runtime for WasmRuntime {
         let load_skill = async move {
             let bytes = registry_ref.load_skill(skill).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill} not found."))?;
-            Component::new(engine_ref, bytes)
-                .with_context(|| format!("Failed to initialize {skill}."))
+            let component = Component::new(engine_ref, bytes)
+                .with_context(|| format!("Failed to initialize {skill}."))?;
+            Ok(SkillComponent { component })
         };
         let skill = self.skill_cache.fetch(skill, load_skill).await?;
 
-        let (bindings, _) = Skill::instantiate_async(&mut store, skill, &self.linker)
+        let (bindings, _) = Skill::instantiate_async(&mut store, &skill.component, &self.linker)
             .await
             .expect("failed to instantiate skill");
         bindings.call_run(&mut store, &name).await
