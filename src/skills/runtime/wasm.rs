@@ -61,7 +61,7 @@ impl WasiView for LinkedCtx {
 pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<LinkedCtx>,
-    components: HashMap<String, Component>,
+    skill_cache: SkillCache,
     skill_registry: Box<dyn SkillRegistry + Send>,
 }
 
@@ -92,7 +92,7 @@ impl WasmRuntime {
         Self {
             engine,
             linker,
-            components: HashMap::new(),
+            skill_cache: SkillCache { components: HashMap::new() },
             skill_registry: Box::new(skill_registry),
         }
     }
@@ -102,7 +102,7 @@ impl WasmRuntime {
         let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
         let component = Component::new(&self.engine, bytes)
             .with_context(|| format!("Failed to initialize {skill_name}."))?;
-        self.components.insert(skill_name, component);
+        self.skill_cache.components.insert(skill_name, component);
         Ok(())
     }
 }
@@ -117,11 +117,11 @@ impl Runtime for WasmRuntime {
         let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
-        let component = if let Some(c) = self.components.get(skill) {
+        let component = if let Some(c) = self.skill_cache.components.get(skill) {
             c
         } else {
             self.load_component(skill.to_owned()).await?;
-            self.components.get(skill).unwrap()
+            self.skill_cache.components.get(skill).unwrap()
         };
 
         let (bindings, _) = Skill::instantiate_async(&mut store, component, &self.linker)
@@ -131,12 +131,16 @@ impl Runtime for WasmRuntime {
     }
 
     fn skills(&self) -> impl Iterator<Item = &str> {
-        self.components.keys().map(String::as_ref)
+        self.skill_cache.components.keys().map(String::as_ref)
     }
 
     fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
-        self.components.remove(skill).is_some()
+        self.skill_cache.components.remove(skill).is_some()
     }
+}
+
+pub struct SkillCache {
+    components: HashMap<String, Component>,
 }
 
 #[cfg(test)]
@@ -198,7 +202,7 @@ mod tests {
         let result = runtime.invalidate_cached_skill("greet_skill");
 
         // Then the component hash map is empty
-        assert_eq!(runtime.components.len(), 0);
+        assert_eq!(runtime.skill_cache.components.len(), 0);
 
         // And result is a success
         assert!(result);
