@@ -37,7 +37,7 @@ use crate::skills::SkillExecutorApi;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, cached_skills, execute_skill, drop_cached_skill),
+    paths(serve_docs, cached_skills, execute_skill, drop_cached_skill, skill_wit),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs)),
     tags(
@@ -248,7 +248,7 @@ async fn drop_cached_skill(
     get,
     operation_id = "get_skill_wit",
     path = "/skill.wit",
-    tag = "skills",
+    tag = "docs",
     responses(
         (status = 200, description = "Ok", body=String),
     ),
