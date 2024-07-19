@@ -60,6 +60,12 @@ pub struct SkillComponent {
     pub component: Component,
 }
 
+impl SkillComponent {
+    pub fn new(component: Component) -> Self {
+        Self { component }
+    }
+}
+
 pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<LinkedCtx>,
@@ -118,7 +124,7 @@ impl Runtime for WasmRuntime {
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill} not found."))?;
             let component = Component::new(engine_ref, bytes)
                 .with_context(|| format!("Failed to initialize {skill}."))?;
-            Ok(SkillComponent { component })
+            Ok(SkillComponent::new(component))
         };
         let skill = self.skill_cache.fetch(skill, load_skill).await?;
 
