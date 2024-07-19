@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context as _, Error};
+use anyhow::Error;
 use wasmtime::{
     component::{bindgen, Component, Linker},
     Config, Engine, OptLevel, Store,
@@ -70,7 +70,6 @@ pub struct WasmRuntime {
     engine: Engine,
     linker: Linker<LinkedCtx>,
     skill_cache: SkillCache,
-    skill_registry: Box<dyn SkillRegistry + Send>,
 }
 
 impl WasmRuntime {
@@ -100,8 +99,7 @@ impl WasmRuntime {
         Self {
             engine,
             linker,
-            skill_cache: SkillCache::new(),
-            skill_registry: Box::new(skill_registry),
+            skill_cache: SkillCache::new(Box::new(skill_registry)),
         }
     }
 }
@@ -116,18 +114,7 @@ impl Runtime for WasmRuntime {
         let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(&self.engine, invocation_ctx);
 
-        // Make borrow checker happy, by not using self within async block.
-        let registry_ref = &mut self.skill_registry;
-        let engine_ref = &self.engine;
-        let load_skill = async move {
-            let bytes = registry_ref.load_skill(skill).await?;
-            let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill} not found."))?;
-            let component = Component::new(engine_ref, bytes)
-                .with_context(|| format!("Failed to initialize {skill}."))?;
-            Ok(SkillComponent::new(component))
-        };
-        let skill = self.skill_cache.fetch(skill, load_skill).await?;
-
+        let skill = self.skill_cache.fetch(skill, &self.engine).await?;
         let (bindings, _) = Skill::instantiate_async(&mut store, &skill.component, &self.linker)
             .await
             .expect("failed to instantiate skill");

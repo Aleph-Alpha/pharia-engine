@@ -1,17 +1,22 @@
-use std::{collections::HashMap, future::Future};
+use std::collections::HashMap;
 
-use anyhow::Error;
+use anyhow::{anyhow, Context, Error};
+use wasmtime::{component::Component, Engine};
+
+use crate::registries::SkillRegistry;
 
 use super::wasm::SkillComponent;
 
 pub struct SkillCache {
     components: HashMap<String, SkillComponent>,
+    skill_registry: Box<dyn SkillRegistry + Send>,
 }
 
 impl SkillCache {
-    pub fn new() -> Self {
+    pub fn new(skill_registry: Box<dyn SkillRegistry + Send>) -> Self {
         SkillCache {
             components: HashMap::new(),
+            skill_registry,
         }
     }
 
@@ -26,17 +31,18 @@ impl SkillCache {
     pub async fn fetch(
         &mut self,
         skill_name: &str,
-        load_skill: impl Future<Output = Result<SkillComponent, Error>>,
+        engine: &Engine,
     ) -> Result<&SkillComponent, Error> {
         // Assert skill is in cache
         if !self.components.contains_key(skill_name) {
-            let skill = load_skill.await?;
+            let bytes = self.skill_registry.load_skill(skill_name).await?;
+            let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
+            let component = Component::new(engine, bytes)
+                .with_context(|| format!("Failed to initialize {skill_name}."))?;
+            let skill = SkillComponent::new(component);
             self.components.insert(skill_name.to_owned(), skill);
         }
         let c = self.components.get(skill_name).unwrap();
-
-        //check for component update
-
         Ok(c)
     }
 }
