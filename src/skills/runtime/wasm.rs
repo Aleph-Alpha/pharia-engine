@@ -105,7 +105,7 @@ impl Runtime for WasmRuntime {
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
-        let (bindings, _) = Skill::instantiate_async(&mut store, component, &self.linker)
+        let bindings = Skill::instantiate_async(&mut store, component, &self.linker)
             .await
             .expect("failed to instantiate skill");
         bindings.call_run(&mut store, &argument).await
