@@ -1,17 +1,13 @@
 use anyhow::Error;
-use wasmtime::{component::Linker, Config, Engine, OptLevel, Store};
+use wasmtime::{Config, Engine, OptLevel};
 
 use crate::registries::{registries, SkillRegistry};
 
-use super::{
-    provider::SkillProvider,
-    wit_world::{LinkedCtx, SupportedVersion},
-    Csi, Runtime,
-};
+use super::{provider::SkillProvider, wit_world::Linker, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
-    linker: Linker<LinkedCtx>,
+    linker: Linker,
     skill_cache: SkillProvider,
 }
 
@@ -32,11 +28,7 @@ impl WasmRuntime {
 
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
         let engine = Self::engine();
-        let mut linker: Linker<LinkedCtx> = Linker::new(&engine);
-        // provide host implementation of WASI interfaces required by the component with wit-bindgen
-        wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
-        // Skill world from bindgen
-        SupportedVersion::add_all_to_linker(&mut linker).expect("linking to skill world must work");
+        let linker = Linker::new(&engine);
 
         Self {
             engine,
@@ -53,12 +45,9 @@ impl Runtime for WasmRuntime {
         argument: String,
         ctx: Box<dyn Csi + Send>,
     ) -> Result<String, Error> {
-        let invocation_ctx = LinkedCtx::new(ctx);
-        let mut store = Store::new(&self.engine, invocation_ctx);
-
         let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
-        component
-            .run_skill(&mut store, &mut self.linker, &argument)
+        self.linker
+            .run_skill(&self.engine, ctx, component, &argument)
             .await
     }
 

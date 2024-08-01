@@ -1,13 +1,49 @@
 use semver::Version;
 use strum::{EnumIter, IntoEnumIterator};
 use wasmtime::{
-    component::{Component, Linker},
-    Store,
+    component::{Component, Linker as WasmtimeLinker},
+    Engine, Store,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
-use super::Csi;
+use super::{provider::CachedComponent, Csi};
+
+pub struct Linker {
+    linker: WasmtimeLinker<LinkedCtx>,
+}
+
+impl Linker {
+    pub fn new(engine: &Engine) -> Self {
+        let mut linker = WasmtimeLinker::new(engine);
+        // provide host implementation of WASI interfaces required by the component with wit-bindgen
+        wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
+        // Skill world from bindgen
+        SupportedVersion::add_all_to_linker(&mut linker).expect("linking to skill world must work");
+
+        Self { linker }
+    }
+
+    pub async fn run_skill(
+        &mut self,
+        engine: &Engine,
+        ctx: Box<dyn Csi + Send>,
+        component: &CachedComponent,
+        argument: &str,
+    ) -> Result<String, anyhow::Error> {
+        let invocation_ctx = LinkedCtx::new(ctx);
+        let mut store = Store::new(engine, invocation_ctx);
+        component
+            .skill_version()
+            .run_skill(
+                &mut store,
+                component.component(),
+                &mut self.linker,
+                argument,
+            )
+            .await
+    }
+}
 
 /// Currently supported versions of the skill world
 #[derive(Debug, Clone, Copy, EnumIter)]
@@ -18,7 +54,7 @@ pub enum SupportedVersion {
 
 impl SupportedVersion {
     /// Adds all supported WIT worlds to the linker.
-    pub fn add_all_to_linker(linker: &mut Linker<LinkedCtx>) -> anyhow::Result<()> {
+    fn add_all_to_linker(linker: &mut WasmtimeLinker<LinkedCtx>) -> anyhow::Result<()> {
         for version in Self::iter() {
             match version {
                 Self::Unversioned => {
@@ -31,11 +67,11 @@ impl SupportedVersion {
     }
 
     /// Run a skill that targets a specific version of the WIT world
-    pub async fn run_skill(
+    async fn run_skill(
         &self,
         mut store: &mut Store<LinkedCtx>,
         component: &Component,
-        linker: &mut Linker<LinkedCtx>,
+        linker: &mut WasmtimeLinker<LinkedCtx>,
         argument: &str,
     ) -> anyhow::Result<String> {
         match self {
@@ -71,14 +107,14 @@ impl SupportedVersion {
 
 /// Linked against the skill by the wasm time. For the most part this gives the skill access to the
 /// CSI.
-pub struct LinkedCtx {
+struct LinkedCtx {
     wasi_ctx: WasiCtx,
     resource_table: ResourceTable,
     skill_ctx: Box<dyn Csi + Send>,
 }
 
 impl LinkedCtx {
-    pub fn new(skill_ctx: Box<dyn Csi + Send>) -> Self {
+    fn new(skill_ctx: Box<dyn Csi + Send>) -> Self {
         let mut builder = WasiCtxBuilder::new();
         LinkedCtx {
             wasi_ctx: builder.build(),

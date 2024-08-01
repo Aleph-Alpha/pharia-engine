@@ -1,14 +1,11 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Error};
-use wasmtime::{
-    component::{Component, Linker},
-    Engine, Store,
-};
+use wasmtime::{component::Component, Engine};
 
 use crate::registries::SkillRegistry;
 
-use super::wit_world::{LinkedCtx, SupportedVersion};
+use super::wit_world::SupportedVersion;
 
 pub struct SkillProvider {
     components: HashMap<String, CachedComponent>,
@@ -67,15 +64,8 @@ impl CachedComponent {
         &self.component
     }
 
-    pub async fn run_skill(
-        &self,
-        store: &mut Store<LinkedCtx>,
-        linker: &mut Linker<LinkedCtx>,
-        argument: &str,
-    ) -> anyhow::Result<String> {
+    pub fn skill_version(&self) -> SupportedVersion {
         self.skill_version
-            .run_skill(store, &self.component, linker, argument)
-            .await
     }
 }
 
