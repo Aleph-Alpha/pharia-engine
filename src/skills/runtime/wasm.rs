@@ -1,59 +1,12 @@
 use anyhow::Error;
 use wasmtime::{component::Linker, Config, Engine, OptLevel, Store};
-use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
+use wit_world::{LinkedCtx, SupportedVersion};
 
-use crate::{
-    inference::CompleteTextParameters,
-    registries::{registries, SkillRegistry},
-};
+use crate::registries::{registries, SkillRegistry};
 
-use super::{
-    provider::SkillProvider,
-    wit_world::unversioned::{pharia, Skill},
-    Csi, Runtime,
-};
+use super::{provider::SkillProvider, Csi, Runtime};
 
-/// Linked against the skill by the wasm time. For the most part this gives the skill access to the
-/// CSI.
-struct LinkedCtx {
-    wasi_ctx: WasiCtx,
-    resource_table: ResourceTable,
-    skill_ctx: Box<dyn Csi + Send>,
-}
-
-impl LinkedCtx {
-    fn new(skill_ctx: Box<dyn Csi + Send>) -> Self {
-        let mut builder = WasiCtxBuilder::new();
-        LinkedCtx {
-            wasi_ctx: builder.build(),
-            resource_table: ResourceTable::new(),
-            skill_ctx,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl pharia::skill::csi::Host for LinkedCtx {
-    #[must_use]
-    async fn complete_text(&mut self, prompt: String, model: String) -> String {
-        let params = CompleteTextParameters {
-            prompt,
-            model,
-            max_tokens: 128,
-        };
-        self.skill_ctx.complete_text(params).await
-    }
-}
-
-impl WasiView for LinkedCtx {
-    fn table(&mut self) -> &mut ResourceTable {
-        &mut self.resource_table
-    }
-
-    fn ctx(&mut self) -> &mut WasiCtx {
-        &mut self.wasi_ctx
-    }
-}
+mod wit_world;
 
 pub struct WasmRuntime {
     engine: Engine,
@@ -82,8 +35,7 @@ impl WasmRuntime {
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
         // Skill world from bindgen
-        Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)
-            .expect("linking to skill world must work");
+        SupportedVersion::add_all_to_linker(&mut linker).expect("linking to skill world must work");
 
         Self {
             engine,
@@ -104,10 +56,9 @@ impl Runtime for WasmRuntime {
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
-        let bindings = Skill::instantiate_async(&mut store, component, &self.linker)
+        SupportedVersion::Unversioned
+            .run_skill(&mut store, component, &mut self.linker, &argument)
             .await
-            .expect("failed to instantiate skill");
-        bindings.call_run(&mut store, &argument).await
     }
 
     fn skills(&self) -> impl Iterator<Item = &str> {
@@ -123,7 +74,7 @@ impl Runtime for WasmRuntime {
 mod tests {
     use std::{collections::HashSet, fs};
 
-    use crate::registries::FileRegistry;
+    use crate::{inference::CompleteTextParameters, registries::FileRegistry};
 
     use super::*;
     use async_trait::async_trait;
