@@ -1,6 +1,8 @@
-use wasmtime::component::bindgen;
+pub mod unversioned {
+    use wasmtime::component::bindgen;
 
-bindgen!({ world: "skill", path: "./wit/skill@unversioned", async: true });
+    bindgen!({ world: "skill", path: "./wit/skill@unversioned", async: true });
+}
 
 #[cfg(test)]
 mod tests {

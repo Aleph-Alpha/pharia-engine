@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     provider::SkillProvider,
-    wit_world::{pharia, Skill},
+    wit_world::unversioned::{pharia, Skill},
     Csi, Runtime,
 };
 
