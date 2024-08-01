@@ -30,6 +30,7 @@ dotenvy = "0.15.7"
 futures = "0.3.30"
 oci-distribution = "0.11.0"
 oci-wasm = "0.0.4"
+semver = "1.0.23"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.121"
 tokio = { version = "1.39.2", features = [
@@ -51,6 +52,7 @@ utoipa = { version = "4.2.3", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.1.0", features = ["axum"] }
 wasmtime = "23.0.1"
 wasmtime-wasi = "23.0.1"
+wit-parser = "0.215.0"
 
 [dev-dependencies]
 http-body-util = "0.1.2"

@@ -1,8 +1,5 @@
 use anyhow::Error;
-use wasmtime::{
-    component::{bindgen, Linker},
-    Config, Engine, OptLevel, Store,
-};
+use wasmtime::{component::Linker, Config, Engine, OptLevel, Store};
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::{
@@ -10,9 +7,11 @@ use crate::{
     registries::{registries, SkillRegistry},
 };
 
-use super::{provider::SkillProvider, Csi, Runtime};
-
-bindgen!({ world: "skill", async: true });
+use super::{
+    provider::SkillProvider,
+    wit_world::{pharia, Skill},
+    Csi, Runtime,
+};
 
 /// Linked against the skill by the wasm time. For the most part this gives the skill access to the
 /// CSI.
