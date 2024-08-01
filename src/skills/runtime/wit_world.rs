@@ -1,6 +1,6 @@
 use wasmtime::component::bindgen;
 
-bindgen!({ world: "skill", async: true });
+bindgen!({ world: "skill", path: "./wit/skill@unversioned", async: true });
 
 #[cfg(test)]
 mod tests {

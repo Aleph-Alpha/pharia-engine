@@ -2,7 +2,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 use pharia::skill::csi::complete_text;
 
-wit_bindgen::generate!({ path: "../wit", world: "skill" });
+wit_bindgen::generate!({ path: "../wit/skill@unversioned", world: "skill" });
 
 struct Skill {}
 

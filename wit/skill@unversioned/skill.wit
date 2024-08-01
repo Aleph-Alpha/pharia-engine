@@ -1,0 +1,10 @@
+package pharia:skill;
+
+world skill {
+    import csi;
+    export run: func(in: string) -> string;
+}
+
+interface csi {
+    complete-text: func(prompt: string, model: string) -> string;
+}
