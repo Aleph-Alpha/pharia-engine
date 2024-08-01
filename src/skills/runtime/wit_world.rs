@@ -1,9 +1,11 @@
+use semver::Version;
 use strum::{EnumIter, IntoEnumIterator};
 use wasmtime::{
     component::{Component, Linker},
     Store,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
+use wit_parser::decoding::{decode, DecodedWasm};
 
 use super::Csi;
 
@@ -43,6 +45,26 @@ impl SupportedVersion {
                     .expect("failed to instantiate skill");
                 bindings.call_run(store, argument).await
             }
+        }
+    }
+
+    pub fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+        Ok(match Self::extract_pharia_skill_version(wasm)? {
+            Some(_) => unreachable!(),
+            None => Self::Unversioned,
+        })
+    }
+
+    fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> anyhow::Result<Option<Version>> {
+        let decoded = decode(wasm.as_ref())?;
+        if let DecodedWasm::Component(resolve, ..) = decoded {
+            Ok(resolve
+                .package_names
+                .keys()
+                .find(|k| (k.namespace == "pharia" && k.name == "skill"))
+                .and_then(|k| k.version.clone()))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -103,26 +125,12 @@ mod unversioned {
 mod tests {
     use std::fs;
 
-    use semver::Version;
-    use wit_parser::decoding::{decode, DecodedWasm};
-
-    fn extract_pharia_skill_version(wasm: &[u8]) -> anyhow::Result<Option<Version>> {
-        let decoded = decode(wasm)?;
-        if let DecodedWasm::Component(resolve, ..) = decoded {
-            Ok(resolve
-                .package_names
-                .keys()
-                .find(|k| (k.namespace == "pharia" && k.name == "skill"))
-                .and_then(|k| k.version.clone()))
-        } else {
-            Ok(None)
-        }
-    }
+    use super::*;
 
     #[test]
     fn can_parse_module() {
         let wasm = fs::read("skills/greet_skill.wasm").unwrap();
-        let version = extract_pharia_skill_version(&wasm).unwrap();
+        let version = SupportedVersion::extract_pharia_skill_version(&wasm).unwrap();
         assert_eq!(version, None);
     }
 }

@@ -1,12 +1,13 @@
 use anyhow::Error;
 use wasmtime::{component::Linker, Config, Engine, OptLevel, Store};
-use wit_world::{LinkedCtx, SupportedVersion};
 
 use crate::registries::{registries, SkillRegistry};
 
-use super::{provider::SkillProvider, Csi, Runtime};
-
-mod wit_world;
+use super::{
+    provider::SkillProvider,
+    wit_world::{LinkedCtx, SupportedVersion},
+    Csi, Runtime,
+};
 
 pub struct WasmRuntime {
     engine: Engine,
@@ -56,8 +57,8 @@ impl Runtime for WasmRuntime {
         let mut store = Store::new(&self.engine, invocation_ctx);
 
         let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
-        SupportedVersion::Unversioned
-            .run_skill(&mut store, component, &mut self.linker, &argument)
+        component
+            .run_skill(&mut store, &mut self.linker, &argument)
             .await
     }
 
