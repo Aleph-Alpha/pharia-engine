@@ -63,7 +63,7 @@ reqwest = "0.12.5"
 tempfile = "3.10.1"
 tokio = { version = "1.39.2", features = ["test-util"] }
 tokio-test = "0.4.4"
-tower = "0.4.13"
+wat = "1.215.0"
 
 [features]
 test_inference = []

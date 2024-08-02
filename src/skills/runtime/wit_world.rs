@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use semver::Version;
 use strum::{EnumIter, IntoEnumIterator};
 use wasmtime::{
@@ -94,11 +95,12 @@ impl SupportedVersion {
     fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> anyhow::Result<Option<Version>> {
         let decoded = decode(wasm.as_ref())?;
         if let DecodedWasm::Component(resolve, ..) = decoded {
-            Ok(resolve
+            let package_name = &resolve
                 .package_names
                 .keys()
                 .find(|k| (k.namespace == "pharia" && k.name == "skill"))
-                .and_then(|k| k.version.clone()))
+                .ok_or_else(|| anyhow!("wasm component isn't using pharia skill"))?;
+            Ok(package_name.version.clone())
         } else {
             Ok(None)
         }
@@ -168,5 +170,12 @@ mod tests {
         let wasm = fs::read("skills/greet_skill.wasm").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(&wasm).unwrap();
         assert_eq!(version, None);
+    }
+
+    #[test]
+    fn errors_if_not_pharia_component() {
+        let wasm = wat::parse_str("(component)").unwrap();
+        let version = SupportedVersion::extract_pharia_skill_version(&wasm);
+        assert!(version.is_err());
     }
 }
