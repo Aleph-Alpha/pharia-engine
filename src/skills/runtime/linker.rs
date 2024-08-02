@@ -1,10 +1,7 @@
 use anyhow::anyhow;
 use semver::Version;
 use strum::{EnumIter, IntoEnumIterator};
-use wasmtime::{
-    component::{Component, Linker as WasmtimeLinker},
-    Engine, Store,
-};
+use wasmtime::{component::Linker as WasmtimeLinker, Engine, Store};
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
@@ -15,14 +12,20 @@ pub struct Linker {
 }
 
 impl Linker {
-    pub fn new(engine: &Engine) -> Self {
+    pub fn new(engine: &Engine) -> anyhow::Result<Self> {
         let mut linker = WasmtimeLinker::new(engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
-        wasmtime_wasi::add_to_linker_async(&mut linker).expect("linking to WASI must work");
+        wasmtime_wasi::add_to_linker_async(&mut linker)?;
         // Skill world from bindgen
-        SupportedVersion::add_all_to_linker(&mut linker).expect("linking to skill world must work");
+        for version in SupportedVersion::iter() {
+            match version {
+                SupportedVersion::Unversioned => {
+                    unversioned::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
+                }
+            }
+        }
 
-        Self { linker }
+        Ok(Self { linker })
     }
 
     pub async fn run_skill(
@@ -34,15 +37,18 @@ impl Linker {
     ) -> Result<String, anyhow::Error> {
         let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(engine, invocation_ctx);
-        component
-            .skill_version()
-            .run_skill(
-                &mut store,
-                component.component(),
-                &mut self.linker,
-                argument,
-            )
-            .await
+        match component.skill_version() {
+            SupportedVersion::Unversioned => {
+                let bindings = unversioned::Skill::instantiate_async(
+                    &mut store,
+                    component.component(),
+                    &self.linker,
+                )
+                .await
+                .expect("failed to instantiate skill");
+                bindings.call_run(store, argument).await
+            }
+        }
     }
 }
 
@@ -54,37 +60,6 @@ pub enum SupportedVersion {
 }
 
 impl SupportedVersion {
-    /// Adds all supported WIT worlds to the linker.
-    fn add_all_to_linker(linker: &mut WasmtimeLinker<LinkedCtx>) -> anyhow::Result<()> {
-        for version in Self::iter() {
-            match version {
-                Self::Unversioned => {
-                    unversioned::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Run a skill that targets a specific version of the WIT world
-    async fn run_skill(
-        &self,
-        mut store: &mut Store<LinkedCtx>,
-        component: &Component,
-        linker: &mut WasmtimeLinker<LinkedCtx>,
-        argument: &str,
-    ) -> anyhow::Result<String> {
-        match self {
-            Self::Unversioned => {
-                let bindings = unversioned::Skill::instantiate_async(&mut store, component, linker)
-                    .await
-                    .expect("failed to instantiate skill");
-                bindings.call_run(store, argument).await
-            }
-        }
-    }
-
     pub fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         Ok(match Self::extract_pharia_skill_version(wasm)? {
             Some(_) => unreachable!(),
@@ -102,7 +77,7 @@ impl SupportedVersion {
                 .ok_or_else(|| anyhow!("wasm component isn't using pharia skill"))?;
             Ok(package_name.version.clone())
         } else {
-            Ok(None)
+            Err(anyhow!("wasm isn't a component"))
         }
     }
 }
@@ -175,6 +150,13 @@ mod tests {
     #[test]
     fn errors_if_not_pharia_component() {
         let wasm = wat::parse_str("(component)").unwrap();
+        let version = SupportedVersion::extract_pharia_skill_version(&wasm);
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn errors_if_not_component() {
+        let wasm = wat::parse_str("(module)").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(&wasm);
         assert!(version.is_err());
     }

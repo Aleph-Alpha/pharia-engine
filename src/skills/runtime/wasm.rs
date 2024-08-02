@@ -28,7 +28,7 @@ impl WasmRuntime {
 
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
         let engine = Self::engine();
-        let linker = Linker::new(&engine);
+        let linker = Linker::new(&engine).expect("linking must succeed");
 
         Self {
             engine,
