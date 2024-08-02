@@ -5,7 +5,7 @@ use wasmtime::{component::Component, Engine};
 
 use crate::registries::SkillRegistry;
 
-use super::wit_world::SupportedVersion;
+use super::linker::SupportedVersion;
 
 pub struct SkillProvider {
     components: HashMap<String, CachedComponent>,

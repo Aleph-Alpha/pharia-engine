@@ -3,7 +3,7 @@ use wasmtime::{Config, Engine, OptLevel};
 
 use crate::registries::{registries, SkillRegistry};
 
-use super::{provider::SkillProvider, wit_world::Linker, Csi, Runtime};
+use super::{linker::Linker, provider::SkillProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
