@@ -22,6 +22,9 @@ impl Linker {
                 SupportedVersion::Unversioned => {
                     unversioned::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
                 }
+                SupportedVersion::V0_1 => {
+                    v0_1::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
+                }
             }
         }
 
@@ -48,6 +51,7 @@ impl Linker {
                 .expect("failed to instantiate skill");
                 bindings.call_run(store, argument).await
             }
+            SupportedVersion::V0_1 => todo!(),
         }
     }
 }
@@ -55,6 +59,8 @@ impl Linker {
 /// Currently supported versions of the skill world
 #[derive(Debug, Clone, Copy, EnumIter)]
 pub enum SupportedVersion {
+    /// Versions 0.1.x of the skill world
+    V0_1,
     /// Pre-semver-released version of skill world
     Unversioned,
 }
@@ -62,8 +68,11 @@ pub enum SupportedVersion {
 impl SupportedVersion {
     pub fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         Ok(match Self::extract_pharia_skill_version(wasm)? {
-            Some(_) => unreachable!(),
+            Some(Version {
+                major: 0, minor: 1, ..
+            }) => Self::V0_1,
             None => Self::Unversioned,
+            Some(_) => unreachable!(),
         })
     }
 
@@ -111,7 +120,30 @@ impl WasiView for LinkedCtx {
     }
 }
 
+mod v0_1 {
+    use pharia::skill::csi::{Completion, CompletionParams, Error, Host};
+    use wasmtime::component::bindgen;
+
+    use super::LinkedCtx;
+
+    bindgen!({ world: "skill", path: "./wit/skill@0.1.0", async: true });
+
+    #[async_trait::async_trait]
+    impl Host for LinkedCtx {
+        #[must_use]
+        async fn complete(
+            &mut self,
+            model: String,
+            prompt: String,
+            options: Option<CompletionParams>,
+        ) -> Result<Completion, Error> {
+            todo!()
+        }
+    }
+}
+
 mod unversioned {
+    use pharia::skill::csi::Host;
     use wasmtime::component::bindgen;
 
     use crate::inference::CompleteTextParameters;
@@ -121,7 +153,7 @@ mod unversioned {
     bindgen!({ world: "skill", path: "./wit/skill@unversioned", async: true });
 
     #[async_trait::async_trait]
-    impl pharia::skill::csi::Host for LinkedCtx {
+    impl Host for LinkedCtx {
         #[must_use]
         async fn complete_text(&mut self, prompt: String, model: String) -> String {
             let params = CompleteTextParameters {
