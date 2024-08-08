@@ -3,7 +3,7 @@ use std::future::pending;
 use super::runtime::{Csi, Runtime, WasmRuntime};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
-use anyhow::{anyhow, Error};
+use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::{
@@ -65,7 +65,7 @@ impl SkillExecutorApi {
         skill: String,
         input: Value,
         api_token: String,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<Value> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Execute {
             skill,
@@ -155,7 +155,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
         skill: String,
         input: Value,
         api_token: String,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<Value> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
@@ -173,7 +173,7 @@ pub enum SkillExecutorMessage {
     Execute {
         skill: String,
         input: Value,
-        send: oneshot::Sender<Result<String, Error>>,
+        send: oneshot::Sender<anyhow::Result<Value>>,
         api_token: String,
     },
     Skills {
@@ -238,7 +238,7 @@ pub mod tests {
     use super::*;
     use std::iter;
 
-    use anyhow::{anyhow, Error};
+    use anyhow::anyhow;
     use serde_json::json;
 
     use crate::{
@@ -259,7 +259,7 @@ pub mod tests {
                 _: &str,
                 _: Value,
                 mut ctx: Box<dyn Csi + Send>,
-            ) -> Result<String, Error> {
+            ) -> anyhow::Result<Value> {
                 ctx.complete_text(CompleteTextParameters {
                     prompt: "dummy".to_owned(),
                     model: "dummy".to_owned(),
@@ -353,7 +353,7 @@ pub mod tests {
             _skill: &str,
             _name: Value,
             _ctx: Box<dyn Csi + Send>,
-        ) -> Result<String, Error> {
+        ) -> anyhow::Result<Value> {
             panic!("Liar runtime does not run skills")
         }
 
@@ -436,7 +436,7 @@ pub mod tests {
             skill: &str,
             input: Value,
             mut ctx: Box<dyn Csi + Send>,
-        ) -> Result<String, Error> {
+        ) -> anyhow::Result<Value> {
             assert!(skill == "greet", "RustRuntime only supports greet skill");
             let prompt = format!(
                 "### Instruction:
@@ -452,7 +452,7 @@ pub mod tests {
                 model: "luminous-nextgen-7b".to_owned(),
                 max_tokens: 10,
             };
-            Ok(ctx.complete_text(params).await)
+            Ok(json!(ctx.complete_text(params).await))
         }
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::once("greet")

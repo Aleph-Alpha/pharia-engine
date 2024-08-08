@@ -1,4 +1,3 @@
-use anyhow::Error;
 use serde_json::Value;
 use wasmtime::{Config, Engine, OptLevel};
 
@@ -45,7 +44,7 @@ impl Runtime for WasmRuntime {
         skill_name: &str,
         input: Value,
         ctx: Box<dyn Csi + Send>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<Value> {
         let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
 
         self.linker

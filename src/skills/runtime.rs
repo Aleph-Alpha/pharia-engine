@@ -2,7 +2,6 @@ mod linker;
 mod provider;
 mod wasm;
 
-use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::future::Future;
@@ -29,7 +28,7 @@ pub trait Runtime {
         skill: &str,
         input: Value,
         ctx: Box<dyn Csi + Send>,
-    ) -> impl Future<Output = Result<String, Error>> + Send;
+    ) -> impl Future<Output = anyhow::Result<Value>> + Send;
 
     fn skills(&self) -> impl Iterator<Item = &str>;
 
@@ -64,7 +63,7 @@ pub mod tests {
             _skill: &str,
             _input: Value,
             _ctx: Box<dyn Csi + Send>,
-        ) -> Result<String, Error> {
+        ) -> anyhow::Result<Value> {
             Err(anyhow!(self.err_msg.clone()))
         }
 
