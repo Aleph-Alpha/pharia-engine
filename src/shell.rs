@@ -13,7 +13,7 @@ use axum_extra::{
     TypedHeader,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -174,18 +174,18 @@ async fn execute_skill(
     State(mut skill_executor_api): State<SkillExecutorApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<ExecuteSkillArgs>,
-) -> (StatusCode, Json<String>) {
+) -> (StatusCode, Json<Value>) {
     if args.skill.trim().is_empty() {
         return (
             VALIDATION_ERROR_STATUS_CODE,
-            Json("Empty skill names are not allowed.".to_owned()),
+            Json(json!("Empty skill names are not allowed.")),
         );
     }
 
     let Some(input) = args.input.as_str() else {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json("Invalid input".to_owned()),
+            Json(json!("Invalid input.")),
         );
     };
 
@@ -193,8 +193,11 @@ async fn execute_skill(
         .execute_skill(args.skill, input.to_owned(), bearer.token().to_owned())
         .await;
     match result {
-        Ok(response) => (StatusCode::OK, Json(response)),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(err.to_string())),
+        Ok(response) => (StatusCode::OK, Json(json!(response))),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!(err.to_string())),
+        ),
     }
 }
 
