@@ -1,13 +1,11 @@
 use serde_json::Value;
-use wasmtime::{Config, Engine, OptLevel};
 
 use crate::registries::{registries, SkillRegistry};
 
-use super::{linker::Linker, provider::SkillProvider, Csi, Runtime};
+use super::{engine::Engine, provider::SkillProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
-    linker: Linker,
     skill_cache: SkillProvider,
 }
 
@@ -16,23 +14,11 @@ impl WasmRuntime {
         Self::with_registry(registries())
     }
 
-    pub fn engine() -> Engine {
-        Engine::new(
-            Config::new()
-                .async_support(true)
-                .cranelift_opt_level(OptLevel::SpeedAndSize)
-                .wasm_component_model(true),
-        )
-        .expect("config must be valid")
-    }
-
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
-        let engine = Self::engine();
-        let linker = Linker::new(&engine).expect("linking must succeed");
+        let engine = Engine::new().expect("engine creation failed");
 
         Self {
             engine,
-            linker,
             skill_cache: SkillProvider::new(Box::new(skill_registry)),
         }
     }
@@ -45,11 +31,7 @@ impl Runtime for WasmRuntime {
         input: Value,
         ctx: Box<dyn Csi + Send>,
     ) -> anyhow::Result<Value> {
-        let skill = self
-            .skill_cache
-            .fetch(skill_name, &self.engine, &self.linker)
-            .await?;
-
+        let skill = self.skill_cache.fetch(skill_name, &self.engine).await?;
         skill.run(&self.engine, ctx, input).await
     }
 

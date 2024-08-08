@@ -4,20 +4,28 @@ use serde_json::{json, Value};
 use strum::{EnumIter, IntoEnumIterator};
 use wasmtime::{
     component::{Component, Linker as WasmtimeLinker},
-    Engine, Store,
+    Config, Engine as WasmtimeEngine, OptLevel, Store,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
 use super::Csi;
 
-pub struct Linker {
+pub struct Engine {
+    engine: WasmtimeEngine,
     linker: WasmtimeLinker<LinkedCtx>,
 }
 
-impl Linker {
-    pub fn new(engine: &Engine) -> anyhow::Result<Self> {
-        let mut linker = WasmtimeLinker::new(engine);
+impl Engine {
+    pub fn new() -> anyhow::Result<Self> {
+        let engine = WasmtimeEngine::new(
+            Config::new()
+                .async_support(true)
+                .cranelift_opt_level(OptLevel::SpeedAndSize)
+                .wasm_component_model(true),
+        )?;
+
+        let mut linker = WasmtimeLinker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker)?;
         // Skill world from bindgen
@@ -32,16 +40,12 @@ impl Linker {
             }
         }
 
-        Ok(Self { linker })
+        Ok(Self { engine, linker })
     }
 
-    pub fn instantiate_pre_skill(
-        &self,
-        engine: &Engine,
-        bytes: impl AsRef<[u8]>,
-    ) -> anyhow::Result<Skill> {
+    pub fn instantiate_pre_skill(&self, bytes: impl AsRef<[u8]>) -> anyhow::Result<Skill> {
         let skill_version = SupportedVersion::extract(&bytes)?;
-        let component = Component::new(engine, bytes)?;
+        let component = Component::new(&self.engine, bytes)?;
         let pre = self.linker.instantiate_pre(&component)?;
 
         match skill_version {
@@ -54,6 +58,10 @@ impl Linker {
                 Ok(Skill::V0_1(skill))
             }
         }
+    }
+
+    fn store<T>(&self, data: T) -> Store<T> {
+        Store::new(&self.engine, data)
     }
 }
 
@@ -77,8 +85,7 @@ impl Skill {
         ctx: Box<dyn Csi + Send>,
         input: Value,
     ) -> anyhow::Result<Value> {
-        let invocation_ctx = LinkedCtx::new(ctx);
-        let mut store = Store::new(engine, invocation_ctx);
+        let mut store = engine.store(LinkedCtx::new(ctx));
         match self {
             Self::V0_1(_) => todo!(),
             Self::Unversioned(skill) => {

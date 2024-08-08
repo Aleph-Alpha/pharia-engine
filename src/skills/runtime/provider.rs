@@ -2,12 +2,11 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Error};
 use serde_json::Value;
-use wasmtime::Engine;
 
 use crate::registries::SkillRegistry;
 
 use super::{
-    linker::{Linker, Skill},
+    engine::{Engine, Skill},
     Csi,
 };
 
@@ -36,12 +35,11 @@ impl SkillProvider {
         &mut self,
         skill_name: &str,
         engine: &Engine,
-        linker: &Linker,
     ) -> Result<&CachedSkill, Error> {
         if !self.skills.contains_key(skill_name) {
             let bytes = self.skill_registry.load_skill(skill_name).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
-            let skill = CachedSkill::new(engine, linker, bytes)
+            let skill = CachedSkill::new(engine, bytes)
                 .with_context(|| format!("Failed to initialize {skill_name}."))?;
             self.skills.insert(skill_name.to_owned(), skill);
         }
@@ -55,8 +53,8 @@ pub struct CachedSkill {
 }
 
 impl CachedSkill {
-    pub fn new(engine: &Engine, linker: &Linker, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
-        let skill = linker.instantiate_pre_skill(engine, bytes)?;
+    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+        let skill = engine.instantiate_pre_skill(bytes)?;
         Ok(Self { skill })
     }
 

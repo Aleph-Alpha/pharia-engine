@@ -101,18 +101,16 @@ fn is_skill_not_found(error: &Error) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::{env, path::Path};
+
     use dotenvy::dotenv;
     use oci_distribution::{secrets::RegistryAuth, Reference};
-    use wasmtime::component::Component;
-    use wasmtime::Engine;
+    use oci_wasm::WasmConfig;
+    use wasmtime::{component::Component, Config, Engine};
 
     use super::OciRegistry;
-    use std::env;
-    use std::path::Path;
 
     use crate::registries::SkillRegistry;
-    use oci_wasm::WasmConfig;
-    use wasmtime::Config;
 
     impl OciRegistry {
         async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str) {
