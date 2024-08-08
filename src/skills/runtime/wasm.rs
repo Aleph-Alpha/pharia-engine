@@ -45,11 +45,12 @@ impl Runtime for WasmRuntime {
         input: Value,
         ctx: Box<dyn Csi + Send>,
     ) -> anyhow::Result<Value> {
-        let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
+        let skill = self
+            .skill_cache
+            .fetch(skill_name, &self.engine, &self.linker)
+            .await?;
 
-        self.linker
-            .run_skill(&self.engine, ctx, component, input)
-            .await
+        skill.run(&self.engine, ctx, input).await
     }
 
     fn skills(&self) -> impl Iterator<Item = &str> {
@@ -63,7 +64,11 @@ impl Runtime for WasmRuntime {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, fs};
+    use std::{
+        collections::HashSet,
+        fs,
+        sync::{Arc, Mutex},
+    };
 
     use crate::{inference::CompleteTextParameters, registries::FileRegistry};
 
@@ -211,6 +216,19 @@ mod tests {
         assert_eq!(actual, "Hello Homer");
     }
 
+    #[tokio::test]
+    async fn can_call_preinstantiated_multiple_times() {
+        let skill_ctx = Box::new(CsiCounter::new());
+        let mut runtime = WasmRuntime::new();
+        for i in 1..10 {
+            let resp = runtime
+                .run("greet_skill", json!("Homer"), skill_ctx.clone())
+                .await
+                .unwrap();
+            assert_eq!(resp, json!(i.to_string()));
+        }
+    }
+
     /// A test double for a [`Csi`] implementation which always completes with "Hello".
     struct CsiGreetingStub;
 
@@ -246,6 +264,26 @@ mod tests {
             } else {
                 "Mock expectation violated".to_owned()
             }
+        }
+    }
+
+    #[derive(Default, Clone)]
+    struct CsiCounter {
+        counter: Arc<Mutex<u32>>,
+    }
+
+    impl CsiCounter {
+        fn new() -> Self {
+            Self::default()
+        }
+    }
+
+    #[async_trait]
+    impl Csi for CsiCounter {
+        async fn complete_text(&mut self, _params: CompleteTextParameters) -> String {
+            let mut counter = self.counter.lock().unwrap();
+            *counter += 1;
+            counter.to_string()
         }
     }
 }

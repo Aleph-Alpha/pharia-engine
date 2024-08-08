@@ -2,11 +2,14 @@ use anyhow::anyhow;
 use semver::Version;
 use serde_json::{json, Value};
 use strum::{EnumIter, IntoEnumIterator};
-use wasmtime::{component::Linker as WasmtimeLinker, Engine, Store};
+use wasmtime::{
+    component::{Component, Linker as WasmtimeLinker},
+    Engine, Store,
+};
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
-use super::{provider::CachedComponent, Csi};
+use super::Csi;
 
 pub struct Linker {
     linker: WasmtimeLinker<LinkedCtx>,
@@ -32,38 +35,67 @@ impl Linker {
         Ok(Self { linker })
     }
 
-    pub async fn run_skill(
-        &mut self,
+    pub fn instantiate_pre_skill(
+        &self,
+        engine: &Engine,
+        bytes: impl AsRef<[u8]>,
+    ) -> anyhow::Result<Skill> {
+        let skill_version = SupportedVersion::extract(&bytes)?;
+        let component = Component::new(engine, bytes)?;
+        let pre = self.linker.instantiate_pre(&component)?;
+
+        match skill_version {
+            SupportedVersion::Unversioned => {
+                let skill = unversioned::SkillPre::new(pre)?;
+                Ok(Skill::Unversioned(skill))
+            }
+            SupportedVersion::V0_1 => {
+                let skill = v0_1::SkillPre::new(pre)?;
+                Ok(Skill::V0_1(skill))
+            }
+        }
+    }
+}
+
+/// Pre-initialized skills already attached to their corresponding linker.
+/// Allows for as much initialization work to be done at load time as possible,
+/// which can be cached across multiple invocations.
+pub enum Skill {
+    /// Skills targeting versions 0.1.x of the skill world
+    V0_1(v0_1::SkillPre<LinkedCtx>),
+    /// Skills targeting the pre-semver-released version of skill world
+    Unversioned(unversioned::SkillPre<LinkedCtx>),
+}
+
+// let pre = linker.instantiate_pre(component)?;
+// SkillPre::new(pre)?.instantiate_async(store).await
+
+impl Skill {
+    pub async fn run(
+        &self,
         engine: &Engine,
         ctx: Box<dyn Csi + Send>,
-        component: &CachedComponent,
         input: Value,
     ) -> anyhow::Result<Value> {
         let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(engine, invocation_ctx);
-        match component.skill_version() {
-            SupportedVersion::Unversioned => {
+        match self {
+            Self::V0_1(_) => todo!(),
+            Self::Unversioned(skill) => {
                 let Some(input) = input.as_str() else {
                     return Err(anyhow!("Invalid input, string expected."));
                 };
-                let bindings = unversioned::Skill::instantiate_async(
-                    &mut store,
-                    component.component(),
-                    &self.linker,
-                )
-                .await
-                .expect("failed to instantiate skill");
+                let bindings = skill.instantiate_async(&mut store).await?;
                 let result = bindings.call_run(store, input).await?;
                 Ok(json!(result))
             }
-            SupportedVersion::V0_1 => todo!(),
         }
     }
 }
 
 /// Currently supported versions of the skill world
 #[derive(Debug, Clone, Copy, EnumIter)]
-pub enum SupportedVersion {
+enum SupportedVersion {
     /// Versions 0.1.x of the skill world
     V0_1,
     /// Pre-semver-released version of skill world
@@ -71,7 +103,7 @@ pub enum SupportedVersion {
 }
 
 impl SupportedVersion {
-    pub fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+    fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         match Self::extract_pharia_skill_version(wasm)? {
             None => Ok(Self::Unversioned),
             Some(_) => Err(anyhow!("Unsupported Pharia Skill version.")),
@@ -95,7 +127,7 @@ impl SupportedVersion {
 
 /// Linked against the skill by the wasm time. For the most part this gives the skill access to the
 /// CSI.
-struct LinkedCtx {
+pub(super) struct LinkedCtx {
     wasi_ctx: WasiCtx,
     resource_table: ResourceTable,
     skill_ctx: Box<dyn Csi + Send>,

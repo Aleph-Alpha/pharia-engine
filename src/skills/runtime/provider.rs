@@ -1,71 +1,72 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Error};
-use wasmtime::{component::Component, Engine};
+use serde_json::Value;
+use wasmtime::Engine;
 
 use crate::registries::SkillRegistry;
 
-use super::linker::SupportedVersion;
+use super::{
+    linker::{Linker, Skill},
+    Csi,
+};
 
 pub struct SkillProvider {
-    components: HashMap<String, CachedComponent>,
+    skills: HashMap<String, CachedSkill>,
     skill_registry: Box<dyn SkillRegistry + Send>,
 }
 
 impl SkillProvider {
     pub fn new(skill_registry: Box<dyn SkillRegistry + Send>) -> Self {
         SkillProvider {
-            components: HashMap::new(),
+            skills: HashMap::new(),
             skill_registry,
         }
     }
 
     pub fn skills(&self) -> impl Iterator<Item = &str> {
-        self.components.keys().map(String::as_ref)
+        self.skills.keys().map(String::as_ref)
     }
 
     pub fn invalidate(&mut self, skill: &str) -> bool {
-        self.components.remove(skill).is_some()
+        self.skills.remove(skill).is_some()
     }
 
     pub async fn fetch(
         &mut self,
         skill_name: &str,
         engine: &Engine,
-    ) -> Result<&CachedComponent, Error> {
-        if !self.components.contains_key(skill_name) {
+        linker: &Linker,
+    ) -> Result<&CachedSkill, Error> {
+        if !self.skills.contains_key(skill_name) {
             let bytes = self.skill_registry.load_skill(skill_name).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;
-            let skill = CachedComponent::new(engine, bytes)
+            let skill = CachedSkill::new(engine, linker, bytes)
                 .with_context(|| format!("Failed to initialize {skill_name}."))?;
-            self.components.insert(skill_name.to_owned(), skill);
+            self.skills.insert(skill_name.to_owned(), skill);
         }
-        let skill = self.components.get(skill_name).unwrap();
+        let skill = self.skills.get(skill_name).unwrap();
         Ok(skill)
     }
 }
 
-pub struct CachedComponent {
-    component: Component,
-    skill_version: SupportedVersion,
+pub struct CachedSkill {
+    skill: Skill,
 }
 
-impl CachedComponent {
-    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
-        let skill_version = SupportedVersion::extract(&bytes)?;
-        let component = Component::new(engine, bytes)?;
-        Ok(Self {
-            component,
-            skill_version,
-        })
+impl CachedSkill {
+    pub fn new(engine: &Engine, linker: &Linker, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+        let skill = linker.instantiate_pre_skill(engine, bytes)?;
+        Ok(Self { skill })
     }
 
-    pub fn component(&self) -> &Component {
-        &self.component
-    }
-
-    pub fn skill_version(&self) -> SupportedVersion {
-        self.skill_version
+    pub async fn run(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn Csi + Send>,
+        input: Value,
+    ) -> anyhow::Result<Value> {
+        self.skill.run(engine, ctx, input).await
     }
 }
 
