@@ -87,7 +87,15 @@ impl Skill {
     ) -> anyhow::Result<Value> {
         let mut store = engine.store(LinkedCtx::new(ctx));
         match self {
-            Self::V0_1(_) => todo!(),
+            Self::V0_1(skill) => {
+                let input = serde_json::to_vec(&input)?;
+                let bindings = skill.instantiate_async(&mut store).await?;
+                let result = bindings
+                    .call_run(store, &input)
+                    .await?
+                    .map_err(|e| anyhow!(e))?;
+                Ok(serde_json::from_slice(&result)?)
+            }
             Self::Unversioned(skill) => {
                 let Some(input) = input.as_str() else {
                     return Err(anyhow!("Invalid input, string expected."));
@@ -112,6 +120,9 @@ enum SupportedVersion {
 impl SupportedVersion {
     fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         match Self::extract_pharia_skill_version(wasm)? {
+            Some(Version {
+                major: 0, minor: 1, ..
+            }) => Ok(Self::V0_1),
             None => Ok(Self::Unversioned),
             Some(_) => Err(anyhow!("Unsupported Pharia Skill version.")),
         }
@@ -162,8 +173,10 @@ impl WasiView for LinkedCtx {
 }
 
 mod v0_1 {
-    use pharia::skill::csi::{Completion, CompletionParams, Error, Host};
+    use pharia::skill::csi::{Completion, CompletionParams, Error, FinishReason, Host};
     use wasmtime::component::bindgen;
+
+    use crate::inference::CompleteTextParameters;
 
     use super::LinkedCtx;
 
@@ -178,7 +191,30 @@ mod v0_1 {
             prompt: String,
             options: Option<CompletionParams>,
         ) -> Result<Completion, Error> {
-            todo!()
+            let params = if let Some(CompletionParams {
+                max_tokens,
+                temperature,
+                top_k,
+                top_p,
+            }) = options
+            {
+                CompleteTextParameters {
+                    model,
+                    prompt,
+                    max_tokens: max_tokens.unwrap_or(128),
+                }
+            } else {
+                CompleteTextParameters {
+                    model,
+                    prompt,
+                    max_tokens: 128,
+                }
+            };
+            let text = self.skill_ctx.complete_text(params).await;
+            Ok(Completion {
+                text,
+                finish_reason: FinishReason::Stop,
+            })
         }
     }
 }
@@ -211,6 +247,8 @@ mod unversioned {
 mod tests {
     use std::fs;
 
+    use crate::skills::runtime::wasm::tests::CsiGreetingMock;
+
     use super::*;
 
     #[test]
@@ -232,5 +270,21 @@ mod tests {
         let wasm = wat::parse_str("(module)").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(&wasm);
         assert!(version.is_err());
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_v0_1_module() {
+        // Given a skill loaded by our engine
+        let wasm = fs::read("skills/greet_skill_v0_1.wasm").unwrap();
+        let engine = Engine::new().unwrap();
+        let skill = engine.instantiate_pre_skill(wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let input = json!("Homer");
+        let result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string
+        assert_eq!(result, json!("Hello Homer"));
     }
 }

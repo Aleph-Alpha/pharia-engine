@@ -13,12 +13,12 @@ impl Skill {
         let name = serde_json::from_slice::<String>(input)?;
         let prompt = format!(
             "### Instruction:
-    Provide a nice greeting for the person utilizing its given name
+Provide a nice greeting for the person utilizing its given name
 
-    ### Input:
-    Name: {name}
+### Input:
+Name: {name}
 
-    ### Response:"
+### Response:"
         );
         let result = complete("luminous-nextgen-7b", &prompt, None)?;
         Ok(serde_json::to_vec(&json!(result.text))?)

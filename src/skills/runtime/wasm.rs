@@ -45,7 +45,7 @@ impl Runtime for WasmRuntime {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::{
         collections::HashSet,
         fs,
@@ -212,7 +212,7 @@ mod tests {
     }
 
     /// A test double for a [`Csi`] implementation which always completes with "Hello".
-    struct CsiGreetingStub;
+    pub struct CsiGreetingStub;
 
     #[async_trait]
     impl Csi for CsiGreetingStub {
@@ -222,7 +222,7 @@ mod tests {
     }
 
     /// Asserts a specific prompt and model and returns a greeting message
-    struct CsiGreetingMock;
+    pub struct CsiGreetingMock;
 
     #[async_trait]
     impl Csi for CsiGreetingMock {
