@@ -67,13 +67,10 @@ pub enum SupportedVersion {
 
 impl SupportedVersion {
     pub fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
-        Ok(match Self::extract_pharia_skill_version(wasm)? {
-            Some(Version {
-                major: 0, minor: 1, ..
-            }) => Self::V0_1,
-            None => Self::Unversioned,
-            Some(_) => unreachable!(),
-        })
+        match Self::extract_pharia_skill_version(wasm)? {
+            None => Ok(Self::Unversioned),
+            Some(_) => Err(anyhow!("Unsupported Pharia Skill version.")),
+        }
     }
 
     fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> anyhow::Result<Option<Version>> {
@@ -83,10 +80,10 @@ impl SupportedVersion {
                 .package_names
                 .keys()
                 .find(|k| (k.namespace == "pharia" && k.name == "skill"))
-                .ok_or_else(|| anyhow!("wasm component isn't using pharia skill"))?;
+                .ok_or_else(|| anyhow!("Wasm component isn't using Pharia Skill."))?;
             Ok(package_name.version.clone())
         } else {
-            Err(anyhow!("wasm isn't a component"))
+            Err(anyhow!("Wasm isn't a component."))
         }
     }
 }
