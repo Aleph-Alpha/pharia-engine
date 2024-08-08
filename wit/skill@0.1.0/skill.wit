@@ -56,11 +56,11 @@ interface csi {
 		/// other stop reasons.
 		max-tokens: option<u32>,
 		/// The randomness with which the next token is selected.
-		temperature: option<float32>,
+		temperature: option<float64>,
 		/// The number of possible next tokens the model will choose from.
 		top-k: option<u32>,
 		/// The probability total of next tokens the model will choose from.
-		top-p: option<float32>
+		top-p: option<float64>
 	}
 
 	@since(version = 0.1.0)

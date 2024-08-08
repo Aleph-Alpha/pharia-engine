@@ -2,7 +2,7 @@ use std::future::pending;
 
 use super::runtime::{Csi, Runtime, WasmRuntime};
 
-use crate::inference::{CompleteTextParameters, InferenceApi};
+use crate::inference::{CompletionRequest, InferenceApi};
 use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -213,7 +213,7 @@ impl SkillInvocationCtx {
 
 #[async_trait]
 impl Csi for SkillInvocationCtx {
-    async fn complete_text(&mut self, params: CompleteTextParameters) -> String {
+    async fn complete_text(&mut self, params: CompletionRequest) -> String {
         match self
             .inference_api
             .complete_text(params, self.api_token.clone())
@@ -242,7 +242,7 @@ pub mod tests {
     use serde_json::json;
 
     use crate::{
-        inference::{tests::InferenceStub, CompleteTextParameters},
+        inference::{tests::InferenceStub, CompletionRequest},
         skills::runtime::tests::SaboteurRuntime,
     };
 
@@ -260,11 +260,10 @@ pub mod tests {
                 _: Value,
                 mut ctx: Box<dyn Csi + Send>,
             ) -> anyhow::Result<Value> {
-                ctx.complete_text(CompleteTextParameters {
-                    prompt: "dummy".to_owned(),
-                    model: "dummy".to_owned(),
-                    max_tokens: 128,
-                })
+                ctx.complete_text(CompletionRequest::new(
+                    "dummy".to_owned(),
+                    "dummy".to_owned(),
+                ))
                 .await;
                 panic!("complete_text must pend forever in case of error")
             }
@@ -447,11 +446,7 @@ pub mod tests {
 
                 ### Response:"
             );
-            let params = CompleteTextParameters {
-                prompt,
-                model: "luminous-nextgen-7b".to_owned(),
-                max_tokens: 10,
-            };
+            let params = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
             Ok(json!(ctx.complete_text(params).await))
         }
         fn skills(&self) -> impl Iterator<Item = &str> {

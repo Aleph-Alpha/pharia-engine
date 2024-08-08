@@ -221,7 +221,7 @@ mod unversioned {
     use pharia::skill::csi::Host;
     use wasmtime::component::bindgen;
 
-    use crate::inference::CompleteTextParameters;
+    use crate::inference::CompletionRequest;
 
     use super::LinkedCtx;
 
@@ -231,11 +231,7 @@ mod unversioned {
     impl Host for LinkedCtx {
         #[must_use]
         async fn complete_text(&mut self, prompt: String, model: String) -> String {
-            let params = CompleteTextParameters {
-                prompt,
-                model,
-                max_tokens: 128,
-            };
+            let params = CompletionRequest::new(prompt, model);
             self.skill_ctx.complete_text(params).await
         }
     }

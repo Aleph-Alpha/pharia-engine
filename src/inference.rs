@@ -1,7 +1,7 @@
 mod actor;
 mod client;
 
-pub use actor::{CompleteTextParameters, Inference, InferenceApi};
+pub use actor::{CompletionRequest, Inference, InferenceApi};
 
 #[cfg(test)]
 pub mod tests {

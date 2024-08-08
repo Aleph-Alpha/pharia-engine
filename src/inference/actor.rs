@@ -56,12 +56,12 @@ impl InferenceApi {
 
     pub async fn complete_text(
         &mut self,
-        params: CompleteTextParameters,
+        request: CompletionRequest,
         api_token: String,
     ) -> Result<String, Error> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::CompleteText {
-            params,
+            request,
             send,
             api_token,
         };
@@ -75,10 +75,33 @@ impl InferenceApi {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CompleteTextParameters {
+pub struct CompletionParams {
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f64>,
+    pub top_k: Option<u32>,
+    pub top_p: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
-    pub max_tokens: u32,
+    pub params: Option<CompletionParams>,
+}
+
+impl CompletionRequest {
+    pub fn new(prompt: String, model: String) -> Self {
+        Self {
+            prompt,
+            model,
+            params: None,
+        }
+    }
+
+    pub fn with_params(mut self, params: CompletionParams) -> Self {
+        self.params = Some(params);
+        self
+    }
 }
 
 /// Private implementation of the inference actor running in its own dedicated green thread.
@@ -104,7 +127,7 @@ impl<C> InferenceActor<C> {
 
 pub enum InferenceMessage {
     CompleteText {
-        params: CompleteTextParameters,
+        request: CompletionRequest,
         send: oneshot::Sender<Result<String, Error>>,
         api_token: String,
     },
@@ -114,13 +137,13 @@ impl InferenceMessage {
     async fn act(self, client: &mut impl InferenceClient) {
         match self {
             InferenceMessage::CompleteText {
-                params,
+                request,
                 send,
                 api_token,
             } => {
                 let mut remaining_retries = 5;
                 let result = loop {
-                    match client.complete_text(&params, api_token.clone()).await {
+                    match client.complete_text(&request, api_token.clone()).await {
                         Ok(value) => break Ok(value),
                         Err(e) if remaining_retries <= 0 => {
                             error!("Error completing text: {e}");
@@ -151,7 +174,7 @@ pub mod tests {
 
     use crate::inference::client::InferenceClient;
 
-    use super::{CompleteTextParameters, Inference, InferenceApi, InferenceMessage};
+    use super::{CompletionRequest, Inference, InferenceApi, InferenceMessage};
 
     /// Always return the same completion
     pub struct InferenceStub {
@@ -202,7 +225,7 @@ pub mod tests {
     impl InferenceClient for SaboteurClient {
         async fn complete_text(
             &mut self,
-            _params: &super::CompleteTextParameters,
+            _params: &super::CompletionRequest,
             _api_token: String,
         ) -> Result<String, Error> {
             if self.remaining_failures > 0 {
@@ -220,10 +243,10 @@ pub mod tests {
         let client = SaboteurClient::new(2);
         let inference = Inference::with_client(client);
         let mut inference_api = inference.api();
-        let params = CompleteTextParameters {
+        let params = CompletionRequest {
             prompt: "dummy_prompt".to_owned(),
             model: "dummy_model".to_owned(),
-            max_tokens: 42,
+            params: None,
         };
 
         // when
@@ -259,7 +282,7 @@ pub mod tests {
     impl InferenceClient for LatchClient {
         async fn complete_text(
             &mut self,
-            _params: &CompleteTextParameters,
+            _params: &CompletionRequest,
             _api_token: String,
         ) -> Result<String, Error> {
             let recv = self.receivers.pop().expect(
@@ -290,12 +313,8 @@ pub mod tests {
     }
 
     /// Dummy complete text params for test, if you do not care particular about them.
-    fn complete_text_params_dummy() -> CompleteTextParameters {
-        CompleteTextParameters {
-            prompt: "Dummy prompt".to_owned(),
-            model: "Dummy model name".to_owned(),
-            max_tokens: 128,
-        }
+    fn complete_text_params_dummy() -> CompletionRequest {
+        CompletionRequest::new("Dummy prompt".to_owned(), "Dummy model name".to_owned())
     }
 
     /// We want to ensure that the actor invokes the client multiple times concurrently instead of

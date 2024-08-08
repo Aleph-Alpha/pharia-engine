@@ -52,7 +52,7 @@ pub mod tests {
         sync::{Arc, Mutex},
     };
 
-    use crate::{inference::CompleteTextParameters, registries::FileRegistry};
+    use crate::{inference::CompletionRequest, registries::FileRegistry};
 
     use super::*;
     use async_trait::async_trait;
@@ -216,7 +216,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiGreetingStub {
-        async fn complete_text(&mut self, _params: CompleteTextParameters) -> String {
+        async fn complete_text(&mut self, _params: CompletionRequest) -> String {
             "Hello".to_owned()
         }
     }
@@ -226,7 +226,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiGreetingMock {
-        async fn complete_text(&mut self, params: CompleteTextParameters) -> String {
+        async fn complete_text(&mut self, params: CompletionRequest) -> String {
             let expected_prompt = "### Instruction:\n\
                 Provide a nice greeting for the person utilizing its given name\n\
                 \n\
@@ -240,7 +240,7 @@ pub mod tests {
             // Print actual parameters in case of failure
             eprintln!("{params:?}");
 
-            if matches!(params, CompleteTextParameters{ prompt, model, max_tokens: 128 } if model == expected_model && prompt == expected_prompt)
+            if matches!(params, CompletionRequest{ prompt, model, ..} if model == expected_model && prompt == expected_prompt)
             {
                 "Hello Homer".to_owned()
             } else {
