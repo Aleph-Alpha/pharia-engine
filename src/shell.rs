@@ -182,15 +182,8 @@ async fn execute_skill(
         );
     }
 
-    let Some(input) = args.input.as_str() else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!("Invalid input.")),
-        );
-    };
-
     let result = skill_executor_api
-        .execute_skill(args.skill, input.to_owned(), bearer.token().to_owned())
+        .execute_skill(args.skill, args.input, bearer.token().to_owned())
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(json!(response))),

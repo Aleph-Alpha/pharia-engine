@@ -3,8 +3,9 @@ use std::future::pending;
 use super::runtime::{Csi, Runtime, WasmRuntime};
 
 use crate::inference::{CompleteTextParameters, InferenceApi};
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use async_trait::async_trait;
+use serde_json::Value;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -62,13 +63,16 @@ impl SkillExecutorApi {
     pub async fn execute_skill(
         &mut self,
         skill: String,
-        input: String,
+        input: Value,
         api_token: String,
-    ) -> Result<String, Error> {
+    ) -> anyhow::Result<String> {
         let (send, recv) = oneshot::channel();
+        let Some(input) = input.as_str() else {
+            return Err(anyhow!("Invalid input, string is expected."));
+        };
         let msg = SkillExecutorMessage::Execute {
             skill,
-            input,
+            input: input.to_owned(),
             send,
             api_token,
         };
@@ -239,6 +243,7 @@ pub mod tests {
     use std::iter;
 
     use anyhow::{anyhow, Error};
+    use serde_json::json;
 
     use crate::{
         inference::{tests::InferenceStub, CompleteTextParameters},
@@ -283,7 +288,7 @@ pub mod tests {
         let result = api
             .execute_skill(
                 "Dummy skill name".to_owned(),
-                "Dummy input".to_owned(),
+                json!("Dummy input"),
                 "Dummy api token".to_owned(),
             )
             .await;
@@ -305,7 +310,7 @@ pub mod tests {
             .api()
             .execute_skill(
                 "greet".to_owned(),
-                String::new(),
+                json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;
@@ -324,7 +329,7 @@ pub mod tests {
             .api()
             .execute_skill(
                 "greet".to_owned(),
-                String::new(),
+                json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;
