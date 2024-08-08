@@ -1288,6 +1288,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "greet-skill-v0_1"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

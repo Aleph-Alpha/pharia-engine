@@ -1,5 +1,5 @@
 [workspace]
-members = ["greet-skill", "pharia-skill"]
+members = ["greet-skill", "greet-skill-v0_1", "pharia-skill"]
 
 [workspace.lints.rust]
 future-incompatible = "warn"
