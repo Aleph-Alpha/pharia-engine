@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use semver::Version;
+use serde_json::Value;
 use strum::{EnumIter, IntoEnumIterator};
 use wasmtime::{component::Linker as WasmtimeLinker, Engine, Store};
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
@@ -36,12 +37,15 @@ impl Linker {
         engine: &Engine,
         ctx: Box<dyn Csi + Send>,
         component: &CachedComponent,
-        argument: &str,
-    ) -> Result<String, anyhow::Error> {
+        input: Value,
+    ) -> anyhow::Result<String> {
         let invocation_ctx = LinkedCtx::new(ctx);
         let mut store = Store::new(engine, invocation_ctx);
         match component.skill_version() {
             SupportedVersion::Unversioned => {
+                let Some(input) = input.as_str() else {
+                    return Err(anyhow!("Invalid input, string expected."));
+                };
                 let bindings = unversioned::Skill::instantiate_async(
                     &mut store,
                     component.component(),
@@ -49,7 +53,7 @@ impl Linker {
                 )
                 .await
                 .expect("failed to instantiate skill");
-                bindings.call_run(store, argument).await
+                bindings.call_run(store, input).await
             }
             SupportedVersion::V0_1 => todo!(),
         }

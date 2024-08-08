@@ -4,6 +4,7 @@ mod wasm;
 
 use anyhow::Error;
 use async_trait::async_trait;
+use serde_json::Value;
 use std::future::Future;
 
 pub use wasm::WasmRuntime;
@@ -26,7 +27,7 @@ pub trait Runtime {
     fn run(
         &mut self,
         skill: &str,
-        name: String,
+        input: Value,
         ctx: Box<dyn Csi + Send>,
     ) -> impl Future<Output = Result<String, Error>> + Send;
 
@@ -61,7 +62,7 @@ pub mod tests {
         async fn run(
             &mut self,
             _skill: &str,
-            _name: String,
+            _input: Value,
             _ctx: Box<dyn Csi + Send>,
         ) -> Result<String, Error> {
             Err(anyhow!(self.err_msg.clone()))

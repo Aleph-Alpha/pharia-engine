@@ -67,12 +67,9 @@ impl SkillExecutorApi {
         api_token: String,
     ) -> anyhow::Result<String> {
         let (send, recv) = oneshot::channel();
-        let Some(input) = input.as_str() else {
-            return Err(anyhow!("Invalid input, string is expected."));
-        };
         let msg = SkillExecutorMessage::Execute {
             skill,
-            input: input.to_owned(),
+            input,
             send,
             api_token,
         };
@@ -156,16 +153,15 @@ impl<R: Runtime> SkillExecutorActor<R> {
     async fn run_skill(
         &mut self,
         skill: String,
-        input: String,
+        input: Value,
         api_token: String,
-    ) -> Result<String, Error> {
+    ) -> anyhow::Result<String> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
             self.inference_api.clone(),
             api_token,
         ));
-
         select! {
             result = self.runtime.run(&skill, input, ctx) => result,
             Ok(error) = recv_rt_err => Err(error)
@@ -176,7 +172,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
 pub enum SkillExecutorMessage {
     Execute {
         skill: String,
-        input: String,
+        input: Value,
         send: oneshot::Sender<Result<String, Error>>,
         api_token: String,
     },
@@ -261,7 +257,7 @@ pub mod tests {
             async fn run(
                 &mut self,
                 _: &str,
-                _: String,
+                _: Value,
                 mut ctx: Box<dyn Csi + Send>,
             ) -> Result<String, Error> {
                 ctx.complete_text(CompleteTextParameters {
@@ -355,7 +351,7 @@ pub mod tests {
         async fn run(
             &mut self,
             _skill: &str,
-            _name: String,
+            _name: Value,
             _ctx: Box<dyn Csi + Send>,
         ) -> Result<String, Error> {
             panic!("Liar runtime does not run skills")
@@ -438,7 +434,7 @@ pub mod tests {
         async fn run(
             &mut self,
             skill: &str,
-            name: String,
+            input: Value,
             mut ctx: Box<dyn Csi + Send>,
         ) -> Result<String, Error> {
             assert!(skill == "greet", "RustRuntime only supports greet skill");
@@ -447,7 +443,7 @@ pub mod tests {
                 Provide a nice greeting for the person utilizing its given name
 
                 ### Input:
-                Name: {name}
+                Name: {input}
 
                 ### Response:"
             );

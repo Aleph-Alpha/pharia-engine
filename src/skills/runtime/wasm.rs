@@ -1,4 +1,5 @@
 use anyhow::Error;
+use serde_json::Value;
 use wasmtime::{Config, Engine, OptLevel};
 
 use crate::registries::{registries, SkillRegistry};
@@ -42,12 +43,13 @@ impl Runtime for WasmRuntime {
     async fn run(
         &mut self,
         skill_name: &str,
-        argument: String,
+        input: Value,
         ctx: Box<dyn Csi + Send>,
-    ) -> Result<String, Error> {
+    ) -> anyhow::Result<String> {
         let component = self.skill_cache.fetch(skill_name, &self.engine).await?;
+
         self.linker
-            .run_skill(&self.engine, ctx, component, &argument)
+            .run_skill(&self.engine, ctx, component, input)
             .await
     }
 
@@ -68,15 +70,14 @@ mod tests {
 
     use super::*;
     use async_trait::async_trait;
+    use serde_json::json;
     use tempfile::tempdir;
 
     #[tokio::test]
     async fn greet_skill_component() {
         let skill_ctx = Box::new(CsiGreetingStub);
         let mut runtime = WasmRuntime::new();
-        let resp = runtime
-            .run("greet_skill", "name".to_owned(), skill_ctx)
-            .await;
+        let resp = runtime.run("greet_skill", json!("name"), skill_ctx).await;
 
         assert_eq!(resp.unwrap(), "Hello");
     }
@@ -86,7 +87,7 @@ mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         let mut runtime = WasmRuntime::new();
         let resp = runtime
-            .run("non-existing-skill", "name".to_owned(), skill_ctx)
+            .run("non-existing-skill", json!("name"), skill_ctx)
             .await;
         assert!(resp.is_err());
     }
@@ -110,7 +111,7 @@ mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run("greet_skill", "name".to_owned(), skill_ctx)
+                .run("greet_skill", json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -144,7 +145,7 @@ mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run("greet_skill", "name".to_owned(), skill_ctx)
+                .run("greet_skill", json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -152,7 +153,7 @@ mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run("greet-py", "name".to_owned(), skill_ctx)
+                .run("greet-py", json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -181,9 +182,7 @@ mod tests {
         fs::copy("./skills/greet_skill.wasm", skill_path).unwrap();
 
         // Then the skill can be invoked
-        let greet = runtime
-            .run("greet_skill", "Homer".to_owned(), skill_ctx)
-            .await;
+        let greet = runtime.run("greet_skill", json!("Homer"), skill_ctx).await;
         assert!(greet.is_ok());
     }
 
@@ -193,7 +192,7 @@ mod tests {
 
         let mut runtime = WasmRuntime::new();
         let actual = runtime
-            .run("greet_skill", "Homer".to_owned(), skill_ctx)
+            .run("greet_skill", json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
@@ -206,7 +205,7 @@ mod tests {
 
         let mut runtime = WasmRuntime::new();
         let actual = runtime
-            .run("greet-py", "Homer".to_owned(), skill_ctx)
+            .run("greet-py", json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
