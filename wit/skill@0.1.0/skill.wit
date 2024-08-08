@@ -5,8 +5,15 @@ world skill {
 	@since(version = 0.1.0)
 	import csi;
 
+	/// The set of errors which may be raised by functions in this interface
 	@since(version = 0.1.0)
-	export run: func(input: list<u8>) -> result<list<u8>, string>;
+	variant error {
+		internal(string),
+		invalid-input(string)
+	}
+
+	@since(version = 0.1.0)
+	export run: func(input: list<u8>) -> result<list<u8>, error>;
 }
 
 // A WASI interface dedicated to interacting with Large Language Models and other AI-related tasks.
@@ -14,7 +21,7 @@ world skill {
 interface csi {
 	/// The set of errors which may be raised by functions in this interface
 	@since(version = 0.1.0)
-	variant error {
+	variant csi-error {
 		model-not-supported,
 		invalid-input(string)
 	}
@@ -57,5 +64,5 @@ interface csi {
 	}
 
 	@since(version = 0.1.0)
-	complete: func(model: string, prompt: string, params: option<completion-params>) -> result<completion, error>;
+	complete: func(model: string, prompt: string, params: option<completion-params>) -> result<completion, csi-error>;
 }

@@ -90,10 +90,7 @@ impl Skill {
             Self::V0_1(skill) => {
                 let input = serde_json::to_vec(&input)?;
                 let bindings = skill.instantiate_async(&mut store).await?;
-                let result = bindings
-                    .call_run(store, &input)
-                    .await?
-                    .map_err(|e| anyhow!(e))?;
+                let result = bindings.call_run(store, &input).await??;
                 Ok(serde_json::from_slice(&result)?)
             }
             Self::Unversioned(skill) => {
@@ -173,7 +170,7 @@ impl WasiView for LinkedCtx {
 }
 
 mod v0_1 {
-    use pharia::skill::csi::{Completion, CompletionParams, Error, FinishReason, Host};
+    use pharia::skill::csi::{Completion, CompletionParams, CsiError, FinishReason, Host};
     use wasmtime::component::bindgen;
 
     use crate::inference::CompleteTextParameters;
@@ -190,7 +187,7 @@ mod v0_1 {
             model: String,
             prompt: String,
             options: Option<CompletionParams>,
-        ) -> Result<Completion, Error> {
+        ) -> Result<Completion, CsiError> {
             let params = if let Some(CompletionParams {
                 max_tokens,
                 temperature,
