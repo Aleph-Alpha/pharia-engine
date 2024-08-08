@@ -13,6 +13,7 @@ use axum_extra::{
     TypedHeader,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -151,7 +152,7 @@ struct ExecuteSkillArgs {
     /// The name of the skill to invoke from one of the configured repositories.
     skill: String,
     /// The expected input for the skill.
-    input: String,
+    input: Value,
 }
 
 /// execute_skill
@@ -180,8 +181,16 @@ async fn execute_skill(
             Json("Empty skill names are not allowed.".to_owned()),
         );
     }
+
+    let Some(input) = args.input.as_str() else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json("Invalid input".to_owned()),
+        );
+    };
+
     let result = skill_executor_api
-        .execute_skill(args.skill, args.input, bearer.token().to_owned())
+        .execute_skill(args.skill, input.to_owned(), bearer.token().to_owned())
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(response)),
@@ -278,6 +287,7 @@ mod tests {
     };
     use dotenvy::dotenv;
     use http_body_util::BodyExt;
+    use serde_json::json;
     use std::env;
     use std::sync::OnceLock;
     use tokio::sync::mpsc;
@@ -309,12 +319,13 @@ mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
 
-        let inference = Inference::new(inference_addr().to_owned());
+        let completion = "dummy completion";
+        let inference = InferenceStub::with_completion(completion);
         let http = http(SkillExecutor::new(inference.api()).api());
 
         let args = ExecuteSkillArgs {
             skill: "greet_skill".to_owned(),
-            input: "Homer".to_owned(),
+            input: json!("Homer"),
         };
         let resp = http
             .oneshot(
@@ -330,8 +341,8 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert!(answer.contains("Homer"));
+        let answer = serde_json::from_slice::<String>(&body).unwrap();
+        assert_eq!(answer, completion);
     }
 
     #[tokio::test]
@@ -341,7 +352,7 @@ mod tests {
         let http = http(SkillExecutor::new(inference.api()).api());
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
-            input: "Homer".to_owned(),
+            input: json!("Homer"),
         };
         let resp = http
             .oneshot(
@@ -455,7 +466,7 @@ mod tests {
         auth_value.set_sensitive(true);
         let args = ExecuteSkillArgs {
             skill: "\n\n".to_owned(),
-            input: "Homer".to_owned(),
+            input: json!("Homer"),
         };
         let resp = http
             .oneshot(
