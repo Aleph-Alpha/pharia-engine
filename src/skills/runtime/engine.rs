@@ -174,7 +174,7 @@ mod v0_1 {
     use pharia::skill::csi::{Completion, CompletionParams, CsiError, FinishReason, Host};
     use wasmtime::component::bindgen;
 
-    use crate::inference::CompleteTextParameters;
+    use crate::inference;
 
     use super::LinkedCtx;
 
@@ -189,26 +189,23 @@ mod v0_1 {
             prompt: String,
             options: Option<CompletionParams>,
         ) -> Result<Completion, CsiError> {
-            let params = if let Some(CompletionParams {
+            let mut request = inference::CompletionRequest::new(prompt, model);
+            if let Some(CompletionParams {
                 max_tokens,
                 temperature,
                 top_k,
                 top_p,
             }) = options
             {
-                CompleteTextParameters {
-                    model,
-                    prompt,
-                    max_tokens: max_tokens.unwrap_or(128),
-                }
-            } else {
-                CompleteTextParameters {
-                    model,
-                    prompt,
-                    max_tokens: 128,
-                }
-            };
-            let text = self.skill_ctx.complete_text(params).await;
+                let params = inference::CompletionParams {
+                    max_tokens,
+                    temperature,
+                    top_k,
+                    top_p,
+                };
+                request = request.with_params(params);
+            }
+            let text = self.skill_ctx.complete_text(request).await;
             Ok(Completion {
                 text,
                 finish_reason: FinishReason::Stop,

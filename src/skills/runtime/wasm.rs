@@ -262,7 +262,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiCounter {
-        async fn complete_text(&mut self, _params: CompleteTextParameters) -> String {
+        async fn complete_text(&mut self, _params: CompletionRequest) -> String {
             let mut counter = self.counter.lock().unwrap();
             *counter += 1;
             counter.to_string()
