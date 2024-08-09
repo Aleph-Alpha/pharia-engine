@@ -2,9 +2,14 @@ package pharia:skill@0.1.0;
 
 @since(version = 0.1.0)
 world skill {
-	@since(version = 0.1.0)
+    @since(version = 0.1.0)
 	import csi;
+	@since(version = 0.1.0)
+	export skill-handler;
+}
 
+@since(version = 0.1.0)
+interface skill-handler {
 	/// The set of errors which may be raised by functions in this interface
 	@since(version = 0.1.0)
 	variant error {
@@ -13,13 +18,12 @@ world skill {
 	}
 
 	@since(version = 0.1.0)
-	export run: func(input: list<u8>) -> result<list<u8>, error>;
+	run: func(input: list<u8>) -> result<list<u8>, error>;
 }
 
 // A WASI interface dedicated to interacting with Large Language Models and other AI-related tasks.
 @since(version = 0.1.0)
 interface csi {
-
 	/// The reason the model finished generating
 	@since(version = 0.1.0)
 	enum finish-reason {

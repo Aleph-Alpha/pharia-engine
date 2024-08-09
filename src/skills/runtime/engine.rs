@@ -91,7 +91,10 @@ impl Skill {
             Self::V0_1(skill) => {
                 let input = serde_json::to_vec(&input)?;
                 let bindings = skill.instantiate_async(&mut store).await?;
-                let result = bindings.call_run(store, &input).await??;
+                let result = bindings
+                    .pharia_skill_skill_handler()
+                    .call_run(store, &input)
+                    .await??;
                 Ok(serde_json::from_slice(&result)?)
             }
             Self::Unversioned(skill) => {

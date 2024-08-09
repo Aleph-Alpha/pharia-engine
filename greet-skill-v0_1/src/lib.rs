@@ -2,6 +2,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
 use anyhow::anyhow;
+use exports::pharia::skill::skill_handler::{Error, Guest};
 use pharia::skill::csi::complete;
 use serde_json::json;
 
