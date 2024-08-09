@@ -446,8 +446,8 @@ pub mod tests {
 
                 ### Response:"
             );
-            let params = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
-            Ok(json!(ctx.complete_text(params).await))
+            let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
+            Ok(json!(ctx.complete_text(request).await))
         }
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::once("greet")

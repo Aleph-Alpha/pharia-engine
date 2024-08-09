@@ -243,7 +243,7 @@ pub mod tests {
         let client = SaboteurClient::new(2);
         let inference = Inference::with_client(client);
         let mut inference_api = inference.api();
-        let params = CompletionRequest {
+        let request = CompletionRequest {
             prompt: "dummy_prompt".to_owned(),
             model: "dummy_model".to_owned(),
             params: None,
@@ -251,7 +251,7 @@ pub mod tests {
 
         // when
         let result = inference_api
-            .complete_text(params, "dummy_api".to_owned())
+            .complete_text(request, "dummy_api".to_owned())
             .await;
 
         // then

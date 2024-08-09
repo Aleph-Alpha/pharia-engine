@@ -216,7 +216,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiGreetingStub {
-        async fn complete_text(&mut self, _params: CompletionRequest) -> String {
+        async fn complete_text(&mut self, _request: CompletionRequest) -> String {
             "Hello".to_owned()
         }
     }
@@ -226,7 +226,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiGreetingMock {
-        async fn complete_text(&mut self, params: CompletionRequest) -> String {
+        async fn complete_text(&mut self, request: CompletionRequest) -> String {
             let expected_prompt = "### Instruction:\n\
                 Provide a nice greeting for the person utilizing its given name\n\
                 \n\
@@ -238,9 +238,9 @@ pub mod tests {
             let expected_model = "luminous-nextgen-7b";
 
             // Print actual parameters in case of failure
-            eprintln!("{params:?}");
+            eprintln!("{request:?}");
 
-            if matches!(params, CompletionRequest{ prompt, model, ..} if model == expected_model && prompt == expected_prompt)
+            if matches!(request, CompletionRequest{ prompt, model, ..} if model == expected_model && prompt == expected_prompt)
             {
                 "Hello Homer".to_owned()
             } else {

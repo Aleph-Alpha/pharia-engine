@@ -228,8 +228,8 @@ mod unversioned {
     impl Host for LinkedCtx {
         #[must_use]
         async fn complete_text(&mut self, prompt: String, model: String) -> String {
-            let params = CompletionRequest::new(prompt, model);
-            self.skill_ctx.complete_text(params).await
+            let request = CompletionRequest::new(prompt, model);
+            self.skill_ctx.complete_text(request).await
         }
     }
 }
