@@ -11,6 +11,8 @@ use wit_parser::decoding::{decode, DecodedWasm};
 
 use super::Csi;
 
+/// Wasmtime engine that is configured with linkers for all of the supported versions of
+/// our pharia/skill WIT world.
 pub struct Engine {
     engine: WasmtimeEngine,
     linker: WasmtimeLinker<LinkedCtx>,
@@ -43,6 +45,8 @@ impl Engine {
         Ok(Self { engine, linker })
     }
 
+    /// Extracts the version of the skill WIT world from the provided bytes,
+    /// and links it to the appropriate version in the linker.
     pub fn instantiate_pre_skill(&self, bytes: impl AsRef<[u8]>) -> anyhow::Result<Skill> {
         let skill_version = SupportedVersion::extract(&bytes)?;
         let component = Component::new(&self.engine, bytes)?;
