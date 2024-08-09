@@ -171,7 +171,7 @@ impl WasiView for LinkedCtx {
 }
 
 mod v0_1 {
-    use pharia::skill::csi::{Completion, CompletionParams, CsiError, FinishReason, Host};
+    use pharia::skill::csi::{Completion, CompletionParams, FinishReason, Host};
     use wasmtime::component::bindgen;
 
     use crate::inference;
@@ -188,7 +188,7 @@ mod v0_1 {
             model: String,
             prompt: String,
             options: Option<CompletionParams>,
-        ) -> Result<Completion, CsiError> {
+        ) -> Completion {
             let mut request = inference::CompletionRequest::new(prompt, model);
             if let Some(CompletionParams {
                 max_tokens,
@@ -206,10 +206,10 @@ mod v0_1 {
                 request = request.with_params(params);
             }
             let text = self.skill_ctx.complete_text(request).await;
-            Ok(Completion {
+            Completion {
                 text,
                 finish_reason: FinishReason::Stop,
-            })
+            }
         }
     }
 }

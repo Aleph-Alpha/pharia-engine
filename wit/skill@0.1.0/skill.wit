@@ -19,12 +19,6 @@ world skill {
 // A WASI interface dedicated to interacting with Large Language Models and other AI-related tasks.
 @since(version = 0.1.0)
 interface csi {
-	/// The set of errors which may be raised by functions in this interface
-	@since(version = 0.1.0)
-	variant csi-error {
-		model-not-supported,
-		invalid-input(string)
-	}
 
 	/// The reason the model finished generating
 	@since(version = 0.1.0)
@@ -64,5 +58,5 @@ interface csi {
 	}
 
 	@since(version = 0.1.0)
-	complete: func(model: string, prompt: string, params: option<completion-params>) -> result<completion, csi-error>;
+	complete: func(model: string, prompt: string, params: option<completion-params>) -> completion;
 }

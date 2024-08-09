@@ -22,8 +22,7 @@ Name: {name}
 
 ### Response:"
         );
-        let result = complete("luminous-nextgen-7b", &prompt, None)
-            .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
+        let result = complete("luminous-nextgen-7b", &prompt, None);
         let output = serde_json::to_vec(&json!(result.text))
             .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
         Ok(output)
