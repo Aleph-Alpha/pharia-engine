@@ -75,9 +75,6 @@ pub enum Skill {
     Unversioned(unversioned::SkillPre<LinkedCtx>),
 }
 
-// let pre = linker.instantiate_pre(component)?;
-// SkillPre::new(pre)?.instantiate_async(store).await
-
 impl Skill {
     pub async fn run(
         &self,
