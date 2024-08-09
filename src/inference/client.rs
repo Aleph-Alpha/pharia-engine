@@ -20,14 +20,10 @@ impl InferenceClient for Client {
         api_token: String,
     ) -> Result<String, Error> {
         let prompt = Prompt::from_text(&request.prompt);
-        let stopping = Stopping::from_maximum_tokens(
-            request
-                .params
-                .as_ref()
-                .and_then(|p| p.max_tokens)
-                .unwrap_or(128),
-        );
+        let mut stopping = Stopping::NO_TOKEN_LIMIT;
+
         let sampling = if let Some(params) = &request.params {
+            stopping.maximum_tokens = params.max_tokens;
             Sampling {
                 temperature: params.temperature,
                 top_k: params.top_k,
