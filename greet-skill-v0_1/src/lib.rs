@@ -15,12 +15,12 @@ impl Guest for Skill {
             .map_err(|e| Error::InvalidInput(anyhow!(e).to_string()))?;
         let prompt = format!(
             "### Instruction:
-    Provide a nice greeting for the person utilizing its given name
+Provide a nice greeting for the person utilizing its given name
 
-    ### Input:
-    Name: {name}
+### Input:
+Name: {name}
 
-    ### Response:"
+### Response:"
         );
         let result = complete("luminous-nextgen-7b", &prompt, None)
             .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
