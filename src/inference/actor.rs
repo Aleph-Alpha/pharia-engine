@@ -74,7 +74,7 @@ impl InferenceApi {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CompletionParams {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,

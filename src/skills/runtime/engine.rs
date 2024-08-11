@@ -192,22 +192,26 @@ mod v0_1 {
             prompt: String,
             options: Option<CompletionParams>,
         ) -> Completion {
-            let mut request = inference::CompletionRequest::new(prompt, model);
-            if let Some(CompletionParams {
+            let params = if let Some(CompletionParams {
                 max_tokens,
                 temperature,
                 top_k,
                 top_p,
             }) = options
             {
-                let params = inference::CompletionParams {
-                    max_tokens,
+                inference::CompletionParams {
+                    max_tokens: max_tokens.or(Some(128)),
                     temperature,
                     top_k,
                     top_p,
-                };
-                request = request.with_params(params);
-            }
+                }
+            } else {
+                inference::CompletionParams {
+                    max_tokens: Some(128),
+                    ..Default::default()
+                }
+            };
+            let request = inference::CompletionRequest::new(prompt, model).with_params(params);
             let text = self.skill_ctx.complete_text(request).await;
             Completion {
                 text,
@@ -221,7 +225,7 @@ mod unversioned {
     use pharia::skill::csi::Host;
     use wasmtime::component::bindgen;
 
-    use crate::inference::CompletionRequest;
+    use crate::inference::{CompletionParams, CompletionRequest};
 
     use super::LinkedCtx;
 
@@ -231,7 +235,10 @@ mod unversioned {
     impl Host for LinkedCtx {
         #[must_use]
         async fn complete_text(&mut self, prompt: String, model: String) -> String {
-            let request = CompletionRequest::new(prompt, model);
+            let request = CompletionRequest::new(prompt, model).with_params(CompletionParams {
+                max_tokens: Some(128),
+                ..Default::default()
+            });
             self.skill_ctx.complete_text(request).await
         }
     }
