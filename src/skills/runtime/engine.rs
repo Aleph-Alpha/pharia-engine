@@ -181,7 +181,7 @@ mod v0_1 {
 
     use super::LinkedCtx;
 
-    bindgen!({ world: "skill", path: "./wit/skill@0.1.0", async: true });
+    bindgen!({ world: "skill", path: "./wit/skill@0.1", async: true });
 
     #[async_trait::async_trait]
     impl Host for LinkedCtx {

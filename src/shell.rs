@@ -259,7 +259,7 @@ async fn drop_cached_skill(
     ),
 )]
 fn skill_wit() -> &'static str {
-    include_str!("../wit/skill.wit")
+    include_str!("../wit/skill@0.2/skill.wit")
 }
 
 /// We use `BAD_REQUEST` (400) for validation error as it is more commonly used.
@@ -518,6 +518,6 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let actual = String::from_utf8(body.to_vec()).unwrap();
 
-        assert_eq!(actual, include_str!("../wit/skill.wit"));
+        assert_eq!(actual, include_str!("../wit/skill@0.2/skill.wit"));
     }
 }
