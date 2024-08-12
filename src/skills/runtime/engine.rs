@@ -173,6 +173,64 @@ impl WasiView for LinkedCtx {
     }
 }
 
+mod v0_2 {
+    use pharia::skill::csi::{Completion, CompletionParams, FinishReason, Host};
+    use wasmtime::component::bindgen;
+
+    use crate::inference;
+
+    use super::LinkedCtx;
+
+    bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true });
+
+    #[async_trait::async_trait]
+    impl Host for LinkedCtx {
+        #[must_use]
+        async fn complete(
+            &mut self,
+            model: String,
+            prompt: String,
+            options: CompletionParams,
+        ) -> Completion {
+            let CompletionParams {
+                max_tokens,
+                temperature,
+                top_k,
+                top_p,
+                stop,
+            } = options;
+            let params = inference::CompletionParams {
+                max_tokens,
+                temperature,
+                top_k,
+                top_p,
+                stop,
+            };
+            let request = inference::CompletionRequest::new(prompt, model).with_params(params);
+            self.skill_ctx.complete_text(request).await.into()
+        }
+    }
+
+    impl From<inference::Completion> for Completion {
+        fn from(completion: inference::Completion) -> Self {
+            Self {
+                text: completion.text,
+                finish_reason: completion.finish_reason.into(),
+            }
+        }
+    }
+
+    impl From<inference::FinishReason> for FinishReason {
+        fn from(finish_reason: inference::FinishReason) -> Self {
+            match finish_reason {
+                inference::FinishReason::Stop => Self::Stop,
+                inference::FinishReason::Length => Self::Length,
+                inference::FinishReason::ContentFilter => Self::ContentFilter,
+            }
+        }
+    }
+}
+
 mod v0_1 {
     use pharia::skill::csi::{Completion, CompletionParams, FinishReason, Host};
     use wasmtime::component::bindgen;
@@ -204,6 +262,7 @@ mod v0_1 {
                     temperature,
                     top_k,
                     top_p,
+                    ..Default::default()
                 }
             } else {
                 inference::CompletionParams {

@@ -81,6 +81,7 @@ pub struct CompletionParams {
     pub temperature: Option<f64>,
     pub top_k: Option<u32>,
     pub top_p: Option<f64>,
+    pub stop: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

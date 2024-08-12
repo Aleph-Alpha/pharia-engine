@@ -4,7 +4,7 @@ use aleph_alpha_client::{
     Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskCompletion,
 };
 
-use super::{Completion, CompletionRequest};
+use super::{Completion, CompletionParams, CompletionRequest};
 
 pub trait InferenceClient {
     fn complete_text(
@@ -21,14 +21,23 @@ impl InferenceClient for Client {
         api_token: String,
     ) -> anyhow::Result<Completion> {
         let prompt = Prompt::from_text(&request.prompt);
-        let mut stopping = Stopping::NO_TOKEN_LIMIT;
+        let mut maximum_tokens = None;
+        let mut stop_sequences = vec![];
 
         let sampling = if let Some(params) = &request.params {
-            stopping.maximum_tokens = params.max_tokens;
+            let CompletionParams {
+                max_tokens,
+                temperature,
+                top_k,
+                top_p,
+                stop,
+            } = params;
+            maximum_tokens = *max_tokens;
+            stop_sequences = stop.iter().map(String::as_str).collect::<Vec<_>>();
             Sampling {
-                temperature: params.temperature,
-                top_k: params.top_k,
-                top_p: params.top_p,
+                temperature: *temperature,
+                top_k: *top_k,
+                top_p: *top_p,
                 start_with_one_of: &[],
             }
         } else {
@@ -36,7 +45,10 @@ impl InferenceClient for Client {
         };
         let task = TaskCompletion {
             prompt,
-            stopping,
+            stopping: Stopping {
+                maximum_tokens,
+                stop_sequences: &stop_sequences,
+            },
             sampling,
         };
         let completion_output = self
