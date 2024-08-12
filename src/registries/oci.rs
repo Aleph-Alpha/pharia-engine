@@ -1,5 +1,4 @@
 use crate::registries::SkillRegistry;
-use anyhow::{Error, Result};
 use oci_distribution::{
     errors::{OciDistributionError, OciErrorCode},
     secrets::RegistryAuth,
@@ -22,7 +21,7 @@ pub struct OciRegistry {
 }
 
 impl SkillRegistry for OciRegistry {
-    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
+    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
         let repository = format!("{}/{name}", self.repository);
         let tag = "latest";
         let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
@@ -84,7 +83,7 @@ impl OciRegistry {
     }
 }
 
-fn is_skill_not_found(error: &Error) -> bool {
+fn is_skill_not_found(error: &anyhow::Error) -> bool {
     let Some(error) = error.downcast_ref::<OciDistributionError>() else {
         return false;
     };

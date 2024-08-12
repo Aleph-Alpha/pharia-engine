@@ -52,7 +52,10 @@ pub mod tests {
         sync::{Arc, Mutex},
     };
 
-    use crate::{inference::CompletionRequest, registries::FileRegistry};
+    use crate::{
+        inference::{Completion, CompletionRequest},
+        registries::FileRegistry,
+    };
 
     use super::*;
     use async_trait::async_trait;
@@ -216,8 +219,8 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiGreetingStub {
-        async fn complete_text(&mut self, _request: CompletionRequest) -> String {
-            "Hello".to_owned()
+        async fn complete_text(&mut self, _request: CompletionRequest) -> Completion {
+            Completion::from_text("Hello")
         }
     }
 
@@ -226,7 +229,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiGreetingMock {
-        async fn complete_text(&mut self, request: CompletionRequest) -> String {
+        async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
             let expected_prompt = "### Instruction:\n\
                 Provide a nice greeting for the person utilizing its given name\n\
                 \n\
@@ -242,9 +245,9 @@ pub mod tests {
 
             if matches!(request, CompletionRequest{ prompt, model, ..} if model == expected_model && prompt == expected_prompt)
             {
-                "Hello Homer".to_owned()
+                Completion::from_text("Hello Homer")
             } else {
-                "Mock expectation violated".to_owned()
+                Completion::from_text("Mock expectation violated")
             }
         }
     }
@@ -262,10 +265,10 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for CsiCounter {
-        async fn complete_text(&mut self, _params: CompletionRequest) -> String {
+        async fn complete_text(&mut self, _params: CompletionRequest) -> Completion {
             let mut counter = self.counter.lock().unwrap();
             *counter += 1;
-            counter.to_string()
+            Completion::from_text(counter.to_string())
         }
     }
 }

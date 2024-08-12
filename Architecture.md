@@ -8,8 +8,8 @@
 
 ### Pharia OS - Pharia AI
 
-* Pharia Studio: Developer Tooling, Resource Management, Fine Tuning
-* Pharia OS: Platform Services operated for Studio
+- Pharia Studio: Developer Tooling, Resource Management, Fine Tuning
+- Pharia OS: Platform Services operated for Studio
 
 ## Software Structure
 
@@ -75,7 +75,7 @@ async fn run_skill(
     skill: String,
     input: String,
     api_token: String,
-) -> Result<String, Error> {
+) -> anyhow::Result<String> {
     let (send_rt_err, recv_rt_err) = oneshot::channel();
     let ctx = Box::new(SkillInvocationCtx::new(
         send_rt_err,
@@ -96,7 +96,7 @@ async fn run_skill(
     skill: String,
     input: String,
     api_token: String,
-) -> Result<String, Error> {
+) -> anyhow::Result<String> {
     let (send_rt_err, recv_rt_err) = oneshot::channel();
     let ctx = Box::new(SkillInvocationCtx::new(
         send_rt_err,

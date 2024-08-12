@@ -1,4 +1,3 @@
-use anyhow::{Error, Result};
 use futures::{stream::FuturesOrdered, StreamExt};
 use oci::OciRegistry;
 use std::{future::Future, pin::Pin};
@@ -20,17 +19,17 @@ type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub trait SkillRegistry {
     /// can return either the binary or WAT text format of a Wasm component
-    fn load_skill<'a>(&'a self, _name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>>;
+    fn load_skill<'a>(&'a self, _name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>>;
 }
 
 impl SkillRegistry for Box<dyn SkillRegistry + Send> {
-    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
+    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
         self.as_ref().load_skill(name)
     }
 }
 
 impl<R: SkillRegistry> SkillRegistry for Vec<R> {
-    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
+    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
         // Collect all the futures into an ordered stream that will run the futures concurrently,
         // but will return the results in the order they were added.
         let mut futures = self
@@ -55,7 +54,7 @@ impl<R: SkillRegistry> SkillRegistry for Vec<R> {
 mod tests {
     use std::collections::HashMap;
 
-    use anyhow::{anyhow, Error};
+    use anyhow::anyhow;
     use tempfile::tempdir;
 
     use super::{DynFuture, FileRegistry, SkillRegistry};
@@ -64,7 +63,7 @@ mod tests {
         fn load_skill<'a>(
             &'a self,
             name: &'a str,
-        ) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
+        ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
             if let Some(bytes) = self.get(name) {
                 Box::pin(async move { Ok(Some(bytes.clone())) })
             } else {
@@ -79,7 +78,7 @@ mod tests {
         fn load_skill<'a>(
             &'a self,
             _name: &'a str,
-        ) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
+        ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
             Box::pin(async move { Err(anyhow!("out-of-cheese-error")) })
         }
     }

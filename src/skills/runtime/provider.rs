@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Context};
 use serde_json::Value;
 
 use crate::registries::SkillRegistry;
@@ -35,7 +35,7 @@ impl SkillProvider {
         &mut self,
         skill_name: &str,
         engine: &Engine,
-    ) -> Result<&CachedSkill, Error> {
+    ) -> anyhow::Result<&CachedSkill> {
         if !self.skills.contains_key(skill_name) {
             let bytes = self.skill_registry.load_skill(skill_name).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_name} not found."))?;

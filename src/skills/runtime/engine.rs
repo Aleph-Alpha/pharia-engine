@@ -212,10 +212,25 @@ mod v0_1 {
                 }
             };
             let request = inference::CompletionRequest::new(prompt, model).with_params(params);
-            let text = self.skill_ctx.complete_text(request).await;
-            Completion {
-                text,
-                finish_reason: FinishReason::Stop,
+            self.skill_ctx.complete_text(request).await.into()
+        }
+    }
+
+    impl From<inference::Completion> for Completion {
+        fn from(completion: inference::Completion) -> Self {
+            Self {
+                text: completion.text,
+                finish_reason: completion.finish_reason.into(),
+            }
+        }
+    }
+
+    impl From<inference::FinishReason> for FinishReason {
+        fn from(finish_reason: inference::FinishReason) -> Self {
+            match finish_reason {
+                inference::FinishReason::Stop => Self::Stop,
+                inference::FinishReason::Length => Self::Length,
+                inference::FinishReason::ContentFilter => Self::ContentFilter,
             }
         }
     }
@@ -239,7 +254,7 @@ mod unversioned {
                 max_tokens: Some(128),
                 ..Default::default()
             });
-            self.skill_ctx.complete_text(request).await
+            self.skill_ctx.complete_text(request).await.text
         }
     }
 }

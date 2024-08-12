@@ -2,8 +2,7 @@ use std::future::pending;
 
 use super::runtime::{Csi, Runtime, WasmRuntime};
 
-use crate::inference::{CompletionRequest, InferenceApi};
-use anyhow::Error;
+use crate::inference::{Completion, CompletionRequest, InferenceApi};
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::{
@@ -192,14 +191,14 @@ pub struct SkillInvocationCtx {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
-    send_rt_err: Option<oneshot::Sender<Error>>,
+    send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
     inference_api: InferenceApi,
     api_token: String,
 }
 
 impl SkillInvocationCtx {
     pub fn new(
-        send_rt_err: oneshot::Sender<Error>,
+        send_rt_err: oneshot::Sender<anyhow::Error>,
         inference_api: InferenceApi,
         api_token: String,
     ) -> Self {
@@ -213,7 +212,7 @@ impl SkillInvocationCtx {
 
 #[async_trait]
 impl Csi for SkillInvocationCtx {
-    async fn complete_text(&mut self, params: CompletionRequest) -> String {
+    async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
         match self
             .inference_api
             .complete_text(params, self.api_token.clone())
@@ -447,7 +446,7 @@ pub mod tests {
                 ### Response:"
             );
             let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
-            Ok(json!(ctx.complete_text(request).await))
+            Ok(json!(ctx.complete_text(request).await.text))
         }
         fn skills(&self) -> impl Iterator<Item = &str> {
             std::iter::once("greet")

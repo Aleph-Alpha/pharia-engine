@@ -1,5 +1,4 @@
 use super::{DynFuture, SkillRegistry};
-use anyhow::{Error, Result};
 use std::{fs, path::PathBuf};
 
 pub struct FileRegistry {
@@ -19,7 +18,7 @@ impl FileRegistry {
 }
 
 impl SkillRegistry for FileRegistry {
-    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, Result<Option<Vec<u8>>, Error>> {
+    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
         let fut = async move {
             let mut skill_path = self.skill_dir.join(name);
             skill_path.set_extension("wasm");

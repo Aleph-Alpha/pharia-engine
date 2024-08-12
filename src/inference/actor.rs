@@ -1,5 +1,6 @@
+use std::str::FromStr;
+
 use aleph_alpha_client::Client;
-use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot},
@@ -58,7 +59,7 @@ impl InferenceApi {
         &mut self,
         request: CompletionRequest,
         api_token: String,
-    ) -> Result<String, Error> {
+    ) -> anyhow::Result<Completion> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::CompleteText {
             request,
@@ -104,6 +105,37 @@ impl CompletionRequest {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinishReason {
+    Stop,
+    Length,
+    ContentFilter,
+}
+
+impl FromStr for FinishReason {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        // https://gitlab.aleph-alpha.de/engineering/luminous-inference/-/blob/main/src/luminous_inference/tasks/task_completion.py#L24
+        match s {
+            "length" | "maximum_tokens" => Ok(Self::Length),
+            "stop"
+            | "end_of_text"
+            | "stop_sequence_reached"
+            | "aborted"
+            | "numeric_instability" => Ok(Self::Stop),
+            _ => Err(anyhow::anyhow!("Unknown finish reason: {}", s)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Completion {
+    pub text: String,
+    pub finish_reason: FinishReason,
+}
+
 /// Private implementation of the inference actor running in its own dedicated green thread.
 struct InferenceActor<C> {
     client: C,
@@ -128,7 +160,7 @@ impl<C> InferenceActor<C> {
 pub enum InferenceMessage {
     CompleteText {
         request: CompletionRequest,
-        send: oneshot::Sender<Result<String, Error>>,
+        send: oneshot::Sender<anyhow::Result<Completion>>,
         api_token: String,
     },
 }
@@ -165,7 +197,7 @@ impl InferenceMessage {
 pub mod tests {
     use std::time::Duration;
 
-    use anyhow::{anyhow, Error};
+    use anyhow::anyhow;
     use tokio::{
         sync::{mpsc, oneshot},
         task::JoinHandle,
@@ -174,7 +206,16 @@ pub mod tests {
 
     use crate::inference::client::InferenceClient;
 
-    use super::{CompletionRequest, Inference, InferenceApi, InferenceMessage};
+    use super::*;
+
+    impl Completion {
+        pub fn from_text(completion: impl Into<String>) -> Self {
+            Self {
+                text: completion.into(),
+                finish_reason: FinishReason::Stop,
+            }
+        }
+    }
 
     /// Always return the same completion
     pub struct InferenceStub {
@@ -183,7 +224,7 @@ pub mod tests {
     }
 
     impl InferenceStub {
-        pub fn new(result: impl Fn() -> Result<String, Error> + Send + 'static) -> Self {
+        pub fn new(result: impl Fn() -> anyhow::Result<Completion> + Send + 'static) -> Self {
             let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
             let join_handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
@@ -198,7 +239,7 @@ pub mod tests {
             Self { send, join_handle }
         }
         pub fn with_completion(completion: impl Into<String>) -> Self {
-            let completion = completion.into();
+            let completion = Completion::from_text(completion);
             Self::new(move || Ok(completion.clone()))
         }
 
@@ -227,12 +268,12 @@ pub mod tests {
             &mut self,
             _params: &super::CompletionRequest,
             _api_token: String,
-        ) -> Result<String, Error> {
+        ) -> anyhow::Result<Completion> {
             if self.remaining_failures > 0 {
                 self.remaining_failures -= 1;
                 Err(anyhow!("Inference error"))
             } else {
-                Ok("Completion succeeded".to_owned())
+                Ok(Completion::from_text("Completion succeeded"))
             }
         }
     }
@@ -284,11 +325,11 @@ pub mod tests {
             &mut self,
             _params: &CompletionRequest,
             _api_token: String,
-        ) -> Result<String, Error> {
+        ) -> anyhow::Result<Completion> {
             let recv = self.receivers.pop().expect(
                 "complete_text must not be called more often than supported by test double",
             );
-            Ok(recv.await.unwrap())
+            Ok(Completion::from_text(recv.await.unwrap()))
         }
     }
 

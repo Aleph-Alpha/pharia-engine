@@ -8,7 +8,7 @@ use std::future::Future;
 
 pub use wasm::WasmRuntime;
 
-use crate::inference::CompletionRequest;
+use crate::inference::{Completion, CompletionRequest};
 
 /// Responsible for loading and executing skills.
 pub trait Runtime {
@@ -39,7 +39,7 @@ pub trait Runtime {
 
 #[async_trait]
 pub trait Csi {
-    async fn complete_text(&mut self, request: CompletionRequest) -> String;
+    async fn complete_text(&mut self, request: CompletionRequest) -> Completion;
 }
 
 #[cfg(test)]

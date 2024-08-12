@@ -1,7 +1,9 @@
 mod actor;
 mod client;
 
-pub use actor::{CompletionParams, CompletionRequest, Inference, InferenceApi};
+pub use actor::{
+    Completion, CompletionParams, CompletionRequest, FinishReason, Inference, InferenceApi,
+};
 
 #[cfg(test)]
 pub mod tests {

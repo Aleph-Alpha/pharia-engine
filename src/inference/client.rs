@@ -1,16 +1,17 @@
 use std::future::Future;
 
-use aleph_alpha_client::{Client, How, Prompt, Sampling, Stopping, TaskCompletion};
-use anyhow::Error;
+use aleph_alpha_client::{
+    Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskCompletion,
+};
 
-use super::CompletionRequest;
+use super::{Completion, CompletionRequest};
 
 pub trait InferenceClient {
     fn complete_text(
         &mut self,
         request: &CompletionRequest,
         api_token: String,
-    ) -> impl Future<Output = Result<String, Error>> + Send;
+    ) -> impl Future<Output = anyhow::Result<Completion>> + Send;
 }
 
 impl InferenceClient for Client {
@@ -18,7 +19,7 @@ impl InferenceClient for Client {
         &mut self,
         request: &CompletionRequest,
         api_token: String,
-    ) -> Result<String, Error> {
+    ) -> anyhow::Result<Completion> {
         let prompt = Prompt::from_text(&request.prompt);
         let mut stopping = Stopping::NO_TOKEN_LIMIT;
 
@@ -38,7 +39,7 @@ impl InferenceClient for Client {
             stopping,
             sampling,
         };
-        Ok(self
+        let completion_output = self
             .completion(
                 &task,
                 &request.model,
@@ -47,7 +48,18 @@ impl InferenceClient for Client {
                     ..Default::default()
                 },
             )
-            .await?
-            .completion)
+            .await?;
+        completion_output.try_into()
+    }
+}
+
+impl TryFrom<CompletionOutput> for Completion {
+    type Error = anyhow::Error;
+
+    fn try_from(completion_output: CompletionOutput) -> anyhow::Result<Self> {
+        Ok(Self {
+            text: completion_output.completion,
+            finish_reason: completion_output.finish_reason.parse()?,
+        })
     }
 }

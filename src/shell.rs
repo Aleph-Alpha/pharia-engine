@@ -1,6 +1,6 @@
 use std::{future::Future, iter::once, net::SocketAddr};
 
-use anyhow::{Context, Error};
+use anyhow::Context;
 use axum::{
     extract::{MatchedPath, Path, State},
     http::{header::AUTHORIZATION, Request, StatusCode},
@@ -88,7 +88,7 @@ pub async fn run(
     addr: impl Into<SocketAddr>,
     skill_executor_api: SkillExecutorApi,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
-) -> impl Future<Output = Result<(), Error>> {
+) -> impl Future<Output = anyhow::Result<()>> {
     let addr = addr.into();
     let listener = TcpListener::bind(addr).await.context(format!(
         "Could not bind a tcp listener to '{addr}' please check environment vars for \
