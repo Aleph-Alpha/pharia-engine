@@ -20,41 +20,37 @@ impl InferenceClient for Client {
         request: &CompletionRequest,
         api_token: String,
     ) -> anyhow::Result<Completion> {
-        let prompt = Prompt::from_text(&request.prompt);
-        let mut maximum_tokens = None;
-        let mut stop_sequences = vec![];
+        let CompletionRequest {
+            model,
+            prompt,
+            params:
+                CompletionParams {
+                    max_tokens,
+                    temperature,
+                    top_k,
+                    top_p,
+                    stop,
+                },
+        } = &request;
 
-        let sampling = if let Some(params) = &request.params {
-            let CompletionParams {
-                max_tokens,
-                temperature,
-                top_k,
-                top_p,
-                stop,
-            } = params;
-            maximum_tokens = *max_tokens;
-            stop_sequences = stop.iter().map(String::as_str).collect::<Vec<_>>();
-            Sampling {
+        let task = TaskCompletion {
+            prompt: Prompt::from_text(prompt),
+            stopping: Stopping {
+                maximum_tokens: *max_tokens,
+                stop_sequences: &stop.iter().map(String::as_str).collect::<Vec<_>>(),
+            },
+            sampling: Sampling {
                 temperature: *temperature,
                 top_k: *top_k,
                 top_p: *top_p,
                 start_with_one_of: &[],
-            }
-        } else {
-            Sampling::MOST_LIKELY
-        };
-        let task = TaskCompletion {
-            prompt,
-            stopping: Stopping {
-                maximum_tokens,
-                stop_sequences: &stop_sequences,
             },
-            sampling,
         };
+
         let completion_output = self
             .completion(
                 &task,
-                &request.model,
+                model,
                 &How {
                     api_token: Some(api_token),
                     ..Default::default()

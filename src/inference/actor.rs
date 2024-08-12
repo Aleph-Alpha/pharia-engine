@@ -84,11 +84,11 @@ pub struct CompletionParams {
     pub stop: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
-    pub params: Option<CompletionParams>,
+    pub params: CompletionParams,
 }
 
 impl CompletionRequest {
@@ -96,12 +96,12 @@ impl CompletionRequest {
         Self {
             prompt,
             model,
-            params: None,
+            params: CompletionParams::default(),
         }
     }
 
     pub fn with_params(mut self, params: CompletionParams) -> Self {
-        self.params = Some(params);
+        self.params = params;
         self
     }
 }
@@ -288,7 +288,7 @@ pub mod tests {
         let request = CompletionRequest {
             prompt: "dummy_prompt".to_owned(),
             model: "dummy_model".to_owned(),
-            params: None,
+            ..Default::default()
         };
 
         // when
