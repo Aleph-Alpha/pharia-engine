@@ -33,11 +33,14 @@ impl Engine {
         // Skill world from bindgen
         for version in SupportedVersion::iter() {
             match version {
-                SupportedVersion::Unversioned => {
-                    unversioned::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
+                SupportedVersion::V0_2 => {
+                    v0_2::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
                 }
                 SupportedVersion::V0_1 => {
                     v0_1::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
+                }
+                SupportedVersion::Unversioned => {
+                    unversioned::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
                 }
             }
         }
@@ -53,13 +56,17 @@ impl Engine {
         let pre = self.linker.instantiate_pre(&component)?;
 
         match skill_version {
-            SupportedVersion::Unversioned => {
-                let skill = unversioned::SkillPre::new(pre)?;
-                Ok(Skill::Unversioned(skill))
+            SupportedVersion::V0_2 => {
+                let skill = v0_2::SkillPre::new(pre)?;
+                Ok(Skill::V0_2(skill))
             }
             SupportedVersion::V0_1 => {
                 let skill = v0_1::SkillPre::new(pre)?;
                 Ok(Skill::V0_1(skill))
+            }
+            SupportedVersion::Unversioned => {
+                let skill = unversioned::SkillPre::new(pre)?;
+                Ok(Skill::Unversioned(skill))
             }
         }
     }
@@ -73,6 +80,8 @@ impl Engine {
 /// Allows for as much initialization work to be done at load time as possible,
 /// which can be cached across multiple invocations.
 pub enum Skill {
+    /// Skills targeting versions 0.2.x of the skill world
+    V0_2(v0_2::SkillPre<LinkedCtx>),
     /// Skills targeting versions 0.1.x of the skill world
     V0_1(v0_1::SkillPre<LinkedCtx>),
     /// Skills targeting the pre-semver-released version of skill world
@@ -88,6 +97,15 @@ impl Skill {
     ) -> anyhow::Result<Value> {
         let mut store = engine.store(LinkedCtx::new(ctx));
         match self {
+            Self::V0_2(skill) => {
+                let input = serde_json::to_vec(&input)?;
+                let bindings = skill.instantiate_async(&mut store).await?;
+                let result = bindings
+                    .pharia_skill_skill_handler()
+                    .call_run(store, &input)
+                    .await??;
+                Ok(serde_json::from_slice(&result)?)
+            }
             Self::V0_1(skill) => {
                 let input = serde_json::to_vec(&input)?;
                 let bindings = skill.instantiate_async(&mut store).await?;
@@ -112,6 +130,8 @@ impl Skill {
 /// Currently supported versions of the skill world
 #[derive(Debug, Clone, Copy, EnumIter)]
 enum SupportedVersion {
+    /// Versions 0.2.x of the skill world
+    V0_2,
     /// Versions 0.1.x of the skill world
     V0_1,
     /// Pre-semver-released version of skill world
@@ -121,6 +141,9 @@ enum SupportedVersion {
 impl SupportedVersion {
     fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         match Self::extract_pharia_skill_version(wasm)? {
+            Some(Version {
+                major: 0, minor: 2, ..
+            }) => Ok(Self::V0_2),
             Some(Version {
                 major: 0, minor: 1, ..
             }) => Ok(Self::V0_1),
@@ -351,6 +374,22 @@ mod tests {
     async fn can_load_and_run_v0_1_module() {
         // Given a skill loaded by our engine
         let wasm = fs::read("skills/greet_skill_v0_1.wasm").unwrap();
+        let engine = Engine::new().unwrap();
+        let skill = engine.instantiate_pre_skill(wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let input = json!("Homer");
+        let result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string
+        assert_eq!(result, json!("Hello Homer"));
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_v0_2_module() {
+        // Given a skill loaded by our engine
+        let wasm = fs::read("skills/greet_skill_v0_2.wasm").unwrap();
         let engine = Engine::new().unwrap();
         let skill = engine.instantiate_pre_skill(wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);

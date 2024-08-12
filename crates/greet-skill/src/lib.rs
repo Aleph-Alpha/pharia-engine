@@ -9,21 +9,17 @@ struct Skill {}
 impl Guest for Skill {
     fn run(name: String) -> String {
         let prompt = format!(
-            "### Instruction:
-Provide a nice greeting for the person utilizing its given name
+            "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-### Input:
-Name: {name}
+Cutting Knowledge Date: December 2023
+Today Date: 23 Jul 2024
 
-### Response:"
+You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         );
-        complete_text(&prompt, "luminous-nextgen-7b")
+        complete_text(&prompt, "llama-3.1-8b-instruct")
     }
 }
 
 export!(Skill);
-
-#[cfg(test)]
-mod tests {
-    // use super::*;
-}

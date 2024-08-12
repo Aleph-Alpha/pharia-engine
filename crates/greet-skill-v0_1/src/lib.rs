@@ -15,15 +15,16 @@ impl Guest for Skill {
         let name = serde_json::from_slice::<String>(&input)
             .map_err(|e| Error::InvalidInput(anyhow!(e).to_string()))?;
         let prompt = format!(
-            "### Instruction:
-Provide a nice greeting for the person utilizing its given name
+            "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-### Input:
-Name: {name}
+Cutting Knowledge Date: December 2023
+Today Date: 23 Jul 2024
 
-### Response:"
+You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         );
-        let result = complete("luminous-nextgen-7b", &prompt, None);
+        let result = complete("llama-3.1-8b-instruct", &prompt, None);
         let output = serde_json::to_vec(&json!(result.text))
             .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
         Ok(output)

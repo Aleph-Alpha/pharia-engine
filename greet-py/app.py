@@ -4,12 +4,13 @@ from skill.imports import csi
 
 class Skill(skill.Skill):
     def run(self, in_: str) -> str:
-        prompt = f"""### Instruction:
-Provide a nice greeting for the person utilizing its given name
+        prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-### Input:
-Name: {in_}
+Cutting Knowledge Date: December 2023
+Today Date: 23 Jul 2024
 
-### Response:"""
+You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
-        return csi.complete_text(prompt, "luminous-nextgen-7b")
+Provide a nice greeting for the person named: {in_}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+
+        return csi.complete_text(prompt, "llama-3.1-8b-instruct")

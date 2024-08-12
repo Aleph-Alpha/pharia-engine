@@ -230,15 +230,16 @@ pub mod tests {
     #[async_trait]
     impl Csi for CsiGreetingMock {
         async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
-            let expected_prompt = "### Instruction:\n\
-                Provide a nice greeting for the person utilizing its given name\n\
-                \n\
-                ### Input:\n\
-                Name: Homer\n\
-                \n\
-                ### Response:";
+            let expected_prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-            let expected_model = "luminous-nextgen-7b";
+Cutting Knowledge Date: December 2023
+Today Date: 23 Jul 2024
+
+You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>";
+
+            let expected_model = "llama-3.1-8b-instruct";
 
             // Print actual parameters in case of failure
             eprintln!("{request:?}");
