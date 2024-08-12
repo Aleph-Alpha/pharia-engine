@@ -399,21 +399,21 @@ mod tests {
     #[test]
     fn can_parse_module() {
         let wasm = fs::read("skills/greet_skill.wasm").unwrap();
-        let version = SupportedVersion::extract_pharia_skill_version(&wasm).unwrap();
+        let version = SupportedVersion::extract_pharia_skill_version(wasm).unwrap();
         assert_eq!(version, None);
     }
 
     #[test]
     fn errors_if_not_pharia_component() {
         let wasm = wat::parse_str("(component)").unwrap();
-        let version = SupportedVersion::extract_pharia_skill_version(&wasm);
+        let version = SupportedVersion::extract_pharia_skill_version(wasm);
         assert!(version.is_err());
     }
 
     #[test]
     fn errors_if_not_component() {
         let wasm = wat::parse_str("(module)").unwrap();
-        let version = SupportedVersion::extract_pharia_skill_version(&wasm);
+        let version = SupportedVersion::extract_pharia_skill_version(wasm);
         assert!(version.is_err());
     }
 
