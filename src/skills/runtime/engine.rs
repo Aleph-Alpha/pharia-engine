@@ -1,7 +1,10 @@
+use std::time::Duration;
+
 use anyhow::anyhow;
 use semver::Version;
 use serde_json::{json, Value};
 use strum::{EnumIter, IntoEnumIterator};
+use tokio::sync::mpsc::{self, error::TryRecvError};
 use wasmtime::{
     component::{Component, Linker as WasmtimeLinker},
     Config, Engine as WasmtimeEngine, OptLevel, Store,
@@ -14,8 +17,9 @@ use super::Csi;
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
 pub struct Engine {
-    engine: WasmtimeEngine,
+    inner: WasmtimeEngine,
     linker: WasmtimeLinker<LinkedCtx>,
+    _epoch_ticker: mpsc::UnboundedSender<()>,
 }
 
 impl Engine {
@@ -24,8 +28,32 @@ impl Engine {
             Config::new()
                 .async_support(true)
                 .cranelift_opt_level(OptLevel::SpeedAndSize)
+                // Allows for cooperative timeslicing in async mode
+                .epoch_interruption(true)
                 .wasm_component_model(true),
         )?;
+
+        // We only need a weak reference to pass to the loop.
+        let engine_ref = engine.weak();
+        // Create a channel so we can stop the loop when the engine is dropped.
+        let (send, mut recv) = mpsc::unbounded_channel::<()>();
+
+        // Increment epoch counter so that running skills have to yield
+        tokio::spawn(async move {
+            while let Err(err) = recv.try_recv() {
+                match err {
+                    TryRecvError::Empty => {
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                        if let Some(engine) = engine_ref.upgrade() {
+                            engine.increment_epoch();
+                        }
+                    }
+                    TryRecvError::Disconnected => {
+                        break;
+                    }
+                }
+            }
+        });
 
         let mut linker = WasmtimeLinker::new(&engine);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
@@ -45,14 +73,18 @@ impl Engine {
             }
         }
 
-        Ok(Self { engine, linker })
+        Ok(Self {
+            inner: engine,
+            linker,
+            _epoch_ticker: send,
+        })
     }
 
     /// Extracts the version of the skill WIT world from the provided bytes,
     /// and links it to the appropriate version in the linker.
     pub fn instantiate_pre_skill(&self, bytes: impl AsRef<[u8]>) -> anyhow::Result<Skill> {
         let skill_version = SupportedVersion::extract(&bytes)?;
-        let component = Component::new(&self.engine, bytes)?;
+        let component = Component::new(&self.inner, bytes)?;
         let pre = self.linker.instantiate_pre(&component)?;
 
         match skill_version {
@@ -72,7 +104,14 @@ impl Engine {
     }
 
     fn store<T>(&self, data: T) -> Store<T> {
-        Store::new(&self.engine, data)
+        let mut store = Store::new(&self.inner, data);
+        // Check after the next tick
+        store.set_epoch_deadline(1);
+        // After it yields, reset the deadline to one more tick.
+        // Currently, this would still allow tasks to run forever, but they will
+        // at least have to yield roughly every tick.
+        store.epoch_deadline_async_yield_and_update(1);
+        store
     }
 }
 
