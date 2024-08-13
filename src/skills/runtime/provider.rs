@@ -6,6 +6,7 @@ use serde_json::Value;
 use crate::registries::SkillRegistry;
 
 use super::{
+    config::SkillConfig,
     engine::{Engine, Skill},
     Csi,
 };
@@ -13,13 +14,18 @@ use super::{
 pub struct SkillProvider {
     skills: HashMap<String, CachedSkill>,
     skill_registry: Box<dyn SkillRegistry + Send>,
+    skill_config: Option<Box<dyn SkillConfig + Send>>,
 }
 
 impl SkillProvider {
-    pub fn new(skill_registry: Box<dyn SkillRegistry + Send>) -> Self {
+    pub fn new(
+        skill_registry: Box<dyn SkillRegistry + Send>,
+        skill_config: Option<Box<dyn SkillConfig + Send>>,
+    ) -> Self {
         SkillProvider {
             skills: HashMap::new(),
             skill_registry,
+            skill_config,
         }
     }
 
@@ -69,4 +75,8 @@ impl CachedSkill {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+    #[test]
+    fn loads_skill_config() {}
+}

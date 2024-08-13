@@ -19,7 +19,7 @@ impl WasmRuntime {
 
         Self {
             engine,
-            skill_cache: SkillProvider::new(Box::new(skill_registry)),
+            skill_cache: SkillProvider::new(Box::new(skill_registry), None),
         }
     }
 }

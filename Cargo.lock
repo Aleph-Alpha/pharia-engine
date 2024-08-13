@@ -2193,6 +2193,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-test",
+ "toml",
  "tower 0.5.0",
  "tower-http",
  "tracing",
