@@ -2,24 +2,35 @@ use serde_json::Value;
 
 use crate::registries::{registries, SkillRegistry};
 
-use super::{engine::Engine, provider::SkillProvider, Csi, Runtime};
+use super::{config::SkillConfig, engine::Engine, provider::SkillProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
-    skill_cache: SkillProvider,
+    provider: SkillProvider,
 }
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        Self::with_registry(registries())
+        Self::with_config(None)
+    }
+
+    pub fn with_config(skill_config: Option<Box<dyn SkillConfig + Send>>) -> Self {
+        Self::with_registry_and_config(registries(), skill_config)
     }
 
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
+        Self::with_registry_and_config(skill_registry, None)
+    }
+
+    pub fn with_registry_and_config(
+        skill_registry: impl SkillRegistry + Send + 'static,
+        skill_config: Option<Box<dyn SkillConfig + Send>>,
+    ) -> Self {
         let engine = Engine::new().expect("engine creation failed");
 
         Self {
             engine,
-            skill_cache: SkillProvider::new(Box::new(skill_registry), None),
+            provider: SkillProvider::new(Box::new(skill_registry), skill_config),
         }
     }
 }
@@ -31,16 +42,16 @@ impl Runtime for WasmRuntime {
         input: Value,
         ctx: Box<dyn Csi + Send>,
     ) -> anyhow::Result<Value> {
-        let skill = self.skill_cache.fetch(skill_name, &self.engine).await?;
+        let skill = self.provider.fetch(skill_name, &self.engine).await?;
         skill.run(&self.engine, ctx, input).await
     }
 
     fn skills(&self) -> impl Iterator<Item = &str> {
-        self.skill_cache.skills()
+        self.provider.skills()
     }
 
     fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
-        self.skill_cache.invalidate(skill)
+        self.provider.invalidate(skill)
     }
 }
 

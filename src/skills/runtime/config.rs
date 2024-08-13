@@ -1,10 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Skill {
-    name: String,
+    pub name: String,
 }
 
 pub trait SkillConfig {
@@ -17,7 +17,11 @@ pub struct TomlConfig {
 }
 
 impl TomlConfig {
-    pub fn new(p: &Path) -> anyhow::Result<Self> {
+    pub fn from_default_file() -> Option<Self> {
+        Self::new("skill_config.toml").ok()
+    }
+
+    pub fn new<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
         let config = std::fs::read_to_string(p)?;
         Self::from_str(&config)
     }

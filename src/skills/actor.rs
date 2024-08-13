@@ -1,6 +1,9 @@
 use std::future::pending;
 
-use super::runtime::{Csi, Runtime, WasmRuntime};
+use super::runtime::{
+    config::{SkillConfig, TomlConfig},
+    Csi, Runtime, WasmRuntime,
+};
 
 use crate::inference::{Completion, CompletionRequest, InferenceApi};
 use async_trait::async_trait;
@@ -20,7 +23,12 @@ pub struct SkillExecutor {
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
-        Self::with_runtime(WasmRuntime::new(), inference_api)
+        let skill_config = TomlConfig::from_default_file().map(|c| {
+            let boxed: Box<dyn SkillConfig + Send> = Box::new(c);
+            boxed
+        });
+        let runtime = WasmRuntime::with_config(skill_config);
+        Self::with_runtime(runtime, inference_api)
     }
 
     /// You may want use this constructor if you want to use a double runtime for testing

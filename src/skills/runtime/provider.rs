@@ -37,7 +37,27 @@ impl SkillProvider {
         self.skills.remove(skill).is_some()
     }
 
+    pub fn allowed(&self, skill: &str) -> bool {
+        if let Some(config) = &self.skill_config {
+            config.skills().iter().any(|s| s.name == skill)
+        } else {
+            true
+        }
+    }
+
     pub async fn fetch(
+        &mut self,
+        skill_name: &str,
+        engine: &Engine,
+    ) -> anyhow::Result<&CachedSkill> {
+        if self.allowed(skill_name) {
+            self.internal_fetch(skill_name, engine).await
+        } else {
+            Err(anyhow!("Skill {skill_name} not configured."))
+        }
+    }
+
+    async fn internal_fetch(
         &mut self,
         skill_name: &str,
         engine: &Engine,
@@ -76,6 +96,37 @@ impl CachedSkill {
 
 #[cfg(test)]
 mod tests {
+    use crate::skills::runtime::config::TomlConfig;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn skill_component_is_in_config() {
+        let skill_config = TomlConfig::from_str(r#"skills = [{name = "greet_skill"}]"#)
+            .map(|c| {
+                let b: Box<dyn SkillConfig + Send> = Box::new(c);
+                b
+            })
+            .ok();
+        let skill_registry = HashMap::<String, Vec<u8>>::new();
+        let provider = SkillProvider::new(Box::new(skill_registry), skill_config);
+        let allowed = provider.allowed("greet_skill");
+        assert!(allowed);
+    }
+
+    #[tokio::test]
+    async fn skill_component_not_in_config() {
+        let skill_config = TomlConfig::from_str("skills = []")
+            .map(|c| {
+                let b: Box<dyn SkillConfig + Send> = Box::new(c);
+                b
+            })
+            .ok();
+        let skill_registry = HashMap::<String, Vec<u8>>::new();
+        let provider = SkillProvider::new(Box::new(skill_registry), skill_config);
+        let allowed = provider.allowed("greet_skill");
+        assert!(!allowed);
+    }
 
     #[test]
     fn loads_skill_config() {}
