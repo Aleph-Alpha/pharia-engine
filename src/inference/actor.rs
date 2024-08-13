@@ -118,14 +118,10 @@ impl FromStr for FinishReason {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
-        // https://gitlab.aleph-alpha.de/engineering/luminous-inference/-/blob/main/src/luminous_inference/tasks/task_completion.py#L24
         match s {
             "length" | "maximum_tokens" => Ok(Self::Length),
-            "stop"
-            | "end_of_text"
-            | "stop_sequence_reached"
-            | "aborted"
-            | "numeric_instability" => Ok(Self::Stop),
+            "stop" | "end_of_text" | "stop_sequence_reached" => Ok(Self::Stop),
+            "content_filter" => Ok(Self::ContentFilter),
             _ => Err(anyhow::anyhow!("Unknown finish reason: {}", s)),
         }
     }
