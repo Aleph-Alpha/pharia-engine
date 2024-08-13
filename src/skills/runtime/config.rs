@@ -50,6 +50,6 @@ mod tests {
             "#,
         )
         .unwrap();
-        assert!(tc.skills.len() == 3);
+        assert_eq!(tc.skills.len(), 3);
     }
 }
