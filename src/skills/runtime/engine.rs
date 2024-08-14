@@ -4,7 +4,6 @@ use anyhow::anyhow;
 use semver::Version;
 use serde_json::{json, Value};
 use strum::{EnumIter, IntoEnumIterator};
-use tokio::sync::mpsc::{self, error::TryRecvError};
 use wasmtime::{
     component::{Component, Linker as WasmtimeLinker},
     Config, Engine as WasmtimeEngine, OptLevel, Store,
@@ -19,7 +18,6 @@ use super::Csi;
 pub struct Engine {
     inner: WasmtimeEngine,
     linker: WasmtimeLinker<LinkedCtx>,
-    _epoch_ticker: mpsc::UnboundedSender<()>,
 }
 
 impl Engine {
@@ -35,23 +33,19 @@ impl Engine {
 
         // We only need a weak reference to pass to the loop.
         let engine_ref = engine.weak();
-        // Create a channel so we can stop the loop when the engine is dropped.
-        let (send, mut recv) = mpsc::unbounded_channel::<()>();
 
         // Increment epoch counter so that running skills have to yield
-        tokio::spawn(async move {
-            while let Err(err) = recv.try_recv() {
-                match err {
-                    TryRecvError::Empty => {
-                        tokio::time::sleep(Duration::from_millis(10)).await;
-                        if let Some(engine) = engine_ref.upgrade() {
-                            engine.increment_epoch();
-                        }
-                    }
-                    TryRecvError::Disconnected => {
-                        break;
-                    }
-                }
+        // Uses a real thread to make sure this doesn't get blocked in
+        // the async runtime by a skill that doesn't yield.
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(Duration::from_millis(100));
+                // If the engine is still alive, increment the epoch counter.
+                // Otherwise stop the thread.
+                let Some(engine) = engine_ref.upgrade() else {
+                    break;
+                };
+                engine.increment_epoch();
             }
         });
 
@@ -76,7 +70,6 @@ impl Engine {
         Ok(Self {
             inner: engine,
             linker,
-            _epoch_ticker: send,
         })
     }
 
