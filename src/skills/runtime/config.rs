@@ -55,6 +55,7 @@ pub struct RemoteConfig {
     skills: Vec<Skill>,
     token: String,
     url: String,
+    sync_interval: u64,
     last_sync: Option<std::time::Instant>,
 }
 
@@ -65,11 +66,16 @@ impl RemoteConfig {
             .expect("Remote skill config token must be provided.");
         let url =
             env::var("REMOTE_SKILL_CONFIG_URL").expect("Remote skill config URL must be provided.");
+        let sync_interval = env::var("REMOTE_SKILL_CONFIG_UPDATE_INTERVAL_SEC")
+            .unwrap_or("60".to_owned())
+            .parse::<u64>()
+            .expect("Failed to parse remote skill config update interval.");
         let skills = vec![];
         Self {
             skills,
             token,
             url,
+            sync_interval,
             last_sync: None,
         }
     }
@@ -77,7 +83,7 @@ impl RemoteConfig {
     fn expired(&self) -> bool {
         if let Some(last_sync) = self.last_sync {
             let elapsed = last_sync.elapsed();
-            elapsed.as_secs() > 60
+            elapsed.as_secs() > self.sync_interval
         } else {
             true
         }
@@ -162,7 +168,9 @@ pub mod tests {
     #[test]
     fn remote_config_expired_if_last_sync_is_yesterday() {
         let mut config = RemoteConfig::from_env();
-        let yesterday = std::time::Instant::now() - std::time::Duration::from_secs(86400);
+        let yesterday = std::time::Instant::now()
+            .checked_sub(std::time::Duration::from_secs(86400))
+            .unwrap();
         config.set_last_sync(yesterday);
 
         assert!(config.expired());
