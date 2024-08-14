@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Skill {
@@ -12,8 +13,7 @@ pub struct Skill {
 
 #[async_trait]
 pub trait SkillConfig {
-    fn skills(&self) -> &[Skill];
-    async fn load(&mut self) -> anyhow::Result<()>;
+    async fn skills(&mut self) -> &[Skill];
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,12 +46,8 @@ impl LocalConfig {
 
 #[async_trait]
 impl SkillConfig for LocalConfig {
-    fn skills(&self) -> &[Skill] {
+    async fn skills(&mut self) -> &[Skill] {
         &self.skills
-    }
-
-    async fn load(&mut self) -> anyhow::Result<()> {
-        Ok(())
     }
 }
 
@@ -71,15 +67,8 @@ impl RemoteConfig {
         let skills = vec![];
         Self { skills, token, url }
     }
-}
 
-#[async_trait]
-impl SkillConfig for RemoteConfig {
-    fn skills(&self) -> &[Skill] {
-        &self.skills
-    }
-
-    async fn load(&mut self) -> anyhow::Result<()> {
+    async fn load(&self) -> anyhow::Result<Vec<Skill>> {
         let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", self.token)).unwrap();
         auth_value.set_sensitive(true);
         let client = reqwest::Client::new();
@@ -90,8 +79,20 @@ impl SkillConfig for RemoteConfig {
             .await?;
         let content = resp.text().await?;
         let config = TomlConfig::from_str(&content)?;
-        self.skills = config.skills;
-        Ok(())
+        // self.skills = config.skills;
+        Ok(config.skills)
+    }
+}
+
+#[async_trait]
+impl SkillConfig for RemoteConfig {
+    async fn skills(&mut self) -> &[Skill] {
+        match self.load().await {
+            Ok(skills) => self.skills = skills,
+            Err(e) => warn!("Could not load skill config, use existing config instead. ({e})"),
+        }
+
+        &self.skills
     }
 }
 
@@ -117,12 +118,8 @@ pub mod tests {
 
     #[async_trait]
     impl SkillConfig for StubConfig {
-        fn skills(&self) -> &[Skill] {
+        async fn skills(&mut self) -> &[Skill] {
             &self.skills
-        }
-
-        async fn load(&mut self) -> anyhow::Result<()> {
-            Ok(())
         }
     }
 
@@ -151,6 +148,6 @@ pub mod tests {
 
         // then the configured skills must listed in the config
         assert!(result.is_ok());
-        assert!(!config.skills().is_empty());
+        assert!(!config.skills().await.is_empty());
     }
 }

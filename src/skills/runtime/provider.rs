@@ -37,9 +37,9 @@ impl SkillProvider {
         self.skills.remove(skill).is_some()
     }
 
-    pub fn allowed(&self, skill: &str) -> bool {
-        if let Some(config) = &self.skill_config {
-            config.skills().iter().any(|s| s.name == skill)
+    pub async fn allowed(&mut self, skill: &str) -> bool {
+        if let Some(config) = self.skill_config.as_mut() {
+            config.skills().await.iter().any(|s| s.name == skill)
         } else {
             true
         }
@@ -50,10 +50,7 @@ impl SkillProvider {
         skill_name: &str,
         engine: &Engine,
     ) -> anyhow::Result<&CachedSkill> {
-        if let Some(config) = self.skill_config.as_mut() {
-            config.load().await?;
-        }
-        if self.allowed(skill_name) {
+        if self.allowed(skill_name).await {
             self.internal_fetch(skill_name, engine).await
         } else {
             Err(anyhow!("Skill {skill_name} not configured."))
@@ -109,9 +106,9 @@ mod tests {
         let skill_config = StubConfig::new(&["greet_skill"]);
         let skill_config = Box::new(skill_config);
         let skill_registry = HashMap::<String, Vec<u8>>::new();
-        let provider = SkillProvider::new(Box::new(skill_registry), Some(skill_config));
+        let mut provider = SkillProvider::new(Box::new(skill_registry), Some(skill_config));
 
-        let allowed = provider.allowed("greet_skill");
+        let allowed = provider.allowed("greet_skill").await;
 
         assert!(allowed);
     }
@@ -121,8 +118,8 @@ mod tests {
         let skill_config = StubConfig::new(&[]);
         let skill_config = Box::new(skill_config);
         let skill_registry = HashMap::<String, Vec<u8>>::new();
-        let provider = SkillProvider::new(Box::new(skill_registry), Some(skill_config));
-        let allowed = provider.allowed("greet_skill");
+        let mut provider = SkillProvider::new(Box::new(skill_registry), Some(skill_config));
+        let allowed = provider.allowed("greet_skill").await;
         assert!(!allowed);
     }
 
