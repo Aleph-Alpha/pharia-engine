@@ -96,34 +96,29 @@ impl CachedSkill {
 
 #[cfg(test)]
 mod tests {
-    use crate::skills::runtime::config::TomlConfig;
+
+    use crate::skills::runtime::config::tests::StubConfig;
 
     use super::*;
 
     #[tokio::test]
     async fn skill_component_is_in_config() {
-        let skill_config = TomlConfig::from_str(r#"skills = [{name = "greet_skill"}]"#)
-            .map(|c| {
-                let b: Box<dyn SkillConfig + Send> = Box::new(c);
-                b
-            })
-            .ok();
+        let skill_config = StubConfig::new(&["greet_skill"]);
+        let skill_config = Box::new(skill_config);
         let skill_registry = HashMap::<String, Vec<u8>>::new();
-        let provider = SkillProvider::new(Box::new(skill_registry), skill_config);
+        let provider = SkillProvider::new(Box::new(skill_registry), Some(skill_config));
+
         let allowed = provider.allowed("greet_skill");
+
         assert!(allowed);
     }
 
     #[tokio::test]
     async fn skill_component_not_in_config() {
-        let skill_config = TomlConfig::from_str("skills = []")
-            .map(|c| {
-                let b: Box<dyn SkillConfig + Send> = Box::new(c);
-                b
-            })
-            .ok();
+        let skill_config = StubConfig::new(&[]);
+        let skill_config = Box::new(skill_config);
         let skill_registry = HashMap::<String, Vec<u8>>::new();
-        let provider = SkillProvider::new(Box::new(skill_registry), skill_config);
+        let provider = SkillProvider::new(Box::new(skill_registry), Some(skill_config));
         let allowed = provider.allowed("greet_skill");
         assert!(!allowed);
     }

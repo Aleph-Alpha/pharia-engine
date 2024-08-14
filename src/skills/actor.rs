@@ -1,7 +1,7 @@
 use std::future::pending;
 
 use super::runtime::{
-    config::{SkillConfig, TomlConfig},
+    config::{LocalConfig, SkillConfig},
     Csi, Runtime, WasmRuntime,
 };
 
@@ -23,7 +23,7 @@ pub struct SkillExecutor {
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
-        let skill_config = TomlConfig::from_default_file().map(|c| {
+        let skill_config = LocalConfig::from_default_file().map(|c| {
             let boxed: Box<dyn SkillConfig + Send> = Box::new(c);
             boxed
         });
