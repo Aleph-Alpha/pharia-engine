@@ -1,5 +1,7 @@
 use std::{env, path::Path};
 
+use axum::http::HeaderValue;
+use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,18 +54,29 @@ pub struct GitlabConfig {
 }
 
 impl GitlabConfig {
-    pub fn from_env() -> anyhow::Result<Self> {
+    pub async fn from_env() -> anyhow::Result<Self> {
         drop(dotenvy::dotenv());
         let token = env::var("GITLAB_SKILL_CONFIG_TOKEN")?;
         let url = env::var("GITLAB_SKILL_CONFIG_URL")?;
         let skills = vec![];
         let mut config = GitlabConfig { skills, token, url };
-        config.fetch()?;
+        config.fetch().await?;
         Ok(config)
     }
 
-    pub fn fetch(&mut self) -> anyhow::Result<()> {
-        todo!()
+    pub async fn fetch(&mut self) -> anyhow::Result<()> {
+        let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", self.token)).unwrap();
+        auth_value.set_sensitive(true);
+        let client = reqwest::Client::new();
+        let resp = client
+            .get(&self.url)
+            .header(AUTHORIZATION, auth_value)
+            .send()
+            .await?;
+        let content = resp.text().await?;
+        let config = TomlConfig::from_str(&content)?;
+        self.skills = config.skills;
+        Ok(())
     }
 }
 
@@ -114,13 +127,13 @@ pub mod tests {
         assert_eq!(tc.skills.len(), 3);
     }
 
-    #[test]
-    fn load_gitlab_config() {
+    #[tokio::test]
+    async fn load_gitlab_config() {
         // Given a gitlab skill config
-        let mut config = GitlabConfig::from_env().unwrap();
+        let fut = GitlabConfig::from_env();
 
         // when fetch skill config
-        config.fetch().unwrap();
+        let config = fut.await.unwrap();
 
         // then the configured skills must listed in the config
         assert!(!config.skills().is_empty());
