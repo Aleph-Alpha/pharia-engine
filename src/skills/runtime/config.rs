@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{env, path::Path};
 
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +45,34 @@ impl SkillConfig for LocalConfig {
     }
 }
 
+pub struct GitlabConfig {
+    skills: Vec<Skill>,
+    token: String,
+    url: String,
+}
+
+impl GitlabConfig {
+    pub fn from_env() -> anyhow::Result<Self> {
+        drop(dotenvy::dotenv());
+        let token = env::var("GITLAB_SKILL_CONFIG_TOKEN")?;
+        let url = env::var("GITLAB_SKILL_CONFIG_URL")?;
+        let skills = vec![];
+        let mut config = GitlabConfig { skills, token, url };
+        config.fetch()?;
+        Ok(config)
+    }
+
+    pub fn fetch(&mut self) -> anyhow::Result<()> {
+        todo!()
+    }
+}
+
+impl SkillConfig for GitlabConfig {
+    fn skills(&self) -> &[Skill] {
+        &self.skills
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use crate::skills::runtime::config::TomlConfig;
@@ -84,5 +112,17 @@ pub mod tests {
         )
         .unwrap();
         assert_eq!(tc.skills.len(), 3);
+    }
+
+    #[test]
+    fn load_gitlab_config() {
+        // Given a gitlab skill config
+        let mut config = GitlabConfig::from_env().unwrap();
+
+        // when fetch skill config
+        config.fetch().unwrap();
+
+        // then the configured skills must listed in the config
+        assert!(!config.skills().is_empty());
     }
 }
