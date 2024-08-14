@@ -55,6 +55,7 @@ pub struct RemoteConfig {
     skills: Vec<Skill>,
     token: String,
     url: String,
+    last_sync: Option<std::time::Instant>,
 }
 
 impl RemoteConfig {
@@ -65,7 +66,21 @@ impl RemoteConfig {
         let url =
             env::var("REMOTE_SKILL_CONFIG_URL").expect("Remote skill config URL must be provided.");
         let skills = vec![];
-        Self { skills, token, url }
+        Self {
+            skills,
+            token,
+            url,
+            last_sync: None,
+        }
+    }
+
+    fn expired(&self) -> bool {
+        if let Some(last_sync) = self.last_sync {
+            let elapsed = last_sync.elapsed();
+            elapsed.as_secs() > 60
+        } else {
+            true
+        }
     }
 
     async fn load(&self) -> anyhow::Result<Vec<Skill>> {
@@ -79,19 +94,28 @@ impl RemoteConfig {
             .await?;
         let content = resp.text().await?;
         let config = TomlConfig::from_str(&content)?;
-        // self.skills = config.skills;
         Ok(config.skills)
+    }
+
+    async fn sync(&mut self) {
+        if self.expired() {
+            match self.load().await {
+                Ok(skills) => {
+                    self.skills = skills;
+                    self.last_sync = Some(std::time::Instant::now());
+                }
+                Err(e) => {
+                    warn!("Failed to load remote skill config, fallback to existing config: {e}");
+                }
+            }
+        }
     }
 }
 
 #[async_trait]
 impl SkillConfig for RemoteConfig {
     async fn skills(&mut self) -> &[Skill] {
-        match self.load().await {
-            Ok(skills) => self.skills = skills,
-            Err(e) => warn!("Could not load skill config, use existing config instead. ({e})"),
-        }
-
+        self.sync().await;
         &self.skills
     }
 }
@@ -123,6 +147,35 @@ pub mod tests {
         }
     }
 
+    impl RemoteConfig {
+        pub fn set_last_sync(&mut self, last_sync: std::time::Instant) {
+            self.last_sync = Some(last_sync);
+        }
+    }
+
+    #[test]
+    fn remote_config_expired_after_creation() {
+        let config = RemoteConfig::from_env();
+        assert!(config.expired());
+    }
+
+    #[test]
+    fn remote_config_expired_if_last_sync_is_yesterday() {
+        let mut config = RemoteConfig::from_env();
+        let yesterday = std::time::Instant::now() - std::time::Duration::from_secs(86400);
+        config.set_last_sync(yesterday);
+
+        assert!(config.expired());
+    }
+
+    #[test]
+    fn remote_config_not_expired_if_just_synced() {
+        let mut config = RemoteConfig::from_env();
+        let now = std::time::Instant::now();
+        config.set_last_sync(now);
+
+        assert!(!config.expired());
+    }
     #[test]
     fn load_skill_list_config_toml() {
         let tc: TomlConfig = toml::from_str(
