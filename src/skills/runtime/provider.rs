@@ -50,6 +50,9 @@ impl SkillProvider {
         skill_name: &str,
         engine: &Engine,
     ) -> anyhow::Result<&CachedSkill> {
+        if let Some(config) = self.skill_config.as_mut() {
+            config.load().await?;
+        }
         if self.allowed(skill_name) {
             self.internal_fetch(skill_name, engine).await
         } else {

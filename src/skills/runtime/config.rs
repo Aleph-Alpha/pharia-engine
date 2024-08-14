@@ -1,5 +1,6 @@
 use std::{env, path::Path};
 
+use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
@@ -9,8 +10,10 @@ pub struct Skill {
     pub name: String,
 }
 
+#[async_trait]
 pub trait SkillConfig {
     fn skills(&self) -> &[Skill];
+    async fn load(&mut self) -> anyhow::Result<()>;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,9 +44,14 @@ impl LocalConfig {
     }
 }
 
+#[async_trait]
 impl SkillConfig for LocalConfig {
     fn skills(&self) -> &[Skill] {
         &self.skills
+    }
+
+    async fn load(&mut self) -> anyhow::Result<()> {
+        Ok(())
     }
 }
 
@@ -54,17 +62,24 @@ pub struct RemoteConfig {
 }
 
 impl RemoteConfig {
-    pub async fn from_env() -> anyhow::Result<Self> {
+    pub fn from_env() -> Self {
         drop(dotenvy::dotenv());
-        let token = env::var("REMOTE_SKILL_CONFIG_TOKEN")?;
-        let url = env::var("REMOTE_SKILL_CONFIG_URL")?;
+        let token = env::var("REMOTE_SKILL_CONFIG_TOKEN")
+            .expect("Remote skill config token must be provided.");
+        let url =
+            env::var("REMOTE_SKILL_CONFIG_URL").expect("Remote skill config URL must be provided.");
         let skills = vec![];
-        let mut config = RemoteConfig { skills, token, url };
-        config.fetch().await?;
-        Ok(config)
+        Self { skills, token, url }
+    }
+}
+
+#[async_trait]
+impl SkillConfig for RemoteConfig {
+    fn skills(&self) -> &[Skill] {
+        &self.skills
     }
 
-    pub async fn fetch(&mut self) -> anyhow::Result<()> {
+    async fn load(&mut self) -> anyhow::Result<()> {
         let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", self.token)).unwrap();
         auth_value.set_sensitive(true);
         let client = reqwest::Client::new();
@@ -77,12 +92,6 @@ impl RemoteConfig {
         let config = TomlConfig::from_str(&content)?;
         self.skills = config.skills;
         Ok(())
-    }
-}
-
-impl SkillConfig for RemoteConfig {
-    fn skills(&self) -> &[Skill] {
-        &self.skills
     }
 }
 
@@ -106,9 +115,14 @@ pub mod tests {
         }
     }
 
+    #[async_trait]
     impl SkillConfig for StubConfig {
         fn skills(&self) -> &[Skill] {
             &self.skills
+        }
+
+        async fn load(&mut self) -> anyhow::Result<()> {
+            Ok(())
         }
     }
 
@@ -130,12 +144,13 @@ pub mod tests {
     #[tokio::test]
     async fn load_gitlab_config() {
         // Given a gitlab skill config
-        let fut = RemoteConfig::from_env();
+        let mut config = RemoteConfig::from_env();
 
         // when fetch skill config
-        let config = fut.await.unwrap();
+        let result = config.load().await;
 
         // then the configured skills must listed in the config
+        assert!(result.is_ok());
         assert!(!config.skills().is_empty());
     }
 }
