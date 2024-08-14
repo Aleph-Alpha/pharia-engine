@@ -47,19 +47,19 @@ impl SkillConfig for LocalConfig {
     }
 }
 
-pub struct GitlabConfig {
+pub struct RemoteConfig {
     skills: Vec<Skill>,
     token: String,
     url: String,
 }
 
-impl GitlabConfig {
+impl RemoteConfig {
     pub async fn from_env() -> anyhow::Result<Self> {
         drop(dotenvy::dotenv());
-        let token = env::var("GITLAB_SKILL_CONFIG_TOKEN")?;
-        let url = env::var("GITLAB_SKILL_CONFIG_URL")?;
+        let token = env::var("REMOTE_SKILL_CONFIG_TOKEN")?;
+        let url = env::var("REMOTE_SKILL_CONFIG_URL")?;
         let skills = vec![];
-        let mut config = GitlabConfig { skills, token, url };
+        let mut config = RemoteConfig { skills, token, url };
         config.fetch().await?;
         Ok(config)
     }
@@ -80,7 +80,7 @@ impl GitlabConfig {
     }
 }
 
-impl SkillConfig for GitlabConfig {
+impl SkillConfig for RemoteConfig {
     fn skills(&self) -> &[Skill] {
         &self.skills
     }
@@ -130,7 +130,7 @@ pub mod tests {
     #[tokio::test]
     async fn load_gitlab_config() {
         // Given a gitlab skill config
-        let fut = GitlabConfig::from_env();
+        let fut = RemoteConfig::from_env();
 
         // when fetch skill config
         let config = fut.await.unwrap();
