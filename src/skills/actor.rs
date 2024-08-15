@@ -1,6 +1,6 @@
 use std::future::pending;
 
-use super::runtime::{config::RemoteConfig, Csi, Runtime, WasmRuntime};
+use super::runtime::{skill_config::RemoteSkillConfig, Csi, Runtime, WasmRuntime};
 
 use crate::inference::{Completion, CompletionRequest, InferenceApi};
 use async_trait::async_trait;
@@ -20,7 +20,7 @@ pub struct SkillExecutor {
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
-        let skill_config = RemoteConfig::from_env();
+        let skill_config = RemoteSkillConfig::from_env();
         let skill_config = Box::new(skill_config);
         let runtime = WasmRuntime::with_config(Some(skill_config));
         Self::with_runtime(runtime, inference_api)

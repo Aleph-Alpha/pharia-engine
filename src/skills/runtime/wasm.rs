@@ -2,7 +2,7 @@ use serde_json::Value;
 
 use crate::registries::{registries, SkillRegistry};
 
-use super::{config::SkillConfig, engine::Engine, provider::SkillProvider, Csi, Runtime};
+use super::{skill_config::SkillConfig, engine::Engine, provider::SkillProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,

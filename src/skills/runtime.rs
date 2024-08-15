@@ -1,6 +1,7 @@
-pub mod config;
+mod config;
 mod engine;
 mod provider;
+pub mod skill_config;
 mod wasm;
 
 use async_trait::async_trait;

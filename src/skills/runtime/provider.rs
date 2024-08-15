@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::registries::SkillRegistry;
 
 use super::{
-    config::SkillConfig,
+    skill_config::SkillConfig,
     engine::{Engine, Skill},
     Csi,
 };
@@ -97,7 +97,7 @@ impl CachedSkill {
 #[cfg(test)]
 mod tests {
 
-    use crate::skills::runtime::config::tests::StubConfig;
+    use crate::skills::runtime::skill_config::tests::StubConfig;
 
     use super::*;
 

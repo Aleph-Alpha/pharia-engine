@@ -1,0 +1,7 @@
+[namespaces.pharia-kernel-team]
+config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+registry = "registry.gitlab.aleph-alpha.de"
+repository = "engineering/pharia-skills/skills"
+
+
+
