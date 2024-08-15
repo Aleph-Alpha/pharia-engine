@@ -1,8 +1,13 @@
 use std::future::pending;
 
-use super::runtime::{skill_config::RemoteSkillConfig, Config, Csi, Runtime, WasmRuntime};
+use super::runtime::{
+    skill_config::RemoteSkillConfig, Config, Csi, Runtime, SkillProvider, WasmRuntime,
+};
 
-use crate::inference::{Completion, CompletionRequest, InferenceApi};
+use crate::{
+    inference::{Completion, CompletionRequest, InferenceApi},
+    registries::registries,
+};
 use async_trait::async_trait;
 use oci_distribution::config;
 use serde_json::Value;
@@ -26,7 +31,9 @@ impl SkillExecutor {
 
         let skill_config = RemoteSkillConfig::from_env();
         let skill_config = Box::new(skill_config);
-        let runtime = WasmRuntime::with_config(Some(skill_config), Some(config));
+        let provider = SkillProvider::new(Box::new(registries()), Some(skill_config), Some(config));
+
+        let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)
     }
 

@@ -1,10 +1,8 @@
 use serde_json::Value;
 
-use crate::registries::{registries, SkillRegistry};
+use crate::registries::registries;
 
-use super::{
-    engine::Engine, provider::SkillProvider, skill_config::SkillConfig, Config, Csi, Runtime,
-};
+use super::{engine::Engine, provider::SkillProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
@@ -13,30 +11,14 @@ pub struct WasmRuntime {
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        Self::with_config(None, None)
+        let provider = SkillProvider::new(Box::new(registries()), None, None);
+        Self::with_provider(provider)
     }
 
-    pub fn with_config(
-        skill_config: Option<Box<dyn SkillConfig + Send>>,
-        config: Option<Config>,
-    ) -> Self {
-        Self::with_registry_and_config(registries(), skill_config, config)
-    }
-
-    pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
-        Self::with_registry_and_config(skill_registry, None, None)
-    }
-
-    pub fn with_registry_and_config(
-        skill_registry: impl SkillRegistry + Send + 'static,
-        skill_config: Option<Box<dyn SkillConfig + Send>>,
-        config: Option<Config>,
-    ) -> Self {
-        let engine = Engine::new().expect("engine creation failed");
-
+    pub fn with_provider(skill_provider: SkillProvider) -> Self {
         Self {
-            engine,
-            provider: SkillProvider::new(Box::new(skill_registry), skill_config, config),
+            engine: Engine::new().expect("engine creation failed"),
+            provider: skill_provider,
         }
     }
 }
@@ -179,8 +161,10 @@ pub mod tests {
     async fn lazy_skill_loading() {
         // Giving and empty skill directory to the WasmRuntime
         let skill_dir = tempdir().unwrap();
+
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let mut runtime = WasmRuntime::with_registry(registry);
+        let provider = SkillProvider::new(Box::new(registry), None, None);
+        let mut runtime = WasmRuntime::with_provider(provider);
         let skill_ctx = Box::new(CsiGreetingStub);
 
         // When adding a new skill component
