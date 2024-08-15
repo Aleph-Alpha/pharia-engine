@@ -7,28 +7,24 @@ use crate::registries::SkillRegistry;
 
 use super::{
     engine::{Engine, Skill},
-    skill_config::SkillConfig,
+    skill_config::{RemoteSkillConfig, SkillConfig},
     Config, Csi,
 };
 
 pub struct SkillProvider {
     skills: HashMap<String, CachedSkill>,
     skill_registry: Box<dyn SkillRegistry + Send>,
-    skill_config: Option<Box<dyn SkillConfig + Send>>,
     config: Option<Config>,
+    skill_configs: HashMap<String, Box<dyn SkillConfig + Send>>,
 }
 
 impl SkillProvider {
-    pub fn new(
-        skill_registry: Box<dyn SkillRegistry + Send>,
-        skill_config: Option<Box<dyn SkillConfig + Send>>,
-        config: Option<Config>,
-    ) -> Self {
+    pub fn new(skill_registry: Box<dyn SkillRegistry + Send>, config: Option<Config>) -> Self {
         SkillProvider {
             skills: HashMap::new(),
             skill_registry,
-            skill_config,
             config,
+            skill_configs: HashMap::new(),
         }
     }
 
@@ -40,12 +36,29 @@ impl SkillProvider {
         self.skills.remove(skill).is_some()
     }
 
-    pub async fn allowed(&mut self, skill: &str) -> bool {
-        if let Some(config) = self.skill_config.as_mut() {
-            config.skills().await.iter().any(|s| s.name == skill)
+    pub async fn allowed(&mut self, namespace: &str, skill_name: &str) -> bool {
+        let skill_config = if let Some(sc) = self.skill_configs.get_mut(namespace) {
+            sc
         } else {
-            true
-        }
+            let Some(cfg) = &self.config else {
+                //if no config is available then fallback to old behavior in order to be
+                //backward compatible
+                return true;
+            };
+            let Some(ns) = cfg.namespaces.get(namespace) else {
+                //if config is available but namespace isn't deny skill usage
+                return false;
+            };
+            let sc = Box::new(RemoteSkillConfig::from_url(&ns.config_url));
+            self.skill_configs.insert(namespace.to_owned(), sc);
+            self.skill_configs.get_mut(namespace).unwrap()
+        };
+
+        skill_config
+            .skills()
+            .await
+            .iter()
+            .any(|s| s.name == skill_name)
     }
 
     pub async fn fetch(
@@ -53,7 +66,12 @@ impl SkillProvider {
         skill_name: &str,
         engine: &Engine,
     ) -> anyhow::Result<&CachedSkill> {
-        if self.allowed(skill_name).await {
+        let (ns, sn) = match skill_name.split_once('/') {
+            Some(nssn) => nssn,
+            None => ("pharia-kernel-team", skill_name),
+        };
+
+        if self.allowed(ns, sn).await {
             self.internal_fetch(skill_name, engine).await
         } else {
             Err(anyhow!("Skill {skill_name} not configured."))
@@ -100,33 +118,27 @@ impl CachedSkill {
 #[cfg(test)]
 mod tests {
 
-    use crate::skills::runtime::skill_config::tests::StubConfig;
-
     use super::*;
 
     #[tokio::test]
     async fn skill_component_is_in_config() {
-        let skill_config = StubConfig::new(&["greet_skill"]);
-        let skill_config = Box::new(skill_config);
         let skill_registry = HashMap::<String, Vec<u8>>::new();
         let config = Config::from_file("config.toml");
-        let mut provider =
-            SkillProvider::new(Box::new(skill_registry), Some(skill_config), Some(config));
+        let mut provider = SkillProvider::new(Box::new(skill_registry), Some(config));
 
-        let allowed = provider.allowed("greet_skill").await;
+        let allowed = provider.allowed("pharia-kernel-team", "greet_skill").await;
 
         assert!(allowed);
     }
 
     #[tokio::test]
     async fn skill_component_not_in_config() {
-        let skill_config = StubConfig::new(&[]);
-        let skill_config = Box::new(skill_config);
         let skill_registry = HashMap::<String, Vec<u8>>::new();
         let config = Config::from_file("config.toml");
-        let mut provider =
-            SkillProvider::new(Box::new(skill_registry), Some(skill_config), Some(config));
-        let allowed = provider.allowed("greet_skill").await;
+        let mut provider = SkillProvider::new(Box::new(skill_registry), Some(config));
+        let allowed = provider
+            .allowed("pharia-kernel-team", "non_existing_skill")
+            .await;
         assert!(!allowed);
     }
 

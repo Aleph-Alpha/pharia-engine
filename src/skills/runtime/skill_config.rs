@@ -62,10 +62,15 @@ pub struct RemoteSkillConfig {
 impl RemoteSkillConfig {
     pub fn from_env() -> Self {
         drop(dotenvy::dotenv());
-        let token = env::var("REMOTE_SKILL_CONFIG_TOKEN")
-            .expect("Remote skill config token must be provided.");
         let url =
             env::var("REMOTE_SKILL_CONFIG_URL").expect("Remote skill config URL must be provided.");
+        Self::from_url(&url)
+    }
+
+    pub fn from_url(url: &str) -> Self {
+        drop(dotenvy::dotenv());
+        let token = env::var("REMOTE_SKILL_CONFIG_TOKEN")
+            .expect("Remote skill config token must be provided.");
         let sync_interval = env::var("REMOTE_SKILL_CONFIG_UPDATE_INTERVAL_SEC")
             .unwrap_or("60".to_owned())
             .parse::<u64>()
@@ -74,7 +79,7 @@ impl RemoteSkillConfig {
         Self {
             skills,
             token,
-            url,
+            url: url.to_owned(),
             sync_interval,
             last_sync: None,
         }

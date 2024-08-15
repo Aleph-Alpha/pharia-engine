@@ -1,15 +1,12 @@
 use std::future::pending;
 
-use super::runtime::{
-    skill_config::RemoteSkillConfig, Config, Csi, Runtime, SkillProvider, WasmRuntime,
-};
+use super::runtime::{Config, Csi, Runtime, SkillProvider, WasmRuntime};
 
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
     registries::registries,
 };
 use async_trait::async_trait;
-use oci_distribution::config;
 use serde_json::Value;
 use tokio::{
     select,
@@ -29,9 +26,7 @@ impl SkillExecutor {
         let config_str = include_str!("../../config.toml");
         let config = Config::from_str(&config_str);
 
-        let skill_config = RemoteSkillConfig::from_env();
-        let skill_config = Box::new(skill_config);
-        let provider = SkillProvider::new(Box::new(registries()), Some(skill_config), Some(config));
+        let provider = SkillProvider::new(Box::new(registries()), Some(config));
 
         let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)

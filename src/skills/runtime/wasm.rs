@@ -11,7 +11,7 @@ pub struct WasmRuntime {
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        let provider = SkillProvider::new(Box::new(registries()), None, None);
+        let provider = SkillProvider::new(Box::new(registries()), None);
         Self::with_provider(provider)
     }
 
@@ -163,7 +163,7 @@ pub mod tests {
         let skill_dir = tempdir().unwrap();
 
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let provider = SkillProvider::new(Box::new(registry), None, None);
+        let provider = SkillProvider::new(Box::new(registry), None);
         let mut runtime = WasmRuntime::with_provider(provider);
         let skill_ctx = Box::new(CsiGreetingStub);
 

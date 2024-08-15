@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Config {
-    namespaces: HashMap<String, Namespace>,
+    pub namespaces: HashMap<String, Namespace>,
 }
 
 impl Config {
@@ -19,10 +19,10 @@ impl Config {
 }
 
 #[derive(Deserialize)]
-struct Namespace {
+pub struct Namespace {
     repository: String,
     registry: String,
-    config_url: String,
+    pub config_url: String,
 }
 
 #[cfg(test)]
