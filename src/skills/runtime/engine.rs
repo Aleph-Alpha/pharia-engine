@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use semver::Version;
@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use strum::{EnumIter, IntoEnumIterator};
 use wasmtime::{
     component::{Component, Linker as WasmtimeLinker},
-    Config, Engine as WasmtimeEngine, OptLevel, Store,
+    Config, Engine as WasmtimeEngine, OptLevel, Store, UpdateDeadline,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
@@ -21,6 +21,12 @@ pub struct Engine {
 }
 
 impl Engine {
+    /// How long to wait before incrementing the epoch counter.
+    const EPOCH_INTERVAL: Duration = Duration::from_millis(100);
+    /// Maximum skill execution time before we cancel the execution.
+    /// Currently set to 10 minutes as an upper bound.
+    const MAX_EXECUTION_TIME: Duration = Duration::from_secs(60 * 10);
+
     pub fn new() -> anyhow::Result<Self> {
         let engine = WasmtimeEngine::new(
             Config::new()
@@ -39,7 +45,7 @@ impl Engine {
         // the async runtime by a skill that doesn't yield.
         std::thread::spawn(move || {
             loop {
-                std::thread::sleep(Duration::from_millis(100));
+                std::thread::sleep(Self::EPOCH_INTERVAL);
                 // If the engine is still alive, increment the epoch counter.
                 // Otherwise stop the thread.
                 let Some(engine) = engine_ref.upgrade() else {
@@ -100,10 +106,19 @@ impl Engine {
         let mut store = Store::new(&self.inner, data);
         // Check after the next tick
         store.set_epoch_deadline(1);
-        // After it yields, reset the deadline to one more tick.
-        // Currently, this would still allow tasks to run forever, but they will
-        // at least have to yield roughly every tick.
-        store.epoch_deadline_async_yield_and_update(1);
+        // Once the deadline is reached, the callback will be called.
+        // If the skill hasn't been running for more than 10 minutes, it will yield
+        // and be allowed to run for one more tick.
+        // If it has been running for more than 10 minutes, it will trap and return an error.
+        let start = Instant::now();
+        store.epoch_deadline_callback(move |_| {
+            let now = Instant::now();
+            if now - start < Self::MAX_EXECUTION_TIME {
+                Ok(UpdateDeadline::Yield(1))
+            } else {
+                Err(anyhow!("Maximum skill execution time reached."))
+            }
+        });
         store
     }
 }
