@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::future::Future;
 
+pub use config::Config;
 pub use wasm::WasmRuntime;
 
 use crate::inference::{Completion, CompletionRequest};

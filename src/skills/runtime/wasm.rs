@@ -2,7 +2,9 @@ use serde_json::Value;
 
 use crate::registries::{registries, SkillRegistry};
 
-use super::{skill_config::SkillConfig, engine::Engine, provider::SkillProvider, Csi, Runtime};
+use super::{
+    engine::Engine, provider::SkillProvider, skill_config::SkillConfig, Config, Csi, Runtime,
+};
 
 pub struct WasmRuntime {
     engine: Engine,
@@ -11,26 +13,30 @@ pub struct WasmRuntime {
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        Self::with_config(None)
+        Self::with_config(None, None)
     }
 
-    pub fn with_config(skill_config: Option<Box<dyn SkillConfig + Send>>) -> Self {
-        Self::with_registry_and_config(registries(), skill_config)
+    pub fn with_config(
+        skill_config: Option<Box<dyn SkillConfig + Send>>,
+        config: Option<Config>,
+    ) -> Self {
+        Self::with_registry_and_config(registries(), skill_config, config)
     }
 
     pub fn with_registry(skill_registry: impl SkillRegistry + Send + 'static) -> Self {
-        Self::with_registry_and_config(skill_registry, None)
+        Self::with_registry_and_config(skill_registry, None, None)
     }
 
     pub fn with_registry_and_config(
         skill_registry: impl SkillRegistry + Send + 'static,
         skill_config: Option<Box<dyn SkillConfig + Send>>,
+        config: Option<Config>,
     ) -> Self {
         let engine = Engine::new().expect("engine creation failed");
 
         Self {
             engine,
-            provider: SkillProvider::new(Box::new(skill_registry), skill_config),
+            provider: SkillProvider::new(Box::new(skill_registry), skill_config, config),
         }
     }
 }

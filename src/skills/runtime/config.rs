@@ -3,16 +3,16 @@ use std::{collections::HashMap, fs, path::Path};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-struct Config {
+pub struct Config {
     namespaces: HashMap<String, Namespace>,
 }
 
 impl Config {
-    fn from_str(config: &str) -> Self {
+    pub fn from_str(config: &str) -> Self {
         toml::from_str(config).expect("Config is invalid")
     }
 
-    fn from_file<P: AsRef<Path>>(p: P) -> Self {
+    pub fn from_file<P: AsRef<Path>>(p: P) -> Self {
         let config = fs::read_to_string(p).expect("Could not read config file");
         Self::from_str(&config)
     }

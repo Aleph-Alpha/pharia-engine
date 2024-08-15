@@ -1,9 +1,10 @@
 use std::future::pending;
 
-use super::runtime::{skill_config::RemoteSkillConfig, Csi, Runtime, WasmRuntime};
+use super::runtime::{skill_config::RemoteSkillConfig, Config, Csi, Runtime, WasmRuntime};
 
 use crate::inference::{Completion, CompletionRequest, InferenceApi};
 use async_trait::async_trait;
+use oci_distribution::config;
 use serde_json::Value;
 use tokio::{
     select,
@@ -20,9 +21,12 @@ pub struct SkillExecutor {
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
+        let config_str = include_str!("../../config.toml");
+        let config = Config::from_str(&config_str);
+
         let skill_config = RemoteSkillConfig::from_env();
         let skill_config = Box::new(skill_config);
-        let runtime = WasmRuntime::with_config(Some(skill_config));
+        let runtime = WasmRuntime::with_config(Some(skill_config), Some(config));
         Self::with_runtime(runtime, inference_api)
     }
 

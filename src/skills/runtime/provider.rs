@@ -6,26 +6,29 @@ use serde_json::Value;
 use crate::registries::SkillRegistry;
 
 use super::{
-    skill_config::SkillConfig,
     engine::{Engine, Skill},
-    Csi,
+    skill_config::SkillConfig,
+    Config, Csi,
 };
 
 pub struct SkillProvider {
     skills: HashMap<String, CachedSkill>,
     skill_registry: Box<dyn SkillRegistry + Send>,
     skill_config: Option<Box<dyn SkillConfig + Send>>,
+    config: Option<Config>,
 }
 
 impl SkillProvider {
     pub fn new(
         skill_registry: Box<dyn SkillRegistry + Send>,
         skill_config: Option<Box<dyn SkillConfig + Send>>,
+        config: Option<Config>,
     ) -> Self {
         SkillProvider {
             skills: HashMap::new(),
             skill_registry,
             skill_config,
+            config,
         }
     }
 
@@ -106,7 +109,9 @@ mod tests {
         let skill_config = StubConfig::new(&["greet_skill"]);
         let skill_config = Box::new(skill_config);
         let skill_registry = HashMap::<String, Vec<u8>>::new();
-        let mut provider = SkillProvider::new(Box::new(skill_registry), Some(skill_config));
+        let config = Config::from_file("config.toml");
+        let mut provider =
+            SkillProvider::new(Box::new(skill_registry), Some(skill_config), Some(config));
 
         let allowed = provider.allowed("greet_skill").await;
 
@@ -118,7 +123,9 @@ mod tests {
         let skill_config = StubConfig::new(&[]);
         let skill_config = Box::new(skill_config);
         let skill_registry = HashMap::<String, Vec<u8>>::new();
-        let mut provider = SkillProvider::new(Box::new(skill_registry), Some(skill_config));
+        let config = Config::from_file("config.toml");
+        let mut provider =
+            SkillProvider::new(Box::new(skill_registry), Some(skill_config), Some(config));
         let allowed = provider.allowed("greet_skill").await;
         assert!(!allowed);
     }
