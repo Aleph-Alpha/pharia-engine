@@ -6,16 +6,6 @@ mod oci;
 
 pub use oci::OciRegistry;
 
-pub use self::file::FileRegistry;
-
-pub fn registries() -> Vec<Box<dyn SkillRegistry + Send>> {
-    let mut registries: Vec<Box<dyn SkillRegistry + Send>> = vec![Box::new(FileRegistry::new())];
-    if let Some(oci_registry) = OciRegistry::from_env() {
-        registries.push(Box::new(oci_registry));
-    }
-    registries
-}
-
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub trait SkillRegistry {
@@ -52,13 +42,15 @@ impl<R: SkillRegistry> SkillRegistry for Vec<R> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::collections::HashMap;
 
     use anyhow::anyhow;
     use tempfile::tempdir;
 
-    use super::{DynFuture, FileRegistry, SkillRegistry};
+    pub use super::file::FileRegistry;
+
+    use super::{DynFuture, SkillRegistry};
 
     impl SkillRegistry for HashMap<String, Vec<u8>> {
         fn load_skill<'a>(

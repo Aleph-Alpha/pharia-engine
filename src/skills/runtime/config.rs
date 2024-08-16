@@ -29,6 +29,19 @@ pub struct Namespace {
 mod tests {
     use super::Config;
 
+    impl Config {
+        pub fn local() -> Self {
+            Self::from_str(
+                r#"
+                    [namespaces.local]
+                    config_url = "file://skill_config.toml"
+                    registry = "registry.gitlab.aleph-alpha.de"
+                    repository = "engineering/pharia-skills/skills"
+                "#,
+            )
+        }
+    }
+
     #[test]
     fn deserialize_config() {
         let config = Config::from_str(

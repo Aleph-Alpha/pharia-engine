@@ -1,10 +1,12 @@
 use std::{env, path::Path};
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
+use url::Url;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Skill {
@@ -14,6 +16,22 @@ pub struct Skill {
 #[async_trait]
 pub trait SkillConfig {
     async fn skills(&mut self) -> &[Skill];
+}
+
+pub fn skill_config_from_url(raw_url: &str) -> anyhow::Result<Box<dyn SkillConfig + Send>> {
+    let url = Url::parse(raw_url)?;
+    match url.scheme() {
+        "https" | "http" => Ok(Box::new(RemoteSkillConfig::from_url(raw_url))),
+        "file" => {
+            // remove leading "file://"
+            let file_path = &raw_url[7..];
+
+            let skill_config = LocalSkillConfig::new(file_path)?;
+
+            Ok(Box::new(skill_config))
+        }
+        scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

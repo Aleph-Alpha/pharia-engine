@@ -27,7 +27,7 @@ impl Runtime for WasmRuntime {
         skill.run(&self.engine, ctx, input).await
     }
 
-    fn skills(&self) -> impl Iterator<Item = &str> {
+    fn skills(&self) -> impl Iterator<Item = String> {
         self.provider.skills()
     }
 
@@ -46,7 +46,6 @@ pub mod tests {
 
     use crate::{
         inference::{Completion, CompletionRequest},
-        registries::{registries, FileRegistry},
         skills::runtime::Config,
     };
 
@@ -56,9 +55,9 @@ pub mod tests {
     use tempfile::tempdir;
 
     impl WasmRuntime {
-        pub fn new() -> Self {
-            let config = Config::from_str("[namespaces]");
-            let provider = NamespaceProvider::new(Box::new(registries()), config);
+        pub fn local() -> Self {
+            let config = Config::local();
+            let provider = NamespaceProvider::new(config);
             Self::with_provider(provider)
         }
     }
@@ -66,8 +65,10 @@ pub mod tests {
     #[tokio::test]
     async fn greet_skill_component() {
         let skill_ctx = Box::new(CsiGreetingStub);
-        let mut runtime = WasmRuntime::new();
-        let resp = runtime.run("greet_skill", json!("name"), skill_ctx).await;
+        let mut runtime = WasmRuntime::local();
+        let resp = runtime
+            .run("local/greet_skill", json!("name"), skill_ctx)
+            .await;
 
         assert_eq!(resp.unwrap(), "Hello");
     }
@@ -75,7 +76,7 @@ pub mod tests {
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
         let skill_ctx = Box::new(CsiGreetingStub);
-        let mut runtime = WasmRuntime::new();
+        let mut runtime = WasmRuntime::local();
         let resp = runtime
             .run("non-existing-skill", json!("name"), skill_ctx)
             .await;
@@ -85,7 +86,7 @@ pub mod tests {
     #[tokio::test]
     async fn drop_non_existing_skill_from_cache() {
         // Given a WasmRuntime with no cached skills
-        let mut runtime = WasmRuntime::new();
+        let mut runtime = WasmRuntime::local();
 
         // When removing a skill from the runtime
         let result = runtime.invalidate_cached_skill("non-cached-skill");
@@ -97,17 +98,17 @@ pub mod tests {
     #[tokio::test]
     async fn drop_existing_skill_from_cache() {
         // Given a WasmRuntime with a cached skill
-        let mut runtime = WasmRuntime::new();
+        let mut runtime = WasmRuntime::local();
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run("greet_skill", json!("name"), skill_ctx)
+                .run("local/greet_skill", json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
 
         // When dropping a skill from the runtime
-        let result = runtime.invalidate_cached_skill("greet_skill");
+        let result = runtime.invalidate_cached_skill("local/greet_skill");
 
         // Then the component hash map is empty
         assert_eq!(runtime.skills().count(), 0);
@@ -119,7 +120,7 @@ pub mod tests {
     #[tokio::test]
     async fn no_skills_are_listed() {
         // given a fresh WasmRuntime
-        let runtime = WasmRuntime::new();
+        let runtime = WasmRuntime::local();
 
         // when querying skills
         let skill_count = runtime.skills().count();
@@ -131,11 +132,11 @@ pub mod tests {
     #[tokio::test]
     async fn skills_are_listed() {
         // given a runtime with two installed skills
-        let mut runtime = WasmRuntime::new();
+        let mut runtime = WasmRuntime::local();
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run("greet_skill", json!("name"), skill_ctx)
+                .run("local/greet_skill", json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -143,7 +144,7 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run("greet-py", json!("name"), skill_ctx)
+                .run("local/greet-py", json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -152,10 +153,11 @@ pub mod tests {
         let skills = runtime.skills();
 
         // convert to a set
-        let skills: HashSet<String> = skills.map(str::to_owned).collect();
-        let expected: HashSet<String> = ["greet-py".to_owned(), "greet_skill".to_owned()]
-            .into_iter()
-            .collect();
+        let skills: HashSet<String> = skills.collect();
+        let expected: HashSet<String> =
+            ["local/greet-py".to_owned(), "local/greet_skill".to_owned()]
+                .into_iter()
+                .collect();
         assert_eq!(skills, expected);
     }
 
@@ -164,9 +166,8 @@ pub mod tests {
         // Giving and empty skill directory to the WasmRuntime
         let skill_dir = tempdir().unwrap();
 
-        let registry = FileRegistry::with_dir(skill_dir.path());
-        let config = Config::from_str("[namespaces]");
-        let provider = NamespaceProvider::new(Box::new(registry), config);
+        let config = Config::local();
+        let provider = NamespaceProvider::new(config);
         let mut runtime = WasmRuntime::with_provider(provider);
         let skill_ctx = Box::new(CsiGreetingStub);
 
@@ -175,7 +176,9 @@ pub mod tests {
         fs::copy("./skills/greet_skill.wasm", skill_path).unwrap();
 
         // Then the skill can be invoked
-        let greet = runtime.run("greet_skill", json!("Homer"), skill_ctx).await;
+        let greet = runtime
+            .run("local/greet_skill", json!("Homer"), skill_ctx)
+            .await;
         assert!(greet.is_ok());
     }
 
@@ -183,9 +186,9 @@ pub mod tests {
     async fn rust_greeting_skill() {
         let skill_ctx = Box::new(CsiGreetingMock);
 
-        let mut runtime = WasmRuntime::new();
+        let mut runtime = WasmRuntime::local();
         let actual = runtime
-            .run("greet_skill", json!("Homer"), skill_ctx)
+            .run("local/greet_skill", json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
@@ -196,9 +199,9 @@ pub mod tests {
     async fn python_greeting_skill() {
         let skill_ctx = Box::new(CsiGreetingMock);
 
-        let mut runtime = WasmRuntime::new();
+        let mut runtime = WasmRuntime::local();
         let actual = runtime
-            .run("greet-py", json!("Homer"), skill_ctx)
+            .run("local/greet-py", json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
@@ -208,10 +211,10 @@ pub mod tests {
     #[tokio::test]
     async fn can_call_preinstantiated_multiple_times() {
         let skill_ctx = Box::new(CsiCounter::new());
-        let mut runtime = WasmRuntime::new();
+        let mut runtime = WasmRuntime::local();
         for i in 1..10 {
             let resp = runtime
-                .run("greet_skill", json!("Homer"), skill_ctx.clone())
+                .run("local/greet_skill", json!("Homer"), skill_ctx.clone())
                 .await
                 .unwrap();
             assert_eq!(resp, json!(i.to_string()));

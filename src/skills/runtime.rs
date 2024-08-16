@@ -34,7 +34,7 @@ pub trait Runtime {
         ctx: Box<dyn Csi + Send>,
     ) -> impl Future<Output = anyhow::Result<Value>> + Send;
 
-    fn skills(&self) -> impl Iterator<Item = &str>;
+    fn skills(&self) -> impl Iterator<Item = String>;
 
     /// The runtime may handle cache invalidation of skills by itself in the future. For now we cut
     /// it a bit of slack and just tell it that a skill might have changed.
@@ -71,7 +71,7 @@ pub mod tests {
             Err(anyhow!(self.err_msg.clone()))
         }
 
-        fn skills(&self) -> impl Iterator<Item = &str> {
+        fn skills(&self) -> impl Iterator<Item = String> {
             std::iter::empty()
         }
         fn invalidate_cached_skill(&mut self, _skill: &str) -> bool {

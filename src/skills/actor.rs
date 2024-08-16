@@ -2,10 +2,7 @@ use std::future::pending;
 
 use super::runtime::{Config, Csi, NamespaceProvider, Runtime, WasmRuntime};
 
-use crate::{
-    inference::{Completion, CompletionRequest, InferenceApi},
-    registries::registries,
-};
+use crate::inference::{Completion, CompletionRequest, InferenceApi};
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::{
@@ -26,7 +23,7 @@ impl SkillExecutor {
         let config_str = include_str!("../../config.toml");
         let config = Config::from_str(config_str);
 
-        let provider = NamespaceProvider::new(Box::new(registries()), config);
+        let provider = NamespaceProvider::new(config);
 
         let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)
@@ -148,7 +145,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 drop(send.send(response));
             }
             SkillExecutorMessage::Skills { send } => {
-                let response = self.runtime.skills().map(str::to_owned).collect();
+                let response = self.runtime.skills().collect();
                 drop(send.send(response));
             }
             SkillExecutorMessage::Drop { skill, send } => {
@@ -276,8 +273,8 @@ pub mod tests {
                 panic!("complete_text must pend forever in case of error")
             }
 
-            fn skills(&self) -> impl Iterator<Item = &str> {
-                iter::once("Greet")
+            fn skills(&self) -> impl Iterator<Item = String> {
+                iter::once("Greet".to_owned())
             }
             fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
                 skill == "Greet"
@@ -364,8 +361,8 @@ pub mod tests {
             panic!("Liar runtime does not run skills")
         }
 
-        fn skills(&self) -> impl Iterator<Item = &str> {
-            self.skills.iter().map(String::as_ref)
+        fn skills(&self) -> impl Iterator<Item = String> {
+            self.skills.iter().map(String::clone)
         }
         fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
             self.skills.iter().any(|s| s == skill)
@@ -457,8 +454,8 @@ pub mod tests {
             let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
             Ok(json!(ctx.complete_text(request).await.text))
         }
-        fn skills(&self) -> impl Iterator<Item = &str> {
-            std::iter::once("greet")
+        fn skills(&self) -> impl Iterator<Item = String> {
+            std::iter::once("greet".to_owned())
         }
         fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
             skill == "greet"

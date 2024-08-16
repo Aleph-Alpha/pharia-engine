@@ -7,13 +7,11 @@ use crate::registries::{OciRegistry, SkillRegistry};
 
 use super::{
     engine::{Engine, Skill},
-    skill_config::{RemoteSkillConfig, SkillConfig},
+    skill_config::{skill_config_from_url, SkillConfig},
     Config, Csi,
 };
 
 pub struct NamespaceProvider {
-    skills: HashMap<String, CachedSkill>,
-    skill_registry: Box<dyn SkillRegistry + Send>,
     config: Config,
     skill_providers: HashMap<String, SkillProvider>,
 }
@@ -27,11 +25,11 @@ pub struct SkillProvider {
 impl SkillProvider {
     pub fn new(
         skill_registry: impl SkillRegistry + Send + 'static,
-        skill_config: impl SkillConfig + Send + 'static,
+        skill_config: Box<dyn SkillConfig + Send>,
     ) -> Self {
         SkillProvider {
             skill_registry: Box::new(skill_registry),
-            skill_config: Box::new(skill_config),
+            skill_config,
             skills: HashMap::new(),
         }
     }
@@ -85,21 +83,31 @@ impl SkillPath {
     }
 }
 impl NamespaceProvider {
-    pub fn new(skill_registry: Box<dyn SkillRegistry + Send>, config: Config) -> Self {
+    pub fn new(config: Config) -> Self {
         NamespaceProvider {
-            skills: HashMap::new(),
-            skill_registry,
             config,
             skill_providers: HashMap::new(),
         }
     }
 
-    pub fn skills(&self) -> impl Iterator<Item = &str> {
-        self.skills.keys().map(String::as_ref)
+    pub fn skills(&self) -> impl Iterator<Item = String> {
+        self.skill_providers
+            .iter()
+            .flat_map(|(namespace, provider)| {
+                provider
+                    .skills
+                    .keys()
+                    .map(|name| format!("{}/{name}", namespace.clone()))
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
-    pub fn invalidate(&mut self, skill: &str) -> bool {
-        self.skills.remove(skill).is_some()
+    pub fn invalidate(&mut self, skill_name: &str) -> bool {
+        let path = SkillPath::from_str(skill_name);
+        self.skill_providers
+            .get_mut(&path.namespace)
+            .is_some_and(|skill_provider| skill_provider.skills.remove(&path.name).is_some())
     }
 
     fn skill_provider(&mut self, namespace: &str) -> anyhow::Result<&mut SkillProvider> {
@@ -107,22 +115,27 @@ impl NamespaceProvider {
             return Err(anyhow!("Namespace not configured."));
         };
 
-        let skill_provider = self
+        if !self.skill_providers.contains_key(namespace) {
+            drop(dotenvy::dotenv());
+            let username = env::var("SKILL_REGISTRY_USER").unwrap();
+            let password = env::var("SKILL_REGISTRY_PASSWORD").unwrap();
+            let skill_registry = OciRegistry::new(
+                ns.repository.clone(),
+                ns.registry.clone(),
+                username,
+                password,
+            );
+
+            let skill_config = skill_config_from_url(&ns.config_url)?;
+            let skill_provider = SkillProvider::new(skill_registry, skill_config);
+            self.skill_providers
+                .insert(namespace.to_owned(), skill_provider);
+        }
+
+        Ok(self
             .skill_providers
-            .entry(namespace.to_owned())
-            .or_insert_with(|| {
-                let username = env::var("SKILL_REGISTRY_USER").unwrap();
-                let password = env::var("SKILL_REGISTRY_PASSWORD").unwrap();
-                let skill_registry = OciRegistry::new(
-                    ns.repository.clone(),
-                    ns.registry.clone(),
-                    username,
-                    password,
-                );
-                let skill_config = RemoteSkillConfig::from_url(&ns.config_url);
-                SkillProvider::new(skill_registry, skill_config)
-            });
-        Ok(skill_provider)
+            .get_mut(namespace)
+            .expect("Skill provider inserted."))
     }
 
     pub async fn fetch(
@@ -160,22 +173,22 @@ impl CachedSkill {
 #[cfg(test)]
 mod tests {
 
-    use crate::{registries::FileRegistry, skills::runtime::skill_config::LocalSkillConfig};
+    use crate::{registries::tests::FileRegistry, skills::runtime::skill_config::LocalSkillConfig};
 
     use super::*;
 
     impl NamespaceProvider {
         fn empty() -> Self {
-            let skill_registry = HashMap::<String, Vec<u8>>::new();
             let config = Config::from_str("[namespaces]");
-            NamespaceProvider::new(Box::new(skill_registry), config)
+            NamespaceProvider::new(config)
         }
 
         fn with_namespace_and_skill(namespace: &str, skill: &str) -> Self {
             let skill_registry = FileRegistry::new();
-            let skill_config =
+            let skill_config = Box::new(
                 LocalSkillConfig::from_str(&format!("skills = [{{ name = \"{skill}\" }}]"))
-                    .unwrap();
+                    .unwrap(),
+            );
             let skill_provider = SkillProvider::new(skill_registry, skill_config);
 
             let mut provider = NamespaceProvider::empty();
