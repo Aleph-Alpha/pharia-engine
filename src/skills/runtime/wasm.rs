@@ -1,7 +1,5 @@
 use serde_json::Value;
 
-use crate::registries::registries;
-
 use super::{engine::Engine, provider::NamespaceProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
@@ -10,11 +8,6 @@ pub struct WasmRuntime {
 }
 
 impl WasmRuntime {
-    pub fn new() -> Self {
-        let provider = NamespaceProvider::new(Box::new(registries()), None);
-        Self::with_provider(provider)
-    }
-
     pub fn with_provider(skill_provider: NamespaceProvider) -> Self {
         Self {
             engine: Engine::new().expect("engine creation failed"),
@@ -53,13 +46,22 @@ pub mod tests {
 
     use crate::{
         inference::{Completion, CompletionRequest},
-        registries::FileRegistry,
+        registries::{registries, FileRegistry},
+        skills::runtime::Config,
     };
 
     use super::*;
     use async_trait::async_trait;
     use serde_json::json;
     use tempfile::tempdir;
+
+    impl WasmRuntime {
+        pub fn new() -> Self {
+            let config = Config::from_str("[namespaces]");
+            let provider = NamespaceProvider::new(Box::new(registries()), config);
+            Self::with_provider(provider)
+        }
+    }
 
     #[tokio::test]
     async fn greet_skill_component() {
@@ -163,7 +165,8 @@ pub mod tests {
         let skill_dir = tempdir().unwrap();
 
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let provider = NamespaceProvider::new(Box::new(registry), None);
+        let config = Config::from_str("[namespaces]");
+        let provider = NamespaceProvider::new(Box::new(registry), config);
         let mut runtime = WasmRuntime::with_provider(provider);
         let skill_ctx = Box::new(CsiGreetingStub);
 
