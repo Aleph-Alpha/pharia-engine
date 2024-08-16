@@ -178,7 +178,4 @@ mod tests {
 
         assert!(!allowed);
     }
-
-    #[test]
-    fn loads_skill_config() {}
 }
