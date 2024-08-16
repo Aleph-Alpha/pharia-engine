@@ -118,27 +118,64 @@ impl CachedSkill {
 #[cfg(test)]
 mod tests {
 
+    use crate::skills::runtime::skill_config::LocalSkillConfig;
+
     use super::*;
+
+    impl SkillProvider {
+        fn empty() -> Self {
+            let skill_registry = HashMap::<String, Vec<u8>>::new();
+            let config = Config::from_str("[namespaces]");
+            SkillProvider::new(Box::new(skill_registry), Some(config))
+        }
+
+        fn add_skill_config(&mut self, namespace: String, skill_config: LocalSkillConfig) {
+            self.skill_configs.insert(namespace, Box::new(skill_config));
+        }
+
+        fn with_namespace_and_skill(namespace: &str, skill: &str) -> Self {
+            let mut provider = SkillProvider::empty();
+            let skill_config =
+                LocalSkillConfig::from_str(&format!("skills = [{{ name = \"{skill}\" }}]"))
+                    .unwrap();
+            provider.add_skill_config(namespace.to_owned(), skill_config);
+            provider
+        }
+    }
 
     #[tokio::test]
     async fn skill_component_is_in_config() {
-        let skill_registry = HashMap::<String, Vec<u8>>::new();
-        let config = Config::from_file("config.toml");
-        let mut provider = SkillProvider::new(Box::new(skill_registry), Some(config));
+        let mut provider =
+            SkillProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
 
-        let allowed = provider.allowed("pharia-kernel-team", "greet_skill").await;
+        let allowed = provider
+            .allowed("existing_namespace", "existing_skill")
+            .await;
 
         assert!(allowed);
     }
 
     #[tokio::test]
     async fn skill_component_not_in_config() {
-        let skill_registry = HashMap::<String, Vec<u8>>::new();
-        let config = Config::from_file("config.toml");
-        let mut provider = SkillProvider::new(Box::new(skill_registry), Some(config));
+        let mut provider =
+            SkillProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
+
         let allowed = provider
-            .allowed("pharia-kernel-team", "non_existing_skill")
+            .allowed("existing_namespace", "non_existing_skill")
             .await;
+
+        assert!(!allowed);
+    }
+
+    #[tokio::test]
+    async fn namespace_not_in_config() {
+        let mut provider =
+            SkillProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
+
+        let allowed = provider
+            .allowed("non_existing_namespace", "existing_skill")
+            .await;
+
         assert!(!allowed);
     }
 

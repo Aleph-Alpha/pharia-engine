@@ -39,7 +39,11 @@ impl LocalSkillConfig {
 
     pub fn new<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
         let config = std::fs::read_to_string(p)?;
-        let skills = TomlSkillConfig::from_str(&config)?.skills;
+        Self::from_str(&config)
+    }
+
+    pub fn from_str(config: &str) -> anyhow::Result<Self> {
+        let skills = TomlSkillConfig::from_str(config)?.skills;
         Ok(Self { skills })
     }
 }
