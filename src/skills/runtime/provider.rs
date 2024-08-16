@@ -67,7 +67,6 @@ impl SkillProvider {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct SkillPath {
     pub namespace: String,
     pub name: String,
