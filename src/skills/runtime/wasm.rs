@@ -2,20 +2,20 @@ use serde_json::Value;
 
 use crate::registries::registries;
 
-use super::{engine::Engine, provider::SkillProvider, Csi, Runtime};
+use super::{engine::Engine, provider::NamespaceProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
-    provider: SkillProvider,
+    provider: NamespaceProvider,
 }
 
 impl WasmRuntime {
     pub fn new() -> Self {
-        let provider = SkillProvider::new(Box::new(registries()), None);
+        let provider = NamespaceProvider::new(Box::new(registries()), None);
         Self::with_provider(provider)
     }
 
-    pub fn with_provider(skill_provider: SkillProvider) -> Self {
+    pub fn with_provider(skill_provider: NamespaceProvider) -> Self {
         Self {
             engine: Engine::new().expect("engine creation failed"),
             provider: skill_provider,
@@ -163,7 +163,7 @@ pub mod tests {
         let skill_dir = tempdir().unwrap();
 
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let provider = SkillProvider::new(Box::new(registry), None);
+        let provider = NamespaceProvider::new(Box::new(registry), None);
         let mut runtime = WasmRuntime::with_provider(provider);
         let skill_ctx = Box::new(CsiGreetingStub);
 

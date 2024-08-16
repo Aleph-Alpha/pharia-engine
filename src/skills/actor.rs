@@ -1,6 +1,6 @@
 use std::future::pending;
 
-use super::runtime::{Config, Csi, Runtime, SkillProvider, WasmRuntime};
+use super::runtime::{Config, Csi, Runtime, NamespaceProvider, WasmRuntime};
 
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
@@ -26,7 +26,7 @@ impl SkillExecutor {
         let config_str = include_str!("../../config.toml");
         let config = Config::from_str(&config_str);
 
-        let provider = SkillProvider::new(Box::new(registries()), Some(config));
+        let provider = NamespaceProvider::new(Box::new(registries()), Some(config));
 
         let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)

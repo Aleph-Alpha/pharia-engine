@@ -11,20 +11,31 @@ use super::{
     Config, Csi,
 };
 
-pub struct SkillProvider {
+pub struct NamespaceProvider {
     skills: HashMap<String, CachedSkill>,
     skill_registry: Box<dyn SkillRegistry + Send>,
     config: Option<Config>,
-    skill_configs: HashMap<String, Box<dyn SkillConfig + Send>>,
+    skill_providers: HashMap<String, SkillProvider>,
+}
+
+pub struct SkillProvider {
+    skill_config: Box<dyn SkillConfig + Send>,
 }
 
 impl SkillProvider {
-    pub fn new(skill_registry: Box<dyn SkillRegistry + Send>, config: Option<Config>) -> Self {
+    pub fn new(skill_config: impl SkillConfig + Send + 'static) -> Self {
         SkillProvider {
+            skill_config: Box::new(skill_config),
+        }
+    }
+}
+impl NamespaceProvider {
+    pub fn new(skill_registry: Box<dyn SkillRegistry + Send>, config: Option<Config>) -> Self {
+        NamespaceProvider {
             skills: HashMap::new(),
             skill_registry,
             config,
-            skill_configs: HashMap::new(),
+            skill_providers: HashMap::new(),
         }
     }
 
@@ -37,8 +48,8 @@ impl SkillProvider {
     }
 
     pub async fn allowed(&mut self, namespace: &str, skill_name: &str) -> bool {
-        let skill_config = if let Some(sc) = self.skill_configs.get_mut(namespace) {
-            sc
+        let skill_provider = if let Some(sp) = self.skill_providers.get_mut(namespace) {
+            sp
         } else {
             let Some(cfg) = &self.config else {
                 //if no config is available then fallback to old behavior in order to be
@@ -49,12 +60,13 @@ impl SkillProvider {
                 //if config is available but namespace isn't deny skill usage
                 return false;
             };
-            let sc = Box::new(RemoteSkillConfig::from_url(&ns.config_url));
-            self.skill_configs.insert(namespace.to_owned(), sc);
-            self.skill_configs.get_mut(namespace).unwrap()
+            let sp = SkillProvider::new(RemoteSkillConfig::from_url(&ns.config_url));
+            self.skill_providers.insert(namespace.to_owned(), sp);
+            self.skill_providers.get_mut(namespace).unwrap()
         };
 
-        skill_config
+        skill_provider
+            .skill_config
             .skills()
             .await
             .iter()
@@ -122,19 +134,20 @@ mod tests {
 
     use super::*;
 
-    impl SkillProvider {
+    impl NamespaceProvider {
         fn empty() -> Self {
             let skill_registry = HashMap::<String, Vec<u8>>::new();
             let config = Config::from_str("[namespaces]");
-            SkillProvider::new(Box::new(skill_registry), Some(config))
+            NamespaceProvider::new(Box::new(skill_registry), Some(config))
         }
 
         fn add_skill_config(&mut self, namespace: String, skill_config: LocalSkillConfig) {
-            self.skill_configs.insert(namespace, Box::new(skill_config));
+            self.skill_providers
+                .insert(namespace, SkillProvider::new(skill_config));
         }
 
         fn with_namespace_and_skill(namespace: &str, skill: &str) -> Self {
-            let mut provider = SkillProvider::empty();
+            let mut provider = NamespaceProvider::empty();
             let skill_config =
                 LocalSkillConfig::from_str(&format!("skills = [{{ name = \"{skill}\" }}]"))
                     .unwrap();
@@ -146,7 +159,7 @@ mod tests {
     #[tokio::test]
     async fn skill_component_is_in_config() {
         let mut provider =
-            SkillProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
+            NamespaceProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
 
         let allowed = provider
             .allowed("existing_namespace", "existing_skill")
@@ -158,7 +171,7 @@ mod tests {
     #[tokio::test]
     async fn skill_component_not_in_config() {
         let mut provider =
-            SkillProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
+            NamespaceProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
 
         let allowed = provider
             .allowed("existing_namespace", "non_existing_skill")
@@ -170,7 +183,7 @@ mod tests {
     #[tokio::test]
     async fn namespace_not_in_config() {
         let mut provider =
-            SkillProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
+            NamespaceProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
 
         let allowed = provider
             .allowed("non_existing_namespace", "existing_skill")

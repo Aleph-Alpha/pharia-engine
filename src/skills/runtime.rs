@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::future::Future;
 
 pub use config::Config;
-pub use provider::SkillProvider;
+pub use provider::NamespaceProvider;
 pub use wasm::WasmRuntime;
 
 use crate::inference::{Completion, CompletionRequest};
