@@ -1,9 +1,10 @@
 use futures::{stream::FuturesOrdered, StreamExt};
-use oci::OciRegistry;
 use std::{future::Future, pin::Pin};
 
 mod file;
 mod oci;
+
+pub use oci::OciRegistry;
 
 pub use self::file::FileRegistry;
 

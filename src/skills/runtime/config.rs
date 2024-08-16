@@ -20,8 +20,8 @@ impl Config {
 
 #[derive(Deserialize)]
 pub struct Namespace {
-    repository: String,
-    registry: String,
+    pub repository: String,
+    pub registry: String,
     pub config_url: String,
 }
 

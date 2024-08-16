@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env};
 
 use anyhow::{anyhow, Context};
 use serde_json::Value;
 
-use crate::registries::SkillRegistry;
+use crate::registries::{OciRegistry, SkillRegistry};
 
 use super::{
     engine::{Engine, Skill},
@@ -19,12 +19,17 @@ pub struct NamespaceProvider {
 }
 
 pub struct SkillProvider {
+    skill_registry: Box<dyn SkillRegistry + Send>,
     skill_config: Box<dyn SkillConfig + Send>,
 }
 
 impl SkillProvider {
-    pub fn new(skill_config: impl SkillConfig + Send + 'static) -> Self {
+    pub fn new(
+        skill_registry: impl SkillRegistry + Send + 'static,
+        skill_config: impl SkillConfig + Send + 'static,
+    ) -> Self {
         SkillProvider {
+            skill_registry: Box::new(skill_registry),
             skill_config: Box::new(skill_config),
         }
     }
@@ -60,8 +65,17 @@ impl NamespaceProvider {
                 //if config is available but namespace isn't deny skill usage
                 return false;
             };
-            let sp = SkillProvider::new(RemoteSkillConfig::from_url(&ns.config_url));
-            self.skill_providers.insert(namespace.to_owned(), sp);
+            let username = env::var("SKILL_REGISTRY_USER").unwrap();
+            let password = env::var("SKILL_REGISTRY_PASSWORD").unwrap();
+            let skill_registry = OciRegistry::new(
+                ns.repository.clone(),
+                ns.registry.clone(),
+                username,
+                password,
+            );
+            let skill_config = RemoteSkillConfig::from_url(&ns.config_url);
+            let provider = SkillProvider::new(skill_registry, skill_config);
+            self.skill_providers.insert(namespace.to_owned(), provider);
             self.skill_providers.get_mut(namespace).unwrap()
         };
 
@@ -130,7 +144,7 @@ impl CachedSkill {
 #[cfg(test)]
 mod tests {
 
-    use crate::skills::runtime::skill_config::LocalSkillConfig;
+    use crate::{registries::FileRegistry, skills::runtime::skill_config::LocalSkillConfig};
 
     use super::*;
 
@@ -141,17 +155,17 @@ mod tests {
             NamespaceProvider::new(Box::new(skill_registry), Some(config))
         }
 
-        fn add_skill_config(&mut self, namespace: String, skill_config: LocalSkillConfig) {
-            self.skill_providers
-                .insert(namespace, SkillProvider::new(skill_config));
-        }
-
         fn with_namespace_and_skill(namespace: &str, skill: &str) -> Self {
-            let mut provider = NamespaceProvider::empty();
+            let skill_registry = FileRegistry::new();
             let skill_config =
                 LocalSkillConfig::from_str(&format!("skills = [{{ name = \"{skill}\" }}]"))
                     .unwrap();
-            provider.add_skill_config(namespace.to_owned(), skill_config);
+            let skill_provider = SkillProvider::new(skill_registry, skill_config);
+
+            let mut provider = NamespaceProvider::empty();
+            provider
+                .skill_providers
+                .insert(namespace.to_owned(), skill_provider);
             provider
         }
     }

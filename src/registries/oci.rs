@@ -51,7 +51,7 @@ impl SkillRegistry for OciRegistry {
 }
 
 impl OciRegistry {
-    fn new(repository: String, registry: String, username: String, password: String) -> Self {
+    pub fn new(repository: String, registry: String, username: String, password: String) -> Self {
         let client = Client::new(ClientConfig::default());
         let client = WasmClient::new(client);
 
