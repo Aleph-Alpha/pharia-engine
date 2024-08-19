@@ -20,12 +20,12 @@ pub async fn run(
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr);
 
-    // Boot up the configuration observer
-    let configuration_observer = ConfigurationObserver::new();
-
     // Boot up runtime we need to execute Skills
     let skill_executor = SkillExecutor::new(inference.api());
     let skill_executor_api = skill_executor.api();
+
+    // Boot up the configuration observer
+    let configuration_observer = ConfigurationObserver::new(skill_executor.api());
 
     let shell_shutdown = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await;
 
@@ -40,8 +40,8 @@ pub async fn run(
 
         // Shutdown everything we started. We reverse the order for the shutdown so all the required
         // actors are still answering for each component.
-        skill_executor.wait_for_shutdown().await;
         configuration_observer.wait_for_shutdown().await;
+        skill_executor.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
     }
 }
