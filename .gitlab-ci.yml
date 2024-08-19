@@ -159,8 +159,7 @@ integration_test:
     - name: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
       alias: $CI_PROJECT_NAME
       variables:
-        REMOTE_SKILL_CONFIG_TOKEN: $REMOTE_SKILL_CONFIG_TOKEN
-        REMOTE_SKILL_CONFIG_URL: $REMOTE_SKILL_CONFIG_URL
+        TEAM_CONFIG_TOKEN: $TEAM_CONFIG_TOKEN
   script:
     - sh -x ./tests/test-image.sh $CONTAINER_PORT $CI_PROJECT_NAME
 
