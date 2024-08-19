@@ -149,7 +149,10 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
 
 #[derive(Deserialize, Serialize, ToSchema)]
 struct ExecuteSkillArgs {
-    /// The name of the skill to invoke from one of the configured repositories.
+    /// The qualified name of the skill to invoke. The qualified name consists of a namespace and
+    /// a skillname (e.g. 'acme/greet').
+    /// If the namespace is omitted, the default 'pharia-kernel-team' namespace is used.
+    ///
     skill: String,
     /// The expected input for the skill.
     input: Value,
