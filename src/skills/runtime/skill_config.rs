@@ -75,7 +75,7 @@ impl SkillConfig for LocalSkillConfig {
 
 pub struct RemoteSkillConfig {
     skills: Vec<Skill>,
-    token: String,
+    token: Option<String>,
     url: String,
     sync_interval: u64,
     last_sync: Option<std::time::Instant>,
@@ -91,8 +91,7 @@ impl RemoteSkillConfig {
 
     pub fn from_url(url: &str) -> Self {
         drop(dotenvy::dotenv());
-        let token = env::var("REMOTE_SKILL_CONFIG_TOKEN")
-            .expect("Remote skill config token must be provided.");
+        let token = env::var("TEAM_CONFIG_TOKEN").ok();
         let sync_interval = env::var("REMOTE_SKILL_CONFIG_UPDATE_INTERVAL_SEC")
             .unwrap_or("60".to_owned())
             .parse::<u64>()
@@ -117,14 +116,14 @@ impl RemoteSkillConfig {
     }
 
     async fn load(&self) -> anyhow::Result<Vec<Skill>> {
-        let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", self.token)).unwrap();
-        auth_value.set_sensitive(true);
-        let client = reqwest::Client::new();
-        let resp = client
-            .get(&self.url)
-            .header(AUTHORIZATION, auth_value)
-            .send()
-            .await?;
+        let mut req_builder = reqwest::Client::new().get(&self.url);
+        if let Some(token) = &self.token {
+            let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
+            auth_value.set_sensitive(true);
+            req_builder = req_builder.header(AUTHORIZATION, auth_value);
+        }
+        let resp = req_builder.send().await?;
+
         let content = resp.text().await?;
         let config = TomlSkillConfig::from_str(&content)?;
         Ok(config.skills)
