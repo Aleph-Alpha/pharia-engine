@@ -82,13 +82,6 @@ pub struct RemoteSkillConfig {
 }
 
 impl RemoteSkillConfig {
-    pub fn from_env() -> Self {
-        drop(dotenvy::dotenv());
-        let url =
-            env::var("REMOTE_SKILL_CONFIG_URL").expect("Remote skill config URL must be provided.");
-        Self::from_url(&url)
-    }
-
     pub fn from_url(url: &str) -> Self {
         drop(dotenvy::dotenv());
         let token = env::var("TEAM_CONFIG_TOKEN").ok();
@@ -183,17 +176,23 @@ pub mod tests {
         pub fn set_last_sync(&mut self, last_sync: std::time::Instant) {
             self.last_sync = Some(last_sync);
         }
+
+        pub fn pharia_kernel_team() -> Self {
+            drop(dotenvy::dotenv());
+            let url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main";
+            Self::from_url(&url)
+        }
     }
 
     #[test]
     fn remote_config_expired_after_creation() {
-        let config = RemoteSkillConfig::from_env();
+        let config = RemoteSkillConfig::pharia_kernel_team();
         assert!(config.expired());
     }
 
     #[test]
     fn remote_config_expired_if_last_sync_is_yesterday() {
-        let mut config = RemoteSkillConfig::from_env();
+        let mut config = RemoteSkillConfig::pharia_kernel_team();
         let yesterday = std::time::Instant::now()
             .checked_sub(std::time::Duration::from_secs(86400))
             .unwrap();
@@ -204,7 +203,7 @@ pub mod tests {
 
     #[test]
     fn remote_config_not_expired_if_just_synced() {
-        let mut config = RemoteSkillConfig::from_env();
+        let mut config = RemoteSkillConfig::pharia_kernel_team();
         let now = std::time::Instant::now();
         config.set_last_sync(now);
 
@@ -228,7 +227,7 @@ pub mod tests {
     #[tokio::test]
     async fn load_gitlab_config() {
         // Given a gitlab skill config
-        let mut config = RemoteSkillConfig::from_env();
+        let mut config = RemoteSkillConfig::pharia_kernel_team();
 
         // when fetch skill config
         let result = config.load().await;
