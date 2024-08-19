@@ -12,7 +12,11 @@ pub struct ConfigurationObserver {
 impl ConfigurationObserver {
     pub fn new(skill_executor_api: SkillExecutorApi) -> Self {
         let (sender, receiver) = tokio::sync::watch::channel(false);
-        let handle = ConfigurationObserverActor::new(receiver, skill_executor_api).run();
+        let handle = tokio::spawn(async move {
+            ConfigurationObserverActor::new(receiver, skill_executor_api)
+                .run()
+                .await;
+        });
         Self {
             shutdown: sender,
             handle,
@@ -39,14 +43,12 @@ impl ConfigurationObserverActor {
             skill_executor_api,
         }
     }
-    fn run(mut self) -> JoinHandle<()> {
-        tokio::spawn(async move {
-            loop {
-                select! {
-                    _ = self.shutdown.changed() => break,
-                    _ = tokio::time::sleep(Duration::from_secs(10)) => (),
-                };
-            }
-        })
+    async fn run(mut self) {
+        loop {
+            select! {
+                _ = self.shutdown.changed() => break,
+                _ = tokio::time::sleep(Duration::from_secs(10)) => (),
+            };
+        }
     }
 }
