@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::{error, warn};
 use url::Url;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,10 +85,13 @@ impl RemoteSkillConfig {
     pub fn from_url(url: &str) -> Self {
         drop(dotenvy::dotenv());
         let token = env::var("TEAM_CONFIG_TOKEN").ok();
-        let sync_interval = env::var("REMOTE_SKILL_CONFIG_UPDATE_INTERVAL_SEC")
+        let sync_interval = env::var("TEAM_CONFIG_UPDATE_INTERVAL_SEC")
             .unwrap_or("60".to_owned())
             .parse::<u64>()
-            .expect("Failed to parse remote skill config update interval.");
+            .unwrap_or_else(|e| {
+                error!("TEAM_CONFIG_UPDATE_INTERVAL_SEC not parseable: {e}");
+                60
+            });
         let skills = vec![];
         Self {
             skills,
