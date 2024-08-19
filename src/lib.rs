@@ -1,9 +1,11 @@
 mod config;
+mod configuration_observer;
 mod inference;
 mod registries;
 mod shell;
 mod skills;
 
+use configuration_observer::ConfigurationObserver;
 use futures::Future;
 use tracing::error;
 
@@ -17,6 +19,9 @@ pub async fn run(
 ) -> impl Future<Output = ()> {
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr);
+
+    // Boot up the configuration observer
+    let configuration_observer = ConfigurationObserver::new();
 
     // Boot up runtime we need to execute Skills
     let skill_executor = SkillExecutor::new(inference.api());
@@ -36,6 +41,7 @@ pub async fn run(
         // Shutdown everything we started. We reverse the order for the shutdown so all the required
         // actors are still answering for each component.
         skill_executor.wait_for_shutdown().await;
+        configuration_observer.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
     }
 }
