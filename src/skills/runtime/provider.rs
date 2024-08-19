@@ -3,12 +3,15 @@ use std::{collections::HashMap, env};
 use anyhow::{anyhow, Context};
 use serde_json::Value;
 
-use crate::registries::{OciRegistry, SkillRegistry};
+use crate::{
+    configuration_observer::Config,
+    registries::{OciRegistry, SkillRegistry},
+};
 
 use super::{
     engine::{Engine, Skill},
     skill_config::{skill_config_from_url, SkillConfig},
-    Config, Csi,
+    Csi,
 };
 
 pub struct NamespaceProvider {

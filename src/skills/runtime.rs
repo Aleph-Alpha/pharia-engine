@@ -1,4 +1,3 @@
-mod config;
 mod engine;
 mod provider;
 pub mod skill_config;
@@ -8,7 +7,6 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::future::Future;
 
-pub use config::Config;
 pub use provider::NamespaceProvider;
 pub use wasm::WasmRuntime;
 

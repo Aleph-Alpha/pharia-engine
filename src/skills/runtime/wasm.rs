@@ -45,8 +45,8 @@ pub mod tests {
     };
 
     use crate::{
+        configuration_observer::Config,
         inference::{Completion, CompletionRequest},
-        skills::runtime::Config,
     };
 
     use super::*;

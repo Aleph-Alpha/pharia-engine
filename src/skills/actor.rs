@@ -1,8 +1,11 @@
 use std::future::pending;
 
-use super::runtime::{Config, Csi, NamespaceProvider, Runtime, WasmRuntime};
+use super::runtime::{Csi, NamespaceProvider, Runtime, WasmRuntime};
 
-use crate::inference::{Completion, CompletionRequest, InferenceApi};
+use crate::{
+    configuration_observer::Config,
+    inference::{Completion, CompletionRequest, InferenceApi},
+};
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::{
