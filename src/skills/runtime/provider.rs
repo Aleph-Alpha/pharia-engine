@@ -35,14 +35,14 @@ impl SkillProvider {
     }
 
     pub async fn fetch(&mut self, name: &str, engine: &Engine) -> anyhow::Result<&CachedSkill> {
-        if self.allowed(name).await {
+        if self.configured(name).await {
             self.internal_fetch(name, engine).await
         } else {
             Err(anyhow!("Skill {name} not configured."))
         }
     }
 
-    async fn allowed(&mut self, name: &str) -> bool {
+    async fn configured(&mut self, name: &str) -> bool {
         self.skill_config
             .skills()
             .await
