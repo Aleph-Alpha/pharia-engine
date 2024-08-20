@@ -37,7 +37,7 @@ pub trait Runtime {
 
     fn remove_skill(&mut self, skill: &SkillPath);
 
-    fn skills(&self) -> impl Iterator<Item = &SkillPath>;
+    fn skills(&self) -> impl Iterator<Item = SkillPath>;
 
     fn loaded_skills(&self) -> impl Iterator<Item = String>;
 
@@ -84,7 +84,7 @@ pub mod tests {
             panic!("SaboteurRuntime does not remove skill")
         }
 
-        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+        fn skills(&self) -> impl Iterator<Item = SkillPath> {
             std::iter::empty()
         }
 

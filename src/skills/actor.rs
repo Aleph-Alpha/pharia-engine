@@ -107,9 +107,20 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn skills(&mut self) -> Vec<String> {
+    pub async fn skills(&mut self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Skills { send };
+
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await.unwrap()
+    }
+
+    pub async fn loaded_skills(&mut self) -> Vec<String> {
+        let (send, recv) = oneshot::channel();
+        let msg = SkillExecutorMessage::LoadedSkills { send };
 
         self.send
             .send(msg)
@@ -169,6 +180,10 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 drop(send.send(response));
             }
             SkillExecutorMessage::Skills { send } => {
+                let response = self.runtime.skills().collect();
+                drop(send.send(response));
+            }
+            SkillExecutorMessage::LoadedSkills { send } => {
                 let response = self.runtime.loaded_skills().collect();
                 drop(send.send(response));
             }
@@ -213,6 +228,9 @@ pub enum SkillExecutorMessage {
         api_token: String,
     },
     Skills {
+        send: oneshot::Sender<Vec<SkillPath>>,
+    },
+    LoadedSkills {
         send: oneshot::Sender<Vec<String>>,
     },
     Unload {
@@ -312,7 +330,7 @@ pub mod tests {
                 panic!("does not remove skill")
             }
 
-            fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+            fn skills(&self) -> impl Iterator<Item = SkillPath> {
                 iter::empty()
             }
 
@@ -415,8 +433,8 @@ pub mod tests {
             self.skills.remove(skill);
         }
 
-        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-            self.skills.iter()
+        fn skills(&self) -> impl Iterator<Item = SkillPath> {
+            self.skills.clone().into_iter()
         }
 
         fn loaded_skills(&self) -> impl Iterator<Item = String> {
@@ -440,7 +458,7 @@ pub mod tests {
 
         // When
         let executor = SkillExecutor::with_runtime(runtime, inference.api());
-        let result = executor.api().skills().await;
+        let result = executor.api().loaded_skills().await;
 
         executor.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
@@ -525,7 +543,7 @@ pub mod tests {
             panic!("RustRuntime does not remove skill")
         }
 
-        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+        fn skills(&self) -> impl Iterator<Item = SkillPath> {
             std::iter::empty()
         }
 

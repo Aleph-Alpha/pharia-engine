@@ -214,7 +214,7 @@ async fn execute_skill(
 async fn cached_skills(
     State(mut skill_executor_api): State<SkillExecutorApi>,
 ) -> (StatusCode, Json<Vec<String>>) {
-    let response = skill_executor_api.skills().await;
+    let response = skill_executor_api.loaded_skills().await;
     (StatusCode::OK, Json(response))
 }
 

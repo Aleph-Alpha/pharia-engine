@@ -37,7 +37,7 @@ impl Runtime for WasmRuntime {
         self.provider.remove_skill(skill);
     }
 
-    fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+    fn skills(&self) -> impl Iterator<Item = SkillPath> {
         self.provider.skills()
     }
 

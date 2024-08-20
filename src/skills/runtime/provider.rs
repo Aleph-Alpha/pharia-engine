@@ -88,8 +88,8 @@ impl OperatorProvider {
         self.skills.retain(|s| s != skill);
     }
 
-    pub fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-        self.skills.iter()
+    pub fn skills(&self) -> impl Iterator<Item = SkillPath> {
+        self.skills.clone().into_iter()
     }
 
     pub fn loaded_skills(&self) -> impl Iterator<Item = String> {
