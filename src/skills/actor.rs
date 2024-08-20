@@ -305,11 +305,15 @@ pub mod tests {
             }
 
             fn add_skill(&mut self, _skill: SkillPath) {
-                panic!("must not add new skill")
+                panic!("does not add new skill")
             }
 
             fn remove_skill(&mut self, _skill: &SkillPath) {
-                panic!("must not remove skill")
+                panic!("does not remove skill")
+            }
+
+            fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+                iter::empty()
             }
 
             fn loaded_skills(&self) -> impl Iterator<Item = String> {
@@ -411,11 +415,16 @@ pub mod tests {
             self.skills.remove(skill);
         }
 
+        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+            self.skills.iter()
+        }
+
         fn loaded_skills(&self) -> impl Iterator<Item = String> {
             self.skills
                 .iter()
                 .map(|SkillPath { namespace, name }| format!("{namespace}/{name}"))
         }
+
         fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
             let skill = SkillPath::from_str(skill);
             self.skills.iter().any(|s| s == &skill)
@@ -514,6 +523,10 @@ pub mod tests {
 
         fn remove_skill(&mut self, _skill: &SkillPath) {
             panic!("RustRuntime does not remove skill")
+        }
+
+        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+            std::iter::empty()
         }
 
         fn loaded_skills(&self) -> impl Iterator<Item = String> {
