@@ -180,9 +180,7 @@ pub mod tests {
         // Giving and empty skill directory to the WasmRuntime
         let skill_dir = tempdir().unwrap();
 
-        let config = OperatorConfig::local();
-        let provider = OperatorProvider::new(config);
-        let mut runtime = WasmRuntime::with_provider(provider);
+        let mut runtime = WasmRuntime::local();
         let skill_ctx = Box::new(CsiGreetingStub);
 
         // When adding a new skill component
