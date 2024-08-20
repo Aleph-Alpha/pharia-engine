@@ -1,5 +1,7 @@
 use serde_json::Value;
 
+use crate::skills::SkillPath;
+
 use super::{engine::Engine, provider::OperatorProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
@@ -25,6 +27,14 @@ impl Runtime for WasmRuntime {
     ) -> anyhow::Result<Value> {
         let skill = self.provider.fetch(skill_name, &self.engine).await?;
         skill.run(&self.engine, ctx, input).await
+    }
+
+    fn add_skill(&mut self, skill: SkillPath) {
+        self.provider.add_skill(skill);
+    }
+
+    fn remove_skill(&mut self, skill: &SkillPath) {
+        self.provider.remove_skill(skill);
     }
 
     fn skills(&self) -> impl Iterator<Item = String> {

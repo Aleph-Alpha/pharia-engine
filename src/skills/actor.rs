@@ -272,7 +272,7 @@ impl Csi for SkillInvocationCtx {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::iter;
+    use std::{collections::HashSet, iter};
 
     use anyhow::anyhow;
     use serde_json::json;
@@ -304,9 +304,18 @@ pub mod tests {
                 panic!("complete_text must pend forever in case of error")
             }
 
+            fn add_skill(&mut self, _skill: SkillPath) {
+                panic!("must not add new skill")
+            }
+
+            fn remove_skill(&mut self, _skill: &SkillPath) {
+                panic!("must not remove skill")
+            }
+
             fn skills(&self) -> impl Iterator<Item = String> {
                 iter::once("Greet".to_owned())
             }
+
             fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
                 skill == "Greet"
             }
@@ -373,12 +382,14 @@ pub mod tests {
 
     // Tell that `skills` are installed
     pub struct LiarRuntime {
-        skills: Vec<String>,
+        skills: HashSet<SkillPath>,
     }
 
     impl LiarRuntime {
-        pub fn new(skills: Vec<String>) -> Self {
-            Self { skills }
+        pub fn new(skills: &[String]) -> Self {
+            Self {
+                skills: skills.iter().map(|s| SkillPath::from_str(s)).collect(),
+            }
         }
     }
 
@@ -392,20 +403,31 @@ pub mod tests {
             panic!("Liar runtime does not run skills")
         }
 
+        fn add_skill(&mut self, skill: SkillPath) {
+            self.skills.insert(skill);
+        }
+
+        fn remove_skill(&mut self, skill: &SkillPath) {
+            self.skills.remove(skill);
+        }
+
         fn skills(&self) -> impl Iterator<Item = String> {
-            self.skills.iter().map(String::clone)
+            self.skills
+                .iter()
+                .map(|SkillPath { namespace, name }| format!("{namespace}/{name}"))
         }
         fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
-            self.skills.iter().any(|s| s == skill)
+            let skill = SkillPath::from_str(skill);
+            self.skills.iter().any(|s| s == &skill)
         }
     }
 
     #[tokio::test]
     async fn list_skills() {
         // Given a runtime with five skills
-        let skills = vec!["First skill".to_owned(), "Second skill".to_owned()];
+        let skills = ["First skill".to_owned(), "Second skill".to_owned()];
         let inference = InferenceStub::with_completion("Hello".to_owned());
-        let runtime = LiarRuntime::new(skills.clone());
+        let runtime = LiarRuntime::new(&skills);
 
         // When
         let executor = SkillExecutor::with_runtime(runtime, inference.api());
@@ -421,9 +443,9 @@ pub mod tests {
     #[tokio::test]
     async fn drop_existing_skill() {
         // Given a runtime with the greet skill
-        let skills = vec!["haiku_skill".to_owned()];
+        let skills = ["haiku_skill".to_owned()];
         let inference = InferenceStub::with_completion("Hello".to_owned());
-        let runtime = LiarRuntime::new(skills.clone());
+        let runtime = LiarRuntime::new(&skills);
 
         // When
         let executor = SkillExecutor::with_runtime(runtime, inference.api());
@@ -442,9 +464,9 @@ pub mod tests {
     #[tokio::test]
     async fn drop_non_existing_skill() {
         // Given a runtime with the greet skill
-        let skills = vec!["haiku_skill".to_owned()];
+        let skills = ["haiku_skill".to_owned()];
         let inference = InferenceStub::with_completion("Hello".to_owned());
-        let runtime = LiarRuntime::new(skills.clone());
+        let runtime = LiarRuntime::new(&skills);
 
         // When
         let executor = SkillExecutor::with_runtime(runtime, inference.api());
@@ -485,9 +507,19 @@ pub mod tests {
             let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
             Ok(json!(ctx.complete_text(request).await.text))
         }
+
+        fn add_skill(&mut self, _skill: SkillPath) {
+            panic!("RustRuntime does not add skill")
+        }
+
+        fn remove_skill(&mut self, _skill: &SkillPath) {
+            panic!("RustRuntime does not remove skill")
+        }
+
         fn skills(&self) -> impl Iterator<Item = String> {
             std::iter::once("greet".to_owned())
         }
+
         fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
             skill == "greet"
         }

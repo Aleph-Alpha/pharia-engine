@@ -11,6 +11,8 @@ pub use wasm::WasmRuntime;
 
 use crate::inference::{Completion, CompletionRequest};
 
+use super::SkillPath;
+
 /// Responsible for loading and executing skills.
 pub trait Runtime {
     // We are returning a Future explicitly here instead of using the `async` syntax. This has the
@@ -30,6 +32,10 @@ pub trait Runtime {
         input: Value,
         ctx: Box<dyn Csi + Send>,
     ) -> impl Future<Output = anyhow::Result<Value>> + Send;
+
+    fn add_skill(&mut self, skill: SkillPath);
+
+    fn remove_skill(&mut self, skill: &SkillPath);
 
     fn skills(&self) -> impl Iterator<Item = String>;
 
@@ -68,9 +74,18 @@ pub mod tests {
             Err(anyhow!(self.err_msg.clone()))
         }
 
+        fn add_skill(&mut self, _skill: SkillPath) {
+            panic!("SaboteurRuntime does not add skill")
+        }
+
+        fn remove_skill(&mut self, _skill: &SkillPath) {
+            panic!("SaboteurRuntime does not remove skill")
+        }
+
         fn skills(&self) -> impl Iterator<Item = String> {
             std::iter::empty()
         }
+
         fn invalidate_cached_skill(&mut self, _skill: &str) -> bool {
             panic!("SaboteurRuntime does not drop skills from cache")
         }

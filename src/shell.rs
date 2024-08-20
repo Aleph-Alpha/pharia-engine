@@ -374,8 +374,8 @@ mod tests {
 
     #[tokio::test]
     async fn cached_skills_are_returned() {
-        let skills = vec!["First skill".to_owned(), "Second skill".to_owned()];
-        let runtime = LiarRuntime::new(skills);
+        let skills = ["First skill".to_owned(), "Second skill".to_owned()];
+        let runtime = LiarRuntime::new(&skills);
         let inference = InferenceStub::with_completion("hello");
 
         let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
@@ -402,7 +402,7 @@ mod tests {
     async fn drop_cached_skill() {
         // Given a runtime with one installed skill
         let skill_name = "haiku_skill".to_owned();
-        let runtime = LiarRuntime::new(vec![skill_name.clone()]);
+        let runtime = LiarRuntime::new(&[skill_name.clone()]);
         let inference = InferenceStub::with_completion("hello");
         let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
 
@@ -428,7 +428,7 @@ mod tests {
     #[tokio::test]
     async fn drop_non_cached_skill() {
         // Given a runtime without cached skills
-        let runtime = LiarRuntime::new(vec![]);
+        let runtime = LiarRuntime::new(&[]);
         let inference = InferenceStub::with_completion("hello");
         let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
 

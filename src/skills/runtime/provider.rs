@@ -17,6 +17,7 @@ use super::{
 pub struct OperatorProvider {
     config: OperatorConfig,
     skill_providers: HashMap<String, SkillProvider>,
+    skills: Vec<SkillPath>,
 }
 
 pub struct SkillProvider {
@@ -75,7 +76,16 @@ impl OperatorProvider {
         OperatorProvider {
             config,
             skill_providers: HashMap::new(),
+            skills: Vec::new(),
         }
+    }
+
+    pub fn add_skill(&mut self, skill: SkillPath) {
+        self.skills.push(skill);
+    }
+
+    pub fn remove_skill(&mut self, skill: &SkillPath) {
+        self.skills.retain(|s| s != skill);
     }
 
     pub fn skills(&self) -> impl Iterator<Item = String> {
