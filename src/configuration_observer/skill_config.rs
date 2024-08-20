@@ -14,11 +14,11 @@ pub struct Skill {
 }
 
 #[async_trait]
-pub trait SkillConfig {
+pub trait NamespaceConfig {
     async fn skills(&mut self) -> &[Skill];
 }
 
-pub fn skill_config_from_url(raw_url: &str) -> anyhow::Result<Box<dyn SkillConfig + Send>> {
+pub fn skill_config_from_url(raw_url: &str) -> anyhow::Result<Box<dyn NamespaceConfig + Send>> {
     let url = Url::parse(raw_url)?;
     match url.scheme() {
         "https" | "http" => Ok(Box::new(RemoteSkillConfig::from_url(raw_url))),
@@ -67,7 +67,7 @@ impl LocalSkillConfig {
 }
 
 #[async_trait]
-impl SkillConfig for LocalSkillConfig {
+impl NamespaceConfig for LocalSkillConfig {
     async fn skills(&mut self) -> &[Skill] {
         &self.skills
     }
@@ -141,7 +141,7 @@ impl RemoteSkillConfig {
 }
 
 #[async_trait]
-impl SkillConfig for RemoteSkillConfig {
+impl NamespaceConfig for RemoteSkillConfig {
     async fn skills(&mut self) -> &[Skill] {
         self.sync().await;
         &self.skills
@@ -150,8 +150,6 @@ impl SkillConfig for RemoteSkillConfig {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::skills::runtime::skill_config::TomlSkillConfig;
-
     use super::*;
 
     pub struct StubConfig {
@@ -169,7 +167,7 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl SkillConfig for StubConfig {
+    impl NamespaceConfig for StubConfig {
         async fn skills(&mut self) -> &[Skill] {
             &self.skills
         }

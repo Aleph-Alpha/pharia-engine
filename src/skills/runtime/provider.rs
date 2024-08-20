@@ -4,31 +4,30 @@ use anyhow::{anyhow, Context};
 use serde_json::Value;
 
 use crate::{
-    configuration_observer::Config,
+    configuration_observer::{skill_config_from_url, NamespaceConfig, OperatorConfig},
     registries::{OciRegistry, SkillRegistry},
 };
 
 use super::{
     engine::{Engine, Skill},
-    skill_config::{skill_config_from_url, SkillConfig},
     Csi,
 };
 
-pub struct NamespaceProvider {
-    config: Config,
+pub struct OperatorProvider {
+    config: OperatorConfig,
     skill_providers: HashMap<String, SkillProvider>,
 }
 
 pub struct SkillProvider {
     skill_registry: Box<dyn SkillRegistry + Send>,
-    skill_config: Box<dyn SkillConfig + Send>,
+    skill_config: Box<dyn NamespaceConfig + Send>,
     skills: HashMap<String, CachedSkill>,
 }
 
 impl SkillProvider {
     pub fn new(
         skill_registry: impl SkillRegistry + Send + 'static,
-        skill_config: Box<dyn SkillConfig + Send>,
+        skill_config: Box<dyn NamespaceConfig + Send>,
     ) -> Self {
         SkillProvider {
             skill_registry: Box::new(skill_registry),
@@ -84,9 +83,9 @@ impl SkillPath {
         }
     }
 }
-impl NamespaceProvider {
-    pub fn new(config: Config) -> Self {
-        NamespaceProvider {
+impl OperatorProvider {
+    pub fn new(config: OperatorConfig) -> Self {
+        OperatorProvider {
             config,
             skill_providers: HashMap::new(),
         }
@@ -175,14 +174,14 @@ impl CachedSkill {
 #[cfg(test)]
 mod tests {
 
-    use crate::{registries::tests::FileRegistry, skills::runtime::skill_config::LocalSkillConfig};
+    use crate::{configuration_observer::tests::LocalSkillConfig, registries::tests::FileRegistry};
 
     use super::*;
 
-    impl NamespaceProvider {
+    impl OperatorProvider {
         fn empty() -> Self {
-            let config = Config::from_str("[namespaces]");
-            NamespaceProvider::new(config)
+            let config = OperatorConfig::from_str("[namespaces]");
+            OperatorProvider::new(config)
         }
 
         fn with_namespace_and_skill(namespace: &str, skill: &str) -> Self {
@@ -193,7 +192,7 @@ mod tests {
             );
             let skill_provider = SkillProvider::new(skill_registry, skill_config);
 
-            let mut provider = NamespaceProvider::empty();
+            let mut provider = OperatorProvider::empty();
             provider
                 .skill_providers
                 .insert(namespace.to_owned(), skill_provider);
@@ -204,7 +203,7 @@ mod tests {
     #[tokio::test]
     async fn skill_component_is_in_config() {
         let mut provider =
-            NamespaceProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
+            OperatorProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
         let engine = Engine::new().unwrap();
 
         let result = provider
@@ -217,7 +216,7 @@ mod tests {
     #[tokio::test]
     async fn skill_component_not_in_config() {
         let mut provider =
-            NamespaceProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
+            OperatorProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
         let engine = Engine::new().unwrap();
 
         let result = provider
@@ -230,7 +229,7 @@ mod tests {
     #[tokio::test]
     async fn namespace_not_in_config() {
         let mut provider =
-            NamespaceProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
+            OperatorProvider::with_namespace_and_skill("existing_namespace", "existing_skill");
         let engine = Engine::new().unwrap();
 
         let result = provider

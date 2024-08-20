@@ -1,13 +1,12 @@
 mod engine;
 mod provider;
-pub mod skill_config;
 mod wasm;
 
 use async_trait::async_trait;
 use serde_json::Value;
 use std::future::Future;
 
-pub use provider::NamespaceProvider;
+pub use provider::OperatorProvider;
 pub use wasm::WasmRuntime;
 
 use crate::inference::{Completion, CompletionRequest};

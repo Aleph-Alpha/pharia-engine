@@ -3,11 +3,11 @@ use std::{collections::HashMap, fs, path::Path};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct Config {
+pub struct OperatorConfig {
     pub namespaces: HashMap<String, Namespace>,
 }
 
-impl Config {
+impl OperatorConfig {
     pub fn from_str(config: &str) -> Self {
         toml::from_str(config).expect("Config is invalid")
     }
@@ -27,9 +27,9 @@ pub struct Namespace {
 
 #[cfg(test)]
 mod tests {
-    use super::Config;
+    use super::OperatorConfig;
 
-    impl Config {
+    impl OperatorConfig {
         pub fn local() -> Self {
             Self::from_str(
                 r#"
@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn deserialize_config() {
-        let config = Config::from_str(
+        let config = OperatorConfig::from_str(
             r#"
             [namespaces.pharia-kernel-team]
             config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn reads_from_file() {
-        let config = Config::from_file("config.toml");
+        let config = OperatorConfig::from_file("config.toml");
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
     }
 }

@@ -1,14 +1,14 @@
 use serde_json::Value;
 
-use super::{engine::Engine, provider::NamespaceProvider, Csi, Runtime};
+use super::{engine::Engine, provider::OperatorProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
-    provider: NamespaceProvider,
+    provider: OperatorProvider,
 }
 
 impl WasmRuntime {
-    pub fn with_provider(skill_provider: NamespaceProvider) -> Self {
+    pub fn with_provider(skill_provider: OperatorProvider) -> Self {
         Self {
             engine: Engine::new().expect("engine creation failed"),
             provider: skill_provider,
@@ -45,7 +45,7 @@ pub mod tests {
     };
 
     use crate::{
-        configuration_observer::Config,
+        configuration_observer::OperatorConfig,
         inference::{Completion, CompletionRequest},
     };
 
@@ -56,8 +56,8 @@ pub mod tests {
 
     impl WasmRuntime {
         pub fn local() -> Self {
-            let config = Config::local();
-            let provider = NamespaceProvider::new(config);
+            let config = OperatorConfig::local();
+            let provider = OperatorProvider::new(config);
             Self::with_provider(provider)
         }
     }
@@ -166,8 +166,8 @@ pub mod tests {
         // Giving and empty skill directory to the WasmRuntime
         let skill_dir = tempdir().unwrap();
 
-        let config = Config::local();
-        let provider = NamespaceProvider::new(config);
+        let config = OperatorConfig::local();
+        let provider = OperatorProvider::new(config);
         let mut runtime = WasmRuntime::with_provider(provider);
         let skill_ctx = Box::new(CsiGreetingStub);
 

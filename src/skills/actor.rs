@@ -1,9 +1,9 @@
 use std::future::pending;
 
-use super::runtime::{Csi, NamespaceProvider, Runtime, WasmRuntime};
+use super::runtime::{Csi, OperatorProvider, Runtime, WasmRuntime};
 
 use crate::{
-    configuration_observer::Config,
+    configuration_observer::OperatorConfig,
     inference::{Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
@@ -24,9 +24,9 @@ impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
         let config_str = include_str!("../../config.toml");
-        let config = Config::from_str(config_str);
+        let config = OperatorConfig::from_str(config_str);
 
-        let provider = NamespaceProvider::new(config);
+        let provider = OperatorProvider::new(config);
 
         let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)
