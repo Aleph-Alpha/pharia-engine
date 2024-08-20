@@ -8,16 +8,11 @@ use super::{namespace_from_url, Namespace, OperatorConfig};
 
 pub trait Config {
     fn namespaces(&self) -> Vec<&str>;
+    fn skills(&self, namespace: &str) -> Option<Vec<&str>>;
 }
 
 struct ConfigImpl {
     namespaces: HashMap<String, Box<dyn Namespace + Send>>,
-}
-
-impl Config for ConfigImpl {
-    fn namespaces(&self) -> Vec<&str> {
-        self.namespaces.keys().map(String::as_str).collect()
-    }
 }
 
 impl ConfigImpl {
@@ -28,6 +23,20 @@ impl ConfigImpl {
             .map(|(namespace, config)| Ok((namespace, namespace_from_url(&config.config_url)?)))
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
         Ok(Self { namespaces })
+    }
+}
+
+impl Config for ConfigImpl {
+    fn namespaces(&self) -> Vec<&str> {
+        self.namespaces.keys().map(String::as_str).collect()
+    }
+
+    fn skills(&self, namespace: &str) -> Option<Vec<&str>> {
+        if let Some(ns) = self.namespaces.get(namespace) {
+            Some(ns.skills().into_iter().map(|s| s.name.as_str()).collect())
+        } else {
+            None
+        }
     }
 }
 
@@ -89,17 +98,17 @@ impl ConfigurationObserverActor {
 
     async fn run(mut self) {
         loop {
+            for namespace in self.config.namespaces() {
+                let skills = self.config.skills(namespace).expect("namespace must exist");
+                for skill in skills {
+                    self.skill_executor_api.add_skill(skill.to_owned()).await;
+                }
+                // Later: compute difference and only send observed changes (new, drop)
+            }
             select! {
                 _ = self.shutdown.changed() => break,
                 _ = tokio::time::sleep(Duration::from_secs(10)) => (),
             };
-            for namespace in self.config.namespaces() {
-                // TODO! next step
-                // read the remote repository,
-                // send all observed skills with namespace to the
-                // executor API
-                // Later: compute difference and only send observed changes (new, drop)
-            }
         }
     }
 }
@@ -109,7 +118,12 @@ mod tests {
 
     use std::collections::HashMap;
 
-    use super::Config;
+    use tokio::sync::mpsc;
+
+    use crate::skills::tests::SkillExecutorMessage;
+    use crate::skills::SkillExecutorApi;
+
+    use super::*;
 
     struct StubConfig {
         namespaces: HashMap<String, Vec<String>>,
@@ -125,17 +139,35 @@ mod tests {
         fn namespaces(&self) -> Vec<&str> {
             self.namespaces.keys().map(String::as_str).collect()
         }
+
+        fn skills(&self, namespace: &str) -> Option<Vec<&str>> {
+            self.namespaces
+                .get(namespace)
+                .map(|ns| ns.iter().map(String::as_str).collect())
+        }
     }
 
-    #[test]
-    fn on_start_reports_all_skills_to_executer_agent() {
+    #[tokio::test]
+    async fn on_start_reports_all_skills_to_executor_agent() {
         // Given some configured skills
+        let dummy_skill = "dummy skill";
         let namespaces =
-            HashMap::from([("dummy namespace".to_owned(), vec!["dummy skill".to_owned()])]);
-        let stub_config = StubConfig::new(namespaces);
+            HashMap::from([("dummy namespace".to_owned(), vec![dummy_skill.to_owned()])]);
+        let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
+        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
+        let skill_executor_api = SkillExecutorApi::new(sender);
+        let observer = ConfigurationObserver::with_config(skill_executor_api, stub_config);
 
         // Then one new skill message is send for each skill configured
+        let msg = receiver.recv().await;
+        let msg = msg.unwrap();
+        if let SkillExecutorMessage::Add { skill } = msg {
+            assert_eq!(skill, dummy_skill);
+        } else {
+            panic!("Add message for newly observed skill not received");
+        }
+        observer.wait_for_shutdown().await;
     }
 }

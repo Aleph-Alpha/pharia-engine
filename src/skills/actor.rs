@@ -68,6 +68,22 @@ impl SkillExecutorApi {
         Self { send }
     }
 
+    pub async fn add_skill(&mut self, skill: String) {
+        let msg = SkillExecutorMessage::Add { skill };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+    }
+
+    pub async fn remove_skill(&mut self, skill: String) {
+        let msg = SkillExecutorMessage::Remove { skill };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+    }
+
     pub async fn execute_skill(
         &mut self,
         skill: String,

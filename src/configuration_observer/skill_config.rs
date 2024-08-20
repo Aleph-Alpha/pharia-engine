@@ -15,7 +15,8 @@ pub struct Skill {
 
 #[async_trait]
 pub trait Namespace {
-    async fn skills(&mut self) -> &[Skill];
+    async fn synced_skills(&mut self) -> &[Skill];
+    fn skills(&self) -> &[Skill];
 }
 
 pub fn namespace_from_url(raw_url: &str) -> anyhow::Result<Box<dyn Namespace + Send + 'static>> {
@@ -68,7 +69,10 @@ impl LocalSkillConfig {
 
 #[async_trait]
 impl Namespace for LocalSkillConfig {
-    async fn skills(&mut self) -> &[Skill] {
+    async fn synced_skills(&mut self) -> &[Skill] {
+        &self.skills
+    }
+    fn skills(&self) -> &[Skill] {
         &self.skills
     }
 }
@@ -142,9 +146,12 @@ impl RemoteSkillConfig {
 
 #[async_trait]
 impl Namespace for RemoteSkillConfig {
-    async fn skills(&mut self) -> &[Skill] {
-        self.sync().await;
+    fn skills(&self) -> &[Skill] {
         &self.skills
+    }
+    async fn synced_skills(&mut self) -> &[Skill] {
+        self.sync().await;
+        self.skills()
     }
 }
 
@@ -168,7 +175,10 @@ pub mod tests {
 
     #[async_trait]
     impl Namespace for StubConfig {
-        async fn skills(&mut self) -> &[Skill] {
+        async fn synced_skills(&mut self) -> &[Skill] {
+            self.skills()
+        }
+        fn skills(&self) -> &[Skill] {
             &self.skills
         }
     }
@@ -235,6 +245,6 @@ pub mod tests {
 
         // then the configured skills must listed in the config
         assert!(result.is_ok());
-        assert!(!config.skills().await.is_empty());
+        assert!(!config.synced_skills().await.is_empty());
     }
 }

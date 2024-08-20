@@ -46,7 +46,7 @@ impl SkillProvider {
 
     async fn configured(&mut self, name: &str) -> bool {
         self.skill_config
-            .skills()
+            .synced_skills()
             .await
             .iter()
             .any(|s| s.name == name)
