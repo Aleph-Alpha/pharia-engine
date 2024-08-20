@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tokio::{select, task::JoinHandle, time::Duration};
 
@@ -113,18 +113,18 @@ impl ConfigurationObserverActor {
     }
 
     fn compute_diff(existing: &[String], incoming: &[String]) -> Diff {
-        let existing = existing.iter().collect::<std::collections::HashSet<_>>();
-        let incoming = incoming.iter().collect::<std::collections::HashSet<_>>();
+        let existing = existing.iter().collect::<HashSet<_>>();
+        let incoming = incoming.iter().collect::<HashSet<_>>();
 
         let added = incoming
             .difference(&existing)
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
             .collect();
-
         let removed = existing
             .difference(&incoming)
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
             .collect();
+
         Diff { added, removed }
     }
 
