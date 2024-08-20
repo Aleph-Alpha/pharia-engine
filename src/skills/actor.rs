@@ -169,7 +169,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 drop(send.send(response));
             }
             SkillExecutorMessage::Skills { send } => {
-                let response = self.runtime.skills().collect();
+                let response = self.runtime.loaded_skills().collect();
                 drop(send.send(response));
             }
             SkillExecutorMessage::Unload { skill, send } => {
@@ -312,7 +312,7 @@ pub mod tests {
                 panic!("must not remove skill")
             }
 
-            fn skills(&self) -> impl Iterator<Item = String> {
+            fn loaded_skills(&self) -> impl Iterator<Item = String> {
                 iter::once("Greet".to_owned())
             }
 
@@ -411,7 +411,7 @@ pub mod tests {
             self.skills.remove(skill);
         }
 
-        fn skills(&self) -> impl Iterator<Item = String> {
+        fn loaded_skills(&self) -> impl Iterator<Item = String> {
             self.skills
                 .iter()
                 .map(|SkillPath { namespace, name }| format!("{namespace}/{name}"))
@@ -516,7 +516,7 @@ pub mod tests {
             panic!("RustRuntime does not remove skill")
         }
 
-        fn skills(&self) -> impl Iterator<Item = String> {
+        fn loaded_skills(&self) -> impl Iterator<Item = String> {
             std::iter::once("greet".to_owned())
         }
 

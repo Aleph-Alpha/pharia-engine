@@ -37,8 +37,8 @@ impl Runtime for WasmRuntime {
         self.provider.remove_skill(skill);
     }
 
-    fn skills(&self) -> impl Iterator<Item = String> {
-        self.provider.skills()
+    fn loaded_skills(&self) -> impl Iterator<Item = String> {
+        self.provider.loaded_skills()
     }
 
     fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
@@ -121,7 +121,7 @@ pub mod tests {
         let result = runtime.invalidate_cached_skill("local/greet_skill");
 
         // Then the component hash map is empty
-        assert_eq!(runtime.skills().count(), 0);
+        assert_eq!(runtime.loaded_skills().count(), 0);
 
         // And result is a success
         assert!(result);
@@ -133,7 +133,7 @@ pub mod tests {
         let runtime = WasmRuntime::local();
 
         // when querying skills
-        let skill_count = runtime.skills().count();
+        let skill_count = runtime.loaded_skills().count();
 
         // then an empty vec is returned
         assert_eq!(skill_count, 0);
@@ -160,7 +160,7 @@ pub mod tests {
         );
 
         // when querying skills
-        let skills = runtime.skills();
+        let skills = runtime.loaded_skills();
 
         // convert to a set
         let skills: HashSet<String> = skills.collect();
