@@ -168,8 +168,8 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
-            SkillExecutorMessage::Add { skill } => (),
-            SkillExecutorMessage::Remove { skill } => (),
+            SkillExecutorMessage::Add { skill } => self.runtime.add_skill(skill),
+            SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
             SkillExecutorMessage::Execute {
                 skill,
                 input,
@@ -290,12 +290,17 @@ impl Csi for SkillInvocationCtx {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::{collections::HashSet, iter};
+    use std::{
+        collections::{HashMap, HashSet},
+        iter,
+        time::Duration,
+    };
 
     use anyhow::anyhow;
     use serde_json::json;
 
     use crate::{
+        configuration_observer::{tests::StubConfig, ConfigurationObserver},
         inference::{tests::InferenceStub, CompletionRequest},
         skills::runtime::tests::SaboteurRuntime,
     };
@@ -507,6 +512,43 @@ pub mod tests {
 
         // Then
         assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn skills_in_sync_between_observer_and_executor() {
+        // Given some configured skills
+        let dummy_namespace = "dummy_namespace";
+        let dummy_skill = "dummy_skill";
+        let namespaces =
+            HashMap::from([(dummy_namespace.to_owned(), vec![dummy_skill.to_owned()])]);
+        let stub_config = Box::new(StubConfig::new(namespaces));
+
+        // And a skill executor
+        let provider = OperatorProvider::new(OperatorConfig::empty());
+        let runtime = WasmRuntime::with_provider(provider);
+        let inference = InferenceStub::with_completion("Hello".to_owned());
+        let executor = SkillExecutor::with_runtime(runtime, inference.api());
+
+        // And a configuration observer
+        let update_interval_ms = 1;
+        let update_interval = Duration::from_millis(update_interval_ms);
+        let observer =
+            ConfigurationObserver::with_config(executor.api(), stub_config, update_interval);
+
+        // When waited sufficiently for the update
+        tokio::time::sleep(Duration::from_millis(update_interval_ms)).await;
+
+        // Then the skills are in sync
+        let result = executor.api().skills().await;
+
+        assert_eq!(
+            result,
+            [SkillPath::from_str(&format!(
+                "{dummy_namespace}/{dummy_skill}"
+            ))]
+        );
+
+        observer.wait_for_shutdown().await;
     }
 
     /// Intended as a test double for the production runtime. This implementation features exactly

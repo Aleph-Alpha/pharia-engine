@@ -30,6 +30,10 @@ mod tests {
     use super::OperatorConfig;
 
     impl OperatorConfig {
+        pub fn empty() -> Self {
+            Self::from_str("[namespaces]").unwrap()
+        }
+
         pub fn local() -> Self {
             Self::from_str(
                 r#"

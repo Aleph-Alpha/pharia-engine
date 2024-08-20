@@ -159,7 +159,7 @@ impl ConfigurationObserverActor {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
 
     use std::collections::HashMap;
 
@@ -171,12 +171,12 @@ mod tests {
 
     use super::*;
 
-    struct StubConfig {
+    pub struct StubConfig {
         namespaces: HashMap<String, Vec<String>>,
     }
 
     impl StubConfig {
-        fn new(namespaces: HashMap<String, Vec<String>>) -> Self {
+        pub fn new(namespaces: HashMap<String, Vec<String>>) -> Self {
             Self { namespaces }
         }
     }
