@@ -37,7 +37,7 @@ impl Config for ConfigImpl {
             .get(namespace)
             .expect("namespace must exist.")
             .skills();
-        skills.into_iter().map(|s| s.name.to_owned()).collect()
+        skills.iter().map(|s| s.name.clone()).collect()
     }
 }
 
@@ -135,10 +135,10 @@ impl ConfigurationObserverActor {
                 let existing = self
                     .skills
                     .insert(namespace.to_owned(), incoming)
-                    .unwrap_or_else(|| vec![]);
+                    .unwrap_or_default();
 
                 let incoming = self.skills.get(namespace).unwrap();
-                let diff = Self::compute_diff(&existing, &incoming);
+                let diff = Self::compute_diff(&existing, incoming);
                 for skill in diff.added {
                     self.skill_executor_api
                         .add_skill(SkillPath::new(namespace, &skill))
