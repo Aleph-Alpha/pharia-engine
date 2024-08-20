@@ -53,16 +53,21 @@ impl ConfigurationObserver {
         let config_str = include_str!("../../config.toml");
         let config = OperatorConfig::from_str(config_str)?;
         let config = Box::new(ConfigImpl::new(config)?);
-        Ok(Self::with_config(skill_executor_api, config))
+        Ok(Self::with_config(
+            skill_executor_api,
+            config,
+            Duration::from_secs(60),
+        ))
     }
 
     pub fn with_config(
         skill_executor_api: SkillExecutorApi,
         config: Box<dyn Config + Send>,
+        update_interval: Duration,
     ) -> Self {
         let (sender, receiver) = tokio::sync::watch::channel(false);
         let handle = tokio::spawn(async move {
-            ConfigurationObserverActor::new(receiver, skill_executor_api, config)
+            ConfigurationObserverActor::new(receiver, skill_executor_api, config, update_interval)
                 .run()
                 .await;
         });
@@ -82,6 +87,7 @@ struct ConfigurationObserverActor {
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_executor_api: SkillExecutorApi,
     config: Box<dyn Config + Send>,
+    update_interval: Duration,
 }
 
 impl ConfigurationObserverActor {
@@ -89,11 +95,13 @@ impl ConfigurationObserverActor {
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_executor_api: SkillExecutorApi,
         config: Box<dyn Config + Send>,
+        update_interval: Duration,
     ) -> Self {
         Self {
             shutdown,
             skill_executor_api,
             config,
+            update_interval,
         }
     }
 
@@ -110,7 +118,7 @@ impl ConfigurationObserverActor {
             }
             select! {
                 _ = self.shutdown.changed() => break,
-                () = tokio::time::sleep(Duration::from_secs(10)) => (),
+                () = tokio::time::sleep(self.update_interval) => (),
             };
         }
     }
@@ -165,7 +173,9 @@ mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
         let skill_executor_api = SkillExecutorApi::new(sender);
-        let observer = ConfigurationObserver::with_config(skill_executor_api, stub_config);
+        let update_interval = Duration::from_millis(10);
+        let observer =
+            ConfigurationObserver::with_config(skill_executor_api, stub_config, update_interval);
 
         // Then one new skill message is send for each skill configured
         let msg = receiver.recv().await;
