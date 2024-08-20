@@ -25,7 +25,8 @@ pub async fn run(
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
-    let configuration_observer = ConfigurationObserver::new(skill_executor.api());
+    let configuration_observer =
+        ConfigurationObserver::new(skill_executor.api()).expect("Configuration must be valid.");
 
     let shell_shutdown = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await;
 

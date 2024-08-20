@@ -14,11 +14,11 @@ pub struct Skill {
 }
 
 #[async_trait]
-pub trait NamespaceConfig {
+pub trait Namespace {
     async fn skills(&mut self) -> &[Skill];
 }
 
-pub fn skill_config_from_url(raw_url: &str) -> anyhow::Result<Box<dyn NamespaceConfig + Send>> {
+pub fn namespace_from_url(raw_url: &str) -> anyhow::Result<Box<dyn Namespace + Send + 'static>> {
     let url = Url::parse(raw_url)?;
     match url.scheme() {
         "https" | "http" => Ok(Box::new(RemoteSkillConfig::from_url(raw_url))),
@@ -67,7 +67,7 @@ impl LocalSkillConfig {
 }
 
 #[async_trait]
-impl NamespaceConfig for LocalSkillConfig {
+impl Namespace for LocalSkillConfig {
     async fn skills(&mut self) -> &[Skill] {
         &self.skills
     }
@@ -141,7 +141,7 @@ impl RemoteSkillConfig {
 }
 
 #[async_trait]
-impl NamespaceConfig for RemoteSkillConfig {
+impl Namespace for RemoteSkillConfig {
     async fn skills(&mut self) -> &[Skill] {
         self.sync().await;
         &self.skills
@@ -167,7 +167,7 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl NamespaceConfig for StubConfig {
+    impl Namespace for StubConfig {
         async fn skills(&mut self) -> &[Skill] {
             &self.skills
         }
@@ -181,7 +181,7 @@ pub mod tests {
         pub fn pharia_kernel_team() -> Self {
             drop(dotenvy::dotenv());
             let url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main";
-            Self::from_url(&url)
+            Self::from_url(url)
         }
     }
 

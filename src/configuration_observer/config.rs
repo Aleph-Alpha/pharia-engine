@@ -4,22 +4,22 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct OperatorConfig {
-    pub namespaces: HashMap<String, Namespace>,
+    pub namespaces: HashMap<String, NamespaceConfig>,
 }
 
 impl OperatorConfig {
-    pub fn from_str(config: &str) -> Self {
-        toml::from_str(config).expect("Config is invalid")
+    pub fn from_str(config: &str) -> anyhow::Result<Self> {
+        Ok(toml::from_str(config)?)
     }
 
-    pub fn from_file<P: AsRef<Path>>(p: P) -> Self {
-        let config = fs::read_to_string(p).expect("Could not read config file");
+    pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
+        let config = fs::read_to_string(p)?;
         Self::from_str(&config)
     }
 }
 
 #[derive(Deserialize)]
-pub struct Namespace {
+pub struct NamespaceConfig {
     pub repository: String,
     pub registry: String,
     pub config_url: String,
@@ -39,6 +39,7 @@ mod tests {
                     repository = "engineering/pharia-skills/skills"
                 "#,
             )
+            .unwrap()
         }
     }
 
@@ -51,13 +52,13 @@ mod tests {
             registry = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
             "#,
-        );
+        ).unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
     }
 
     #[test]
     fn reads_from_file() {
-        let config = OperatorConfig::from_file("config.toml");
+        let config = OperatorConfig::from_file("config.toml").unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
     }
 }

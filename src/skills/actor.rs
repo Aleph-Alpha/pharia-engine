@@ -24,7 +24,7 @@ impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
         let config_str = include_str!("../../config.toml");
-        let config = OperatorConfig::from_str(config_str);
+        let config = OperatorConfig::from_str(config_str).unwrap();
 
         let provider = OperatorProvider::new(config);
 
@@ -101,7 +101,7 @@ impl SkillExecutorApi {
 
     pub async fn drop_from_cache(&mut self, skill: String) -> bool {
         let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMessage::Drop { send, skill };
+        let msg = SkillExecutorMessage::Unload { send, skill };
 
         self.send
             .send(msg)
@@ -138,6 +138,8 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
+            SkillExecutorMessage::Add { skill } => (),
+            SkillExecutorMessage::Remove { skill } => (),
             SkillExecutorMessage::Execute {
                 skill,
                 input,
@@ -151,7 +153,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 let response = self.runtime.skills().collect();
                 drop(send.send(response));
             }
-            SkillExecutorMessage::Drop { skill, send } => {
+            SkillExecutorMessage::Unload { skill, send } => {
                 let response = self.runtime.invalidate_cached_skill(&skill);
                 let _ = send.send(response);
             }
@@ -178,6 +180,12 @@ impl<R: Runtime> SkillExecutorActor<R> {
 }
 
 pub enum SkillExecutorMessage {
+    Add {
+        skill: String,
+    },
+    Remove {
+        skill: String,
+    },
     Execute {
         skill: String,
         input: Value,
@@ -187,7 +195,7 @@ pub enum SkillExecutorMessage {
     Skills {
         send: oneshot::Sender<Vec<String>>,
     },
-    Drop {
+    Unload {
         skill: String,
         send: oneshot::Sender<bool>,
     },

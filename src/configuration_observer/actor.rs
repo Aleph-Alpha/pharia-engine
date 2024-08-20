@@ -4,27 +4,30 @@ use tokio::{select, task::JoinHandle, time::Duration};
 
 use crate::skills::SkillExecutorApi;
 
-use super::{NamespaceConfig, OperatorConfig};
+use super::{namespace_from_url, Namespace, OperatorConfig};
 
 pub trait Config {
-    fn namespaces(&self) -> &[String];
+    fn namespaces(&self) -> Vec<&str>;
 }
 
 struct ConfigImpl {
-    namespaces: HashMap<String, Box<dyn NamespaceConfig + Send>>,
+    namespaces: HashMap<String, Box<dyn Namespace + Send>>,
 }
 
 impl Config for ConfigImpl {
-    fn namespaces(&self) -> &[String] {
-        &[]
+    fn namespaces(&self) -> Vec<&str> {
+        self.namespaces.keys().map(String::as_str).collect()
     }
 }
 
 impl ConfigImpl {
-    pub fn new(deserialized: OperatorConfig) -> Self {
-        Self {
-            namespaces: HashMap::new(),
-        }
+    pub fn new(deserialized: OperatorConfig) -> anyhow::Result<Self> {
+        let namespaces = deserialized
+            .namespaces
+            .into_iter()
+            .map(|(namespace, config)| Ok((namespace, namespace_from_url(&config.config_url)?)))
+            .collect::<anyhow::Result<HashMap<_, _>>>()?;
+        Ok(Self { namespaces })
     }
 }
 
@@ -36,11 +39,11 @@ pub struct ConfigurationObserver {
 }
 
 impl ConfigurationObserver {
-    pub fn new(skill_executor_api: SkillExecutorApi) -> Self {
+    pub fn new(skill_executor_api: SkillExecutorApi) -> anyhow::Result<Self> {
         let config_str = include_str!("../../config.toml");
-        let config = OperatorConfig::from_str(config_str);
-        let config = Box::new(ConfigImpl::new(config));
-        Self::with_config(skill_executor_api, config)
+        let config = OperatorConfig::from_str(config_str)?;
+        let config = Box::new(ConfigImpl::new(config)?);
+        Ok(Self::with_config(skill_executor_api, config))
     }
 
     pub fn with_config(
@@ -104,26 +107,33 @@ impl ConfigurationObserverActor {
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashMap;
+
     use super::Config;
 
-    struct StubConfig {}
+    struct StubConfig {
+        namespaces: HashMap<String, Vec<String>>,
+    }
 
     impl StubConfig {
-        fn new() -> StubConfig {
-            StubConfig {}
+        fn new(namespaces: HashMap<String, Vec<String>>) -> Self {
+            Self { namespaces }
         }
     }
 
     impl Config for StubConfig {
-        fn namespaces(&self) -> &[String] {
-            &[]
+        fn namespaces(&self) -> Vec<&str> {
+            self.namespaces.keys().map(String::as_str).collect()
         }
     }
 
     #[test]
     fn on_start_reports_all_skills_to_executer_agent() {
         // Given some configured skills
-        let stub_config = StubConfig::new();
+        let namespaces =
+            HashMap::from([("dummy namespace".to_owned(), vec!["dummy skill".to_owned()])]);
+        let stub_config = StubConfig::new(namespaces);
+
         // When we boot up the configuration observer
 
         // Then one new skill message is send for each skill configured

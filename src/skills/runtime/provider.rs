@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context};
 use serde_json::Value;
 
 use crate::{
-    configuration_observer::{skill_config_from_url, NamespaceConfig, OperatorConfig},
+    configuration_observer::{namespace_from_url, Namespace, OperatorConfig},
     registries::{OciRegistry, SkillRegistry},
 };
 
@@ -20,14 +20,14 @@ pub struct OperatorProvider {
 
 pub struct SkillProvider {
     skill_registry: Box<dyn SkillRegistry + Send>,
-    skill_config: Box<dyn NamespaceConfig + Send>,
+    skill_config: Box<dyn Namespace + Send>,
     skills: HashMap<String, CachedSkill>,
 }
 
 impl SkillProvider {
     pub fn new(
         skill_registry: impl SkillRegistry + Send + 'static,
-        skill_config: Box<dyn NamespaceConfig + Send>,
+        skill_config: Box<dyn Namespace + Send>,
     ) -> Self {
         SkillProvider {
             skill_registry: Box::new(skill_registry),
@@ -127,7 +127,7 @@ impl OperatorProvider {
                 password,
             );
 
-            let skill_config = skill_config_from_url(&ns.config_url)?;
+            let skill_config = namespace_from_url(&ns.config_url)?;
             let skill_provider = SkillProvider::new(skill_registry, skill_config);
             self.skill_providers
                 .insert(namespace.to_owned(), skill_provider);
@@ -180,7 +180,7 @@ mod tests {
 
     impl OperatorProvider {
         fn empty() -> Self {
-            let config = OperatorConfig::from_str("[namespaces]");
+            let config = OperatorConfig::from_str("[namespaces]").unwrap();
             OperatorProvider::new(config)
         }
 
