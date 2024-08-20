@@ -1,6 +1,9 @@
 use std::future::pending;
 
-use super::runtime::{Csi, OperatorProvider, Runtime, WasmRuntime};
+use super::{
+    runtime::{Csi, OperatorProvider, Runtime, WasmRuntime},
+    SkillPath,
+};
 
 use crate::{
     configuration_observer::OperatorConfig,
@@ -68,7 +71,7 @@ impl SkillExecutorApi {
         Self { send }
     }
 
-    pub async fn add_skill(&mut self, skill: String) {
+    pub async fn add_skill(&mut self, skill: SkillPath) {
         let msg = SkillExecutorMessage::Add { skill };
         self.send
             .send(msg)
@@ -76,7 +79,7 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn remove_skill(&mut self, skill: String) {
+    pub async fn remove_skill(&mut self, skill: SkillPath) {
         let msg = SkillExecutorMessage::Remove { skill };
         self.send
             .send(msg)
@@ -197,10 +200,10 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
 pub enum SkillExecutorMessage {
     Add {
-        skill: String,
+        skill: SkillPath,
     },
     Remove {
-        skill: String,
+        skill: SkillPath,
     },
     Execute {
         skill: String,

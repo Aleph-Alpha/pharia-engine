@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use tokio::{select, task::JoinHandle, time::Duration};
 
-use crate::skills::SkillExecutorApi;
+use crate::skills::{SkillExecutorApi, SkillPath};
 
 use super::{namespace_from_url, Namespace, OperatorConfig};
 
 pub trait Config {
     fn namespaces(&self) -> Vec<&str>;
-    fn skills(&self, namespace: &str) -> Option<Vec<&str>>;
+    fn skills(&self, namespace: &str) -> Vec<&str>;
 }
 
 struct ConfigImpl {
@@ -31,12 +31,13 @@ impl Config for ConfigImpl {
         self.namespaces.keys().map(String::as_str).collect()
     }
 
-    fn skills(&self, namespace: &str) -> Option<Vec<&str>> {
-        if let Some(ns) = self.namespaces.get(namespace) {
-            Some(ns.skills().into_iter().map(|s| s.name.as_str()).collect())
-        } else {
-            None
-        }
+    fn skills(&self, namespace: &str) -> Vec<&str> {
+        let skills = self
+            .namespaces
+            .get(namespace)
+            .expect("namespace must exist.")
+            .skills();
+        skills.into_iter().map(|s| s.name.as_str()).collect()
     }
 }
 
@@ -99,15 +100,17 @@ impl ConfigurationObserverActor {
     async fn run(mut self) {
         loop {
             for namespace in self.config.namespaces() {
-                let skills = self.config.skills(namespace).expect("namespace must exist");
+                let skills = self.config.skills(namespace);
                 for skill in skills {
-                    self.skill_executor_api.add_skill(skill.to_owned()).await;
+                    self.skill_executor_api
+                        .add_skill(SkillPath::new(namespace, skill))
+                        .await;
                 }
                 // Later: compute difference and only send observed changes (new, drop)
             }
             select! {
                 _ = self.shutdown.changed() => break,
-                _ = tokio::time::sleep(Duration::from_secs(10)) => (),
+                () = tokio::time::sleep(Duration::from_secs(10)) => (),
             };
         }
     }
@@ -121,7 +124,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::skills::tests::SkillExecutorMessage;
-    use crate::skills::SkillExecutorApi;
+    use crate::skills::{SkillExecutorApi, SkillPath};
 
     use super::*;
 
@@ -140,19 +143,23 @@ mod tests {
             self.namespaces.keys().map(String::as_str).collect()
         }
 
-        fn skills(&self, namespace: &str) -> Option<Vec<&str>> {
+        fn skills(&self, namespace: &str) -> Vec<&str> {
             self.namespaces
                 .get(namespace)
-                .map(|ns| ns.iter().map(String::as_str).collect())
+                .expect("namespace must exist.")
+                .iter()
+                .map(String::as_str)
+                .collect()
         }
     }
 
     #[tokio::test]
     async fn on_start_reports_all_skills_to_executor_agent() {
         // Given some configured skills
-        let dummy_skill = "dummy skill";
+        let dummy_namespace = "dummy_namespace";
+        let dummy_skill = "dummy_skill";
         let namespaces =
-            HashMap::from([("dummy namespace".to_owned(), vec![dummy_skill.to_owned()])]);
+            HashMap::from([(dummy_namespace.to_owned(), vec![dummy_skill.to_owned()])]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
@@ -163,11 +170,18 @@ mod tests {
         // Then one new skill message is send for each skill configured
         let msg = receiver.recv().await;
         let msg = msg.unwrap();
-        if let SkillExecutorMessage::Add { skill } = msg {
-            assert_eq!(skill, dummy_skill);
-        } else {
-            panic!("Add message for newly observed skill not received");
-        }
+
+        assert!(matches!(
+            msg,
+            SkillExecutorMessage::Add {
+                skill: SkillPath {
+                    namespace,
+                    name,
+                }
+            }
+            if namespace == dummy_namespace && name == dummy_skill
+        ));
+
         observer.wait_for_shutdown().await;
     }
 }

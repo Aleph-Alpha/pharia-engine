@@ -6,6 +6,7 @@ use serde_json::Value;
 use crate::{
     configuration_observer::{namespace_from_url, Namespace, OperatorConfig},
     registries::{OciRegistry, SkillRegistry},
+    skills::SkillPath,
 };
 
 use super::{
@@ -69,20 +70,6 @@ impl SkillProvider {
     }
 }
 
-pub struct SkillPath {
-    pub namespace: String,
-    pub name: String,
-}
-
-impl SkillPath {
-    fn from_str(s: &str) -> Self {
-        let (namespace, name) = s.split_once('/').unwrap_or(("pharia-kernel-team", s));
-        Self {
-            namespace: namespace.to_owned(),
-            name: name.to_owned(),
-        }
-    }
-}
 impl OperatorProvider {
     pub fn new(config: OperatorConfig) -> Self {
         OperatorProvider {
