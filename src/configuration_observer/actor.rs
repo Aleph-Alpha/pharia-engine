@@ -164,6 +164,7 @@ mod tests {
     use std::collections::HashMap;
 
     use tokio::sync::mpsc;
+    use tokio::time::timeout;
 
     use crate::skills::tests::SkillExecutorMessage;
     use crate::skills::{SkillExecutorApi, SkillPath};
@@ -210,7 +211,7 @@ mod tests {
         // Given some configured skills
         let dummy_namespace = "dummy_namespace";
         let dummy_skill = "dummy_skill";
-        let update_interval_ms = 2;
+        let update_interval_ms = 1;
         let namespaces =
             HashMap::from([(dummy_namespace.to_owned(), vec![dummy_skill.to_owned()])]);
         let stub_config = Box::new(StubConfig::new(namespaces));
@@ -225,7 +226,7 @@ mod tests {
         // Then one new skill message is send for each skill configured
         let msg = receiver.recv().await;
         let msg = msg.unwrap();
-        dbg!(&msg);
+
         assert!(matches!(
             msg,
             SkillExecutorMessage::Add {
@@ -236,8 +237,36 @@ mod tests {
             }
             if namespace == dummy_namespace && name == dummy_skill
         ));
-        tokio::time::sleep(Duration::from_millis(update_interval_ms * 10)).await;
-        let next_msg = receiver.try_recv();
+
+        observer.wait_for_shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn new_skill_only_reported_once() {
+        // Given some configured skills
+        let dummy_namespace = "dummy_namespace";
+        let dummy_skill = "dummy_skill";
+        let update_interval_ms = 1;
+        let namespaces =
+            HashMap::from([(dummy_namespace.to_owned(), vec![dummy_skill.to_owned()])]);
+        let stub_config = Box::new(StubConfig::new(namespaces));
+
+        // When we boot up the configuration observer
+        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
+        let skill_executor_api = SkillExecutorApi::new(sender);
+        let update_interval = Duration::from_millis(update_interval_ms);
+        let observer =
+            ConfigurationObserver::with_config(skill_executor_api, stub_config, update_interval);
+
+        // Then only one new skill message is send for each skill configured
+        receiver.recv().await.unwrap();
+
+        let next_msg = timeout(
+            Duration::from_millis(update_interval_ms + 10),
+            receiver.recv(),
+        )
+        .await;
+
         assert!(next_msg.is_err());
 
         observer.wait_for_shutdown().await;
