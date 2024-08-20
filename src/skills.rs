@@ -2,6 +2,7 @@ mod actor;
 mod runtime;
 pub use actor::{SkillExecutor, SkillExecutorApi};
 
+#[derive(Debug)]
 pub struct SkillPath {
     pub namespace: String,
     pub name: String,

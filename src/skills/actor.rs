@@ -198,6 +198,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
     }
 }
 
+#[derive(Debug)]
 pub enum SkillExecutorMessage {
     Add {
         skill: SkillPath,

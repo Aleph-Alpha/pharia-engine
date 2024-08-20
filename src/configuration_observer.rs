@@ -8,5 +8,5 @@ pub use self::skill_config::{namespace_from_url, Namespace};
 
 #[cfg(test)]
 pub mod tests {
-    pub use super::skill_config::{LocalSkillConfig, Skill};
+    pub use super::skill_config::LocalSkillConfig;
 }

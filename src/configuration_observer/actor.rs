@@ -8,7 +8,7 @@ use super::{namespace_from_url, Namespace, OperatorConfig};
 
 pub trait Config {
     fn namespaces(&self) -> Vec<&str>;
-    fn skills(&self, namespace: &str) -> Vec<&str>;
+    fn skills(&self, namespace: &str) -> Vec<String>;
 }
 
 struct ConfigImpl {
@@ -31,13 +31,13 @@ impl Config for ConfigImpl {
         self.namespaces.keys().map(String::as_str).collect()
     }
 
-    fn skills(&self, namespace: &str) -> Vec<&str> {
+    fn skills(&self, namespace: &str) -> Vec<String> {
         let skills = self
             .namespaces
             .get(namespace)
             .expect("namespace must exist.")
             .skills();
-        skills.into_iter().map(|s| s.name.as_str()).collect()
+        skills.into_iter().map(|s| s.name.to_owned()).collect()
     }
 }
 
@@ -88,6 +88,12 @@ struct ConfigurationObserverActor {
     skill_executor_api: SkillExecutorApi,
     config: Box<dyn Config + Send>,
     update_interval: Duration,
+    skills: HashMap<String, Vec<String>>,
+}
+
+struct Diff {
+    added: Vec<String>,
+    removed: Vec<String>,
 }
 
 impl ConfigurationObserverActor {
@@ -102,19 +108,47 @@ impl ConfigurationObserverActor {
             skill_executor_api,
             config,
             update_interval,
+            skills: HashMap::new(),
         }
+    }
+
+    fn compute_diff(existing: &[String], incoming: &[String]) -> Diff {
+        let existing = existing.iter().collect::<std::collections::HashSet<_>>();
+        let incoming = incoming.iter().collect::<std::collections::HashSet<_>>();
+
+        let added = incoming
+            .difference(&existing)
+            .map(|s| s.to_string())
+            .collect();
+
+        let removed = existing
+            .difference(&incoming)
+            .map(|s| s.to_string())
+            .collect();
+        Diff { added, removed }
     }
 
     async fn run(mut self) {
         loop {
             for namespace in self.config.namespaces() {
-                let skills = self.config.skills(namespace);
-                for skill in skills {
+                let incoming = self.config.skills(namespace);
+                let existing = self
+                    .skills
+                    .insert(namespace.to_owned(), incoming)
+                    .unwrap_or_else(|| vec![]);
+
+                let incoming = self.skills.get(namespace).unwrap();
+                let diff = Self::compute_diff(&existing, &incoming);
+                for skill in diff.added {
                     self.skill_executor_api
-                        .add_skill(SkillPath::new(namespace, skill))
+                        .add_skill(SkillPath::new(namespace, &skill))
                         .await;
                 }
-                // Later: compute difference and only send observed changes (new, drop)
+                for skill in diff.removed {
+                    self.skill_executor_api
+                        .remove_skill(SkillPath::new(namespace, &skill))
+                        .await;
+                }
             }
             select! {
                 _ = self.shutdown.changed() => break,
@@ -151,14 +185,24 @@ mod tests {
             self.namespaces.keys().map(String::as_str).collect()
         }
 
-        fn skills(&self, namespace: &str) -> Vec<&str> {
+        fn skills(&self, namespace: &str) -> Vec<String> {
             self.namespaces
                 .get(namespace)
                 .expect("namespace must exist.")
-                .iter()
-                .map(String::as_str)
-                .collect()
+                .clone()
         }
+    }
+
+    #[test]
+    fn diff_is_computed() {
+        let incoming = vec!["new_skill".to_owned(), "existing_skill".to_owned()];
+        let existing = vec!["existing_skill".to_owned(), "old_skill".to_owned()];
+
+        let diff = ConfigurationObserverActor::compute_diff(&existing, &incoming);
+
+        // when the observer checks for new skills
+        assert_eq!(diff.added, vec!["new_skill"]);
+        assert_eq!(diff.removed, vec!["old_skill"]);
     }
 
     #[tokio::test]
@@ -166,6 +210,7 @@ mod tests {
         // Given some configured skills
         let dummy_namespace = "dummy_namespace";
         let dummy_skill = "dummy_skill";
+        let update_interval_ms = 2;
         let namespaces =
             HashMap::from([(dummy_namespace.to_owned(), vec![dummy_skill.to_owned()])]);
         let stub_config = Box::new(StubConfig::new(namespaces));
@@ -173,14 +218,14 @@ mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
         let skill_executor_api = SkillExecutorApi::new(sender);
-        let update_interval = Duration::from_millis(10);
+        let update_interval = Duration::from_millis(update_interval_ms);
         let observer =
             ConfigurationObserver::with_config(skill_executor_api, stub_config, update_interval);
 
         // Then one new skill message is send for each skill configured
         let msg = receiver.recv().await;
         let msg = msg.unwrap();
-
+        dbg!(&msg);
         assert!(matches!(
             msg,
             SkillExecutorMessage::Add {
@@ -191,6 +236,9 @@ mod tests {
             }
             if namespace == dummy_namespace && name == dummy_skill
         ));
+        tokio::time::sleep(Duration::from_millis(update_interval_ms * 10)).await;
+        let next_msg = receiver.try_recv();
+        assert!(next_msg.is_err());
 
         observer.wait_for_shutdown().await;
     }
