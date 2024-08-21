@@ -52,10 +52,6 @@ pub struct LocalSkillConfig {
 }
 
 impl LocalSkillConfig {
-    pub fn from_default_file() -> Option<Self> {
-        Self::new("skill_config.toml").ok()
-    }
-
     pub fn new<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
         let config = std::fs::read_to_string(p)?;
         Self::from_str(&config)
@@ -161,16 +157,6 @@ pub mod tests {
 
     pub struct StubConfig {
         skills: Vec<Skill>,
-    }
-
-    impl StubConfig {
-        pub fn new(skills: &[&str]) -> Self {
-            let skills = skills
-                .iter()
-                .map(|&s| Skill { name: s.to_owned() })
-                .collect();
-            Self { skills }
-        }
     }
 
     #[async_trait]
