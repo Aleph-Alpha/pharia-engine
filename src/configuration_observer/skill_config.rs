@@ -155,20 +155,6 @@ impl Namespace for RemoteSkillConfig {
 pub mod tests {
     use super::*;
 
-    pub struct StubConfig {
-        skills: Vec<Skill>,
-    }
-
-    #[async_trait]
-    impl Namespace for StubConfig {
-        async fn synced_skills(&mut self) -> &[Skill] {
-            self.skills()
-        }
-        fn skills(&self) -> &[Skill] {
-            &self.skills
-        }
-    }
-
     impl RemoteSkillConfig {
         pub fn set_last_sync(&mut self, last_sync: std::time::Instant) {
             self.last_sync = Some(last_sync);
