@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context};
 use serde_json::Value;
 
 use crate::{
-    configuration_observer::{namespace_from_url, Namespace, OperatorConfig},
+    configuration_observer::{namespace_from_url, Namespace, NamespaceConfig, OperatorConfig},
     registries::{OciRegistry, SkillRegistry},
     skills::SkillPath,
 };
@@ -113,7 +113,12 @@ impl OperatorProvider {
     }
 
     fn skill_provider(&mut self, namespace: &str) -> anyhow::Result<&mut SkillProvider> {
-        let Some(ns) = self.config.namespaces.get(namespace) else {
+        let Some(NamespaceConfig::Oci {
+            repository,
+            registry,
+            config_url,
+        }) = self.config.namespaces.get(namespace)
+        else {
             return Err(anyhow!("Namespace not configured."));
         };
 
@@ -121,14 +126,10 @@ impl OperatorProvider {
             drop(dotenvy::dotenv());
             let username = env::var("SKILL_REGISTRY_USER").unwrap();
             let password = env::var("SKILL_REGISTRY_PASSWORD").unwrap();
-            let skill_registry = OciRegistry::new(
-                ns.repository.clone(),
-                ns.registry.clone(),
-                username,
-                password,
-            );
+            let skill_registry =
+                OciRegistry::new(repository.clone(), registry.clone(), username, password);
 
-            let skill_config = namespace_from_url(&ns.config_url)?;
+            let skill_config = namespace_from_url(&config_url)?;
             let skill_provider = SkillProvider::new(skill_registry, skill_config);
             self.skill_providers
                 .insert(namespace.to_owned(), skill_provider);

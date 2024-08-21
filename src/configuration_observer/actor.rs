@@ -4,7 +4,7 @@ use tokio::{select, task::JoinHandle, time::Duration};
 
 use crate::skills::{SkillExecutorApi, SkillPath};
 
-use super::{namespace_from_url, Namespace, OperatorConfig};
+use super::{namespace_from_url, Namespace, NamespaceConfig, OperatorConfig};
 
 pub trait Config {
     fn namespaces(&self) -> Vec<&str>;
@@ -20,7 +20,12 @@ impl ConfigImpl {
         let namespaces = deserialized
             .namespaces
             .into_iter()
-            .map(|(namespace, config)| Ok((namespace, namespace_from_url(&config.config_url)?)))
+            .map(|(namespace, config)| match config {
+                NamespaceConfig::File { config_url, .. }
+                | NamespaceConfig::Oci { config_url, .. } => {
+                    Ok((namespace, namespace_from_url(&config_url)?))
+                }
+            })
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
         Ok(Self { namespaces })
     }

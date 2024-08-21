@@ -14,10 +14,17 @@ impl OperatorConfig {
 }
 
 #[derive(Deserialize)]
-pub struct NamespaceConfig {
-    pub repository: String,
-    pub registry: String,
-    pub config_url: String,
+#[serde(rename_all = "snake_case", tag = "registry_type")]
+pub enum NamespaceConfig {
+    File {
+        registry: String,
+        config_url: String,
+    },
+    Oci {
+        repository: String,
+        registry: String,
+        config_url: String,
+    },
 }
 
 #[cfg(test)]
@@ -66,5 +73,6 @@ mod tests {
     fn reads_from_file() {
         let config = OperatorConfig::from_file("config.toml").unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
+        assert!(config.namespaces.contains_key("local"));
     }
 }
