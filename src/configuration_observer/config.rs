@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::collections::HashMap;
 
 use serde::Deserialize;
 
@@ -11,11 +11,6 @@ impl OperatorConfig {
     pub fn from_str(config: &str) -> anyhow::Result<Self> {
         Ok(toml::from_str(config)?)
     }
-
-    pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
-        let config = fs::read_to_string(p)?;
-        Self::from_str(&config)
-    }
 }
 
 #[derive(Deserialize)]
@@ -27,6 +22,8 @@ pub struct NamespaceConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, path::Path};
+
     use super::OperatorConfig;
 
     impl OperatorConfig {
@@ -44,6 +41,11 @@ mod tests {
                 "#,
             )
             .unwrap()
+        }
+
+        pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
+            let config = fs::read_to_string(p)?;
+            Self::from_str(&config)
         }
     }
 

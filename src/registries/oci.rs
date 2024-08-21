@@ -5,7 +5,6 @@ use oci_distribution::{
     Reference,
 };
 use oci_wasm::WasmClient;
-use std::env;
 use tracing::error;
 
 use oci_distribution::{client::ClientConfig, Client};
@@ -63,24 +62,6 @@ impl OciRegistry {
             password,
         }
     }
-
-    pub fn from_env() -> Option<Self> {
-        let maybe_repository = env::var("SKILL_REPOSITORY");
-        let maybe_registry = env::var("SKILL_REGISTRY");
-        let maybe_username = env::var("SKILL_REGISTRY_USER");
-        let maybe_password = env::var("SKILL_REGISTRY_PASSWORD");
-        match (
-            maybe_repository,
-            maybe_registry,
-            maybe_username,
-            maybe_password,
-        ) {
-            (Ok(repository), Ok(registry), Ok(username), Ok(password)) => {
-                Some(OciRegistry::new(repository, registry, username, password))
-            }
-            _ => None,
-        }
-    }
 }
 
 fn is_skill_not_found(error: &anyhow::Error) -> bool {
@@ -112,6 +93,24 @@ mod tests {
     use crate::registries::SkillRegistry;
 
     impl OciRegistry {
+        fn from_env() -> Option<Self> {
+            let maybe_repository = env::var("SKILL_REPOSITORY");
+            let maybe_registry = env::var("SKILL_REGISTRY");
+            let maybe_username = env::var("SKILL_REGISTRY_USER");
+            let maybe_password = env::var("SKILL_REGISTRY_PASSWORD");
+            match (
+                maybe_repository,
+                maybe_registry,
+                maybe_username,
+                maybe_password,
+            ) {
+                (Ok(repository), Ok(registry), Ok(username), Ok(password)) => {
+                    Some(OciRegistry::new(repository, registry, username, password))
+                }
+                _ => None,
+            }
+        }
+
         async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str) {
             let repository = format!("{}/{skill_name}", self.repository);
             let tag = "latest";

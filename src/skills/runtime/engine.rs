@@ -216,7 +216,7 @@ impl SupportedVersion {
 
 /// Linked against the skill by the wasm time. For the most part this gives the skill access to the
 /// CSI.
-pub(super) struct LinkedCtx {
+pub struct LinkedCtx {
     wasi_ctx: WasiCtx,
     resource_table: ResourceTable,
     skill_ctx: Box<dyn Csi + Send>,
