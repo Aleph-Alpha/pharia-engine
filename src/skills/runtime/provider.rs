@@ -14,13 +14,6 @@ use super::{
     Csi,
 };
 
-pub struct OperatorProvider {
-    config: OperatorConfig,
-    skill_providers: HashMap<String, SkillProvider>,
-    skills: Vec<SkillPath>,
-    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
-}
-
 pub struct SkillProvider {
     skill_registry: Box<dyn SkillRegistry + Send>,
     skill_config: Box<dyn Namespace + Send>,
@@ -72,14 +65,51 @@ impl SkillProvider {
     }
 }
 
+pub struct OperatorProvider {
+    config: OperatorConfig,
+    skill_providers: HashMap<String, SkillProvider>,
+    skills: Vec<SkillPath>,
+    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
+}
+
 impl OperatorProvider {
-    pub fn new(config: OperatorConfig, namespaces: HashMap<String, NamespaceConfig>) -> Self {
+    pub fn new(config: OperatorConfig, namespaces: &HashMap<String, NamespaceConfig>) -> Self {
+        let skill_registries = namespaces
+            .iter()
+            .map(|(k, v)| Self::registry(v).map(|r| (k.clone(), r)))
+            .collect::<anyhow::Result<HashMap<_, _>>>()
+            .expect("All namespace registry in operator config must be valid.");
         OperatorProvider {
             config,
             skill_providers: HashMap::new(),
             skills: Vec::new(),
-            skill_registries: HashMap::new(),
+            skill_registries,
         }
+    }
+
+    fn registry(
+        namespace_config: &NamespaceConfig,
+    ) -> anyhow::Result<Box<dyn SkillRegistry + Send>> {
+        let registry: Box<dyn SkillRegistry + Send> = match namespace_config {
+            NamespaceConfig::File { registry, .. } => Box::new(FileRegistry::with_url(registry)?),
+
+            NamespaceConfig::Oci {
+                repository,
+                registry,
+                ..
+            } => {
+                drop(dotenvy::dotenv());
+                let username = env::var("SKILL_REGISTRY_USER").unwrap();
+                let password = env::var("SKILL_REGISTRY_PASSWORD").unwrap();
+                Box::new(OciRegistry::new(
+                    repository.clone(),
+                    registry.clone(),
+                    username,
+                    password,
+                ))
+            }
+        };
+        Ok(registry)
     }
 
     pub fn add_skill(&mut self, skill: SkillPath) {
@@ -197,7 +227,7 @@ mod tests {
         fn empty() -> Self {
             let config = OperatorConfig::from_str("[namespaces]").unwrap();
             let namespaces = HashMap::new();
-            OperatorProvider::new(config, namespaces)
+            OperatorProvider::new(config, &namespaces)
         }
 
         fn with_namespace_and_skill(namespace: &str, skill: &str) -> Self {

@@ -25,7 +25,7 @@ pub async fn run(
         .expect("Configuration must be valid.");
 
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::new(inference.api(), config.namespaces.clone());
+    let skill_executor = SkillExecutor::new(inference.api(), &config.namespaces);
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer

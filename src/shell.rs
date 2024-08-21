@@ -322,7 +322,7 @@ mod tests {
         let completion = "dummy completion";
         let inference = InferenceStub::with_completion(completion);
         let config = OperatorConfig::local();
-        let http = http(SkillExecutor::new(inference.api(), config.namespaces).api());
+        let http = http(SkillExecutor::new(inference.api(), &config.namespaces).api());
 
         let args = ExecuteSkillArgs {
             skill: "greet_skill".to_owned(),
@@ -351,7 +351,7 @@ mod tests {
         let inference = Inference::new(inference_addr().to_owned());
         let config = OperatorConfig::local();
 
-        let http = http(SkillExecutor::new(inference.api(), config.namespaces).api());
+        let http = http(SkillExecutor::new(inference.api(), &config.namespaces).api());
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
             input: json!("Homer"),

@@ -72,7 +72,7 @@ pub mod tests {
         pub fn local() -> Self {
             let config = OperatorConfig::local();
             let namespaces = config.namespaces.clone();
-            let provider = OperatorProvider::new(config, namespaces);
+            let provider = OperatorProvider::new(config, &namespaces);
             Self::with_provider(provider)
         }
     }
