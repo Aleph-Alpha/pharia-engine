@@ -43,6 +43,7 @@ mod tests {
                 r#"
                     [namespaces.local]
                     config_url = "file://skill_config.toml"
+                    registry_type = "oci"
                     registry = "registry.gitlab.aleph-alpha.de"
                     repository = "engineering/pharia-skills/skills"
                 "#,
@@ -57,11 +58,26 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_config() {
+    fn deserialize_config_with_file_registry() {
+        let config = OperatorConfig::from_str(
+            r#"
+            [namespaces.local]
+            config_url = "file://skill_config.toml"
+            registry_type = "file"
+            registry = "file://skills"
+            "#,
+        )
+        .unwrap();
+        assert!(config.namespaces.contains_key("local"));
+    }
+
+    #[test]
+    fn deserialize_config_with_oci_registry() {
         let config = OperatorConfig::from_str(
             r#"
             [namespaces.pharia-kernel-team]
             config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+            registry_type = "oci"
             registry = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
             "#,
@@ -73,6 +89,5 @@ mod tests {
     fn reads_from_file() {
         let config = OperatorConfig::from_file("config.toml").unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
-        assert!(config.namespaces.contains_key("local"));
     }
 }

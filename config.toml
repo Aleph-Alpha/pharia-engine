@@ -3,8 +3,3 @@ config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files
 registry_type = "oci"
 registry = "registry.gitlab.aleph-alpha.de"
 repository = "engineering/pharia-skills/skills"
-
-[namespaces.local]
-config_url = "file:///skill_config.toml"
-registry_type = "file"
-registry = "file:///skills"
