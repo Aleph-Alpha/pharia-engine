@@ -55,8 +55,7 @@ pub struct ConfigurationObserver {
 
 impl ConfigurationObserver {
     pub fn new(skill_executor_api: SkillExecutorApi) -> anyhow::Result<Self> {
-        let config_str = include_str!("../../config.toml");
-        let config = OperatorConfig::from_str(config_str)?;
+        let config = OperatorConfig::from_env_or_default()?;
         let config = Box::new(ConfigImpl::new(config)?);
         Ok(Self::with_config(
             skill_executor_api,

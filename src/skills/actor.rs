@@ -26,8 +26,7 @@ pub struct SkillExecutor {
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi) -> Self {
-        let config_str = include_str!("../../config.toml");
-        let config = OperatorConfig::from_str(config_str).unwrap();
+        let config = OperatorConfig::from_env_or_default().unwrap();
 
         let provider = OperatorProvider::new(config);
 

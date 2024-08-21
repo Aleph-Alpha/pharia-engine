@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env, fs, path::Path};
 
 use serde::Deserialize;
 
@@ -8,6 +8,17 @@ pub struct OperatorConfig {
 }
 
 impl OperatorConfig {
+    pub fn from_env_or_default() -> anyhow::Result<Self> {
+        drop(dotenvy::dotenv());
+        let config_path = env::var("OPERATOR_CONFIG_PATH").unwrap_or("config.toml".to_owned());
+        Self::from_file(config_path)
+    }
+
+    pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
+        let config = fs::read_to_string(p)?;
+        Self::from_str(&config)
+    }
+
     pub fn from_str(config: &str) -> anyhow::Result<Self> {
         Ok(toml::from_str(config)?)
     }
@@ -29,7 +40,6 @@ pub enum NamespaceConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path};
 
     use super::OperatorConfig;
 
@@ -48,11 +58,6 @@ mod tests {
                 "#,
             )
             .unwrap()
-        }
-
-        pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
-            let config = fs::read_to_string(p)?;
-            Self::from_str(&config)
         }
     }
 
