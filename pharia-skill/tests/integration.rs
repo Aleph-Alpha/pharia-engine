@@ -109,6 +109,7 @@ impl Kernel {
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
+            operator_config: "../config.toml".parse().unwrap(),
         };
         Self::new(app_config).await
     }

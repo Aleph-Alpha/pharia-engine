@@ -1,8 +1,9 @@
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, path::PathBuf};
 
 pub struct AppConfig {
     pub tcp_addr: SocketAddr,
     pub inference_addr: String,
+    pub operator_config: PathBuf,
 }
 
 impl AppConfig {
@@ -18,9 +19,16 @@ impl AppConfig {
         let inference_addr = env::var("AA_INFERENCE_ADDRESS")
             .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
 
+        let operator_config =
+            env::var("OPERATOR_CONFIG_PATH").unwrap_or_else(|_| "config.toml".to_owned());
+        let operator_config = operator_config.parse().expect(&format!(
+            "Invalid path {operator_config} for operator config"
+        ));
+
         AppConfig {
             tcp_addr: addr.parse().unwrap(),
             inference_addr,
+            operator_config,
         }
     }
 }

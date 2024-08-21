@@ -5,7 +5,7 @@ mod registries;
 mod shell;
 mod skills;
 
-use configuration_observer::ConfigurationObserver;
+use configuration_observer::{ConfigImpl, ConfigurationObserver, OperatorConfig};
 use futures::Future;
 use tracing::error;
 
@@ -25,8 +25,15 @@ pub async fn run(
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
-    let configuration_observer =
-        ConfigurationObserver::new(skill_executor.api()).expect("Configuration must be valid.");
+    let config = OperatorConfig::from_file(app_config.operator_config)
+        .expect("Configuration must be valid.");
+    let config = Box::new(ConfigImpl::new(config).expect("Namespace configuration must be valid."));
+
+    let configuration_observer = ConfigurationObserver::with_config(
+        skill_executor.api(),
+        config,
+        tokio::time::Duration::from_secs(60),
+    );
 
     let shell_shutdown = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await;
 
@@ -63,6 +70,7 @@ mod tests {
         let config = AppConfig {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
+            operator_config: "config.toml".parse().unwrap(),
         };
 
         //wasm runtime needs some time to shutdown (at least on Daniel's machine), so the time out

@@ -11,7 +11,7 @@ pub trait Config {
     fn skills(&self, namespace: &str) -> Vec<String>;
 }
 
-struct ConfigImpl {
+pub struct ConfigImpl {
     namespaces: HashMap<String, Box<dyn Namespace + Send>>,
 }
 
