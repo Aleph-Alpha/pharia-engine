@@ -71,7 +71,8 @@ pub mod tests {
     impl WasmRuntime {
         pub fn local() -> Self {
             let config = OperatorConfig::local();
-            let provider = OperatorProvider::new(config);
+            let namespaces = config.namespaces.clone();
+            let provider = OperatorProvider::new(config, namespaces);
             Self::with_provider(provider)
         }
     }

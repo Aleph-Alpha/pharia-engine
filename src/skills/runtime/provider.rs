@@ -18,6 +18,7 @@ pub struct OperatorProvider {
     config: OperatorConfig,
     skill_providers: HashMap<String, SkillProvider>,
     skills: Vec<SkillPath>,
+    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
 }
 
 pub struct SkillProvider {
@@ -72,11 +73,12 @@ impl SkillProvider {
 }
 
 impl OperatorProvider {
-    pub fn new(config: OperatorConfig) -> Self {
+    pub fn new(config: OperatorConfig, namespaces: HashMap<String, NamespaceConfig>) -> Self {
         OperatorProvider {
             config,
             skill_providers: HashMap::new(),
             skills: Vec::new(),
+            skill_registries: HashMap::new(),
         }
     }
 
@@ -194,7 +196,8 @@ mod tests {
     impl OperatorProvider {
         fn empty() -> Self {
             let config = OperatorConfig::from_str("[namespaces]").unwrap();
-            OperatorProvider::new(config)
+            let namespaces = HashMap::new();
+            OperatorProvider::new(config, namespaces)
         }
 
         fn with_namespace_and_skill(namespace: &str, skill: &str) -> Self {

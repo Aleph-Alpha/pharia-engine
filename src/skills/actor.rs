@@ -1,4 +1,4 @@
-use std::future::pending;
+use std::{collections::HashMap, future::pending};
 
 use super::{
     runtime::{Csi, OperatorProvider, Runtime, WasmRuntime},
@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::{
-    configuration_observer::OperatorConfig,
+    configuration_observer::{Namespace, NamespaceConfig, OperatorConfig},
     inference::{Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
@@ -25,10 +25,10 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(inference_api: InferenceApi) -> Self {
+    pub fn new(inference_api: InferenceApi, namespaces: HashMap<String, NamespaceConfig>) -> Self {
         let config = OperatorConfig::from_env_or_default().unwrap();
 
-        let provider = OperatorProvider::new(config);
+        let provider = OperatorProvider::new(config, namespaces);
 
         let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)
@@ -510,7 +510,9 @@ pub mod tests {
 
     impl SkillExecutor {
         pub fn with_wasm_runtime() -> Self {
-            let provider = OperatorProvider::new(OperatorConfig::empty());
+            let config = OperatorConfig::empty();
+            let namespaces = OperatorConfig::empty().namespaces;
+            let provider = OperatorProvider::new(config, namespaces);
             let runtime = WasmRuntime::with_provider(provider);
             let inference = InferenceStub::with_completion("Hello".to_owned());
             SkillExecutor::with_runtime(runtime, inference.api())

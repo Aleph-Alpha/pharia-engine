@@ -20,13 +20,15 @@ pub async fn run(
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr);
 
+    // Read the config once, assume it never changes during runtime
+    let config = OperatorConfig::from_file(app_config.operator_config)
+        .expect("Configuration must be valid.");
+
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::new(inference.api());
+    let skill_executor = SkillExecutor::new(inference.api(), config.namespaces.clone());
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
-    let config = OperatorConfig::from_file(app_config.operator_config)
-        .expect("Configuration must be valid.");
     let config = Box::new(ConfigImpl::new(config).expect("Namespace configuration must be valid."));
 
     let configuration_observer = ConfigurationObserver::with_config(

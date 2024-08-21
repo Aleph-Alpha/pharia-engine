@@ -24,7 +24,7 @@ impl OperatorConfig {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "snake_case", tag = "registry_type")]
 pub enum NamespaceConfig {
     File {

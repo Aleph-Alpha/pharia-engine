@@ -273,6 +273,7 @@ const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 #[cfg(test)]
 mod tests {
     use crate::{
+        configuration_observer::OperatorConfig,
         inference::tests::InferenceStub,
         skills::{tests::LiarRuntime, SkillExecutor},
     };
@@ -320,7 +321,8 @@ mod tests {
 
         let completion = "dummy completion";
         let inference = InferenceStub::with_completion(completion);
-        let http = http(SkillExecutor::new(inference.api()).api());
+        let config = OperatorConfig::local();
+        let http = http(SkillExecutor::new(inference.api(), config.namespaces).api());
 
         let args = ExecuteSkillArgs {
             skill: "greet_skill".to_owned(),
@@ -347,8 +349,9 @@ mod tests {
     #[tokio::test]
     async fn api_token_missing() {
         let inference = Inference::new(inference_addr().to_owned());
+        let config = OperatorConfig::local();
 
-        let http = http(SkillExecutor::new(inference.api()).api());
+        let http = http(SkillExecutor::new(inference.api(), config.namespaces).api());
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
             input: json!("Homer"),
