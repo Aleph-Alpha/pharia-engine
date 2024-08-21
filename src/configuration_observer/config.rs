@@ -43,9 +43,8 @@ mod tests {
                 r#"
                     [namespaces.local]
                     config_url = "file://skill_config.toml"
-                    registry_type = "oci"
-                    registry = "registry.gitlab.aleph-alpha.de"
-                    repository = "engineering/pharia-skills/skills"
+                    registry_type = "file"
+                    registry = "file://skills"
                 "#,
             )
             .unwrap()

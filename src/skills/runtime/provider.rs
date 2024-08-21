@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::{
     configuration_observer::{namespace_from_url, Namespace, NamespaceConfig, OperatorConfig},
-    registries::{OciRegistry, SkillRegistry},
+    registries::{FileRegistry, OciRegistry, SkillRegistry},
     skills::SkillPath,
 };
 
@@ -113,24 +113,35 @@ impl OperatorProvider {
     }
 
     fn skill_provider(&mut self, namespace: &str) -> anyhow::Result<&mut SkillProvider> {
-        let Some(NamespaceConfig::Oci {
-            repository,
-            registry,
-            config_url,
-        }) = self.config.namespaces.get(namespace)
-        else {
+        let Some(ns) = self.config.namespaces.get(namespace) else {
             return Err(anyhow!("Namespace not configured."));
         };
 
         if !self.skill_providers.contains_key(namespace) {
-            drop(dotenvy::dotenv());
-            let username = env::var("SKILL_REGISTRY_USER").unwrap();
-            let password = env::var("SKILL_REGISTRY_PASSWORD").unwrap();
-            let skill_registry =
-                OciRegistry::new(repository.clone(), registry.clone(), username, password);
+            let skill_provider = match ns {
+                NamespaceConfig::File {
+                    registry,
+                    config_url,
+                } => {
+                    let skill_registry = FileRegistry::with_url(registry)?;
+                    let skill_config = namespace_from_url(config_url)?;
+                    SkillProvider::new(skill_registry, skill_config)
+                }
+                NamespaceConfig::Oci {
+                    repository,
+                    registry,
+                    config_url,
+                } => {
+                    drop(dotenvy::dotenv());
+                    let username = env::var("SKILL_REGISTRY_USER").unwrap();
+                    let password = env::var("SKILL_REGISTRY_PASSWORD").unwrap();
+                    let skill_registry =
+                        OciRegistry::new(repository.clone(), registry.clone(), username, password);
+                    let skill_config = namespace_from_url(config_url)?;
+                    SkillProvider::new(skill_registry, skill_config)
+                }
+            };
 
-            let skill_config = namespace_from_url(&config_url)?;
-            let skill_provider = SkillProvider::new(skill_registry, skill_config);
             self.skill_providers
                 .insert(namespace.to_owned(), skill_provider);
         }
@@ -176,7 +187,7 @@ impl CachedSkill {
 #[cfg(test)]
 mod tests {
 
-    use crate::{configuration_observer::tests::LocalSkillConfig, registries::tests::FileRegistry};
+    use crate::configuration_observer::tests::LocalSkillConfig;
 
     use super::*;
 

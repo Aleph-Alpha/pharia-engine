@@ -4,6 +4,7 @@ use std::{future::Future, pin::Pin};
 mod file;
 mod oci;
 
+pub use file::FileRegistry;
 pub use oci::OciRegistry;
 
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -48,7 +49,7 @@ pub mod tests {
     use anyhow::anyhow;
     use tempfile::tempdir;
 
-    pub use super::file::FileRegistry;
+    use crate::registries::FileRegistry;
 
     use super::{DynFuture, SkillRegistry};
 
