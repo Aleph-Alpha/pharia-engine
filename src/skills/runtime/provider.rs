@@ -49,8 +49,10 @@ impl SkillProvider {
                 ..
             } => {
                 drop(dotenvy::dotenv());
-                let username = env::var("SKILL_REGISTRY_USER").unwrap();
-                let password = env::var("SKILL_REGISTRY_PASSWORD").unwrap();
+                let username = env::var("SKILL_REGISTRY_USER")
+                    .expect("SKILL_REGISTRY_USER must be set if OCI registry is used.");
+                let password = env::var("SKILL_REGISTRY_PASSWORD")
+                    .expect("SKILL_REGISTRY_PASSWORD must be set if OCI registry is used.");
                 Box::new(OciRegistry::new(
                     repository.clone(),
                     registry.clone(),
