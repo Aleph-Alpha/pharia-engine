@@ -28,7 +28,7 @@ pub trait Runtime {
     /// Executes a skill and return its result.
     fn run(
         &mut self,
-        skill: &str,
+        skill_path: &SkillPath,
         input: Value,
         ctx: Box<dyn Csi + Send>,
     ) -> impl Future<Output = anyhow::Result<Value>> + Send;
@@ -69,7 +69,7 @@ pub mod tests {
     impl Runtime for SaboteurRuntime {
         async fn run(
             &mut self,
-            _skill: &str,
+            _skill_path: &SkillPath,
             _input: Value,
             _ctx: Box<dyn Csi + Send>,
         ) -> anyhow::Result<Value> {

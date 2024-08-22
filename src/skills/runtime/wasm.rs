@@ -21,11 +21,11 @@ impl WasmRuntime {
 impl Runtime for WasmRuntime {
     async fn run(
         &mut self,
-        skill_name: &str,
+        skill_path: &SkillPath,
         input: Value,
         ctx: Box<dyn Csi + Send>,
     ) -> anyhow::Result<Value> {
-        let skill = self.provider.fetch(skill_name, &self.engine).await?;
+        let skill = self.provider.fetch(skill_path, &self.engine).await?;
         skill.run(&self.engine, ctx, input).await
     }
 
@@ -82,9 +82,7 @@ pub mod tests {
         let mut runtime = WasmRuntime::local();
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.add_skill(skill_path.clone());
-        let resp = runtime
-            .run(&skill_path.to_string(), json!("name"), skill_ctx)
-            .await;
+        let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
 
         assert_eq!(resp.unwrap(), "Hello");
     }
@@ -94,7 +92,7 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         let mut runtime = WasmRuntime::local();
         let resp = runtime
-            .run("non-existing-skill", json!("name"), skill_ctx)
+            .run(&SkillPath::dummy(), json!("name"), skill_ctx)
             .await;
         assert!(resp.is_err());
     }
@@ -120,7 +118,7 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run(&skill_path.to_string(), json!("name"), skill_ctx)
+                .run(&skill_path, json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -156,7 +154,7 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run(&skill_path_rs.to_string(), json!("name"), skill_ctx)
+                .run(&skill_path_rs, json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -167,7 +165,7 @@ pub mod tests {
 
         drop(
             runtime
-                .run(&skill_path_py.to_string(), json!("name"), skill_ctx)
+                .run(&skill_path_py, json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -198,9 +196,7 @@ pub mod tests {
         fs::copy("./skills/greet_skill.wasm", skill_file).unwrap();
 
         // Then the skill can be invoked
-        let greet = runtime
-            .run(&skill_path.to_string(), json!("Homer"), skill_ctx)
-            .await;
+        let greet = runtime.run(&skill_path, json!("Homer"), skill_ctx).await;
         assert!(greet.is_ok());
     }
 
@@ -213,7 +209,7 @@ pub mod tests {
         runtime.add_skill(skill_path.clone());
 
         let actual = runtime
-            .run(&skill_path.to_string(), json!("Homer"), skill_ctx)
+            .run(&skill_path, json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
@@ -229,7 +225,7 @@ pub mod tests {
         runtime.add_skill(skill_path.clone());
 
         let actual = runtime
-            .run(&skill_path.to_string(), json!("Homer"), skill_ctx)
+            .run(&skill_path, json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
@@ -244,7 +240,7 @@ pub mod tests {
         runtime.add_skill(skill_path.clone());
         for i in 1..10 {
             let resp = runtime
-                .run(&skill_path.to_string(), json!("Homer"), skill_ctx.clone())
+                .run(&skill_path, json!("Homer"), skill_ctx.clone())
                 .await
                 .unwrap();
             assert_eq!(resp, json!(i.to_string()));

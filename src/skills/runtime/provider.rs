@@ -84,26 +84,29 @@ impl SkillProvider {
 
     pub async fn fetch(
         &mut self,
-        skill_name: &str,
+        skill_path: &SkillPath,
         engine: &Engine,
     ) -> anyhow::Result<&CachedSkill> {
-        let path = SkillPath::from_str(skill_name);
-
-        if !self.known_skills.contains(&path) {
-            return Err(anyhow!("Skill {path} not configured."));
+        if !self.known_skills.contains(skill_path) {
+            return Err(anyhow!("Skill {skill_path} not configured."));
         }
-        if !self.cached_skills.contains_key(&path) {
-            let Some(registry) = self.skill_registries.get(&path.namespace) else {
-                return Err(anyhow!("Namespace {} not configured.", path.namespace));
+
+        if !self.cached_skills.contains_key(skill_path) {
+            let Some(registry) = self.skill_registries.get(&skill_path.namespace) else {
+                return Err(anyhow!(
+                    "Namespace {} not configured.",
+                    skill_path.namespace
+                ));
             };
 
-            let bytes = registry.load_skill(&path.name).await?;
-            let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {} not found.", path.name))?;
+            let bytes = registry.load_skill(&skill_path.name).await?;
+            let bytes =
+                bytes.ok_or_else(|| anyhow!("Sorry, skill {} not found.", skill_path.name))?;
             let skill = CachedSkill::new(engine, bytes)
-                .with_context(|| format!("Failed to initialize {}.", path.name))?;
-            self.cached_skills.insert(path.clone(), skill);
+                .with_context(|| format!("Failed to initialize {}.", skill_path.name))?;
+            self.cached_skills.insert(skill_path.clone(), skill);
         }
-        Ok(self.cached_skills.get(&path).expect("Skill present."))
+        Ok(self.cached_skills.get(skill_path).expect("Skill present."))
     }
 }
 
@@ -153,7 +156,7 @@ mod tests {
         let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
-        let result = provider.fetch(&skill_path.to_string(), &engine).await;
+        let result = provider.fetch(&skill_path, &engine).await;
 
         assert!(result.is_err());
     }
@@ -166,7 +169,7 @@ mod tests {
 
         let result = provider
             .fetch(
-                &format!("{}/non_existing_skill", skill_path.namespace),
+                &SkillPath::new(&skill_path.namespace, "non_existing_skill"),
                 &engine,
             )
             .await;
@@ -182,7 +185,7 @@ mod tests {
 
         let result = provider
             .fetch(
-                &format!("non_existing_namespace/{}", skill_path.name),
+                &SkillPath::new("non_existing_namespace", &skill_path.name),
                 &engine,
             )
             .await;

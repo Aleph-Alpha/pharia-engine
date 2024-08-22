@@ -185,8 +185,9 @@ async fn execute_skill(
         );
     }
 
+    let skill_path = SkillPath::from_str(&args.skill);
     let result = skill_executor_api
-        .execute_skill(args.skill, args.input, bearer.token().to_owned())
+        .execute_skill(skill_path, args.input, bearer.token().to_owned())
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(json!(response))),

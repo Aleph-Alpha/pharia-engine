@@ -85,13 +85,13 @@ impl SkillExecutorApi {
 
     pub async fn execute_skill(
         &self,
-        skill: String,
+        skill_path: SkillPath,
         input: Value,
         api_token: String,
     ) -> anyhow::Result<Value> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Execute {
-            skill,
+            skill_path,
             input,
             send,
             api_token,
@@ -167,12 +167,12 @@ impl<R: Runtime> SkillExecutorActor<R> {
             SkillExecutorMessage::Add { skill } => self.runtime.add_skill(skill),
             SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
             SkillExecutorMessage::Execute {
-                skill,
+                skill_path,
                 input,
                 send,
                 api_token,
             } => {
-                let response = self.run_skill(skill, input, api_token).await;
+                let response = self.run_skill(&skill_path, input, api_token).await;
                 drop(send.send(response));
             }
             SkillExecutorMessage::Skills { send } => {
@@ -192,7 +192,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn run_skill(
         &mut self,
-        skill: String,
+        skill_path: &SkillPath,
         input: Value,
         api_token: String,
     ) -> anyhow::Result<Value> {
@@ -203,7 +203,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
             api_token,
         ));
         select! {
-            result = self.runtime.run(&skill, input, ctx) => result,
+            result = self.runtime.run(skill_path, input, ctx) => result,
             Ok(error) = recv_rt_err => Err(error)
         }
     }
@@ -218,7 +218,7 @@ pub enum SkillExecutorMessage {
         skill: SkillPath,
     },
     Execute {
-        skill: String,
+        skill_path: SkillPath,
         input: Value,
         send: oneshot::Sender<anyhow::Result<Value>>,
         api_token: String,
@@ -307,7 +307,7 @@ pub mod tests {
         impl Runtime for MockRuntime {
             async fn run(
                 &mut self,
-                _: &str,
+                _: &SkillPath,
                 _: Value,
                 mut ctx: Box<dyn Csi + Send>,
             ) -> anyhow::Result<Value> {
@@ -346,7 +346,7 @@ pub mod tests {
         let api = executer.api();
         let result = api
             .execute_skill(
-                "Dummy skill name".to_owned(),
+                SkillPath::dummy(),
                 json!("Dummy input"),
                 "Dummy api token".to_owned(),
             )
@@ -368,7 +368,7 @@ pub mod tests {
         let result = executor
             .api()
             .execute_skill(
-                "greet".to_owned(),
+                SkillPath::dummy(),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
@@ -387,7 +387,7 @@ pub mod tests {
         let result = executor
             .api()
             .execute_skill(
-                "greet".to_owned(),
+                SkillPath::new("any_namespace", "greet"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
@@ -415,7 +415,7 @@ pub mod tests {
     impl Runtime for LiarRuntime {
         async fn run(
             &mut self,
-            _skill: &str,
+            _skill_path: &SkillPath,
             _name: Value,
             _ctx: Box<dyn Csi + Send>,
         ) -> anyhow::Result<Value> {
@@ -540,11 +540,14 @@ pub mod tests {
     impl Runtime for RustRuntime {
         async fn run(
             &mut self,
-            skill: &str,
+            skill_path: &SkillPath,
             input: Value,
             mut ctx: Box<dyn Csi + Send>,
         ) -> anyhow::Result<Value> {
-            assert!(skill == "greet", "RustRuntime only supports greet skill");
+            assert!(
+                skill_path.name == "greet",
+                "RustRuntime only supports greet skill"
+            );
             let prompt = format!(
                 "### Instruction:
                 Provide a nice greeting for the person utilizing its given name
