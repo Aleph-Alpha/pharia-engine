@@ -43,6 +43,22 @@ impl OperatorConfig {
         )
         .unwrap()
     }
+
+    /// # Panics
+    /// Cannot parse config.
+    #[must_use]
+    pub fn remote() -> Self {
+        Self::from_toml(
+            r#"
+                [namespaces.pharia-kernel-team]
+                config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+                registry_type = "oci"
+                registry = "registry.gitlab.aleph-alpha.de"
+                repository = "engineering/pharia-skills/skills"
+            "#,
+        )
+        .unwrap()
+    }
 }
 
 #[derive(Deserialize, Clone)]
