@@ -81,8 +81,10 @@ pub mod tests {
     async fn greet_skill_component() {
         let skill_ctx = Box::new(CsiGreetingStub);
         let mut runtime = WasmRuntime::local();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        runtime.add_skill(skill_path.clone());
         let resp = runtime
-            .run("local/greet_skill", json!("name"), skill_ctx)
+            .run(&skill_path.to_string(), json!("name"), skill_ctx)
             .await;
 
         assert_eq!(resp.unwrap(), "Hello");
@@ -114,16 +116,18 @@ pub mod tests {
     async fn drop_existing_skill_from_cache() {
         // Given a WasmRuntime with a cached skill
         let mut runtime = WasmRuntime::local();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        runtime.add_skill(skill_path.clone());
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run("local/greet_skill", json!("name"), skill_ctx)
+                .run(&skill_path.to_string(), json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
 
         // When dropping a skill from the runtime
-        let result = runtime.invalidate_cached_skill("local/greet_skill");
+        let result = runtime.invalidate_cached_skill(&skill_path.to_string());
 
         // Then the component hash map is empty
         assert_eq!(runtime.loaded_skills().count(), 0);
@@ -148,18 +152,23 @@ pub mod tests {
     async fn skills_are_listed() {
         // given a runtime with two installed skills
         let mut runtime = WasmRuntime::local();
+        let skill_path_rs = SkillPath::new("local", "greet_skill");
+        runtime.add_skill(skill_path_rs.clone());
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
-                .run("local/greet_skill", json!("name"), skill_ctx)
+                .run(&skill_path_rs.to_string(), json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
 
         let skill_ctx = Box::new(CsiGreetingStub);
+        let skill_path_py = SkillPath::new("local", "greet-py");
+        runtime.add_skill(skill_path_py.clone());
+
         drop(
             runtime
-                .run("local/greet-py", json!("name"), skill_ctx)
+                .run(&skill_path_py.to_string(), json!("name"), skill_ctx)
                 .await
                 .unwrap(),
         );
@@ -169,10 +178,9 @@ pub mod tests {
 
         // convert to a set
         let skills: HashSet<String> = skills.collect();
-        let expected: HashSet<String> =
-            ["local/greet-py".to_owned(), "local/greet_skill".to_owned()]
-                .into_iter()
-                .collect();
+        let expected: HashSet<String> = [skill_path_py.to_string(), skill_path_rs.to_string()]
+            .into_iter()
+            .collect();
         assert_eq!(skills, expected);
     }
 
@@ -182,15 +190,17 @@ pub mod tests {
         let skill_dir = tempdir().unwrap();
 
         let mut runtime = WasmRuntime::local();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        runtime.add_skill(skill_path.clone());
         let skill_ctx = Box::new(CsiGreetingStub);
 
         // When adding a new skill component
-        let skill_path = skill_dir.path().join("greet_skill.wasm");
-        fs::copy("./skills/greet_skill.wasm", skill_path).unwrap();
+        let skill_file = skill_dir.path().join("greet_skill.wasm");
+        fs::copy("./skills/greet_skill.wasm", skill_file).unwrap();
 
         // Then the skill can be invoked
         let greet = runtime
-            .run("local/greet_skill", json!("Homer"), skill_ctx)
+            .run(&skill_path.to_string(), json!("Homer"), skill_ctx)
             .await;
         assert!(greet.is_ok());
     }
@@ -200,8 +210,11 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingMock);
 
         let mut runtime = WasmRuntime::local();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        runtime.add_skill(skill_path.clone());
+
         let actual = runtime
-            .run("local/greet_skill", json!("Homer"), skill_ctx)
+            .run(&skill_path.to_string(), json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
@@ -213,8 +226,11 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingMock);
 
         let mut runtime = WasmRuntime::local();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        runtime.add_skill(skill_path.clone());
+
         let actual = runtime
-            .run("local/greet-py", json!("Homer"), skill_ctx)
+            .run(&skill_path.to_string(), json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
@@ -225,9 +241,11 @@ pub mod tests {
     async fn can_call_preinstantiated_multiple_times() {
         let skill_ctx = Box::new(CsiCounter::new());
         let mut runtime = WasmRuntime::local();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        runtime.add_skill(skill_path.clone());
         for i in 1..10 {
             let resp = runtime
-                .run("local/greet_skill", json!("Homer"), skill_ctx.clone())
+                .run(&skill_path.to_string(), json!("Homer"), skill_ctx.clone())
                 .await
                 .unwrap();
             assert_eq!(resp, json!(i.to_string()));

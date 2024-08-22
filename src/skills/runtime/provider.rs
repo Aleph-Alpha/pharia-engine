@@ -35,27 +35,7 @@ impl SkillProvider {
         }
     }
 
-    pub async fn fetch(&mut self, name: &str, engine: &Engine) -> anyhow::Result<&CachedSkill> {
-        if self.configured(name).await {
-            self.internal_fetch(name, engine).await
-        } else {
-            Err(anyhow!("Skill {name} not configured."))
-        }
-    }
-
-    async fn configured(&mut self, name: &str) -> bool {
-        self.skill_config
-            .synced_skills()
-            .await
-            .iter()
-            .any(|s| s.name == name)
-    }
-
-    async fn internal_fetch(
-        &mut self,
-        name: &str,
-        engine: &Engine,
-    ) -> anyhow::Result<&CachedSkill> {
+    async fn fetch(&mut self, name: &str, engine: &Engine) -> anyhow::Result<&CachedSkill> {
         if !self.skills.contains_key(name) {
             let bytes = self.skill_registry.load_skill(name).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {name} not found."))?;

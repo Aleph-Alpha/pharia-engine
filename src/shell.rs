@@ -275,7 +275,7 @@ mod tests {
     use crate::{
         configuration_observer::OperatorConfig,
         inference::tests::InferenceStub,
-        skills::{tests::LiarRuntime, SkillExecutor},
+        skills::{tests::LiarRuntime, SkillExecutor, SkillPath},
     };
 
     use super::*;
@@ -322,10 +322,13 @@ mod tests {
         let completion = "dummy completion";
         let inference = InferenceStub::with_completion(completion);
         let config = OperatorConfig::local();
-        let http = http(SkillExecutor::new(inference.api(), &config.namespaces).api());
+        let mut skill_executor_api = SkillExecutor::new(inference.api(), &config.namespaces).api();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        skill_executor_api.add_skill(skill_path.clone()).await;
+        let http = http(skill_executor_api);
 
         let args = ExecuteSkillArgs {
-            skill: "greet_skill".to_owned(),
+            skill: skill_path.to_string(),
             input: json!("Homer"),
         };
         let resp = http
