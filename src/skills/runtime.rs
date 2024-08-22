@@ -37,9 +37,9 @@ pub trait Runtime {
 
     fn remove_skill(&mut self, skill: &SkillPath);
 
-    fn skills(&self) -> impl Iterator<Item = SkillPath>;
+    fn skills(&self) -> impl Iterator<Item = &SkillPath>;
 
-    fn loaded_skills(&self) -> impl Iterator<Item = String>;
+    fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath>;
 
     /// The runtime may handle cache invalidation of skills by itself in the future. For now we cut
     /// it a bit of slack and just tell it that a skill might have changed.
@@ -84,11 +84,11 @@ pub mod tests {
             panic!("SaboteurRuntime does not remove skill")
         }
 
-        fn skills(&self) -> impl Iterator<Item = SkillPath> {
+        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
             std::iter::empty()
         }
 
-        fn loaded_skills(&self) -> impl Iterator<Item = String> {
+        fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
             std::iter::empty()
         }
 

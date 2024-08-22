@@ -114,7 +114,7 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn loaded_skills(&self) -> Vec<String> {
+    pub async fn loaded_skills(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::CachedSkills { send };
 
@@ -176,11 +176,11 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 drop(send.send(response));
             }
             SkillExecutorMessage::Skills { send } => {
-                let response = self.runtime.skills().collect();
+                let response = self.runtime.skills().cloned().collect();
                 drop(send.send(response));
             }
             SkillExecutorMessage::CachedSkills { send } => {
-                let response = self.runtime.loaded_skills().collect();
+                let response = self.runtime.loaded_skills().cloned().collect();
                 drop(send.send(response));
             }
             SkillExecutorMessage::Uncache { skill_path, send } => {
@@ -227,7 +227,7 @@ pub enum SkillExecutorMessage {
         send: oneshot::Sender<Vec<SkillPath>>,
     },
     CachedSkills {
-        send: oneshot::Sender<Vec<String>>,
+        send: oneshot::Sender<Vec<SkillPath>>,
     },
     Uncache {
         skill_path: SkillPath,
@@ -302,7 +302,9 @@ pub mod tests {
         // Given
         // This mock runtime expects that its skills never complete. The futures invoking them must
         // be dropped
-        struct MockRuntime;
+        struct MockRuntime {
+            skill_path: SkillPath,
+        }
 
         impl Runtime for MockRuntime {
             async fn run(
@@ -327,26 +329,29 @@ pub mod tests {
                 panic!("does not remove skill")
             }
 
-            fn skills(&self) -> impl Iterator<Item = SkillPath> {
+            fn skills(&self) -> impl Iterator<Item = &SkillPath> {
                 iter::empty()
             }
 
-            fn loaded_skills(&self) -> impl Iterator<Item = String> {
-                iter::once("Greet".to_owned())
+            fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
+                iter::once(&self.skill_path)
             }
 
             fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
-                skill_path.name == "Greet"
+                skill_path == &self.skill_path
             }
         }
         let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
 
         // When
-        let executer = SkillExecutor::with_runtime(MockRuntime, inference_saboteur.api());
+        let skill_path = SkillPath::dummy();
+        let runtime = MockRuntime { skill_path };
+        let executer = SkillExecutor::with_runtime(runtime, inference_saboteur.api());
         let api = executer.api();
+        let another_skill_path = SkillPath::dummy();
         let result = api
             .execute_skill(
-                SkillPath::dummy(),
+                another_skill_path,
                 json!("Dummy input"),
                 "Dummy api token".to_owned(),
             )
@@ -383,11 +388,12 @@ pub mod tests {
         let inference = InferenceStub::with_completion("Hello".to_owned());
 
         // When
-        let executor = SkillExecutor::with_runtime(RustRuntime, inference.api());
+        let runtime = RustRuntime::with_greet_skill();
+        let executor = SkillExecutor::with_runtime(runtime, inference.api());
         let result = executor
             .api()
             .execute_skill(
-                SkillPath::new("any_namespace", "greet"),
+                SkillPath::new("local", "greet"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
@@ -430,14 +436,12 @@ pub mod tests {
             self.skills.remove(skill);
         }
 
-        fn skills(&self) -> impl Iterator<Item = SkillPath> {
-            self.skills.clone().into_iter()
+        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+            self.skills.iter()
         }
 
-        fn loaded_skills(&self) -> impl Iterator<Item = String> {
-            self.skills
-                .iter()
-                .map(|SkillPath { namespace, name }| format!("{namespace}/{name}"))
+        fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
+            self.skills.iter()
         }
 
         fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
@@ -533,9 +537,18 @@ pub mod tests {
     }
 
     /// Intended as a test double for the production runtime. This implementation features exactly
-    /// one hardcoded skill. The skill is called `greet` and it uses `luminous-nextgen-7b` to create
-    /// a greeting given a provided name as an input.
-    pub struct RustRuntime;
+    /// one hardcoded skill. The skill is called `greet` in the `local` namespace and it uses
+    /// `luminous-nextgen-7b` to create a greeting given a provided name as an input.
+    pub struct RustRuntime {
+        skill_path: SkillPath,
+    }
+
+    impl RustRuntime {
+        pub fn with_greet_skill() -> Self {
+            let skill_path = SkillPath::new("local", "greet");
+            Self { skill_path }
+        }
+    }
 
     impl Runtime for RustRuntime {
         async fn run(
@@ -545,8 +558,9 @@ pub mod tests {
             mut ctx: Box<dyn Csi + Send>,
         ) -> anyhow::Result<Value> {
             assert!(
-                skill_path.name == "greet",
-                "RustRuntime only supports greet skill"
+                skill_path == &self.skill_path,
+                "RustRuntime only supports {} skill",
+                self.skill_path
             );
             let prompt = format!(
                 "### Instruction:
@@ -569,16 +583,16 @@ pub mod tests {
             panic!("RustRuntime does not remove skill")
         }
 
-        fn skills(&self) -> impl Iterator<Item = SkillPath> {
+        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
             std::iter::empty()
         }
 
-        fn loaded_skills(&self) -> impl Iterator<Item = String> {
-            std::iter::once("greet".to_owned())
+        fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
+            std::iter::once(&self.skill_path)
         }
 
         fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
-            skill_path.name == "greet"
+            skill_path == &self.skill_path
         }
     }
 }

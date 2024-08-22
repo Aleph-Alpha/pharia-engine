@@ -37,11 +37,11 @@ impl Runtime for WasmRuntime {
         self.provider.remove_skill(skill);
     }
 
-    fn skills(&self) -> impl Iterator<Item = SkillPath> {
+    fn skills(&self) -> impl Iterator<Item = &SkillPath> {
         self.provider.skills()
     }
 
-    fn loaded_skills(&self) -> impl Iterator<Item = String> {
+    fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
         self.provider.loaded_skills()
     }
 
@@ -174,10 +174,10 @@ pub mod tests {
         let skills = runtime.loaded_skills();
 
         // convert to a set
-        let skills: HashSet<String> = skills.collect();
-        let expected: HashSet<String> = [skill_path_py.to_string(), skill_path_rs.to_string()]
-            .into_iter()
-            .collect();
+        let skills = skills.collect::<HashSet<_>>();
+        let mut expected = HashSet::new();
+        expected.insert(&skill_path_rs);
+        expected.insert(&skill_path_py);
         assert_eq!(skills, expected);
     }
 

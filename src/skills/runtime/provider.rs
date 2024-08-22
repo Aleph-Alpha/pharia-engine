@@ -70,12 +70,12 @@ impl SkillProvider {
         self.known_skills.remove(skill);
     }
 
-    pub fn skills(&self) -> impl Iterator<Item = SkillPath> {
-        self.known_skills.clone().into_iter()
+    pub fn skills(&self) -> impl Iterator<Item = &SkillPath> {
+        self.known_skills.iter()
     }
 
-    pub fn loaded_skills(&self) -> impl Iterator<Item = String> + '_ {
-        self.cached_skills.keys().map(ToString::to_string)
+    pub fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> + '_ {
+        self.cached_skills.keys()
     }
 
     pub fn invalidate(&mut self, skill_path: &SkillPath) -> bool {
