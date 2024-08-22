@@ -1,5 +1,7 @@
 mod actor;
 mod runtime;
+use std::fmt;
+
 pub use actor::{SkillExecutor, SkillExecutorApi};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -19,6 +21,11 @@ impl SkillPath {
             namespace: namespace.to_owned(),
             name: name.to_owned(),
         }
+    }
+}
+impl fmt::Display for SkillPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.namespace, self.name)
     }
 }
 
