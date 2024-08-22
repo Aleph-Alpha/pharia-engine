@@ -22,6 +22,17 @@ impl OperatorConfig {
     pub fn from_str(config: &str) -> anyhow::Result<Self> {
         Ok(toml::from_str(config)?)
     }
+    pub fn local() -> Self {
+        Self::from_str(
+            r#"
+                [namespaces.local]
+                config_url = "file://skill_config.toml"
+                registry_type = "file"
+                registry = "file://skills"
+            "#,
+        )
+        .unwrap()
+    }
 }
 
 #[derive(Deserialize, Clone)]
@@ -46,18 +57,6 @@ mod tests {
     impl OperatorConfig {
         pub fn empty() -> Self {
             Self::from_str("[namespaces]").unwrap()
-        }
-
-        pub fn local() -> Self {
-            Self::from_str(
-                r#"
-                    [namespaces.local]
-                    config_url = "file://skill_config.toml"
-                    registry_type = "file"
-                    registry = "file://skills"
-                "#,
-            )
-            .unwrap()
         }
     }
 

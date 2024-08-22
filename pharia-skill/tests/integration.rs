@@ -1,7 +1,7 @@
 use std::{env, fs::File, io::Write, path::Path};
 
 use assert_cmd::Command;
-use pharia_kernel::{run, AppConfig};
+use pharia_kernel::{run, AppConfig, OperatorConfig};
 use predicates::str::contains;
 use tokio::{sync::oneshot, task::JoinHandle};
 
@@ -109,7 +109,8 @@ impl Kernel {
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
-            operator_config: "../config.toml".parse().unwrap(),
+            operator_config: OperatorConfig::from_file("../config.toml")
+                .expect("Configuration must be valid."),
         };
         Self::new(app_config).await
     }

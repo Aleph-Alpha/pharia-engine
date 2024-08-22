@@ -5,13 +5,14 @@ mod registries;
 mod shell;
 mod skills;
 
-use configuration_observer::{ConfigImpl, ConfigurationObserver, OperatorConfig};
+use configuration_observer::{ConfigImpl, ConfigurationObserver};
 use futures::Future;
 use tracing::error;
 
 use self::{inference::Inference, skills::SkillExecutor};
 
 pub use config::AppConfig;
+pub use configuration_observer::OperatorConfig;
 
 pub async fn run(
     app_config: AppConfig,
@@ -20,16 +21,16 @@ pub async fn run(
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr);
 
-    // Read the config once, assume it never changes during runtime
-    let config = OperatorConfig::from_file(app_config.operator_config)
-        .expect("Configuration must be valid.");
-
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::new(inference.api(), &config.namespaces);
+    let skill_executor =
+        SkillExecutor::new(inference.api(), &app_config.operator_config.namespaces);
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
-    let config = Box::new(ConfigImpl::new(config).expect("Namespace configuration must be valid."));
+    let config = Box::new(
+        ConfigImpl::new(app_config.operator_config)
+            .expect("Namespace configuration must be valid."),
+    );
 
     let configuration_observer = ConfigurationObserver::with_config(
         skill_executor.api(),
@@ -62,6 +63,7 @@ mod tests {
     use std::future::ready;
     use std::time::Duration;
 
+    use configuration_observer::OperatorConfig;
     use tokio_test::assert_ok;
 
     use super::*;
@@ -72,7 +74,7 @@ mod tests {
         let config = AppConfig {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
-            operator_config: "config.toml".parse().unwrap(),
+            operator_config: OperatorConfig::empty(),
         };
 
         //wasm runtime needs some time to shutdown (at least on Daniel's machine), so the time out

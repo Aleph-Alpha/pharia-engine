@@ -1,9 +1,11 @@
-use std::{env, net::SocketAddr, path::PathBuf};
+use std::{env, net::SocketAddr};
+
+use crate::configuration_observer::OperatorConfig;
 
 pub struct AppConfig {
     pub tcp_addr: SocketAddr,
     pub inference_addr: String,
-    pub operator_config: PathBuf,
+    pub operator_config: OperatorConfig,
 }
 
 impl AppConfig {
@@ -21,14 +23,14 @@ impl AppConfig {
 
         let operator_config =
             env::var("OPERATOR_CONFIG_PATH").unwrap_or_else(|_| "config.toml".to_owned());
-        let operator_config = operator_config
-            .parse()
-            .unwrap_or_else(|_| panic!("Invalid path {operator_config} for operator config"));
+
+        let operator_config_deserialized =
+            OperatorConfig::from_file(&operator_config).expect("Configuration must be valid.");
 
         AppConfig {
             tcp_addr: addr.parse().unwrap(),
             inference_addr,
-            operator_config,
+            operator_config: operator_config_deserialized,
         }
     }
 }

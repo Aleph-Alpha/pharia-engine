@@ -2,7 +2,7 @@ use std::{env, sync::OnceLock, time::Duration};
 
 use axum::http;
 use dotenvy::dotenv;
-use pharia_kernel::{run, AppConfig};
+use pharia_kernel::{run, AppConfig, OperatorConfig};
 use reqwest::{header, Body};
 use serde_json::json;
 use tokio::{sync::oneshot, task::JoinHandle};
@@ -30,7 +30,7 @@ impl Kernel {
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
-            operator_config: "config.toml".parse().unwrap(),
+            operator_config: OperatorConfig::local(),
         };
         Self::new(app_config).await
     }
@@ -56,7 +56,7 @@ async fn execute_skill() {
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
         .body(Body::from(
-            json!({ "skill": "greet_skill", "input": "Homer"}).to_string(),
+            json!({ "skill": "local/greet_skill", "input": "Homer"}).to_string(),
         ))
         .timeout(Duration::from_secs(10))
         .send()
