@@ -1,9 +1,13 @@
-use std::str::FromStr;
+use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 
 use aleph_alpha_client::Client;
+use futures::{stream::FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{
-    sync::{mpsc, oneshot},
+    sync::{
+        mpsc::{self, error::TryRecvError},
+        oneshot,
+    },
     task::JoinHandle,
 };
 use tracing::{error, warn};
@@ -24,8 +28,8 @@ impl Inference {
         Self::with_client(client)
     }
 
-    pub fn with_client(client: impl InferenceClient + Send + 'static) -> Self {
-        let (send, recv) = tokio::sync::mpsc::channel::<InferenceMessage>(1);
+    pub fn with_client(client: impl InferenceClient + Send + Sync + 'static) -> Self {
+        let (send, recv) = tokio::sync::mpsc::channel::<InferenceMessage>(10);
         let mut actor = InferenceActor::new(client, recv);
         let handle = tokio::spawn(async move { actor.run().await });
         Inference { send, handle }
@@ -134,26 +138,61 @@ pub struct Completion {
 }
 
 /// Private implementation of the inference actor running in its own dedicated green thread.
-struct InferenceActor<C> {
-    client: C,
+struct InferenceActor<C: InferenceClient + Send + Sync + 'static> {
+    client: Arc<C>,
     recv: mpsc::Receiver<InferenceMessage>,
+    running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
-impl<C> InferenceActor<C> {
+impl<C: InferenceClient + Send + Sync + 'static> InferenceActor<C> {
     fn new(client: C, recv: mpsc::Receiver<InferenceMessage>) -> Self {
-        InferenceActor { client, recv }
-    }
-
-    async fn run(&mut self)
-    where
-        C: InferenceClient,
-    {
-        while let Some(msg) = self.recv.recv().await {
-            msg.act(&mut self.client).await;
+        InferenceActor {
+            client: Arc::new(client),
+            recv,
+            running_requests: FuturesUnordered::new(),
         }
     }
+
+    async fn run(&mut self) {
+        loop {
+            // Take the next message, unless all senders are gone.
+            if let Some(msg) = self.recv.recv().await {
+                self.act(msg);
+            } else {
+                break;
+            }
+
+            // If there are completions to do, process them whenever there aren't messages.
+            // Once we are done with current completions, fall back to `recv()` which sleeps
+            // until there is another message
+            while !self.running_requests.is_empty() {
+                match self.recv.try_recv() {
+                    // If we get a message, process it
+                    Ok(msg) => {
+                        self.act(msg);
+                    }
+                    // If there are no messages, return at least one completion.
+                    // FuturesUnordered will run all of them concurrently and yield once
+                    // at least one is done.
+                    // If we are disconnected, still complete any in progress requests
+                    // before we shut down.
+                    Err(TryRecvError::Empty | TryRecvError::Disconnected) => {
+                        self.running_requests.next().await;
+                    }
+                }
+            }
+        }
+    }
+
+    fn act(&mut self, msg: InferenceMessage) {
+        let client = self.client.clone();
+        self.running_requests.push(Box::pin(async move {
+            msg.act(client.as_ref()).await;
+        }));
+    }
 }
 
+#[derive(Debug)]
 pub enum InferenceMessage {
     CompleteText {
         request: CompletionRequest,
@@ -163,9 +202,9 @@ pub enum InferenceMessage {
 }
 
 impl InferenceMessage {
-    async fn act(self, client: &mut impl InferenceClient) {
+    async fn act(self, client: &impl InferenceClient) {
         match self {
-            InferenceMessage::CompleteText {
+            Self::CompleteText {
                 request,
                 send,
                 api_token,
@@ -374,12 +413,12 @@ pub mod tests {
     /// We want to ensure that the actor invokes the client multiple times concurrently instead of
     /// only one inference request at a time.
     #[tokio::test]
-    #[should_panic(expected = "assertion failed: potential_timeout.is_ok()")] // Inference is not concurrent yet
     async fn concurrent_invocation_of_client() {
         // Given
         let (client, mut control) = LatchClient::new(2);
         let inference = Inference::with_client(client);
-        let api = inference.api();
+        let first_api = inference.api();
+        let second_api = inference.api();
 
         // When
         // This means the second call to complete_text over the api, will succeed almost immediatly,
@@ -387,8 +426,16 @@ pub mod tests {
         control.answer_nth(1, "second".to_owned());
 
         // Schedule two tasks
-        let first = api.complete_text(complete_text_params_dummy(), "dummy api token".to_owned());
-        let second = api.complete_text(complete_text_params_dummy(), "dummy api token".to_owned());
+        let first = tokio::spawn(async move {
+            first_api
+                .complete_text(complete_text_params_dummy(), "dummy api token".to_owned())
+                .await
+        });
+        let second = tokio::spawn(async move {
+            second_api
+                .complete_text(complete_text_params_dummy(), "dummy api token2".to_owned())
+                .await
+        });
 
         // Wait for the second one to be completed before answering the first one. This will block
         // forever if inference
@@ -402,7 +449,6 @@ pub mod tests {
         control.answer_nth(0, "first".to_owned());
         let _any_completion = first.await.unwrap();
         // We need to drop the sender in order for `actor.run` to terminate
-        drop(api);
         inference.wait_for_shutdown().await;
     }
 }
