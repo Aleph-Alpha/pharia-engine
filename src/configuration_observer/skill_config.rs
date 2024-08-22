@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
-use tracing::{error, warn};
+use tracing::warn;
 use url::Url;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -73,37 +73,17 @@ pub struct RemoteSkillConfig {
     skills: Vec<Skill>,
     token: Option<String>,
     url: String,
-    sync_interval: u64,
-    last_sync: Option<std::time::Instant>,
 }
 
 impl RemoteSkillConfig {
     pub fn from_url(url: &str) -> Self {
         drop(dotenvy::dotenv());
         let token = env::var("TEAM_CONFIG_TOKEN").ok();
-        let sync_interval = env::var("TEAM_CONFIG_UPDATE_INTERVAL_SEC")
-            .unwrap_or("60".to_owned())
-            .parse::<u64>()
-            .unwrap_or_else(|e| {
-                error!("TEAM_CONFIG_UPDATE_INTERVAL_SEC not parseable: {e}");
-                60
-            });
         let skills = vec![];
         Self {
             skills,
             token,
             url: url.to_owned(),
-            sync_interval,
-            last_sync: None,
-        }
-    }
-
-    fn expired(&self) -> bool {
-        if let Some(last_sync) = self.last_sync {
-            let elapsed = last_sync.elapsed();
-            elapsed.as_secs() > self.sync_interval
-        } else {
-            true
         }
     }
 
@@ -122,15 +102,12 @@ impl RemoteSkillConfig {
     }
 
     async fn sync(&mut self) {
-        if self.expired() {
-            match self.load().await {
-                Ok(skills) => {
-                    self.skills = skills;
-                    self.last_sync = Some(std::time::Instant::now());
-                }
-                Err(e) => {
-                    warn!("Failed to load remote skill config, fallback to existing config: {e}");
-                }
+        match self.load().await {
+            Ok(skills) => {
+                self.skills = skills;
+            }
+            Err(e) => {
+                warn!("Failed to load remote skill config, fallback to existing config: {e}");
             }
         }
     }
@@ -149,10 +126,6 @@ pub mod tests {
     use super::*;
 
     impl RemoteSkillConfig {
-        pub fn set_last_sync(&mut self, last_sync: std::time::Instant) {
-            self.last_sync = Some(last_sync);
-        }
-
         pub fn pharia_kernel_team() -> Self {
             drop(dotenvy::dotenv());
             let url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main";
@@ -160,31 +133,6 @@ pub mod tests {
         }
     }
 
-    #[test]
-    fn remote_config_expired_after_creation() {
-        let config = RemoteSkillConfig::pharia_kernel_team();
-        assert!(config.expired());
-    }
-
-    #[test]
-    fn remote_config_expired_if_last_sync_is_yesterday() {
-        let mut config = RemoteSkillConfig::pharia_kernel_team();
-        let yesterday = std::time::Instant::now()
-            .checked_sub(std::time::Duration::from_secs(86400))
-            .unwrap();
-        config.set_last_sync(yesterday);
-
-        assert!(config.expired());
-    }
-
-    #[test]
-    fn remote_config_not_expired_if_just_synced() {
-        let mut config = RemoteSkillConfig::pharia_kernel_team();
-        let now = std::time::Instant::now();
-        config.set_last_sync(now);
-
-        assert!(!config.expired());
-    }
     #[test]
     fn load_skill_list_config_toml() {
         let tc: TomlSkillConfig = toml::from_str(

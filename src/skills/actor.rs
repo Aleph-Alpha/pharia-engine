@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::{
-    configuration_observer::{NamespaceConfig, OperatorConfig},
+    configuration_observer::NamespaceConfig,
     inference::{Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
@@ -294,6 +294,7 @@ pub mod tests {
     use crate::{
         inference::{tests::InferenceStub, CompletionRequest},
         skills::runtime::tests::SaboteurRuntime,
+        OperatorConfig,
     };
 
     #[tokio::test]

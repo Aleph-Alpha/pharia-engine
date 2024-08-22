@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 use serde_json::Value;
 
 use crate::{
-    configuration_observer::{namespace_from_url, Namespace, NamespaceConfig, OperatorConfig},
+    configuration_observer::NamespaceConfig,
     registries::{FileRegistry, OciRegistry, SkillRegistry},
     skills::SkillPath,
 };
