@@ -8,7 +8,7 @@ use super::{Completion, CompletionParams, CompletionRequest};
 
 pub trait InferenceClient {
     fn complete_text(
-        &mut self,
+        &self,
         request: &CompletionRequest,
         api_token: String,
     ) -> impl Future<Output = anyhow::Result<Completion>> + Send;
@@ -16,7 +16,7 @@ pub trait InferenceClient {
 
 impl InferenceClient for Client {
     async fn complete_text(
-        &mut self,
+        &self,
         request: &CompletionRequest,
         api_token: String,
     ) -> anyhow::Result<Completion> {

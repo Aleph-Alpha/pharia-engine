@@ -192,11 +192,14 @@ impl InferenceMessage {
 
 #[cfg(test)]
 pub mod tests {
-    use std::time::Duration;
+    use std::{
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
+    };
 
     use anyhow::anyhow;
     use tokio::{
-        sync::{mpsc, oneshot},
+        sync::{mpsc, oneshot, Mutex},
         task::JoinHandle,
         time::timeout,
     };
@@ -251,23 +254,31 @@ pub mod tests {
     }
 
     struct SaboteurClient {
-        remaining_failures: usize,
+        remaining_failures: AtomicUsize,
     }
 
     impl SaboteurClient {
         fn new(remaining_failures: usize) -> Self {
-            Self { remaining_failures }
+            Self {
+                remaining_failures: remaining_failures.into(),
+            }
         }
     }
 
     impl InferenceClient for SaboteurClient {
         async fn complete_text(
-            &mut self,
+            &self,
             _params: &super::CompletionRequest,
             _api_token: String,
         ) -> anyhow::Result<Completion> {
-            if self.remaining_failures > 0 {
-                self.remaining_failures -= 1;
+            let remaining = self
+                .remaining_failures
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |f| {
+                    Some(f.saturating_sub(1))
+                })
+                .unwrap();
+
+            if remaining == 0 {
                 Err(anyhow!("Inference error"))
             } else {
                 Ok(Completion::from_text("Completion succeeded"))
@@ -301,7 +312,7 @@ pub mod tests {
     struct LatchClient {
         /// For every call to inference we want to pop one receiver in order to wait for the answer.
         /// It is up to the [`LatchControl`] to see to it, that these might be answered.
-        receivers: Vec<oneshot::Receiver<String>>,
+        receivers: Mutex<Vec<oneshot::Receiver<String>>>,
     }
 
     impl LatchClient {
@@ -313,17 +324,22 @@ pub mod tests {
                 senders.push(Some(send));
                 receivers.push(recv);
             }
-            (LatchClient { receivers }, LatchControl { senders })
+            (
+                LatchClient {
+                    receivers: Mutex::new(receivers),
+                },
+                LatchControl { senders },
+            )
         }
     }
 
     impl InferenceClient for LatchClient {
         async fn complete_text(
-            &mut self,
+            &self,
             _params: &CompletionRequest,
             _api_token: String,
         ) -> anyhow::Result<Completion> {
-            let recv = self.receivers.pop().expect(
+            let recv = self.receivers.lock().await.pop().expect(
                 "complete_text must not be called more often than supported by test double",
             );
             Ok(Completion::from_text(recv.await.unwrap()))
