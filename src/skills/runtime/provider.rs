@@ -109,24 +109,13 @@ impl OperatorProvider {
         self.known_skills.clone().into_iter()
     }
 
-    pub fn loaded_skills(&self) -> impl Iterator<Item = String> {
-        self.skill_providers
-            .iter()
-            .flat_map(|(namespace, provider)| {
-                provider
-                    .skills
-                    .keys()
-                    .map(|name| format!("{}/{name}", namespace.clone()))
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
+    pub fn loaded_skills(&self) -> impl Iterator<Item = String> + '_ {
+        self.cached_skills.keys().map(|s| s.to_string())
     }
 
     pub fn invalidate(&mut self, skill_name: &str) -> bool {
         let path = SkillPath::from_str(skill_name);
-        self.skill_providers
-            .get_mut(&path.namespace)
-            .is_some_and(|skill_provider| skill_provider.skills.remove(&path.name).is_some())
+        self.cached_skills.remove(&path).is_some()
     }
 
     fn skill_provider(&mut self, namespace: &str) -> anyhow::Result<&mut SkillProvider> {
@@ -179,10 +168,21 @@ impl OperatorProvider {
         if !self.known_skills.contains(&path) {
             return Err(anyhow!("Skill {path} not configured."));
         }
+        if !self.cached_skills.contains_key(&path) {
+            let Some(registry) = self.skill_registries.get(&path.namespace) else {
+                return Err(anyhow!("Namespace {} not configured.", path.namespace));
+            };
 
-        let skill_provider = self.skill_provider(&path.namespace)?;
-
-        skill_provider.fetch(&path.name, engine).await
+            let bytes = registry.load_skill(&path.name).await?;
+            let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {} not found.", path.name))?;
+            let skill = CachedSkill::new(engine, bytes)
+                .with_context(|| format!("Failed to initialize {}.", path.name))?;
+            self.cached_skills.insert(path.clone(), skill);
+        }
+        Ok(self
+            .cached_skills
+            .get(&path)
+            .expect("Skill present."))
     }
 }
 
