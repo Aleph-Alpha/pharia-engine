@@ -1,7 +1,4 @@
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
+use std::{env, path::PathBuf};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -23,12 +20,12 @@ pub trait Namespace {
 pub fn namespace_from_url(raw_url: &str) -> anyhow::Result<Box<dyn Namespace + Send + 'static>> {
     let url = Url::parse(raw_url)?;
     match url.scheme() {
-        "https" | "http" => Ok(Box::new(RemoteSkillConfig::from_url(raw_url))),
+        "https" | "http" => Ok(Box::new(RemoteNamespace::from_url(raw_url))),
         "file" => {
             // remove leading "file://"
             let file_path = &raw_url[7..];
 
-            let skill_config = LocalSkillConfig::new(file_path.into());
+            let skill_config = LocalNamespace::new(file_path.into());
 
             Ok(Box::new(skill_config))
         }
@@ -37,42 +34,42 @@ pub fn namespace_from_url(raw_url: &str) -> anyhow::Result<Box<dyn Namespace + S
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct TomlSkillConfig {
+struct SkillConfig {
     skills: Vec<Skill>,
 }
 
-impl TomlSkillConfig {
+impl SkillConfig {
     pub fn from_str(skill_config: &str) -> anyhow::Result<Self> {
         let tc = toml::from_str(skill_config)?;
         Ok(tc)
     }
 }
 
-pub struct LocalSkillConfig {
+pub struct LocalNamespace {
     path: PathBuf,
 }
 
-impl LocalSkillConfig {
+impl LocalNamespace {
     pub fn new(path: PathBuf) -> Self {
         Self { path }
     }
 }
 
 #[async_trait]
-impl Namespace for LocalSkillConfig {
+impl Namespace for LocalNamespace {
     async fn skills(&mut self) -> anyhow::Result<Vec<Skill>> {
         let config = std::fs::read_to_string(&self.path)?;
-        let skills = TomlSkillConfig::from_str(&config)?.skills;
+        let skills = SkillConfig::from_str(&config)?.skills;
         Ok(skills)
     }
 }
 
-pub struct RemoteSkillConfig {
+pub struct RemoteNamespace {
     token: Option<String>,
     url: String,
 }
 
-impl RemoteSkillConfig {
+impl RemoteNamespace {
     pub fn from_url(url: &str) -> Self {
         drop(dotenvy::dotenv());
         let token = env::var("TEAM_CONFIG_TOKEN").ok();
@@ -84,7 +81,7 @@ impl RemoteSkillConfig {
 }
 
 #[async_trait]
-impl Namespace for RemoteSkillConfig {
+impl Namespace for RemoteNamespace {
     async fn skills(&mut self) -> anyhow::Result<Vec<Skill>> {
         let mut req_builder = reqwest::Client::new().get(&self.url);
         if let Some(token) = &self.token {
@@ -95,7 +92,7 @@ impl Namespace for RemoteSkillConfig {
         let resp = req_builder.send().await?;
 
         let content = resp.text().await?;
-        let config = TomlSkillConfig::from_str(&content)?;
+        let config = SkillConfig::from_str(&content)?;
         Ok(config.skills)
     }
 }
@@ -104,7 +101,7 @@ impl Namespace for RemoteSkillConfig {
 pub mod tests {
     use super::*;
 
-    impl RemoteSkillConfig {
+    impl RemoteNamespace {
         pub fn pharia_kernel_team() -> Self {
             drop(dotenvy::dotenv());
             let url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main";
@@ -114,7 +111,7 @@ pub mod tests {
 
     #[test]
     fn load_skill_list_config_toml() {
-        let tc: TomlSkillConfig = toml::from_str(
+        let tc: SkillConfig = toml::from_str(
             r#"
             skills = [
                 {name = "Goofy"},
@@ -130,7 +127,7 @@ pub mod tests {
     #[tokio::test]
     async fn load_gitlab_config() {
         // Given a gitlab skill config
-        let mut config = RemoteSkillConfig::pharia_kernel_team();
+        let mut config = RemoteNamespace::pharia_kernel_team();
 
         // when fetch skill config
         let skills = config.skills().await.unwrap();

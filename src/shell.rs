@@ -33,7 +33,7 @@ use utoipa::{
 };
 use utoipa_scalar::{Scalar, Servable};
 
-use crate::skills::SkillExecutorApi;
+use crate::skills::{SkillExecutorApi, SkillPath};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -238,7 +238,8 @@ async fn drop_cached_skill(
     State(skill_executor_api): State<SkillExecutorApi>,
     Path(name): Path<String>,
 ) -> (StatusCode, Json<String>) {
-    let skill_was_cached = skill_executor_api.drop_from_cache(name.clone()).await;
+    let skill_path = SkillPath::from_str(&name);
+    let skill_was_cached = skill_executor_api.drop_from_cache(skill_path).await;
     let msg = if skill_was_cached {
         "Skill removed from cache".to_string()
     } else {

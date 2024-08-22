@@ -17,20 +17,20 @@ use super::{
     Csi,
 };
 
-pub struct OperatorProvider {
+pub struct SkillProvider {
     known_skills: HashSet<SkillPath>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
     skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
 }
 
-impl OperatorProvider {
+impl SkillProvider {
     pub fn new(namespaces: &HashMap<String, NamespaceConfig>) -> Self {
         let skill_registries = namespaces
             .iter()
             .map(|(k, v)| Self::registry(v).map(|r| (k.clone(), r)))
             .collect::<anyhow::Result<HashMap<_, _>>>()
             .expect("All namespace registry in operator config must be valid.");
-        OperatorProvider {
+        SkillProvider {
             known_skills: HashSet::new(),
             cached_skills: HashMap::new(),
             skill_registries,
@@ -75,12 +75,11 @@ impl OperatorProvider {
     }
 
     pub fn loaded_skills(&self) -> impl Iterator<Item = String> + '_ {
-        self.cached_skills.keys().map(|s| s.to_string())
+        self.cached_skills.keys().map(ToString::to_string)
     }
 
-    pub fn invalidate(&mut self, skill_name: &str) -> bool {
-        let path = SkillPath::from_str(skill_name);
-        self.cached_skills.remove(&path).is_some()
+    pub fn invalidate(&mut self, skill_path: &SkillPath) -> bool {
+        self.cached_skills.remove(skill_path).is_some()
     }
 
     pub async fn fetch(
@@ -133,7 +132,7 @@ mod tests {
 
     use super::*;
 
-    impl OperatorProvider {
+    impl SkillProvider {
         fn with_namespace_and_skill(skill_path: &SkillPath) -> Self {
             let ns_cfg = NamespaceConfig::File {
                 registry: "file://skills".to_owned(),
@@ -142,7 +141,7 @@ mod tests {
             let mut namespaces = HashMap::new();
             namespaces.insert(skill_path.namespace.clone(), ns_cfg);
 
-            let mut provider = OperatorProvider::new(&namespaces);
+            let mut provider = SkillProvider::new(&namespaces);
             provider.add_skill(skill_path.clone());
             provider
         }
@@ -151,7 +150,7 @@ mod tests {
     #[tokio::test]
     async fn skill_component_is_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = OperatorProvider::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider.fetch(&skill_path.to_string(), &engine).await;
@@ -162,7 +161,7 @@ mod tests {
     #[tokio::test]
     async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = OperatorProvider::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider
@@ -178,7 +177,7 @@ mod tests {
     #[tokio::test]
     async fn namespace_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = OperatorProvider::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider

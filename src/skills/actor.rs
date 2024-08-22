@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    runtime::{Csi, OperatorProvider, Runtime, WasmRuntime},
+    runtime::{Csi, Runtime, SkillProvider, WasmRuntime},
     SkillPath,
 };
 
@@ -26,7 +26,7 @@ pub struct SkillExecutor {
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new(inference_api: InferenceApi, namespaces: &HashMap<String, NamespaceConfig>) -> Self {
-        let provider = OperatorProvider::new(namespaces);
+        let provider = SkillProvider::new(namespaces);
         let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)
     }
@@ -116,7 +116,7 @@ impl SkillExecutorApi {
 
     pub async fn loaded_skills(&self) -> Vec<String> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMessage::LoadedSkills { send };
+        let msg = SkillExecutorMessage::CachedSkills { send };
 
         self.send
             .send(msg)
@@ -125,9 +125,9 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn drop_from_cache(&self, skill: String) -> bool {
+    pub async fn drop_from_cache(&self, skill_path: SkillPath) -> bool {
         let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMessage::Unload { send, skill };
+        let msg = SkillExecutorMessage::Uncache { send, skill_path };
 
         self.send
             .send(msg)
@@ -179,12 +179,12 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 let response = self.runtime.skills().collect();
                 drop(send.send(response));
             }
-            SkillExecutorMessage::LoadedSkills { send } => {
+            SkillExecutorMessage::CachedSkills { send } => {
                 let response = self.runtime.loaded_skills().collect();
                 drop(send.send(response));
             }
-            SkillExecutorMessage::Unload { skill, send } => {
-                let response = self.runtime.invalidate_cached_skill(&skill);
+            SkillExecutorMessage::Uncache { skill_path, send } => {
+                let response = self.runtime.invalidate_cached_skill(&skill_path);
                 let _ = send.send(response);
             }
         }
@@ -226,11 +226,11 @@ pub enum SkillExecutorMessage {
     Skills {
         send: oneshot::Sender<Vec<SkillPath>>,
     },
-    LoadedSkills {
+    CachedSkills {
         send: oneshot::Sender<Vec<String>>,
     },
-    Unload {
-        skill: String,
+    Uncache {
+        skill_path: SkillPath,
         send: oneshot::Sender<bool>,
     },
 }
@@ -335,8 +335,8 @@ pub mod tests {
                 iter::once("Greet".to_owned())
             }
 
-            fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
-                skill == "Greet"
+            fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
+                skill_path.name == "Greet"
             }
         }
         let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
@@ -440,9 +440,8 @@ pub mod tests {
                 .map(|SkillPath { namespace, name }| format!("{namespace}/{name}"))
         }
 
-        fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
-            let skill = SkillPath::from_str(skill);
-            self.skills.iter().any(|s| s == &skill)
+        fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
+            self.skills.iter().any(|s| s == skill_path)
         }
     }
 
@@ -475,7 +474,7 @@ pub mod tests {
         let executor = SkillExecutor::with_runtime(runtime, inference.api());
         let result = executor
             .api()
-            .drop_from_cache("haiku_skill".to_owned())
+            .drop_from_cache(SkillPath::from_str("haiku_skill"))
             .await;
 
         executor.wait_for_shutdown().await;
@@ -496,7 +495,7 @@ pub mod tests {
         let executor = SkillExecutor::with_runtime(runtime, inference.api());
         let result = executor
             .api()
-            .drop_from_cache("a_different_skill".to_owned())
+            .drop_from_cache(SkillPath::from_str("a_different_skill"))
             .await;
 
         executor.wait_for_shutdown().await;
@@ -509,7 +508,7 @@ pub mod tests {
     impl SkillExecutor {
         pub fn with_wasm_runtime() -> Self {
             let namespaces = OperatorConfig::empty().namespaces;
-            let provider = OperatorProvider::new(&namespaces);
+            let provider = SkillProvider::new(&namespaces);
             let runtime = WasmRuntime::with_provider(provider);
             let inference = InferenceStub::with_completion("Hello".to_owned());
             SkillExecutor::with_runtime(runtime, inference.api())
@@ -575,8 +574,8 @@ pub mod tests {
             std::iter::once("greet".to_owned())
         }
 
-        fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
-            skill == "greet"
+        fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
+            skill_path.name == "greet"
         }
     }
 }

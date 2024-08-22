@@ -11,7 +11,7 @@ pub struct SkillPath {
 }
 
 impl SkillPath {
-    fn from_str(s: &str) -> Self {
+    pub fn from_str(s: &str) -> Self {
         let (namespace, name) = s.split_once('/').unwrap_or(("pharia-kernel-team", s));
         Self::new(namespace, name)
     }

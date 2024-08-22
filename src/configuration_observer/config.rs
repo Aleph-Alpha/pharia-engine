@@ -8,22 +8,32 @@ pub struct OperatorConfig {
 }
 
 impl OperatorConfig {
+    /// # Errors
+    /// Cannot parse config or cannot read from file.
     pub fn from_env_or_default() -> anyhow::Result<Self> {
         drop(dotenvy::dotenv());
         let config_path = env::var("OPERATOR_CONFIG_PATH").unwrap_or("config.toml".to_owned());
         Self::from_file(config_path)
     }
 
+    /// # Errors
+    /// Cannot parse config or cannot read from file.
     pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
         let config = fs::read_to_string(p)?;
-        Self::from_str(&config)
+        Self::from_toml(&config)
     }
 
-    pub fn from_str(config: &str) -> anyhow::Result<Self> {
+    /// # Errors
+    /// Cannot parse config.
+    pub fn from_toml(config: &str) -> anyhow::Result<Self> {
         Ok(toml::from_str(config)?)
     }
+
+    /// # Panics
+    /// Cannot parse config.
+    #[must_use]
     pub fn local() -> Self {
-        Self::from_str(
+        Self::from_toml(
             r#"
                 [namespaces.local]
                 config_url = "file://skill_config.toml"
@@ -55,14 +65,17 @@ mod tests {
     use super::OperatorConfig;
 
     impl OperatorConfig {
+        /// # Panics
+        /// Cannot parse config.
+        #[must_use]
         pub fn empty() -> Self {
-            Self::from_str("[namespaces]").unwrap()
+            Self::from_toml("[namespaces]").unwrap()
         }
     }
 
     #[test]
     fn deserialize_config_with_file_registry() {
-        let config = OperatorConfig::from_str(
+        let config = OperatorConfig::from_toml(
             r#"
             [namespaces.local]
             config_url = "file://skill_config.toml"
@@ -76,7 +89,7 @@ mod tests {
 
     #[test]
     fn deserialize_config_with_oci_registry() {
-        let config = OperatorConfig::from_str(
+        let config = OperatorConfig::from_toml(
             r#"
             [namespaces.pharia-kernel-team]
             config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"

@@ -59,16 +59,6 @@ pub struct ConfigurationObserver {
 }
 
 impl ConfigurationObserver {
-    pub fn new(skill_executor_api: SkillExecutorApi) -> anyhow::Result<Self> {
-        let config = OperatorConfig::from_env_or_default()?;
-        let config = Box::new(ConfigImpl::new(config)?);
-        Ok(Self::with_config(
-            skill_executor_api,
-            config,
-            Duration::from_secs(60),
-        ))
-    }
-
     pub fn with_config(
         skill_executor_api: SkillExecutorApi,
         config: Box<dyn Config + Send>,

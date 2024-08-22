@@ -2,15 +2,15 @@ use serde_json::Value;
 
 use crate::skills::SkillPath;
 
-use super::{engine::Engine, provider::OperatorProvider, Csi, Runtime};
+use super::{engine::Engine, provider::SkillProvider, Csi, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
-    provider: OperatorProvider,
+    provider: SkillProvider,
 }
 
 impl WasmRuntime {
-    pub fn with_provider(skill_provider: OperatorProvider) -> Self {
+    pub fn with_provider(skill_provider: SkillProvider) -> Self {
         Self {
             engine: Engine::new().expect("engine creation failed"),
             provider: skill_provider,
@@ -45,7 +45,7 @@ impl Runtime for WasmRuntime {
         self.provider.loaded_skills()
     }
 
-    fn invalidate_cached_skill(&mut self, skill: &str) -> bool {
+    fn invalidate_cached_skill(&mut self, skill: &SkillPath) -> bool {
         self.provider.invalidate(skill)
     }
 }
@@ -71,7 +71,7 @@ pub mod tests {
     impl WasmRuntime {
         pub fn local() -> Self {
             let namespaces = OperatorConfig::local().namespaces;
-            let provider = OperatorProvider::new(&namespaces);
+            let provider = SkillProvider::new(&namespaces);
             Self::with_provider(provider)
         }
     }
@@ -105,7 +105,7 @@ pub mod tests {
         let mut runtime = WasmRuntime::local();
 
         // When removing a skill from the runtime
-        let result = runtime.invalidate_cached_skill("non-cached-skill");
+        let result = runtime.invalidate_cached_skill(&SkillPath::from_str("non-cached-skill"));
 
         // Then
         assert!(!result);
@@ -126,7 +126,7 @@ pub mod tests {
         );
 
         // When dropping a skill from the runtime
-        let result = runtime.invalidate_cached_skill(&skill_path.to_string());
+        let result = runtime.invalidate_cached_skill(&skill_path);
 
         // Then the component hash map is empty
         assert_eq!(runtime.loaded_skills().count(), 0);

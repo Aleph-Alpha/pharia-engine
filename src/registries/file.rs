@@ -9,10 +9,6 @@ pub struct FileRegistry {
 }
 
 impl FileRegistry {
-    pub fn new() -> Self {
-        Self::with_dir("./skills")
-    }
-
     pub fn with_dir(skill_dir: impl Into<PathBuf>) -> Self {
         FileRegistry {
             skill_dir: skill_dir.into(),

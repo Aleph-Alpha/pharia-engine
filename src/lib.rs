@@ -14,6 +14,8 @@ use self::{inference::Inference, skills::SkillExecutor};
 pub use config::AppConfig;
 pub use configuration_observer::OperatorConfig;
 
+/// # Panics
+/// Cannot parse operator config.
 pub async fn run(
     app_config: AppConfig,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,

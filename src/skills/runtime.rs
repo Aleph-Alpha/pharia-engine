@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::future::Future;
 
-pub use provider::OperatorProvider;
+pub use provider::SkillProvider;
 pub use wasm::WasmRuntime;
 
 use crate::inference::{Completion, CompletionRequest};
@@ -43,7 +43,7 @@ pub trait Runtime {
 
     /// The runtime may handle cache invalidation of skills by itself in the future. For now we cut
     /// it a bit of slack and just tell it that a skill might have changed.
-    fn invalidate_cached_skill(&mut self, skill: &str) -> bool;
+    fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool;
 }
 
 #[async_trait]
@@ -92,7 +92,7 @@ pub mod tests {
             std::iter::empty()
         }
 
-        fn invalidate_cached_skill(&mut self, _skill: &str) -> bool {
+        fn invalidate_cached_skill(&mut self, _skill_path: &SkillPath) -> bool {
             panic!("SaboteurRuntime does not drop skills from cache")
         }
     }
