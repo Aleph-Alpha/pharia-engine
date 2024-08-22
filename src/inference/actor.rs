@@ -56,7 +56,7 @@ impl InferenceApi {
     }
 
     pub async fn complete_text(
-        &mut self,
+        &self,
         request: CompletionRequest,
         api_token: String,
     ) -> anyhow::Result<Completion> {
@@ -280,7 +280,7 @@ pub mod tests {
         // given
         let client = SaboteurClient::new(2);
         let inference = Inference::with_client(client);
-        let mut inference_api = inference.api();
+        let inference_api = inference.api();
         let request = CompletionRequest {
             prompt: "dummy_prompt".to_owned(),
             model: "dummy_model".to_owned(),
@@ -363,8 +363,7 @@ pub mod tests {
         // Given
         let (client, mut control) = LatchClient::new(2);
         let inference = Inference::with_client(client);
-        let mut api_one = inference.api();
-        let mut api_two = inference.api();
+        let api = inference.api();
 
         // When
         // This means the second call to complete_text over the api, will succeed almost immediatly,
@@ -372,10 +371,8 @@ pub mod tests {
         control.answer_nth(1, "second".to_owned());
 
         // Schedule two tasks
-        let first =
-            api_one.complete_text(complete_text_params_dummy(), "dummy api token".to_owned());
-        let second =
-            api_two.complete_text(complete_text_params_dummy(), "dummy api token".to_owned());
+        let first = api.complete_text(complete_text_params_dummy(), "dummy api token".to_owned());
+        let second = api.complete_text(complete_text_params_dummy(), "dummy api token".to_owned());
 
         // Wait for the second one to be completed before answering the first one. This will block
         // forever if inference
@@ -389,8 +386,7 @@ pub mod tests {
         control.answer_nth(0, "first".to_owned());
         let _any_completion = first.await.unwrap();
         // We need to drop the sender in order for `actor.run` to terminate
-        drop(api_one);
-        drop(api_two);
+        drop(api);
         inference.wait_for_shutdown().await;
     }
 }

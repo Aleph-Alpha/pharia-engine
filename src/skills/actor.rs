@@ -71,7 +71,7 @@ impl SkillExecutorApi {
         Self { send }
     }
 
-    pub async fn add_skill(&mut self, skill: SkillPath) {
+    pub async fn add_skill(&self, skill: SkillPath) {
         let msg = SkillExecutorMessage::Add { skill };
         self.send
             .send(msg)
@@ -79,7 +79,7 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn remove_skill(&mut self, skill: SkillPath) {
+    pub async fn remove_skill(&self, skill: SkillPath) {
         let msg = SkillExecutorMessage::Remove { skill };
         self.send
             .send(msg)
@@ -88,7 +88,7 @@ impl SkillExecutorApi {
     }
 
     pub async fn execute_skill(
-        &mut self,
+        &self,
         skill: String,
         input: Value,
         api_token: String,
@@ -107,7 +107,7 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn skills(&mut self) -> Vec<SkillPath> {
+    pub async fn skills(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Skills { send };
 
@@ -118,7 +118,7 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn loaded_skills(&mut self) -> Vec<String> {
+    pub async fn loaded_skills(&self) -> Vec<String> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::LoadedSkills { send };
 
@@ -129,7 +129,7 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn drop_from_cache(&mut self, skill: String) -> bool {
+    pub async fn drop_from_cache(&self, skill: String) -> bool {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Unload { send, skill };
 
@@ -346,7 +346,7 @@ pub mod tests {
 
         // When
         let executer = SkillExecutor::with_runtime(MockRuntime, inference_saboteur.api());
-        let mut api = executer.api();
+        let api = executer.api();
         let result = api
             .execute_skill(
                 "Dummy skill name".to_owned(),
@@ -520,7 +520,7 @@ pub mod tests {
     #[tokio::test]
     async fn executor_api_add_skills() {
         // Given a skill executor api
-        let mut api = SkillExecutor::with_wasm_runtime().api();
+        let api = SkillExecutor::with_wasm_runtime().api();
 
         // When adding a skill
         let skill_path_1 = SkillPath::dummy();

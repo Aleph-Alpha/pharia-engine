@@ -174,7 +174,7 @@ struct ExecuteSkillArgs {
     ),
 )]
 async fn execute_skill(
-    State(mut skill_executor_api): State<SkillExecutorApi>,
+    State(skill_executor_api): State<SkillExecutorApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<ExecuteSkillArgs>,
 ) -> (StatusCode, Json<Value>) {
@@ -212,7 +212,7 @@ async fn execute_skill(
     ),
 )]
 async fn cached_skills(
-    State(mut skill_executor_api): State<SkillExecutorApi>,
+    State(skill_executor_api): State<SkillExecutorApi>,
 ) -> (StatusCode, Json<Vec<String>>) {
     let response = skill_executor_api.loaded_skills().await;
     (StatusCode::OK, Json(response))
@@ -235,7 +235,7 @@ async fn cached_skills(
     ),
 )]
 async fn drop_cached_skill(
-    State(mut skill_executor_api): State<SkillExecutorApi>,
+    State(skill_executor_api): State<SkillExecutorApi>,
     Path(name): Path<String>,
 ) -> (StatusCode, Json<String>) {
     let skill_was_cached = skill_executor_api.drop_from_cache(name.clone()).await;
