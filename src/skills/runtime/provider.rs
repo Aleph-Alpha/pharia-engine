@@ -1,4 +1,7 @@
-use std::{collections::HashMap, env};
+use std::{
+    collections::{HashMap, HashSet},
+    env,
+};
 
 use anyhow::{anyhow, Context};
 use serde_json::Value;
@@ -68,7 +71,7 @@ impl SkillProvider {
 pub struct OperatorProvider {
     config: OperatorConfig,
     skill_providers: HashMap<String, SkillProvider>,
-    skills: Vec<SkillPath>,
+    skills: HashSet<SkillPath>,
     skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
 }
 
@@ -82,7 +85,7 @@ impl OperatorProvider {
         OperatorProvider {
             config,
             skill_providers: HashMap::new(),
-            skills: Vec::new(),
+            skills: HashSet::new(),
             skill_registries,
         }
     }
@@ -113,11 +116,11 @@ impl OperatorProvider {
     }
 
     pub fn add_skill(&mut self, skill: SkillPath) {
-        self.skills.push(skill);
+        self.skills.insert(skill);
     }
 
     pub fn remove_skill(&mut self, skill: &SkillPath) {
-        self.skills.retain(|s| s != skill);
+        self.skills.remove(skill);
     }
 
     pub fn skills(&self) -> impl Iterator<Item = SkillPath> {
