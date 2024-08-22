@@ -1,14 +1,17 @@
 use std::collections::{HashMap, HashSet};
 
+use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
+use tracing::error;
 
 use crate::skills::{SkillExecutorApi, SkillPath};
 
 use super::{namespace_from_url, Namespace, NamespaceConfig, OperatorConfig};
 
+#[async_trait]
 pub trait Config {
-    fn namespaces(&self) -> Vec<&str>;
-    fn skills(&self, namespace: &str) -> Vec<String>;
+    fn namespaces(&self) -> Vec<String>;
+    async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<String>>;
 }
 
 pub struct ConfigImpl {
@@ -31,18 +34,20 @@ impl ConfigImpl {
     }
 }
 
+#[async_trait]
 impl Config for ConfigImpl {
-    fn namespaces(&self) -> Vec<&str> {
-        self.namespaces.keys().map(String::as_str).collect()
+    fn namespaces(&self) -> Vec<String> {
+        self.namespaces.keys().cloned().collect()
     }
 
-    fn skills(&self, namespace: &str) -> Vec<String> {
+    async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<String>> {
         let skills = self
             .namespaces
-            .get(namespace)
+            .get_mut(namespace)
             .expect("namespace must exist.")
-            .skills();
-        skills.iter().map(|s| s.name.clone()).collect()
+            .skills()
+            .await?;
+        Ok(skills.iter().map(|s| s.name.clone()).collect())
     }
 }
 
@@ -95,6 +100,7 @@ struct ConfigurationObserverActor {
     skills: HashMap<String, Vec<String>>,
 }
 
+#[derive(Debug)]
 struct Diff {
     added: Vec<String>,
     removed: Vec<String>,
@@ -133,9 +139,16 @@ impl ConfigurationObserverActor {
     }
 
     async fn run(mut self) {
+        let namespaces = self.config.namespaces();
         loop {
-            for namespace in self.config.namespaces() {
-                let incoming = self.config.skills(namespace);
+            for namespace in &namespaces {
+                let incoming = match self.config.skills(namespace).await {
+                    Ok(incoming) => incoming,
+                    Err(e) => {
+                        error!("Failed to get the latest skills in namespace {namespace}, caused by: {e}");
+                        continue;
+                    }
+                };
                 let existing = self
                     .skills
                     .insert(namespace.to_owned(), incoming)
@@ -185,16 +198,18 @@ pub mod tests {
         }
     }
 
+    #[async_trait]
     impl Config for StubConfig {
-        fn namespaces(&self) -> Vec<&str> {
-            self.namespaces.keys().map(String::as_str).collect()
+        fn namespaces(&self) -> Vec<String> {
+            self.namespaces.keys().cloned().collect()
         }
 
-        fn skills(&self, namespace: &str) -> Vec<String> {
-            self.namespaces
+        async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<String>> {
+            Ok(self
+                .namespaces
                 .get(namespace)
                 .expect("namespace must exist.")
-                .clone()
+                .clone())
         }
     }
 

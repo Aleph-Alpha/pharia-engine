@@ -1,9 +1,9 @@
-use std::{env, fs::File, io::Write, path::Path};
+use std::{env, fs::File, io::Write, path::Path, time::Duration};
 
 use assert_cmd::Command;
 use pharia_kernel::{run, AppConfig, OperatorConfig};
 use predicates::str::contains;
-use tokio::{sync::oneshot, task::JoinHandle};
+use tokio::{sync::oneshot, task::JoinHandle, time::sleep};
 
 #[test]
 fn invalid_args() {
@@ -64,13 +64,15 @@ async fn run_skill() {
     // given a Pharia Kernel instance
     const PORT: u16 = 9_000;
     let kernel = Kernel::with_port(PORT).await;
+    sleep(Duration::from_millis(10)).await;
 
     // when running a skill
+    drop(dotenvy::dotenv());
     let mut cmd = Command::cargo_bin("pharia-skill").unwrap();
     let cmd = cmd
         .arg("run")
         .arg("-n")
-        .arg("greet_skill")
+        .arg("local/greet_skill")
         .arg("-i")
         .arg("Homer")
         .arg("-l")
@@ -109,8 +111,15 @@ impl Kernel {
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
-            operator_config: OperatorConfig::from_file("../config.toml")
-                .expect("Configuration must be valid."),
+            operator_config: OperatorConfig::from_str(
+                r#"
+                    [namespaces.local]
+                    config_url = "file://../skill_config.toml"
+                    registry_type = "file"
+                    registry = "file://../skills"
+                "#,
+            )
+            .unwrap(),
         };
         Self::new(app_config).await
     }
