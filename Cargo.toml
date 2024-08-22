@@ -12,6 +12,7 @@ rust-2024-compatibility = "warn"
 unused = { level = "warn", priority = -1 }
 
 [workspace.lints.clippy]
+dbg-macro = "warn"
 pedantic = { level = "warn", priority = -1 }
 module-name-repetitions = "allow"
 

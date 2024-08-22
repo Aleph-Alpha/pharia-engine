@@ -4,10 +4,8 @@ use aleph_alpha_client::Client;
 use futures::{stream::FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{
-    sync::{
-        mpsc::{self, error::TryRecvError},
-        oneshot,
-    },
+    select,
+    sync::{mpsc, oneshot},
     task::JoinHandle,
 };
 use tracing::{error, warn};
@@ -29,7 +27,7 @@ impl Inference {
     }
 
     pub fn with_client(client: impl InferenceClient + Send + Sync + 'static) -> Self {
-        let (send, recv) = tokio::sync::mpsc::channel::<InferenceMessage>(10);
+        let (send, recv) = tokio::sync::mpsc::channel::<InferenceMessage>(1);
         let mut actor = InferenceActor::new(client, recv);
         let handle = tokio::spawn(async move { actor.run().await });
         Inference { send, handle }
@@ -155,32 +153,19 @@ impl<C: InferenceClient + Send + Sync + 'static> InferenceActor<C> {
 
     async fn run(&mut self) {
         loop {
-            // Take the next message, unless all senders are gone.
-            if let Some(msg) = self.recv.recv().await {
-                self.act(msg);
-            } else {
-                break;
-            }
-
-            // If there are completions to do, process them whenever there aren't messages.
-            // Once we are done with current completions, fall back to `recv()` which sleeps
-            // until there is another message
-            while !self.running_requests.is_empty() {
-                match self.recv.try_recv() {
-                    // If we get a message, process it
-                    Ok(msg) => {
-                        self.act(msg);
-                    }
-                    // If there are no messages, return at least one completion.
-                    // FuturesUnordered will run all of them concurrently and yield once
-                    // at least one is done.
-                    // If we are disconnected, still complete any in progress requests
-                    // before we shut down.
-                    Err(TryRecvError::Empty | TryRecvError::Disconnected) => {
-                        self.running_requests.next().await;
-                    }
-                }
-            }
+            // While there are messages and completions, poll both.
+            // If there is a message, add it to the queue.
+            // If there are completions, make progress on them.
+            select! {
+                msg = self.recv.recv() => match msg {
+                    Some(msg) => self.act(msg),
+                    // Senders are gone, break out of the loop for shutdown.
+                    None => break
+                },
+                // FuturesUnordered will let them run in parallel. It will
+                // yield once one of them is completed.
+                () = self.running_requests.select_next_some(), if !self.running_requests.is_empty()  => {}
+            };
         }
     }
 
@@ -237,11 +222,7 @@ pub mod tests {
     };
 
     use anyhow::anyhow;
-    use tokio::{
-        sync::{mpsc, oneshot, Mutex},
-        task::JoinHandle,
-        time::timeout,
-    };
+    use tokio::{sync::mpsc, task::JoinHandle, time::sleep, try_join};
 
     use crate::inference::client::InferenceClient;
 
@@ -346,109 +327,66 @@ pub mod tests {
         assert!(result.is_ok());
     }
 
-    /// A test double which for an inference client, which has every request pending until
-    /// explicitly told to be ready.
-    struct LatchClient {
-        /// For every call to inference we want to pop one receiver in order to wait for the answer.
-        /// It is up to the [`LatchControl`] to see to it, that these might be answered.
-        receivers: Mutex<Vec<oneshot::Receiver<String>>>,
-    }
-
-    impl LatchClient {
-        pub fn new(number_of_supported_requests: usize) -> (Self, LatchControl) {
-            let mut senders = Vec::new();
-            let mut receivers = Vec::new();
-            for _ in 0..number_of_supported_requests {
-                let (send, recv) = oneshot::channel();
-                senders.push(Some(send));
-                receivers.push(recv);
-            }
-            (
-                LatchClient {
-                    receivers: Mutex::new(receivers),
-                },
-                LatchControl { senders },
-            )
-        }
-    }
-
-    impl InferenceClient for LatchClient {
-        async fn complete_text(
-            &self,
-            _params: &CompletionRequest,
-            _api_token: String,
-        ) -> anyhow::Result<Completion> {
-            let recv = self.receivers.lock().await.pop().expect(
-                "complete_text must not be called more often than supported by test double",
-            );
-            Ok(Completion::from_text(recv.await.unwrap()))
-        }
-    }
-
-    /// Sibling of [`LatchClient`]. Used to answer the completions in any order desired by the caller
-    /// in a different thread of execution
-    struct LatchControl {
-        /// We maintain the senders as Options, so we do not need mess with the indices of the Vec
-        /// if we consume the senders. This is to support test scenarios in which we want the
-        /// completions to be answered out of order.
-        senders: Vec<Option<oneshot::Sender<String>>>,
-    }
-
-    impl LatchControl {
-        /// Answer the nth completion requested with complete text
-        pub fn answer_nth(&mut self, n: usize, completion: String) {
-            // We pop the receivers in reverse orders, so we also revert the index when answering
-            // requests.
-            let index = self.senders.len() - n - 1;
-            let send = self.senders.get_mut(index).unwrap().take().unwrap();
-            let _result = send.send(completion);
-        }
-    }
-
     /// Dummy complete text params for test, if you do not care particular about them.
     fn complete_text_params_dummy() -> CompletionRequest {
         CompletionRequest::new("Dummy prompt".to_owned(), "Dummy model name".to_owned())
     }
 
+    /// This Client will only resolve a completion once the correct number of
+    /// requests have been reached.
+    struct AssertConcurrentClient {
+        /// Number of requests we are still waiting on
+        expected_concurrent_requests: AtomicUsize,
+    }
+
+    impl AssertConcurrentClient {
+        fn new(expected_concurrent_requests: impl Into<AtomicUsize>) -> Self {
+            Self {
+                expected_concurrent_requests: expected_concurrent_requests.into(),
+            }
+        }
+    }
+
+    impl InferenceClient for AssertConcurrentClient {
+        async fn complete_text(
+            &self,
+            request: &CompletionRequest,
+            _api_token: String,
+        ) -> anyhow::Result<Completion> {
+            self.expected_concurrent_requests
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |e| {
+                    Some(e.saturating_sub(1))
+                })
+                .unwrap();
+
+            while self.expected_concurrent_requests.load(Ordering::SeqCst) > 0 {
+                sleep(Duration::from_millis(1)).await;
+            }
+            Ok(Completion::from_text(&request.prompt))
+        }
+    }
+
     /// We want to ensure that the actor invokes the client multiple times concurrently instead of
     /// only one inference request at a time.
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn concurrent_invocation_of_client() {
         // Given
-        let (client, mut control) = LatchClient::new(2);
+        let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
-        let first_api = inference.api();
-        let second_api = inference.api();
+        let api = inference.api();
 
         // When
-        // This means the second call to complete_text over the api, will succeed almost immediatly,
-        // if only it is actually invoked.
-        control.answer_nth(1, "second".to_owned());
-
         // Schedule two tasks
-        let first = tokio::spawn(async move {
-            first_api
-                .complete_text(complete_text_params_dummy(), "dummy api token".to_owned())
-                .await
-        });
-        let second = tokio::spawn(async move {
-            second_api
-                .complete_text(complete_text_params_dummy(), "dummy api token2".to_owned())
-                .await
-        });
+        let resp = try_join!(
+            api.complete_text(complete_text_params_dummy(), "0".to_owned()),
+            api.complete_text(complete_text_params_dummy(), "1".to_owned())
+        );
 
-        // Wait for the second one to be completed before answering the first one. This will block
-        // forever if inference
-        let potential_timeout = timeout(Duration::from_secs(1), second).await;
+        // Then: Both run concurrently and only return once both are completed.
+        assert!(resp.is_ok());
 
-        // Then: Second task did not timeout
-        assert!(potential_timeout.is_ok());
-
-        // Free resources associated with test
-        // Second one done, now answer first task
-        control.answer_nth(0, "first".to_owned());
-        let _any_completion = first.await.unwrap();
         // We need to drop the sender in order for `actor.run` to terminate
+        drop(api);
         inference.wait_for_shutdown().await;
     }
 }
