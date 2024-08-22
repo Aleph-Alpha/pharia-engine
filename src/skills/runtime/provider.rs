@@ -100,10 +100,9 @@ impl SkillProvider {
             };
 
             let bytes = registry.load_skill(&skill_path.name).await?;
-            let bytes =
-                bytes.ok_or_else(|| anyhow!("Sorry, skill {} not found.", skill_path.name))?;
+            let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_path} not found."))?;
             let skill = CachedSkill::new(engine, bytes)
-                .with_context(|| format!("Failed to initialize {}.", skill_path.name))?;
+                .with_context(|| format!("Failed to initialize {skill_path}."))?;
             self.cached_skills.insert(skill_path.clone(), skill);
         }
         Ok(self.cached_skills.get(skill_path).expect("Skill present."))
