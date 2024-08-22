@@ -5,17 +5,16 @@ use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 use url::Url;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Skill {
     pub name: String,
 }
 
 #[async_trait]
 pub trait Namespace {
-    async fn skills(&mut self) -> anyhow::Result<&[Skill]>;
+    async fn skills(&mut self) -> anyhow::Result<Vec<Skill>>;
 }
 
 pub fn namespace_from_url(raw_url: &str) -> anyhow::Result<Box<dyn Namespace + Send + 'static>> {
@@ -64,13 +63,12 @@ impl LocalSkillConfig {
 
 #[async_trait]
 impl Namespace for LocalSkillConfig {
-    async fn skills(&mut self) -> anyhow::Result<&[Skill]> {
-        Ok(&self.skills)
+    async fn skills(&mut self) -> anyhow::Result<Vec<Skill>> {
+        Ok(self.skills.clone())
     }
 }
 
 pub struct RemoteSkillConfig {
-    skills: Vec<Skill>,
     token: Option<String>,
     url: String,
 }
@@ -79,15 +77,16 @@ impl RemoteSkillConfig {
     pub fn from_url(url: &str) -> Self {
         drop(dotenvy::dotenv());
         let token = env::var("TEAM_CONFIG_TOKEN").ok();
-        let skills = vec![];
         Self {
-            skills,
             token,
             url: url.to_owned(),
         }
     }
+}
 
-    async fn load(&self) -> anyhow::Result<Vec<Skill>> {
+#[async_trait]
+impl Namespace for RemoteSkillConfig {
+    async fn skills(&mut self) -> anyhow::Result<Vec<Skill>> {
         let mut req_builder = reqwest::Client::new().get(&self.url);
         if let Some(token) = &self.token {
             let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
@@ -99,25 +98,6 @@ impl RemoteSkillConfig {
         let content = resp.text().await?;
         let config = TomlSkillConfig::from_str(&content)?;
         Ok(config.skills)
-    }
-
-    async fn sync(&mut self) {
-        match self.load().await {
-            Ok(skills) => {
-                self.skills = skills;
-            }
-            Err(e) => {
-                warn!("Failed to load remote skill config, fallback to existing config: {e}");
-            }
-        }
-    }
-}
-
-#[async_trait]
-impl Namespace for RemoteSkillConfig {
-    async fn skills(&mut self) -> anyhow::Result<&[Skill]> {
-        self.sync().await;
-        Ok(&self.skills)
     }
 }
 
@@ -154,10 +134,9 @@ pub mod tests {
         let mut config = RemoteSkillConfig::pharia_kernel_team();
 
         // when fetch skill config
-        let result = config.load().await;
+        let skills = config.skills().await.unwrap();
 
         // then the configured skills must listed in the config
-        assert!(result.is_ok());
-        assert!(!config.skills().await.unwrap().is_empty());
+        assert!(!skills.is_empty());
     }
 }
