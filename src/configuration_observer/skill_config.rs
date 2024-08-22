@@ -1,4 +1,7 @@
-use std::{env, path::Path};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -25,7 +28,7 @@ pub fn namespace_from_url(raw_url: &str) -> anyhow::Result<Box<dyn Namespace + S
             // remove leading "file://"
             let file_path = &raw_url[7..];
 
-            let skill_config = LocalSkillConfig::new(file_path)?;
+            let skill_config = LocalSkillConfig::new(file_path.into());
 
             Ok(Box::new(skill_config))
         }
@@ -46,25 +49,21 @@ impl TomlSkillConfig {
 }
 
 pub struct LocalSkillConfig {
-    skills: Vec<Skill>,
+    path: PathBuf,
 }
 
 impl LocalSkillConfig {
-    pub fn new<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
-        let config = std::fs::read_to_string(p)?;
-        Self::from_str(&config)
-    }
-
-    pub fn from_str(config: &str) -> anyhow::Result<Self> {
-        let skills = TomlSkillConfig::from_str(config)?.skills;
-        Ok(Self { skills })
+    pub fn new(path: PathBuf) -> Self {
+        Self { path }
     }
 }
 
 #[async_trait]
 impl Namespace for LocalSkillConfig {
     async fn skills(&mut self) -> anyhow::Result<Vec<Skill>> {
-        Ok(self.skills.clone())
+        let config = std::fs::read_to_string(&self.path)?;
+        let skills = TomlSkillConfig::from_str(&config)?.skills;
+        Ok(skills)
     }
 }
 
