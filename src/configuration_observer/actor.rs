@@ -6,7 +6,7 @@ use tracing::error;
 
 use crate::skills::{SkillExecutorApi, SkillPath};
 
-use super::{namespace_from_url, Namespace, NamespaceConfig, OperatorConfig};
+use super::{namespace_from_url, NamespaceDescriptionLoader, NamespaceReference, OperatorConfig};
 
 #[async_trait]
 pub trait Config {
@@ -15,7 +15,7 @@ pub trait Config {
 }
 
 pub struct ConfigImpl {
-    namespaces: HashMap<String, Box<dyn Namespace + Send>>,
+    namespaces: HashMap<String, Box<dyn NamespaceDescriptionLoader + Send>>,
 }
 
 impl ConfigImpl {
@@ -24,8 +24,8 @@ impl ConfigImpl {
             .namespaces
             .into_iter()
             .map(|(namespace, config)| match config {
-                NamespaceConfig::File { config_url, .. }
-                | NamespaceConfig::Oci { config_url, .. } => {
+                NamespaceReference::File { config_url, .. }
+                | NamespaceReference::Oci { config_url, .. } => {
                     Ok((namespace, namespace_from_url(&config_url)?))
                 }
             })
@@ -45,8 +45,9 @@ impl Config for ConfigImpl {
             .namespaces
             .get_mut(namespace)
             .expect("namespace must exist.")
-            .skills()
-            .await?;
+            .description()
+            .await?
+            .skills;
         Ok(skills.iter().map(|s| s.name.clone()).collect())
     }
 }

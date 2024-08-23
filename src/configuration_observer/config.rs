@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct OperatorConfig {
-    pub namespaces: HashMap<String, NamespaceConfig>,
+    pub namespaces: HashMap<String, NamespaceReference>,
 }
 
 impl OperatorConfig {
@@ -63,7 +63,7 @@ impl OperatorConfig {
 
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "snake_case", tag = "registry_type")]
-pub enum NamespaceConfig {
+pub enum NamespaceReference {
     File {
         registry: String,
         config_url: String,

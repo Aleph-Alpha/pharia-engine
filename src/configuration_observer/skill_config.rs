@@ -12,20 +12,25 @@ pub struct Skill {
     pub name: String,
 }
 
+// this is actual more of a namespace skill config
+// namespace is not good, as a namespace could list skills,
+// but could also load skills
 #[async_trait]
-pub trait Namespace {
-    async fn skills(&mut self) -> anyhow::Result<Vec<Skill>>;
+pub trait NamespaceDescriptionLoader {
+    async fn description(&mut self) -> anyhow::Result<NamespaceDescription>;
 }
 
-pub fn namespace_from_url(raw_url: &str) -> anyhow::Result<Box<dyn Namespace + Send + 'static>> {
+pub fn namespace_from_url(
+    raw_url: &str,
+) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + 'static>> {
     let url = Url::parse(raw_url)?;
     match url.scheme() {
-        "https" | "http" => Ok(Box::new(RemoteNamespace::from_url(raw_url))),
+        "https" | "http" => Ok(Box::new(HttpLoader::from_url(raw_url))),
         "file" => {
             // remove leading "file://"
             let file_path = &raw_url[7..];
 
-            let skill_config = LocalNamespace::new(file_path.into());
+            let skill_config = FileLoader::new(file_path.into());
 
             Ok(Box::new(skill_config))
         }
@@ -34,42 +39,41 @@ pub fn namespace_from_url(raw_url: &str) -> anyhow::Result<Box<dyn Namespace + S
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SkillConfig {
-    skills: Vec<Skill>,
+pub struct NamespaceDescription {
+    pub skills: Vec<Skill>,
 }
 
-impl SkillConfig {
+impl NamespaceDescription {
     pub fn from_str(skill_config: &str) -> anyhow::Result<Self> {
         let tc = toml::from_str(skill_config)?;
         Ok(tc)
     }
 }
 
-pub struct LocalNamespace {
+pub struct FileLoader {
     path: PathBuf,
 }
 
-impl LocalNamespace {
+impl FileLoader {
     pub fn new(path: PathBuf) -> Self {
         Self { path }
     }
 }
 
 #[async_trait]
-impl Namespace for LocalNamespace {
-    async fn skills(&mut self) -> anyhow::Result<Vec<Skill>> {
+impl NamespaceDescriptionLoader for FileLoader {
+    async fn description(&mut self) -> anyhow::Result<NamespaceDescription> {
         let config = std::fs::read_to_string(&self.path)?;
-        let skills = SkillConfig::from_str(&config)?.skills;
-        Ok(skills)
+        NamespaceDescription::from_str(&config)
     }
 }
 
-pub struct RemoteNamespace {
+pub struct HttpLoader {
     token: Option<String>,
     url: String,
 }
 
-impl RemoteNamespace {
+impl HttpLoader {
     pub fn from_url(url: &str) -> Self {
         drop(dotenvy::dotenv());
         let token = env::var("TEAM_CONFIG_TOKEN").ok();
@@ -81,8 +85,8 @@ impl RemoteNamespace {
 }
 
 #[async_trait]
-impl Namespace for RemoteNamespace {
-    async fn skills(&mut self) -> anyhow::Result<Vec<Skill>> {
+impl NamespaceDescriptionLoader for HttpLoader {
+    async fn description(&mut self) -> anyhow::Result<NamespaceDescription> {
         let mut req_builder = reqwest::Client::new().get(&self.url);
         if let Some(token) = &self.token {
             let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
@@ -94,8 +98,7 @@ impl Namespace for RemoteNamespace {
         resp.error_for_status_ref()?;
 
         let content = resp.text().await?;
-        let config = SkillConfig::from_str(&content)?;
-        Ok(config.skills)
+        NamespaceDescription::from_str(&content)
     }
 }
 
@@ -103,7 +106,7 @@ impl Namespace for RemoteNamespace {
 pub mod tests {
     use super::*;
 
-    impl RemoteNamespace {
+    impl HttpLoader {
         pub fn pharia_kernel_team() -> Self {
             drop(dotenvy::dotenv());
             let url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main";
@@ -113,7 +116,7 @@ pub mod tests {
 
     #[test]
     fn load_skill_list_config_toml() {
-        let tc: SkillConfig = toml::from_str(
+        let tc: NamespaceDescription = toml::from_str(
             r#"
             skills = [
                 {name = "Goofy"},
@@ -129,12 +132,12 @@ pub mod tests {
     #[tokio::test]
     async fn load_gitlab_config() {
         // Given a gitlab skill config
-        let mut config = RemoteNamespace::pharia_kernel_team();
+        let mut config = HttpLoader::pharia_kernel_team();
 
         // when fetch skill config
-        let skills = config.skills().await.unwrap();
+        let description = config.description().await.unwrap();
 
         // then the configured skills must listed in the config
-        assert!(!skills.is_empty());
+        assert!(!description.skills.is_empty());
     }
 }
