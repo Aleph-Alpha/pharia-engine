@@ -110,6 +110,7 @@ pub fn http(skill_executor_api: SkillExecutorApi) -> Router {
     Router::new()
         .route("/skill.wit", get(skill_wit()))
         .route("/execute_skill", post(execute_skill))
+        .route("/skills", get(skills))
         .route("/cached_skills", get(cached_skills))
         .route("/cached_skills/:name", delete(drop_cached_skill))
         .with_state(skill_executor_api)
@@ -198,6 +199,26 @@ async fn execute_skill(
     }
 }
 
+/// skills
+///
+/// List of all configured skills.
+#[utoipa::path(
+    get,
+    operation_id = "skills",
+    path = "/skills",
+    tag = "skills",
+    responses(
+        (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
+    ),
+)]
+async fn skills(
+    State(skill_executor_api): State<SkillExecutorApi>,
+) -> (StatusCode, Json<Vec<String>>) {
+    let response = skill_executor_api.skills().await;
+    let response = response.iter().map(ToString::to_string).collect();
+    (StatusCode::OK, Json(response))
+}
+
 /// cached_skills
 ///
 /// List of all cached skills. These are skills that are already compiled
@@ -209,7 +230,7 @@ async fn execute_skill(
     path = "/cached_skills",
     tag = "skills",
     responses(
-        (status = 200, body=Vec<String>, example = json!(["first skill", "second skill"])),
+        (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
 )]
 async fn cached_skills(
@@ -531,5 +552,36 @@ mod tests {
         let actual = String::from_utf8(body.to_vec()).unwrap();
 
         assert_eq!(actual, include_str!("../wit/skill@0.2/skill.wit"));
+    }
+
+    #[tokio::test]
+    async fn list_skills() {
+        // given a skill executor with cached skills
+        let (send, mut recv) = mpsc::channel(1);
+        let skill_executer_api = SkillExecutorApi::new(send);
+        let skill_path = SkillPath::dummy();
+        let skill_qualified_name = skill_path.to_string();
+        tokio::spawn(async move {
+            if let Some(crate::skills::tests::SkillExecutorMessage::Skills { send }) =
+                recv.recv().await
+            {
+                send.send(vec![skill_path]).unwrap();
+            }
+        });
+
+        let http = http(skill_executer_api);
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .uri("/skills")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let skills_str = String::from_utf8(body.to_vec()).unwrap();
+        let skills = serde_json::from_str::<Vec<String>>(&skills_str).unwrap();
+        assert_eq!(skills, vec![skill_qualified_name]);
     }
 }
