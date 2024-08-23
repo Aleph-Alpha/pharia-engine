@@ -156,12 +156,11 @@ integration_test:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
-    TEAM_CONFIG_TOKEN: $TEAM_CONFIG_TOKEN
+    TEAM_CONFIG_TOKEN: $TEAM_CONFIG_TOKEN_UI
   services:
     - name: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
       alias: $CI_PROJECT_NAME
       variables:
-        TEAM_CONFIG_TOKEN: $TEAM_CONFIG_TOKEN
         SKILL_REGISTRY_USER: $CI_REGISTRY_USER
         SKILL_REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
   script:
