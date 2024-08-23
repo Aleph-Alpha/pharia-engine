@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct OperatorConfig {
-    pub namespaces: HashMap<String, NamespaceReference>,
+    pub namespaces: HashMap<String, NamespaceConfig>,
 }
 
 impl OperatorConfig {
@@ -36,7 +36,7 @@ impl OperatorConfig {
         Self::from_toml(
             r#"
                 [namespaces.local]
-                config_url = "file://skill_config.toml"
+                config_url = "file://namespace.toml"
                 registry_type = "file"
                 registry = "file://skills"
             "#,
@@ -63,7 +63,7 @@ impl OperatorConfig {
 
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "snake_case", tag = "registry_type")]
-pub enum NamespaceReference {
+pub enum NamespaceConfig {
     File {
         registry: String,
         config_url: String,
@@ -91,15 +91,7 @@ mod tests {
 
     #[test]
     fn deserialize_config_with_file_registry() {
-        let config = OperatorConfig::from_toml(
-            r#"
-            [namespaces.local]
-            config_url = "file://skill_config.toml"
-            registry_type = "file"
-            registry = "file://skills"
-            "#,
-        )
-        .unwrap();
+        let config = OperatorConfig::local();
         assert!(config.namespaces.contains_key("local"));
     }
 

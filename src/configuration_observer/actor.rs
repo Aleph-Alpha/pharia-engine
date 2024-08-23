@@ -6,26 +6,26 @@ use tracing::error;
 
 use crate::skills::{SkillExecutorApi, SkillPath};
 
-use super::{namespace_from_url, NamespaceDescriptionLoader, NamespaceReference, OperatorConfig};
+use super::{namespace_from_url, NamespaceConfig, NamespaceDescriptionLoader, OperatorConfig};
 
 #[async_trait]
-pub trait Config {
+pub trait ObservableConfig {
     fn namespaces(&self) -> Vec<String>;
     async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<String>>;
 }
 
-pub struct ConfigImpl {
+pub struct NamespaceDescriptionLoaders {
     namespaces: HashMap<String, Box<dyn NamespaceDescriptionLoader + Send>>,
 }
 
-impl ConfigImpl {
+impl NamespaceDescriptionLoaders {
     pub fn new(deserialized: OperatorConfig) -> anyhow::Result<Self> {
         let namespaces = deserialized
             .namespaces
             .into_iter()
             .map(|(namespace, config)| match config {
-                NamespaceReference::File { config_url, .. }
-                | NamespaceReference::Oci { config_url, .. } => {
+                NamespaceConfig::File { config_url, .. }
+                | NamespaceConfig::Oci { config_url, .. } => {
                     Ok((namespace, namespace_from_url(&config_url)?))
                 }
             })
@@ -35,7 +35,7 @@ impl ConfigImpl {
 }
 
 #[async_trait]
-impl Config for ConfigImpl {
+impl ObservableConfig for NamespaceDescriptionLoaders {
     fn namespaces(&self) -> Vec<String> {
         self.namespaces.keys().cloned().collect()
     }
@@ -62,7 +62,7 @@ pub struct ConfigurationObserver {
 impl ConfigurationObserver {
     pub fn with_config(
         skill_executor_api: SkillExecutorApi,
-        config: Box<dyn Config + Send>,
+        config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
     ) -> Self {
         let (sender, receiver) = tokio::sync::watch::channel(false);
@@ -86,7 +86,7 @@ impl ConfigurationObserver {
 struct ConfigurationObserverActor {
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_executor_api: SkillExecutorApi,
-    config: Box<dyn Config + Send>,
+    config: Box<dyn ObservableConfig + Send>,
     update_interval: Duration,
     skills: HashMap<String, Vec<String>>,
 }
@@ -101,7 +101,7 @@ impl ConfigurationObserverActor {
     fn new(
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_executor_api: SkillExecutorApi,
-        config: Box<dyn Config + Send>,
+        config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
     ) -> Self {
         Self {
@@ -190,7 +190,7 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl Config for StubConfig {
+    impl ObservableConfig for StubConfig {
         fn namespaces(&self) -> Vec<String> {
             self.namespaces.keys().cloned().collect()
         }

@@ -114,7 +114,7 @@ impl Kernel {
             operator_config: OperatorConfig::from_toml(
                 r#"
                     [namespaces.local]
-                    config_url = "file://../skill_config.toml"
+                    config_url = "file://../namespace.toml"
                     registry_type = "file"
                     registry = "file://../skills"
                 "#,

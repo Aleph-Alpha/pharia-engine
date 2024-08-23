@@ -5,7 +5,7 @@ mod registries;
 mod shell;
 mod skills;
 
-use configuration_observer::{ConfigImpl, ConfigurationObserver};
+use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use futures::Future;
 use tracing::error;
 
@@ -30,7 +30,7 @@ pub async fn run(
 
     // Boot up the configuration observer
     let config = Box::new(
-        ConfigImpl::new(app_config.operator_config)
+        NamespaceDescriptionLoaders::new(app_config.operator_config)
             .expect("Namespace configuration must be valid."),
     );
 

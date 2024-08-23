@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::{
-    configuration_observer::NamespaceReference,
+    configuration_observer::NamespaceConfig,
     inference::{Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
@@ -25,10 +25,7 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(
-        inference_api: InferenceApi,
-        namespaces: &HashMap<String, NamespaceReference>,
-    ) -> Self {
+    pub fn new(inference_api: InferenceApi, namespaces: &HashMap<String, NamespaceConfig>) -> Self {
         let provider = SkillProvider::new(namespaces);
         let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)

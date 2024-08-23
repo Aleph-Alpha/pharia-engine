@@ -30,9 +30,9 @@ pub fn namespace_from_url(
             // remove leading "file://"
             let file_path = &raw_url[7..];
 
-            let skill_config = FileLoader::new(file_path.into());
+            let loader = FileLoader::new(file_path.into());
 
-            Ok(Box::new(skill_config))
+            Ok(Box::new(loader))
         }
         scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
     }
@@ -44,8 +44,8 @@ pub struct NamespaceDescription {
 }
 
 impl NamespaceDescription {
-    pub fn from_str(skill_config: &str) -> anyhow::Result<Self> {
-        let tc = toml::from_str(skill_config)?;
+    pub fn from_str(config: &str) -> anyhow::Result<Self> {
+        let tc = toml::from_str(config)?;
         Ok(tc)
     }
 }

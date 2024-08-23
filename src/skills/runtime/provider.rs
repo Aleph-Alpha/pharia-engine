@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 use serde_json::Value;
 
 use crate::{
-    configuration_observer::NamespaceReference,
+    configuration_observer::NamespaceConfig,
     registries::{FileRegistry, OciRegistry, SkillRegistry},
     skills::SkillPath,
 };
@@ -24,7 +24,7 @@ pub struct SkillProvider {
 }
 
 impl SkillProvider {
-    pub fn new(namespaces: &HashMap<String, NamespaceReference>) -> Self {
+    pub fn new(namespaces: &HashMap<String, NamespaceConfig>) -> Self {
         let skill_registries = namespaces
             .iter()
             .map(|(k, v)| Self::registry(v).map(|r| (k.clone(), r)))
@@ -38,14 +38,12 @@ impl SkillProvider {
     }
 
     fn registry(
-        namespace_config: &NamespaceReference,
+        namespace_config: &NamespaceConfig,
     ) -> anyhow::Result<Box<dyn SkillRegistry + Send>> {
         let registry: Box<dyn SkillRegistry + Send> = match namespace_config {
-            NamespaceReference::File { registry, .. } => {
-                Box::new(FileRegistry::with_url(registry)?)
-            }
+            NamespaceConfig::File { registry, .. } => Box::new(FileRegistry::with_url(registry)?),
 
-            NamespaceReference::Oci {
+            NamespaceConfig::Oci {
                 repository,
                 registry,
                 ..
@@ -140,9 +138,9 @@ mod tests {
 
     impl SkillProvider {
         fn with_namespace_and_skill(skill_path: &SkillPath) -> Self {
-            let ns_cfg = NamespaceReference::File {
+            let ns_cfg = NamespaceConfig::File {
                 registry: "file://skills".to_owned(),
-                config_url: "file://skill_config.toml".to_owned(),
+                config_url: "file://namespace.toml".to_owned(),
             };
             let mut namespaces = HashMap::new();
             namespaces.insert(skill_path.namespace.clone(), ns_cfg);
