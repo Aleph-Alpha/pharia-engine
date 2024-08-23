@@ -1,13 +1,12 @@
 use crate::registries::SkillRegistry;
-use oci_distribution::{
+use oci_client::{
+    client::ClientConfig,
     errors::{OciDistributionError, OciErrorCode},
     secrets::RegistryAuth,
-    Reference,
+    Client, Reference,
 };
 use oci_wasm::WasmClient;
 use tracing::error;
-
-use oci_distribution::{client::ClientConfig, Client};
 
 use super::DynFuture;
 
@@ -84,7 +83,7 @@ mod tests {
     use std::{env, path::Path};
 
     use dotenvy::dotenv;
-    use oci_distribution::{secrets::RegistryAuth, Reference};
+    use oci_client::{secrets::RegistryAuth, Reference};
     use oci_wasm::WasmConfig;
     use wasmtime::{component::Component, Config, Engine};
 

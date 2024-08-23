@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use mime::APPLICATION_JSON;
-use oci_distribution::{client::ClientConfig, secrets::RegistryAuth, Client, Reference};
+use oci_client::{client::ClientConfig, secrets::RegistryAuth, Client, Reference};
 use oci_wasm::{WasmClient, WasmConfig};
 use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde_json::json;
