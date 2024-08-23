@@ -70,6 +70,7 @@ impl SkillProvider {
 
     pub fn remove_skill(&mut self, skill: &SkillPath) {
         self.known_skills.remove(skill);
+        self.invalidate(skill);
     }
 
     pub fn skills(&self) -> impl Iterator<Item = &SkillPath> {
@@ -89,11 +90,11 @@ impl SkillProvider {
         skill_path: &SkillPath,
         engine: &Engine,
     ) -> anyhow::Result<&CachedSkill> {
-        if !self.known_skills.contains(skill_path) {
-            return Err(anyhow!("Skill {skill_path} not configured."));
-        }
-
         if !self.cached_skills.contains_key(skill_path) {
+            if !self.known_skills.contains(skill_path) {
+                return Err(anyhow!("Skill {skill_path} not configured."));
+            }
+
             let Some(registry) = self.skill_registries.get(&skill_path.namespace) else {
                 return Err(anyhow!(
                     "Namespace {} not configured.",
@@ -192,5 +193,20 @@ mod tests {
             .await;
 
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn cached_skill_removed() {
+        // given one cached skill
+        let skill_path = SkillPath::new("local", "greet_skill");
+        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
+        let engine = Engine::new().unwrap();
+        provider.fetch(&skill_path, &engine).await.unwrap();
+
+        // when we remove the skill
+        provider.remove_skill(&skill_path);
+
+        // then the skill is no longer cached
+        assert!(provider.loaded_skills().next().is_none());
     }
 }
