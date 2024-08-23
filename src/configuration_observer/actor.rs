@@ -55,24 +55,39 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
 /// Periodically observes changes in remote repositories containing
 /// skill configurations and reports detected changes to the skill executor
 pub struct ConfigurationObserver {
+    ready: tokio::sync::watch::Receiver<bool>,
     shutdown: tokio::sync::watch::Sender<bool>,
     handle: JoinHandle<()>,
 }
 
 impl ConfigurationObserver {
+    /// Completes after attempted to load all config once.
+    /// This ensures that the requests are only accepted after initialization.
+    pub async fn wait_for_ready(&mut self) {
+        self.ready.wait_for(|ready| *ready).await.unwrap();
+    }
+
     pub fn with_config(
         skill_executor_api: SkillExecutorApi,
         config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
     ) -> Self {
-        let (sender, receiver) = tokio::sync::watch::channel(false);
+        let (ready_sender, ready_receiver) = tokio::sync::watch::channel(false);
+        let (shutdown_sender, shutdown_receiver) = tokio::sync::watch::channel(false);
         let handle = tokio::spawn(async move {
-            ConfigurationObserverActor::new(receiver, skill_executor_api, config, update_interval)
-                .run()
-                .await;
+            ConfigurationObserverActor::new(
+                ready_sender,
+                shutdown_receiver,
+                skill_executor_api,
+                config,
+                update_interval,
+            )
+            .run()
+            .await;
         });
         Self {
-            shutdown: sender,
+            ready: ready_receiver,
+            shutdown: shutdown_sender,
             handle,
         }
     }
@@ -84,6 +99,7 @@ impl ConfigurationObserver {
 }
 
 struct ConfigurationObserverActor {
+    ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_executor_api: SkillExecutorApi,
     config: Box<dyn ObservableConfig + Send>,
@@ -99,12 +115,14 @@ struct Diff {
 
 impl ConfigurationObserverActor {
     fn new(
+        ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_executor_api: SkillExecutorApi,
         config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
     ) -> Self {
         Self {
+            ready,
             shutdown,
             skill_executor_api,
             config,
@@ -131,45 +149,53 @@ impl ConfigurationObserverActor {
 
     async fn run(mut self) {
         let namespaces = self.config.namespaces();
+        self.load(&namespaces).await;
+        let _ = self.ready.send(true);
         loop {
-            for namespace in &namespaces {
-                let incoming = match self.config.skills(namespace).await {
-                    Ok(incoming) => incoming,
-                    Err(e) => {
-                        error!("Failed to get the latest skills in namespace {namespace}, caused by: {e}");
-                        continue;
-                    }
-                };
-                let existing = self
-                    .skills
-                    .insert(namespace.to_owned(), incoming)
-                    .unwrap_or_default();
-
-                let incoming = self.skills.get(namespace).unwrap();
-                let diff = Self::compute_diff(&existing, incoming);
-                for skill in diff.added {
-                    self.skill_executor_api
-                        .add_skill(SkillPath::new(namespace, &skill))
-                        .await;
-                }
-                for skill in diff.removed {
-                    self.skill_executor_api
-                        .remove_skill(SkillPath::new(namespace, &skill))
-                        .await;
-                }
-            }
             select! {
                 _ = self.shutdown.changed() => break,
                 () = tokio::time::sleep(self.update_interval) => (),
             };
+            self.load(&namespaces).await;
+        }
+    }
+
+    async fn load(&mut self, namespaces: &Vec<String>) {
+        for namespace in namespaces {
+            let incoming = match self.config.skills(namespace).await {
+                Ok(incoming) => incoming,
+                Err(e) => {
+                    error!(
+                        "Failed to get the latest skills in namespace {namespace}, caused by: {e}"
+                    );
+                    continue;
+                }
+            };
+            let existing = self
+                .skills
+                .insert(namespace.to_owned(), incoming)
+                .unwrap_or_default();
+
+            let incoming = self.skills.get(namespace).unwrap();
+            let diff = Self::compute_diff(&existing, incoming);
+            for skill in diff.added {
+                self.skill_executor_api
+                    .add_skill(SkillPath::new(namespace, &skill))
+                    .await;
+            }
+            for skill in diff.removed {
+                self.skill_executor_api
+                    .remove_skill(SkillPath::new(namespace, &skill))
+                    .await;
+            }
         }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-
     use std::collections::HashMap;
+    use std::future::pending;
 
     use tokio::sync::mpsc;
     use tokio::time::timeout;
@@ -204,6 +230,19 @@ pub mod tests {
         }
     }
 
+    pub struct PendingConfig;
+
+    #[async_trait]
+    impl ObservableConfig for PendingConfig {
+        fn namespaces(&self) -> Vec<String> {
+            vec!["dummy_namespace".to_owned()]
+        }
+
+        async fn skills(&mut self, _namespace: &str) -> anyhow::Result<Vec<String>> {
+            pending().await
+        }
+    }
+
     #[test]
     fn diff_is_computed() {
         let incoming = vec!["new_skill".to_owned(), "existing_skill".to_owned()];
@@ -214,6 +253,23 @@ pub mod tests {
         // when the observer checks for new skills
         assert_eq!(diff.added, vec!["new_skill"]);
         assert_eq!(diff.removed, vec!["old_skill"]);
+    }
+
+    #[tokio::test]
+    async fn load_config_during_first_pass() {
+        // Given a config that take forever to load
+        let (sender, _) = mpsc::channel::<SkillExecutorMessage>(1);
+        let skill_executor_api = SkillExecutorApi::new(sender);
+        let config = Box::new(PendingConfig);
+        let update_interval = Duration::from_millis(1);
+        let mut observer =
+            ConfigurationObserver::with_config(skill_executor_api, config, update_interval);
+
+        // When waiting for the first pass
+        let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
+
+        // Then it will timeout
+        assert!(result.is_err());
     }
 
     #[tokio::test]

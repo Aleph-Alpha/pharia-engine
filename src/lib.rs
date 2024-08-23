@@ -34,11 +34,14 @@ pub async fn run(
             .expect("Namespace configuration must be valid."),
     );
 
-    let configuration_observer = ConfigurationObserver::with_config(
+    let mut configuration_observer = ConfigurationObserver::with_config(
         skill_executor.api(),
         config,
         tokio::time::Duration::from_secs(60),
     );
+
+    // Wait for first pass of the configuration so that the configured skills are loaded
+    configuration_observer.wait_for_ready().await;
 
     let shell_shutdown = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await;
 

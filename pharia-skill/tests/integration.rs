@@ -1,9 +1,9 @@
-use std::{env, fs::File, io::Write, path::Path, time::Duration};
+use std::{env, fs::File, io::Write, path::Path};
 
 use assert_cmd::Command;
 use pharia_kernel::{run, AppConfig, OperatorConfig};
 use predicates::str::contains;
-use tokio::{sync::oneshot, task::JoinHandle, time::sleep};
+use tokio::{sync::oneshot, task::JoinHandle};
 
 #[test]
 fn invalid_args() {
@@ -64,7 +64,6 @@ async fn run_skill() {
     // given a Pharia Kernel instance
     const PORT: u16 = 9_000;
     let kernel = Kernel::with_port(PORT).await;
-    sleep(Duration::from_millis(10)).await;
 
     // when running a skill
     drop(dotenvy::dotenv());
