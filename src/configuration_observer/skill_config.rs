@@ -91,6 +91,8 @@ impl Namespace for RemoteNamespace {
         }
         let resp = req_builder.send().await?;
 
+        resp.error_for_status_ref()?;
+
         let content = resp.text().await?;
         let config = SkillConfig::from_str(&content)?;
         Ok(config.skills)
