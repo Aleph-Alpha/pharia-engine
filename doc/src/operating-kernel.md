@@ -22,17 +22,35 @@ podman run -p 8081:8081 pharia-kernel
 
 ## Deploying Skills
 
-Pharia Kernel will automatically serve any Skill deployed at the `skills` subdirectory of its working directory. However, this is mostly intended for local development of Skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommended to use a container registry. At least if you want to deploy them dynamically. Pharia Kernel will look at the following Enviroment variables (here with example):
+Pharia Kernel organizes skills in namespaces. A namespace is a unique identifier which has an associated configuration file specifying deployed skills and an associated registry. Skills will be loaded lazily if invoked. Namespace can be local or remote:
+
+### Local namespace
+
+```toml
+[namespaces.local]
+config_url = "file://namespace.toml"
+registry_type = "file"
+registry = "file://skills"
+```
+
+With the local configuration above, Pharia Kernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace "local". This is mostly intended for local development of skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommended to use a remote namespace. 
+
+### Remote namespace
+
+```toml
+[namespaces.my-team]
+config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+registry_type = "oci"
+registry = "registry.gitlab.aleph-alpha.de"
+repository = "engineering/pharia-skills/skills"
+```
+
+With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace "my-team". If authentication is required, then a universal token can be specified with the following environment variables:
 
 ```shell
 SKILL_REGISTRY_USER=Joe.Plumber
 SKILL_REGISTRY_PASSWORD=****
-SKILL_REGISTRY=registry.gitlab.aleph-alpha.de
-SKILL_REPOSITORY=engineering/pharia-skills/skills
 ```
-
-Skills we be loaded lazily if invoked.
-
 
 ## Logging
 
