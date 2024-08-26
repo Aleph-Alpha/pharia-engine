@@ -30,7 +30,7 @@ enum Command {
         #[arg(required = false, long, short = 'n')]
         name: Option<String>,
         /// Published skill tag
-        #[arg(long, short = 't', default_value = "latest")]
+        #[arg(long, short = 't')]
         tag: String,
         /// User name for OCI registry
         #[arg(long, short = 'u', env = "SKILL_REGISTRY_USER")]

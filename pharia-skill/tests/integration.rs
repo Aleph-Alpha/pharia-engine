@@ -40,6 +40,8 @@ fn publish_minimal_args() {
     let cmd = cmd
         .arg("publish")
         .arg(path)
+        .arg("-t")
+        .arg("0.0.1")
         .env(
             "SKILL_REGISTRY",
             env::var("SKILL_REGISTRY").expect("SKILL_REGISTRY must be set."),
