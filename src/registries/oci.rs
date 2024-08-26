@@ -29,7 +29,7 @@ impl SkillRegistry for OciRegistry {
         let auth = RegistryAuth::Basic(self.username.clone(), self.password.clone());
 
         Box::pin(async move {
-            // TODO: we want to match on the specific type of result.
+            // We want to match on the specific type of result.
             // If it is not found, return None, if it is a connection error, return an error
             let result = self.client.pull(&image, &auth).await;
             match result {

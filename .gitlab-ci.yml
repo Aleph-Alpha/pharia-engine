@@ -148,7 +148,6 @@ container_test:
   script:
     - sh -x ./tests/test-container.sh $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
 
-# TODO: replace with actual integration tests
 integration_test:
   stage: image_test
   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
