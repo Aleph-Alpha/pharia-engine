@@ -67,16 +67,16 @@ impl SkillExecutorApi {
         Self { send }
     }
 
-    pub async fn add_skill(&self, skill: SkillPath, tag: Option<String>) {
-        let msg = SkillExecutorMessage::Add { skill, tag };
+    pub async fn upsert_skill(&self, skill: SkillPath, tag: Option<String>) {
+        let msg = SkillExecutorMessage::Upsert { skill, tag };
         self.send
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn remove_skill(&self, skill: SkillPath, tag: Option<String>) {
-        let msg = SkillExecutorMessage::Remove { skill, tag };
+    pub async fn remove_skill(&self, skill: SkillPath) {
+        let msg = SkillExecutorMessage::Remove { skill };
         self.send
             .send(msg)
             .await
@@ -164,8 +164,8 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
-            SkillExecutorMessage::Add { skill, tag } => self.runtime.add_skill(skill, tag),
-            SkillExecutorMessage::Remove { skill, tag } => self.runtime.remove_skill(&skill, tag),
+            SkillExecutorMessage::Upsert { skill, tag } => self.runtime.upsert_skill(skill, tag),
+            SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
             SkillExecutorMessage::Execute {
                 skill_path,
                 input,
@@ -211,13 +211,12 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
 #[derive(Debug)]
 pub enum SkillExecutorMessage {
-    Add {
+    Upsert {
         skill: SkillPath,
         tag: Option<String>,
     },
     Remove {
         skill: SkillPath,
-        tag: Option<String>,
     },
     Execute {
         skill_path: SkillPath,
@@ -323,11 +322,11 @@ pub mod tests {
                 panic!("complete_text must pend forever in case of error")
             }
 
-            fn add_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
+            fn upsert_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
                 panic!("does not add new skill")
             }
 
-            fn remove_skill(&mut self, _skill: &SkillPath, _tag: Option<String>) {
+            fn remove_skill(&mut self, _skill: &SkillPath) {
                 panic!("does not remove skill")
             }
 
@@ -430,11 +429,11 @@ pub mod tests {
             panic!("Liar runtime does not run skills")
         }
 
-        fn add_skill(&mut self, skill: SkillPath, _tag: Option<String>) {
+        fn upsert_skill(&mut self, skill: SkillPath, _tag: Option<String>) {
             self.skills.insert(skill);
         }
 
-        fn remove_skill(&mut self, skill: &SkillPath, _tag: Option<String>) {
+        fn remove_skill(&mut self, skill: &SkillPath) {
             self.skills.remove(skill);
         }
 
@@ -527,9 +526,9 @@ pub mod tests {
 
         // When adding a skill
         let skill_path_1 = SkillPath::dummy();
-        api.add_skill(skill_path_1.clone(), None).await;
+        api.upsert_skill(skill_path_1.clone(), None).await;
         let skill_path_2 = SkillPath::dummy();
-        api.add_skill(skill_path_2.clone(), None).await;
+        api.upsert_skill(skill_path_2.clone(), None).await;
 
         // Then the skills is listed by the skill executor api
         let skills = api.skills().await;
@@ -577,11 +576,11 @@ pub mod tests {
             Ok(json!(ctx.complete_text(request).await.text))
         }
 
-        fn add_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
+        fn upsert_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
             panic!("RustRuntime does not add skill")
         }
 
-        fn remove_skill(&mut self, _skill: &SkillPath, _tag: Option<String>) {
+        fn remove_skill(&mut self, _skill: &SkillPath) {
             panic!("RustRuntime does not remove skill")
         }
 

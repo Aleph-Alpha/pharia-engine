@@ -110,10 +110,21 @@ struct ConfigurationObserverActor {
     skills: HashMap<String, Vec<Skill>>,
 }
 
+/// Keep track of changes that need to be propagated to the skill provider.
 #[derive(Debug)]
 struct Diff {
-    added: Vec<Skill>,
+    added_or_changed: Vec<Skill>,
     removed: Vec<Skill>,
+}
+
+impl Diff {
+    fn new(added: Vec<Skill>, removed: Vec<Skill>) -> Self {
+        // Do not list skills as removed if only the tag changed.
+        Self {
+            removed: removed.into_iter().filter(|r| !added.contains(r)).collect(),
+            added_or_changed: added,
+        }
+    }
 }
 
 impl ConfigurationObserverActor {
@@ -147,7 +158,7 @@ impl ConfigurationObserverActor {
             .map(|&skill| skill.clone())
             .collect();
 
-        Diff { added, removed }
+        Diff::new(added, removed)
     }
 
     async fn run(mut self) {
@@ -183,14 +194,14 @@ impl ConfigurationObserverActor {
 
             let incoming = self.skills.get(namespace).unwrap();
             let diff = Self::compute_diff(&existing, incoming);
-            for skill in diff.added {
+            for skill in diff.added_or_changed {
                 self.skill_executor_api
-                    .add_skill(SkillPath::new(namespace, &skill.name), skill.tag)
+                    .upsert_skill(SkillPath::new(namespace, &skill.name), skill.tag)
                     .await;
             }
             for skill in diff.removed {
                 self.skill_executor_api
-                    .remove_skill(SkillPath::new(namespace, &skill.name), skill.tag)
+                    .remove_skill(SkillPath::new(namespace, &skill.name))
                     .await;
             }
         }
@@ -256,7 +267,7 @@ pub mod tests {
         fn new(name: &str, tag: Option<&str>) -> Self {
             Self {
                 name: name.to_owned(),
-                tag: tag.map(|s| s.to_owned()),
+                tag: tag.map(ToOwned::to_owned),
             }
         }
     }
@@ -275,7 +286,7 @@ pub mod tests {
         let diff = ConfigurationObserverActor::compute_diff(&existing, &incoming);
 
         // when the observer checks for new skills
-        assert_eq!(diff.added, vec![Skill::with_name("new_skill")]);
+        assert_eq!(diff.added_or_changed, vec![Skill::with_name("new_skill")]);
         assert_eq!(diff.removed, vec![Skill::with_name("old_skill")]);
     }
 
@@ -290,7 +301,7 @@ pub mod tests {
             ConfigurationObserverActor::compute_diff(&[existing.clone()], &[incoming.clone()]);
 
         // Then the new version is added and the old version is removed
-        assert_eq!(diff.added, vec![incoming]);
+        assert_eq!(diff.added_or_changed, vec![incoming]);
         assert_eq!(diff.removed, vec![existing]);
     }
 
@@ -336,7 +347,7 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillExecutorMessage::Add {
+            SkillExecutorMessage::Upsert {
                 skill: SkillPath {
                     namespace,
                     name,

@@ -61,25 +61,14 @@ impl SkillProvider {
         Ok(registry)
     }
 
-    pub fn add_skill(&mut self, skill: SkillPath, tag: Option<String>) {
-        self.known_skills.insert(skill, tag);
+    pub fn upsert_skill(&mut self, skill: &SkillPath, tag: Option<String>) {
+        if self.known_skills.insert(skill.clone(), tag).is_some() {
+            self.invalidate(skill);
+        }
     }
 
-    pub fn remove_skill(&mut self, skill: &SkillPath, tag: Option<String>) {
-        // If a skill changes versions, the skill provider receives two messages:
-        //
-        // 1. Add skill (greet_skill, v2)
-        // 2. Remove skill (greet_skill, v1)
-        //
-        // If the add message is sent first, the skill has already been replaced in known_skills,
-        // and we MUST not remove the (greet_skill, v2) from known skills. We therefore only
-        // remove the skill if the tag matches the one requested for removal.
-        // If the remove skill message is sent first, everything is fine.
-        if let Some(value) = self.known_skills.get(skill) {
-            if value == &tag {
-                self.known_skills.remove(skill);
-            }
-        }
+    pub fn remove_skill(&mut self, skill: &SkillPath) {
+        self.known_skills.remove(skill);
         self.invalidate(skill);
     }
 
@@ -159,7 +148,7 @@ mod tests {
             namespaces.insert(skill_path.namespace.clone(), ns_cfg);
 
             let mut provider = SkillProvider::new(&namespaces);
-            provider.add_skill(skill_path.clone(), None);
+            provider.upsert_skill(skill_path, None);
             provider
         }
     }
@@ -216,7 +205,7 @@ mod tests {
         provider.fetch(&skill_path, &engine).await.unwrap();
 
         // when we remove the skill
-        provider.remove_skill(&skill_path, None);
+        provider.remove_skill(&skill_path);
 
         // then the skill is no longer cached
         assert!(provider.loaded_skills().next().is_none());
