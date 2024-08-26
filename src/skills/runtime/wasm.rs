@@ -29,12 +29,12 @@ impl Runtime for WasmRuntime {
         skill.run(&self.engine, ctx, input).await
     }
 
-    fn add_skill(&mut self, skill: SkillPath) {
-        self.provider.add_skill(skill);
+    fn add_skill(&mut self, skill: SkillPath, tag: Option<String>) {
+        self.provider.add_skill(skill, tag);
     }
 
-    fn remove_skill(&mut self, skill: &SkillPath) {
-        self.provider.remove_skill(skill);
+    fn remove_skill(&mut self, skill: &SkillPath, tag: Option<String>) {
+        self.provider.remove_skill(skill, tag);
     }
 
     fn skills(&self) -> impl Iterator<Item = &SkillPath> {
@@ -81,7 +81,7 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingStub);
         let mut runtime = WasmRuntime::local();
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.add_skill(skill_path.clone());
+        runtime.add_skill(skill_path.clone(), None);
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
 
         assert_eq!(resp.unwrap(), "Hello");
@@ -114,7 +114,7 @@ pub mod tests {
         // Given a WasmRuntime with a cached skill
         let mut runtime = WasmRuntime::local();
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.add_skill(skill_path.clone());
+        runtime.add_skill(skill_path.clone(), None);
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
@@ -150,7 +150,7 @@ pub mod tests {
         // given a runtime with two installed skills
         let mut runtime = WasmRuntime::local();
         let skill_path_rs = SkillPath::new("local", "greet_skill");
-        runtime.add_skill(skill_path_rs.clone());
+        runtime.add_skill(skill_path_rs.clone(), None);
         let skill_ctx = Box::new(CsiGreetingStub);
         drop(
             runtime
@@ -161,7 +161,7 @@ pub mod tests {
 
         let skill_ctx = Box::new(CsiGreetingStub);
         let skill_path_py = SkillPath::new("local", "greet-py");
-        runtime.add_skill(skill_path_py.clone());
+        runtime.add_skill(skill_path_py.clone(), None);
 
         drop(
             runtime
@@ -188,7 +188,7 @@ pub mod tests {
 
         let mut runtime = WasmRuntime::local();
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.add_skill(skill_path.clone());
+        runtime.add_skill(skill_path.clone(), None);
         let skill_ctx = Box::new(CsiGreetingStub);
 
         // When adding a new skill component
@@ -206,7 +206,7 @@ pub mod tests {
 
         let mut runtime = WasmRuntime::local();
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.add_skill(skill_path.clone());
+        runtime.add_skill(skill_path.clone(), None);
 
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -222,7 +222,7 @@ pub mod tests {
 
         let mut runtime = WasmRuntime::local();
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.add_skill(skill_path.clone());
+        runtime.add_skill(skill_path.clone(), None);
 
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -237,7 +237,7 @@ pub mod tests {
         let skill_ctx = Box::new(CsiCounter::new());
         let mut runtime = WasmRuntime::local();
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.add_skill(skill_path.clone());
+        runtime.add_skill(skill_path.clone(), None);
         for i in 1..10 {
             let resp = runtime
                 .run(&skill_path, json!("Homer"), skill_ctx.clone())

@@ -164,8 +164,8 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
-            SkillExecutorMessage::Add { skill, tag } => self.runtime.add_skill(skill),
-            SkillExecutorMessage::Remove { skill, tag } => self.runtime.remove_skill(&skill),
+            SkillExecutorMessage::Add { skill, tag } => self.runtime.add_skill(skill, tag),
+            SkillExecutorMessage::Remove { skill, tag } => self.runtime.remove_skill(&skill, tag),
             SkillExecutorMessage::Execute {
                 skill_path,
                 input,
@@ -323,11 +323,11 @@ pub mod tests {
                 panic!("complete_text must pend forever in case of error")
             }
 
-            fn add_skill(&mut self, _skill: SkillPath) {
+            fn add_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
                 panic!("does not add new skill")
             }
 
-            fn remove_skill(&mut self, _skill: &SkillPath) {
+            fn remove_skill(&mut self, _skill: &SkillPath, _tag: Option<String>) {
                 panic!("does not remove skill")
             }
 
@@ -430,11 +430,11 @@ pub mod tests {
             panic!("Liar runtime does not run skills")
         }
 
-        fn add_skill(&mut self, skill: SkillPath) {
+        fn add_skill(&mut self, skill: SkillPath, _tag: Option<String>) {
             self.skills.insert(skill);
         }
 
-        fn remove_skill(&mut self, skill: &SkillPath) {
+        fn remove_skill(&mut self, skill: &SkillPath, _tag: Option<String>) {
             self.skills.remove(skill);
         }
 
@@ -577,11 +577,11 @@ pub mod tests {
             Ok(json!(ctx.complete_text(request).await.text))
         }
 
-        fn add_skill(&mut self, _skill: SkillPath) {
+        fn add_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
             panic!("RustRuntime does not add skill")
         }
 
-        fn remove_skill(&mut self, _skill: &SkillPath) {
+        fn remove_skill(&mut self, _skill: &SkillPath, _tag: Option<String>) {
             panic!("RustRuntime does not remove skill")
         }
 

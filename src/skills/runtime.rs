@@ -33,9 +33,9 @@ pub trait Runtime {
         ctx: Box<dyn Csi + Send>,
     ) -> impl Future<Output = anyhow::Result<Value>> + Send;
 
-    fn add_skill(&mut self, skill: SkillPath);
+    fn add_skill(&mut self, skill: SkillPath, tag: Option<String>);
 
-    fn remove_skill(&mut self, skill: &SkillPath);
+    fn remove_skill(&mut self, skill: &SkillPath, tag: Option<String>);
 
     fn skills(&self) -> impl Iterator<Item = &SkillPath>;
 
@@ -76,11 +76,11 @@ pub mod tests {
             Err(anyhow!(self.err_msg.clone()))
         }
 
-        fn add_skill(&mut self, _skill: SkillPath) {
+        fn add_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
             panic!("SaboteurRuntime does not add skill")
         }
 
-        fn remove_skill(&mut self, _skill: &SkillPath) {
+        fn remove_skill(&mut self, _skill: &SkillPath, _tag: Option<String>) {
             panic!("SaboteurRuntime does not remove skill")
         }
 

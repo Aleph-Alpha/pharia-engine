@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    env,
-};
+use std::{collections::HashMap, env};
 
 use anyhow::{anyhow, Context};
 use serde_json::Value;
@@ -18,7 +15,7 @@ use super::{
 };
 
 pub struct SkillProvider {
-    known_skills: HashSet<SkillPath>,
+    known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
     skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
 }
@@ -31,7 +28,7 @@ impl SkillProvider {
             .collect::<anyhow::Result<HashMap<_, _>>>()
             .expect("All namespace registry in operator config must be valid.");
         SkillProvider {
-            known_skills: HashSet::new(),
+            known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
             skill_registries,
         }
@@ -64,17 +61,30 @@ impl SkillProvider {
         Ok(registry)
     }
 
-    pub fn add_skill(&mut self, skill: SkillPath) {
-        self.known_skills.insert(skill);
+    pub fn add_skill(&mut self, skill: SkillPath, tag: Option<String>) {
+        self.known_skills.insert(skill, tag);
     }
 
-    pub fn remove_skill(&mut self, skill: &SkillPath) {
-        self.known_skills.remove(skill);
+    pub fn remove_skill(&mut self, skill: &SkillPath, tag: Option<String>) {
+        // If a skill changes versions, the skill provider receives two messages:
+        //
+        // 1. Add skill (greet_skill, v2)
+        // 2. Remove skill (greet_skill, v1)
+        //
+        // If the add message is sent first, the skill has already been replaced in known_skills,
+        // and we MUST not remove the (greet_skill, v2) from known skills. We therefore only
+        // remove the skill if the tag matches the one requested for removal.
+        // If the remove skill message is sent first, everything is fine.
+        if let Some(value) = self.known_skills.get(skill) {
+            if value == &tag {
+                self.known_skills.remove(skill);
+            }
+        }
         self.invalidate(skill);
     }
 
     pub fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-        self.known_skills.iter()
+        self.known_skills.keys()
     }
 
     pub fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> + '_ {
@@ -91,9 +101,9 @@ impl SkillProvider {
         engine: &Engine,
     ) -> anyhow::Result<&CachedSkill> {
         if !self.cached_skills.contains_key(skill_path) {
-            if !self.known_skills.contains(skill_path) {
+            let Some(tag) = self.known_skills.get(skill_path) else {
                 return Err(anyhow!("Skill {skill_path} not configured."));
-            }
+            };
 
             let Some(registry) = self.skill_registries.get(&skill_path.namespace) else {
                 return Err(anyhow!(
@@ -102,9 +112,9 @@ impl SkillProvider {
                 ));
             };
 
-            let version_tag = "latest";
-
-            let bytes = registry.load_skill(&skill_path.name, version_tag).await?;
+            let bytes = registry
+                .load_skill(&skill_path.name, tag.as_deref().unwrap_or("latest"))
+                .await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_path} not found."))?;
             let skill = CachedSkill::new(engine, bytes)
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
@@ -149,7 +159,7 @@ mod tests {
             namespaces.insert(skill_path.namespace.clone(), ns_cfg);
 
             let mut provider = SkillProvider::new(&namespaces);
-            provider.add_skill(skill_path.clone());
+            provider.add_skill(skill_path.clone(), None);
             provider
         }
     }
@@ -206,7 +216,7 @@ mod tests {
         provider.fetch(&skill_path, &engine).await.unwrap();
 
         // when we remove the skill
-        provider.remove_skill(&skill_path);
+        provider.remove_skill(&skill_path, None);
 
         // then the skill is no longer cached
         assert!(provider.loaded_skills().next().is_none());
