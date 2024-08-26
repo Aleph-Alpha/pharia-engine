@@ -102,7 +102,9 @@ impl SkillProvider {
                 ));
             };
 
-            let bytes = registry.load_skill(&skill_path.name, "latest").await?;
+            let version_tag = "latest";
+
+            let bytes = registry.load_skill(&skill_path.name, version_tag).await?;
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_path} not found."))?;
             let skill = CachedSkill::new(engine, bytes)
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;

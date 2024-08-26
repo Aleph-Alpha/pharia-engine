@@ -10,6 +10,7 @@ use url::Url;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Skill {
     pub name: String,
+    pub tag: Option<String>,
 }
 
 // this is actual more of a namespace skill config
@@ -119,7 +120,7 @@ pub mod tests {
         let tc: NamespaceDescription = toml::from_str(
             r#"
             skills = [
-                {name = "Goofy"},
+                {name = "Goofy", tag = "v1.0.0-rc"},
                 {name = "Pluto"},
                 {name = "Gamma"}
             ]
@@ -127,6 +128,8 @@ pub mod tests {
         )
         .unwrap();
         assert_eq!(tc.skills.len(), 3);
+        assert_eq!(tc.skills[0].tag.as_ref().unwrap(), "v1.0.0-rc");
+        assert!(tc.skills[1].tag.is_none());
     }
 
     #[tokio::test]
