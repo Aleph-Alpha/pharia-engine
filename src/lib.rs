@@ -29,14 +29,14 @@ pub async fn run(
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
-    let config = Box::new(
+    let loaders = Box::new(
         NamespaceDescriptionLoaders::new(app_config.operator_config)
             .expect("Namespace configuration must be valid."),
     );
 
     let mut configuration_observer = ConfigurationObserver::with_config(
         skill_executor.api(),
-        config,
+        loaders,
         tokio::time::Duration::from_secs(60),
     );
 
