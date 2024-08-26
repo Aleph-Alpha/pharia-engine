@@ -67,16 +67,16 @@ impl SkillExecutorApi {
         Self { send }
     }
 
-    pub async fn add_skill(&self, skill: SkillPath) {
-        let msg = SkillExecutorMessage::Add { skill };
+    pub async fn add_skill(&self, skill: SkillPath, tag: Option<String>) {
+        let msg = SkillExecutorMessage::Add { skill, tag };
         self.send
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn remove_skill(&self, skill: SkillPath) {
-        let msg = SkillExecutorMessage::Remove { skill };
+    pub async fn remove_skill(&self, skill: SkillPath, tag: Option<String>) {
+        let msg = SkillExecutorMessage::Remove { skill, tag };
         self.send
             .send(msg)
             .await
@@ -164,8 +164,8 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
-            SkillExecutorMessage::Add { skill } => self.runtime.add_skill(skill),
-            SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
+            SkillExecutorMessage::Add { skill, tag } => self.runtime.add_skill(skill),
+            SkillExecutorMessage::Remove { skill, tag } => self.runtime.remove_skill(&skill),
             SkillExecutorMessage::Execute {
                 skill_path,
                 input,
@@ -213,9 +213,11 @@ impl<R: Runtime> SkillExecutorActor<R> {
 pub enum SkillExecutorMessage {
     Add {
         skill: SkillPath,
+        tag: Option<String>,
     },
     Remove {
         skill: SkillPath,
+        tag: Option<String>,
     },
     Execute {
         skill_path: SkillPath,
@@ -525,9 +527,9 @@ pub mod tests {
 
         // When adding a skill
         let skill_path_1 = SkillPath::dummy();
-        api.add_skill(skill_path_1.clone()).await;
+        api.add_skill(skill_path_1.clone(), None).await;
         let skill_path_2 = SkillPath::dummy();
-        api.add_skill(skill_path_2.clone()).await;
+        api.add_skill(skill_path_2.clone(), None).await;
 
         // Then the skills is listed by the skill executor api
         let skills = api.skills().await;

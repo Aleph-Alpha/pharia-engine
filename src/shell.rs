@@ -348,7 +348,7 @@ mod tests {
         let config = OperatorConfig::local();
         let skill_executor_api = SkillExecutor::new(inference.api(), &config.namespaces).api();
         let skill_path = SkillPath::new("local", "greet_skill");
-        skill_executor_api.add_skill(skill_path.clone()).await;
+        skill_executor_api.add_skill(skill_path.clone(), None).await;
         let http = http(skill_executor_api);
 
         let args = ExecuteSkillArgs {

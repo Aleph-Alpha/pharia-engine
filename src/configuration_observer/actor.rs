@@ -185,12 +185,12 @@ impl ConfigurationObserverActor {
             let diff = Self::compute_diff(&existing, incoming);
             for skill in diff.added {
                 self.skill_executor_api
-                    .add_skill(SkillPath::new(namespace, &skill.name))
+                    .add_skill(SkillPath::new(namespace, &skill.name), skill.tag)
                     .await;
             }
             for skill in diff.removed {
                 self.skill_executor_api
-                    .remove_skill(SkillPath::new(namespace, &skill.name))
+                    .remove_skill(SkillPath::new(namespace, &skill.name), skill.tag)
                     .await;
             }
         }
@@ -340,7 +340,8 @@ pub mod tests {
                 skill: SkillPath {
                     namespace,
                     name,
-                }
+                },
+                tag: None
             }
             if namespace == dummy_namespace && name == dummy_skill
         ));
