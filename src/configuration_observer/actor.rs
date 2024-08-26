@@ -107,13 +107,13 @@ struct ConfigurationObserverActor {
     skill_executor_api: SkillExecutorApi,
     config: Box<dyn ObservableConfig + Send>,
     update_interval: Duration,
-    skills: HashMap<String, Vec<String>>,
+    skills: HashMap<String, Vec<Skill>>,
 }
 
 #[derive(Debug)]
 struct Diff {
-    added: Vec<String>,
-    removed: Vec<String>,
+    added: Vec<Skill>,
+    removed: Vec<Skill>,
 }
 
 impl ConfigurationObserverActor {
@@ -134,17 +134,17 @@ impl ConfigurationObserverActor {
         }
     }
 
-    fn compute_diff(existing: &[String], incoming: &[String]) -> Diff {
+    fn compute_diff(existing: &[Skill], incoming: &[Skill]) -> Diff {
         let existing = existing.iter().collect::<HashSet<_>>();
         let incoming = incoming.iter().collect::<HashSet<_>>();
 
         let added = incoming
             .difference(&existing)
-            .map(ToString::to_string)
+            .map(|&skill| skill.clone())
             .collect();
         let removed = existing
             .difference(&incoming)
-            .map(ToString::to_string)
+            .map(|&skill| skill.clone())
             .collect();
 
         Diff { added, removed }
@@ -178,22 +178,19 @@ impl ConfigurationObserverActor {
             };
             let existing = self
                 .skills
-                .insert(
-                    namespace.to_owned(),
-                    incoming.into_iter().map(|s| s.name).collect(),
-                )
+                .insert(namespace.to_owned(), incoming)
                 .unwrap_or_default();
 
             let incoming = self.skills.get(namespace).unwrap();
             let diff = Self::compute_diff(&existing, incoming);
             for skill in diff.added {
                 self.skill_executor_api
-                    .add_skill(SkillPath::new(namespace, &skill))
+                    .add_skill(SkillPath::new(namespace, &skill.name))
                     .await;
             }
             for skill in diff.removed {
                 self.skill_executor_api
-                    .remove_skill(SkillPath::new(namespace, &skill))
+                    .remove_skill(SkillPath::new(namespace, &skill.name))
                     .await;
             }
         }
@@ -251,16 +248,50 @@ pub mod tests {
         }
     }
 
+    impl Skill {
+        fn with_name(name: &str) -> Self {
+            Self::new(name, None)
+        }
+
+        fn new(name: &str, tag: Option<&str>) -> Self {
+            Self {
+                name: name.to_owned(),
+                tag: tag.map(|s| s.to_owned()),
+            }
+        }
+    }
+
     #[test]
     fn diff_is_computed() {
-        let incoming = vec!["new_skill".to_owned(), "existing_skill".to_owned()];
-        let existing = vec!["existing_skill".to_owned(), "old_skill".to_owned()];
+        let incoming = vec![
+            Skill::with_name("new_skill"),
+            Skill::with_name("existing_skill"),
+        ];
+        let existing = vec![
+            Skill::with_name("existing_skill"),
+            Skill::with_name("old_skill"),
+        ];
 
         let diff = ConfigurationObserverActor::compute_diff(&existing, &incoming);
 
         // when the observer checks for new skills
-        assert_eq!(diff.added, vec!["new_skill"]);
-        assert_eq!(diff.removed, vec!["old_skill"]);
+        assert_eq!(diff.added, vec![Skill::with_name("new_skill")]);
+        assert_eq!(diff.removed, vec![Skill::with_name("old_skill")]);
+    }
+
+    #[test]
+    fn diff_is_computed_over_versions() {
+        // Given a skill has a new version
+        let existing = Skill::new("existing_skill", Some("v1"));
+        let incoming = Skill::new("existing_skill", Some("v2"));
+
+        // When the observer checks for new skills
+        let diff =
+            ConfigurationObserverActor::compute_diff(&[existing.clone()], &[incoming.clone()]);
+
+        // Then the new version is added and the old version is removed
+        assert_eq!(diff.added, vec![incoming]);
+        assert_eq!(diff.removed, vec![existing]);
     }
 
     #[tokio::test]
@@ -280,11 +311,6 @@ pub mod tests {
         assert!(result.is_err());
     }
 
-    impl Skill {
-        fn with_name(name: String) -> Self {
-            Self { name, tag: None }
-        }
-    }
     #[tokio::test]
     async fn on_start_reports_all_skills_to_executor_agent() {
         // Given some configured skills
@@ -293,7 +319,7 @@ pub mod tests {
         let update_interval_ms = 1;
         let namespaces = HashMap::from([(
             dummy_namespace.to_owned(),
-            vec![Skill::with_name(dummy_skill.to_owned())],
+            vec![Skill::with_name(dummy_skill)],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
@@ -330,7 +356,7 @@ pub mod tests {
         let update_interval_ms = 1;
         let namespaces = HashMap::from([(
             dummy_namespace.to_owned(),
-            vec![Skill::with_name(dummy_skill.to_owned())],
+            vec![Skill::with_name(dummy_skill)],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
