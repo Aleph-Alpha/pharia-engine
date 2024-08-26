@@ -19,9 +19,12 @@ pub struct OciRegistry {
 }
 
 impl SkillRegistry for OciRegistry {
-    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+    fn load_skill<'a>(
+        &'a self,
+        name: &'a str,
+        tag: &'a str,
+    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
         let repository = format!("{}/{name}", self.repository);
-        let tag = "latest";
         let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
         let auth = RegistryAuth::Basic(self.username.clone(), self.password.clone());
 
@@ -110,9 +113,8 @@ mod tests {
             }
         }
 
-        async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str) {
+        async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str, tag: &str) {
             let repository = format!("{}/{skill_name}", self.repository);
-            let tag = "latest";
             let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
             let (config, component_layer) = WasmConfig::from_component(path, None)
                 .await
@@ -137,15 +139,16 @@ mod tests {
         drop(dotenvy::dotenv());
         let registry =
             OciRegistry::from_env().expect("Please configure registry, see .env.example");
+        let tag = "latest";
         registry
-            .store_skill("./skills/greet_skill.wasm", "greet_skill")
+            .store_skill("./skills/greet_skill.wasm", "greet_skill", tag)
             .await;
 
         // when pulled from registry
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
         let bytes = registry
-            .load_skill("greet_skill")
+            .load_skill("greet_skill", tag)
             .await
             .expect("must return okay")
             .expect("component binaries must be found");
@@ -157,12 +160,15 @@ mod tests {
 
     #[tokio::test]
     async fn skill_not_found() {
-        // given a OCI registry is available at localhost:5000
+        // given a OCI registry is available
         drop(dotenv());
         let registry = OciRegistry::from_env().unwrap();
 
         // when loading a skill that does not exist
-        let bytes = registry.load_skill("not-existing-skill").await.unwrap();
+        let bytes = registry
+            .load_skill("not-existing-skill", "not-existing-tag")
+            .await
+            .unwrap();
 
         // then skill can not be found
         assert!(bytes.is_none());
@@ -179,7 +185,9 @@ mod tests {
         );
 
         // when loading a skill that does not exist
-        let bytes = registry.load_skill("not-existing-skill").await;
+        let bytes = registry
+            .load_skill("not-existing-skill", "not-existing-tag")
+            .await;
 
         // then skill can not be found
         assert!(bytes.is_err());

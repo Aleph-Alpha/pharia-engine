@@ -11,22 +11,34 @@ type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub trait SkillRegistry {
     /// can return either the binary or WAT text format of a Wasm component
-    fn load_skill<'a>(&'a self, _name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>>;
+    fn load_skill<'a>(
+        &'a self,
+        name: &'a str,
+        tag: &'a str,
+    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>>;
 }
 
 impl SkillRegistry for Box<dyn SkillRegistry + Send> {
-    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
-        self.as_ref().load_skill(name)
+    fn load_skill<'a>(
+        &'a self,
+        name: &'a str,
+        tag: &'a str,
+    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+        self.as_ref().load_skill(name, tag)
     }
 }
 
 impl<R: SkillRegistry> SkillRegistry for Vec<R> {
-    fn load_skill<'a>(&'a self, name: &'a str) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+    fn load_skill<'a>(
+        &'a self,
+        name: &'a str,
+        tag: &'a str,
+    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
         // Collect all the futures into an ordered stream that will run the futures concurrently,
         // but will return the results in the order they were added.
         let mut futures = self
             .iter()
-            .map(|r| r.load_skill(name))
+            .map(|r| r.load_skill(name, tag))
             .collect::<FuturesOrdered<_>>();
         Box::pin(async move {
             while let Some(result) = futures.next().await {
@@ -57,6 +69,7 @@ pub mod tests {
         fn load_skill<'a>(
             &'a self,
             name: &'a str,
+            _tag: &'a str,
         ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
             if let Some(bytes) = self.get(name) {
                 Box::pin(async move { Ok(Some(bytes.clone())) })
@@ -72,6 +85,7 @@ pub mod tests {
         fn load_skill<'a>(
             &'a self,
             _name: &'a str,
+            _tag: &'a str,
         ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
             Box::pin(async move { Err(anyhow!("out-of-cheese-error")) })
         }
@@ -81,7 +95,7 @@ pub mod tests {
     async fn empty_file_registry() {
         let skill_dir = tempdir().unwrap();
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let result = registry.load_skill("dummy skill name").await;
+        let result = registry.load_skill("dummy skill name", "dummy tag").await;
         let bytes = result.unwrap();
         assert!(bytes.is_none());
     }
@@ -89,7 +103,7 @@ pub mod tests {
     #[tokio::test]
     async fn empty_skill_registries() {
         let registries = HashMap::new();
-        let result = registries.load_skill("dummy skill name").await;
+        let result = registries.load_skill("dummy skill name", "dummy tag").await;
         let bytes = result.unwrap();
         assert!(bytes.is_none());
     }
@@ -97,7 +111,7 @@ pub mod tests {
     #[tokio::test]
     async fn two_empty_registries() {
         let registries = vec![HashMap::new(), HashMap::new()];
-        let result = registries.load_skill("dummy skill name").await;
+        let result = registries.load_skill("dummy skill name", "dummy tag").await;
         let bytes = result.unwrap();
         assert!(bytes.is_none());
     }
@@ -114,7 +128,7 @@ pub mod tests {
         ];
 
         // when
-        let result = registries.load_skill("dummy skill name").await;
+        let result = registries.load_skill("dummy skill name", "dummy tag").await;
         let bytes = result.unwrap().unwrap();
 
         // then
@@ -133,7 +147,7 @@ pub mod tests {
         ];
 
         // when
-        let result = registries.load_skill("dummy skill name").await;
+        let result = registries.load_skill("dummy skill name", "dummy tag").await;
         let bytes = result.unwrap().unwrap();
 
         // then
@@ -152,7 +166,7 @@ pub mod tests {
         ];
 
         // when
-        let result = registries.load_skill("dummy skill name").await;
+        let result = registries.load_skill("dummy skill name", "dummy tag").await;
 
         // then
         assert!(result.is_err());
@@ -169,7 +183,7 @@ pub mod tests {
         ];
 
         // when
-        let result = registries.load_skill("dummy skill name").await;
+        let result = registries.load_skill("dummy skill name", "dummy tag").await;
 
         // then
         assert!(result.is_ok());
