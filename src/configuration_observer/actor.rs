@@ -149,13 +149,15 @@ impl ConfigurationObserverActor {
 
     async fn run(mut self) {
         let namespaces = self.config.namespaces();
+        let mut started = tokio::time::Instant::now();
         self.load(&namespaces).await;
         let _ = self.ready.send(true);
         loop {
             select! {
                 _ = self.shutdown.changed() => break,
-                () = tokio::time::sleep(self.update_interval) => (),
+                () = tokio::time::sleep_until(started + self.update_interval) => (),
             };
+            started = tokio::time::Instant::now();
             self.load(&namespaces).await;
         }
     }
