@@ -6,12 +6,15 @@ use tracing::error;
 
 use crate::skills::{SkillExecutorApi, SkillPath};
 
-use super::{namespace_from_url, NamespaceConfig, NamespaceDescriptionLoader, OperatorConfig};
+use super::{
+    namespace_description::Skill, namespace_from_url, NamespaceConfig, NamespaceDescriptionLoader,
+    OperatorConfig,
+};
 
 #[async_trait]
 pub trait ObservableConfig {
     fn namespaces(&self) -> Vec<String>;
-    async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<String>>;
+    async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<Skill>>;
 }
 
 pub struct NamespaceDescriptionLoaders {
@@ -40,7 +43,7 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
         self.namespaces.keys().cloned().collect()
     }
 
-    async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<String>> {
+    async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<Skill>> {
         let skills = self
             .namespaces
             .get_mut(namespace)
@@ -48,7 +51,7 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
             .description()
             .await?
             .skills;
-        Ok(skills.iter().map(|s| s.name.clone()).collect())
+        Ok(skills)
     }
 }
 
@@ -175,7 +178,10 @@ impl ConfigurationObserverActor {
             };
             let existing = self
                 .skills
-                .insert(namespace.to_owned(), incoming)
+                .insert(
+                    namespace.to_owned(),
+                    incoming.into_iter().map(|s| s.name).collect(),
+                )
                 .unwrap_or_default();
 
             let incoming = self.skills.get(namespace).unwrap();
@@ -208,11 +214,11 @@ pub mod tests {
     use super::*;
 
     pub struct StubConfig {
-        namespaces: HashMap<String, Vec<String>>,
+        namespaces: HashMap<String, Vec<Skill>>,
     }
 
     impl StubConfig {
-        pub fn new(namespaces: HashMap<String, Vec<String>>) -> Self {
+        pub fn new(namespaces: HashMap<String, Vec<Skill>>) -> Self {
             Self { namespaces }
         }
     }
@@ -223,7 +229,7 @@ pub mod tests {
             self.namespaces.keys().cloned().collect()
         }
 
-        async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<String>> {
+        async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<Skill>> {
             Ok(self
                 .namespaces
                 .get(namespace)
@@ -240,7 +246,7 @@ pub mod tests {
             vec!["dummy_namespace".to_owned()]
         }
 
-        async fn skills(&mut self, _namespace: &str) -> anyhow::Result<Vec<String>> {
+        async fn skills(&mut self, _namespace: &str) -> anyhow::Result<Vec<Skill>> {
             pending().await
         }
     }
@@ -274,14 +280,21 @@ pub mod tests {
         assert!(result.is_err());
     }
 
+    impl Skill {
+        fn with_name(name: String) -> Self {
+            Self { name, tag: None }
+        }
+    }
     #[tokio::test]
     async fn on_start_reports_all_skills_to_executor_agent() {
         // Given some configured skills
         let dummy_namespace = "dummy_namespace";
         let dummy_skill = "dummy_skill";
         let update_interval_ms = 1;
-        let namespaces =
-            HashMap::from([(dummy_namespace.to_owned(), vec![dummy_skill.to_owned()])]);
+        let namespaces = HashMap::from([(
+            dummy_namespace.to_owned(),
+            vec![Skill::with_name(dummy_skill.to_owned())],
+        )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
@@ -315,8 +328,10 @@ pub mod tests {
         let dummy_namespace = "dummy_namespace";
         let dummy_skill = "dummy_skill";
         let update_interval_ms = 1;
-        let namespaces =
-            HashMap::from([(dummy_namespace.to_owned(), vec![dummy_skill.to_owned()])]);
+        let namespaces = HashMap::from([(
+            dummy_namespace.to_owned(),
+            vec![Skill::with_name(dummy_skill.to_owned())],
+        )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer

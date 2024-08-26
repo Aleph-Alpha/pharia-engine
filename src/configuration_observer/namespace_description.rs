@@ -7,7 +7,7 @@ use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Skill {
     pub name: String,
     pub tag: Option<String>,
