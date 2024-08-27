@@ -83,16 +83,6 @@ pub mod tests {
     use super::*;
     use std::env;
 
-    impl HttpLoader {
-        pub fn pharia_kernel_team() -> Self {
-            drop(dotenvy::dotenv());
-            let url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main";
-            let access_token = env::var("GITLAB_CONFIG_ACCESS_TOKEN")
-                .expect("GITLAB_CONFIG_ACCESS_TOKEN must be set");
-            Self::from_url(url, Some(access_token))
-        }
-    }
-
     #[test]
     fn load_skill_list_config_toml() {
         let tc: NamespaceDescription = toml::from_str(
