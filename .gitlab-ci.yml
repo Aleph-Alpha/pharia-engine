@@ -46,7 +46,8 @@ cargo_test:
   variables:
     SKILL_REGISTRY_USER: $CI_REGISTRY_USER
     SKILL_REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
-  script:
+    GITLAB_CONFIG_ACCESS_TOKEN: $CI_JOB_TOKEN
+script:
     - apt-get update
     - apt-get -y install python3-venv
     - cargo install wit-bindgen-cli
@@ -155,7 +156,7 @@ integration_test:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
-    TEAM_CONFIG_TOKEN: $TEAM_CONFIG_TOKEN_UI
+    GITLAB_CONFIG_ACCESS_TOKEN: $CI_JOB_TOKEN
   services:
     - name: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
       alias: $CI_PROJECT_NAME
