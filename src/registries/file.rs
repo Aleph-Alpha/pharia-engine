@@ -1,8 +1,6 @@
 use super::{DynFuture, SkillRegistry};
 
-use anyhow::anyhow;
 use std::{fs, path::PathBuf};
-use url::Url;
 
 pub struct FileRegistry {
     skill_dir: PathBuf,
@@ -12,18 +10,6 @@ impl FileRegistry {
     pub fn with_dir(skill_dir: impl Into<PathBuf>) -> Self {
         FileRegistry {
             skill_dir: skill_dir.into(),
-        }
-    }
-
-    pub fn with_url(raw_url: &str) -> anyhow::Result<Self> {
-        let url = Url::parse(raw_url)?;
-        match url.scheme() {
-            "file" => {
-                // remove leading "file://"
-                let file_path = &raw_url[7..];
-                Ok(Self::with_dir(file_path))
-            }
-            scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
         }
     }
 }

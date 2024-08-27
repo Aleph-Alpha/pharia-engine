@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context};
 use serde_json::Value;
 
 use crate::{
-    configuration_observer::NamespaceConfig,
+    configuration_observer::{NamespaceConfig, Registry},
     registries::{FileRegistry, OciRegistry, SkillRegistry},
     skills::SkillPath,
 };
@@ -24,9 +24,8 @@ impl SkillProvider {
     pub fn new(namespaces: &HashMap<String, NamespaceConfig>) -> Self {
         let skill_registries = namespaces
             .iter()
-            .map(|(k, v)| Self::registry(v).map(|r| (k.clone(), r)))
-            .collect::<anyhow::Result<HashMap<_, _>>>()
-            .expect("All namespace registry in operator config must be valid.");
+            .map(|(k, v)| (k.to_owned(), Self::registry(v)))
+            .collect::<HashMap<_, _>>();
         SkillProvider {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
@@ -34,16 +33,12 @@ impl SkillProvider {
         }
     }
 
-    fn registry(
-        namespace_config: &NamespaceConfig,
-    ) -> anyhow::Result<Box<dyn SkillRegistry + Send>> {
-        let registry: Box<dyn SkillRegistry + Send> = match namespace_config {
-            NamespaceConfig::File { registry, .. } => Box::new(FileRegistry::with_url(registry)?),
-
-            NamespaceConfig::Oci {
+    fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send> {
+        match &namespace_config.registry {
+            Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
+            Registry::Oci {
                 repository,
                 registry,
-                ..
             } => {
                 drop(dotenvy::dotenv());
                 let username = env::var("SKILL_REGISTRY_USER")
@@ -57,8 +52,7 @@ impl SkillProvider {
                     password,
                 ))
             }
-        };
-        Ok(registry)
+        }
     }
 
     pub fn upsert_skill(&mut self, skill: &SkillPath, tag: Option<String>) {
@@ -140,10 +134,13 @@ mod tests {
 
     impl SkillProvider {
         fn with_namespace_and_skill(skill_path: &SkillPath) -> Self {
-            let ns_cfg = NamespaceConfig::File {
-                registry: "file://skills".to_owned(),
+            let registry = Registry::File {
+                path: "skills".to_owned(),
+            };
+            let ns_cfg = NamespaceConfig {
                 config_url: "file://namespace.toml".to_owned(),
                 config_access_token_env_var: None,
+                registry,
             };
             let mut namespaces = HashMap::new();
             namespaces.insert(skill_path.namespace.clone(), ns_cfg);

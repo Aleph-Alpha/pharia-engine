@@ -44,8 +44,7 @@ impl OperatorConfig {
             r#"
                 [namespaces.local]
                 config_url = "file://namespace.toml"
-                registry_type = "file"
-                registry = "file://skills"
+                registry = { type = "file", path = "skills" }
             "#,
         )
         .unwrap()
@@ -67,64 +66,54 @@ impl OperatorConfig {
         .unwrap()
     }
 }
-
 #[derive(Deserialize, Clone)]
-#[serde(rename_all = "snake_case", tag = "registry_type")]
-pub enum NamespaceConfig {
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum Registry {
     File {
-        registry: String,
-        config_url: String,
-        config_access_token_env_var: Option<String>,
+        path: String,
     },
     Oci {
-        repository: String,
         registry: String,
-        config_url: String,
-        config_access_token_env_var: Option<String>,
+        repository: String,
     },
+}
+
+#[derive(Deserialize, Clone)]
+pub struct NamespaceConfig {
+    pub config_url: String,
+    pub config_access_token_env_var: Option<String>,
+    pub registry: Registry,
 }
 
 impl NamespaceConfig {
     pub fn loader(&self) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + 'static>> {
-        match self {
-            NamespaceConfig::File {
-                config_url,
-                config_access_token_env_var,
-                ..
+        let url = Url::parse(&self.config_url)?;
+        match url.scheme() {
+            "https" | "http" => {
+                let config_access_token = self
+                    .config_access_token_env_var
+                    .as_ref()
+                    .map(env::var)
+                    .transpose()?;
+                Ok(Box::new(HttpLoader::from_url(
+                    &self.config_url,
+                    config_access_token,
+                )))
             }
-            | NamespaceConfig::Oci {
-                config_url,
-                config_access_token_env_var,
-                ..
-            } => {
-                let url = Url::parse(&config_url)?;
-                match url.scheme() {
-                    "https" | "http" => {
-                        let config_access_token = config_access_token_env_var.as_ref()
-                            .map(|key| env::var(key))
-                            .transpose()?;
-                        Ok(Box::new(HttpLoader::from_url(
-                            &config_url,
-                            config_access_token,
-                        )))
-                    }
-                    "file" => {
-                        // remove leading "file://"
-                        let file_path = &config_url[7..];
-                        let loader = FileLoader::new(file_path.into());
-                        Ok(Box::new(loader))
-                    }
-                    scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
-                }
+            "file" => {
+                // remove leading "file://"
+                let file_path = &self.config_url[7..];
+                let loader = FileLoader::new(file_path.into());
+                Ok(Box::new(loader))
             }
+            scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use crate::configuration_observer::NamespaceConfig;
+    use crate::configuration_observer::config::Registry;
 
     use super::OperatorConfig;
 
@@ -149,9 +138,7 @@ mod tests {
             r#"
             [namespaces.pharia-kernel-team]
             config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
-            registry_type = "oci"
-            registry = "registry.gitlab.aleph-alpha.de"
-            repository = "engineering/pharia-skills/skills"
+            registry = { type = "oci", registry = "registry.gitlab.aleph-alpha.de", repository = "engineering/pharia-skills/skills" }
             "#,
         ).unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
@@ -163,31 +150,52 @@ mod tests {
             r#"
             [namespaces.dummy_team]
             config_url = "file://dummy_config_url"
-            registry_type = "file"
-            registry = "dummy_file_path"
             config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+            registry = { type = "file", path = "dummy_file_path" }
             "#,
         )
         .unwrap();
-        let config_access_token_env_var = match config.namespaces.get("dummy_team").unwrap() {
-            NamespaceConfig::File {
-                config_access_token_env_var,
-                ..
-            }
-            | NamespaceConfig::Oci {
-                config_access_token_env_var,
-                ..
-            } => config_access_token_env_var.clone(),
-        };
-        assert_eq!(
-            config_access_token_env_var.unwrap(),
-            "GITLAB_CONFIG_ACCESS_TOKEN".to_owned()
-        );
+        let config_access_token_env_var = config
+            .namespaces
+            .get("dummy_team")
+            .unwrap()
+            .config_access_token_env_var
+            .as_ref()
+            .unwrap();
+        assert_eq!(config_access_token_env_var, "GITLAB_CONFIG_ACCESS_TOKEN");
     }
 
     #[test]
     fn reads_from_file() {
         let config = OperatorConfig::from_file("config.toml").unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
+    }
+
+    #[test]
+    fn deserializes_new_config() {
+        let config = toml::from_str::<OperatorConfig>(
+            r#"
+            [namespaces.pharia-kernel-team]
+            config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+            config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+            registry = { type = "oci", registry = "registry.gitlab.aleph-alpha.de", repository = "engineering/pharia-skills/skills" }
+
+            [namespaces.pharia-kernel-team-local]
+            config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+            config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+            registry = { type = "file", path = "/temp/skills" }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.namespaces.len(), 2);
+        assert!(matches!(
+            &config.namespaces["pharia-kernel-team"].registry,
+            Registry::Oci { .. }
+        ));
+        assert!(matches!(
+            &config.namespaces["pharia-kernel-team-local"].registry,
+            Registry::File { .. }
+        ));
     }
 }

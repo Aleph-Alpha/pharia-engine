@@ -116,8 +116,7 @@ impl Kernel {
                 r#"
                     [namespaces.local]
                     config_url = "file://../namespace.toml"
-                    registry_type = "file"
-                    registry = "file://../skills"
+                    registry = { type = "file", path = "../skills" }
                 "#,
             )
             .unwrap(),
