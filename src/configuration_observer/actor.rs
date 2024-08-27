@@ -6,10 +6,7 @@ use tracing::error;
 
 use crate::skills::{SkillExecutorApi, SkillPath};
 
-use super::{
-    namespace_description::Skill, namespace_from_url, NamespaceConfig, NamespaceDescriptionLoader,
-    OperatorConfig,
-};
+use super::{namespace_description::Skill, NamespaceDescriptionLoader, OperatorConfig};
 
 #[async_trait]
 pub trait ObservableConfig {
@@ -26,21 +23,7 @@ impl NamespaceDescriptionLoaders {
         let namespaces = deserialized
             .namespaces
             .into_iter()
-            .map(|(namespace, config)| match config {
-                NamespaceConfig::File {
-                    config_url,
-                    config_access_token_env_var,
-                    ..
-                }
-                | NamespaceConfig::Oci {
-                    config_url,
-                    config_access_token_env_var,
-                    ..
-                } => Ok((
-                    namespace,
-                    namespace_from_url(&config_url, config_access_token_env_var)?,
-                )),
-            })
+            .map(|(namespace, config)| config.loader().map(|loader| (namespace, loader)))
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
         Ok(Self { namespaces })
     }

@@ -1,6 +1,13 @@
 use std::{collections::HashMap, env, fs, path::Path};
 
+use anyhow::anyhow;
 use serde::Deserialize;
+use url::Url;
+
+use super::{
+    namespace_description::{FileLoader, HttpLoader},
+    NamespaceDescriptionLoader,
+};
 
 #[derive(Deserialize)]
 pub struct OperatorConfig {
@@ -75,6 +82,43 @@ pub enum NamespaceConfig {
         config_url: String,
         config_access_token_env_var: Option<String>,
     },
+}
+
+impl NamespaceConfig {
+    pub fn loader(&self) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + 'static>> {
+        match self {
+            NamespaceConfig::File {
+                config_url,
+                config_access_token_env_var,
+                ..
+            }
+            | NamespaceConfig::Oci {
+                config_url,
+                config_access_token_env_var,
+                ..
+            } => {
+                let url = Url::parse(&config_url)?;
+                match url.scheme() {
+                    "https" | "http" => {
+                        let config_access_token = config_access_token_env_var.as_ref()
+                            .map(|key| env::var(key))
+                            .transpose()?;
+                        Ok(Box::new(HttpLoader::from_url(
+                            &config_url,
+                            config_access_token,
+                        )))
+                    }
+                    "file" => {
+                        // remove leading "file://"
+                        let file_path = &config_url[7..];
+                        let loader = FileLoader::new(file_path.into());
+                        Ok(Box::new(loader))
+                    }
+                    scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

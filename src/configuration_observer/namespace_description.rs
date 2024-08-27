@@ -1,11 +1,9 @@
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
 
-use anyhow::anyhow;
 use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Skill {
@@ -19,30 +17,6 @@ pub struct Skill {
 #[async_trait]
 pub trait NamespaceDescriptionLoader {
     async fn description(&mut self) -> anyhow::Result<NamespaceDescription>;
-}
-
-pub fn namespace_from_url(
-    raw_url: &str,
-    config_access_token_env_var: Option<String>,
-) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + 'static>> {
-    let url = Url::parse(raw_url)?;
-    match url.scheme() {
-        "https" | "http" => {
-            let config_access_token = config_access_token_env_var
-                .map(|key| env::var(key))
-                .transpose()?;
-            Ok(Box::new(HttpLoader::from_url(raw_url, config_access_token)))
-        }
-        "file" => {
-            // remove leading "file://"
-            let file_path = &raw_url[7..];
-
-            let loader = FileLoader::new(file_path.into());
-
-            Ok(Box::new(loader))
-        }
-        scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -107,6 +81,7 @@ impl NamespaceDescriptionLoader for HttpLoader {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use std::env;
 
     impl HttpLoader {
         pub fn pharia_kernel_team() -> Self {
