@@ -143,6 +143,7 @@ mod tests {
             let ns_cfg = NamespaceConfig::File {
                 registry: "file://skills".to_owned(),
                 config_url: "file://namespace.toml".to_owned(),
+                config_access_token_env_var: None,
             };
             let mut namespaces = HashMap::new();
             namespaces.insert(skill_path.namespace.clone(), ns_cfg);

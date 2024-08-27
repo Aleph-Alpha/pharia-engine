@@ -67,16 +67,20 @@ pub enum NamespaceConfig {
     File {
         registry: String,
         config_url: String,
+        config_access_token_env_var: Option<String>,
     },
     Oci {
         repository: String,
         registry: String,
         config_url: String,
+        config_access_token_env_var: Option<String>,
     },
 }
 
 #[cfg(test)]
 mod tests {
+
+    use crate::configuration_observer::NamespaceConfig;
 
     use super::OperatorConfig;
 
@@ -107,6 +111,34 @@ mod tests {
             "#,
         ).unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
+    }
+
+    #[test]
+    fn deserialize_config_with_config_access_token() {
+        let config = OperatorConfig::from_toml(
+            r#"
+            [namespaces.dummy_team]
+            config_url = "file://dummy_config_url"
+            registry_type = "file"
+            registry = "dummy_file_path"
+            config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+            "#,
+        )
+        .unwrap();
+        let config_access_token_env_var = match config.namespaces.get("dummy_team").unwrap() {
+            NamespaceConfig::File {
+                config_access_token_env_var,
+                ..
+            }
+            | NamespaceConfig::Oci {
+                config_access_token_env_var,
+                ..
+            } => config_access_token_env_var.clone(),
+        };
+        assert_eq!(
+            config_access_token_env_var.unwrap(),
+            "GITLAB_CONFIG_ACCESS_TOKEN".to_owned()
+        );
     }
 
     #[test]

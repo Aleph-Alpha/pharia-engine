@@ -1,5 +1,6 @@
 [namespaces.pharia-kernel-team]
 config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
 registry_type = "oci"
 registry = "registry.gitlab.aleph-alpha.de"
 repository = "engineering/pharia-skills/skills"
