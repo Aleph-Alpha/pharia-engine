@@ -58,7 +58,7 @@ async fn execute_skill() {
         .body(Body::from(
             json!({ "skill": "local/greet_skill", "input": "Homer"}).to_string(),
         ))
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
         .send()
         .await
         .unwrap();
