@@ -1,7 +1,5 @@
 use std::{env, net::SocketAddr};
 
-use tracing::info;
-
 use crate::configuration_observer::OperatorConfig;
 
 pub struct AppConfig {
@@ -23,13 +21,8 @@ impl AppConfig {
         let inference_addr = env::var("AA_INFERENCE_ADDRESS")
             .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
 
-        let operator_config = if let Ok(operator_config_path) = env::var("OPERATOR_CONFIG_PATH") {
-            OperatorConfig::from_file(operator_config_path)
-                .expect("The provided operator configuration must be valid.")
-        } else {
-            info!("No operator config provided. Fallback to the default remote config.");
-            OperatorConfig::remote()
-        };
+        let operator_config = OperatorConfig::from_file("operator-config.toml")
+            .expect("The provided operator configuration must be valid.");
 
         AppConfig {
             tcp_addr: addr.parse().unwrap(),

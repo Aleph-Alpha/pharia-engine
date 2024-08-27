@@ -17,14 +17,6 @@ pub struct OperatorConfig {
 impl OperatorConfig {
     /// # Errors
     /// Cannot parse config or cannot read from file.
-    pub fn from_env_or_default() -> anyhow::Result<Self> {
-        drop(dotenvy::dotenv());
-        let config_path = env::var("OPERATOR_CONFIG_PATH").unwrap_or("config.toml".to_owned());
-        Self::from_file(config_path)
-    }
-
-    /// # Errors
-    /// Cannot parse config or cannot read from file.
     pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
         let config = fs::read_to_string(p)?;
         Self::from_toml(&config)
@@ -45,22 +37,6 @@ impl OperatorConfig {
                 [namespaces.local]
                 config_url = "file://namespace.toml"
                 registry = { type = "file", path = "skills" }
-            "#,
-        )
-        .unwrap()
-    }
-
-    /// # Panics
-    /// Cannot parse config.
-    #[must_use]
-    pub fn remote() -> Self {
-        Self::from_toml(
-            r#"
-                [namespaces.pharia-kernel-team]
-                config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
-                registry_type = "oci"
-                registry = "registry.gitlab.aleph-alpha.de"
-                repository = "engineering/pharia-skills/skills"
             "#,
         )
         .unwrap()
@@ -167,7 +143,7 @@ mod tests {
 
     #[test]
     fn reads_from_file() {
-        let config = OperatorConfig::from_file("config.toml").unwrap();
+        let config = OperatorConfig::from_file("operator-config.toml").unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
     }
 
