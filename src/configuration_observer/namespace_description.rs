@@ -23,10 +23,16 @@ pub trait NamespaceDescriptionLoader {
 
 pub fn namespace_from_url(
     raw_url: &str,
+    config_access_token_env_var: Option<String>,
 ) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + 'static>> {
     let url = Url::parse(raw_url)?;
     match url.scheme() {
-        "https" | "http" => Ok(Box::new(HttpLoader::from_url(raw_url))),
+        "https" | "http" => {
+            let config_access_token = config_access_token_env_var
+                .map(|key| env::var(key))
+                .transpose()?;
+            Ok(Box::new(HttpLoader::from_url(raw_url, config_access_token)))
+        }
         "file" => {
             // remove leading "file://"
             let file_path = &raw_url[7..];
@@ -68,23 +74,18 @@ impl NamespaceDescriptionLoader for FileLoader {
         NamespaceDescription::from_str(&config)
     }
 }
-
 pub struct HttpLoader {
-    token: Option<String>,
     url: String,
+    token: Option<String>,
 }
-
 impl HttpLoader {
-    pub fn from_url(url: &str) -> Self {
-        drop(dotenvy::dotenv());
-        let token = env::var("TEAM_CONFIG_TOKEN").ok();
+    pub fn from_url(url: &str, token: Option<String>) -> Self {
         Self {
-            token,
             url: url.to_owned(),
+            token,
         }
     }
 }
-
 #[async_trait]
 impl NamespaceDescriptionLoader for HttpLoader {
     async fn description(&mut self) -> anyhow::Result<NamespaceDescription> {
@@ -111,7 +112,9 @@ pub mod tests {
         pub fn pharia_kernel_team() -> Self {
             drop(dotenvy::dotenv());
             let url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main";
-            Self::from_url(url)
+            let access_token = env::var("GITLAB_CONFIG_ACCESS_TOKEN")
+                .expect("GITLAB_CONFIG_ACCESS_TOKEN must be set");
+            Self::from_url(url, Some(access_token))
         }
     }
 
@@ -134,10 +137,14 @@ pub mod tests {
 
     #[tokio::test]
     async fn load_gitlab_config() {
-        // Given a gitlab skill config
-        let mut config = HttpLoader::pharia_kernel_team();
+        // Given a gitlab namespace config
+        drop(dotenvy::dotenv());
+        let url = "https://gitlab.aleph-alpha.de/api/v4/projects/887/repository/files/namespace.toml/raw?ref=main";
+        let access_token =
+            env::var("GITLAB_CONFIG_ACCESS_TOKEN").expect("GITLAB_CONFIG_ACCESS_TOKEN must be set");
+        let mut config = HttpLoader::from_url(url, Some(access_token));
 
-        // when fetch skill config
+        // when fetch namespace config
         let description = config.description().await.unwrap();
 
         // then the configured skills must listed in the config

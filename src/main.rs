@@ -5,6 +5,7 @@ use pharia_kernel::AppConfig;
 
 #[tokio::main]
 async fn main() {
+    drop(dotenvy::dotenv());
     let app_config = AppConfig::from_env();
     // Set up tracing subscriber that behaves like env_logger
     // Can switch to some other subscriber in the future

@@ -27,10 +27,19 @@ impl NamespaceDescriptionLoaders {
             .namespaces
             .into_iter()
             .map(|(namespace, config)| match config {
-                NamespaceConfig::File { config_url, .. }
-                | NamespaceConfig::Oci { config_url, .. } => {
-                    Ok((namespace, namespace_from_url(&config_url)?))
+                NamespaceConfig::File {
+                    config_url,
+                    config_access_token_env_var,
+                    ..
                 }
+                | NamespaceConfig::Oci {
+                    config_url,
+                    config_access_token_env_var,
+                    ..
+                } => Ok((
+                    namespace,
+                    namespace_from_url(&config_url, config_access_token_env_var)?,
+                )),
             })
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
         Ok(Self { namespaces })
