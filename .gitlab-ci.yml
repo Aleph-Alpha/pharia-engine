@@ -155,7 +155,7 @@ integration_test:
     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
-    GITLAB_CONFIG_ACCESS_TOKEN: $TEAM_CONFIG_TOKEN_UI
+    GITLAB_CONFIG_ACCESS_TOKEN: $TEAM_CONFIG_TOKEN
   services:
     - name: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
       alias: $CI_PROJECT_NAME
