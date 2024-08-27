@@ -48,5 +48,5 @@ COPY --from=builder /build/doc/book/html /doc/book/html
 
 # use a random uid/gid to avoid running as root
 USER 2000:2000
-WORKDIR /usr/local/bin
+WORKDIR /app
 CMD ["pharia-kernel"]
