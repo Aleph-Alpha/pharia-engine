@@ -22,7 +22,11 @@ podman run -p 8081:8081 pharia-kernel
 
 ## Deploying Skills
 
-Pharia Kernel organizes skills in namespaces. A namespace is a unique identifier which has an associated configuration file specifying deployed skills and an associated registry. Skills will be loaded lazily if invoked. The configuration file and the registry can be local or remote in any combination:
+Pharia Kernel wants to enable teams outside of the Pharia Kernel Operators to deploy skills in self service. To achieve this, skills are organized into namespaces. The Pharia Kernel Operators maintain the list of namespaces and associate each one with a configuration file, which in turn is owned by a team.
+
+Each namespace configuration typically would reside in a Git repository owned by the Team which owns the namespace. Changes in this file will be automatically detected by the Kernel.
+
+A namespace is also associated with a registry to load the skills from. These skill registries can either be directories in filesystem (mostly used for a development setup) or point to an OCI registry (recommended for production).
 
 ### Namespace with Local Config and Local Registry
 
@@ -38,11 +42,20 @@ With the local configuration above, Pharia Kernel will serve any skill deployed 
 
 ```toml
 [namespaces.my-team]
+# The URL to the configuration listing the skills of this namespace
 config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+# Pharia kernel will use the contents of this environment variable to access (authorize) the above URL
+config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+# Registry to load skills from
 registry = { type = "oci", registry = "registry.gitlab.aleph-alpha.de", repository = "engineering/pharia-skills/skills" }
 ```
 
-With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace "my-team". If authentication is required, then a universal token can be specified with the following environment variables:
+
+With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace "my-team".
+
+### Authentication against OCI Registries
+
+Currently Pharia Kernel uses the same credentials to authenticate against all OCI registries. To set these credentials use these environment variables:
 
 ```shell
 SKILL_REGISTRY_USER=Joe.Plumber

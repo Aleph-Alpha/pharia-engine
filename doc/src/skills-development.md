@@ -61,7 +61,14 @@ This will create a file called `haiku.wasm`, which can now be deployed into Phar
 
 ## Deploying Skills to the Kernel
 
-Skills can be deployed in a namespace. You can request a namespace from your Pharia Kernel operator. A namespace is associated with a URL to a file in a Git repository you own. The TOML file lists all skills in the namespace. Here is an example:
+In order to make a Skill available in Pharia Kernel two criteria need to be met:
+
+* The skill must be deployed as a component to an OCI registry (for local development a directory might also suffice)
+* The skill must be configured in the namespace configuration (a `toml` file, typically checked into a Git repository)
+
+If your team does not own a namespace yet, you can request one from your Pharia Kernel operators. They will associate it with a `namespace.toml` which lists the skills you want to deploy as well as an OCI registry to load the skill code into. Ideally your team owns both, so you can deploy skills in self service.
+
+The TOML file lists all skills in the namespace. Here is an example:
 
 ```toml
 skills = [

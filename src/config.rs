@@ -24,7 +24,7 @@ impl AppConfig {
             .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
 
         let operator_config = if let Ok(operator_config_path) = env::var("OPERATOR_CONFIG_PATH") {
-            OperatorConfig::from_file(&operator_config_path)
+            OperatorConfig::from_file(operator_config_path)
                 .expect("The provided operator configuration must be valid.")
         } else {
             info!("No operator config provided. Fallback to the default remote config.");

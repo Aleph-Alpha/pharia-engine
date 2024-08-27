@@ -1,4 +1,7 @@
 [namespaces.pharia-kernel-team]
+# The URL to the configuration listing the skills of this namespace
 config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+# Pharia kernel will use the contents of this environment variable to access (authorize) the above URL
 config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+# Registry to load skills from
 registry = { type = "oci", registry = "registry.gitlab.aleph-alpha.de", repository = "engineering/pharia-skills/skills" }
