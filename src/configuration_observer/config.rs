@@ -137,7 +137,7 @@ mod tests {
         let config = OperatorConfig::from_toml(
             r#"
             [namespaces.pharia-kernel-team]
-            config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+            config_url = "https://dummy_url"
             registry = { type = "oci", registry = "registry.gitlab.aleph-alpha.de", repository = "engineering/pharia-skills/skills" }
             "#,
         ).unwrap();
@@ -176,12 +176,12 @@ mod tests {
         let config = toml::from_str::<OperatorConfig>(
             r#"
             [namespaces.pharia-kernel-team]
-            config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+            config_url = "https://dummy_url"
             config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
             registry = { type = "oci", registry = "registry.gitlab.aleph-alpha.de", repository = "engineering/pharia-skills/skills" }
 
             [namespaces.pharia-kernel-team-local]
-            config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+            config_url = "https://dummy_url"
             config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
             registry = { type = "file", path = "/temp/skills" }
             "#,
