@@ -81,7 +81,6 @@ impl NamespaceDescriptionLoader for HttpLoader {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::env;
 
     #[test]
     fn load_skill_list_config_toml() {
@@ -98,21 +97,5 @@ pub mod tests {
         assert_eq!(tc.skills.len(), 3);
         assert_eq!(tc.skills[0].tag.as_ref().unwrap(), "v1.0.0-rc");
         assert!(tc.skills[1].tag.is_none());
-    }
-
-    #[tokio::test]
-    async fn load_gitlab_config() {
-        // Given a gitlab namespace config
-        drop(dotenvy::dotenv());
-        let url = "https://gitlab.aleph-alpha.de/api/v4/projects/887/repository/files/namespace.toml/raw?ref=main";
-        let access_token =
-            env::var("GITLAB_CONFIG_ACCESS_TOKEN").expect("GITLAB_CONFIG_ACCESS_TOKEN must be set");
-        let mut config = HttpLoader::from_url(url, Some(access_token));
-
-        // when fetch namespace config
-        let description = config.description().await.unwrap();
-
-        // then the configured skills must listed in the config
-        assert!(!description.skills.is_empty());
     }
 }
