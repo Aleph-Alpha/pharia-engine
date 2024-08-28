@@ -57,6 +57,8 @@ Then, run the image with
 podman run -v ./operator-config.toml:/app/operator-config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
 
+> Ensure that `PHARIA_KERNEL_ADDRESS` falls back to the default "0.0.0.0:8081".
+
 #### MacOS
 
 Podman on MacOS requires a virtual machine. Additionally, you need to allocate more memory than the default for building the image.
