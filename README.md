@@ -33,7 +33,19 @@ Every time we change the example skill we need to rebuild them.
 
 ### Building and running the kernel container using Podman
 
-You can build the image with
+To compile Pharia Kernel, at least 4 GiB of RAM are needed. You can check your podman configuration with
+
+```shell
+podman machine list
+```
+
+and change it with
+
+```shell
+podman machine set --memory 8192
+```
+
+Now, you can build the image with
 
 ```shell
 podman build . --tag pharia-kernel
