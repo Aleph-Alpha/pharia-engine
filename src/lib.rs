@@ -14,8 +14,8 @@ use self::{inference::Inference, skills::SkillExecutor};
 pub use config::AppConfig;
 pub use configuration_observer::OperatorConfig;
 
-/// # Panics
-/// Cannot parse operator config.
+/// Boots up all the actors making up the kernel. The result of this method is also a future, which
+/// signals that all resources have been shutdown.
 pub async fn run(
     app_config: AppConfig,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,

@@ -15,8 +15,8 @@ async fn main() {
         .init();
 
     pharia_kernel::run(app_config, shutdown_signal())
-        .await
-        .await;
+        .await // We booted everything up and are operational
+        .await; // We shut everything down, and released all resources.
 }
 
 async fn shutdown_signal() {
