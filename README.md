@@ -48,7 +48,7 @@ podman build . --tag pharia-kernel --platform linux/arm64
 Then, run the image with
 
 ```shell
-podman run -p 8081:8081 pharia-kernel
+podman run -v ./operator-config.toml:/app/operator-config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
 
 ## User manual
