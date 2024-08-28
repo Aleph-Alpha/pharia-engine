@@ -1,10 +1,11 @@
+use anyhow::Error;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use pharia_kernel::AppConfig;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
     drop(dotenvy::dotenv());
     let app_config = AppConfig::from_env();
     // Set up tracing subscriber that behaves like env_logger
@@ -15,8 +16,9 @@ async fn main() {
         .init();
 
     pharia_kernel::run(app_config, shutdown_signal())
-        .await // We booted everything up and are operational
+        .await? // We booted everything up and are operational
         .await; // We shut everything down, and released all resources.
+    Ok(())
 }
 
 async fn shutdown_signal() {

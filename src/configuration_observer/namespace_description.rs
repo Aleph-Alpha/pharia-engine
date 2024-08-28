@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Context;
 use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
@@ -44,8 +45,15 @@ impl FileLoader {
 #[async_trait]
 impl NamespaceDescriptionLoader for FileLoader {
     async fn description(&mut self) -> anyhow::Result<NamespaceDescription> {
-        let config = std::fs::read_to_string(&self.path)?;
-        NamespaceDescription::from_str(&config)
+        let config = std::fs::read_to_string(&self.path)
+            .with_context(|| format!("Unbale to read file {}", self.path.to_string_lossy()))?;
+        let desc = NamespaceDescription::from_str(&config).with_context(|| {
+            format!(
+                "Unbale to parse file {} into a valid configuration for a team owned namespace.",
+                self.path.to_string_lossy()
+            )
+        })?;
+        Ok(desc)
     }
 }
 pub struct HttpLoader {
@@ -74,7 +82,13 @@ impl NamespaceDescriptionLoader for HttpLoader {
         resp.error_for_status_ref()?;
 
         let content = resp.text().await?;
-        NamespaceDescription::from_str(&content)
+        let desc = NamespaceDescription::from_str(&content).with_context(|| {
+            format!(
+                "Unbale to parse file at '{}' into a valid configuration for a team owned namespace.",
+                self.url
+            )
+        })?;
+        Ok(desc)
     }
 }
 

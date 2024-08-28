@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use anyhow::Context;
 use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
@@ -23,7 +24,14 @@ impl NamespaceDescriptionLoaders {
         let namespaces = deserialized
             .namespaces
             .into_iter()
-            .map(|(namespace, config)| config.loader().map(|loader| (namespace, loader)))
+            .map(|(namespace, config)| {
+                config
+                    .loader()
+                    .with_context(|| {
+                        format!("Unable to load configuration of namespace: '{namespace}'")
+                    })
+                    .map(|loader| (namespace, loader))
+            })
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
         Ok(Self { namespaces })
     }

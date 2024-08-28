@@ -5,6 +5,7 @@ mod registries;
 mod shell;
 mod skills;
 
+use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use futures::Future;
 use tracing::error;
@@ -19,7 +20,7 @@ pub use configuration_observer::OperatorConfig;
 pub async fn run(
     app_config: AppConfig,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
-) -> impl Future<Output = ()> {
+) -> Result<impl Future<Output = ()>, Error> {
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr);
 
@@ -31,7 +32,7 @@ pub async fn run(
     // Boot up the configuration observer
     let loaders = Box::new(
         NamespaceDescriptionLoaders::new(app_config.operator_config)
-            .expect("Namespace configuration must be valid."),
+            .context("Unable to read the configuration for namespaces")?,
     );
 
     let mut configuration_observer = ConfigurationObserver::with_config(
@@ -45,7 +46,7 @@ pub async fn run(
 
     let shell_shutdown = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await;
 
-    async {
+    Ok(async {
         // Make skills available via http interface. If we get the signal for shutdown the future
         // will complete.
         if let Err(e) = shell_shutdown.await {
@@ -59,7 +60,7 @@ pub async fn run(
         configuration_observer.wait_for_shutdown().await;
         skill_executor.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
-    }
+    })
 }
 
 #[cfg(test)]
@@ -82,10 +83,11 @@ mod tests {
             operator_config: OperatorConfig::empty(),
         };
 
+        let shutdown_completed = super::run(config, ready(())).await.unwrap();
+
         //wasm runtime needs some time to shutdown (at least on Daniel's machine), so the time out
         //has been increased to 2sec
-        let r =
-            tokio::time::timeout(Duration::from_secs(2), super::run(config, ready(())).await).await;
+        let r = tokio::time::timeout(Duration::from_secs(2), shutdown_completed).await;
         assert_ok!(r);
     }
 }

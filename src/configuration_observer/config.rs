@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, path::Path};
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use url::Url;
 
@@ -70,7 +70,13 @@ impl NamespaceConfig {
                     .config_access_token_env_var
                     .as_ref()
                     .map(env::var)
-                    .transpose()?;
+                    .transpose()
+                    .with_context(|| {
+                        format!(
+                            "Missing environment variable: {}",
+                            self.config_access_token_env_var.as_ref().unwrap()
+                        )
+                    })?;
                 Ok(Box::new(HttpLoader::from_url(
                     &self.config_url,
                     config_access_token,
