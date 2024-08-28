@@ -51,17 +51,28 @@ Now, you can build the image with
 podman build . --tag pharia-kernel
 ```
 
-On Apple Silicon, you need to specify the target platform
-
-```shell
-podman build . --tag pharia-kernel --platform linux/arm64
-```
-
 Then, run the image with
 
 ```shell
 podman run -v ./operator-config.toml:/app/operator-config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
+
+#### MacOS
+
+Podman on MacOS requires a virtual machine. Additionally, you need to allocate more memory than the default for building the image.
+
+```shell
+podman machine init
+podman machine set --memory 4096
+podman machine start
+```
+
+When building the image, you need to specify the target platform.
+
+```shell
+podman build . --tag pharia-kernel --platform linux/arm64
+```
+
 ### curl commands
 
 health check:
