@@ -44,7 +44,7 @@ FROM registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/artifact-
 COPY --from=builder /build/target/release/pharia-kernel /usr/local/bin/pharia-kernel
 
 # Move docs to runtime container
-COPY --from=builder /build/doc/book/html /doc/book/html
+COPY --from=builder /build/doc/book/html /app/doc/book/html
 
 # use a random uid/gid to avoid running as root
 USER 2000:2000
