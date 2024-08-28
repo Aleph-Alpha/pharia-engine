@@ -162,6 +162,7 @@ integration_test:
         -e SKILL_REGISTRY_USER=$CI_REGISTRY_USER  \
         -e SKILL_REGISTRY_PASSWORD=$CI_REGISTRY_PASSWORD  \
         -e GITLAB_CONFIG_ACCESS_TOKEN=$TEAM_CONFIG_TOKEN  \
+        -e PHARIA_KERNEL_LOG=info  \
         -d \
         $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
     - sh -x ./tests/test-image.sh $CONTAINER_PORT 127.0.0.1
