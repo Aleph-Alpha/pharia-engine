@@ -164,6 +164,7 @@ integration_test:
         -e GITLAB_CONFIG_ACCESS_TOKEN=$TEAM_CONFIG_TOKEN  \
         -e PHARIA_KERNEL_LOG=info  \
         $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA | cat) &
+    - sleep 5 # let pharia kernel boot up and be ready
     - sh -x ./tests/test-image.sh $CONTAINER_PORT 127.0.0.1
 
 image_publish:
