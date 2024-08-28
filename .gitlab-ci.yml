@@ -164,7 +164,7 @@ integration_test:
         -e GITLAB_CONFIG_ACCESS_TOKEN=$TEAM_CONFIG_TOKEN  \
         -d \
         $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
-    - sh -x ./tests/test-image.sh $CONTAINER_PORT
+    - sh -x ./tests/test-image.sh $CONTAINER_PORT 127.0.0.1
 
 image_publish:
   stage: image_publish
