@@ -23,7 +23,7 @@ use tower_http::{
     services::{ServeDir, ServeFile},
     trace::{DefaultOnResponse, TraceLayer},
 };
-use tracing::{info_span, Level};
+use tracing::{info, info_span, Level};
 use utoipa::{
     openapi::{
         self,
@@ -94,6 +94,7 @@ pub async fn run(
         "Could not bind a tcp listener to '{addr}' please check environment vars for \
         PHARIA_KERNEL_ADDRESS."
     ));
+    info!("Listening on: {addr}");
 
     async {
         axum::serve(listener?, http(skill_executor_api))
