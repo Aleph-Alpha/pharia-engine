@@ -50,6 +50,27 @@ Then, run the image with
 ```shell
 podman run -v ./operator-config.toml:/app/operator-config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
+### curl commands
+
+health check:
+```shell
+curl -v GET 127.0.0.1:8081/healthcheck
+```
+
+list skills:
+
+```shell
+curl -v GET 127.0.0.1:8081/skills
+curl -v GET 127.0.0.1:8081/cached_skills
+j
+```
+execute skill:
+```shell
+curl -v -X POST 127.0.0.1:8081/execute_skill \
+-H 'Authorization: Bearer AA_API_TOKEN' \
+-H 'Content-Type: application/json' \
+-d '{"skill":"pharia-kernel-team/greet_skill", "input":"Homer"}'
+```
 
 ## User manual
 
