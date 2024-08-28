@@ -100,7 +100,7 @@ impl Kernel {
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
-        let wait_for_shutdown = run(app_config, shutdown_signal).await;
+        let wait_for_shutdown = run(app_config, shutdown_signal).await.unwrap();
         let handle = tokio::spawn(wait_for_shutdown);
         Self {
             handle,
