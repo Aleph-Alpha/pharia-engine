@@ -53,6 +53,7 @@ podman run -v ./operator-config.toml:/app/operator-config.toml -p 8081:8081 --en
 ### curl commands
 
 health check:
+
 ```shell
 curl -v GET 127.0.0.1:8081/healthcheck
 ```
@@ -65,6 +66,7 @@ curl -v GET 127.0.0.1:8081/cached_skills
 j
 ```
 execute skill:
+
 ```shell
 curl -v -X POST 127.0.0.1:8081/execute_skill \
 -H 'Authorization: Bearer AA_API_TOKEN' \
