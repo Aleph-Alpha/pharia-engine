@@ -148,22 +148,23 @@ container_test:
   script:
     - sh -x ./tests/test-container.sh $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
 
-# integration_test:
-#   stage: image_test
-#   image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
-#   rules:
-#     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
-#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-#   variables:
-#     GITLAB_CONFIG_ACCESS_TOKEN: $TEAM_CONFIG_TOKEN
-#   services:
-#     - name: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
-#       alias: $CI_PROJECT_NAME
-#       variables:
-#         SKILL_REGISTRY_USER: $CI_REGISTRY_USER
-#         SKILL_REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
-#   script:
-#     - sh -x ./tests/test-image.sh $CONTAINER_PORT $CI_PROJECT_NAME
+integration_test:
+  stage: image_test
+  image: registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/gitlab-ci/common:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - podman login --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - podman pull $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
+    - >
+      podman run -p 8081:8081 -v ./operator-config.toml:/app/operator-config.toml \
+        -e SKILL_REGISTRY_USER=$CI_REGISTRY_USER  \
+        -e SKILL_REGISTRY_PASSWORD=$CI_REGISTRY_PASSWORD  \
+        -e GITLAB_CONFIG_ACCESS_TOKEN=$TEAM_CONFIG_TOKEN  \
+        -d \
+        $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
+    - sh -x ./tests/test-image.sh $CONTAINER_PORT
 
 image_publish:
   stage: image_publish

@@ -11,9 +11,16 @@ fi
 
 BODY=$(curl -s http://$HOST:$PORT/healthcheck)
 
-if [ "$BODY" = "ok" ]; then
+if [ "$BODY" != "ok" ]; then
+    echo "unexpected response: BODY='$BODY'"
+    exit 1
+fi
+
+RESPONSE_CODE=$(curl -o /dev/null -s -w "%{http_code}\n" http://$HOST:$PORT/docs/index.html)
+
+if [ "$RESPONSE_CODE" = "200" ]; then
     exit 0
 else
-    echo "unexpected response: BODY='$BODY'"
+    echo "unexpected response code: RESPONSE_CODE='$RESPONSE_CODE'"
     exit 1
 fi
