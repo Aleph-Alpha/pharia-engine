@@ -9,7 +9,15 @@ if [ -z $PORT ]; then
     exit 1
 fi
 
-BODY=$(curl -s http://$HOST:$PORT/healthcheck)
+for i in {1..5}
+do
+    BODY=$(curl -s http://$HOST:$PORT/healthcheck)
+    if [ "$BODY" = "ok" ]; then
+        break
+    else
+        sleep 1
+    fi
+done
 
 if [ "$BODY" != "ok" ]; then
     echo "unexpected response: BODY='$BODY'"
