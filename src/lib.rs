@@ -17,6 +17,10 @@ pub use configuration_observer::OperatorConfig;
 
 /// Boots up all the actors making up the kernel. The result of this method is also a future, which
 /// signals that all resources have been shutdown.
+/// 
+/// # Errors
+/// 
+/// Errors if the configuration is invalid
 pub async fn run(
     app_config: AppConfig,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
