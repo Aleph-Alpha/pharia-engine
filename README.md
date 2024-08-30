@@ -33,18 +33,6 @@ Every time we change the example skill we need to rebuild them.
 
 ### Building and running the kernel container using Podman
 
-To compile Pharia Kernel, at least 4 GiB of RAM are needed. You can check your podman configuration with
-
-```shell
-podman machine list
-```
-
-and change it with
-
-```shell
-podman machine set --memory 8192
-```
-
 Now, you can build the image with
 
 ```shell
@@ -57,15 +45,16 @@ Then, run the image with
 podman run -v ./operator-config.toml:/app/operator-config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
 
-> Ensure that `PHARIA_KERNEL_ADDRESS` falls back to the default "0.0.0.0:8081".
+We configure the bind address and port via the environemnt variable `PHARIA_KERNEL_ADDRESS`.
+If not configured it defaults to "0.0.0.0:8081", which is necessary in the container, but locally may cause the firewall to complain.
 
 #### MacOS
 
-Podman on MacOS requires a virtual machine. Additionally, you need to allocate more memory than the default for building the image.
+Podman on MacOS requires a separate virtual machine run by the user. To compile Pharia Kernel, at least 4 GiB of RAM are needed and 8 GiB are recommended. You set this up with
 
 ```shell
 podman machine init
-podman machine set --memory 4096
+podman machine set --memory 8192
 podman machine start
 ```
 
@@ -90,6 +79,7 @@ curl -v GET 127.0.0.1:8081/skills
 curl -v GET 127.0.0.1:8081/cached_skills
 j
 ```
+
 execute skill:
 
 ```shell
@@ -107,20 +97,26 @@ The user manual will be served by the Pharia Kernel app at `docs/` path (eg. `ht
 
 For local development you can run the site generator locally, either via docker or via the mdBook tool chain.
 
-### Run via Docker
+### Run via podman
 
 ***Note:*** *the following steps assume that you are in the workspace's root directory.*
 
 As a prerequisite you have to build the container image once:
 
 ```shell
-docker build -f Containerfile.mdbook -t mdbook .
+podman build -f Containerfile.mdbook -t mdbook .
+```
+
+On MacOS we need to add the target platform
+
+```shell
+podman build -f Containerfile.mdbook -t mdbook --platform linux/arm64
 ```
 
 Run the container with mounted sources:
 
 ```shell
-docker run -ti --mount type=bind,source="$(pwd)",target=/mdbook --network host --name mdbook mdbook
+podman run -ti --mount type=bind,source="$(pwd)",target=/mdbook --network host --name mdbook mdbook
 ```
 
 and run mdbook in the interactive container shell, e.g:
