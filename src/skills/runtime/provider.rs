@@ -78,11 +78,12 @@ impl SkillProvider {
         self.cached_skills.remove(skill_path).is_some()
     }
 
+    /// `Some` if the skill can be successfully loaded, `None` if the skill can not be found
     pub async fn fetch(
         &mut self,
         skill_path: &SkillPath,
         engine: &Engine,
-    ) -> anyhow::Result<&CachedSkill> {
+    ) -> anyhow::Result<Option<&CachedSkill>> {
         if !self.cached_skills.contains_key(skill_path) {
             let Some(tag) = self.known_skills.get(skill_path) else {
                 return Err(anyhow!("Skill {skill_path} not configured."));
@@ -103,7 +104,7 @@ impl SkillProvider {
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
             self.cached_skills.insert(skill_path.clone(), skill);
         }
-        Ok(self.cached_skills.get(skill_path).expect("Skill present."))
+        Ok(Some(self.cached_skills.get(skill_path).expect("Skill present.")))
     }
 }
 

@@ -184,7 +184,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 api_token,
             } => {
                 let response = self.run_skill(&skill_path, input, api_token).await;
-                let result = send.send(response.map_err(ExecuteSkillError::Other));
+                let result = send.send(response);
                 // Error is expected to happen during shutdown. Ignore result.
                 drop(result);
             }
@@ -214,7 +214,7 @@ impl<R: Runtime> SkillExecutorActor<R> {
         skill_path: &SkillPath,
         input: Value,
         api_token: String,
-    ) -> anyhow::Result<Value> {
+    ) -> Result<Value, ExecuteSkillError> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
@@ -223,7 +223,8 @@ impl<R: Runtime> SkillExecutorActor<R> {
         ));
         select! {
             result = self.runtime.run(skill_path, input, ctx) => result,
-            Ok(error) = recv_rt_err => Err(error)
+            // An error occurred during skill execution.
+            Ok(error) = recv_rt_err => Err(ExecuteSkillError::Other(error))
         }
     }
 }
@@ -351,7 +352,7 @@ pub mod tests {
                 _: &SkillPath,
                 _: Value,
                 mut ctx: Box<dyn Csi + Send>,
-            ) -> anyhow::Result<Value> {
+            ) -> Result<Value, ExecuteSkillError> {
                 ctx.complete_text(CompletionRequest::new(
                     "dummy".to_owned(),
                     "dummy".to_owned(),
@@ -463,7 +464,7 @@ pub mod tests {
             _skill_path: &SkillPath,
             _name: Value,
             _ctx: Box<dyn Csi + Send>,
-        ) -> anyhow::Result<Value> {
+        ) -> Result<Value, ExecuteSkillError> {
             panic!("Liar runtime does not run skills")
         }
 
@@ -595,7 +596,7 @@ pub mod tests {
             skill_path: &SkillPath,
             input: Value,
             mut ctx: Box<dyn Csi + Send>,
-        ) -> anyhow::Result<Value> {
+        ) -> Result<Value, ExecuteSkillError> {
             assert!(
                 skill_path == &self.skill_path,
                 "RustRuntime only supports {} skill",

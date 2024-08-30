@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::skills::SkillPath;
+use crate::skills::{actor::ExecuteSkillError, SkillPath};
 
 use super::{engine::Engine, provider::SkillProvider, Csi, Runtime};
 
@@ -24,9 +24,11 @@ impl Runtime for WasmRuntime {
         skill_path: &SkillPath,
         input: Value,
         ctx: Box<dyn Csi + Send>,
-    ) -> anyhow::Result<Value> {
-        let skill = self.provider.fetch(skill_path, &self.engine).await?;
-        skill.run(&self.engine, ctx, input).await
+    ) -> Result<Value, ExecuteSkillError> {
+        let skill = self.provider.fetch(skill_path, &self.engine).await.map_err(ExecuteSkillError::Other)?;
+        // Unwrap Skill, raise error if it is not existing
+        let skill = skill.ok_or(ExecuteSkillError::SkillDoesNotExist)?;
+        skill.run(&self.engine, ctx, input).await.map_err(ExecuteSkillError::Other)
     }
 
     fn upsert_skill(&mut self, skill: SkillPath, tag: Option<String>) {
