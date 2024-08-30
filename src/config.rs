@@ -21,9 +21,7 @@ impl AppConfig {
         let inference_addr = env::var("AA_INFERENCE_ADDRESS")
             .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
 
-        if inference_addr.is_empty() {
-            panic!("The inference address must be provided.");
-        }
+        assert!(!inference_addr.is_empty(), "The inference address must be provided.");
 
         let operator_config = OperatorConfig::from_file("operator-config.toml")
             .expect("The provided operator configuration must be valid.");
