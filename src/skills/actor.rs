@@ -139,13 +139,13 @@ impl SkillExecutorApi {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExecuteSkillError {
-    // #[error(
-    //     "The requested skill does not exist. Make sure it is configured in the configuration \
-    //     associated with the namespace."
-    // )]
-    // SkillDoesNotExist,
+    #[error(
+        "The requested skill does not exist. Make sure it is configured in the configuration \
+        associated with the namespace."
+    )]
+    SkillDoesNotExist,
     #[error(transparent)]
-    Other(anyhow::Error)
+    Other(anyhow::Error),
 }
 
 struct SkillExecutorActor<R: Runtime> {
@@ -308,6 +308,25 @@ pub mod tests {
         skills::runtime::tests::SaboteurRuntime,
         OperatorConfig,
     };
+
+    #[tokio::test]
+    async fn dedicated_error_for_skill_not_found() {
+        // Given a skill executer with no skills
+        let namespaces = HashMap::new();
+        let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
+        let executer = SkillExecutor::new(inference_dummy.api(), &namespaces);
+        let api = executer.api();
+
+        // When a skill is requested, but it is not listed in the namespace
+        let result = api.execute_skill(
+            SkillPath::new("my_namespace", "my_skill"),
+            json!("Any input"),
+            "Dummy api token".to_owned(),
+        ).await;
+
+        // Then result indictaes that the skill is missing
+        assert!(matches!(result, Err(ExecuteSkillError::SkillDoesNotExist)));
+    }
 
     #[tokio::test]
     async fn inference_error_during_skill_execution() {
