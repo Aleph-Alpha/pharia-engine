@@ -86,15 +86,13 @@ impl SkillProvider {
     ) -> anyhow::Result<Option<&CachedSkill>> {
         if !self.cached_skills.contains_key(skill_path) {
             let Some(tag) = self.known_skills.get(skill_path) else {
-                return Err(anyhow!("Skill {skill_path} not configured."));
+                return Ok(None);
             };
 
-            let Some(registry) = self.skill_registries.get(&skill_path.namespace) else {
-                return Err(anyhow!(
-                    "Namespace {} not configured.",
-                    skill_path.namespace
-                ));
-            };
+            let registry = self
+                .skill_registries
+                .get(&skill_path.namespace)
+                .expect("If skill exists, so must the namespace it resides in.");
 
             let bytes = registry
                 .load_skill(&skill_path.name, tag.as_deref().unwrap_or("latest"))
@@ -104,7 +102,9 @@ impl SkillProvider {
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
             self.cached_skills.insert(skill_path.clone(), skill);
         }
-        Ok(Some(self.cached_skills.get(skill_path).expect("Skill present.")))
+        Ok(Some(
+            self.cached_skills.get(skill_path).expect("Skill present."),
+        ))
     }
 }
 
@@ -176,7 +176,7 @@ mod tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Ok(None)));
     }
 
     #[tokio::test]
@@ -192,7 +192,7 @@ mod tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Ok(None)));
     }
 
     #[tokio::test]

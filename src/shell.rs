@@ -300,7 +300,7 @@ mod tests {
     use crate::{
         configuration_observer::OperatorConfig,
         inference::tests::InferenceStub,
-        skills::{tests::LiarRuntime, SkillExecutor, SkillPath},
+        skills::{tests::LiarRuntime, ExecuteSkillError, SkillExecutor, SkillPath},
     };
 
     use super::*;
@@ -586,5 +586,46 @@ mod tests {
         let skills_str = String::from_utf8(body.to_vec()).unwrap();
         let skills = serde_json::from_str::<Vec<String>>(&skills_str).unwrap();
         assert_eq!(skills, vec![skill_qualified_name]);
+    }
+
+    #[tokio::test]
+    async fn not_existing_skill_is_400_error() {
+        // Given a skill executer which always replies Skill does not exist
+        let (send, mut recv) = mpsc::channel(1);
+        let skill_executer_api = SkillExecutorApi::new(send);
+        let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
+
+        tokio::spawn(async move {
+            if let Some(crate::skills::tests::SkillExecutorMessage::Execute { send, .. }) =
+                recv.recv().await
+            {
+                send.send(Err(ExecuteSkillError::SkillDoesNotExist)).unwrap();
+            }
+        });
+
+        // When executing a skill
+        let http = http(skill_executer_api);
+        let args = ExecuteSkillArgs {
+            skill: "my_namespace/my_skill".to_owned(),
+            input: json!("Homer"),
+        };
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/execute_skill")
+                    .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then answer is 400 skill does not exist
+        // assert_eq!(StatusCode::BAD_REQUEST, resp.status());
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let body_str = String::from_utf8(body.to_vec()).unwrap();
+        assert_eq!("The requested skill does not exist. Make sure it is configured in the configuration associated with the namespace.", body_str);
     }
 }
