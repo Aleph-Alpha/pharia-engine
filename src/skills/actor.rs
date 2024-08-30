@@ -100,7 +100,7 @@ impl SkillExecutorApi {
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
-        recv.await.unwrap().map_err(ExecuteSkillError::Other)
+        recv.await.unwrap()
     }
 
     pub async fn skills(&self) -> Vec<SkillPath> {
@@ -184,19 +184,27 @@ impl<R: Runtime> SkillExecutorActor<R> {
                 api_token,
             } => {
                 let response = self.run_skill(&skill_path, input, api_token).await;
-                drop(send.send(response));
+                let result = send.send(response.map_err(ExecuteSkillError::Other));
+                // Error is expected to happen during shutdown. Ignore result.
+                drop(result);
             }
             SkillExecutorMessage::Skills { send } => {
                 let response = self.runtime.skills().cloned().collect();
-                drop(send.send(response));
+                let result = send.send(response);
+                // Error is expected to happen during shutdown. Ignore result
+                drop(result);
             }
             SkillExecutorMessage::CachedSkills { send } => {
                 let response = self.runtime.loaded_skills().cloned().collect();
-                drop(send.send(response));
+                let result = send.send(response);
+                // Error is expected to happen during shutdown. Ignore result
+                drop(result);
             }
             SkillExecutorMessage::Uncache { skill_path, send } => {
                 let response = self.runtime.invalidate_cached_skill(&skill_path);
-                let _ = send.send(response);
+                let result = send.send(response);
+                // Error is expected to happen during shutdown. Ignore result
+                let _ = result;
             }
         }
     }
@@ -232,7 +240,7 @@ pub enum SkillExecutorMessage {
     Execute {
         skill_path: SkillPath,
         input: Value,
-        send: oneshot::Sender<anyhow::Result<Value>>,
+        send: oneshot::Sender<Result<Value, ExecuteSkillError>>,
         api_token: String,
     },
     Skills {
