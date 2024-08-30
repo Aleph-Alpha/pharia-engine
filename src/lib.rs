@@ -38,7 +38,7 @@ pub async fn run(
     let mut configuration_observer = ConfigurationObserver::with_config(
         skill_executor.api(),
         loaders,
-        tokio::time::Duration::from_secs(60),
+        tokio::time::Duration::from_secs(10),
     );
 
     // Wait for first pass of the configuration so that the configured skills are loaded
