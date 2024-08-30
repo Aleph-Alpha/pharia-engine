@@ -88,7 +88,7 @@ impl SkillExecutorApi {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> anyhow::Result<Value> {
+    ) -> Result<Value, ExecuteSkillError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Execute {
             skill_path,
@@ -100,7 +100,7 @@ impl SkillExecutorApi {
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
-        recv.await.unwrap()
+        recv.await.unwrap().map_err(ExecuteSkillError::Other)
     }
 
     pub async fn skills(&self) -> Vec<SkillPath> {
@@ -135,6 +135,17 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ExecuteSkillError {
+    // #[error(
+    //     "The requested skill does not exist. Make sure it is configured in the configuration \
+    //     associated with the namespace."
+    // )]
+    // SkillDoesNotExist,
+    #[error(transparent)]
+    Other(anyhow::Error)
 }
 
 struct SkillExecutorActor<R: Runtime> {

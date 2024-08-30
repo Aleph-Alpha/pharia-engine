@@ -2216,6 +2216,7 @@ dependencies = [
  "serde_json",
  "strum",
  "tempfile",
+ "thiserror",
  "tokio",
  "tokio-test",
  "toml",
