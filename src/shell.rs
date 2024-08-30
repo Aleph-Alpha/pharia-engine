@@ -33,7 +33,7 @@ use utoipa::{
 };
 use utoipa_scalar::{Scalar, Servable};
 
-use crate::skills::{SkillExecutorApi, SkillPath};
+use crate::skills::{ExecuteSkillError, SkillExecutorApi, SkillPath};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -193,7 +193,11 @@ async fn execute_skill(
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(json!(response))),
-        Err(err) => (
+        Err(ExecuteSkillError::SkillDoesNotExist) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
+        ),
+        Err(ExecuteSkillError::Other(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
@@ -599,7 +603,8 @@ mod tests {
             if let Some(crate::skills::tests::SkillExecutorMessage::Execute { send, .. }) =
                 recv.recv().await
             {
-                send.send(Err(ExecuteSkillError::SkillDoesNotExist)).unwrap();
+                send.send(Err(ExecuteSkillError::SkillDoesNotExist))
+                    .unwrap();
             }
         });
 
@@ -623,9 +628,13 @@ mod tests {
             .unwrap();
 
         // Then answer is 400 skill does not exist
-        // assert_eq!(StatusCode::BAD_REQUEST, resp.status());
+        assert_eq!(StatusCode::BAD_REQUEST, resp.status());
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let body_str = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!("The requested skill does not exist. Make sure it is configured in the configuration associated with the namespace.", body_str);
+        assert_eq!(
+            "\"The requested skill does not exist. Make sure it is configured in the configuration \
+            associated with the namespace.\"",
+            body_str
+        );
     }
 }
