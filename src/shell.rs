@@ -304,7 +304,10 @@ mod tests {
     use crate::{
         configuration_observer::OperatorConfig,
         inference::tests::InferenceStub,
-        skills::{tests::LiarRuntime, ExecuteSkillError, SkillExecutor, SkillPath},
+        skills::{
+            tests::{LiarRuntime, SkillExecutorMessage},
+            ExecuteSkillError, SkillExecutor, SkillPath,
+        },
     };
 
     use super::*;
@@ -319,7 +322,7 @@ mod tests {
     use serde_json::json;
     use std::env;
     use std::sync::OnceLock;
-    use tokio::sync::mpsc;
+    use tokio::{sync::mpsc, task::JoinHandle};
     use tower::util::ServiceExt;
 
     /// API Token used by tests to authenticate requests
@@ -564,17 +567,14 @@ mod tests {
     #[tokio::test]
     async fn list_skills() {
         // given a skill executor with cached skills
-        let (send, mut recv) = mpsc::channel(1);
-        let skill_executer_api = SkillExecutorApi::new(send);
         let skill_path = SkillPath::dummy();
         let skill_qualified_name = skill_path.to_string();
-        tokio::spawn(async move {
-            if let Some(crate::skills::tests::SkillExecutorMessage::Skills { send }) =
-                recv.recv().await
-            {
-                send.send(vec![skill_path]).unwrap();
+        let stub_skill_executer = StubSkillExecuter::new(move |msg| {
+            if let SkillExecutorMessage::Skills { send } = msg {
+                send.send(vec![skill_path.clone()]).unwrap();
             }
         });
+        let skill_executer_api = stub_skill_executer.api();
 
         let http = http(skill_executer_api);
         let resp = http
@@ -586,6 +586,8 @@ mod tests {
             )
             .await
             .unwrap();
+        stub_skill_executer.shutdown().await;
+
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let skills_str = String::from_utf8(body.to_vec()).unwrap();
         let skills = serde_json::from_str::<Vec<String>>(&skills_str).unwrap();
@@ -595,18 +597,14 @@ mod tests {
     #[tokio::test]
     async fn not_existing_skill_is_400_error() {
         // Given a skill executer which always replies Skill does not exist
-        let (send, mut recv) = mpsc::channel(1);
-        let skill_executer_api = SkillExecutorApi::new(send);
-        let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
-
-        tokio::spawn(async move {
-            if let Some(crate::skills::tests::SkillExecutorMessage::Execute { send, .. }) =
-                recv.recv().await
-            {
+        let skill_executer_dummy = StubSkillExecuter::new(|msg| {
+            if let SkillExecutorMessage::Execute { send, .. } = msg {
                 send.send(Err(ExecuteSkillError::SkillDoesNotExist))
                     .unwrap();
             }
         });
+        let skill_executer_api = skill_executer_dummy.api();
+        let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
 
         // When executing a skill
         let http = http(skill_executer_api);
@@ -626,6 +624,8 @@ mod tests {
             )
             .await
             .unwrap();
+        // Cleanup
+        skill_executer_dummy.shutdown().await;
 
         // Then answer is 400 skill does not exist
         assert_eq!(StatusCode::BAD_REQUEST, resp.status());
@@ -636,5 +636,34 @@ mod tests {
             associated with the namespace.\"",
             body_str
         );
+    }
+
+    /// A skill executer double, loaded up with predefined answers.
+    struct StubSkillExecuter {
+        send: mpsc::Sender<SkillExecutorMessage>,
+        handle: JoinHandle<()>,
+    }
+
+    impl StubSkillExecuter {
+        pub fn new(
+            mut handle: impl FnMut(SkillExecutorMessage) + Send + 'static,
+        ) -> StubSkillExecuter {
+            let (send, mut recv) = mpsc::channel(1);
+            let handle = tokio::spawn(async move {
+                while let Some(msg) = recv.recv().await {
+                    handle(msg);
+                }
+            });
+            Self { send, handle }
+        }
+
+        pub fn api(&self) -> SkillExecutorApi {
+            SkillExecutorApi::new(self.send.clone())
+        }
+
+        pub async fn shutdown(self) {
+            drop(self.send);
+            self.handle.await.unwrap();
+        }
     }
 }
