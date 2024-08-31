@@ -1,6 +1,6 @@
 # Operating Pharia Kernel
 
-This manual is for Operators running Pharia Kernel for their buisness or department. In case you are more interessted in developing Skills or interfacing with Pharia Kernel in order to invoke deployed skills you should consider the developer or user manual instead.
+This manual is for Operators running Pharia Kernel for their business or department. In case you are more interested in developing Skills or interfacing with Pharia Kernel in order to invoke deployed skills you should consider the developer or user manual instead.
 
 ## How to get it
 

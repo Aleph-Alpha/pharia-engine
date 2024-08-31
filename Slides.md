@@ -8,8 +8,8 @@
   * Skill code does not need to care about tokens (we forward permissions for them, for now)
   * No handling of Runtime errors required in Skill code
   * Automatic handling of Busy errors
-* Dynamically add/remove Skills securly without redeploying Kernel
-* Securly run user defined code
+* Dynamically add/remove Skills securely without redeploying Kernel
+* Securely run user defined code
 * Live demo of Haiku Python example
 * Mention Go- and Rust on the Slides
 
@@ -18,10 +18,10 @@
 * Currently we only execute one skill at a time
 * One inference request at the time
 * Anyone can deploy skills
-* No namespaceses for skills
+* No namespaces for skills
 * CSI is very limited
 * ...
 
 ## Vision
 
-* AI can write and deploy its own code in seconds. And it is sufficently sandboxed to be trustworthy.
+* AI can write and deploy its own code in seconds. And it is sufficiently sandboxed to be trustworthy.

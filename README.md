@@ -1,6 +1,6 @@
 # Pharia Kernel
 
-Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in a number of languages, including Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrival via the cognitive system interface. This enables to deploy RAG usecases serverless.
+Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in a number of languages, including Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the cognitive system interface. This enables to deploy RAG usecases serverless.
 
 The entire Stack including Kernel, Inference, Document Index, etc is called **Pharia OS**.
 
@@ -45,7 +45,7 @@ Then, run the image with
 podman run -v ./operator-config.toml:/app/operator-config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
 
-We configure the bind address and port via the environemnt variable `PHARIA_KERNEL_ADDRESS`.
+We configure the bind address and port via the environment variable `PHARIA_KERNEL_ADDRESS`.
 If not configured it defaults to "0.0.0.0:8081", which is necessary in the container, but locally may cause the firewall to complain.
 
 #### MacOS

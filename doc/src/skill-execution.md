@@ -6,4 +6,4 @@ In order to authenticate the requests, we currently use Aleph Alpha Bearer token
 
 ## How do I get an Aleph Alpha API token
 
-For on-premise installations, contact the Adminstrator of your stack. If you are interacting with the hosted version, you can go to <https://app.aleph-alpha.com> and navigate to your profile page to create a token.
+For on-premise installations, contact the Administrator of your stack. If you are interacting with the hosted version, you can go to <https://app.aleph-alpha.com> and navigate to your profile page to create a token.
