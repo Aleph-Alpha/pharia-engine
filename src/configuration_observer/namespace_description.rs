@@ -6,6 +6,14 @@ use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, thiserror::Error)]
+pub enum NamespaceDescriptionError {
+    #[error(transparent)]
+    Recoverable(anyhow::Error),
+}
+
+pub type NamespaceDescriptionResult = Result<NamespaceDescription, NamespaceDescriptionError>;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Skill {
     pub name: String,
@@ -17,7 +25,7 @@ pub struct Skill {
 // but could also load skills
 #[async_trait]
 pub trait NamespaceDescriptionLoader {
-    async fn description(&mut self) -> anyhow::Result<NamespaceDescription>;
+    async fn description(&mut self) -> NamespaceDescriptionResult;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,15 +52,18 @@ impl FileLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for FileLoader {
-    async fn description(&mut self) -> anyhow::Result<NamespaceDescription> {
+    async fn description(&mut self) -> NamespaceDescriptionResult {
         let config = std::fs::read_to_string(&self.path)
-            .with_context(|| format!("Unbale to read file {}", self.path.to_string_lossy()))?;
-        let desc = NamespaceDescription::from_str(&config).with_context(|| {
-            format!(
+            .with_context(|| format!("Unbale to read file {}", self.path.to_string_lossy()))
+            .map_err(NamespaceDescriptionError::Recoverable)?;
+        let desc = NamespaceDescription::from_str(&config)
+            .with_context(|| {
+                format!(
                 "Unbale to parse file {} into a valid configuration for a team owned namespace.",
                 self.path.to_string_lossy()
             )
-        })?;
+            })
+            .map_err(NamespaceDescriptionError::Recoverable)?;
         Ok(desc)
     }
 }
@@ -70,24 +81,31 @@ impl HttpLoader {
 }
 #[async_trait]
 impl NamespaceDescriptionLoader for HttpLoader {
-    async fn description(&mut self) -> anyhow::Result<NamespaceDescription> {
+    async fn description(&mut self) -> NamespaceDescriptionResult {
         let mut req_builder = reqwest::Client::new().get(&self.url);
         if let Some(token) = &self.token {
             let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
             auth_value.set_sensitive(true);
             req_builder = req_builder.header(AUTHORIZATION, auth_value);
         }
-        let resp = req_builder.send().await?;
+        let resp = req_builder
+            .send()
+            .await
+            .map_err(|e| NamespaceDescriptionError::Recoverable(e.into()))?;
 
-        resp.error_for_status_ref()?;
+        resp.error_for_status_ref()
+            .map_err(|e| NamespaceDescriptionError::Recoverable(e.into()))?;
 
-        let content = resp.text().await?;
+        let content = resp
+            .text()
+            .await
+            .map_err(|e| NamespaceDescriptionError::Recoverable(e.into()))?;
         let desc = NamespaceDescription::from_str(&content).with_context(|| {
             format!(
                 "Unbale to parse file at '{}' into a valid configuration for a team owned namespace.",
                 self.url
             )
-        })?;
+        }).map_err(NamespaceDescriptionError::Recoverable)?;
         Ok(desc)
     }
 }
