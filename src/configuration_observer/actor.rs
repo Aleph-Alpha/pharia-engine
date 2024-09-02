@@ -111,6 +111,7 @@ struct ConfigurationObserverActor {
     config: Box<dyn ObservableConfig + Send>,
     update_interval: Duration,
     skills: HashMap<String, Vec<Skill>>,
+    invalid_namespaces: HashSet<String>,
 }
 
 /// Keep track of changes that need to be propagated to the skill provider.
@@ -145,6 +146,7 @@ impl ConfigurationObserverActor {
             config,
             update_interval,
             skills: HashMap::new(),
+            invalid_namespaces: HashSet::new(),
         }
     }
 
@@ -186,16 +188,24 @@ impl ConfigurationObserverActor {
 
     async fn load_namespace(&mut self, namespace: &str) {
         let incoming = match self.config.skills(namespace).await {
-            Ok(incoming) => incoming,
+            Ok(incoming) => {
+                if self.invalid_namespaces.contains(namespace) {
+                    self.skill_executor_api
+                        .remove_invalid_namespace(namespace.to_owned())
+                        .await;
+                    self.invalid_namespaces.remove(namespace);
+                }
+                incoming
+            }
             Err(NamespaceDescriptionError::Recoverable(e)) => {
                 error!(
-                    "Failed to get the skills in namespace {namespace}, fallback to existing skills, caused by: {e}"
+                    "Failed to get the skills in namespace {namespace}, fallback to existing state, caused by: {e}"
                 );
                 return;
             }
             Err(NamespaceDescriptionError::Unrecoverable(e)) => {
                 error!(
-                    "Failed to get the skills in namespace {namespace}, unload all skills, caused by: {e}"
+                    "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
                 self.skill_executor_api
                     .add_invalid_namespace(
@@ -203,6 +213,7 @@ impl ConfigurationObserverActor {
                         NamespaceDescriptionError::Unrecoverable(e),
                     )
                     .await;
+                self.invalid_namespaces.insert(namespace.to_owned());
                 vec![]
             }
         };
@@ -363,12 +374,12 @@ pub mod tests {
         let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
         let skill_executor_api = SkillExecutorApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let observer =
+        let mut observer =
             ConfigurationObserver::with_config(skill_executor_api, stub_config, update_interval);
+        observer.wait_for_ready().await;
 
         // Then one new skill message is send for each skill configured
-        let msg = receiver.recv().await;
-        let msg = msg.unwrap();
+        let msg = receiver.try_recv().unwrap();
 
         assert!(matches!(
             msg,
@@ -400,6 +411,7 @@ pub mod tests {
                 config,
                 update_interval: Duration::from_millis(1),
                 skills,
+                invalid_namespaces: HashSet::new(),
             }
         }
     }
