@@ -181,6 +181,7 @@ impl ConfigurationObserverActor {
             let incoming = match self.config.skills(namespace).await {
                 Ok(incoming) => incoming,
                 Err(e) => {
+                    //if unrecoverable -> unload skills
                     error!(
                         "Failed to get the latest skills in namespace {namespace}, caused by: {e}"
                     );
@@ -220,6 +221,7 @@ pub mod tests {
     use crate::skills::{SkillExecutorApi, SkillPath};
 
     use super::*;
+    use anyhow::anyhow;
 
     pub struct StubConfig {
         namespaces: HashMap<String, Vec<Skill>>,
@@ -358,6 +360,73 @@ pub mod tests {
         ));
 
         observer.wait_for_shutdown().await;
+    }
+
+    impl ConfigurationObserverActor {
+        fn with_skills(
+            skills: HashMap<String, Vec<Skill>>,
+            skill_executor_api: SkillExecutorApi,
+            config: Box<dyn ObservableConfig + Send>,
+        ) -> Self {
+            let (ready, _) = tokio::sync::watch::channel(false);
+            let (_, shutdown) = tokio::sync::watch::channel(false);
+            Self {
+                ready,
+                shutdown,
+                skill_executor_api,
+                config,
+                update_interval: Duration::from_millis(1),
+                skills,
+            }
+        }
+    }
+
+    struct SaboteurConfig;
+
+    #[async_trait]
+    impl ObservableConfig for SaboteurConfig {
+        fn namespaces(&self) -> Vec<String> {
+            panic!("Should not be invoked")
+        }
+
+        async fn skills(&mut self, _namespace: &str) -> anyhow::Result<Vec<Skill>> {
+            Err(anyhow!("SaboteurConfig will always fail."))
+        }
+    }
+
+    #[tokio::test]
+    async fn unload_skill_for_invalid_namespace_description() {
+        // given an configuration observer actor
+        let dummy_namespace = "dummy_namespace";
+        let dummy_skill = "dummy_skill";
+        let namespaces = HashMap::from([(
+            dummy_namespace.to_owned(),
+            vec![Skill::with_name(dummy_skill)],
+        )]);
+
+        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
+        let skill_executor_api = SkillExecutorApi::new(sender);
+        let config = Box::new(SaboteurConfig);
+
+        let mut coa =
+            ConfigurationObserverActor::with_skills(namespaces, skill_executor_api, config);
+
+        // when we load an invalid namespace
+        coa.load(&vec![dummy_namespace.to_owned()]).await;
+
+        // then unload messages for all loaded skills of that namespace are send
+        let msg = receiver.try_recv().unwrap();
+
+        assert!(matches!(
+            msg,
+            SkillExecutorMessage::Remove {
+                skill: SkillPath {
+                    namespace,
+                    name,
+                },
+            }
+            if namespace == dummy_namespace && name == dummy_skill
+        ));
     }
 
     #[tokio::test]

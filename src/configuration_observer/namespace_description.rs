@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 pub enum NamespaceDescriptionError {
     #[error(transparent)]
     Recoverable(anyhow::Error),
+    #[error("Unrecoverable error loading namespace configuration: {0}")]
+    Unrecoverable(anyhow::Error),
 }
 
 pub type NamespaceDescriptionResult = Result<NamespaceDescription, NamespaceDescriptionError>;
