@@ -9,7 +9,10 @@ use std::future::Future;
 pub use provider::SkillProvider;
 pub use wasm::WasmRuntime;
 
-use crate::inference::{Completion, CompletionRequest};
+use crate::{
+    configuration_observer::NamespaceDescriptionError,
+    inference::{Completion, CompletionRequest},
+};
 
 use super::{actor::ExecuteSkillError, SkillPath};
 
@@ -44,6 +47,8 @@ pub trait Runtime {
     /// The runtime may handle cache invalidation of skills by itself in the future. For now we cut
     /// it a bit of slack and just tell it that a skill might have changed.
     fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool;
+
+    fn invalidate_namespace(&mut self, namespace: String, e: NamespaceDescriptionError);
 }
 
 #[async_trait]
@@ -94,6 +99,10 @@ pub mod tests {
 
         fn invalidate_cached_skill(&mut self, _skill_path: &SkillPath) -> bool {
             panic!("SaboteurRuntime does not drop skills from cache")
+        }
+
+        fn invalidate_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+            panic!("SaboteurRuntime does not invalidate namespace")
         }
     }
 }

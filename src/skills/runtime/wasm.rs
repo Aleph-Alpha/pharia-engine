@@ -1,6 +1,9 @@
 use serde_json::Value;
 
-use crate::skills::{actor::ExecuteSkillError, SkillPath};
+use crate::{
+    configuration_observer::NamespaceDescriptionError,
+    skills::{actor::ExecuteSkillError, SkillPath},
+};
 
 use super::{engine::Engine, provider::SkillProvider, Csi, Runtime};
 
@@ -25,10 +28,17 @@ impl Runtime for WasmRuntime {
         input: Value,
         ctx: Box<dyn Csi + Send>,
     ) -> Result<Value, ExecuteSkillError> {
-        let skill = self.provider.fetch(skill_path, &self.engine).await.map_err(ExecuteSkillError::Other)?;
+        let skill = self
+            .provider
+            .fetch(skill_path, &self.engine)
+            .await
+            .map_err(ExecuteSkillError::Other)?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(ExecuteSkillError::SkillDoesNotExist)?;
-        skill.run(&self.engine, ctx, input).await.map_err(ExecuteSkillError::Other)
+        skill
+            .run(&self.engine, ctx, input)
+            .await
+            .map_err(ExecuteSkillError::Other)
     }
 
     fn upsert_skill(&mut self, skill: SkillPath, tag: Option<String>) {
@@ -49,6 +59,10 @@ impl Runtime for WasmRuntime {
 
     fn invalidate_cached_skill(&mut self, skill: &SkillPath) -> bool {
         self.provider.invalidate(skill)
+    }
+
+    fn invalidate_namespace(&mut self, namespace: String, e: NamespaceDescriptionError) {
+        self.provider.invalidate_namespace(namespace, e);
     }
 }
 

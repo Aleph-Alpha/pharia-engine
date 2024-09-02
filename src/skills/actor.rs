@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::{
-    configuration_observer::NamespaceConfig,
+    configuration_observer::{NamespaceConfig, NamespaceDescriptionError},
     inference::{Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
@@ -175,6 +175,9 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
+            SkillExecutorMessage::InvalidateNamespace { name, e } => {
+                self.runtime.invalidate_namespace(name, e);
+            }
             SkillExecutorMessage::Upsert { skill, tag } => self.runtime.upsert_skill(skill, tag),
             SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
             SkillExecutorMessage::Execute {
@@ -231,6 +234,10 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
 #[derive(Debug)]
 pub enum SkillExecutorMessage {
+    InvalidateNamespace {
+        name: String,
+        e: NamespaceDescriptionError,
+    },
     Upsert {
         skill: SkillPath,
         tag: Option<String>,
@@ -327,11 +334,13 @@ pub mod tests {
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace
-        let result = api.execute_skill(
-            SkillPath::new("my_namespace", "my_skill"),
-            json!("Any input"),
-            "Dummy api token".to_owned(),
-        ).await;
+        let result = api
+            .execute_skill(
+                SkillPath::new("my_namespace", "my_skill"),
+                json!("Any input"),
+                "Dummy api token".to_owned(),
+            )
+            .await;
 
         // Then result indictaes that the skill is missing
         assert!(matches!(result, Err(ExecuteSkillError::SkillDoesNotExist)));
@@ -379,6 +388,10 @@ pub mod tests {
 
             fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
                 skill_path == &self.skill_path
+            }
+
+            fn invalidate_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+                panic!("does not invalidate namespace")
             }
         }
         let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
@@ -486,6 +499,10 @@ pub mod tests {
 
         fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
             self.skills.iter().any(|s| s == skill_path)
+        }
+
+        fn invalidate_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+            panic!("Liar runtime does not invalidate namespace")
         }
     }
 
@@ -633,6 +650,10 @@ pub mod tests {
 
         fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
             skill_path == &self.skill_path
+        }
+
+        fn invalidate_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+            panic!("RustRuntime does not invalidate namespace")
         }
     }
 }

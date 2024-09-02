@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context};
 use serde_json::Value;
 
 use crate::{
-    configuration_observer::{NamespaceConfig, Registry},
+    configuration_observer::{NamespaceConfig, NamespaceDescriptionError, Registry},
     registries::{FileRegistry, OciRegistry, SkillRegistry},
     skills::SkillPath,
 };
@@ -17,7 +17,10 @@ use super::{
 pub struct SkillProvider {
     known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
+    // key: Namespace, value: Registry
     skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
+    // key: Namespace, value: Error
+    invalid_namespaces: HashMap<String, NamespaceDescriptionError>,
 }
 
 impl SkillProvider {
@@ -30,6 +33,7 @@ impl SkillProvider {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
             skill_registries,
+            invalid_namespaces: HashMap::new(),
         }
     }
 
@@ -76,6 +80,10 @@ impl SkillProvider {
 
     pub fn invalidate(&mut self, skill_path: &SkillPath) -> bool {
         self.cached_skills.remove(skill_path).is_some()
+    }
+
+    pub fn invalidate_namespace(&mut self, namespace: String, e: NamespaceDescriptionError) {
+        self.invalid_namespaces.insert(namespace, e);
     }
 
     /// `Some` if the skill can be successfully loaded, `None` if the skill can not be found
