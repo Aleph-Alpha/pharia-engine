@@ -61,8 +61,12 @@ impl Runtime for WasmRuntime {
         self.provider.invalidate(skill)
     }
 
-    fn invalidate_namespace(&mut self, namespace: String, e: NamespaceDescriptionError) {
-        self.provider.invalidate_namespace(namespace, e);
+    fn add_invalid_namespace(&mut self, namespace: String, e: NamespaceDescriptionError) {
+        self.provider.add_invalid_namespace(namespace, e);
+    }
+
+    fn remove_invalid_namespace(&mut self, namespace: &str) {
+        self.provider.remove_invalid_namespace(namespace);
     }
 }
 

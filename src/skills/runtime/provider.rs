@@ -82,8 +82,12 @@ impl SkillProvider {
         self.cached_skills.remove(skill_path).is_some()
     }
 
-    pub fn invalidate_namespace(&mut self, namespace: String, e: NamespaceDescriptionError) {
+    pub fn add_invalid_namespace(&mut self, namespace: String, e: NamespaceDescriptionError) {
         self.invalid_namespaces.insert(namespace, e);
+    }
+
+    pub fn remove_invalid_namespace(&mut self, namespace: &str) {
+        self.invalid_namespaces.remove(namespace);
     }
 
     /// `Some` if the skill can be successfully loaded, `None` if the skill can not be found
@@ -227,7 +231,7 @@ mod tests {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::new("local", "greet_skill");
         let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
-        provider.invalidate_namespace(
+        provider.add_invalid_namespace(
             skill_path.namespace.clone(),
             NamespaceDescriptionError::Unrecoverable(anyhow!("")),
         );

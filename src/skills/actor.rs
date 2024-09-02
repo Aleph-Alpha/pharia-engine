@@ -175,8 +175,11 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
-            SkillExecutorMessage::InvalidateNamespace { name, e } => {
-                self.runtime.invalidate_namespace(name, e);
+            SkillExecutorMessage::AddInvalidNamespace { namespace, e } => {
+                self.runtime.add_invalid_namespace(namespace, e);
+            }
+            SkillExecutorMessage::RemoveInvalidNamespace { namespace } => {
+                self.runtime.remove_invalid_namespace(&namespace);
             }
             SkillExecutorMessage::Upsert { skill, tag } => self.runtime.upsert_skill(skill, tag),
             SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
@@ -234,9 +237,12 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
 #[derive(Debug)]
 pub enum SkillExecutorMessage {
-    InvalidateNamespace {
-        name: String,
+    AddInvalidNamespace {
+        namespace: String,
         e: NamespaceDescriptionError,
+    },
+    RemoveInvalidNamespace {
+        namespace: String,
     },
     Upsert {
         skill: SkillPath,
@@ -390,8 +396,12 @@ pub mod tests {
                 skill_path == &self.skill_path
             }
 
-            fn invalidate_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
-                panic!("does not invalidate namespace")
+            fn add_invalid_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+                panic!("does not add invalid namespace")
+            }
+
+            fn remove_invalid_namespace(&mut self, _namespace: &str) {
+                panic!("does not remove invalid namespace")
             }
         }
         let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
@@ -501,8 +511,12 @@ pub mod tests {
             self.skills.iter().any(|s| s == skill_path)
         }
 
-        fn invalidate_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
-            panic!("Liar runtime does not invalidate namespace")
+        fn add_invalid_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+            panic!("Liar runtime does not add invalid namespace")
+        }
+
+        fn remove_invalid_namespace(&mut self, _namespace: &str) {
+            panic!("Liar runtime does not remove invalid namespace")
         }
     }
 
@@ -652,8 +666,12 @@ pub mod tests {
             skill_path == &self.skill_path
         }
 
-        fn invalidate_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
-            panic!("RustRuntime does not invalidate namespace")
+        fn add_invalid_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+            panic!("Rust runtime does not add invalid namespace")
+        }
+
+        fn remove_invalid_namespace(&mut self, _namespace: &str) {
+            panic!("Rust runtime does not remove invalid namespace")
         }
     }
 }

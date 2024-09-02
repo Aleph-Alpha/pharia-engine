@@ -48,7 +48,9 @@ pub trait Runtime {
     /// it a bit of slack and just tell it that a skill might have changed.
     fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool;
 
-    fn invalidate_namespace(&mut self, namespace: String, e: NamespaceDescriptionError);
+    fn add_invalid_namespace(&mut self, namespace: String, e: NamespaceDescriptionError);
+
+    fn remove_invalid_namespace(&mut self, namespace: &str);
 }
 
 #[async_trait]
@@ -82,11 +84,11 @@ pub mod tests {
         }
 
         fn upsert_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
-            panic!("SaboteurRuntime does not add skill")
+            panic!("Saboteur runtime does not add skill")
         }
 
         fn remove_skill(&mut self, _skill: &SkillPath) {
-            panic!("SaboteurRuntime does not remove skill")
+            panic!("Saboteur runtime does not remove skill")
         }
 
         fn skills(&self) -> impl Iterator<Item = &SkillPath> {
@@ -98,11 +100,15 @@ pub mod tests {
         }
 
         fn invalidate_cached_skill(&mut self, _skill_path: &SkillPath) -> bool {
-            panic!("SaboteurRuntime does not drop skills from cache")
+            panic!("Saboteur runtime does not drop skills from cache")
         }
 
-        fn invalidate_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
-            panic!("SaboteurRuntime does not invalidate namespace")
+        fn add_invalid_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+            panic!("Saboteur runtime does not add invalid namespace")
+        }
+
+        fn remove_invalid_namespace(&mut self, _namespace: &str) {
+            panic!("Saboteur runtime does not remove invalid namespace")
         }
     }
 }
