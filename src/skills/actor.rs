@@ -67,6 +67,22 @@ impl SkillExecutorApi {
         Self { send }
     }
 
+    pub async fn add_invalid_namespace(&self, namespace: String, e: NamespaceDescriptionError) {
+        let msg = SkillExecutorMessage::AddInvalidNamespace { namespace, e };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+    }
+
+    pub async fn remove_invalid_namespace(&self, namespace: String) {
+        let msg = SkillExecutorMessage::RemoveInvalidNamespace { namespace };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+    }
+
     pub async fn upsert_skill(&self, skill: SkillPath, tag: Option<String>) {
         let msg = SkillExecutorMessage::Upsert { skill, tag };
         self.send
