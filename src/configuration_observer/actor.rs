@@ -241,8 +241,10 @@ impl ConfigurationObserverActor {
 pub mod tests {
     use std::collections::HashMap;
     use std::future::pending;
+    use std::sync::Arc;
 
-    use tokio::sync::mpsc;
+    use futures::executor::block_on;
+    use tokio::sync::{mpsc, Mutex};
     use tokio::time::timeout;
 
     use crate::skills::tests::SkillExecutorMessage;
@@ -250,6 +252,30 @@ pub mod tests {
 
     use super::*;
     use anyhow::anyhow;
+
+    pub struct UpdatableConfig {
+        config: Arc<Mutex<Box<dyn ObservableConfig + Send>>>,
+    }
+
+    impl UpdatableConfig {
+        pub fn new(config: Arc<Mutex<Box<dyn ObservableConfig + Send>>>) -> Self {
+            Self { config }
+        }
+    }
+
+    #[async_trait]
+    impl ObservableConfig for UpdatableConfig {
+        fn namespaces(&self) -> Vec<String> {
+            block_on(self.config.lock()).namespaces()
+        }
+
+        async fn skills(
+            &mut self,
+            namespace: &str,
+        ) -> Result<Vec<Skill>, NamespaceDescriptionError> {
+            self.config.lock().await.skills(namespace).await
+        }
+    }
 
     pub struct StubConfig {
         namespaces: HashMap<String, Vec<Skill>>,
@@ -416,12 +442,20 @@ pub mod tests {
         }
     }
 
-    struct SaboteurConfig;
+    struct SaboteurConfig {
+        namespaces: Vec<String>,
+    }
+
+    impl SaboteurConfig {
+        fn new(namespaces: Vec<String>) -> Self {
+            Self { namespaces }
+        }
+    }
 
     #[async_trait]
     impl ObservableConfig for SaboteurConfig {
         fn namespaces(&self) -> Vec<String> {
-            panic!("Should not be invoked")
+            self.namespaces.clone()
         }
 
         async fn skills(
@@ -446,7 +480,7 @@ pub mod tests {
 
         let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(2);
         let skill_executor_api = SkillExecutorApi::new(sender);
-        let config = Box::new(SaboteurConfig);
+        let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
 
         let mut coa =
             ConfigurationObserverActor::with_skills(namespaces, skill_executor_api, config);
@@ -510,5 +544,71 @@ pub mod tests {
         assert!(next_msg.is_err());
 
         observer.wait_for_shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn remove_invalid_namespace_if_namespace_become_valid() {
+        // given an invalid namespace
+        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
+        let skill_executor_api = SkillExecutorApi::new(sender);
+        let update_interval_ms = 1;
+        let update_interval = Duration::from_millis(update_interval_ms);
+        let dummy_namespace = "dummy_namespace";
+        let config_arc: Arc<Mutex<Box<dyn ObservableConfig + Send>>> =
+            Arc::new(Mutex::new(Box::new(SaboteurConfig::new(vec![
+                dummy_namespace.to_owned(),
+            ]))));
+        let config_arc_clone = Arc::clone(&config_arc);
+        let config = Box::new(UpdatableConfig::new(config_arc));
+        let mut observer =
+            ConfigurationObserver::with_config(skill_executor_api, config, update_interval);
+        observer.wait_for_ready().await;
+        receiver.try_recv().unwrap();
+
+        // when the namespace become valid
+        let dummy_skill = "dummy_skill";
+        let namespaces = HashMap::from([(
+            dummy_namespace.to_owned(),
+            vec![Skill::with_name(dummy_skill)],
+        )]);
+        let stub_config = Box::new(StubConfig::new(namespaces));
+        *config_arc_clone.lock().await = stub_config;
+
+        // then we expect the namespace is no longer invalid and its skills are added
+        let msg = timeout(
+            Duration::from_millis(update_interval_ms + 10),
+            receiver.recv(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert!(matches!(
+             msg,
+            SkillExecutorMessage::RemoveInvalidNamespace {
+                namespace
+            }
+            if namespace == dummy_namespace
+        ));
+
+        let msg = timeout(
+            Duration::from_millis(update_interval_ms + 10),
+            receiver.recv(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert!(matches!(
+            msg,
+            SkillExecutorMessage::Upsert {
+                skill: SkillPath {
+                    namespace,
+                    name,
+                },
+                tag: None
+            }
+            if namespace == dummy_namespace && name == dummy_skill
+        ));
     }
 }
