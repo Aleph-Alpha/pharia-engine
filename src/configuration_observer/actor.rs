@@ -7,12 +7,15 @@ use tracing::error;
 
 use crate::skills::{SkillExecutorApi, SkillPath};
 
-use super::{namespace_description::Skill, NamespaceDescriptionLoader, OperatorConfig};
+use super::{
+    namespace_description::{NamespaceDescriptionError, Skill},
+    NamespaceDescriptionLoader, OperatorConfig,
+};
 
 #[async_trait]
 pub trait ObservableConfig {
     fn namespaces(&self) -> Vec<String>;
-    async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<Skill>>;
+    async fn skills(&mut self, namespace: &str) -> Result<Vec<Skill>, NamespaceDescriptionError>;
 }
 
 pub struct NamespaceDescriptionLoaders {
@@ -43,7 +46,7 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
         self.namespaces.keys().cloned().collect()
     }
 
-    async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<Skill>> {
+    async fn skills(&mut self, namespace: &str) -> Result<Vec<Skill>, NamespaceDescriptionError> {
         let skills = self
             .namespaces
             .get_mut(namespace)
@@ -180,12 +183,17 @@ impl ConfigurationObserverActor {
         for namespace in namespaces {
             let incoming = match self.config.skills(namespace).await {
                 Ok(incoming) => incoming,
-                Err(e) => {
-                    //if unrecoverable -> unload skills
+                Err(NamespaceDescriptionError::Recoverable(e)) => {
                     error!(
-                        "Failed to get the latest skills in namespace {namespace}, caused by: {e}"
+                        "Failed to get the skills in namespace {namespace}, fallback to existing skills, caused by: {e}"
                     );
                     continue;
+                }
+                Err(NamespaceDescriptionError::Unrecoverable(e)) => {
+                    error!(
+                        "Failed to get the skills in namespace {namespace}, unload all skills, caused by: {e}"
+                    );
+                    vec![]
                 }
             };
             let existing = self
@@ -239,7 +247,10 @@ pub mod tests {
             self.namespaces.keys().cloned().collect()
         }
 
-        async fn skills(&mut self, namespace: &str) -> anyhow::Result<Vec<Skill>> {
+        async fn skills(
+            &mut self,
+            namespace: &str,
+        ) -> Result<Vec<Skill>, NamespaceDescriptionError> {
             Ok(self
                 .namespaces
                 .get(namespace)
@@ -256,7 +267,10 @@ pub mod tests {
             vec!["dummy_namespace".to_owned()]
         }
 
-        async fn skills(&mut self, _namespace: &str) -> anyhow::Result<Vec<Skill>> {
+        async fn skills(
+            &mut self,
+            _namespace: &str,
+        ) -> Result<Vec<Skill>, NamespaceDescriptionError> {
             pending().await
         }
     }
@@ -389,8 +403,13 @@ pub mod tests {
             panic!("Should not be invoked")
         }
 
-        async fn skills(&mut self, _namespace: &str) -> anyhow::Result<Vec<Skill>> {
-            Err(anyhow!("SaboteurConfig will always fail."))
+        async fn skills(
+            &mut self,
+            _namespace: &str,
+        ) -> Result<Vec<Skill>, NamespaceDescriptionError> {
+            Err(NamespaceDescriptionError::Unrecoverable(anyhow!(
+                "SaboteurConfig will always fail."
+            )))
         }
     }
 

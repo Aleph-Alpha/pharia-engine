@@ -14,7 +14,7 @@ pub enum NamespaceDescriptionError {
     Unrecoverable(anyhow::Error),
 }
 
-pub type NamespaceDescriptionResult = Result<NamespaceDescription, NamespaceDescriptionError>;
+type NamespaceDescriptionResult = Result<NamespaceDescription, NamespaceDescriptionError>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Skill {
