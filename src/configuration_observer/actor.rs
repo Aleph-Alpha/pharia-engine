@@ -197,6 +197,12 @@ impl ConfigurationObserverActor {
                 error!(
                     "Failed to get the skills in namespace {namespace}, unload all skills, caused by: {e}"
                 );
+                self.skill_executor_api
+                    .add_invalid_namespace(
+                        namespace.to_owned(),
+                        NamespaceDescriptionError::Unrecoverable(e),
+                    )
+                    .await;
                 vec![]
             }
         };
@@ -417,7 +423,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn unload_skill_for_invalid_namespace_description() {
+    async fn add_invalid_namespace_and_unload_skill_for_invalid_namespace_description() {
         // given an configuration observer actor
         let dummy_namespace = "dummy_namespace";
         let dummy_skill = "dummy_skill";
@@ -426,7 +432,7 @@ pub mod tests {
             vec![Skill::with_name(dummy_skill)],
         )]);
 
-        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
+        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(2);
         let skill_executor_api = SkillExecutorApi::new(sender);
         let config = Box::new(SaboteurConfig);
 
@@ -436,7 +442,17 @@ pub mod tests {
         // when we load an invalid namespace
         coa.load_namespace(dummy_namespace).await;
 
-        // then unload messages for all loaded skills of that namespace are send
+        // then mark the namespace as invalid and remove all skills of that namespace
+        let msg = receiver.try_recv().unwrap();
+
+        assert!(matches!(
+            msg,
+            SkillExecutorMessage::AddInvalidNamespace {
+                namespace, ..
+            }
+            if namespace == dummy_namespace
+        ));
+
         let msg = receiver.try_recv().unwrap();
 
         assert!(matches!(
