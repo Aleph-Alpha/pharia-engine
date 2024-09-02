@@ -181,38 +181,42 @@ impl ConfigurationObserverActor {
 
     async fn load(&mut self, namespaces: &Vec<String>) {
         for namespace in namespaces {
-            let incoming = match self.config.skills(namespace).await {
-                Ok(incoming) => incoming,
-                Err(NamespaceDescriptionError::Recoverable(e)) => {
-                    error!(
-                        "Failed to get the skills in namespace {namespace}, fallback to existing skills, caused by: {e}"
-                    );
-                    continue;
-                }
-                Err(NamespaceDescriptionError::Unrecoverable(e)) => {
-                    error!(
-                        "Failed to get the skills in namespace {namespace}, unload all skills, caused by: {e}"
-                    );
-                    vec![]
-                }
-            };
-            let existing = self
-                .skills
-                .insert(namespace.to_owned(), incoming)
-                .unwrap_or_default();
+            self.load_namespace(namespace).await;
+        }
+    }
 
-            let incoming = self.skills.get(namespace).unwrap();
-            let diff = Self::compute_diff(&existing, incoming);
-            for skill in diff.added_or_changed {
-                self.skill_executor_api
-                    .upsert_skill(SkillPath::new(namespace, &skill.name), skill.tag)
-                    .await;
+    async fn load_namespace(&mut self, namespace: &str) {
+        let incoming = match self.config.skills(namespace).await {
+            Ok(incoming) => incoming,
+            Err(NamespaceDescriptionError::Recoverable(e)) => {
+                error!(
+                    "Failed to get the skills in namespace {namespace}, fallback to existing skills, caused by: {e}"
+                );
+                return;
             }
-            for skill in diff.removed {
-                self.skill_executor_api
-                    .remove_skill(SkillPath::new(namespace, &skill.name))
-                    .await;
+            Err(NamespaceDescriptionError::Unrecoverable(e)) => {
+                error!(
+                    "Failed to get the skills in namespace {namespace}, unload all skills, caused by: {e}"
+                );
+                vec![]
             }
+        };
+        let existing = self
+            .skills
+            .insert(namespace.to_owned(), incoming)
+            .unwrap_or_default();
+        let incoming = self.skills.get(namespace).unwrap();
+        let diff = Self::compute_diff(&existing, incoming);
+        for skill in diff.added_or_changed {
+            self.skill_executor_api
+                .upsert_skill(SkillPath::new(namespace, &skill.name), skill.tag)
+                .await;
+        }
+
+        for skill in diff.removed {
+            self.skill_executor_api
+                .remove_skill(SkillPath::new(namespace, &skill.name))
+                .await;
         }
     }
 }
@@ -431,7 +435,7 @@ pub mod tests {
             ConfigurationObserverActor::with_skills(namespaces, skill_executor_api, config);
 
         // when we load an invalid namespace
-        coa.load(&vec![dummy_namespace.to_owned()]).await;
+        coa.load_namespace(dummy_namespace).await;
 
         // then unload messages for all loaded skills of that namespace are send
         let msg = receiver.try_recv().unwrap();
