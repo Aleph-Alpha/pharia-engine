@@ -92,6 +92,10 @@ impl SkillProvider {
         skill_path: &SkillPath,
         engine: &Engine,
     ) -> anyhow::Result<Option<&CachedSkill>> {
+        if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
+            return Err(anyhow!("Invalid namespace: {error}"));
+        }
+
         if !self.cached_skills.contains_key(skill_path) {
             let Some(tag) = self.known_skills.get(skill_path) else {
                 return Ok(None);
@@ -216,5 +220,23 @@ mod tests {
 
         // then the skill is no longer cached
         assert!(provider.loaded_skills().next().is_none());
+    }
+
+    #[tokio::test]
+    async fn error_fetching_skill_in_invalid_namespace() {
+        // given a skill in an invalid namespace
+        let skill_path = SkillPath::new("local", "greet_skill");
+        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
+        provider.invalidate_namespace(
+            skill_path.namespace.clone(),
+            NamespaceDescriptionError::Unrecoverable(anyhow!("")),
+        );
+        let engine = Engine::new().unwrap();
+
+        // when fetching the skill
+        let result = provider.fetch(&skill_path, &engine).await;
+
+        // then it returns an error
+        assert!(result.is_err());
     }
 }
