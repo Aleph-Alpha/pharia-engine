@@ -34,13 +34,12 @@ pub fn chunking(text: &str, tokenizer: tokenizers::Tokenizer, params: ChunkParam
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
 
     use tokenizers::Tokenizer;
 
     fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
-        let tokenizer = include_str!("pharia-1-llm-7b-control_tokenizer.json");
-        Tokenizer::from_str(tokenizer).unwrap()
+        let tokenizer = include_bytes!("pharia-1-llm-7b-control_tokenizer.json");
+        Tokenizer::from_bytes(tokenizer).unwrap()
     }
     #[tokio::test]
     async fn chunking_splits_text() {
