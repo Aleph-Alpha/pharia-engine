@@ -18,8 +18,12 @@ use tokio::{
     task::JoinHandle,
 };
 
+/// All configuration values our skill executor cares about, independent of where they are in the
+/// [`crate::AppConfig`]
 pub struct SkillExecutorConfig<'a> {
     pub namespaces: &'a HashMap<String, NamespaceConfig>,
+    /// We use this URL to the AA inference API to fetch tokenizers for chunking
+    pub api_base_url: String,
 }
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
@@ -365,6 +369,7 @@ pub mod tests {
         let namespaces = HashMap::new();
         let config = SkillExecutorConfig {
             namespaces: &namespaces,
+            api_base_url: "https://dummy".to_owned(),
         };
         let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
         let executer = SkillExecutor::new(inference_dummy.api(), config);
