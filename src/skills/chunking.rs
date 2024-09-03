@@ -25,7 +25,7 @@ impl ChunkRequest {
     }
 }
 
-pub fn chunking(text: &str, tokenizer: tokenizers::Tokenizer, params: ChunkParams) -> Vec<String> {
+pub fn chunking(text: &str, tokenizer: &tokenizers::Tokenizer, params: &ChunkParams) -> Vec<String> {
     let config = ChunkConfig::new(params.max_tokens as usize).with_trim(params.trim);
     let splitter = TextSplitter::new(config);
     splitter.chunks(text).map(str::to_owned).collect()
@@ -53,7 +53,7 @@ mod tests {
             overlap: 0,
             trim: true,
         };
-        let chunks = chunking(text, tokenizer, params);
+        let chunks = chunking(text, &tokenizer, &params);
         assert_eq!(chunks.len(), 3);
         assert_eq!(chunks[1], "But, as we look to the horizon of a decade hence, we see no silver bullet. \
             There is no single development, in either technology or in management technique, that by itself \

@@ -1,9 +1,10 @@
 //! Fetching and instatiating tokenizers
 use anyhow::{anyhow, Context};
-use reqwest;
+use async_trait::async_trait;
 use tokenizers::Tokenizer;
 
 /// Allows to a tokenizer for a given model
+#[async_trait]
 pub trait TokenizerProvider {
     /// Tokenizer best used for this model
     async fn tokenizer_for_model(&mut self, model: &str) -> Result<Tokenizer, anyhow::Error>;
@@ -25,6 +26,7 @@ impl TokenizerFromAAInference {
     }
 }
 
+#[async_trait]
 impl TokenizerProvider for TokenizerFromAAInference {
     async fn tokenizer_for_model(&mut self, model: &str) -> Result<Tokenizer, anyhow::Error> {
         let url = format!("{}/models/{model}/tokenizer", self.api_base_url);

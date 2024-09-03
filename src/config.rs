@@ -4,6 +4,8 @@ use crate::configuration_observer::OperatorConfig;
 
 pub struct AppConfig {
     pub tcp_addr: SocketAddr,
+    /// This base URL is used to do inference against models hosted by the Aleph Alpha inference
+    /// stack, as well as used to fetch Tokenizers for said models.
     pub inference_addr: String,
     pub operator_config: OperatorConfig,
 }

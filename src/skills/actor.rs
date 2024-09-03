@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    chunking::ChunkRequest, runtime::{Csi, Runtime, SkillProvider, WasmRuntime}, SkillPath
+    chunking::ChunkRequest, runtime::{Csi, Runtime, SkillProvider, WasmRuntime}, tokenizers::TokenizerProvider, SkillPath
 };
 
 use crate::{
