@@ -56,12 +56,12 @@ impl FileLoader {
 impl NamespaceDescriptionLoader for FileLoader {
     async fn description(&mut self) -> NamespaceDescriptionResult {
         let config = std::fs::read_to_string(&self.path)
-            .with_context(|| format!("Unbale to read file {}", self.path.to_string_lossy()))
+            .with_context(|| format!("Unable to read file {}", self.path.to_string_lossy()))
             .map_err(NamespaceDescriptionError::Recoverable)?;
         let desc = NamespaceDescription::from_str(&config)
             .with_context(|| {
                 format!(
-                "Unbale to parse file {} into a valid configuration for a team owned namespace.",
+                "Unable to parse file {} into a valid configuration for a team owned namespace.",
                 self.path.to_string_lossy()
             )
             })
@@ -104,7 +104,7 @@ impl NamespaceDescriptionLoader for HttpLoader {
             .map_err(|e| NamespaceDescriptionError::Recoverable(e.into()))?;
         let desc = NamespaceDescription::from_str(&content).with_context(|| {
             format!(
-                "Unbale to parse file at '{}' into a valid configuration for a team owned namespace.",
+                "Unable to parse file at '{}' into a valid configuration for a team owned namespace.",
                 self.url
             )
         }).map_err(NamespaceDescriptionError::Recoverable)?;
