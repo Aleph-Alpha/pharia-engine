@@ -302,11 +302,10 @@ const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 #[cfg(test)]
 mod tests {
     use crate::{
-        configuration_observer::{NamespaceDescriptionError, OperatorConfig},
         inference::tests::InferenceStub,
         skills::{
             tests::{LiarRuntime, SkillExecutorMessage},
-            ExecuteSkillError, SkillExecutor, SkillExecutorConfig, SkillPath,
+            ExecuteSkillError, SkillExecutor, SkillPath,
         },
     };
 
@@ -598,26 +597,15 @@ mod tests {
     #[tokio::test]
     async fn invalid_namespace_config_is_500_error() {
         // Given a skill executor which has an invalid namespace
-        let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
-        let completion = "dummy completion";
-        let inference = InferenceStub::with_completion(completion);
-        let config = OperatorConfig::local();
-        let config = SkillExecutorConfig {
-            namespaces: &config.namespaces,
-        };
-        let skill_executor_api = SkillExecutor::new(inference.api(), config).api();
-        let skill_path = SkillPath::new("local", "greet_skill");
-        skill_executor_api
-            .mark_namespace_as_invalid(
-                skill_path.namespace.clone(),
-                NamespaceDescriptionError::Unrecoverable(anyhow!("dummy error")),
-            )
-            .await;
-        let http = http(skill_executor_api);
-
+        let skill_executor = StubSkillExecuter::new(|msg| if let SkillExecutorMessage::Execute { send, ..} = msg {
+            send.send(Err(ExecuteSkillError::Other(anyhow!("Namespace is invalid")))).unwrap();
+        });
+        let http = http(skill_executor.api());
+    
         // When executing a skill in the namespace
+        let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
         let args = ExecuteSkillArgs {
-            skill: skill_path.to_string(),
+            skill: "any_namespace/any_skill".to_owned(),
             input: json!("Homer"),
         };
         let resp = http
@@ -639,7 +627,7 @@ mod tests {
         let response = serde_json::from_slice::<String>(&body).unwrap();
         assert_eq!(
             response,
-            "Invalid namespace: Unrecoverable error loading namespace configuration: dummy error"
+            "Namespace is invalid"
         );
     }
 
