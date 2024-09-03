@@ -139,7 +139,7 @@ pub struct Completion {
 pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
-    pub overlap: Option<u32>,
+    pub overlap: u32,
     pub trim: bool,
 }
 

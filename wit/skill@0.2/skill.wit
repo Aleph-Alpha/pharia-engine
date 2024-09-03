@@ -76,7 +76,7 @@ interface csi {
 		max-tokens: u32,
 		/// The maximum number of tokens overlapping between chunks.
 		/// This must be smaller than max-tokens.
-		overlap: option<u32>,
+		overlap: u32,
 		/// Whether or not whitespace should be trimmed for each chunk.
 		trim: bool,
 	}
