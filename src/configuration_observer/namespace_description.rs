@@ -57,7 +57,7 @@ impl NamespaceDescriptionLoader for FileLoader {
     async fn description(&mut self) -> NamespaceDescriptionResult {
         let config = std::fs::read_to_string(&self.path)
             .with_context(|| format!("Unable to read file {}", self.path.to_string_lossy()))
-            .map_err(NamespaceDescriptionError::Recoverable)?;
+            .map_err(NamespaceDescriptionError::Unrecoverable)?;
         let desc = NamespaceDescription::from_str(&config)
             .with_context(|| {
                 format!(
@@ -65,7 +65,7 @@ impl NamespaceDescriptionLoader for FileLoader {
                 self.path.to_string_lossy()
             )
             })
-            .map_err(NamespaceDescriptionError::Recoverable)?;
+            .map_err(NamespaceDescriptionError::Unrecoverable)?;
         Ok(desc)
     }
 }
