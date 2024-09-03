@@ -1,13 +1,12 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    runtime::{Csi, Runtime, SkillProvider, WasmRuntime},
-    SkillPath,
+    chunking::ChunkRequest, runtime::{Csi, Runtime, SkillProvider, WasmRuntime}, SkillPath
 };
 
 use crate::{
     configuration_observer::{NamespaceConfig, NamespaceDescriptionError},
-    inference::{ChunkRequest, Completion, CompletionRequest, InferenceApi},
+    inference::{Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -333,7 +332,10 @@ impl Csi for SkillInvocationCtx {
     }
 
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
-        unimplemented!("implement that test-driven");
+        unimplemented!("Chunking is not yet implemented")
+        // use model to get tokenizer from AA Api
+        // instantiate tokenizer
+        // chunk model
     }
 }
 

@@ -1,5 +1,6 @@
 mod actor;
 mod runtime;
+pub mod chunking;
 use std::fmt;
 
 pub use actor::{SkillExecutor, SkillExecutorApi, ExecuteSkillError};

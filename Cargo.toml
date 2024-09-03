@@ -59,6 +59,7 @@ wasmtime-wasi = "24.0.0"
 wit-parser = "0.216.0"
 url = "2.5.2"
 thiserror = "1.0.63"
+tokenizers = { version = "0.20.0", default-features = false, features = ["onig", "esaxx_fast"] }
 
 [dev-dependencies]
 fake = "2.9.2"

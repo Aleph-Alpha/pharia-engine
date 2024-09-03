@@ -247,7 +247,7 @@ mod v0_2 {
     use pharia::skill::csi::{ChunkParams, Completion, CompletionParams, FinishReason, Host};
     use wasmtime::component::bindgen;
 
-    use crate::inference;
+    use crate::{inference, skills::chunking};
 
     use super::LinkedCtx;
 
@@ -287,13 +287,12 @@ mod v0_2 {
                 overlap,
                 trim,
             } = params;
-            let params = inference::ChunkParams {
-                model,
+            let params = chunking::ChunkParams {
                 max_tokens,
                 overlap,
                 trim,
             };
-            let request = inference::ChunkRequest::new(text, params);
+            let request = chunking::ChunkRequest::new(text, model, params);
             self.skill_ctx.chunk(request).await
         }
     }

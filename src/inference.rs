@@ -2,7 +2,7 @@ mod actor;
 mod client;
 
 pub use actor::{
-    ChunkParams, ChunkRequest, Completion, CompletionParams, CompletionRequest, FinishReason,
+    Completion, CompletionParams, CompletionRequest, FinishReason,
     Inference, InferenceApi,
 };
 

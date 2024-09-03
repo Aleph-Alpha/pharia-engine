@@ -80,7 +80,7 @@ pub mod tests {
 
     use crate::{
         configuration_observer::OperatorConfig,
-        inference::{ChunkRequest, Completion, CompletionRequest},
+        inference::{Completion, CompletionRequest}, skills::chunking::ChunkRequest,
     };
 
     use super::*;
