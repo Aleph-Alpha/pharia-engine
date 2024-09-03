@@ -312,7 +312,6 @@ mod tests {
 
     use super::*;
 
-    use crate::inference::Inference;
     use anyhow::anyhow;
     use axum::{
         body::Body,
@@ -332,16 +331,6 @@ mod tests {
         API_TOKEN.get_or_init(|| {
             drop(dotenv());
             env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
-        })
-    }
-
-    /// inference address used by test to call inference
-    fn inference_addr() -> &'static str {
-        static INFERENCE_ADDRESS: OnceLock<String> = OnceLock::new();
-        INFERENCE_ADDRESS.get_or_init(|| {
-            drop(dotenv());
-            env::var("INFERENCE_ADDRESS")
-                .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned())
         })
     }
 
@@ -394,12 +383,11 @@ mod tests {
 
     #[tokio::test]
     async fn api_token_missing() {
-        let inference = Inference::new(inference_addr().to_owned());
-        let config = OperatorConfig::local();
-        let config = SkillExecutorConfig {
-            namespaces: &config.namespaces,
-        };
-        let http = http(SkillExecutor::new(inference.api(), config).api());
+        // Given
+        let skill_executor = StubSkillExecuter::new(|_| {});
+
+        // When
+        let http = http(skill_executor.api());
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
             input: json!("Homer"),
@@ -415,6 +403,8 @@ mod tests {
             )
             .await
             .unwrap();
+
+        // Then
         assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(
