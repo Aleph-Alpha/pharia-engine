@@ -1,9 +1,9 @@
 mod actor;
-mod runtime;
 pub mod chunking;
+mod runtime;
 use std::fmt;
 
-pub use actor::{SkillExecutor, SkillExecutorApi, ExecuteSkillError};
+pub use actor::{ExecuteSkillError, SkillExecutor, SkillExecutorApi};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SkillPath {
