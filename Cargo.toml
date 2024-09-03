@@ -13,6 +13,12 @@ unused = { level = "warn", priority = -1 }
 
 [workspace.lints.clippy]
 dbg-macro = "warn"
+# While the pass by value may be needless know, one might decide to pass ownership with later
+# optimizations in mind. Long story short: Function signatures are interfacs, which may be harder
+# to change later, and we might anticpate actually using the ownership in the implementation later,
+# even if we do not do so know. IMHO this lint was created without keeping in mind that code needs
+# to change. This leads to false positives.
+needless-pass-by-value = "allow"
 pedantic = { level = "warn", priority = -1 }
 module-name-repetitions = "allow"
 

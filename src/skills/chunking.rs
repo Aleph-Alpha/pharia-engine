@@ -25,8 +25,14 @@ impl ChunkRequest {
     }
 }
 
-pub fn chunking(text: &str, tokenizer: &tokenizers::Tokenizer, params: &ChunkParams) -> Vec<String> {
-    let config = ChunkConfig::new(params.max_tokens as usize).with_trim(params.trim);
+pub fn chunking(
+    text: &str,
+    tokenizer: &tokenizers::Tokenizer,
+    params: &ChunkParams,
+) -> Vec<String> {
+    let config = ChunkConfig::new(params.max_tokens as usize)
+        .with_sizer(tokenizer)
+        .with_trim(params.trim);
     let splitter = TextSplitter::new(config);
     splitter.chunks(text).map(str::to_owned).collect()
 }
@@ -49,20 +55,19 @@ mod tests {
 
         // When we chunk the text
         let params = ChunkParams {
-            max_tokens: 1000,
+            max_tokens: 100,
             overlap: 0,
             trim: true,
         };
         let chunks = chunking(text, &tokenizer, &params);
-        assert_eq!(chunks.len(), 3);
-        assert_eq!(chunks[1], "But, as we look to the horizon of a decade hence, we see no silver bullet. \
-            There is no single development, in either technology or in management technique, that by itself \
-            promises even one order-of-magnitude improvement in productivity, in reliability, in simplicity. \
-            In this article, I shall try to show why, by examining both the nature of the software problem and \
-            the properties of the bullets proposed.\n\nSkepticism is not pessimism, however. Although we see no \
-            startling breakthroughs--and indeed, I believe such to be inconsistent with the nature of software--many \
-            encouraging innovations are under way. A disciplined, consistent effort to develop, propagate, and \
-            exploit these innovations should indeed yield an order-of-magnitude improvement. There is no royal \
-            road, but there is a road.");
+        assert_eq!(chunks.len(), 5);
+        assert_eq!(
+            chunks[1],
+            "The familiar software project, at least as seen by the nontechnical \
+            manager, has something of this character; it is usually innocent and straightforward, \
+            but is capable of becoming a monster of missed schedules, blown budgets, and flawed \
+            products. So we hear desperate cries for a silver bullet--something to make software \
+            costs drop as rapidly as computer hardware costs do."
+        );
     }
 }

@@ -305,8 +305,7 @@ mod tests {
         configuration_observer::{NamespaceDescriptionError, OperatorConfig},
         inference::tests::InferenceStub,
         skills::{
-            tests::{LiarRuntime, SkillExecutorMessage},
-            ExecuteSkillError, SkillExecutor, SkillPath,
+            tests::{LiarRuntime, SkillExecutorMessage}, ExecuteSkillError, SkillExecutor, SkillExecutorConfig, SkillPath
         },
     };
 
@@ -355,7 +354,8 @@ mod tests {
         let completion = "dummy completion";
         let inference = InferenceStub::with_completion(completion);
         let config = OperatorConfig::local();
-        let skill_executor_api = SkillExecutor::new(inference.api(), &config.namespaces).api();
+        let config = SkillExecutorConfig {namespaces: &config.namespaces };
+        let skill_executor_api = SkillExecutor::new(inference.api(), config).api();
         let skill_path = SkillPath::new("local", "greet_skill");
         skill_executor_api
             .upsert_skill(skill_path.clone(), None)
@@ -388,8 +388,8 @@ mod tests {
     async fn api_token_missing() {
         let inference = Inference::new(inference_addr().to_owned());
         let config = OperatorConfig::local();
-
-        let http = http(SkillExecutor::new(inference.api(), &config.namespaces).api());
+        let config = SkillExecutorConfig{ namespaces: &config.namespaces };
+        let http = http(SkillExecutor::new(inference.api(), config).api());
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
             input: json!("Homer"),
@@ -602,7 +602,8 @@ mod tests {
         let completion = "dummy completion";
         let inference = InferenceStub::with_completion(completion);
         let config = OperatorConfig::local();
-        let skill_executor_api = SkillExecutor::new(inference.api(), &config.namespaces).api();
+        let config = SkillExecutorConfig { namespaces: &config.namespaces };
+        let skill_executor_api = SkillExecutor::new(inference.api(), config).api();
         let skill_path = SkillPath::new("local", "greet_skill");
         skill_executor_api
             .mark_namespace_as_invalid(

@@ -1,7 +1,9 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    chunking::ChunkRequest, runtime::{Csi, Runtime, SkillProvider, WasmRuntime}, tokenizers::TokenizerProvider, SkillPath
+    chunking::ChunkRequest,
+    runtime::{Csi, Runtime, SkillProvider, WasmRuntime},
+    SkillPath,
 };
 
 use crate::{
@@ -16,6 +18,10 @@ use tokio::{
     task::JoinHandle,
 };
 
+pub struct SkillExecutorConfig<'a> {
+    pub namespaces: &'a HashMap<String, NamespaceConfig>,
+}
+
 /// Starts and stops the execution of skills as it owns the skill executer actor.
 pub struct SkillExecutor {
     send: mpsc::Sender<SkillExecutorMessage>,
@@ -24,8 +30,8 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(inference_api: InferenceApi, namespaces: &HashMap<String, NamespaceConfig>) -> Self {
-        let provider = SkillProvider::new(namespaces);
+    pub fn new(inference_api: InferenceApi, cfg: SkillExecutorConfig<'_>) -> Self {
+        let provider = SkillProvider::new(cfg.namespaces);
         let runtime = WasmRuntime::with_provider(provider);
         Self::with_runtime(runtime, inference_api)
     }
@@ -357,8 +363,11 @@ pub mod tests {
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
         let namespaces = HashMap::new();
+        let config = SkillExecutorConfig {
+            namespaces: &namespaces,
+        };
         let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
-        let executer = SkillExecutor::new(inference_dummy.api(), &namespaces);
+        let executer = SkillExecutor::new(inference_dummy.api(), config);
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace

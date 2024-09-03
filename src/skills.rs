@@ -4,7 +4,7 @@ mod tokenizers;
 pub mod chunking;
 use std::fmt;
 
-pub use actor::{ExecuteSkillError, SkillExecutor, SkillExecutorApi};
+pub use actor::{ExecuteSkillError, SkillExecutor, SkillExecutorApi, SkillExecutorConfig};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SkillPath {

@@ -26,11 +26,11 @@ pub async fn run(
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> Result<impl Future<Output = ()>, Error> {
     // Boot up the drivers which power the CSI. Right now we only have inference.
-    let inference = Inference::new(app_config.inference_addr);
+    let inference = Inference::new(app_config.inference_addr.clone());
 
     // Boot up runtime we need to execute Skills
     let skill_executor =
-        SkillExecutor::new(inference.api(), &app_config.operator_config.namespaces);
+        SkillExecutor::new(inference.api(), app_config.skill_executer_cfg());
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
