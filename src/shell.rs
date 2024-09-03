@@ -302,7 +302,7 @@ const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 #[cfg(test)]
 mod tests {
     use crate::{
-        configuration_observer::OperatorConfig,
+        configuration_observer::{NamespaceDescriptionError, OperatorConfig},
         inference::tests::InferenceStub,
         skills::{
             tests::{LiarRuntime, SkillExecutorMessage},
@@ -313,6 +313,7 @@ mod tests {
     use super::*;
 
     use crate::inference::Inference;
+    use anyhow::anyhow;
     use axum::{
         body::Body,
         http::{self, header, Request},
@@ -592,6 +593,51 @@ mod tests {
         let skills_str = String::from_utf8(body.to_vec()).unwrap();
         let skills = serde_json::from_str::<Vec<String>>(&skills_str).unwrap();
         assert_eq!(skills, vec![skill_qualified_name]);
+    }
+
+    #[tokio::test]
+    async fn invalid_namespace_config_is_500_error() {
+        // Given a skill executor which has an invalid namespace
+        let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
+        let completion = "dummy completion";
+        let inference = InferenceStub::with_completion(completion);
+        let config = OperatorConfig::local();
+        let skill_executor_api = SkillExecutor::new(inference.api(), &config.namespaces).api();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        skill_executor_api
+            .mark_namespace_as_invalid(
+                skill_path.namespace.clone(),
+                NamespaceDescriptionError::Unrecoverable(anyhow!("dummy error")),
+            )
+            .await;
+        let http = http(skill_executor_api);
+
+        // When executing a skill in the namespace
+        let args = ExecuteSkillArgs {
+            skill: skill_path.to_string(),
+            input: json!("Homer"),
+        };
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/execute_skill")
+                    .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the response is 500 about invalid namespace
+        assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let response = serde_json::from_slice::<String>(&body).unwrap();
+        assert_eq!(
+            response,
+            "Invalid namespace: Unrecoverable error loading namespace configuration: dummy error"
+        );
     }
 
     #[tokio::test]
