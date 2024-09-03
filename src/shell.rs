@@ -305,7 +305,8 @@ mod tests {
         configuration_observer::{NamespaceDescriptionError, OperatorConfig},
         inference::tests::InferenceStub,
         skills::{
-            tests::{LiarRuntime, SkillExecutorMessage}, ExecuteSkillError, SkillExecutor, SkillExecutorConfig, SkillPath
+            tests::{LiarRuntime, SkillExecutorMessage},
+            ExecuteSkillError, SkillExecutor, SkillExecutorConfig, SkillPath,
         },
     };
 
@@ -344,19 +345,26 @@ mod tests {
         })
     }
 
-    #[cfg_attr(not(feature = "test_inference"), ignore)]
     #[tokio::test]
     async fn execute_skill() {
+        // Given
+        let skill_path = SkillPath::new("local", "greet_skill");
+        let skill_path_clone = skill_path.clone();
+        let skill_executer_mock = StubSkillExecuter::new(move |msg| {
+            if let SkillExecutorMessage::Execute {
+                skill_path, send, ..
+            } = msg
+            {
+                assert_eq!(skill_path, skill_path_clone);
+                send.send(Ok(json!("dummy completion"))).unwrap();
+            }
+        });
+        let skill_executor_api = skill_executer_mock.api();
+
+        // When
         let api_token = api_token();
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
-
-        let completion = "dummy completion";
-        let inference = InferenceStub::with_completion(completion);
-        let config = OperatorConfig::local();
-        let config = SkillExecutorConfig {namespaces: &config.namespaces };
-        let skill_executor_api = SkillExecutor::new(inference.api(), config).api();
-        let skill_path = SkillPath::new("local", "greet_skill");
         skill_executor_api
             .upsert_skill(skill_path.clone(), None)
             .await;
@@ -381,14 +389,16 @@ mod tests {
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = serde_json::from_slice::<String>(&body).unwrap();
-        assert_eq!(answer, completion);
+        assert_eq!(answer, "dummy completion");
     }
 
     #[tokio::test]
     async fn api_token_missing() {
         let inference = Inference::new(inference_addr().to_owned());
         let config = OperatorConfig::local();
-        let config = SkillExecutorConfig{ namespaces: &config.namespaces };
+        let config = SkillExecutorConfig {
+            namespaces: &config.namespaces,
+        };
         let http = http(SkillExecutor::new(inference.api(), config).api());
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
@@ -602,7 +612,9 @@ mod tests {
         let completion = "dummy completion";
         let inference = InferenceStub::with_completion(completion);
         let config = OperatorConfig::local();
-        let config = SkillExecutorConfig { namespaces: &config.namespaces };
+        let config = SkillExecutorConfig {
+            namespaces: &config.namespaces,
+        };
         let skill_executor_api = SkillExecutor::new(inference.api(), config).api();
         let skill_path = SkillPath::new("local", "greet_skill");
         skill_executor_api
