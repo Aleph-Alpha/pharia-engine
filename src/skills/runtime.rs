@@ -11,7 +11,7 @@ pub use wasm::WasmRuntime;
 
 use crate::{
     configuration_observer::NamespaceDescriptionError,
-    inference::{Completion, CompletionRequest},
+    inference::{ChunkRequest, Completion, CompletionRequest},
 };
 
 use super::{actor::ExecuteSkillError, SkillPath};
@@ -56,6 +56,7 @@ pub trait Runtime {
 #[async_trait]
 pub trait Csi {
     async fn complete_text(&mut self, request: CompletionRequest) -> Completion;
+    async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
 }
 
 #[cfg(test)]

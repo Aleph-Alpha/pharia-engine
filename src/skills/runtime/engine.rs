@@ -244,7 +244,7 @@ impl WasiView for LinkedCtx {
 }
 
 mod v0_2 {
-    use pharia::skill::csi::{Completion, CompletionParams, FinishReason, Host};
+    use pharia::skill::csi::{ChunkParams, Completion, CompletionParams, FinishReason, Host};
     use wasmtime::component::bindgen;
 
     use crate::inference;
@@ -278,6 +278,23 @@ mod v0_2 {
             };
             let request = inference::CompletionRequest::new(prompt, model).with_params(params);
             self.skill_ctx.complete_text(request).await.into()
+        }
+
+        async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
+            let ChunkParams {
+                model,
+                max_tokens,
+                overlap,
+                trim,
+            } = params;
+            let params = inference::ChunkParams {
+                model,
+                max_tokens,
+                overlap,
+                trim,
+            };
+            let request = inference::ChunkRequest::new(text, params);
+            self.skill_ctx.chunk(request).await
         }
     }
 

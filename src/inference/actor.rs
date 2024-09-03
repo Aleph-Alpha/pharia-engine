@@ -135,6 +135,26 @@ pub struct Completion {
     pub finish_reason: FinishReason,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ChunkParams {
+    pub model: String,
+    pub max_tokens: u32,
+    pub overlap: Option<u32>,
+    pub trim: bool,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ChunkRequest {
+    pub text: String,
+    pub params: ChunkParams,
+}
+
+impl ChunkRequest {
+    pub fn new(text: String, params: ChunkParams) -> Self {
+        Self { text, params }
+    }
+}
+
 /// Private implementation of the inference actor running in its own dedicated green thread.
 struct InferenceActor<C: InferenceClient + Send + Sync + 'static> {
     client: Arc<C>,

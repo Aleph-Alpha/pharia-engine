@@ -80,7 +80,7 @@ pub mod tests {
 
     use crate::{
         configuration_observer::OperatorConfig,
-        inference::{Completion, CompletionRequest},
+        inference::{ChunkRequest, Completion, CompletionRequest},
     };
 
     use super::*;
@@ -275,6 +275,10 @@ pub mod tests {
         async fn complete_text(&mut self, _request: CompletionRequest) -> Completion {
             Completion::from_text("Hello")
         }
+
+        async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
+            vec![request.text]
+        }
     }
 
     /// Asserts a specific prompt and model and returns a greeting message
@@ -304,6 +308,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 Completion::from_text("Mock expectation violated")
             }
         }
+
+        async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
+            vec![request.text]
+        }
     }
 
     #[derive(Default, Clone)]
@@ -323,6 +331,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             let mut counter = self.counter.lock().unwrap();
             *counter += 1;
             Completion::from_text(counter.to_string())
+        }
+
+        async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
+            vec![request.text]
         }
     }
 }

@@ -7,7 +7,7 @@ use super::{
 
 use crate::{
     configuration_observer::{NamespaceConfig, NamespaceDescriptionError},
-    inference::{Completion, CompletionRequest, InferenceApi},
+    inference::{ChunkRequest, Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -330,6 +330,10 @@ impl Csi for SkillInvocationCtx {
                 pending().await
             }
         }
+    }
+
+    async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
+        unimplemented!("implement that test-driven");
     }
 }
 
