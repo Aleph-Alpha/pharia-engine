@@ -191,7 +191,7 @@ impl ConfigurationObserverActor {
             Ok(incoming) => {
                 if self.invalid_namespaces.contains(namespace) {
                     self.skill_executor_api
-                        .remove_invalid_namespace(namespace.to_owned())
+                        .mark_namespace_as_valid(namespace.to_owned())
                         .await;
                     self.invalid_namespaces.remove(namespace);
                 }
@@ -208,7 +208,7 @@ impl ConfigurationObserverActor {
                     "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
                 self.skill_executor_api
-                    .add_invalid_namespace(
+                    .mark_namespace_as_invalid(
                         namespace.to_owned(),
                         NamespaceDescriptionError::Unrecoverable(e),
                     )
@@ -493,7 +493,7 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillExecutorMessage::AddInvalidNamespace {
+            SkillExecutorMessage::MarkNamespaceAsInvalid {
                 namespace, ..
             }
             if namespace == dummy_namespace
@@ -585,7 +585,7 @@ pub mod tests {
 
         assert!(matches!(
              msg,
-            SkillExecutorMessage::RemoveInvalidNamespace {
+            SkillExecutorMessage::MarkNamespaceAsValid {
                 namespace
             }
             if namespace == dummy_namespace

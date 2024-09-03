@@ -48,9 +48,9 @@ pub trait Runtime {
     /// it a bit of slack and just tell it that a skill might have changed.
     fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool;
 
-    fn add_invalid_namespace(&mut self, namespace: String, e: NamespaceDescriptionError);
+    fn mark_namespace_as_invalid(&mut self, namespace: String, e: NamespaceDescriptionError);
 
-    fn remove_invalid_namespace(&mut self, namespace: &str);
+    fn mark_namespace_as_valid(&mut self, namespace: &str);
 }
 
 #[async_trait]
@@ -103,11 +103,11 @@ pub mod tests {
             panic!("Saboteur runtime does not drop skills from cache")
         }
 
-        fn add_invalid_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
             panic!("Saboteur runtime does not add invalid namespace")
         }
 
-        fn remove_invalid_namespace(&mut self, _namespace: &str) {
+        fn mark_namespace_as_valid(&mut self, _namespace: &str) {
             panic!("Saboteur runtime does not remove invalid namespace")
         }
     }

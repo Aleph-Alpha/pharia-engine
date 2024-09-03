@@ -67,16 +67,16 @@ impl SkillExecutorApi {
         Self { send }
     }
 
-    pub async fn add_invalid_namespace(&self, namespace: String, e: NamespaceDescriptionError) {
-        let msg = SkillExecutorMessage::AddInvalidNamespace { namespace, e };
+    pub async fn mark_namespace_as_invalid(&self, namespace: String, e: NamespaceDescriptionError) {
+        let msg = SkillExecutorMessage::MarkNamespaceAsInvalid { namespace, e };
         self.send
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn remove_invalid_namespace(&self, namespace: String) {
-        let msg = SkillExecutorMessage::RemoveInvalidNamespace { namespace };
+    pub async fn mark_namespace_as_valid(&self, namespace: String) {
+        let msg = SkillExecutorMessage::MarkNamespaceAsValid { namespace };
         self.send
             .send(msg)
             .await
@@ -191,11 +191,11 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
-            SkillExecutorMessage::AddInvalidNamespace { namespace, e } => {
-                self.runtime.add_invalid_namespace(namespace, e);
+            SkillExecutorMessage::MarkNamespaceAsInvalid { namespace, e } => {
+                self.runtime.mark_namespace_as_invalid(namespace, e);
             }
-            SkillExecutorMessage::RemoveInvalidNamespace { namespace } => {
-                self.runtime.remove_invalid_namespace(&namespace);
+            SkillExecutorMessage::MarkNamespaceAsValid { namespace } => {
+                self.runtime.mark_namespace_as_valid(&namespace);
             }
             SkillExecutorMessage::Upsert { skill, tag } => self.runtime.upsert_skill(skill, tag),
             SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
@@ -253,11 +253,11 @@ impl<R: Runtime> SkillExecutorActor<R> {
 
 #[derive(Debug)]
 pub enum SkillExecutorMessage {
-    AddInvalidNamespace {
+    MarkNamespaceAsInvalid {
         namespace: String,
         e: NamespaceDescriptionError,
     },
-    RemoveInvalidNamespace {
+    MarkNamespaceAsValid {
         namespace: String,
     },
     Upsert {
@@ -412,11 +412,15 @@ pub mod tests {
                 skill_path == &self.skill_path
             }
 
-            fn add_invalid_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+            fn mark_namespace_as_invalid(
+                &mut self,
+                _namespace: String,
+                _e: NamespaceDescriptionError,
+            ) {
                 panic!("does not add invalid namespace")
             }
 
-            fn remove_invalid_namespace(&mut self, _namespace: &str) {
+            fn mark_namespace_as_valid(&mut self, _namespace: &str) {
                 panic!("does not remove invalid namespace")
             }
         }
@@ -527,11 +531,11 @@ pub mod tests {
             self.skills.iter().any(|s| s == skill_path)
         }
 
-        fn add_invalid_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
             panic!("Liar runtime does not add invalid namespace")
         }
 
-        fn remove_invalid_namespace(&mut self, _namespace: &str) {
+        fn mark_namespace_as_valid(&mut self, _namespace: &str) {
             panic!("Liar runtime does not remove invalid namespace")
         }
     }
@@ -682,11 +686,11 @@ pub mod tests {
             skill_path == &self.skill_path
         }
 
-        fn add_invalid_namespace(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
             panic!("Rust runtime does not add invalid namespace")
         }
 
-        fn remove_invalid_namespace(&mut self, _namespace: &str) {
+        fn mark_namespace_as_valid(&mut self, _namespace: &str) {
             panic!("Rust runtime does not remove invalid namespace")
         }
     }
