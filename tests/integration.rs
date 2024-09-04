@@ -31,6 +31,7 @@ impl Kernel {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::local(),
+            aa_api_token: api_token().to_owned(),
         };
         Self::new(app_config).await
     }

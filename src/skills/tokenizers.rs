@@ -57,9 +57,7 @@ impl TokenizerProvider for TokenizerFromAAInference {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, sync::OnceLock};
-
-    use dotenvy::dotenv;
+    use crate::tests::api_token;
 
     use super::{TokenizerFromAAInference, TokenizerProvider};
 
@@ -76,16 +74,5 @@ mod tests {
 
         // Then we can use the tokenizer
         assert_eq!(tokenizer.get_vocab_size(true), 128_000);
-    }
-
-    /// API Token used by tests to authenticate requests.
-    ///
-    /// Similar functionality exists in shell.rs, better extract these into a common helper
-    fn api_token() -> &'static str {
-        static API_TOKEN: OnceLock<String> = OnceLock::new();
-        API_TOKEN.get_or_init(|| {
-            drop(dotenv());
-            env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
-        })
     }
 }

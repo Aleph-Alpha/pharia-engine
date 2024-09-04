@@ -1,6 +1,7 @@
-use std::{env, fs::File, io::Write, path::Path};
+use std::{env, fs::File, io::Write, path::Path, sync::OnceLock};
 
 use assert_cmd::Command;
+use dotenvy::dotenv;
 use pharia_kernel::{run, AppConfig, OperatorConfig};
 use predicates::str::contains;
 use tokio::{sync::oneshot, task::JoinHandle};
@@ -89,6 +90,15 @@ async fn run_skill() {
     kernel.shutdown().await;
 }
 
+/// API Token used by tests to authenticate requests.
+fn api_token() -> &'static str {
+    static API_TOKEN: OnceLock<String> = OnceLock::new();
+    API_TOKEN.get_or_init(|| {
+        drop(dotenv());
+        env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
+    })
+}
+
 struct Kernel {
     handle: JoinHandle<()>,
     shutdown_trigger: oneshot::Sender<()>,
@@ -120,6 +130,7 @@ impl Kernel {
                 "#,
             )
             .unwrap(),
+            aa_api_token: api_token().to_owned(),
         };
         Self::new(app_config).await
     }

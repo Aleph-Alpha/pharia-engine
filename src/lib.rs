@@ -17,9 +17,9 @@ pub use configuration_observer::OperatorConfig;
 
 /// Boots up all the actors making up the kernel. The result of this method is also a future, which
 /// signals that all resources have been shutdown.
-/// 
+///
 /// # Errors
-/// 
+///
 /// Errors if the configuration is invalid
 pub async fn run(
     app_config: AppConfig,
@@ -29,8 +29,7 @@ pub async fn run(
     let inference = Inference::new(app_config.inference_addr.clone());
 
     // Boot up runtime we need to execute Skills
-    let skill_executor =
-        SkillExecutor::new(inference.api(), app_config.skill_executer_cfg());
+    let skill_executor = SkillExecutor::new(inference.api(), app_config.skill_executer_cfg());
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
@@ -69,14 +68,25 @@ pub async fn run(
 
 #[cfg(test)]
 mod tests {
-
+    use std::env;
     use std::future::ready;
+    use std::sync::OnceLock;
     use std::time::Duration;
 
     use configuration_observer::OperatorConfig;
+    use dotenvy::dotenv;
     use tokio_test::assert_ok;
 
     use super::*;
+
+    /// API Token used by tests to authenticate requests.
+    pub fn api_token() -> &'static str {
+        static API_TOKEN: OnceLock<String> = OnceLock::new();
+        API_TOKEN.get_or_init(|| {
+            drop(dotenv());
+            env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
+        })
+    }
 
     // tests if the shutdown procedure is executed properly (not blocking)
     #[tokio::test]
@@ -85,6 +95,7 @@ mod tests {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::empty(),
+            aa_api_token: api_token().to_owned(),
         };
 
         let shutdown_completed = super::run(config, ready(())).await.unwrap();

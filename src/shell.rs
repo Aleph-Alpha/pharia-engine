@@ -307,6 +307,7 @@ mod tests {
             tests::{LiarRuntime, SkillExecutorMessage},
             ExecuteSkillError, SkillExecutor, SkillPath,
         },
+        tests::api_token,
     };
 
     use super::*;
@@ -316,22 +317,10 @@ mod tests {
         body::Body,
         http::{self, header, Request},
     };
-    use dotenvy::dotenv;
     use http_body_util::BodyExt;
     use serde_json::json;
-    use std::env;
-    use std::sync::OnceLock;
     use tokio::{sync::mpsc, task::JoinHandle};
     use tower::util::ServiceExt;
-
-    /// API Token used by tests to authenticate requests
-    fn api_token() -> &'static str {
-        static API_TOKEN: OnceLock<String> = OnceLock::new();
-        API_TOKEN.get_or_init(|| {
-            drop(dotenv());
-            env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
-        })
-    }
 
     #[tokio::test]
     async fn execute_skill() {
@@ -597,11 +586,16 @@ mod tests {
     #[tokio::test]
     async fn invalid_namespace_config_is_500_error() {
         // Given a skill executor which has an invalid namespace
-        let skill_executor = StubSkillExecuter::new(|msg| if let SkillExecutorMessage::Execute { send, ..} = msg {
-            send.send(Err(ExecuteSkillError::Other(anyhow!("Namespace is invalid")))).unwrap();
+        let skill_executor = StubSkillExecuter::new(|msg| {
+            if let SkillExecutorMessage::Execute { send, .. } = msg {
+                send.send(Err(ExecuteSkillError::Other(anyhow!(
+                    "Namespace is invalid"
+                ))))
+                .unwrap();
+            }
         });
         let http = http(skill_executor.api());
-    
+
         // When executing a skill in the namespace
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
         let args = ExecuteSkillArgs {
@@ -625,10 +619,7 @@ mod tests {
         assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let response = serde_json::from_slice::<String>(&body).unwrap();
-        assert_eq!(
-            response,
-            "Namespace is invalid"
-        );
+        assert_eq!(response, "Namespace is invalid");
     }
 
     #[tokio::test]
