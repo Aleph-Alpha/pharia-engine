@@ -316,7 +316,7 @@ pub struct SkillInvocationCtx {
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
     send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
-    inference_api: InferenceApi,
+    csi_apis: CsiApis,
     api_token: String,
     tokenizer_provider: Box<dyn TokenizerProvider + Send>,
 }
@@ -330,7 +330,7 @@ impl SkillInvocationCtx {
     ) -> Self {
         SkillInvocationCtx {
             send_rt_err: Some(send_rt_err),
-            inference_api: csi_apis.inference,
+            csi_apis,
             api_token,
             tokenizer_provider: Box::new(tokenizer_provider),
         }
@@ -351,7 +351,8 @@ impl SkillInvocationCtx {
 impl Csi for SkillInvocationCtx {
     async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
         match self
-            .inference_api
+            .csi_apis
+            .inference
             .complete_text(params, self.api_token.clone())
             .await
         {
