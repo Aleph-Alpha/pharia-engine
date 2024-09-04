@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::channel::oneshot::{self, channel};
+use futures::channel::oneshot;
 use tokenizers::Tokenizer;
 use tokio::{sync::mpsc, task::JoinHandle,};
 use anyhow::{anyhow, Context as _};
@@ -116,8 +116,11 @@ async fn tokenizer_for_model(api_base_url: &str, api_token: String, model: &str)
 
 #[cfg(test)]
 pub mod tests {
+    use std::sync::Arc;
+
     use tokenizers::Tokenizer;
-    use super::tokenizer_for_model;
+    use tokio::{sync::mpsc, task::JoinHandle};
+    use super::{tokenizer_for_model, TokenizersApi, TokenizersMsg};
 
     use crate::tests::{api_token, inference_address};
 
@@ -125,6 +128,40 @@ pub mod tests {
     pub fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
         let tokenizer = include_bytes!("tokenizers/pharia-1-llm-7b-control_tokenizer.json");
         Tokenizer::from_bytes(tokenizer).unwrap()
+    }
+
+    /// A skill executer double, loaded up with predefined answers.
+    pub struct StubTokenizers {
+        send: mpsc::Sender<TokenizersMsg>,
+        handle: JoinHandle<()>,
+    }
+
+    impl StubTokenizers {
+        pub fn new(
+        ) -> StubTokenizers {
+            let (send, mut recv) = mpsc::channel(1);
+            let handle = tokio::spawn(async move {
+                while let Some(msg) = recv.recv().await {
+                    match msg {
+                        TokenizersMsg::TokenizerByModel { api_token: _, model_name, send } => {
+                            if model_name == "Pharia-1-LLM-7B-control" {
+                                send.send(Ok(Arc::new(pharia_1_llm_7b_control_tokenizer()))).unwrap();
+                            }
+                        },
+                    }
+                }
+            });
+            Self { send, handle }
+        }
+
+        pub fn api(&self) -> TokenizersApi {
+            TokenizersApi::new(self.send.clone())
+        }
+
+        pub async fn shutdown(self) {
+            drop(self.send);
+            self.handle.await.unwrap();
+        }
     }
 
     #[tokio::test]

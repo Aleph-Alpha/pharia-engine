@@ -1,16 +1,14 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    chunking::{chunking, ChunkRequest},
     runtime::{CsiForSkills, Runtime, SkillProvider, WasmRuntime},
-    tokenizers::{TokenizerFromAAInference, TokenizerProvider},
     SkillPath,
 };
 
 use crate::{
     configuration_observer::{NamespaceConfig, NamespaceDescriptionError},
-    csi::{self, Csi as _, CsiApis},
-    inference::{Completion, CompletionRequest, InferenceApi},
+    csi::{ChunkRequest, Csi as _, CsiApis},
+    inference::{Completion, CompletionRequest},
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -40,22 +38,14 @@ impl SkillExecutor {
     pub fn with_cfg(csi_apis: CsiApis, cfg: SkillExecutorConfig<'_>) -> Self {
         let provider = SkillProvider::new(cfg.namespaces);
         let runtime = WasmRuntime::with_provider(provider);
-        Self::new(runtime, csi_apis, move || {
-            TokenizerFromAAInference::new(cfg.api_base_url.clone(), cfg.api_token.clone())
-        })
+        Self::new(runtime, csi_apis)
     }
 
     /// You may want use this constructor if you want to use a double runtime for testing
-    pub fn new<R: Runtime + Send + 'static>(
-        runtime: R,
-        csi_apis: CsiApis,
-        tokenizer_provider_factory: impl Fn() -> TokenizerFromAAInference + Send + 'static,
-    ) -> Self {
+    pub fn new<R: Runtime + Send + 'static>(runtime: R, csi_apis: CsiApis) -> Self {
         let (send, recv) = mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
-            SkillExecutorActor::new(runtime, recv, csi_apis, tokenizer_provider_factory)
-                .run()
-                .await;
+            SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
         });
         SkillExecutor { send, handle }
     }
@@ -179,29 +169,21 @@ pub enum ExecuteSkillError {
     Other(anyhow::Error),
 }
 
-struct SkillExecutorActor<R: Runtime, F> {
+struct SkillExecutorActor<R: Runtime> {
     runtime: R,
     recv: mpsc::Receiver<SkillExecutorMessage>,
     csi_apis: CsiApis,
-    tokenizer_provider_factory: F,
 }
 
-impl<R, F> SkillExecutorActor<R, F>
+impl<R> SkillExecutorActor<R>
 where
     R: Runtime,
-    F: Fn() -> TokenizerFromAAInference,
 {
-    fn new(
-        runtime: R,
-        recv: mpsc::Receiver<SkillExecutorMessage>,
-        csi_apis: CsiApis,
-        tokenizer_provider_factory: F,
-    ) -> Self {
+    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMessage>, csi_apis: CsiApis) -> Self {
         SkillExecutorActor {
             runtime,
             recv,
             csi_apis,
-            tokenizer_provider_factory,
         }
     }
 
@@ -264,7 +246,6 @@ where
             send_rt_err,
             self.csi_apis.clone(),
             api_token,
-            (self.tokenizer_provider_factory)(),
         ));
         select! {
             result = self.runtime.run(skill_path, input, ctx) => result,
@@ -318,7 +299,6 @@ pub struct SkillInvocationCtx {
     send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
     csi_apis: CsiApis,
     api_token: String,
-    tokenizer_provider: Box<dyn TokenizerProvider + Send>,
 }
 
 impl SkillInvocationCtx {
@@ -326,13 +306,11 @@ impl SkillInvocationCtx {
         send_rt_err: oneshot::Sender<anyhow::Error>,
         csi_apis: CsiApis,
         api_token: String,
-        tokenizer_provider: impl TokenizerProvider + Send + 'static,
     ) -> Self {
         SkillInvocationCtx {
             send_rt_err: Some(send_rt_err),
             csi_apis,
             api_token,
-            tokenizer_provider: Box::new(tokenizer_provider),
         }
     }
 
@@ -360,16 +338,9 @@ impl CsiForSkills for SkillInvocationCtx {
         }
     }
 
-    async fn chunk(
-        &mut self,
-        ChunkRequest {
-            text,
-            model,
-            params,
-        }: ChunkRequest,
-    ) -> Vec<String> {
-        match self.tokenizer_provider.tokenizer_for_model(&model).await {
-            Ok(tokenizer) => chunking(&text, &tokenizer, &params),
+    async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
+        match self.csi_apis.chunk(self.api_token.clone(), request).await {
+            Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
         }
     }
@@ -384,27 +355,23 @@ pub mod tests {
     use serde_json::json;
 
     use crate::{
-        csi::tests::dummy_csi_apis,
+        csi::{tests::dummy_csi_apis, ChunkParams},
         inference::{tests::InferenceStub, CompletionRequest},
-        skills::{
-            chunking::ChunkParams,
-            runtime::tests::SaboteurRuntime,
-            tests::test_tokenizer_provider,
-            tokenizers::tests::{SaboteurTokenizerProvider, StubTokenizerProvider},
-        },
+        skills::runtime::tests::SaboteurRuntime,
         tests::{api_token, inference_address},
+        tokenizers::{tests::StubTokenizers, TokenizersApi, TokenizersMsg},
     };
 
     #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
-        let mut invocation_ctx = SkillInvocationCtx::new(
-            send,
-            dummy_csi_apis(),
-            "dummy token".to_owned(),
-            StubTokenizerProvider,
-        );
+        let tokenizers = StubTokenizers::new();
+        let csi_apis = CsiApis {
+            tokenizers: tokenizers.api(),
+            ..dummy_csi_apis()
+        };
+        let mut invocation_ctx = SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned());
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -416,6 +383,9 @@ pub mod tests {
         };
         let chunks = invocation_ctx.chunk(request).await;
 
+        drop(invocation_ctx);
+        tokenizers.shutdown().await;
+
         // Then a single chunk is returned
         assert_eq!(chunks.len(), 1);
     }
@@ -424,12 +394,17 @@ pub mod tests {
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
         let (send, recv) = oneshot::channel();
-        let mut invocation_ctx = SkillInvocationCtx::new(
-            send,
-            dummy_csi_apis(),
-            "dummy token".to_owned(),
-            SaboteurTokenizerProvider,
-        );
+        let (send_tokenizer, mut recv_tokenizer) = mpsc::channel(1);
+        let tokenizers = TokenizersApi::new(send_tokenizer);
+        tokio::spawn(async move {
+            let TokenizersMsg::TokenizerByModel { send, .. } = recv_tokenizer.recv().await.unwrap();
+            send.send(Err(anyhow!("Failed to load tokenizer")))
+        });
+        let csi_apis = CsiApis {
+            tokenizers,
+            ..dummy_csi_apis()
+        };
+        let mut invocation_ctx = SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned());
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -445,7 +420,7 @@ pub mod tests {
         };
 
         // Then receive the error from saboteur tokenizer provider
-        assert_eq!(error.to_string(), "Failed to load tokenizer.");
+        assert_eq!(error.to_string(), "Failed to load tokenizer");
     }
 
     #[tokio::test]
@@ -539,7 +514,7 @@ pub mod tests {
         // When
         let skill_path = SkillPath::dummy();
         let runtime = MockRuntime { skill_path };
-        let executer = SkillExecutor::new(runtime, csi_apis, test_tokenizer_provider);
+        let executer = SkillExecutor::new(runtime, csi_apis);
         let api = executer.api();
         let another_skill_path = SkillPath::dummy();
         let result = api
@@ -565,7 +540,7 @@ pub mod tests {
             inference: inference.api(),
             ..dummy_csi_apis()
         };
-        let executor = SkillExecutor::new(runtime, csi_apis, test_tokenizer_provider);
+        let executor = SkillExecutor::new(runtime, csi_apis);
 
         let result = executor
             .api()
@@ -590,7 +565,7 @@ pub mod tests {
 
         // When
         let runtime = RustRuntime::with_greet_skill();
-        let executor = SkillExecutor::new(runtime, csi_apis, test_tokenizer_provider);
+        let executor = SkillExecutor::new(runtime, csi_apis);
         let result = executor
             .api()
             .execute_skill(
@@ -665,7 +640,7 @@ pub mod tests {
         let runtime = LiarRuntime::new(&skills);
 
         // When
-        let executor = SkillExecutor::new(runtime, dummy_csi_apis(), test_tokenizer_provider);
+        let executor = SkillExecutor::new(runtime, dummy_csi_apis());
         let result = executor.api().loaded_skills().await;
 
         executor.wait_for_shutdown().await;
@@ -681,7 +656,7 @@ pub mod tests {
         let runtime = LiarRuntime::new(&skills);
 
         // When
-        let executor = SkillExecutor::new(runtime, dummy_csi_apis(), test_tokenizer_provider);
+        let executor = SkillExecutor::new(runtime, dummy_csi_apis());
         let result = executor
             .api()
             .drop_from_cache(SkillPath::from_str("haiku_skill"))
@@ -700,7 +675,7 @@ pub mod tests {
         let runtime = LiarRuntime::new(&skills);
 
         // When
-        let executor = SkillExecutor::new(runtime, dummy_csi_apis(), test_tokenizer_provider);
+        let executor = SkillExecutor::new(runtime, dummy_csi_apis());
         let result = executor
             .api()
             .drop_from_cache(SkillPath::from_str("a_different_skill"))

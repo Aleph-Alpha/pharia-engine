@@ -1,8 +1,7 @@
 mod chunking;
-
-use chunking::ChunkRequest;
-
 use crate::{inference::{Completion, CompletionRequest, InferenceApi}, tokenizers::TokenizersApi};
+
+pub use self::chunking::{ChunkRequest, ChunkParams};
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
 /// 

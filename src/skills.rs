@@ -1,7 +1,6 @@
 mod actor;
 pub mod chunking;
 mod runtime;
-mod tokenizers;
 use std::fmt;
 
 pub use actor::{ExecuteSkillError, SkillExecutor, SkillExecutorApi, SkillExecutorConfig};
@@ -38,7 +37,6 @@ pub mod tests {
     use rand::Rng;
 
     pub use super::actor::SkillExecutorMessage;
-    pub use super::tokenizers::tests::test_tokenizer_provider;
     use super::SkillPath;
 
     impl SkillPath {

@@ -247,7 +247,7 @@ mod v0_2 {
     use pharia::skill::csi::{ChunkParams, Completion, CompletionParams, FinishReason, Host};
     use wasmtime::component::bindgen;
 
-    use crate::{inference, skills::chunking};
+    use crate::{csi::ChunkRequest, inference};
 
     use super::LinkedCtx;
 
@@ -282,8 +282,8 @@ mod v0_2 {
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
             let ChunkParams { model, max_tokens } = params;
-            let params = chunking::ChunkParams { max_tokens };
-            let request = chunking::ChunkRequest::new(text, model, params);
+            let params = crate::csi::ChunkParams { max_tokens };
+            let request = ChunkRequest::new(text, model, params);
             self.skill_ctx.chunk(request).await
         }
     }

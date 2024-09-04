@@ -10,11 +10,10 @@ pub use provider::SkillProvider;
 pub use wasm::WasmRuntime;
 
 use crate::{
-    configuration_observer::NamespaceDescriptionError,
-    inference::{Completion, CompletionRequest},
+    configuration_observer::NamespaceDescriptionError, csi::ChunkRequest, inference::{Completion, CompletionRequest}
 };
 
-use super::{actor::ExecuteSkillError, chunking::ChunkRequest, SkillPath};
+use super::{actor::ExecuteSkillError, SkillPath};
 
 /// Responsible for loading and executing skills.
 pub trait Runtime {

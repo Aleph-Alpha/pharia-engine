@@ -79,9 +79,7 @@ pub mod tests {
     };
 
     use crate::{
-        configuration_observer::OperatorConfig,
-        inference::{Completion, CompletionRequest},
-        skills::chunking::ChunkRequest,
+        configuration_observer::OperatorConfig, csi::ChunkRequest, inference::{Completion, CompletionRequest}
     };
 
     use super::*;
