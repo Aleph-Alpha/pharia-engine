@@ -5,11 +5,13 @@ mod inference;
 mod registries;
 mod shell;
 mod skills;
+mod tokenizers;
 
 use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use csi::CsiApis;
 use futures::Future;
+use tokenizers::Tokenizers;
 use tracing::error;
 
 use self::{inference::Inference, skills::SkillExecutor};
@@ -29,6 +31,7 @@ pub async fn run(
 ) -> Result<impl Future<Output = ()>, Error> {
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr.clone());
+    let tokenizers = Tokenizers::new();
     let csi_apis = CsiApis {
         inference: inference.api(),
     };
