@@ -600,7 +600,7 @@ pub mod tests {
     }
 
     // Tell that `skills` are installed
-    pub struct LiarRuntime {
+    struct LiarRuntime {
         skills: HashSet<SkillPath>,
     }
 

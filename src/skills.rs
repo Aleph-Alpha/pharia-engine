@@ -37,7 +37,6 @@ pub mod tests {
     use fake::{Dummy, Fake, Faker};
     use rand::Rng;
 
-    pub use super::actor::tests::LiarRuntime;
     pub use super::actor::SkillExecutorMessage;
     pub use super::tokenizers::tests::test_tokenizer_provider;
     use super::SkillPath;

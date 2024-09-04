@@ -301,12 +301,10 @@ const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use crate::{
-        inference::tests::InferenceStub,
-        skills::{
-            tests::{test_tokenizer_provider, LiarRuntime, SkillExecutorMessage},
-            ExecuteSkillError, SkillExecutor, SkillPath,
-        },
+        skills::{tests::SkillExecutorMessage, ExecuteSkillError, SkillPath},
         tests::api_token,
     };
 
@@ -403,13 +401,17 @@ mod tests {
 
     #[tokio::test]
     async fn cached_skills_are_returned() {
-        let skills = ["First skill".to_owned(), "Second skill".to_owned()];
-        let runtime = LiarRuntime::new(&skills);
-        let inference = InferenceStub::with_completion("hello");
+        let skill_executer = StubSkillExecuter::new(|msg| {
+            if let SkillExecutorMessage::CachedSkills { send } = msg {
+                send.send(vec![
+                    SkillPath::new("ns", "first"),
+                    SkillPath::new("ns", "second"),
+                ])
+                .unwrap();
+            }
+        });
 
-        let http = http(
-            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider).api(),
-        );
+        let http = http(skill_executer.api());
 
         let resp = http
             .oneshot(
@@ -424,27 +426,32 @@ mod tests {
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
-
-        assert!(answer.contains("First skill"));
-        assert!(answer.contains("Second skill"));
+        assert_eq!(answer, "[\"ns/first\",\"ns/second\"]");
     }
 
     #[tokio::test]
     async fn drop_cached_skill() {
         // Given a runtime with one installed skill
-        let skill_name = "haiku_skill".to_owned();
-        let runtime = LiarRuntime::new(&[skill_name.clone()]);
-        let inference = InferenceStub::with_completion("hello");
-        let http = http(
-            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider).api(),
-        );
+
+        // We use this to spy on the path send to the skill executer. Better to use a channel,
+        // rather than a mutex, but we do not have async closures yet.
+        let skill_path = Arc::new(Mutex::new(None));
+        let skill_path_clone = skill_path.clone();
+        let skill_executer = StubSkillExecuter::new(move |msg| {
+            if let SkillExecutorMessage::Uncache { skill_path, send } = msg {
+                skill_path_clone.lock().unwrap().replace(skill_path);
+                // `true` means it we actually deleted a skill
+                send.send(true).unwrap();
+            }
+        });
+        let http = http(skill_executer.api());
 
         // When the skill is deleted
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri(format!("/cached_skills/{skill_name}"))
+                    .uri(format!("/cached_skills/haiku_skill"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -453,6 +460,10 @@ mod tests {
 
         // Then
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        assert_eq!(
+            skill_path.lock().unwrap().take().unwrap(),
+            SkillPath::new("pharia-kernel-team", "haiku_skill")
+        );
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
         assert!(answer.contains("removed from cache"));
@@ -460,19 +471,27 @@ mod tests {
 
     #[tokio::test]
     async fn drop_non_cached_skill() {
-        // Given a runtime without cached skills
-        let runtime = LiarRuntime::new(&[]);
-        let inference = InferenceStub::with_completion("hello");
-        let http = http(
-            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider).api(),
-        );
+        // Given a runtime without cached skill
 
-        // When a skills is deleted
+        // We use this to spy on the path send to the skill executer. Better to use a channel,
+        // rather than a mutex, but we do not have async closures yet.
+        let skill_path = Arc::new(Mutex::new(None));
+        let skill_path_clone = skill_path.clone();
+        let skill_executer = StubSkillExecuter::new(move |msg| {
+            if let SkillExecutorMessage::Uncache { skill_path, send } = msg {
+                skill_path_clone.lock().unwrap().replace(skill_path);
+                // `true` means it we actually deleted a skill
+                send.send(false).unwrap();
+            }
+        });
+        let http = http(skill_executer.api());
+
+        // When the skill is deleted
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri(format!("/cached_skills/{}", "non-cached-skill"))
+                    .uri(format!("/cached_skills/haiku_skill"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -481,9 +500,13 @@ mod tests {
 
         // Then
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        assert_eq!(
+            skill_path.lock().unwrap().take().unwrap(),
+            SkillPath::new("pharia-kernel-team", "haiku_skill")
+        );
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert!(answer.contains("not present"));
+        assert_eq!(answer, "\"Skill was not present in cache\"");
     }
 
     #[tokio::test]
