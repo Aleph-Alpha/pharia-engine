@@ -88,6 +88,14 @@ mod tests {
         })
     }
 
+    /// Inference address used by tests.
+    pub fn inference_address() -> &'static str {
+        static AA_INFERENCE_ADDRESS: OnceLock<String> = OnceLock::new();
+        AA_INFERENCE_ADDRESS.get_or_init(|| {
+            drop(dotenv());
+            env::var("AA_INFERENCE_ADDRESS").expect("AA_INFERENCE_ADDRESS variable not set")
+        })
+    }
     // tests if the shutdown procedure is executed properly (not blocking)
     #[tokio::test]
     async fn shutdown() {

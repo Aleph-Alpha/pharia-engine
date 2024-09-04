@@ -304,7 +304,7 @@ mod tests {
     use crate::{
         inference::tests::InferenceStub,
         skills::{
-            tests::{LiarRuntime, SkillExecutorMessage},
+            tests::{test_tokenizer_provider, LiarRuntime, SkillExecutorMessage},
             ExecuteSkillError, SkillExecutor, SkillPath,
         },
         tests::api_token,
@@ -407,7 +407,9 @@ mod tests {
         let runtime = LiarRuntime::new(&skills);
         let inference = InferenceStub::with_completion("hello");
 
-        let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
+        let http = http(
+            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider).api(),
+        );
 
         let resp = http
             .oneshot(
@@ -433,7 +435,9 @@ mod tests {
         let skill_name = "haiku_skill".to_owned();
         let runtime = LiarRuntime::new(&[skill_name.clone()]);
         let inference = InferenceStub::with_completion("hello");
-        let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
+        let http = http(
+            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider).api(),
+        );
 
         // When the skill is deleted
         let resp = http
@@ -459,7 +463,9 @@ mod tests {
         // Given a runtime without cached skills
         let runtime = LiarRuntime::new(&[]);
         let inference = InferenceStub::with_completion("hello");
-        let http = http(SkillExecutor::with_runtime(runtime, inference.api()).api());
+        let http = http(
+            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider).api(),
+        );
 
         // When a skills is deleted
         let resp = http

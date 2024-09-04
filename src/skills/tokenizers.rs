@@ -12,6 +12,7 @@ pub trait TokenizerProvider {
 
 /// A [`TokenizerProvider`] which fetches the fitting tokenizer for a model by asking the Aleph
 /// Alpha Inference API fro the correct one.
+#[derive(Clone)]
 pub struct TokenizerFromAAInference {
     api_base_url: String,
     api_token: String,
@@ -56,10 +57,14 @@ impl TokenizerProvider for TokenizerFromAAInference {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::tests::api_token;
+pub mod tests {
+    use crate::tests::{api_token, inference_address};
 
     use super::{TokenizerFromAAInference, TokenizerProvider};
+
+    pub fn test_tokenizer_provider() -> TokenizerFromAAInference {
+        TokenizerFromAAInference::new(inference_address().to_owned(), api_token().to_owned())
+    }
 
     #[tokio::test]
     async fn fetch_pharia_1_llm_7b_control_tokenizer() {
