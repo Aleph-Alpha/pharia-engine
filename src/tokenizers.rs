@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::channel::oneshot;
+use futures::channel::oneshot::{self, channel};
 use tokenizers::Tokenizer;
 use tokio::{sync::mpsc, task::JoinHandle,};
 use anyhow::{anyhow, Context as _};
@@ -13,6 +13,13 @@ pub struct TokenizersApi {
 impl TokenizersApi {
     pub fn new(sender: mpsc::Sender<TokenizersMsg>) -> Self {
         TokenizersApi { sender }
+    }
+
+    pub async fn tokenizer_by_model(&mut self, api_token: String, model_name: String) -> Result<Arc<Tokenizer>, anyhow::Error> {
+        let (send, recv) = oneshot::channel();
+        let msg = TokenizersMsg::TokenizerByModel { api_token, model_name, send };
+        self.sender.send(msg).await.unwrap();
+        recv.await.unwrap()
     }
 }
 
@@ -49,7 +56,7 @@ pub enum TokenizersMsg {
     TokenizerByModel{
         api_token: String,
         model_name: String,
-        send: oneshot::Sender<Arc<Tokenizer>>
+        send: oneshot::Sender<Result<Arc<Tokenizer>, anyhow::Error>>
     }
 }
 
@@ -72,7 +79,9 @@ impl TokenizersActor {
     async fn act(&mut self, msg: TokenizersMsg) {
         match msg {
             TokenizersMsg::TokenizerByModel { api_token, model_name, send } => {
-
+                let result = tokenizer_for_model(&self.api_base_url, api_token, &model_name).await;
+                let send_result = send.send(result.map(Arc::new));
+                drop(send_result)
             },
         }
     }

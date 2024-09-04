@@ -28,9 +28,9 @@ impl Csi for CsiApis {
         self.inference.complete_text(request, auth).await
     }
 
-    async fn chunk(&mut self, _auth: String, request: ChunkRequest,) -> Result<Vec<String>, anyhow::Error> {
-        let tokenizer = todo!();
-        let chunks = chunking::chunking(&request.text, tokenizer, &request.params);
+    async fn chunk(&mut self, auth: String, request: ChunkRequest,) -> Result<Vec<String>, anyhow::Error> {
+        let tokenizer = self.tokenizers.tokenizer_by_model(auth, request.model).await?;
+        let chunks = chunking::chunking(&request.text, &tokenizer, &request.params);
         Ok(chunks)
     }
 }
