@@ -31,7 +31,7 @@ pub async fn run(
 ) -> Result<impl Future<Output = ()>, Error> {
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr.clone());
-    let tokenizers = Tokenizers::new();
+    let tokenizers = Tokenizers::new(app_config.inference_addr.clone());
     let csi_apis = CsiApis {
         inference: inference.api(),
         tokenizers: tokenizers.api(),
