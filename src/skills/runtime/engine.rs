@@ -455,4 +455,36 @@ mod tests {
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
     }
+
+    #[tokio::test]
+    async fn can_load_and_run_unversioned_py_module() {
+        // Given a skill loaded by our engine
+        let wasm = fs::read("skills/greet-py.wasm").unwrap();
+        let engine = Engine::new().unwrap();
+        let skill = engine.instantiate_pre_skill(wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let input = json!("Homer");
+        let result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string
+        assert_eq!(result, json!("Hello Homer"));
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_v0_2_py_module() {
+        // Given a skill loaded by our engine
+        let wasm = fs::read("skills/greet-py-v0_2.wasm").unwrap();
+        let engine = Engine::new().unwrap();
+        let skill = engine.instantiate_pre_skill(wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let input = json!("Homer");
+        let result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string
+        assert_eq!(result, json!("Hello Homer"));
+    }
 }
