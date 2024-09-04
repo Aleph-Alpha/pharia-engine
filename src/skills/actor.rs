@@ -382,14 +382,12 @@ pub mod tests {
     use serde_json::json;
 
     use crate::{
-        inference::{tests::InferenceStub, CompletionRequest},
-        skills::{
+        csi::tests::dummy_csi_apis, inference::{tests::InferenceStub, CompletionRequest}, skills::{
             chunking::ChunkParams,
             runtime::tests::SaboteurRuntime,
             tests::test_tokenizer_provider,
             tokenizers::tests::{SaboteurTokenizerProvider, StubTokenizerProvider},
-        },
-        OperatorConfig,
+        }, OperatorConfig
     };
 
     #[tokio::test]
@@ -456,10 +454,7 @@ pub mod tests {
             api_base_url: "https://dummy".to_owned(),
             api_token: "dummy_token".to_owned(),
         };
-        let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
-        let csi_apis = CsiApis {
-            inference: inference_dummy.api(),
-        };
+        let csi_apis = dummy_csi_apis();
         let executer = SkillExecutor::with_cfg(csi_apis, config);
         let api = executer.api();
 

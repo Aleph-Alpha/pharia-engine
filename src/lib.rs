@@ -34,6 +34,7 @@ pub async fn run(
     let tokenizers = Tokenizers::new();
     let csi_apis = CsiApis {
         inference: inference.api(),
+        tokenizers: tokenizers.api(),
     };
 
     // Boot up runtime we need to execute Skills
