@@ -1,5 +1,4 @@
 mod actor;
-pub mod chunking;
 mod runtime;
 use std::fmt;
 
