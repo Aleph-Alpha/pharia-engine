@@ -281,12 +281,8 @@ mod v0_2 {
         }
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
-            let ChunkParams {
-                model,
-                max_tokens,
-                trim,
-            } = params;
-            let params = chunking::ChunkParams { max_tokens, trim };
+            let ChunkParams { model, max_tokens } = params;
+            let params = chunking::ChunkParams { max_tokens };
             let request = chunking::ChunkRequest::new(text, model, params);
             self.skill_ctx.chunk(request).await
         }

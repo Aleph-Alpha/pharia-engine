@@ -74,8 +74,6 @@ interface csi {
 		model: string,
 		/// The maximum number of tokens that should be returned per chunk.
 		max-tokens: u32,
-		/// Whether or not whitespace should be trimmed for each chunk.
-		trim: bool,
 	}
 
 	@since(version = 0.2.1)

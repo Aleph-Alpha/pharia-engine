@@ -4,7 +4,6 @@ use text_splitter::{ChunkConfig, TextSplitter};
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ChunkParams {
     pub max_tokens: u32,
-    pub trim: bool,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -29,9 +28,7 @@ pub fn chunking(
     tokenizer: &tokenizers::Tokenizer,
     params: &ChunkParams,
 ) -> Vec<String> {
-    let config = ChunkConfig::new(params.max_tokens as usize)
-        .with_sizer(tokenizer)
-        .with_trim(params.trim);
+    let config = ChunkConfig::new(params.max_tokens as usize).with_sizer(tokenizer);
     let splitter = TextSplitter::new(config);
     splitter.chunks(text).map(str::to_owned).collect()
 }
@@ -53,10 +50,7 @@ mod tests {
         let tokenizer = pharia_1_llm_7b_control_tokenizer();
 
         // When we chunk the text
-        let params = ChunkParams {
-            max_tokens: 100,
-            trim: true,
-        };
+        let params = ChunkParams { max_tokens: 100 };
         let chunks = chunking(text, &tokenizer, &params);
         assert_eq!(chunks.len(), 5);
         assert_eq!(
