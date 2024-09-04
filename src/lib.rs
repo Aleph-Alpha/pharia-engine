@@ -70,6 +70,7 @@ pub async fn run(
         // actors are still answering for each component.
         configuration_observer.wait_for_shutdown().await;
         skill_executor.wait_for_shutdown().await;
+        tokenizers.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
     })
 }
