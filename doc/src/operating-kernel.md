@@ -36,7 +36,7 @@ config_url = "file://namespace.toml"
 registry = { type = "file", path = "skills" }
 ```
 
-With the local configuration above, Pharia Kernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace "local". This is mostly intended for local development of skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommended to use a remote namespace. 
+With the local configuration above, Pharia Kernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace "local". This is mostly intended for local development of skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommended to use a remote namespace.
 
 ### Namespace with Remote Config and Remote Registry
 
@@ -70,10 +70,12 @@ By default, only logs of `ERROR` level are output. You can change this by settin
 PHARIA_KERNEL_LOG=info
 ```
 
-## Using on-premise inference
+## Configuring inference API
 
 By default the kernel uses the Aleph Alpha SAAS [inference API](https://api.aleph-alpha.com). You can change this by setting the `INFERENCE_ADDRESS` environment variable.
 
 ```shell
 INFERENCE_ADDRESS=https://inference.acme.com
 ```
+
+An API token needed to be via the environment variable `AA_API_TOKEN`.

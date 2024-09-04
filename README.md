@@ -4,10 +4,6 @@ Pharia Kernel allows you to execute Cognitive Business Units called skills. Thes
 
 The entire Stack including Kernel, Inference, Document Index, etc is called **Pharia OS**.
 
-The current prototype is deployed at <https://pharia-kernel.aleph-alpha.stackit.run>
-
-The status page for uptime robot is found at: <https://stats.uptimerobot.com/gjXpoIPMnv>
-
 ![Block Diagram Pharia OS](./tam/pharia-os-running.drawio.svg)
 
 ## Contributing
@@ -175,19 +171,16 @@ pull container:
 wasm-to-oci pull registry.gitlab.aleph-alpha.de/engineering/pharia-skills/skills/greet-py:v1 --out skills/oci.wasm
 ```
 
-## Design Pharia Kernel
-
-Pharia Kernel is a single process running in a docker container, running actors in a tokio runtime.
-
-![Block Diagram Kernel Overview](./tam/kernel-block.drawio.svg)
-
-* **Shell**: Exposes interface for applications. Handles http requests.
-* **Skill Executer**: Invokes skill in green threads. Forwards their input and output to the shell. Exposes the **C**ognitive **System** **I**nterface (CSI) to the skills.
-* **Context Message Bus**: Exposes the combined API of all drivers via channel to the **Skill Executer** and handles messaging between drivers.
-* **Drivers**: Act as ports for the various external systems.
-
 ## Deploying Pharia Kernel on Customer side
 
 **Pharia Kernel** is intended to be installed **on premise** by the customer it. It is deployed, as are all other modules of the **Pharia OS**, to the JFrog Artifactory. Our colleagues at the Pharia OS Team are going to develop tooling for deploying tooling for rolling it out. Until they come up with a name it is here called "Pharia Up".
 
 ![Block Diagram Pharia OS deploy](./tam/pharia-os-deployment.drawio.svg)
+
+## Helpful links for internal deployment
+
+The current prototype is deployed at <https://pharia-kernel.aleph-alpha.stackit.run>
+
+The status page for uptime robot is found at: <https://stats.uptimerobot.com/gjXpoIPMnv>
+
+The secrets for the deployment can be added to the vault: <https://vault.management-prod01.stackit.run/ui/vault/secrets/c-aa01/list/projects/pharia-kernel/>
