@@ -50,7 +50,6 @@ config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
 registry = { type = "oci", registry = "registry.gitlab.aleph-alpha.de", repository = "engineering/pharia-skills/skills" }
 ```
 
-
 With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace "my-team".
 
 ### Authentication against OCI Registries
