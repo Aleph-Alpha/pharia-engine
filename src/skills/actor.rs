@@ -9,7 +9,7 @@ use super::{
 
 use crate::{
     configuration_observer::{NamespaceConfig, NamespaceDescriptionError},
-    csi::CsiApis,
+    csi::{self, CsiApis},
     inference::{Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
@@ -53,14 +53,9 @@ impl SkillExecutor {
     ) -> Self {
         let (send, recv) = mpsc::channel::<SkillExecutorMessage>(1);
         let handle = tokio::spawn(async {
-            SkillExecutorActor::new(
-                runtime,
-                recv,
-                csi_apis.inference,
-                tokenizer_provider_factory,
-            )
-            .run()
-            .await;
+            SkillExecutorActor::new(runtime, recv, csi_apis, tokenizer_provider_factory)
+                .run()
+                .await;
         });
         SkillExecutor { send, handle }
     }
@@ -187,7 +182,7 @@ pub enum ExecuteSkillError {
 struct SkillExecutorActor<R: Runtime, F> {
     runtime: R,
     recv: mpsc::Receiver<SkillExecutorMessage>,
-    inference_api: InferenceApi,
+    csi_apis: CsiApis,
     tokenizer_provider_factory: F,
 }
 
@@ -199,13 +194,13 @@ where
     fn new(
         runtime: R,
         recv: mpsc::Receiver<SkillExecutorMessage>,
-        inference_api: InferenceApi,
+        csi_apis: CsiApis,
         tokenizer_provider_factory: F,
     ) -> Self {
         SkillExecutorActor {
             runtime,
             recv,
-            inference_api,
+            csi_apis,
             tokenizer_provider_factory,
         }
     }
@@ -267,7 +262,7 @@ where
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
-            self.inference_api.clone(),
+            self.csi_apis.clone(),
             api_token,
             (self.tokenizer_provider_factory)(),
         ));
@@ -329,13 +324,13 @@ pub struct SkillInvocationCtx {
 impl SkillInvocationCtx {
     pub fn new(
         send_rt_err: oneshot::Sender<anyhow::Error>,
-        inference_api: InferenceApi,
+        csi_apis: CsiApis,
         api_token: String,
         tokenizer_provider: impl TokenizerProvider + Send + 'static,
     ) -> Self {
         SkillInvocationCtx {
             send_rt_err: Some(send_rt_err),
-            inference_api,
+            inference_api: csi_apis.inference,
             api_token,
             tokenizer_provider: Box::new(tokenizer_provider),
         }
@@ -404,10 +399,9 @@ pub mod tests {
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
-        let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
         let mut invocation_ctx = SkillInvocationCtx::new(
             send,
-            inference_dummy.api(),
+            dummy_csi_apis(),
             "dummy token".to_owned(),
             StubTokenizerProvider,
         );
@@ -430,10 +424,9 @@ pub mod tests {
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
         let (send, recv) = oneshot::channel();
-        let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
         let mut invocation_ctx = SkillInvocationCtx::new(
             send,
-            inference_dummy.api(),
+            dummy_csi_apis(),
             "dummy token".to_owned(),
             SaboteurTokenizerProvider,
         );

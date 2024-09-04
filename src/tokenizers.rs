@@ -1,5 +1,6 @@
 use tokio::{sync::mpsc, task::JoinHandle,};
 
+#[derive(Clone)]
 pub struct TokenizersApi {
     sender: mpsc::Sender<TokenizersMsg>
 }
