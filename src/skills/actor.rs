@@ -35,16 +35,16 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(csi_apis: CsiApis, cfg: SkillExecutorConfig<'_>) -> Self {
+    pub fn with_cfg(csi_apis: CsiApis, cfg: SkillExecutorConfig<'_>) -> Self {
         let provider = SkillProvider::new(cfg.namespaces);
         let runtime = WasmRuntime::with_provider(provider);
-        Self::with_runtime(runtime, csi_apis.inference, move || {
+        Self::new(runtime, csi_apis.inference, move || {
             TokenizerFromAAInference::new(cfg.api_base_url.clone(), cfg.api_token.clone())
         })
     }
 
     /// You may want use this constructor if you want to use a double runtime for testing
-    pub fn with_runtime<R: Runtime + Send + 'static>(
+    pub fn new<R: Runtime + Send + 'static>(
         runtime: R,
         inference_api: InferenceApi,
         tokenizer_provider_factory: impl Fn() -> TokenizerFromAAInference + Send + 'static,
@@ -460,7 +460,7 @@ pub mod tests {
         let csi_apis = CsiApis {
             inference: inference_dummy.api(),
         };
-        let executer = SkillExecutor::new(csi_apis, config);
+        let executer = SkillExecutor::with_cfg(csi_apis, config);
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace
@@ -538,7 +538,7 @@ pub mod tests {
         let skill_path = SkillPath::dummy();
         let runtime = MockRuntime { skill_path };
         let executer =
-            SkillExecutor::with_runtime(runtime, inference_saboteur.api(), test_tokenizer_provider);
+            SkillExecutor::new(runtime, inference_saboteur.api(), test_tokenizer_provider);
         let api = executer.api();
         let another_skill_path = SkillPath::dummy();
         let result = api
@@ -561,7 +561,7 @@ pub mod tests {
         let inference = InferenceStub::with_completion("Hello".to_owned());
         let runtime = SaboteurRuntime::new(error_msg.clone());
         let executor =
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider);
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider);
 
         let result = executor
             .api()
@@ -583,7 +583,7 @@ pub mod tests {
         // When
         let runtime = RustRuntime::with_greet_skill();
         let executor =
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider);
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider);
         let result = executor
             .api()
             .execute_skill(
@@ -660,7 +660,7 @@ pub mod tests {
 
         // When
         let executor =
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider);
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider);
         let result = executor.api().loaded_skills().await;
 
         executor.wait_for_shutdown().await;
@@ -679,7 +679,7 @@ pub mod tests {
 
         // When
         let executor =
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider);
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider);
         let result = executor
             .api()
             .drop_from_cache(SkillPath::from_str("haiku_skill"))
@@ -701,7 +701,7 @@ pub mod tests {
 
         // When
         let executor =
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider);
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider);
         let result = executor
             .api()
             .drop_from_cache(SkillPath::from_str("a_different_skill"))
@@ -720,7 +720,7 @@ pub mod tests {
             let provider = SkillProvider::new(&namespaces);
             let runtime = WasmRuntime::with_provider(provider);
             let inference = InferenceStub::with_completion("Hello".to_owned());
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider)
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider)
         }
     }
     #[tokio::test]

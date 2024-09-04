@@ -408,7 +408,7 @@ mod tests {
         let inference = InferenceStub::with_completion("hello");
 
         let http = http(
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider).api(),
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider).api(),
         );
 
         let resp = http
@@ -436,7 +436,7 @@ mod tests {
         let runtime = LiarRuntime::new(&[skill_name.clone()]);
         let inference = InferenceStub::with_completion("hello");
         let http = http(
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider).api(),
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider).api(),
         );
 
         // When the skill is deleted
@@ -464,7 +464,7 @@ mod tests {
         let runtime = LiarRuntime::new(&[]);
         let inference = InferenceStub::with_completion("hello");
         let http = http(
-            SkillExecutor::with_runtime(runtime, inference.api(), test_tokenizer_provider).api(),
+            SkillExecutor::new(runtime, inference.api(), test_tokenizer_provider).api(),
         );
 
         // When a skills is deleted

@@ -34,7 +34,7 @@ pub async fn run(
     };
 
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::new(csi_apis, app_config.skill_executer_cfg());
+    let skill_executor = SkillExecutor::with_cfg(csi_apis, app_config.skill_executer_cfg());
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
