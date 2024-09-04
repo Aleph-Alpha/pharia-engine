@@ -93,7 +93,8 @@ mod tests {
         static AA_INFERENCE_ADDRESS: OnceLock<String> = OnceLock::new();
         AA_INFERENCE_ADDRESS.get_or_init(|| {
             drop(dotenv());
-            env::var("AA_INFERENCE_ADDRESS").expect("AA_INFERENCE_ADDRESS variable not set")
+            env::var("AA_INFERENCE_ADDRESS")
+                .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned())
         })
     }
     // tests if the shutdown procedure is executed properly (not blocking)
