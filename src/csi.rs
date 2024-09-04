@@ -1,3 +1,7 @@
+mod chunking;
+
+use chunking::ChunkRequest;
+
 use crate::{inference::{Completion, CompletionRequest, InferenceApi}, tokenizers::TokenizersApi};
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
@@ -16,11 +20,18 @@ pub struct CsiApis {
 pub trait Csi {
 
     async fn complete_text(&mut self, auth: String, request: CompletionRequest) -> Result<Completion, anyhow::Error>;
+    async fn chunk(&mut self, auth: String, request: ChunkRequest) -> Result<Vec<String>, anyhow::Error>;
 }
 
 impl Csi for CsiApis {
     async fn complete_text(&mut self, auth: String, request: CompletionRequest) -> Result<Completion, anyhow::Error> {
         self.inference.complete_text(request, auth).await
+    }
+
+    async fn chunk(&mut self, _auth: String, request: ChunkRequest,) -> Result<Vec<String>, anyhow::Error> {
+        let tokenizer = todo!();
+        let chunks = chunking::chunking(&request.text, tokenizer, &request.params);
+        Ok(chunks)
     }
 }
 

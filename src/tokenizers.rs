@@ -57,3 +57,14 @@ impl TokenizersActor {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use tokenizers::Tokenizer;
+
+    /// A real world hugging face tokenizer for testing
+    pub fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
+        let tokenizer = include_bytes!("tokenizers/pharia-1-llm-7b-control_tokenizer.json");
+        Tokenizer::from_bytes(tokenizer).unwrap()
+    }
+}
