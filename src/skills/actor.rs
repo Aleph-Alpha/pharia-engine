@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    chunking::ChunkRequest,
+    chunking::{chunking, ChunkRequest},
     runtime::{Csi, Runtime, SkillProvider, WasmRuntime},
     tokenizers::{TokenizerFromAAInference, TokenizerProvider},
     SkillPath,
@@ -357,11 +357,20 @@ impl Csi for SkillInvocationCtx {
         }
     }
 
-    async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
-        unimplemented!("Chunking is not yet implemented")
-        // use model to get tokenizer from AA Api
-        // instantiate tokenizer
-        // chunk model
+    async fn chunk(
+        &mut self,
+        ChunkRequest {
+            text,
+            model,
+            params,
+        }: ChunkRequest,
+    ) -> Vec<String> {
+        let tokenizer = self
+            .tokenizer_provider
+            .tokenizer_for_model(&model)
+            .await
+            .unwrap();
+        chunking(&text, &tokenizer, &params)
     }
 }
 
@@ -375,9 +384,38 @@ pub mod tests {
 
     use crate::{
         inference::{tests::InferenceStub, CompletionRequest},
-        skills::{runtime::tests::SaboteurRuntime, tests::test_tokenizer_provider},
+        skills::{
+            chunking::ChunkParams, runtime::tests::SaboteurRuntime, tests::test_tokenizer_provider,
+            tokenizers::tests::StubTokenizerProvider,
+        },
         OperatorConfig,
     };
+
+    #[tokio::test]
+    async fn chunk() {
+        // Given a skill invocation context with a stub tokenizer provider
+        let (send, _) = oneshot::channel();
+        let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
+        let mut invocation_ctx = SkillInvocationCtx::new(
+            send,
+            inference_dummy.api(),
+            "dummy token".to_owned(),
+            StubTokenizerProvider,
+        );
+
+        // When chunking a short text
+        let model = "Pharia-1-LLM-7B-control".to_owned();
+        let params = ChunkParams { max_tokens: 10 };
+        let request = ChunkRequest {
+            text: "Greet".to_owned(),
+            model,
+            params,
+        };
+        let chunks = invocation_ctx.chunk(request).await;
+
+        // Then a single chunk is returned
+        assert_eq!(chunks.len(), 1);
+    }
 
     #[tokio::test]
     async fn dedicated_error_for_skill_not_found() {

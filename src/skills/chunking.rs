@@ -35,14 +35,10 @@ pub fn chunking(
 
 #[cfg(test)]
 mod tests {
+    use crate::skills::tokenizers::tests::pharia_1_llm_7b_control_tokenizer;
+
     use super::*;
 
-    use tokenizers::Tokenizer;
-
-    fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
-        let tokenizer = include_bytes!("pharia-1-llm-7b-control_tokenizer.json");
-        Tokenizer::from_bytes(tokenizer).unwrap()
-    }
     #[tokio::test]
     async fn chunking_splits_text() {
         // Given some text and a tokenizer

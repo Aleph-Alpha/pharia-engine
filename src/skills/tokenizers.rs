@@ -60,10 +60,24 @@ impl TokenizerProvider for TokenizerFromAAInference {
 pub mod tests {
     use crate::tests::{api_token, inference_address};
 
-    use super::{TokenizerFromAAInference, TokenizerProvider};
+    use super::*;
 
     pub fn test_tokenizer_provider() -> TokenizerFromAAInference {
         TokenizerFromAAInference::new(inference_address().to_owned(), api_token().to_owned())
+    }
+
+    pub struct StubTokenizerProvider;
+
+    #[async_trait]
+    impl TokenizerProvider for StubTokenizerProvider {
+        async fn tokenizer_for_model(&mut self, model: &str) -> Result<Tokenizer, anyhow::Error> {
+            Ok(pharia_1_llm_7b_control_tokenizer())
+        }
+    }
+
+    pub fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
+        let tokenizer = include_bytes!("pharia-1-llm-7b-control_tokenizer.json");
+        Tokenizer::from_bytes(tokenizer).unwrap()
     }
 
     #[tokio::test]
