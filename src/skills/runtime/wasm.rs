@@ -5,7 +5,7 @@ use crate::{
     skills::{actor::ExecuteSkillError, SkillPath},
 };
 
-use super::{engine::Engine, provider::SkillProvider, Csi, Runtime};
+use super::{engine::Engine, provider::SkillProvider, CsiForSkills, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
@@ -26,7 +26,7 @@ impl Runtime for WasmRuntime {
         &mut self,
         skill_path: &SkillPath,
         input: Value,
-        ctx: Box<dyn Csi + Send>,
+        ctx: Box<dyn CsiForSkills + Send>,
     ) -> Result<Value, ExecuteSkillError> {
         let skill = self
             .provider
@@ -272,7 +272,7 @@ pub mod tests {
     pub struct CsiGreetingStub;
 
     #[async_trait]
-    impl Csi for CsiGreetingStub {
+    impl CsiForSkills for CsiGreetingStub {
         async fn complete_text(&mut self, _request: CompletionRequest) -> Completion {
             Completion::from_text("Hello")
         }
@@ -286,7 +286,7 @@ pub mod tests {
     pub struct CsiGreetingMock;
 
     #[async_trait]
-    impl Csi for CsiGreetingMock {
+    impl CsiForSkills for CsiGreetingMock {
         async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
             let expected_prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -327,7 +327,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     }
 
     #[async_trait]
-    impl Csi for CsiCounter {
+    impl CsiForSkills for CsiCounter {
         async fn complete_text(&mut self, _params: CompletionRequest) -> Completion {
             let mut counter = self.counter.lock().unwrap();
             *counter += 1;

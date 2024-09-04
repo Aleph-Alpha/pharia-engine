@@ -11,7 +11,7 @@ use wasmtime::{
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
-use super::Csi;
+use super::CsiForSkills;
 
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
@@ -139,7 +139,7 @@ impl Skill {
     pub async fn run(
         &self,
         engine: &Engine,
-        ctx: Box<dyn Csi + Send>,
+        ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
     ) -> anyhow::Result<Value> {
         let mut store = engine.store(LinkedCtx::new(ctx));
@@ -219,11 +219,11 @@ impl SupportedVersion {
 pub struct LinkedCtx {
     wasi_ctx: WasiCtx,
     resource_table: ResourceTable,
-    skill_ctx: Box<dyn Csi + Send>,
+    skill_ctx: Box<dyn CsiForSkills + Send>,
 }
 
 impl LinkedCtx {
-    fn new(skill_ctx: Box<dyn Csi + Send>) -> Self {
+    fn new(skill_ctx: Box<dyn CsiForSkills + Send>) -> Self {
         let mut builder = WasiCtxBuilder::new();
         LinkedCtx {
             wasi_ctx: builder.build(),

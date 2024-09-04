@@ -2,14 +2,14 @@ use std::{collections::HashMap, future::pending};
 
 use super::{
     chunking::{chunking, ChunkRequest},
-    runtime::{Csi, Runtime, SkillProvider, WasmRuntime},
+    runtime::{CsiForSkills, Runtime, SkillProvider, WasmRuntime},
     tokenizers::{TokenizerFromAAInference, TokenizerProvider},
     SkillPath,
 };
 
 use crate::{
     configuration_observer::{NamespaceConfig, NamespaceDescriptionError},
-    csi::{self, CsiApis},
+    csi::{self, Csi as _, CsiApis},
     inference::{Completion, CompletionRequest, InferenceApi},
 };
 use async_trait::async_trait;
@@ -348,12 +348,11 @@ impl SkillInvocationCtx {
 }
 
 #[async_trait]
-impl Csi for SkillInvocationCtx {
+impl CsiForSkills for SkillInvocationCtx {
     async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
         match self
             .csi_apis
-            .inference
-            .complete_text(params, self.api_token.clone())
+            .complete_text(self.api_token.clone(), params)
             .await
         {
             Ok(value) => value,
@@ -489,7 +488,7 @@ pub mod tests {
                 &mut self,
                 _: &SkillPath,
                 _: Value,
-                mut ctx: Box<dyn Csi + Send>,
+                mut ctx: Box<dyn CsiForSkills + Send>,
             ) -> Result<Value, ExecuteSkillError> {
                 ctx.complete_text(CompletionRequest::new(
                     "dummy".to_owned(),
@@ -625,7 +624,7 @@ pub mod tests {
             &mut self,
             _skill_path: &SkillPath,
             _name: Value,
-            _ctx: Box<dyn Csi + Send>,
+            _ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<Value, ExecuteSkillError> {
             panic!("Liar runtime does not run skills")
         }
@@ -759,7 +758,7 @@ pub mod tests {
             &mut self,
             skill_path: &SkillPath,
             input: Value,
-            mut ctx: Box<dyn Csi + Send>,
+            mut ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<Value, ExecuteSkillError> {
             assert!(
                 skill_path == &self.skill_path,

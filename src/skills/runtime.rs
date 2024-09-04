@@ -33,7 +33,7 @@ pub trait Runtime {
         &mut self,
         skill_path: &SkillPath,
         input: Value,
-        ctx: Box<dyn Csi + Send>,
+        ctx: Box<dyn CsiForSkills + Send>,
     ) -> impl Future<Output = Result<Value, ExecuteSkillError>> + Send;
 
     fn upsert_skill(&mut self, skill: SkillPath, tag: Option<String>);
@@ -53,8 +53,12 @@ pub trait Runtime {
     fn mark_namespace_as_valid(&mut self, namespace: &str);
 }
 
+/// Cognitive System Interface (CSI) as consumed by Skill developers. In particular some accidential
+/// complexity has been stripped away, by implementations due to removing accidental errors from the
+/// interface. It also assumes all authentication and authorization is handled behind the scenes.
+/// This is the CSI as passed to user defined code in WASM.
 #[async_trait]
-pub trait Csi {
+pub trait CsiForSkills {
     async fn complete_text(&mut self, request: CompletionRequest) -> Completion;
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
 }
@@ -79,7 +83,7 @@ pub mod tests {
             &mut self,
             _skill_path: &SkillPath,
             _input: Value,
-            _ctx: Box<dyn Csi + Send>,
+            _ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<Value, ExecuteSkillError> {
             Err(ExecuteSkillError::Other(anyhow!(self.err_msg.clone())))
         }

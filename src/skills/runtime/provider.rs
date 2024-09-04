@@ -11,7 +11,7 @@ use crate::{
 
 use super::{
     engine::{Engine, Skill},
-    Csi,
+    CsiForSkills,
 };
 
 pub struct SkillProvider {
@@ -137,7 +137,7 @@ impl CachedSkill {
     pub async fn run(
         &self,
         engine: &Engine,
-        ctx: Box<dyn Csi + Send>,
+        ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
     ) -> anyhow::Result<Value> {
         self.skill.run(engine, ctx, input).await
