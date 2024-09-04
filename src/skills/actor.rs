@@ -334,6 +334,16 @@ impl SkillInvocationCtx {
             tokenizer_provider: Box::new(tokenizer_provider),
         }
     }
+
+    /// Never return, we did report the error via the send error channel.
+    async fn send_error<T>(&mut self, error: anyhow::Error) -> T {
+        self.send_rt_err
+            .take()
+            .expect("Only one error must be send during skill invocation")
+            .send(error)
+            .unwrap();
+        pending().await
+    }
 }
 
 #[async_trait]
@@ -345,15 +355,7 @@ impl Csi for SkillInvocationCtx {
             .await
         {
             Ok(value) => value,
-            Err(error) => {
-                self.send_rt_err
-                    .take()
-                    .expect("Only one error must be send during skill invocation")
-                    .send(error)
-                    .unwrap();
-                // Never return, we did report the error via the send error channel.
-                pending().await
-            }
+            Err(error) => self.send_error(error).await,
         }
     }
 
@@ -365,12 +367,10 @@ impl Csi for SkillInvocationCtx {
             params,
         }: ChunkRequest,
     ) -> Vec<String> {
-        let tokenizer = self
-            .tokenizer_provider
-            .tokenizer_for_model(&model)
-            .await
-            .unwrap();
-        chunking(&text, &tokenizer, &params)
+        match self.tokenizer_provider.tokenizer_for_model(&model).await {
+            Ok(tokenizer) => chunking(&text, &tokenizer, &params),
+            Err(error) => self.send_error(error).await,
+        }
     }
 }
 
@@ -385,8 +385,10 @@ pub mod tests {
     use crate::{
         inference::{tests::InferenceStub, CompletionRequest},
         skills::{
-            chunking::ChunkParams, runtime::tests::SaboteurRuntime, tests::test_tokenizer_provider,
-            tokenizers::tests::StubTokenizerProvider,
+            chunking::ChunkParams,
+            runtime::tests::SaboteurRuntime,
+            tests::test_tokenizer_provider,
+            tokenizers::tests::{SaboteurTokenizerProvider, StubTokenizerProvider},
         },
         OperatorConfig,
     };
@@ -415,6 +417,35 @@ pub mod tests {
 
         // Then a single chunk is returned
         assert_eq!(chunks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn receive_error_if_chunk_failed() {
+        // Given a skill invocation context with a saboteur tokenizer provider
+        let (send, recv) = oneshot::channel();
+        let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
+        let mut invocation_ctx = SkillInvocationCtx::new(
+            send,
+            inference_dummy.api(),
+            "dummy token".to_owned(),
+            SaboteurTokenizerProvider,
+        );
+
+        // When chunking a short text
+        let model = "Pharia-1-LLM-7B-control".to_owned();
+        let params = ChunkParams { max_tokens: 10 };
+        let request = ChunkRequest {
+            text: "Greet".to_owned(),
+            model,
+            params,
+        };
+        let error = select! {
+            error = recv => error.unwrap(),
+            _ = invocation_ctx.chunk(request)  => unreachable!(),
+        };
+
+        // Then receive the error from saboteur tokenizer provider
+        assert_eq!(error.to_string(), "Failed to load tokenizer.");
     }
 
     #[tokio::test]

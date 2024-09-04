@@ -70,7 +70,7 @@ pub mod tests {
 
     #[async_trait]
     impl TokenizerProvider for StubTokenizerProvider {
-        async fn tokenizer_for_model(&mut self, model: &str) -> Result<Tokenizer, anyhow::Error> {
+        async fn tokenizer_for_model(&mut self, _model: &str) -> Result<Tokenizer, anyhow::Error> {
             Ok(pharia_1_llm_7b_control_tokenizer())
         }
     }
@@ -78,6 +78,15 @@ pub mod tests {
     pub fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
         let tokenizer = include_bytes!("pharia-1-llm-7b-control_tokenizer.json");
         Tokenizer::from_bytes(tokenizer).unwrap()
+    }
+
+    pub struct SaboteurTokenizerProvider;
+
+    #[async_trait]
+    impl TokenizerProvider for SaboteurTokenizerProvider {
+        async fn tokenizer_for_model(&mut self, _model: &str) -> Result<Tokenizer, anyhow::Error> {
+            Err(anyhow!("Failed to load tokenizer."))
+        }
     }
 
     #[tokio::test]
