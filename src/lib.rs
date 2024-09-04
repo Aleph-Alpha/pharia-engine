@@ -1,5 +1,6 @@
 mod config;
 mod configuration_observer;
+mod csi;
 mod inference;
 mod registries;
 mod shell;
@@ -7,6 +8,7 @@ mod skills;
 
 use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
+use csi::CsiApis;
 use futures::Future;
 use tracing::error;
 
@@ -27,9 +29,12 @@ pub async fn run(
 ) -> Result<impl Future<Output = ()>, Error> {
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr.clone());
+    let csi_apis = CsiApis {
+        inference: inference.api(),
+    };
 
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::new(inference.api(), app_config.skill_executer_cfg());
+    let skill_executor = SkillExecutor::new(csi_apis, app_config.skill_executer_cfg());
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer

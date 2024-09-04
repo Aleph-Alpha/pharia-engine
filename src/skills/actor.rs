@@ -8,8 +8,7 @@ use super::{
 };
 
 use crate::{
-    configuration_observer::{NamespaceConfig, NamespaceDescriptionError},
-    inference::{Completion, CompletionRequest, InferenceApi},
+    configuration_observer::{NamespaceConfig, NamespaceDescriptionError}, csi::CsiApis, inference::{Completion, CompletionRequest, InferenceApi}
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -36,10 +35,10 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(inference_api: InferenceApi, cfg: SkillExecutorConfig<'_>) -> Self {
+    pub fn new(csi_apis: CsiApis, cfg: SkillExecutorConfig<'_>) -> Self {
         let provider = SkillProvider::new(cfg.namespaces);
         let runtime = WasmRuntime::with_provider(provider);
-        Self::with_runtime(runtime, inference_api, move || {
+        Self::with_runtime(runtime, csi_apis.inference, move || {
             TokenizerFromAAInference::new(cfg.api_base_url.clone(), cfg.api_token.clone())
         })
     }
@@ -458,7 +457,10 @@ pub mod tests {
             api_token: "dummy_token".to_owned(),
         };
         let inference_dummy = InferenceStub::new(|| panic!("Inference must never be invoked."));
-        let executer = SkillExecutor::new(inference_dummy.api(), config);
+        let csi_apis = CsiApis {
+            inference: inference_dummy.api(),
+        };
+        let executer = SkillExecutor::new(csi_apis, config);
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace
