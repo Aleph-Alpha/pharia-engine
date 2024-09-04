@@ -159,10 +159,11 @@ integration_test:
     - podman pull $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
     - >
       (podman run -p 8081:8081 -v ./operator-config.toml:/app/operator-config.toml \
-        -e SKILL_REGISTRY_USER=$CI_REGISTRY_USER  \
-        -e SKILL_REGISTRY_PASSWORD=$CI_REGISTRY_PASSWORD  \
-        -e GITLAB_CONFIG_ACCESS_TOKEN=$TEAM_CONFIG_TOKEN  \
-        -e PHARIA_KERNEL_LOG=info  \
+        -e SKILL_REGISTRY_USER=$CI_REGISTRY_USER \
+        -e SKILL_REGISTRY_PASSWORD=$CI_REGISTRY_PASSWORD \
+        -e GITLAB_CONFIG_ACCESS_TOKEN=$TEAM_CONFIG_TOKEN \
+        -e PHARIA_KERNEL_LOG=info \
+        -e AA_API_TOKEN=dummy \
         $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA | cat) &
     - sh -x ./tests/test-image.sh $CONTAINER_PORT 127.0.0.1
 
