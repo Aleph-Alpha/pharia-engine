@@ -284,14 +284,9 @@ mod v0_2 {
             let ChunkParams {
                 model,
                 max_tokens,
-                overlap,
                 trim,
             } = params;
-            let params = chunking::ChunkParams {
-                max_tokens,
-                overlap,
-                trim,
-            };
+            let params = chunking::ChunkParams { max_tokens, trim };
             let request = chunking::ChunkRequest::new(text, model, params);
             self.skill_ctx.chunk(request).await
         }

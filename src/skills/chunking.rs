@@ -4,7 +4,6 @@ use text_splitter::{ChunkConfig, TextSplitter};
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ChunkParams {
     pub max_tokens: u32,
-    pub overlap: u32,
     pub trim: bool,
 }
 
@@ -56,7 +55,6 @@ mod tests {
         // When we chunk the text
         let params = ChunkParams {
             max_tokens: 100,
-            overlap: 0,
             trim: true,
         };
         let chunks = chunking(text, &tokenizer, &params);
