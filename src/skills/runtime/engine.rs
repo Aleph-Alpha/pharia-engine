@@ -282,8 +282,7 @@ mod v0_2 {
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
             let ChunkParams { model, max_tokens } = params;
-            let params = crate::csi::ChunkParams { max_tokens };
-            let request = ChunkRequest::new(text, model, params);
+            let request = ChunkRequest::new(text, model, max_tokens);
             self.skill_ctx.chunk(request).await
         }
     }

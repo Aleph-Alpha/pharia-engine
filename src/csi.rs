@@ -1,7 +1,7 @@
 mod chunking;
 use crate::{inference::{Completion, CompletionRequest, InferenceApi}, tokenizers::TokenizersApi};
 
-pub use self::chunking::{ChunkRequest, ChunkParams};
+pub use self::chunking::ChunkRequest;
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
 /// 
@@ -29,7 +29,7 @@ impl Csi for CsiApis {
 
     async fn chunk(&mut self, auth: String, request: ChunkRequest,) -> Result<Vec<String>, anyhow::Error> {
         let tokenizer = self.tokenizers.tokenizer_by_model(auth, request.model).await?;
-        let chunks = chunking::chunking(&request.text, &tokenizer, &request.params);
+        let chunks = chunking::chunking(&request.text, &tokenizer, request.max_tokens);
         Ok(chunks)
     }
 }

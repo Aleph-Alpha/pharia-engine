@@ -2,23 +2,18 @@ use serde::{Deserialize, Serialize};
 use text_splitter::{ChunkConfig, TextSplitter};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct ChunkParams {
-    pub max_tokens: u32,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ChunkRequest {
     pub text: String,
     pub model: String,
-    pub params: ChunkParams,
+    pub max_tokens: u32,
 }
 
 impl ChunkRequest {
-    pub fn new(text: String, model: String, params: ChunkParams) -> Self {
+    pub fn new(text: String, model: String, max_tokens: u32) -> Self {
         Self {
             text,
             model,
-            params,
+            max_tokens,
         }
     }
 }
@@ -26,9 +21,9 @@ impl ChunkRequest {
 pub fn chunking(
     text: &str,
     tokenizer: &tokenizers::Tokenizer,
-    params: &ChunkParams,
+    max_tokens: u32,
 ) -> Vec<String> {
-    let config = ChunkConfig::new(params.max_tokens as usize).with_sizer(tokenizer);
+    let config = ChunkConfig::new(max_tokens as usize).with_sizer(tokenizer);
     let splitter = TextSplitter::new(config);
     splitter.chunks(text).map(str::to_owned).collect()
 }
@@ -46,8 +41,8 @@ mod tests {
         let tokenizer = pharia_1_llm_7b_control_tokenizer();
 
         // When we chunk the text
-        let params = ChunkParams { max_tokens: 100 };
-        let chunks = chunking(text, &tokenizer, &params);
+        let max_tokens = 100;
+        let chunks = chunking(text, &tokenizer, max_tokens);
         assert_eq!(chunks.len(), 5);
         assert_eq!(
             chunks[1],

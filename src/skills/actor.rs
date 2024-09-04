@@ -355,7 +355,7 @@ pub mod tests {
     use serde_json::json;
 
     use crate::{
-        csi::{tests::dummy_csi_apis, ChunkParams},
+        csi::tests::dummy_csi_apis,
         inference::{tests::InferenceStub, CompletionRequest},
         skills::runtime::tests::SaboteurRuntime,
         tests::{api_token, inference_address},
@@ -375,11 +375,11 @@ pub mod tests {
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
-        let params = ChunkParams { max_tokens: 10 };
+        let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
             model,
-            params,
+            max_tokens,
         };
         let chunks = invocation_ctx.chunk(request).await;
 
@@ -408,11 +408,11 @@ pub mod tests {
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
-        let params = ChunkParams { max_tokens: 10 };
+        let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
             model,
-            params,
+            max_tokens,
         };
         let error = select! {
             error = recv => error.unwrap(),
