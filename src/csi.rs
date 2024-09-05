@@ -1,10 +1,15 @@
 mod chunking;
-use crate::{inference::{Completion, CompletionRequest, InferenceApi}, tokenizers::TokenizersApi};
+use tracing::trace;
+
+use crate::{
+    inference::{Completion, CompletionRequest, InferenceApi},
+    tokenizers::TokenizersApi,
+};
 
 pub use self::chunking::ChunkRequest;
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
-/// 
+///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
 pub struct CsiApis {
@@ -17,19 +22,51 @@ pub struct CsiApis {
 /// passed to the end user in Skill code we further strip away some of the accidential complexity.
 /// See its sibling trait `CsiForSkills`.
 pub trait Csi {
-
-    async fn complete_text(&mut self, auth: String, request: CompletionRequest) -> Result<Completion, anyhow::Error>;
-    async fn chunk(&mut self, auth: String, request: ChunkRequest) -> Result<Vec<String>, anyhow::Error>;
+    async fn complete_text(
+        &mut self,
+        auth: String,
+        request: CompletionRequest,
+    ) -> Result<Completion, anyhow::Error>;
+    async fn chunk(
+        &mut self,
+        auth: String,
+        request: ChunkRequest,
+    ) -> Result<Vec<String>, anyhow::Error>;
 }
 
 impl Csi for CsiApis {
-    async fn complete_text(&mut self, auth: String, request: CompletionRequest) -> Result<Completion, anyhow::Error> {
+    async fn complete_text(
+        &mut self,
+        auth: String,
+        request: CompletionRequest,
+    ) -> Result<Completion, anyhow::Error> {
+        trace!(
+            "complete_text: request.model={} request.params.max_tokens={}",
+            request.model,
+            request
+                .params
+                .max_tokens
+                .map_or_else(|| "None".to_owned(), |val| val.to_string()),
+        );
         self.inference.complete_text(request, auth).await
     }
 
-    async fn chunk(&mut self, auth: String, request: ChunkRequest,) -> Result<Vec<String>, anyhow::Error> {
-        let tokenizer = self.tokenizers.tokenizer_by_model(auth, request.model).await?;
+    async fn chunk(
+        &mut self,
+        auth: String,
+        request: ChunkRequest,
+    ) -> Result<Vec<String>, anyhow::Error> {
+        let tokenizer = self
+            .tokenizers
+            .tokenizer_by_model(auth, request.model)
+            .await?;
         let chunks = chunking::chunking(&request.text, &tokenizer, request.max_tokens);
+        trace!(
+            "chunk: textlen={} max_tokens={} -> chunks.len()={}",
+            request.text.len(),
+            request.max_tokens,
+            chunks.len()
+        );
         Ok(chunks)
     }
 }
@@ -42,7 +79,6 @@ pub mod tests {
 
     use super::CsiApis;
 
-
     pub fn dummy_csi_apis() -> CsiApis {
         let (send, _recv) = mpsc::channel(1);
         let inference = InferenceApi::new(send);
@@ -50,6 +86,9 @@ pub mod tests {
         let (send, _recv) = mpsc::channel(1);
         let tokenizers = TokenizersApi::new(send);
 
-        CsiApis { inference, tokenizers }
+        CsiApis {
+            inference,
+            tokenizers,
+        }
     }
 }
