@@ -24,7 +24,6 @@ pub struct SkillExecutorConfig<'a> {
     pub namespaces: &'a HashMap<String, NamespaceConfig>,
     /// We use this URL to the AA inference API to fetch tokenizers for chunking
     pub api_base_url: String,
-    pub api_token: String,
 }
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
@@ -360,7 +359,7 @@ pub mod tests {
         csi::tests::dummy_csi_apis,
         inference::{tests::InferenceStub, CompletionRequest},
         skills::runtime::tests::SaboteurRuntime,
-        tests::{api_token, inference_address},
+        tests::inference_address,
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
     };
 
@@ -432,7 +431,6 @@ pub mod tests {
         let config = SkillExecutorConfig {
             namespaces: &namespaces,
             api_base_url: "https://dummy".to_owned(),
-            api_token: "dummy_token".to_owned(),
         };
         let csi_apis = dummy_csi_apis();
         let executer = SkillExecutor::with_cfg(csi_apis, config);
@@ -698,7 +696,6 @@ pub mod tests {
             SkillExecutorConfig {
                 namespaces: &HashMap::new(),
                 api_base_url: inference_address().to_owned(),
-                api_token: api_token().to_owned(),
             },
         );
         let api = skill_executor.api();

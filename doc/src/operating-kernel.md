@@ -68,13 +68,3 @@ By default, only logs of `ERROR` level are output. You can change this by settin
 ```shell
 PHARIA_KERNEL_LOG=info
 ```
-
-## Configuring inference API
-
-By default the kernel uses the Aleph Alpha SAAS [inference API](https://api.aleph-alpha.com). You can change this by setting the `INFERENCE_ADDRESS` environment variable.
-
-```shell
-INFERENCE_ADDRESS=https://inference.acme.com
-```
-
-An API token needed to be via the environment variable `AA_API_TOKEN`.
