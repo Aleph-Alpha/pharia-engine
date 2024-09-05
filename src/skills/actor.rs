@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    runtime::{CsiForSkills, Runtime, SkillProvider, SkillProviderActorHandle, WasmRuntime},
+    runtime::{CsiForSkills, Runtime, SkillProvider, SkillProviderApi, WasmRuntime},
     SkillPath,
 };
 
@@ -32,10 +32,9 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn with_cfg(csi_apis: CsiApis, cfg: SkillExecutorConfig<'_>) -> Self {
+    pub fn with_cfg(csi_apis: CsiApis, skill_provider: SkillProviderApi, cfg: SkillExecutorConfig<'_>) -> Self {
         let provider = SkillProvider::new(cfg.namespaces);
-        let provider_actor = SkillProviderActorHandle::new();
-        let runtime = WasmRuntime::with_provider(provider, provider_actor.api());
+        let runtime = WasmRuntime::with_provider(provider, skill_provider);
         Self::new(runtime, csi_apis)
     }
 
@@ -356,7 +355,7 @@ pub mod tests {
     use crate::{
         csi::tests::dummy_csi_apis,
         inference::{tests::InferenceStub, CompletionRequest},
-        skills::runtime::tests::SaboteurRuntime,
+        skills::{runtime::tests::SaboteurRuntime, SkillProviderActorHandle},
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
     };
 
@@ -428,8 +427,9 @@ pub mod tests {
         let config = SkillExecutorConfig {
             namespaces: &namespaces,
         };
+        let skill_provider = SkillProviderActorHandle::new(&namespaces);
         let csi_apis = dummy_csi_apis();
-        let executer = SkillExecutor::with_cfg(csi_apis, config);
+        let executer = SkillExecutor::with_cfg(csi_apis, skill_provider.api(), config);
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace
@@ -440,6 +440,10 @@ pub mod tests {
                 "Dummy api token".to_owned(),
             )
             .await;
+
+        drop(api);
+        executer.wait_for_shutdown().await;
+        skill_provider.wait_for_shutdown().await;
 
         // Then result indictaes that the skill is missing
         assert!(matches!(result, Err(ExecuteSkillError::SkillDoesNotExist)));
@@ -686,9 +690,11 @@ pub mod tests {
     #[tokio::test]
     async fn executor_api_add_skills() {
         // Given a skill executor api
+        let skill_provider = SkillProviderActorHandle::new(&HashMap::new());
         let csi_apis = dummy_csi_apis();
         let skill_executor = SkillExecutor::with_cfg(
             csi_apis,
+            skill_provider.api(),
             SkillExecutorConfig {
                 namespaces: &HashMap::new(),
             },
@@ -700,9 +706,14 @@ pub mod tests {
         api.upsert_skill(skill_path_1.clone(), None).await;
         let skill_path_2 = SkillPath::dummy();
         api.upsert_skill(skill_path_2.clone(), None).await;
+        let skills = api.skills().await;
+
+
+        drop(api);
+        skill_executor.wait_for_shutdown().await;
+        skill_provider.wait_for_shutdown().await;
 
         // Then the skills is listed by the skill executor api
-        let skills = api.skills().await;
         assert_eq!(skills.len(), 2);
         assert!(skills.contains(&skill_path_1));
         assert!(skills.contains(&skill_path_2));

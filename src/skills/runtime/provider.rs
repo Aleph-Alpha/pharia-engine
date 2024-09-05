@@ -2,6 +2,7 @@ use std::{collections::HashMap, env};
 
 use anyhow::{anyhow, Context};
 use serde_json::Value;
+use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::{
     configuration_observer::{NamespaceConfig, NamespaceDescriptionError, Registry},
@@ -144,20 +145,56 @@ impl CachedSkill {
     }
 }
 
-pub struct SkillProviderActorHandle {}
+pub struct SkillProviderActorHandle {
+    sender: mpsc::Sender<SkillProviderMsg>,
+    handle: JoinHandle<()>,
+}
 
 impl SkillProviderActorHandle {
-    pub fn new() -> Self {
-        SkillProviderActorHandle {  }
+    pub fn new(namespaces: &HashMap<String, NamespaceConfig>) -> Self {
+        let (sender, recv) = mpsc::channel(1);
+        let mut actor = SkillProviderActor::new(recv, namespaces);
+        let handle = tokio::spawn(async move {
+            actor.run().await;
+        });
+        SkillProviderActorHandle { sender, handle }
     }
 
     pub fn api(&self) -> SkillProviderApi {
-        SkillProviderApi {  }
+        SkillProviderApi { sender: self.sender.clone() }
+    }
+
+    pub async fn wait_for_shutdown(self) {
+        // Drop sender so actor terminates, as soon as all api handles are freed.
+        drop(self.sender);
+        self.handle.await.unwrap();
     }
 }
 
 pub struct SkillProviderApi {
+    sender: mpsc::Sender<SkillProviderMsg>
+}
 
+enum SkillProviderMsg {}
+
+struct SkillProviderActor {
+    receiver: mpsc::Receiver<SkillProviderMsg>,
+    provider: SkillProvider,
+}
+
+impl SkillProviderActor {
+    pub fn new(receiver: mpsc::Receiver<SkillProviderMsg>, namespaces: &HashMap<String, NamespaceConfig>) -> Self {
+        SkillProviderActor {
+            receiver,
+            provider: SkillProvider::new(namespaces),
+        }
+    }
+
+    pub async fn run(&mut self) {
+        while let Some(msg) = self.receiver.recv().await {
+            
+        }
+    }
 }
 
 #[cfg(test)]

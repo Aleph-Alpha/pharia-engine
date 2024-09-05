@@ -11,6 +11,7 @@ use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use csi::CsiApis;
 use futures::Future;
+use skills::SkillProviderActorHandle;
 use tokenizers::Tokenizers;
 use tracing::error;
 
@@ -36,9 +37,14 @@ pub async fn run(
         inference: inference.api(),
         tokenizers: tokenizers.api(),
     };
+    let skill_provider = SkillProviderActorHandle::new(&app_config.operator_config.namespaces);
 
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::with_cfg(csi_apis, app_config.skill_executer_cfg());
+    let skill_executor = SkillExecutor::with_cfg(
+        csi_apis,
+        skill_provider.api(),
+        app_config.skill_executer_cfg(),
+    );
     let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
@@ -71,6 +77,7 @@ pub async fn run(
         // actors are still answering for each component.
         configuration_observer.wait_for_shutdown().await;
         skill_executor.wait_for_shutdown().await;
+        skill_provider.wait_for_shutdown().await;
         tokenizers.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
     })

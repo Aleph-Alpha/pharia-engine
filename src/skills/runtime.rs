@@ -15,7 +15,7 @@ use crate::{
 use super::{actor::ExecuteSkillError, SkillPath};
 
 pub use self::{
-    provider::{SkillProvider, SkillProviderActorHandle},
+    provider::{SkillProvider, SkillProviderActorHandle, SkillProviderApi},
     wasm::WasmRuntime,
 };
 

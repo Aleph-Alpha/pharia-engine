@@ -90,42 +90,55 @@ pub mod tests {
     use tempfile::tempdir;
 
     impl WasmRuntime {
-        pub fn local() -> Self {
+        pub fn local(skill_provider_api: SkillProviderApi) -> Self {
             let namespaces = OperatorConfig::local().namespaces;
             let provider = SkillProvider::new(&namespaces);
-            let skill_provider_actor = SkillProviderActorHandle::new();
-            Self::with_provider(provider, skill_provider_actor.api())
+            Self::with_provider(provider, skill_provider_api)
         }
     }
 
     #[tokio::test]
     async fn greet_skill_component() {
+
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_ctx = Box::new(CsiGreetingStub);
-        let mut runtime = WasmRuntime::local();
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
 
         assert_eq!(resp.unwrap(), "Hello");
     }
 
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_ctx = Box::new(CsiGreetingStub);
-        let mut runtime = WasmRuntime::local();
         let resp = runtime
             .run(&SkillPath::dummy(), json!("name"), skill_ctx)
             .await;
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
+
         assert!(resp.is_err());
     }
 
     #[tokio::test]
     async fn drop_non_existing_skill_from_cache() {
         // Given a WasmRuntime with no cached skills
-        let mut runtime = WasmRuntime::local();
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
 
         // When removing a skill from the runtime
         let result = runtime.invalidate_cached_skill(&SkillPath::from_str("non-cached-skill"));
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
 
         // Then
         assert!(!result);
@@ -134,7 +147,8 @@ pub mod tests {
     #[tokio::test]
     async fn drop_existing_skill_from_cache() {
         // Given a WasmRuntime with a cached skill
-        let mut runtime = WasmRuntime::local();
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
         let skill_ctx = Box::new(CsiGreetingStub);
@@ -144,12 +158,16 @@ pub mod tests {
                 .await
                 .unwrap(),
         );
-
+        
         // When dropping a skill from the runtime
         let result = runtime.invalidate_cached_skill(&skill_path);
+        let loaded_skill_count = runtime.loaded_skills().count();
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
 
         // Then the component hash map is empty
-        assert_eq!(runtime.loaded_skills().count(), 0);
+        assert_eq!(loaded_skill_count, 0);
 
         // And result is a success
         assert!(result);
@@ -158,10 +176,14 @@ pub mod tests {
     #[tokio::test]
     async fn no_skills_are_listed() {
         // given a fresh WasmRuntime
-        let runtime = WasmRuntime::local();
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let runtime = WasmRuntime::local(skill_provider.api());
 
         // when querying skills
         let skill_count = runtime.loaded_skills().count();
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
 
         // then an empty vec is returned
         assert_eq!(skill_count, 0);
@@ -170,7 +192,8 @@ pub mod tests {
     #[tokio::test]
     async fn skills_are_listed() {
         // given a runtime with two installed skills
-        let mut runtime = WasmRuntime::local();
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path_rs = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path_rs.clone(), None);
         let skill_ctx = Box::new(CsiGreetingStub);
@@ -196,10 +219,14 @@ pub mod tests {
         let skills = runtime.loaded_skills();
 
         // convert to a set
-        let skills = skills.collect::<HashSet<_>>();
+        let skills = skills.cloned().collect::<HashSet<_>>();
         let mut expected = HashSet::new();
-        expected.insert(&skill_path_rs);
-        expected.insert(&skill_path_py);
+        expected.insert(skill_path_rs);
+        expected.insert(skill_path_py);
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
+
         assert_eq!(skills, expected);
     }
 
@@ -208,7 +235,8 @@ pub mod tests {
         // Giving and empty skill directory to the WasmRuntime
         let skill_dir = tempdir().unwrap();
 
-        let mut runtime = WasmRuntime::local();
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
         let skill_ctx = Box::new(CsiGreetingStub);
@@ -219,6 +247,10 @@ pub mod tests {
 
         // Then the skill can be invoked
         let greet = runtime.run(&skill_path, json!("Homer"), skill_ctx).await;
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
+
         assert!(greet.is_ok());
     }
 
@@ -226,7 +258,8 @@ pub mod tests {
     async fn rust_greeting_skill() {
         let skill_ctx = Box::new(CsiGreetingMock);
 
-        let mut runtime = WasmRuntime::local();
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
 
@@ -234,6 +267,9 @@ pub mod tests {
             .run(&skill_path, json!("Homer"), skill_ctx)
             .await
             .unwrap();
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
 
         assert_eq!(actual, "Hello Homer");
     }
@@ -242,7 +278,8 @@ pub mod tests {
     async fn python_greeting_skill() {
         let skill_ctx = Box::new(CsiGreetingMock);
 
-        let mut runtime = WasmRuntime::local();
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
 
@@ -251,13 +288,17 @@ pub mod tests {
             .await
             .unwrap();
 
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
+
         assert_eq!(actual, "Hello Homer");
     }
 
     #[tokio::test]
     async fn can_call_preinstantiated_multiple_times() {
         let skill_ctx = Box::new(CsiCounter::new());
-        let mut runtime = WasmRuntime::local();
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
         for i in 1..10 {
@@ -267,6 +308,9 @@ pub mod tests {
                 .unwrap();
             assert_eq!(resp, json!(i.to_string()));
         }
+
+        drop(runtime);
+        skill_provider.wait_for_shutdown().await;
     }
 
     /// A test double for a [`Csi`] implementation which always completes with "Hello".

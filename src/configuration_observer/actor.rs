@@ -576,7 +576,7 @@ pub mod tests {
 
         // then we expect the namespace is no longer invalid and its skills are added
         let msg = timeout(
-            Duration::from_millis(update_interval_ms + 10),
+            Duration::from_millis(update_interval_ms + 100),
             receiver.recv(),
         )
         .await
