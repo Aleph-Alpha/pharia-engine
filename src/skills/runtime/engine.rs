@@ -244,7 +244,9 @@ impl WasiView for LinkedCtx {
 }
 
 mod v0_2 {
-    use pharia::skill::csi::{ChunkParams, Completion, CompletionParams, FinishReason, Host};
+    use pharia::skill::csi::{
+        ChunkParams, Completion, CompletionParams, FinishReason, Host, Language,
+    };
     use wasmtime::component::bindgen;
 
     use crate::{csi::ChunkRequest, inference};
@@ -284,6 +286,14 @@ mod v0_2 {
             let ChunkParams { model, max_tokens } = params;
             let request = ChunkRequest::new(text, model, max_tokens);
             self.skill_ctx.chunk(request).await
+        }
+
+        async fn select_language(
+            &mut self,
+            text: String,
+            languages: Vec<Language>,
+        ) -> Option<Language> {
+            unimplemented!()
         }
     }
 

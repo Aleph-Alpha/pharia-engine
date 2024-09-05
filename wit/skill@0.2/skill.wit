@@ -88,12 +88,11 @@ interface csi {
         deu,
     }
 
-    /// Select the detected language for the provided input based on the list of possible languages if
-    /// one of them is above the specified threshold. Otherwise, `None` is returned.
+    /// Select the detected language for the provided input based on the list of possible languages.
+    /// If no language matches, None is returned.
     ///
     /// text: Text input
     /// languages: All languages that should be considered during detection.
-    /// threshold: Minimum probability value for a language to be considered the best fit.
     @since(version = 0.2.2)
-    select_language: func(text: string, languages: list<language>, threshold: f64) -> option<language>;
+    select-language: func(text: string, languages: list<language>) -> option<language>;
 }
