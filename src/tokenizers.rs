@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{anyhow, Context as _};
+use aleph_alpha_client::Client;
+use anyhow::Context as _;
 use futures::channel::oneshot;
 use tokenizers::Tokenizer;
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -38,13 +39,14 @@ pub struct Tokenizers {
 }
 
 impl Tokenizers {
-    pub fn new(api_base_url: String) -> Self {
+    pub fn new(api_base_url: String) -> Result<Self, anyhow::Error> {
         let (sender, receiver) = mpsc::channel(1);
+        let client = Client::new(api_base_url, None)?;
         let handle = tokio::spawn(async move {
-            let mut actor = TokenizersActor::new(receiver, api_base_url);
+            let mut actor = TokenizersActor::new(receiver, client);
             actor.run().await;
         });
-        Tokenizers { sender, handle }
+        Ok(Tokenizers { sender, handle })
     }
 
     pub fn api(&self) -> TokenizersApi {
@@ -67,9 +69,8 @@ pub enum TokenizersMsg {
 
 struct TokenizersActor {
     receiver: mpsc::Receiver<TokenizersMsg>,
-    /// We use this URL to connect to the Aleph Alpha inference API which does serve the JSON
-    /// representation of the tokenizers.
-    api_base_url: String,
+    /// Used to connect to the Aleph Alpha inference API which does serve the tokenizers.
+    client: Client,
     /// Cache Tokenizers by model name. Currently this is case sensitive, due to the AA API being
     /// case sensitive. We wrap tokenizers in `Arc` so we can send them in a fire and forget manner
     /// to the requesting skillexecuter, and we do not need to worry about keeping them alive.
@@ -77,11 +78,11 @@ struct TokenizersActor {
 }
 
 impl TokenizersActor {
-    pub fn new(receiver: mpsc::Receiver<TokenizersMsg>, api_base_url: String) -> Self {
+    pub fn new(receiver: mpsc::Receiver<TokenizersMsg>, client: Client) -> Self {
         TokenizersActor {
             receiver,
-            api_base_url,
-            cache: HashMap::new()
+            client,
+            cache: HashMap::new(),
         }
     }
 
@@ -104,13 +105,22 @@ impl TokenizersActor {
                     Ok(tokenizer.clone())
                 } else {
                     // Miss, we need to request and insert it first
-                    match tokenizer_for_model(&self.api_base_url, api_token, &model_name).await {
+                    match self
+                        .client
+                        .tokenizer_by_model(&model_name, Some(api_token))
+                        .await
+                    {
                         Ok(tokenizer) => {
                             let tokenizer = Arc::new(tokenizer);
                             self.cache.insert(model_name, tokenizer.clone());
                             Ok(tokenizer)
-                        },
-                        Err(e) => Err(e),
+                        }
+                        Err(e) => {
+                            let error: anyhow::Error = e.into();
+                            Err(error).with_context(|| {
+                                format!("Error fetching tokenizer for {model_name}")
+                            })
+                        }
                     }
                 };
                 let send_result = send.send(tokenizer_result);
@@ -120,46 +130,18 @@ impl TokenizersActor {
     }
 }
 
-/// This method does the actual work of sending the request which fetches the tonkenizer from the API
-async fn tokenizer_for_model(
-    api_base_url: &str,
-    api_token: String,
-    model: &str,
-) -> Result<Tokenizer, anyhow::Error> {
-    let url = format!("{api_base_url}/models/{model}/tokenizer");
-    let client = reqwest::Client::new();
-    let response = client
-        .get(url)
-        .bearer_auth(api_token)
-        .send()
-        .await
-        .with_context(|| format!("Error fetching tokenizer for {model}"))?;
-    response
-        .error_for_status_ref()
-        .with_context(|| format!("Error fetching tokenizer for {model}"))?;
-    let tokenizer = response
-        .bytes()
-        .await
-        .with_context(|| format!("Error fetching tokenizer for {model}"))?;
-
-    let tokenizer = Tokenizer::from_bytes(tokenizer).map_err(|e| {
-        anyhow!(
-            "Error deserializing tokenizer for {model}: {}",
-            e.to_string()
-        )
-    })?;
-    Ok(tokenizer)
-}
-
 #[cfg(test)]
 pub mod tests {
     use std::sync::Arc;
 
-    use super::{tokenizer_for_model, TokenizersApi, TokenizersMsg};
+    use super::{TokenizersApi, TokenizersMsg};
     use tokenizers::Tokenizer;
     use tokio::{sync::mpsc, task::JoinHandle};
 
-    use crate::tests::{api_token, inference_address};
+    use crate::{
+        tests::{api_token, inference_address},
+        tokenizers::Tokenizers,
+    };
 
     /// A real world hugging face tokenizer for testing
     pub fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
@@ -213,7 +195,10 @@ pub mod tests {
         let api_token = api_token().to_owned();
 
         // When we can request a tokenizer from the AA API
-        let tokenizer = tokenizer_for_model(base_url, api_token, model_name)
+        let actor = Tokenizers::new(base_url.to_owned()).unwrap();
+        let mut api = actor.api();
+        let tokenizer = api
+            .tokenizer_by_model(api_token, model_name.to_owned())
             .await
             .unwrap();
 
