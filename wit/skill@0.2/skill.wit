@@ -1,4 +1,4 @@
-package pharia:skill@0.2.1;
+package pharia:skill@0.2.2;
 
 @since(version = 0.1.0)
 world skill {
@@ -78,4 +78,22 @@ interface csi {
 
 	@since(version = 0.2.1)
 	chunk: func(text: string, params: chunk-params) -> list<string>;
+
+	/// ISO 639-3
+	@since(version = 0.2.2)
+	enum language {
+	   /// English
+	   eng,
+	   /// German
+	   deu,
+	}
+
+	/// Select the detected language for the provided input based on the list of possible languages if
+	/// one of them is above the specified threshold. Otherwise, `None` is returned.
+	///
+	/// text: Text input
+	/// languages: All languages that should be considered during detection.
+	/// threshold: Minimum probability value for a language to be considered the best fit.
+	@since(version = 0.2.2)
+	select_language: func(text: string, languages: list<language>, threshold: f64) -> option<language>;
 }
