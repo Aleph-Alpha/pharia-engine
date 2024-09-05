@@ -2,6 +2,7 @@ mod config;
 mod configuration_observer;
 mod csi;
 mod inference;
+mod language_selection;
 mod registries;
 mod shell;
 mod skills;
