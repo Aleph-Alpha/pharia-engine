@@ -5,11 +5,12 @@ use crate::{
     skills::{actor::ExecuteSkillError, SkillPath},
 };
 
-use super::{engine::Engine, provider::SkillProvider, CsiForSkills, Runtime};
+use super::{engine::Engine, provider::{SkillProvider, SkillProviderActorHandle}, CsiForSkills, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
     provider: SkillProvider,
+    provider_actor: SkillProviderActorHandle,
 }
 
 impl WasmRuntime {
@@ -17,6 +18,7 @@ impl WasmRuntime {
         Self {
             engine: Engine::new().expect("engine creation failed"),
             provider: skill_provider,
+            provider_actor: SkillProviderActorHandle::new(), 
         }
     }
 }

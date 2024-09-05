@@ -144,6 +144,14 @@ impl CachedSkill {
     }
 }
 
+pub struct SkillProviderActorHandle {}
+
+impl SkillProviderActorHandle {
+    pub fn new() -> Self {
+        SkillProviderActorHandle {  }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
