@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use futures::channel::oneshot;
@@ -67,7 +67,13 @@ pub enum TokenizersMsg {
 
 struct TokenizersActor {
     receiver: mpsc::Receiver<TokenizersMsg>,
+    /// We use this URL to connect to the Aleph Alpha inference API which does serve the JSON
+    /// representation of the tokenizers.
     api_base_url: String,
+    /// Cache Tokenizers by model name. Currently this is case sensitive, due to the AA API being
+    /// case sensitive. We wrap tokenizers in `Arc` so we can send them in a fire and forget manner
+    /// to the requesting skillexecuter, and we do not need to worry about keeping them alive.
+    cache: HashMap<String, Arc<Tokenizer>>,
 }
 
 impl TokenizersActor {
@@ -75,6 +81,7 @@ impl TokenizersActor {
         TokenizersActor {
             receiver,
             api_base_url,
+            cache: HashMap::new()
         }
     }
 
@@ -91,8 +98,22 @@ impl TokenizersActor {
                 model_name,
                 send,
             } => {
-                let result = tokenizer_for_model(&self.api_base_url, api_token, &model_name).await;
-                let send_result = send.send(result.map(Arc::new));
+                // First see if we find the tokenizer in cache
+                let tokenizer_result = if let Some(tokenizer) = self.cache.get(&model_name) {
+                    // Yeah, cache hit! Let's return our find
+                    Ok(tokenizer.clone())
+                } else {
+                    // Miss, we need to request and insert it first
+                    match tokenizer_for_model(&self.api_base_url, api_token, &model_name).await {
+                        Ok(tokenizer) => {
+                            let tokenizer = Arc::new(tokenizer);
+                            self.cache.insert(model_name, tokenizer.clone());
+                            Ok(tokenizer)
+                        },
+                        Err(e) => Err(e),
+                    }
+                };
+                let send_result = send.send(tokenizer_result);
                 drop(send_result);
             }
         }
