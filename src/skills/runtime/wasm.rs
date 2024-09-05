@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::{
@@ -8,7 +10,9 @@ use crate::{
 use super::{engine::Engine, provider::{SkillProvider, SkillProviderApi}, CsiForSkills, Runtime};
 
 pub struct WasmRuntime {
-    engine: Engine,
+    /// Used to execute skills. We will share the engine with multiple running skills, and skill
+    /// provider to convert bytes into executable skills.
+    engine: Arc<Engine>,
     provider: SkillProvider,
     skill_provider_api: SkillProviderApi,
 }
@@ -16,7 +20,7 @@ pub struct WasmRuntime {
 impl WasmRuntime {
     pub fn with_provider(skill_provider: SkillProvider, skill_provider_api: SkillProviderApi) -> Self {
         Self {
-            engine: Engine::new().expect("engine creation failed"),
+            engine: Arc::new(Engine::new().expect("engine creation failed")),
             provider: skill_provider,
             skill_provider_api, 
         }
