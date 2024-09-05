@@ -451,7 +451,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri(format!("/cached_skills/haiku_skill"))
+                    .uri("/cached_skills/haiku_skill".to_owned())
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -491,7 +491,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri(format!("/cached_skills/haiku_skill"))
+                    .uri("/cached_skills/haiku_skill".to_owned())
                     .body(Body::empty())
                     .unwrap(),
             )

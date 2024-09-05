@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
+use anyhow::{anyhow, Context as _};
 use futures::channel::oneshot;
 use tokenizers::Tokenizer;
-use tokio::{sync::mpsc, task::JoinHandle,};
-use anyhow::{anyhow, Context as _};
+use tokio::{sync::mpsc, task::JoinHandle};
 
 #[derive(Clone)]
 pub struct TokenizersApi {
-    sender: mpsc::Sender<TokenizersMsg>
+    sender: mpsc::Sender<TokenizersMsg>,
 }
 
 impl TokenizersApi {
@@ -15,9 +15,17 @@ impl TokenizersApi {
         TokenizersApi { sender }
     }
 
-    pub async fn tokenizer_by_model(&mut self, api_token: String, model_name: String) -> Result<Arc<Tokenizer>, anyhow::Error> {
+    pub async fn tokenizer_by_model(
+        &mut self,
+        api_token: String,
+        model_name: String,
+    ) -> Result<Arc<Tokenizer>, anyhow::Error> {
         let (send, recv) = oneshot::channel();
-        let msg = TokenizersMsg::TokenizerByModel { api_token, model_name, send };
+        let msg = TokenizersMsg::TokenizerByModel {
+            api_token,
+            model_name,
+            send,
+        };
         self.sender.send(msg).await.unwrap();
         recv.await.unwrap()
     }
@@ -26,7 +34,7 @@ impl TokenizersApi {
 /// Actor providing tokenizers. These tokenizers are currently used to power chunking logic for CSI
 pub struct Tokenizers {
     sender: mpsc::Sender<TokenizersMsg>,
-    handle: JoinHandle<()>
+    handle: JoinHandle<()>,
 }
 
 impl Tokenizers {
@@ -34,12 +42,9 @@ impl Tokenizers {
         let (sender, receiver) = mpsc::channel(1);
         let handle = tokio::spawn(async move {
             let mut actor = TokenizersActor::new(receiver, api_base_url);
-            actor.run().await
+            actor.run().await;
         });
-        Tokenizers {
-            sender,
-            handle
-        }
+        Tokenizers { sender, handle }
     }
 
     pub fn api(&self) -> TokenizersApi {
@@ -53,11 +58,11 @@ impl Tokenizers {
 }
 
 pub enum TokenizersMsg {
-    TokenizerByModel{
+    TokenizerByModel {
         api_token: String,
         model_name: String,
-        send: oneshot::Sender<Result<Arc<Tokenizer>, anyhow::Error>>
-    }
+        send: oneshot::Sender<Result<Arc<Tokenizer>, anyhow::Error>>,
+    },
 }
 
 struct TokenizersActor {
@@ -67,29 +72,40 @@ struct TokenizersActor {
 
 impl TokenizersActor {
     pub fn new(receiver: mpsc::Receiver<TokenizersMsg>, api_base_url: String) -> Self {
-        TokenizersActor { receiver, api_base_url }
+        TokenizersActor {
+            receiver,
+            api_base_url,
+        }
     }
 
     pub async fn run(&mut self) {
         while let Some(msg) = self.receiver.recv().await {
-            self.act(msg).await
+            self.act(msg).await;
         }
     }
 
     async fn act(&mut self, msg: TokenizersMsg) {
         match msg {
-            TokenizersMsg::TokenizerByModel { api_token, model_name, send } => {
+            TokenizersMsg::TokenizerByModel {
+                api_token,
+                model_name,
+                send,
+            } => {
                 let result = tokenizer_for_model(&self.api_base_url, api_token, &model_name).await;
                 let send_result = send.send(result.map(Arc::new));
-                drop(send_result)
-            },
+                drop(send_result);
+            }
         }
     }
 }
 
 /// This method does the actual work of sending the request which fetches the tonkenizer from the API
-async fn tokenizer_for_model(api_base_url: &str, api_token: String, model: &str) -> Result<Tokenizer, anyhow::Error> {
-    let url = format!("{}/models/{model}/tokenizer", api_base_url);
+async fn tokenizer_for_model(
+    api_base_url: &str,
+    api_token: String,
+    model: &str,
+) -> Result<Tokenizer, anyhow::Error> {
+    let url = format!("{api_base_url}/models/{model}/tokenizer");
     let client = reqwest::Client::new();
     let response = client
         .get(url)
@@ -118,9 +134,9 @@ async fn tokenizer_for_model(api_base_url: &str, api_token: String, model: &str)
 pub mod tests {
     use std::sync::Arc;
 
+    use super::{tokenizer_for_model, TokenizersApi, TokenizersMsg};
     use tokenizers::Tokenizer;
     use tokio::{sync::mpsc, task::JoinHandle};
-    use super::{tokenizer_for_model, TokenizersApi, TokenizersMsg};
 
     use crate::tests::{api_token, inference_address};
 
@@ -131,23 +147,27 @@ pub mod tests {
     }
 
     /// A skill executer double, loaded up with predefined answers.
-    pub struct StubTokenizers {
+    pub struct FakeTokenizers {
         send: mpsc::Sender<TokenizersMsg>,
         handle: JoinHandle<()>,
     }
 
-    impl StubTokenizers {
-        pub fn new(
-        ) -> StubTokenizers {
+    impl FakeTokenizers {
+        pub fn new() -> FakeTokenizers {
             let (send, mut recv) = mpsc::channel(1);
             let handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
                     match msg {
-                        TokenizersMsg::TokenizerByModel { api_token: _, model_name, send } => {
+                        TokenizersMsg::TokenizerByModel {
+                            api_token: _,
+                            model_name,
+                            send,
+                        } => {
                             if model_name == "Pharia-1-LLM-7B-control" {
-                                send.send(Ok(Arc::new(pharia_1_llm_7b_control_tokenizer()))).unwrap();
+                                send.send(Ok(Arc::new(pharia_1_llm_7b_control_tokenizer())))
+                                    .unwrap();
                             }
-                        },
+                        }
                     }
                 }
             });
@@ -172,7 +192,9 @@ pub mod tests {
         let api_token = api_token().to_owned();
 
         // When we can request a tokenizer from the AA API
-        let tokenizer = tokenizer_for_model(&base_url, api_token, model_name).await.unwrap();
+        let tokenizer = tokenizer_for_model(base_url, api_token, model_name)
+            .await
+            .unwrap();
 
         // Then we can use the tokenizer
         assert_eq!(tokenizer.get_vocab_size(true), 128_000);

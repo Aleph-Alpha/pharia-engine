@@ -298,6 +298,7 @@ pub struct SkillInvocationCtx {
     /// operator.
     send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
     csi_apis: CsiApis,
+    // How the user authenticates with us
     api_token: String,
 }
 
@@ -324,6 +325,7 @@ impl SkillInvocationCtx {
         pending().await
     }
 }
+
 
 #[async_trait]
 impl CsiForSkills for SkillInvocationCtx {
@@ -359,14 +361,14 @@ pub mod tests {
         inference::{tests::InferenceStub, CompletionRequest},
         skills::runtime::tests::SaboteurRuntime,
         tests::{api_token, inference_address},
-        tokenizers::{tests::StubTokenizers, TokenizersApi, TokenizersMsg},
+        tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
     };
 
     #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
-        let tokenizers = StubTokenizers::new();
+        let tokenizers = FakeTokenizers::new();
         let csi_apis = CsiApis {
             tokenizers: tokenizers.api(),
             ..dummy_csi_apis()
