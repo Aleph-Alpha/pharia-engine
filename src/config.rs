@@ -42,7 +42,6 @@ impl AppConfig {
     pub fn skill_executer_cfg(&self) -> SkillExecutorConfig<'_> {
         SkillExecutorConfig {
             namespaces: &self.operator_config.namespaces,
-            api_base_url: self.inference_addr.clone(),
         }
     }
 }

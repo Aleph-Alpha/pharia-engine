@@ -22,8 +22,6 @@ use tokio::{
 /// [`crate::AppConfig`]
 pub struct SkillExecutorConfig<'a> {
     pub namespaces: &'a HashMap<String, NamespaceConfig>,
-    /// We use this URL to the AA inference API to fetch tokenizers for chunking
-    pub api_base_url: String,
 }
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
@@ -325,7 +323,6 @@ impl SkillInvocationCtx {
     }
 }
 
-
 #[async_trait]
 impl CsiForSkills for SkillInvocationCtx {
     async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
@@ -359,7 +356,6 @@ pub mod tests {
         csi::tests::dummy_csi_apis,
         inference::{tests::InferenceStub, CompletionRequest},
         skills::runtime::tests::SaboteurRuntime,
-        tests::inference_address,
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
     };
 
@@ -430,7 +426,6 @@ pub mod tests {
         let namespaces = HashMap::new();
         let config = SkillExecutorConfig {
             namespaces: &namespaces,
-            api_base_url: "https://dummy".to_owned(),
         };
         let csi_apis = dummy_csi_apis();
         let executer = SkillExecutor::with_cfg(csi_apis, config);
@@ -695,7 +690,6 @@ pub mod tests {
             csi_apis,
             SkillExecutorConfig {
                 namespaces: &HashMap::new(),
-                api_base_url: inference_address().to_owned(),
             },
         );
         let api = skill_executor.api();

@@ -107,6 +107,7 @@ mod tests {
                 .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned())
         })
     }
+
     // tests if the shutdown procedure is executed properly (not blocking)
     #[tokio::test]
     async fn shutdown() {
