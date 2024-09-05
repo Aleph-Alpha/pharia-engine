@@ -1,8 +1,11 @@
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, env, sync::Arc};
 
 use anyhow::{anyhow, Context};
 use serde_json::Value;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 
 use crate::{
     configuration_observer::{NamespaceConfig, NamespaceDescriptionError, Registry},
@@ -17,7 +20,7 @@ use super::{
 
 pub struct SkillProvider {
     known_skills: HashMap<SkillPath, Option<String>>,
-    cached_skills: HashMap<SkillPath, CachedSkill>,
+    cached_skills: HashMap<SkillPath, Arc<CachedSkill>>,
     // key: Namespace, value: Registry
     skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
     // key: Namespace, value: Error
@@ -96,7 +99,7 @@ impl SkillProvider {
         &mut self,
         skill_path: &SkillPath,
         engine: &Engine,
-    ) -> anyhow::Result<Option<&CachedSkill>> {
+    ) -> anyhow::Result<Option<Arc<CachedSkill>>> {
         if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
             return Err(anyhow!("Invalid namespace: {error}"));
         }
@@ -117,10 +120,10 @@ impl SkillProvider {
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_path} not found."))?;
             let skill = CachedSkill::new(engine, bytes)
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
-            self.cached_skills.insert(skill_path.clone(), skill);
+            self.cached_skills.insert(skill_path.clone(), Arc::new(skill));
         }
         Ok(Some(
-            self.cached_skills.get(skill_path).expect("Skill present."),
+            self.cached_skills.get(skill_path).expect("Skill present.").clone(),
         ))
     }
 }
@@ -161,7 +164,9 @@ impl SkillProviderActorHandle {
     }
 
     pub fn api(&self) -> SkillProviderApi {
-        SkillProviderApi { sender: self.sender.clone() }
+        SkillProviderApi {
+            sender: self.sender.clone(),
+        }
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -172,10 +177,16 @@ impl SkillProviderActorHandle {
 }
 
 pub struct SkillProviderApi {
-    sender: mpsc::Sender<SkillProviderMsg>
+    sender: mpsc::Sender<SkillProviderMsg>,
 }
 
-enum SkillProviderMsg {}
+enum SkillProviderMsg {
+    FetchSkill {
+        skill_path: SkillPath,
+        engine: Arc<Engine>,
+        send: oneshot::Sender<Result<Option<Arc<CachedSkill>>, anyhow::Error>>,
+    },
+}
 
 struct SkillProviderActor {
     receiver: mpsc::Receiver<SkillProviderMsg>,
@@ -183,7 +194,10 @@ struct SkillProviderActor {
 }
 
 impl SkillProviderActor {
-    pub fn new(receiver: mpsc::Receiver<SkillProviderMsg>, namespaces: &HashMap<String, NamespaceConfig>) -> Self {
+    pub fn new(
+        receiver: mpsc::Receiver<SkillProviderMsg>,
+        namespaces: &HashMap<String, NamespaceConfig>,
+    ) -> Self {
         SkillProviderActor {
             receiver,
             provider: SkillProvider::new(namespaces),
@@ -191,8 +205,19 @@ impl SkillProviderActor {
     }
 
     pub async fn run(&mut self) {
-        while let Some(msg) = self.receiver.recv().await {
-            
+        while let Some(msg) = self.receiver.recv().await {}
+    }
+
+    pub async fn act(&mut self, msg: SkillProviderMsg) {
+        match msg {
+            SkillProviderMsg::FetchSkill {
+                skill_path,
+                engine,
+                send,
+            } => {
+                let result = self.provider.fetch(&skill_path, &engine).await;
+                drop(send.send(result));
+            }
         }
     }
 }
