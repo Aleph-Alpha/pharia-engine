@@ -150,6 +150,14 @@ impl SkillProviderActorHandle {
     pub fn new() -> Self {
         SkillProviderActorHandle {  }
     }
+
+    pub fn api(&self) -> SkillProviderApi {
+        SkillProviderApi {  }
+    }
+}
+
+pub struct SkillProviderApi {
+
 }
 
 #[cfg(test)]

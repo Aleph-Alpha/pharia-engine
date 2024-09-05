@@ -6,14 +6,18 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::future::Future;
 
-pub use provider::SkillProvider;
-pub use wasm::WasmRuntime;
-
 use crate::{
-    configuration_observer::NamespaceDescriptionError, csi::ChunkRequest, inference::{Completion, CompletionRequest}
+    configuration_observer::NamespaceDescriptionError,
+    csi::ChunkRequest,
+    inference::{Completion, CompletionRequest},
 };
 
 use super::{actor::ExecuteSkillError, SkillPath};
+
+pub use self::{
+    provider::{SkillProvider, SkillProviderActorHandle},
+    wasm::WasmRuntime,
+};
 
 /// Responsible for loading and executing skills.
 pub trait Runtime {

@@ -5,20 +5,20 @@ use crate::{
     skills::{actor::ExecuteSkillError, SkillPath},
 };
 
-use super::{engine::Engine, provider::{SkillProvider, SkillProviderActorHandle}, CsiForSkills, Runtime};
+use super::{engine::Engine, provider::{SkillProvider, SkillProviderApi}, CsiForSkills, Runtime};
 
 pub struct WasmRuntime {
     engine: Engine,
     provider: SkillProvider,
-    provider_actor: SkillProviderActorHandle,
+    skill_provider_api: SkillProviderApi,
 }
 
 impl WasmRuntime {
-    pub fn with_provider(skill_provider: SkillProvider) -> Self {
+    pub fn with_provider(skill_provider: SkillProvider, skill_provider_api: SkillProviderApi) -> Self {
         Self {
             engine: Engine::new().expect("engine creation failed"),
             provider: skill_provider,
-            provider_actor: SkillProviderActorHandle::new(), 
+            skill_provider_api, 
         }
     }
 }
@@ -81,7 +81,7 @@ pub mod tests {
     };
 
     use crate::{
-        configuration_observer::OperatorConfig, csi::ChunkRequest, inference::{Completion, CompletionRequest}
+        configuration_observer::OperatorConfig, csi::ChunkRequest, inference::{Completion, CompletionRequest}, skills::runtime::SkillProviderActorHandle
     };
 
     use super::*;
@@ -93,7 +93,8 @@ pub mod tests {
         pub fn local() -> Self {
             let namespaces = OperatorConfig::local().namespaces;
             let provider = SkillProvider::new(&namespaces);
-            Self::with_provider(provider)
+            let skill_provider_actor = SkillProviderActorHandle::new();
+            Self::with_provider(provider, skill_provider_actor.api())
         }
     }
 

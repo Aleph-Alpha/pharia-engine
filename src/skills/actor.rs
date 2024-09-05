@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    runtime::{CsiForSkills, Runtime, SkillProvider, WasmRuntime},
+    runtime::{CsiForSkills, Runtime, SkillProvider, SkillProviderActorHandle, WasmRuntime},
     SkillPath,
 };
 
@@ -34,7 +34,8 @@ impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn with_cfg(csi_apis: CsiApis, cfg: SkillExecutorConfig<'_>) -> Self {
         let provider = SkillProvider::new(cfg.namespaces);
-        let runtime = WasmRuntime::with_provider(provider);
+        let provider_actor = SkillProviderActorHandle::new();
+        let runtime = WasmRuntime::with_provider(provider, provider_actor.api());
         Self::new(runtime, csi_apis)
     }
 
