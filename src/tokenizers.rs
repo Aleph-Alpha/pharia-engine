@@ -198,7 +198,7 @@ pub mod tests {
 
         // When we can request a tokenizer from the AA API
         let actor = Tokenizers::new(base_url.to_owned()).unwrap();
-        let mut api = actor.api();
+        let api = actor.api();
         let tokenizer = api
             .tokenizer_by_model(api_token, model_name.to_owned())
             .await

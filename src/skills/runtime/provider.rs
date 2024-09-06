@@ -233,9 +233,22 @@ impl SkillProviderApi {
         recv.await.unwrap()
     }
 
+    /// List all skills which are currently cached and can be executed without fetching the wasm
+    /// component from an OCI
     pub async fn list_cached(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
         let msg = SkillProviderMsg::ListCached { send };
+        self.sender
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await.unwrap()
+    }
+
+    /// List all skills from all namespaces
+    pub async fn list(&self) -> Vec<SkillPath> {
+        let (send, recv) = oneshot::channel();
+        let msg = SkillProviderMsg::List { send };
         self.sender
             .send(msg)
             .await
@@ -348,8 +361,6 @@ pub mod tests {
 
     use std::collections::HashSet;
 
-    use crate::OperatorConfig;
-
     use super::*;
 
     pub fn dummy_skill_provider_api() -> SkillProviderApi {
@@ -456,22 +467,48 @@ pub mod tests {
         let engine = Arc::new(Engine::new().unwrap());
         let skill_path_rs = SkillPath::new("local", "greet_skill");
         let skill_path_py = SkillPath::new("local", "greet-py");
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let skill_provider = SkillProviderActorHandle::new(&local_namespace());
 
-        // when adding these two skills and fetching them
-        skill_provider.api().upsert(skill_path_rs.clone(), None).await;
-        skill_provider.api().upsert(skill_path_py.clone(), None).await;
-        skill_provider.api().fetch(skill_path_rs.clone(), engine.clone()).await.unwrap();
-        skill_provider.api().fetch(skill_path_py.clone(), engine.clone()).await.unwrap();
+        // When adding these two skills and fetching them
+        skill_provider
+            .api()
+            .upsert(skill_path_rs.clone(), None)
+            .await;
+        skill_provider
+            .api()
+            .upsert(skill_path_py.clone(), None)
+            .await;
+        skill_provider
+            .api()
+            .fetch(skill_path_rs.clone(), engine.clone())
+            .await
+            .unwrap();
+        skill_provider
+            .api()
+            .fetch(skill_path_py.clone(), engine.clone())
+            .await
+            .unwrap();
         let skills = skill_provider.api().list_cached().await;
 
         skill_provider.wait_for_shutdown().await;
 
-        // then they will appear in the list of cached skills after in any order
+        // Then they will appear in the list of cached skills after in any order
         let skills = skills.into_iter().collect::<HashSet<_>>();
         let mut expected = HashSet::new();
         expected.insert(skill_path_rs);
         expected.insert(skill_path_py);
         assert_eq!(skills, expected);
+    }
+
+    /// Namespace named local backed by a file registry with "skills" directory
+    fn local_namespace() -> HashMap<String, NamespaceConfig> {
+        let namespace_cfg = NamespaceConfig {
+            config_url: "file://namespace.toml".to_owned(),
+            config_access_token_env_var: None,
+            registry: Registry::File {
+                path: "./skills".to_owned(),
+            },
+        };
+        std::iter::once(("local".to_owned(), namespace_cfg)).collect()
     }
 }

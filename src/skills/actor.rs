@@ -655,7 +655,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn list_skills() {
-        // Given a runtime with five skills
+        // Given two skills
         let skills = ["First skill".to_owned(), "Second skill".to_owned()];
         let runtime = LiarRuntime::new(&skills);
 

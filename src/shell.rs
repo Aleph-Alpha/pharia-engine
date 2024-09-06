@@ -112,10 +112,10 @@ pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillProvi
     Router::new()
         .route("/cached_skills", get(cached_skills))
         .route("/cached_skills/:name", delete(drop_cached_skill))
+        .route("/skills", get(skills))
         .with_state(skill_provider_api)
         .route("/skill.wit", get(skill_wit()))
         .route("/execute_skill", post(execute_skill))
-        .route("/skills", get(skills))
         .with_state(skill_executor_api)
         .nest_service("/docs", serve_dir.clone())
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
@@ -219,9 +219,9 @@ async fn execute_skill(
     ),
 )]
 async fn skills(
-    State(skill_executor_api): State<SkillExecutorApi>,
+    State(skill_provider_api): State<SkillProviderApi>,
 ) -> (StatusCode, Json<Vec<String>>) {
-    let response = skill_executor_api.skills().await;
+    let response = skill_provider_api.list().await;
     let response = response.iter().map(ToString::to_string).collect();
     (StatusCode::OK, Json(response))
 }
@@ -411,12 +411,14 @@ mod tests {
         let skill_provider_api = SkillProviderApi::new(send);
         tokio::spawn(async move {
             if let SkillProviderMsg::ListCached { send } = recv.recv().await.unwrap() {
-                send.send(vec![SkillPath::new("ns", "first"), SkillPath::new("ns", "second")])
+                send.send(vec![
+                    SkillPath::new("ns", "first"),
+                    SkillPath::new("ns", "second"),
+                ])
             } else {
                 panic!("unexpected message in test")
             }
         });
-
 
         let http = http(dummy_skill_executer.api(), skill_provider_api);
 
@@ -438,7 +440,7 @@ mod tests {
 
     #[tokio::test]
     async fn drop_cached_skill() {
-        // Given a runtime with one installed skill
+        // Given a provider wchich answers invalidate cache with `true`
         let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.
@@ -447,7 +449,9 @@ mod tests {
         let (send, mut recv) = mpsc::channel(1);
         let skill_provider_api = SkillProviderApi::new(send);
         tokio::spawn(async move {
-            if let SkillProviderMsg::InvalidateCache { skill_path, send } = recv.recv().await.unwrap() {
+            if let SkillProviderMsg::InvalidateCache { skill_path, send } =
+                recv.recv().await.unwrap()
+            {
                 skill_path_clone.lock().unwrap().replace(skill_path);
                 // `true` means it we actually deleted a skill
                 send.send(true).unwrap();
@@ -493,7 +497,9 @@ mod tests {
         let (send, mut recv) = mpsc::channel(1);
         let skill_provider_api = SkillProviderApi::new(send);
         tokio::spawn(async move {
-            if let SkillProviderMsg::InvalidateCache { skill_path, send } = recv.recv().await.unwrap() {
+            if let SkillProviderMsg::InvalidateCache { skill_path, send } =
+                recv.recv().await.unwrap()
+            {
                 skill_path_clone.lock().unwrap().replace(skill_path);
                 // `false` means the skill has not been there before
                 send.send(false).unwrap();
@@ -599,17 +605,24 @@ mod tests {
 
     #[tokio::test]
     async fn list_skills() {
-        // given a skill executor with cached skills
-        let skill_path = SkillPath::dummy();
-        let skill_qualified_name = skill_path.to_string();
-        let stub_skill_executer = StubSkillExecuter::new(move |msg| {
-            if let SkillExecutorMessage::Skills { send } = msg {
-                send.send(vec![skill_path.clone()]).unwrap();
+        // Given we can provide two skills "ns_one/one" and "ns_two/two"
+        let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
+        let (send, mut recv) = mpsc::channel(1);
+        let skill_provider_api = SkillProviderApi::new(send);
+        tokio::spawn(async move {
+            if let SkillProviderMsg::List { send } = recv.recv().await.unwrap() {
+                send.send(vec![
+                    SkillPath::new("ns_one", "one"),
+                    SkillPath::new("ns_two", "two"),
+                ])
+                .unwrap();
+            } else {
+                panic!("Unexpected message in test")
             }
         });
-        let skill_executer_api = stub_skill_executer.api();
+        let http = http(dummy_skill_executer.api(), skill_provider_api);
 
-        let http = http(skill_executer_api, dummy_skill_provider_api());
+        // When
         let resp = http
             .oneshot(
                 Request::builder()
@@ -619,12 +632,12 @@ mod tests {
             )
             .await
             .unwrap();
-        stub_skill_executer.shutdown().await;
 
+        // Then
         let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let skills_str = String::from_utf8(body.to_vec()).unwrap();
-        let skills = serde_json::from_str::<Vec<String>>(&skills_str).unwrap();
-        assert_eq!(skills, vec![skill_qualified_name]);
+        let actual = String::from_utf8(body.to_vec()).unwrap();
+        let expected = "[\"ns_one/one\",\"ns_two/two\"]";
+        assert_eq!(actual, expected);
     }
 
     #[tokio::test]
