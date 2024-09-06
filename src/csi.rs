@@ -47,9 +47,9 @@ pub trait Csi {
         &mut self,
         text: String,
         languages: Vec<Language>,
-    ) -> Option<Language> {
+    ) -> anyhow::Result<Option<Language>> {
         // default implementation can be provided here because language selection is stateless
-        select_language(&text, &languages)
+        Ok(tokio::task::spawn_blocking(move || select_language(&text, &languages)).await?)
     }
 }
 

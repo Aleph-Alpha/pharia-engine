@@ -234,7 +234,10 @@ impl CsiForSkills for SkillInvocationCtx {
         text: String,
         languages: Vec<Language>,
     ) -> Option<Language> {
-        self.csi_apis.select_language(text, languages).await
+        match self.csi_apis.select_language(text, languages).await {
+            Ok(language) => language,
+            Err(error) => self.send_error(error).await,
+        }
     }
 }
 
