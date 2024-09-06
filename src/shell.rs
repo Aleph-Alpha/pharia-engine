@@ -328,30 +328,25 @@ mod tests {
     #[tokio::test]
     async fn execute_skill() {
         // Given
-        let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_path_clone = skill_path.clone();
         let skill_executer_mock = StubSkillExecuter::new(move |msg| {
             if let SkillExecutorMessage::Execute {
                 skill_path, send, ..
             } = msg
             {
-                assert_eq!(skill_path, skill_path_clone);
+                assert_eq!(skill_path, SkillPath::new("local", "greet_skill"));
                 send.send(Ok(json!("dummy completion"))).unwrap();
             }
         });
         let skill_executor_api = skill_executer_mock.api();
 
         // When
-        let api_token = api_token();
+        let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
-        skill_executor_api
-            .upsert_skill(skill_path.clone(), None)
-            .await;
         let http = http(skill_executor_api, dummy_skill_provider_api());
 
         let args = ExecuteSkillArgs {
-            skill: skill_path.to_string(),
+            skill: "local/greet_skill".to_owned(),
             input: json!("Homer"),
         };
         let resp = http

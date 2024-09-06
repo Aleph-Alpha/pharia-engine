@@ -232,9 +232,6 @@ impl ConfigurationObserverActor {
         let incoming = self.skills.get(namespace).unwrap();
         let diff = Self::compute_diff(&existing, incoming);
         for skill in diff.added_or_changed {
-            self.skill_executor_api
-                .upsert_skill(SkillPath::new(namespace, &skill.name), skill.tag.clone())
-                .await;
             self.skill_provider_api
                 .upsert(SkillPath::new(namespace, &skill.name), skill.tag)
                 .await;

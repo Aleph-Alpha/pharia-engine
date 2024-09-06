@@ -50,10 +50,6 @@ impl Runtime for WasmRuntime {
             .map_err(ExecuteSkillError::Other)
     }
 
-    fn upsert_skill(&mut self, skill: SkillPath, tag: Option<String>) {
-        self.provider.upsert_skill(&skill, tag);
-    }
-
     fn remove_skill(&mut self, skill: &SkillPath) {
         self.provider.remove_skill(skill);
     }
@@ -69,10 +65,7 @@ impl Runtime for WasmRuntime {
 
 #[cfg(test)]
 pub mod tests {
-    use std::{
-        fs,
-        sync::{Arc, Mutex},
-    };
+    use std::sync::{Arc, Mutex};
 
     use crate::{
         configuration_observer::OperatorConfig,
@@ -85,7 +78,6 @@ pub mod tests {
     use super::*;
     use async_trait::async_trait;
     use serde_json::json;
-    use tempfile::tempdir;
 
     impl WasmRuntime {
         pub fn local(skill_provider_api: SkillProviderApi) -> Self {
@@ -103,7 +95,6 @@ pub mod tests {
 
         let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
-        runtime.upsert_skill(skill_path.clone(), None);
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
 
         drop(runtime);
@@ -125,31 +116,6 @@ pub mod tests {
         skill_provider.wait_for_shutdown().await;
 
         assert!(resp.is_err());
-    }
-
-    #[tokio::test]
-    async fn lazy_skill_loading() {
-        // Giving and empty skill directory to the WasmRuntime
-        let skill_dir = tempdir().unwrap();
-        let skill_path = SkillPath::new("local", "greet_skill");
-
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        skill_provider.api().upsert(skill_path.clone(), None).await;
-        let mut runtime = WasmRuntime::local(skill_provider.api());
-        runtime.upsert_skill(skill_path.clone(), None);
-        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
-
-        // When adding a new skill component
-        let skill_file = skill_dir.path().join("greet_skill.wasm");
-        fs::copy("./skills/greet_skill.wasm", skill_file).unwrap();
-
-        // Then the skill can be invoked
-        let greet = runtime.run(&skill_path, json!("Homer"), skill_ctx).await;
-
-        drop(runtime);
-        skill_provider.wait_for_shutdown().await;
-
-        assert!(greet.is_ok());
     }
 
     #[tokio::test]

@@ -39,8 +39,6 @@ pub trait Runtime {
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> impl Future<Output = Result<Value, ExecuteSkillError>> + Send;
 
-    fn upsert_skill(&mut self, skill: SkillPath, tag: Option<String>);
-
     fn remove_skill(&mut self, skill: &SkillPath);
 
     fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error);
@@ -87,11 +85,7 @@ pub mod tests {
         ) -> Result<Value, ExecuteSkillError> {
             Err(ExecuteSkillError::Other(anyhow!(self.err_msg.clone())))
         }
-
-        fn upsert_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
-            panic!("Saboteur runtime does not add skill")
-        }
-
+        
         fn remove_skill(&mut self, _skill: &SkillPath) {
             panic!("Saboteur runtime does not remove skill")
         }

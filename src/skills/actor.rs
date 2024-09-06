@@ -90,14 +90,6 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn upsert_skill(&self, skill: SkillPath, tag: Option<String>) {
-        let msg = SkillExecutorMessage::Upsert { skill, tag };
-        self.send
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
-    }
-
     pub async fn remove_skill(&self, skill: SkillPath) {
         let msg = SkillExecutorMessage::Remove { skill };
         self.send
@@ -170,7 +162,6 @@ where
             SkillExecutorMessage::MarkNamespaceAsValid { namespace } => {
                 self.runtime.mark_namespace_as_valid(&namespace);
             }
-            SkillExecutorMessage::Upsert { skill, tag } => self.runtime.upsert_skill(skill, tag),
             SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
             SkillExecutorMessage::Execute {
                 skill_path,
@@ -214,10 +205,6 @@ pub enum SkillExecutorMessage {
     },
     MarkNamespaceAsValid {
         namespace: String,
-    },
-    Upsert {
-        skill: SkillPath,
-        tag: Option<String>,
     },
     Remove {
         skill: SkillPath,
@@ -434,10 +421,6 @@ pub mod tests {
                 panic!("complete_text must pend forever in case of error")
             }
 
-            fn upsert_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
-                panic!("does not add new skill")
-            }
-
             fn remove_skill(&mut self, _skill: &SkillPath) {
                 panic!("does not remove skill")
             }
@@ -562,10 +545,6 @@ pub mod tests {
             );
             let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
             Ok(json!(ctx.complete_text(request).await.text))
-        }
-
-        fn upsert_skill(&mut self, _skill: SkillPath, _tag: Option<String>) {
-            panic!("RustRuntime does not add skill")
         }
 
         fn remove_skill(&mut self, _skill: &SkillPath) {
