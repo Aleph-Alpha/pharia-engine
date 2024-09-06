@@ -90,15 +90,23 @@ impl Csi for CsiApis {
         auth: String,
         request: ChunkRequest,
     ) -> Result<Vec<String>, anyhow::Error> {
-        let tokenizer = self
-            .tokenizers
-            .tokenizer_by_model(auth, request.model)
-            .await?;
-        let chunks = chunking::chunking(&request.text, &tokenizer, request.max_tokens);
+        let ChunkRequest {
+            text,
+            model,
+            max_tokens,
+        } = request;
+        let text_len = text.len();
+
+        let tokenizer = self.tokenizers.tokenizer_by_model(auth, model).await?;
+        // Push into the blocking thread pool because this can be expensive for long documents
+        let chunks =
+            tokio::task::spawn_blocking(move || chunking::chunking(&text, &tokenizer, max_tokens))
+                .await?;
+
         trace!(
             "chunk: textlen={} max_tokens={} -> chunks.len()={}",
-            request.text.len(),
-            request.max_tokens,
+            text_len,
+            max_tokens,
             chunks.len()
         );
         Ok(chunks)
