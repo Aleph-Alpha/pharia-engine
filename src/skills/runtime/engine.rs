@@ -284,7 +284,7 @@ mod v0_2 {
 
         async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             let requests = requests
-                .iter()
+                .into_iter()
                 .map(|r| {
                     let CompletionParams {
                         max_tokens,
@@ -292,10 +292,10 @@ mod v0_2 {
                         top_k,
                         top_p,
                         stop,
-                    } = r.params.clone();
+                    } = r.params;
                     inference::CompletionRequest {
-                        prompt: r.prompt.clone(),
-                        model: r.model.clone(),
+                        prompt: r.prompt,
+                        model: r.model,
                         params: inference::CompletionParams {
                             max_tokens,
                             temperature,
@@ -310,9 +310,9 @@ mod v0_2 {
             self.skill_ctx
                 .complete_all(requests)
                 .await
-                .iter()
+                .into_iter()
                 .map(|c| Completion {
-                    text: c.text.clone(),
+                    text: c.text,
                     finish_reason: match c.finish_reason {
                         inference::FinishReason::Stop => FinishReason::Stop,
                         inference::FinishReason::Length => FinishReason::Length,
