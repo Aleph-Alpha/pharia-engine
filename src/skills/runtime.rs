@@ -1,5 +1,4 @@
 mod engine;
-mod provider;
 mod wasm;
 
 use async_trait::async_trait;
@@ -15,7 +14,7 @@ use crate::{
 use super::{actor::ExecuteSkillError, SkillPath};
 
 pub use self::{
-    provider::{SkillProvider, SkillProviderApi},
+    engine::{Engine, Skill},
     wasm::WasmRuntime,
 };
 
@@ -57,8 +56,6 @@ pub trait CsiForSkills {
 pub mod tests {
     use super::*;
     use anyhow::anyhow;
-
-    pub use self::provider::tests::{dummy_skill_provider_api, SkillProviderMsg};
 
     pub struct SaboteurRuntime {
         err_msg: String,

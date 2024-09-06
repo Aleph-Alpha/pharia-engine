@@ -1,9 +1,12 @@
 use serde_json::Value;
 use std::sync::Arc;
 
-use crate::skills::{actor::ExecuteSkillError, SkillPath};
+use crate::{
+    skill_provider::SkillProviderApi,
+    skills::{actor::ExecuteSkillError, SkillPath},
+};
 
-use super::{engine::Engine, provider::SkillProviderApi, CsiForSkills, Runtime};
+use super::{engine::Engine, CsiForSkills, Runtime};
 
 pub struct WasmRuntime {
     /// Used to execute skills. We will share the engine with multiple running skills, and skill
@@ -51,7 +54,7 @@ pub mod tests {
         csi::ChunkRequest,
         inference::{Completion, CompletionRequest},
         language_selection::{select_language, Language},
-        skills::runtime::SkillProvider,
+        skill_provider::SkillProvider,
     };
 
     use super::*;

@@ -10,12 +10,7 @@ use tokio::{
 use crate::{
     configuration_observer::{NamespaceConfig, Registry},
     registries::{FileRegistry, OciRegistry, SkillRegistry},
-    skills::SkillPath,
-};
-
-use super::{
-    engine::{Engine, Skill},
-    CsiForSkills,
+    skills::{CsiForSkills, Engine, Skill, SkillPath},
 };
 
 struct SkillProviderState {

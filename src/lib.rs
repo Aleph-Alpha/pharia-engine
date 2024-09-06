@@ -5,6 +5,7 @@ mod inference;
 mod language_selection;
 mod registries;
 mod shell;
+mod skill_provider;
 mod skills;
 mod tokenizers;
 
@@ -12,7 +13,7 @@ use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use csi::CsiApis;
 use futures::Future;
-use skills::SkillProvider;
+use skill_provider::SkillProvider;
 use tokenizers::Tokenizers;
 use tracing::error;
 

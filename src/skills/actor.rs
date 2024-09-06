@@ -1,7 +1,7 @@
 use std::future::pending;
 
 use super::{
-    runtime::{CsiForSkills, Runtime, SkillProviderApi, WasmRuntime},
+    runtime::{CsiForSkills, Runtime, WasmRuntime},
     SkillPath,
 };
 
@@ -9,6 +9,7 @@ use crate::{
     csi::{ChunkRequest, Csi as _, CsiApis},
     inference::{Completion, CompletionRequest},
     language_selection::Language,
+    skill_provider::SkillProviderApi,
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -249,7 +250,8 @@ pub mod tests {
     use crate::{
         csi::tests::dummy_csi_apis,
         inference::{tests::InferenceStub, CompletionRequest},
-        skills::{runtime::tests::SaboteurRuntime, SkillProvider},
+        skill_provider::SkillProvider,
+        skills::runtime::tests::SaboteurRuntime,
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
     };
 
