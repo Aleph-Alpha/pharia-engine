@@ -242,6 +242,18 @@ impl SkillProviderApi {
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
+
+    /// Drops a skill from the cache in case it has been cached before. `true` if the skill has been
+    /// in the cache before, `false` otherwise .
+    pub async fn invalidate_cache(&self, skill_path: SkillPath) -> bool {
+        let (send, recv) = oneshot::channel();
+        let msg = SkillProviderMsg::InvalidateCache { skill_path, send };
+        self.sender
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await.unwrap()
+    }
 }
 
 pub enum SkillProviderMsg {
@@ -266,6 +278,10 @@ pub enum SkillProviderMsg {
     SetNamespaceError {
         namespace: String,
         error: Option<anyhow::Error>,
+    },
+    InvalidateCache {
+        skill_path: SkillPath,
+        send: oneshot::Sender<bool>,
     },
 }
 
@@ -319,6 +335,9 @@ impl SkillProviderActor {
             }
             SkillProviderMsg::ListCached { send } => {
                 drop(send.send(self.provider.list_cached_skills().cloned().collect()));
+            }
+            SkillProviderMsg::InvalidateCache { skill_path, send } => {
+                drop(send.send(self.provider.invalidate(&skill_path)));
             }
         }
     }

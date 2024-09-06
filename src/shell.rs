@@ -111,11 +111,11 @@ pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillProvi
 
     Router::new()
         .route("/cached_skills", get(cached_skills))
+        .route("/cached_skills/:name", delete(drop_cached_skill))
         .with_state(skill_provider_api)
         .route("/skill.wit", get(skill_wit()))
         .route("/execute_skill", post(execute_skill))
         .route("/skills", get(skills))
-        .route("/cached_skills/:name", delete(drop_cached_skill))
         .with_state(skill_executor_api)
         .nest_service("/docs", serve_dir.clone())
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
@@ -265,11 +265,11 @@ async fn cached_skills(
     ),
 )]
 async fn drop_cached_skill(
-    State(skill_executor_api): State<SkillExecutorApi>,
+    State(skill_provider_api): State<SkillProviderApi>,
     Path(name): Path<String>,
 ) -> (StatusCode, Json<String>) {
     let skill_path = SkillPath::from_str(&name);
-    let skill_was_cached = skill_executor_api.drop_from_cache(skill_path).await;
+    let skill_was_cached = skill_provider_api.invalidate_cache(skill_path).await;
     let msg = if skill_was_cached {
         "Skill removed from cache".to_string()
     } else {
@@ -405,7 +405,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cached_skills_are_returned() {
+    async fn list_cached_skills_for_user() {
         let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
         let skill_provider_api = SkillProviderApi::new(send);
@@ -439,19 +439,21 @@ mod tests {
     #[tokio::test]
     async fn drop_cached_skill() {
         // Given a runtime with one installed skill
-
+        let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.
         let skill_path = Arc::new(Mutex::new(None));
         let skill_path_clone = skill_path.clone();
-        let skill_executer = StubSkillExecuter::new(move |msg| {
-            if let SkillExecutorMessage::Uncache { skill_path, send } = msg {
+        let (send, mut recv) = mpsc::channel(1);
+        let skill_provider_api = SkillProviderApi::new(send);
+        tokio::spawn(async move {
+            if let SkillProviderMsg::InvalidateCache { skill_path, send } = recv.recv().await.unwrap() {
                 skill_path_clone.lock().unwrap().replace(skill_path);
                 // `true` means it we actually deleted a skill
                 send.send(true).unwrap();
             }
         });
-        let http = http(skill_executer.api(), dummy_skill_provider_api());
+        let http = http(dummy_skill_executer.api(), skill_provider_api);
 
         // When the skill is deleted
         let resp = http
@@ -482,16 +484,22 @@ mod tests {
 
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.
+        // Given a runtime with one installed skill
+        let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
+        // We use this to spy on the path send to the skill executer. Better to use a channel,
+        // rather than a mutex, but we do not have async closures yet.
         let skill_path = Arc::new(Mutex::new(None));
         let skill_path_clone = skill_path.clone();
-        let skill_executer = StubSkillExecuter::new(move |msg| {
-            if let SkillExecutorMessage::Uncache { skill_path, send } = msg {
+        let (send, mut recv) = mpsc::channel(1);
+        let skill_provider_api = SkillProviderApi::new(send);
+        tokio::spawn(async move {
+            if let SkillProviderMsg::InvalidateCache { skill_path, send } = recv.recv().await.unwrap() {
                 skill_path_clone.lock().unwrap().replace(skill_path);
-                // `true` means it we actually deleted a skill
+                // `false` means the skill has not been there before
                 send.send(false).unwrap();
             }
         });
-        let http = http(skill_executer.api(), dummy_skill_provider_api());
+        let http = http(dummy_skill_executer.api(), skill_provider_api);
 
         // When the skill is deleted
         let resp = http

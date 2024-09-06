@@ -176,8 +176,8 @@ pub mod tests {
         );
 
         // When dropping a skill from the runtime
-        let result = runtime.invalidate_cached_skill(&skill_path);
-        let loaded_skill_count = runtime.loaded_skills().count();
+        let had_been_in_cache = skill_provider.api().invalidate_cache(skill_path).await;
+        let loaded_skill_count = skill_provider.api().list_cached().await.len();
 
         drop(runtime);
         skill_provider.wait_for_shutdown().await;
@@ -185,8 +185,8 @@ pub mod tests {
         // Then the component hash map is empty
         assert_eq!(loaded_skill_count, 0);
 
-        // And result is a success
-        assert!(result);
+        // And it had actually been cached before
+        assert!(had_been_in_cache);
     }
 
     #[tokio::test]
