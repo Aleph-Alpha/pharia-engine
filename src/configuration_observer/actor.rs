@@ -238,6 +238,9 @@ impl ConfigurationObserverActor {
             self.skill_executor_api
                 .remove_skill(SkillPath::new(namespace, &skill.name))
                 .await;
+            self.skill_provider_api
+                .remove(SkillPath::new(namespace, &skill.name))
+                .await;
         }
     }
 }
@@ -497,9 +500,9 @@ pub mod tests {
             vec![Skill::with_name(dummy_skill)],
         )]);
 
-        let (sender, _) = mpsc::channel::<SkillProviderMsg>(1);
+        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(1);
         let skill_provider_api = SkillProviderApi::new(sender);
-        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(2);
+        let (sender, mut receiver_skill_executor) = mpsc::channel::<SkillExecutorMessage>(2);
         let skill_executor_api = SkillExecutorApi::new(sender);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
 
@@ -514,7 +517,8 @@ pub mod tests {
         coa.load_namespace(dummy_namespace).await;
 
         // then mark the namespace as invalid and remove all skills of that namespace
-        let msg = receiver.try_recv().unwrap();
+        let _msg = receiver.try_recv().unwrap();
+        let msg = receiver_skill_executor.try_recv().unwrap();
 
         assert!(matches!(
             msg,
@@ -524,7 +528,7 @@ pub mod tests {
             if namespace == dummy_namespace
         ));
 
-        let msg = receiver.try_recv().unwrap();
+        let msg = receiver_skill_executor.try_recv().unwrap();
 
         assert!(matches!(
             msg,

@@ -188,6 +188,14 @@ impl SkillProviderApi {
     pub fn new(sender: mpsc::Sender<SkillProviderMsg>) -> Self {
         SkillProviderApi { sender }
     }
+
+    pub async fn remove(&self, skill_path: SkillPath) {
+        let msg = SkillProviderMsg::Remove { skill_path };
+        self.sender
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+    }
 }
 
 pub enum SkillProviderMsg {
