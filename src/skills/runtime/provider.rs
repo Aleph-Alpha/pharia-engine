@@ -178,6 +178,7 @@ impl SkillProviderActorHandle {
     }
 }
 
+#[derive(Clone)]
 pub struct SkillProviderApi {
     sender: mpsc::Sender<SkillProviderMsg>,
 }
@@ -324,9 +325,14 @@ impl SkillProviderActor {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
 
     use super::*;
+
+    pub fn dummy_skill_provider_api() -> SkillProviderApi {
+        let (send, _recv) = mpsc::channel(1);
+        SkillProviderApi::new(send)
+    }
 
     impl SkillProvider {
         fn with_namespace_and_skill(skill_path: &SkillPath) -> Self {

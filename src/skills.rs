@@ -3,7 +3,7 @@ mod runtime;
 use std::fmt;
 
 pub use actor::{ExecuteSkillError, SkillExecutor, SkillExecutorApi, SkillExecutorConfig};
-pub use runtime::{SkillProviderActorHandle, SkillProviderApi, SkillProviderMsg};
+pub use runtime::{SkillProviderActorHandle, SkillProviderApi};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SkillPath {
@@ -37,6 +37,7 @@ pub mod tests {
     use rand::Rng;
 
     pub use super::actor::SkillExecutorMessage;
+    pub use super::runtime::{SkillProviderMsg, tests::dummy_skill_provider_api};
     use super::SkillPath;
 
     impl SkillPath {

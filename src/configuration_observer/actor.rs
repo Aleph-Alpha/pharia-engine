@@ -258,7 +258,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::skills::tests::SkillExecutorMessage;
-    use crate::skills::{SkillExecutorApi, SkillPath, SkillProviderMsg};
+    use crate::skills::{SkillExecutorApi, SkillPath, tests::SkillProviderMsg};
 
     use super::*;
     use anyhow::anyhow;

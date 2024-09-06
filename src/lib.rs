@@ -46,7 +46,6 @@ pub async fn run(
         skill_provider.api(),
         app_config.skill_executer_cfg(),
     );
-    let skill_executor_api = skill_executor.api();
 
     // Boot up the configuration observer
     let loaders = Box::new(
@@ -64,7 +63,7 @@ pub async fn run(
     // Wait for first pass of the configuration so that the configured skills are loaded
     configuration_observer.wait_for_ready().await;
 
-    let shell_shutdown = shell::run(app_config.tcp_addr, skill_executor_api, shutdown_signal).await;
+    let shell_shutdown = shell::run(app_config.tcp_addr, skill_executor.api(), skill_provider.api(), shutdown_signal).await;
 
     Ok(async {
         // Make skills available via http interface. If we get the signal for shutdown the future

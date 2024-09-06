@@ -74,6 +74,8 @@ pub mod tests {
     use super::*;
     use anyhow::anyhow;
 
+    pub use self::provider::tests::dummy_skill_provider_api;
+
     pub struct SaboteurRuntime {
         err_msg: String,
     }
