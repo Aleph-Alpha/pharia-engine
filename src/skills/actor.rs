@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::{
-    configuration_observer::{NamespaceConfig, NamespaceDescriptionError},
+    configuration_observer::NamespaceConfig,
     csi::{ChunkRequest, Csi as _, CsiApis},
     inference::{Completion, CompletionRequest},
 };
@@ -69,7 +69,7 @@ impl SkillExecutorApi {
         Self { send }
     }
 
-    pub async fn mark_namespace_as_invalid(&self, namespace: String, e: NamespaceDescriptionError) {
+    pub async fn mark_namespace_as_invalid(&self, namespace: String, e: anyhow::Error) {
         let msg = SkillExecutorMessage::MarkNamespaceAsInvalid { namespace, e };
         self.send
             .send(msg)
@@ -256,7 +256,7 @@ where
 pub enum SkillExecutorMessage {
     MarkNamespaceAsInvalid {
         namespace: String,
-        e: NamespaceDescriptionError,
+        e: anyhow::Error,
     },
     MarkNamespaceAsValid {
         namespace: String,
@@ -496,7 +496,7 @@ pub mod tests {
             fn mark_namespace_as_invalid(
                 &mut self,
                 _namespace: String,
-                _e: NamespaceDescriptionError,
+                _e: anyhow::Error,
             ) {
                 panic!("does not add invalid namespace")
             }
@@ -624,7 +624,7 @@ pub mod tests {
             self.skills.iter().any(|s| s == skill_path)
         }
 
-        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
             panic!("Liar runtime does not add invalid namespace")
         }
 
@@ -778,7 +778,7 @@ pub mod tests {
             skill_path == &self.skill_path
         }
 
-        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
             panic!("Rust runtime does not add invalid namespace")
         }
 

@@ -7,7 +7,6 @@ use serde_json::Value;
 use std::future::Future;
 
 use crate::{
-    configuration_observer::NamespaceDescriptionError,
     csi::ChunkRequest,
     inference::{Completion, CompletionRequest},
 };
@@ -51,7 +50,7 @@ pub trait Runtime {
     /// it a bit of slack and just tell it that a skill might have changed.
     fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool;
 
-    fn mark_namespace_as_invalid(&mut self, namespace: String, e: NamespaceDescriptionError);
+    fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error);
 
     fn mark_namespace_as_valid(&mut self, namespace: &str);
 }
@@ -111,7 +110,7 @@ pub mod tests {
             panic!("Saboteur runtime does not drop skills from cache")
         }
 
-        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: NamespaceDescriptionError) {
+        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
             panic!("Saboteur runtime does not add invalid namespace")
         }
 

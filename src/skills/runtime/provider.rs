@@ -8,7 +8,7 @@ use tokio::{
 };
 
 use crate::{
-    configuration_observer::{NamespaceConfig, NamespaceDescriptionError, Registry},
+    configuration_observer::{NamespaceConfig, Registry},
     registries::{FileRegistry, OciRegistry, SkillRegistry},
     skills::SkillPath,
 };
@@ -24,7 +24,7 @@ pub struct SkillProvider {
     // key: Namespace, value: Registry
     skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
     // key: Namespace, value: Error
-    invalid_namespaces: HashMap<String, NamespaceDescriptionError>,
+    invalid_namespaces: HashMap<String, anyhow::Error>,
 }
 
 impl SkillProvider {
@@ -86,7 +86,7 @@ impl SkillProvider {
         self.cached_skills.remove(skill_path).is_some()
     }
 
-    pub fn add_invalid_namespace(&mut self, namespace: String, e: NamespaceDescriptionError) {
+    pub fn add_invalid_namespace(&mut self, namespace: String, e: anyhow::Error) {
         self.invalid_namespaces.insert(namespace, e);
     }
 
@@ -356,7 +356,7 @@ mod tests {
         let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
         provider.add_invalid_namespace(
             skill_path.namespace.clone(),
-            NamespaceDescriptionError::Unrecoverable(anyhow!("")),
+            anyhow!(""),
         );
         let engine = Engine::new().unwrap();
 

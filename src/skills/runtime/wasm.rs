@@ -1,13 +1,14 @@
-use std::sync::Arc;
+use std::{any, sync::Arc};
 
 use serde_json::Value;
 
-use crate::{
-    configuration_observer::NamespaceDescriptionError,
-    skills::{actor::ExecuteSkillError, SkillPath},
-};
+use crate::skills::{actor::ExecuteSkillError, SkillPath};
 
-use super::{engine::Engine, provider::{SkillProvider, SkillProviderApi}, CsiForSkills, Runtime};
+use super::{
+    engine::Engine,
+    provider::{SkillProvider, SkillProviderApi},
+    CsiForSkills, Runtime,
+};
 
 pub struct WasmRuntime {
     /// Used to execute skills. We will share the engine with multiple running skills, and skill
@@ -18,11 +19,14 @@ pub struct WasmRuntime {
 }
 
 impl WasmRuntime {
-    pub fn with_provider(skill_provider: SkillProvider, skill_provider_api: SkillProviderApi) -> Self {
+    pub fn with_provider(
+        skill_provider: SkillProvider,
+        skill_provider_api: SkillProviderApi,
+    ) -> Self {
         Self {
             engine: Arc::new(Engine::new().expect("engine creation failed")),
             provider: skill_provider,
-            skill_provider_api, 
+            skill_provider_api,
         }
     }
 }
@@ -67,7 +71,7 @@ impl Runtime for WasmRuntime {
         self.provider.invalidate(skill)
     }
 
-    fn mark_namespace_as_invalid(&mut self, namespace: String, e: NamespaceDescriptionError) {
+    fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error) {
         self.provider.add_invalid_namespace(namespace, e);
     }
 
@@ -85,7 +89,10 @@ pub mod tests {
     };
 
     use crate::{
-        configuration_observer::OperatorConfig, csi::ChunkRequest, inference::{Completion, CompletionRequest}, skills::runtime::SkillProviderActorHandle
+        configuration_observer::OperatorConfig,
+        csi::ChunkRequest,
+        inference::{Completion, CompletionRequest},
+        skills::runtime::SkillProviderActorHandle,
     };
 
     use super::*;
@@ -103,7 +110,6 @@ pub mod tests {
 
     #[tokio::test]
     async fn greet_skill_component() {
-
         let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
         let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_ctx = Box::new(CsiGreetingStub);
@@ -162,7 +168,7 @@ pub mod tests {
                 .await
                 .unwrap(),
         );
-        
+
         // When dropping a skill from the runtime
         let result = runtime.invalidate_cached_skill(&skill_path);
         let loaded_skill_count = runtime.loaded_skills().count();

@@ -213,10 +213,7 @@ impl ConfigurationObserverActor {
                     "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
                 self.skill_executor_api
-                    .mark_namespace_as_invalid(
-                        namespace.to_owned(),
-                        NamespaceDescriptionError::Unrecoverable(e),
-                    )
+                    .mark_namespace_as_invalid(namespace.to_owned(), e)
                     .await;
                 self.invalid_namespaces.insert(namespace.to_owned());
                 vec![]
