@@ -249,7 +249,11 @@ mod v0_2 {
     };
     use wasmtime::component::bindgen;
 
-    use crate::{csi::ChunkRequest, inference};
+    use crate::{
+        csi::ChunkRequest,
+        inference,
+        language_selection::{self, select_language},
+    };
 
     use super::LinkedCtx;
 
@@ -293,7 +297,17 @@ mod v0_2 {
             text: String,
             languages: Vec<Language>,
         ) -> Option<Language> {
-            unimplemented!()
+            let languages = languages
+                .iter()
+                .map(|l| match l {
+                    Language::Eng => language_selection::Language::Eng,
+                    Language::Deu => language_selection::Language::Deu,
+                })
+                .collect::<Vec<_>>();
+            select_language(&text, &languages).map(|l| match l {
+                language_selection::Language::Eng => Language::Eng,
+                language_selection::Language::Deu => Language::Deu,
+            })
         }
     }
 
@@ -408,7 +422,14 @@ mod unversioned {
 mod tests {
     use std::fs;
 
-    use crate::skills::runtime::wasm::tests::CsiGreetingMock;
+    use tokio::sync::oneshot;
+    use v0_2::pharia::skill::csi::{self, Host, Language};
+
+    use crate::{
+        csi::tests::dummy_csi_apis,
+        skills::{actor::SkillInvocationCtx, runtime::wasm::tests::CsiGreetingMock},
+        tests::api_token,
+    };
 
     use super::*;
 
@@ -431,6 +452,28 @@ mod tests {
         let wasm = wat::parse_str("(module)").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(wasm);
         assert!(version.is_err());
+    }
+
+    #[tokio::test]
+    async fn language_selection_from_csi() {
+        // Given a linked context
+        let (send_rt_err, _) = oneshot::channel();
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            send_rt_err,
+            dummy_csi_apis(),
+            api_token().to_owned(),
+        ));
+        let mut ctx = LinkedCtx::new(skill_ctx);
+
+        // When selecting a language based on the provided text
+        let text = "This is a sentence written in German language.";
+        let language = ctx
+            .select_language(text.to_owned(), vec![Language::Eng, Language::Deu])
+            .await;
+
+        // Then English is selected as the language
+        assert!(language.is_some());
+        assert_eq!(language.unwrap(), Language::Eng);
     }
 
     #[tokio::test]
