@@ -195,7 +195,7 @@ impl SkillProviderApi {
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn upsert_skill(&self, skill_path: SkillPath, tag: Option<String>) {
+    pub async fn upsert(&self, skill_path: SkillPath, tag: Option<String>) {
         let msg = SkillProviderMsg::Upsert { skill_path, tag };
         self.sender
             .send(msg)

@@ -198,7 +198,7 @@ impl ConfigurationObserverActor {
                     self.skill_executor_api
                         .mark_namespace_as_valid(namespace.to_owned())
                         .await;
-                    // self.skill_provider_api.set_namespace_error(namespace.to_owned(), None).await;
+                    self.skill_provider_api.set_namespace_error(namespace.to_owned(), None).await;
                     self.invalid_namespaces.remove(namespace);
                 }
                 incoming
@@ -216,7 +216,7 @@ impl ConfigurationObserverActor {
                 self.skill_executor_api
                     .mark_namespace_as_invalid(namespace.to_owned(), anyhow!("{}",e.to_string()))
                     .await;
-                // self.skill_provider_api.set_namespace_error(namespace.to_owned(), Some(e)).await;
+                self.skill_provider_api.set_namespace_error(namespace.to_owned(), Some(e)).await;
                 self.invalid_namespaces.insert(namespace.to_owned());
                 vec![]
             }
@@ -232,7 +232,7 @@ impl ConfigurationObserverActor {
                 .upsert_skill(SkillPath::new(namespace, &skill.name), skill.tag.clone())
                 .await;
             self.skill_provider_api
-                .upsert_skill(SkillPath::new(namespace, &skill.name), skill.tag)
+                .upsert(SkillPath::new(namespace, &skill.name), skill.tag)
                 .await;
         }
 
@@ -499,7 +499,7 @@ pub mod tests {
             vec![Skill::with_name(dummy_skill)],
         )]);
 
-        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(1);
+        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
         let skill_provider_api = SkillProviderApi::new(sender);
         let (sender, mut receiver_skill_executor) = mpsc::channel::<SkillExecutorMessage>(2);
         let skill_executor_api = SkillExecutorApi::new(sender);
@@ -516,29 +516,26 @@ pub mod tests {
         coa.report_changes_in_namespace(dummy_namespace).await;
 
         // then mark the namespace as invalid and remove all skills of that namespace
-        let _msg = receiver.try_recv().unwrap();
-        let msg = receiver_skill_executor.try_recv().unwrap();
+        let msg = receiver.try_recv().unwrap();
+        let _msg = receiver_skill_executor.try_recv().unwrap();
 
         assert!(matches!(
             msg,
-            SkillExecutorMessage::MarkNamespaceAsInvalid {
+            SkillProviderMsg::SetNamespaceError {
                 namespace, ..
             }
             if namespace == dummy_namespace
         ));
 
-        let msg = receiver_skill_executor.try_recv().unwrap();
-        // let _msg = receiver.try_recv().unwrap();
+        let _msg = receiver_skill_executor.try_recv().unwrap();
+        let msg = receiver.try_recv().unwrap();
 
         assert!(matches!(
             msg,
-            SkillExecutorMessage::Remove {
-                skill: SkillPath {
-                    namespace,
-                    name,
-                },
+            SkillProviderMsg::Remove {
+                skill_path
             }
-            if namespace == dummy_namespace && name == dummy_skill
+            if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
         ));
     }
 
@@ -584,9 +581,9 @@ pub mod tests {
     #[tokio::test]
     async fn remove_invalid_namespace_if_namespace_become_valid() {
         // given an invalid namespace
-        let (sender, _) = mpsc::channel::<SkillProviderMsg>(1);
+        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
         let skill_provider_api = SkillProviderApi::new(sender);
-        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
+        let (sender, mut receiver_exec) = mpsc::channel::<SkillExecutorMessage>(2);
         let skill_executor_api = SkillExecutorApi::new(sender);
         let update_interval_ms = 1;
         let update_interval = Duration::from_millis(update_interval_ms);
@@ -604,7 +601,8 @@ pub mod tests {
             update_interval,
         );
         observer.wait_for_ready().await;
-        receiver.try_recv().unwrap();
+        receiver.recv().await.unwrap();
+        receiver_exec.recv().await.unwrap();
 
         // when the namespace become valid
         let dummy_skill = "dummy_skill";
@@ -626,14 +624,14 @@ pub mod tests {
 
         assert!(matches!(
              msg,
-            SkillExecutorMessage::MarkNamespaceAsValid {
-                namespace
+            SkillProviderMsg::SetNamespaceError {
+                namespace, error: None
             }
             if namespace == dummy_namespace
         ));
 
         let msg = timeout(
-            Duration::from_millis(update_interval_ms + 10),
+            Duration::from_millis(update_interval_ms + 100),
             receiver.recv(),
         )
         .await
@@ -642,14 +640,11 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillExecutorMessage::Upsert {
-                skill: SkillPath {
-                    namespace,
-                    name,
-                },
+            SkillProviderMsg::Upsert {
+                skill_path,
                 tag: None
             }
-            if namespace == dummy_namespace && name == dummy_skill
+            if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
         ));
     }
 }
