@@ -439,9 +439,10 @@ mod tests {
 
     use crate::{
         csi::tests::dummy_csi_apis,
+        inference::Completion,
         skills::{
             actor::SkillInvocationCtx,
-            runtime::wasm::tests::{CsiGreetingMock, CsiGreetingStub},
+            runtime::wasm::tests::{CsiCompleteStub, CsiGreetingMock},
         },
         tests::api_token,
     };
@@ -472,7 +473,9 @@ mod tests {
     #[tokio::test]
     async fn complete_all_completion_requests_in_respective_order() {
         // Given a linked context
-        let skill_ctx = Box::new(CsiGreetingStub);
+        let skill_ctx = Box::new(CsiCompleteStub::new(|request| {
+            Completion::from_text(request.prompt)
+        }));
         let mut ctx = LinkedCtx::new(skill_ctx);
 
         // When requesting multiple completions

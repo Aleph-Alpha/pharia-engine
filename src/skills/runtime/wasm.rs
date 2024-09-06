@@ -1,4 +1,4 @@
-use std::{any, sync::Arc};
+use std::sync::Arc;
 
 use serde_json::Value;
 
@@ -113,7 +113,7 @@ pub mod tests {
     async fn greet_skill_component() {
         let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
         let mut runtime = WasmRuntime::local(skill_provider.api());
-        let skill_ctx = Box::new(CsiGreetingStub);
+        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
@@ -128,7 +128,7 @@ pub mod tests {
     async fn errors_for_non_existing_skill() {
         let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
         let mut runtime = WasmRuntime::local(skill_provider.api());
-        let skill_ctx = Box::new(CsiGreetingStub);
+        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
             .run(&SkillPath::dummy(), json!("name"), skill_ctx)
             .await;
@@ -162,7 +162,7 @@ pub mod tests {
         let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
-        let skill_ctx = Box::new(CsiGreetingStub);
+        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         drop(
             runtime
                 .run(&skill_path, json!("name"), skill_ctx)
@@ -207,7 +207,7 @@ pub mod tests {
         let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path_rs = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path_rs.clone(), None);
-        let skill_ctx = Box::new(CsiGreetingStub);
+        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         drop(
             runtime
                 .run(&skill_path_rs, json!("name"), skill_ctx)
@@ -215,7 +215,7 @@ pub mod tests {
                 .unwrap(),
         );
 
-        let skill_ctx = Box::new(CsiGreetingStub);
+        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let skill_path_py = SkillPath::new("local", "greet-py");
         runtime.upsert_skill(skill_path_py.clone(), None);
 
@@ -250,7 +250,7 @@ pub mod tests {
         let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
-        let skill_ctx = Box::new(CsiGreetingStub);
+        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
 
         // When adding a new skill component
         let skill_file = skill_dir.path().join("greet_skill.wasm");
@@ -324,14 +324,23 @@ pub mod tests {
         skill_provider.wait_for_shutdown().await;
     }
 
-    /// A test double for a [`Csi`] implementation which always completes with "Hello
-    /// {request.prompt}".
-    pub struct CsiGreetingStub;
+    /// A test double for a [`Csi`] implementation which always completes with the provided function.
+    pub struct CsiCompleteStub {
+        complete: Box<dyn FnMut(CompletionRequest) -> Completion + Send>,
+    }
+
+    impl CsiCompleteStub {
+        pub fn new(complete: impl FnMut(CompletionRequest) -> Completion + Send + 'static) -> Self {
+            Self {
+                complete: Box::new(complete),
+            }
+        }
+    }
 
     #[async_trait]
-    impl CsiForSkills for CsiGreetingStub {
+    impl CsiForSkills for CsiCompleteStub {
         async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
-            Completion::from_text(format!("Hello {}", request.prompt))
+            (self.complete)(request)
         }
 
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
