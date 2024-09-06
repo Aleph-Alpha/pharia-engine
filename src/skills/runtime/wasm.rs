@@ -37,14 +37,12 @@ impl Runtime for WasmRuntime {
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> Result<Value, ExecuteSkillError> {
-        // let skill = self
-        //     .skill_provider_api
-        //     .fetch(skill_path.to_owned(), self.engine.clone())
-        //     .await
-        //     .map_err(ExecuteSkillError::Other)?;
+        // We still need to call the "old" provider directly in order to support the listing of
+        // cached skills accuratly.
+        let _skill = self.provider.fetch(skill_path, &self.engine).await;
         let skill = self
-            .provider
-            .fetch(skill_path, &self.engine)
+            .skill_provider_api
+            .fetch(skill_path.to_owned(), self.engine.clone())
             .await
             .map_err(ExecuteSkillError::Other)?;
         // Unwrap Skill, raise error if it is not existing
@@ -115,10 +113,12 @@ pub mod tests {
 
     #[tokio::test]
     async fn greet_skill_component() {
+        let skill_path = SkillPath::new("local", "greet_skill");
         let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        skill_provider.api().upsert(skill_path.clone(), None).await;
+
         let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
-        let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
 
@@ -162,9 +162,10 @@ pub mod tests {
     #[tokio::test]
     async fn drop_existing_skill_from_cache() {
         // Given a WasmRuntime with a cached skill
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        skill_provider.api().upsert(skill_path.clone(), None).await;
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         runtime.upsert_skill(skill_path.clone(), None);
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         drop(
@@ -207,9 +208,12 @@ pub mod tests {
     #[tokio::test]
     async fn skills_are_listed() {
         // given a runtime with two installed skills
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path_rs = SkillPath::new("local", "greet_skill");
+        let skill_path_py = SkillPath::new("local", "greet-py");
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        skill_provider.api().upsert(skill_path_rs.clone(), None).await;
+        skill_provider.api().upsert(skill_path_py.clone(), None).await;
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         runtime.upsert_skill(skill_path_rs.clone(), None);
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         drop(
@@ -220,7 +224,6 @@ pub mod tests {
         );
 
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
-        let skill_path_py = SkillPath::new("local", "greet-py");
         runtime.upsert_skill(skill_path_py.clone(), None);
 
         drop(
@@ -249,10 +252,11 @@ pub mod tests {
     async fn lazy_skill_loading() {
         // Giving and empty skill directory to the WasmRuntime
         let skill_dir = tempdir().unwrap();
+        let skill_path = SkillPath::new("local", "greet_skill");
 
         let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        skill_provider.api().upsert(skill_path.clone(), None).await;
         let mut runtime = WasmRuntime::local(skill_provider.api());
-        let skill_path = SkillPath::new("local", "greet_skill");
         runtime.upsert_skill(skill_path.clone(), None);
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
 
@@ -272,11 +276,10 @@ pub mod tests {
     #[tokio::test]
     async fn rust_greeting_skill() {
         let skill_ctx = Box::new(CsiGreetingMock);
-
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.upsert_skill(skill_path.clone(), None);
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        skill_provider.api().upsert(skill_path.clone(), None).await;
+        let mut runtime = WasmRuntime::local(skill_provider.api());
 
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -292,11 +295,10 @@ pub mod tests {
     #[tokio::test]
     async fn python_greeting_skill() {
         let skill_ctx = Box::new(CsiGreetingMock);
-
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.upsert_skill(skill_path.clone(), None);
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        skill_provider.api().upsert(skill_path.clone(), None).await;
+        let mut runtime = WasmRuntime::local(skill_provider.api());
 
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -312,10 +314,10 @@ pub mod tests {
     #[tokio::test]
     async fn can_call_preinstantiated_multiple_times() {
         let skill_ctx = Box::new(CsiCounter::new());
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        let mut runtime = WasmRuntime::local(skill_provider.api());
         let skill_path = SkillPath::new("local", "greet_skill");
-        runtime.upsert_skill(skill_path.clone(), None);
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        skill_provider.api().upsert(skill_path.clone(), None).await;
+        let mut runtime = WasmRuntime::local(skill_provider.api());
         for i in 1..10 {
             let resp = runtime
                 .run(&skill_path, json!("Homer"), skill_ctx.clone())
