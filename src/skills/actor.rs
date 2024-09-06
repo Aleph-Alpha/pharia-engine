@@ -137,17 +137,6 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn loaded_skills(&self) -> Vec<SkillPath> {
-        let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMessage::CachedSkills { send };
-
-        self.send
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
-        recv.await.unwrap()
-    }
-
     pub async fn drop_from_cache(&self, skill_path: SkillPath) -> bool {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Uncache { send, skill_path };
@@ -222,12 +211,6 @@ where
                 // Error is expected to happen during shutdown. Ignore result
                 drop(result);
             }
-            SkillExecutorMessage::CachedSkills { send } => {
-                let response = self.runtime.loaded_skills().cloned().collect();
-                let result = send.send(response);
-                // Error is expected to happen during shutdown. Ignore result
-                drop(result);
-            }
             SkillExecutorMessage::Uncache { skill_path, send } => {
                 let response = self.runtime.invalidate_cached_skill(&skill_path);
                 let result = send.send(response);
@@ -280,9 +263,6 @@ pub enum SkillExecutorMessage {
         api_token: String,
     },
     Skills {
-        send: oneshot::Sender<Vec<SkillPath>>,
-    },
-    CachedSkills {
         send: oneshot::Sender<Vec<SkillPath>>,
     },
     Uncache {
@@ -509,10 +489,6 @@ pub mod tests {
                 iter::empty()
             }
 
-            fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
-                iter::once(&self.skill_path)
-            }
-
             fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
                 skill_path == &self.skill_path
             }
@@ -636,10 +612,6 @@ pub mod tests {
             self.skills.iter()
         }
 
-        fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
-            self.skills.iter()
-        }
-
         fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
             self.skills.iter().any(|s| s == skill_path)
         }
@@ -651,22 +623,6 @@ pub mod tests {
         fn mark_namespace_as_valid(&mut self, _namespace: &str) {
             panic!("Liar runtime does not remove invalid namespace")
         }
-    }
-
-    #[tokio::test]
-    async fn list_skills() {
-        // Given two skills
-        let skills = ["First skill".to_owned(), "Second skill".to_owned()];
-        let runtime = LiarRuntime::new(&skills);
-
-        // When
-        let executor = SkillExecutor::new(runtime, dummy_csi_apis());
-        let result = executor.api().loaded_skills().await;
-
-        executor.wait_for_shutdown().await;
-
-        // Then
-        assert_eq!(result.len(), skills.len());
     }
 
     #[tokio::test]
@@ -787,10 +743,6 @@ pub mod tests {
 
         fn skills(&self) -> impl Iterator<Item = &SkillPath> {
             std::iter::empty()
-        }
-
-        fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
-            std::iter::once(&self.skill_path)
         }
 
         fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {

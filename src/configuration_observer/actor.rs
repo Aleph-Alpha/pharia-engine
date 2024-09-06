@@ -198,7 +198,9 @@ impl ConfigurationObserverActor {
                     self.skill_executor_api
                         .mark_namespace_as_valid(namespace.to_owned())
                         .await;
-                    self.skill_provider_api.set_namespace_error(namespace.to_owned(), None).await;
+                    self.skill_provider_api
+                        .set_namespace_error(namespace.to_owned(), None)
+                        .await;
                     self.invalid_namespaces.remove(namespace);
                 }
                 incoming
@@ -214,9 +216,11 @@ impl ConfigurationObserverActor {
                     "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
                 self.skill_executor_api
-                    .mark_namespace_as_invalid(namespace.to_owned(), anyhow!("{}",e.to_string()))
+                    .mark_namespace_as_invalid(namespace.to_owned(), anyhow!("{}", e.to_string()))
                     .await;
-                self.skill_provider_api.set_namespace_error(namespace.to_owned(), Some(e)).await;
+                self.skill_provider_api
+                    .set_namespace_error(namespace.to_owned(), Some(e))
+                    .await;
                 self.invalid_namespaces.insert(namespace.to_owned());
                 vec![]
             }
@@ -258,7 +262,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::skills::tests::SkillExecutorMessage;
-    use crate::skills::{SkillExecutorApi, SkillPath, tests::SkillProviderMsg};
+    use crate::skills::{tests::SkillProviderMsg, SkillExecutorApi, SkillPath};
 
     use super::*;
     use anyhow::anyhow;

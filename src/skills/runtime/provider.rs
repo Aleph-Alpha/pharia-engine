@@ -359,8 +359,6 @@ impl SkillProviderActor {
 #[cfg(test)]
 pub mod tests {
 
-    use std::collections::HashSet;
-
     use super::*;
 
     pub fn dummy_skill_provider_api() -> SkillProviderApi {
@@ -461,15 +459,13 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn list_cached_skills() {
+    async fn only_fetched_skills_are_cached() {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new().unwrap());
         let skill_path_rs = SkillPath::new("local", "greet_skill");
         let skill_path_py = SkillPath::new("local", "greet-py");
         let skill_provider = SkillProviderActorHandle::new(&local_namespace());
-
-        // When adding these two skills and fetching them
         skill_provider
             .api()
             .upsert(skill_path_rs.clone(), None)
@@ -478,26 +474,21 @@ pub mod tests {
             .api()
             .upsert(skill_path_py.clone(), None)
             .await;
+
+        // When fetching "greet_skill" but not "greet-py"
         skill_provider
             .api()
             .fetch(skill_path_rs.clone(), engine.clone())
             .await
             .unwrap();
-        skill_provider
-            .api()
-            .fetch(skill_path_py.clone(), engine.clone())
-            .await
-            .unwrap();
-        let skills = skill_provider.api().list_cached().await;
+        // and listing all chached skills
+        let cached_skills = skill_provider.api().list_cached().await;
 
+        // Then only "greet_skill" will appear in that list, but not "greet-py"
+        assert_eq!(cached_skills, vec![SkillPath::new("local", "greet_skill")]);
+
+        // Cleanup
         skill_provider.wait_for_shutdown().await;
-
-        // Then they will appear in the list of cached skills after in any order
-        let skills = skills.into_iter().collect::<HashSet<_>>();
-        let mut expected = HashSet::new();
-        expected.insert(skill_path_rs);
-        expected.insert(skill_path_py);
-        assert_eq!(skills, expected);
     }
 
     /// Namespace named local backed by a file registry with "skills" directory

@@ -45,8 +45,6 @@ pub trait Runtime {
 
     fn skills(&self) -> impl Iterator<Item = &SkillPath>;
 
-    fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath>;
-
     /// The runtime may handle cache invalidation of skills by itself in the future. For now we cut
     /// it a bit of slack and just tell it that a skill might have changed.
     fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool;
@@ -105,10 +103,6 @@ pub mod tests {
         }
 
         fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-            std::iter::empty()
-        }
-
-        fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
             std::iter::empty()
         }
 

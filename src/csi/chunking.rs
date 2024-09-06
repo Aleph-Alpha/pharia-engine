@@ -18,11 +18,7 @@ impl ChunkRequest {
     }
 }
 
-pub fn chunking(
-    text: &str,
-    tokenizer: &tokenizers::Tokenizer,
-    max_tokens: u32,
-) -> Vec<String> {
+pub fn chunking(text: &str, tokenizer: &tokenizers::Tokenizer, max_tokens: u32) -> Vec<String> {
     let config = ChunkConfig::new(max_tokens as usize).with_sizer(tokenizer);
     let splitter = TextSplitter::new(config);
     splitter.chunks(text).map(str::to_owned).collect()

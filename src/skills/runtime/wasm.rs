@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use serde_json::Value;
+use std::sync::Arc;
 
 use crate::skills::{actor::ExecuteSkillError, SkillPath};
 
@@ -62,10 +62,6 @@ impl Runtime for WasmRuntime {
         self.provider.skills()
     }
 
-    fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
-        self.provider.list_cached_skills()
-    }
-
     fn invalidate_cached_skill(&mut self, skill: &SkillPath) -> bool {
         self.provider.invalidate(skill)
     }
@@ -82,7 +78,6 @@ impl Runtime for WasmRuntime {
 #[cfg(test)]
 pub mod tests {
     use std::{
-        collections::HashSet,
         fs,
         sync::{Arc, Mutex},
     };
@@ -184,48 +179,6 @@ pub mod tests {
 
         // And it had actually been cached before
         assert!(had_been_in_cache);
-    }
-
-    #[tokio::test]
-    async fn no_skills_are_listed() {
-        // given a fresh WasmRuntime
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        let runtime = WasmRuntime::local(skill_provider.api());
-
-        // when querying skills
-        let skill_count = runtime.loaded_skills().count();
-
-        drop(runtime);
-        skill_provider.wait_for_shutdown().await;
-
-        // then an empty vec is returned
-        assert_eq!(skill_count, 0);
-    }
-
-    #[tokio::test]
-    async fn list_cached_skills() {
-        // Given local is a configured namespace, backed by a file repository with "greet_skill"
-        // and "greet-py"
-        let engine = Arc::new(Engine::new().unwrap());
-        let skill_path_rs = SkillPath::new("local", "greet_skill");
-        let skill_path_py = SkillPath::new("local", "greet-py");
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-
-        // when adding these two skills and fetching them
-        skill_provider.api().upsert(skill_path_rs.clone(), None).await;
-        skill_provider.api().upsert(skill_path_py.clone(), None).await;
-        skill_provider.api().fetch(skill_path_rs.clone(), engine.clone()).await.unwrap();
-        skill_provider.api().fetch(skill_path_py.clone(), engine.clone()).await.unwrap();
-        let skills = skill_provider.api().list_cached().await;
-
-        skill_provider.wait_for_shutdown().await;
-
-        // then they will appear in the list of cached skills after in any order
-        let skills = skills.into_iter().collect::<HashSet<_>>();
-        let mut expected = HashSet::new();
-        expected.insert(skill_path_rs);
-        expected.insert(skill_path_py);
-        assert_eq!(skills, expected);
     }
 
     #[tokio::test]
