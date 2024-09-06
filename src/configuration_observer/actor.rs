@@ -86,6 +86,7 @@ impl ConfigurationObserver {
                 ready_sender,
                 shutdown_receiver,
                 skill_executor_api,
+                skill_provider_api,
                 config,
                 update_interval,
             )
@@ -109,6 +110,7 @@ struct ConfigurationObserverActor {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_executor_api: SkillExecutorApi,
+    skill_provider_api: SkillProviderApi,
     config: Box<dyn ObservableConfig + Send>,
     update_interval: Duration,
     skills: HashMap<String, Vec<Skill>>,
@@ -137,6 +139,7 @@ impl ConfigurationObserverActor {
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_executor_api: SkillExecutorApi,
+        skill_provider_api: SkillProviderApi,
         config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
     ) -> Self {
@@ -144,6 +147,7 @@ impl ConfigurationObserverActor {
             ready,
             shutdown,
             skill_executor_api,
+            skill_provider_api,
             config,
             update_interval,
             skills: HashMap::new(),
@@ -439,6 +443,7 @@ pub mod tests {
         fn with_skills(
             skills: HashMap<String, Vec<Skill>>,
             skill_executor_api: SkillExecutorApi,
+            skill_provider_api: SkillProviderApi,
             config: Box<dyn ObservableConfig + Send>,
         ) -> Self {
             let (ready, _) = tokio::sync::watch::channel(false);
@@ -447,6 +452,7 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_executor_api,
+                skill_provider_api,
                 config,
                 update_interval: Duration::from_millis(1),
                 skills,
@@ -491,12 +497,18 @@ pub mod tests {
             vec![Skill::with_name(dummy_skill)],
         )]);
 
+        let (sender, _) = mpsc::channel::<SkillProviderMsg>(1);
+        let skill_provider_api = SkillProviderApi::new(sender);
         let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(2);
         let skill_executor_api = SkillExecutorApi::new(sender);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
 
-        let mut coa =
-            ConfigurationObserverActor::with_skills(namespaces, skill_executor_api, config);
+        let mut coa = ConfigurationObserverActor::with_skills(
+            namespaces,
+            skill_executor_api,
+            skill_provider_api,
+            config,
+        );
 
         // when we load an invalid namespace
         coa.load_namespace(dummy_namespace).await;
