@@ -1,4 +1,4 @@
-package pharia:skill@0.2.2;
+package pharia:skill@0.2.3;
 
 @since(version = 0.1.0)
 world skill {
@@ -95,4 +95,15 @@ interface csi {
     /// languages: All languages that should be considered during detection.
     @since(version = 0.2.2)
     select-language: func(text: string, languages: list<language>) -> option<language>;
+
+    /// Completion request parameters
+    @since(version = 0.2.3)
+    record completion-request {
+        model: string,
+        prompt: string,
+        params: completion-params
+    }
+
+    @since(version = 0.2.3)
+    complete-all: func(requests: list<completion-request>) -> list<completion>;
 }
