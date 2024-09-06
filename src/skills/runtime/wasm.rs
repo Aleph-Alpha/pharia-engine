@@ -66,7 +66,7 @@ impl Runtime for WasmRuntime {
     }
 
     fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> {
-        self.provider.loaded_skills()
+        self.provider.list_cached_skills()
     }
 
     fn invalidate_cached_skill(&mut self, skill: &SkillPath) -> bool {

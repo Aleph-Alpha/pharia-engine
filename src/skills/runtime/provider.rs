@@ -78,7 +78,7 @@ impl SkillProvider {
         self.known_skills.keys()
     }
 
-    pub fn loaded_skills(&self) -> impl Iterator<Item = &SkillPath> + '_ {
+    pub fn list_cached_skills(&self) -> impl Iterator<Item = &SkillPath> + '_ {
         self.cached_skills.keys()
     }
 
@@ -231,6 +231,16 @@ impl SkillProviderApi {
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
+
+    pub async fn list_cached(&self) -> Vec<SkillPath> {
+        let (send, recv) = oneshot::channel();
+        let msg = SkillProviderMsg::ListCached { send };
+        self.sender
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await.unwrap()
+    }
 }
 
 pub enum SkillProviderMsg {
@@ -240,6 +250,9 @@ pub enum SkillProviderMsg {
         send: oneshot::Sender<Result<Option<Arc<CachedSkill>>, anyhow::Error>>,
     },
     List {
+        send: oneshot::Sender<Vec<SkillPath>>,
+    },
+    ListCached {
         send: oneshot::Sender<Vec<SkillPath>>,
     },
     Remove {
@@ -302,6 +315,9 @@ impl SkillProviderActor {
                 } else {
                     self.provider.remove_invalid_namespace(&namespace);
                 }
+            }
+            SkillProviderMsg::ListCached { send } => {
+                drop(send.send(self.provider.list_cached_skills().cloned().collect()));
             }
         }
     }
@@ -386,7 +402,7 @@ mod tests {
         provider.remove_skill(&skill_path);
 
         // then the skill is no longer cached
-        assert!(provider.loaded_skills().next().is_none());
+        assert!(provider.list_cached_skills().next().is_none());
     }
 
     #[tokio::test]
