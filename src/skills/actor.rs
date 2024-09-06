@@ -9,6 +9,7 @@ use crate::{
     configuration_observer::NamespaceConfig,
     csi::{ChunkRequest, Csi as _, CsiApis},
     inference::{Completion, CompletionRequest},
+    language_selection::{select_language, Language},
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -32,7 +33,11 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn with_cfg(csi_apis: CsiApis, skill_provider: SkillProviderApi, cfg: SkillExecutorConfig<'_>) -> Self {
+    pub fn with_cfg(
+        csi_apis: CsiApis,
+        skill_provider: SkillProviderApi,
+        cfg: SkillExecutorConfig<'_>,
+    ) -> Self {
         let provider = SkillProvider::new(cfg.namespaces);
         let runtime = WasmRuntime::with_provider(provider, skill_provider);
         Self::new(runtime, csi_apis)
@@ -341,6 +346,14 @@ impl CsiForSkills for SkillInvocationCtx {
             Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
         }
+    }
+
+    async fn select_language(
+        &mut self,
+        text: String,
+        languages: Vec<Language>,
+    ) -> Option<Language> {
+        select_language(&text, &languages)
     }
 }
 
@@ -707,7 +720,6 @@ pub mod tests {
         let skill_path_2 = SkillPath::dummy();
         api.upsert_skill(skill_path_2.clone(), None).await;
         let skills = api.skills().await;
-
 
         drop(api);
         skill_executor.wait_for_shutdown().await;

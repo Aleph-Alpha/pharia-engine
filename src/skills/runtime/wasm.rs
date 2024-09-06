@@ -92,6 +92,7 @@ pub mod tests {
         configuration_observer::OperatorConfig,
         csi::ChunkRequest,
         inference::{Completion, CompletionRequest},
+        language_selection::{select_language, Language},
         skills::runtime::SkillProviderActorHandle,
     };
 
@@ -335,6 +336,14 @@ pub mod tests {
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
             vec![request.text]
         }
+
+        async fn select_language(
+            &mut self,
+            text: String,
+            languages: Vec<Language>,
+        ) -> Option<Language> {
+            select_language(&text, &languages)
+        }
     }
 
     /// Asserts a specific prompt and model and returns a greeting message
@@ -368,6 +377,14 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
             vec![request.text]
         }
+
+        async fn select_language(
+            &mut self,
+            text: String,
+            languages: Vec<Language>,
+        ) -> Option<Language> {
+            select_language(&text, &languages)
+        }
     }
 
     #[derive(Default, Clone)]
@@ -391,6 +408,14 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
             vec![request.text]
+        }
+
+        async fn select_language(
+            &mut self,
+            text: String,
+            languages: Vec<Language>,
+        ) -> Option<Language> {
+            select_language(&text, &languages)
         }
     }
 }
