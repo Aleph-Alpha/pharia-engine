@@ -1,4 +1,5 @@
 use lingua::LanguageDetectorBuilder;
+use tracing::trace;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Language {
@@ -31,7 +32,12 @@ pub fn select_language(text: &str, languages: &[Language]) -> Option<Language> {
     let detector = LanguageDetectorBuilder::from_languages(&languages)
         .with_minimum_relative_distance(0.5) // empirical value that makes the tests pass ;-)
         .build();
-    detector.detect_language_of(text).map(Into::into)
+    let language = detector.detect_language_of(text).map(Into::into);
+    trace!(
+        "select_language: text.len()={} languages={languages:?} selected_language={language:?}",
+        text.len()
+    );
+    language
 }
 
 #[cfg(test)]
