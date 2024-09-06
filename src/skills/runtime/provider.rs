@@ -519,7 +519,9 @@ pub mod tests {
         let skill_provider = SkillProviderActorHandle::new(&local_namespace());
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
-        api.fetch(greet_skill.clone(), Arc::new(Engine::new().unwrap())).await.unwrap();
+        api.fetch(greet_skill.clone(), Arc::new(Engine::new().unwrap()))
+            .await
+            .unwrap();
 
         // When we invalidate "greet_skill"
         let skill_had_been_in_cache = api.invalidate_cache(greet_skill.clone()).await;

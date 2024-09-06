@@ -90,14 +90,6 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn remove_skill(&self, skill: SkillPath) {
-        let msg = SkillExecutorMessage::Remove { skill };
-        self.send
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
-    }
-
     pub async fn execute_skill(
         &self,
         skill_path: SkillPath,
@@ -162,7 +154,6 @@ where
             SkillExecutorMessage::MarkNamespaceAsValid { namespace } => {
                 self.runtime.mark_namespace_as_valid(&namespace);
             }
-            SkillExecutorMessage::Remove { skill } => self.runtime.remove_skill(&skill),
             SkillExecutorMessage::Execute {
                 skill_path,
                 input,
@@ -205,9 +196,6 @@ pub enum SkillExecutorMessage {
     },
     MarkNamespaceAsValid {
         namespace: String,
-    },
-    Remove {
-        skill: SkillPath,
     },
     Execute {
         skill_path: SkillPath,
@@ -403,8 +391,7 @@ pub mod tests {
         // Given
         // This mock runtime expects that its skills never complete. The futures invoking them must
         // be dropped
-        struct MockRuntime {
-        }
+        struct MockRuntime {}
 
         impl Runtime for MockRuntime {
             async fn run(
@@ -419,10 +406,6 @@ pub mod tests {
                 ))
                 .await;
                 panic!("complete_text must pend forever in case of error")
-            }
-
-            fn remove_skill(&mut self, _skill: &SkillPath) {
-                panic!("does not remove skill")
             }
 
             fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
@@ -440,7 +423,7 @@ pub mod tests {
         };
 
         // When
-        let runtime = MockRuntime { };
+        let runtime = MockRuntime {};
         let executer = SkillExecutor::new(runtime, csi_apis);
         let api = executer.api();
         let another_skill_path = SkillPath::dummy();
@@ -545,10 +528,6 @@ pub mod tests {
             );
             let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
             Ok(json!(ctx.complete_text(request).await.text))
-        }
-
-        fn remove_skill(&mut self, _skill: &SkillPath) {
-            panic!("RustRuntime does not remove skill")
         }
 
         fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {

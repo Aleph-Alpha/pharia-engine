@@ -50,10 +50,6 @@ impl Runtime for WasmRuntime {
             .map_err(ExecuteSkillError::Other)
     }
 
-    fn remove_skill(&mut self, skill: &SkillPath) {
-        self.provider.remove_skill(skill);
-    }
-
     fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error) {
         self.provider.add_invalid_namespace(namespace, e);
     }

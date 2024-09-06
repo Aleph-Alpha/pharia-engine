@@ -39,8 +39,6 @@ pub trait Runtime {
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> impl Future<Output = Result<Value, ExecuteSkillError>> + Send;
 
-    fn remove_skill(&mut self, skill: &SkillPath);
-
     fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error);
 
     fn mark_namespace_as_valid(&mut self, namespace: &str);
@@ -64,7 +62,7 @@ pub mod tests {
     use super::*;
     use anyhow::anyhow;
 
-    pub use self::provider::tests::{SkillProviderMsg, dummy_skill_provider_api};
+    pub use self::provider::tests::{dummy_skill_provider_api, SkillProviderMsg};
 
     pub struct SaboteurRuntime {
         err_msg: String,
@@ -84,10 +82,6 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<Value, ExecuteSkillError> {
             Err(ExecuteSkillError::Other(anyhow!(self.err_msg.clone())))
-        }
-        
-        fn remove_skill(&mut self, _skill: &SkillPath) {
-            panic!("Saboteur runtime does not remove skill")
         }
 
         fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {

@@ -238,9 +238,6 @@ impl ConfigurationObserverActor {
         }
 
         for skill in diff.removed {
-            self.skill_executor_api
-                .remove_skill(SkillPath::new(namespace, &skill.name))
-                .await;
             self.skill_provider_api
                 .remove(SkillPath::new(namespace, &skill.name))
                 .await;
@@ -528,7 +525,6 @@ pub mod tests {
             if namespace == dummy_namespace
         ));
 
-        let _msg = receiver_skill_executor.try_recv().unwrap();
         let msg = receiver.try_recv().unwrap();
 
         assert!(matches!(
