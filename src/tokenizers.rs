@@ -2,9 +2,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use aleph_alpha_client::Client;
 use anyhow::Context as _;
-use futures::channel::oneshot;
 use tokenizers::Tokenizer;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 
 #[derive(Clone)]
 pub struct TokenizersApi {
