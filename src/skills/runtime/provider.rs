@@ -168,9 +168,9 @@ impl SkillProviderActorHandle {
     }
 
     pub fn api(&self) -> SkillProviderApi {
-        SkillProviderApi {
-            sender: self.sender.clone(),
-        }
+        SkillProviderApi::new(
+            self.sender.clone()
+        )
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -229,7 +229,9 @@ impl SkillProviderActor {
     }
 
     pub async fn run(&mut self) {
-        while let Some(msg) = self.receiver.recv().await {}
+        while let Some(msg) = self.receiver.recv().await {
+            self.act(msg).await;
+        }
     }
 
     pub async fn act(&mut self, msg: SkillProviderMsg) {

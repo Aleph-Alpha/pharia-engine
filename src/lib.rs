@@ -12,7 +12,7 @@ use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use csi::CsiApis;
 use futures::Future;
-use skills::{SkillProviderActorHandle, SkillExecutorApi};
+use skills::SkillProviderActorHandle;
 use tokenizers::Tokenizers;
 use tracing::error;
 
