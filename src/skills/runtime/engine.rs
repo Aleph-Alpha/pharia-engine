@@ -247,7 +247,6 @@ mod v0_2 {
     use pharia::skill::csi::{
         ChunkParams, Completion, CompletionParams, CompletionRequest, FinishReason, Host, Language,
     };
-    use tracing::trace;
     use wasmtime::component::bindgen;
 
     use crate::{csi::ChunkRequest, inference, language_selection};
@@ -284,15 +283,43 @@ mod v0_2 {
         }
 
         async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            let mut completions = Vec::new();
-            trace!("complete_all: requests.len()={}", requests.len());
-            for request in requests {
-                let completion = self
-                    .complete(request.model, request.prompt, request.params)
-                    .await;
-                completions.push(completion);
-            }
-            completions
+            let requests = requests
+                .iter()
+                .map(|r| {
+                    let CompletionParams {
+                        max_tokens,
+                        temperature,
+                        top_k,
+                        top_p,
+                        stop,
+                    } = r.params.clone();
+                    inference::CompletionRequest {
+                        prompt: r.prompt.clone(),
+                        model: r.model.clone(),
+                        params: inference::CompletionParams {
+                            max_tokens,
+                            temperature,
+                            top_k,
+                            top_p,
+                            stop,
+                        },
+                    }
+                })
+                .collect();
+
+            self.skill_ctx
+                .complete_all(requests)
+                .await
+                .iter()
+                .map(|c| Completion {
+                    text: c.text.clone(),
+                    finish_reason: match c.finish_reason {
+                        inference::FinishReason::Stop => FinishReason::Stop,
+                        inference::FinishReason::Length => FinishReason::Length,
+                        inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
+                    },
+                })
+                .collect()
         }
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
@@ -438,12 +465,9 @@ mod tests {
     use v0_2::pharia::skill::csi::{CompletionParams, CompletionRequest, Host, Language};
 
     use crate::{
-        csi::tests::dummy_csi_apis,
-        inference::Completion,
-        skills::{
-            actor::SkillInvocationCtx,
-            runtime::wasm::tests::{CsiCompleteStub, CsiGreetingMock},
-        },
+        csi::{tests::dummy_csi_apis, CsiApis},
+        inference::{self, tests::InferenceStub},
+        skills::{actor::SkillInvocationCtx, runtime::wasm::tests::CsiGreetingMock},
         tests::api_token,
     };
 
@@ -473,9 +497,17 @@ mod tests {
     #[tokio::test]
     async fn complete_all_completion_requests_in_respective_order() {
         // Given a linked context
-        let skill_ctx = Box::new(CsiCompleteStub::new(|request| {
-            Completion::from_text(request.prompt)
-        }));
+        let inference_stub = InferenceStub::new(|r| Ok(inference::Completion::from_text(r.prompt)));
+        let csi_apis = CsiApis {
+            inference: inference_stub.api(),
+            ..dummy_csi_apis()
+        };
+        let (send_rt_err, _) = oneshot::channel();
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            send_rt_err,
+            csi_apis,
+            api_token().to_owned(),
+        ));
         let mut ctx = LinkedCtx::new(skill_ctx);
 
         // When requesting multiple completions

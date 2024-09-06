@@ -349,6 +349,10 @@ pub mod tests {
             (self.complete)(request)
         }
 
+        async fn complete_all(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            unimplemented!()
+        }
+
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
             vec![request.text]
         }
@@ -390,6 +394,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             }
         }
 
+        async fn complete_all(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            unimplemented!()
+        }
+
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
             vec![request.text]
         }
@@ -420,6 +428,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             let mut counter = self.counter.lock().unwrap();
             *counter += 1;
             Completion::from_text(counter.to_string())
+        }
+
+        async fn complete_all(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            unimplemented!()
         }
 
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {

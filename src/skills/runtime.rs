@@ -63,6 +63,7 @@ pub trait Runtime {
 #[async_trait]
 pub trait CsiForSkills {
     async fn complete_text(&mut self, request: CompletionRequest) -> Completion;
+    async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
     async fn select_language(&mut self, text: String, languages: Vec<Language>)
         -> Option<Language>;

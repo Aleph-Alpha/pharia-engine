@@ -244,13 +244,15 @@ pub mod tests {
     }
 
     impl InferenceStub {
-        pub fn new(result: impl Fn() -> anyhow::Result<Completion> + Send + 'static) -> Self {
+        pub fn new(
+            result: impl Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + 'static,
+        ) -> Self {
             let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
             let join_handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
                     match msg {
-                        InferenceMessage::CompleteText { send, .. } => {
-                            send.send(result()).unwrap();
+                        InferenceMessage::CompleteText { request, send, .. } => {
+                            send.send(result(request)).unwrap();
                         }
                     }
                 }
@@ -260,7 +262,7 @@ pub mod tests {
         }
         pub fn with_completion(completion: impl Into<String>) -> Self {
             let completion = Completion::from_text(completion);
-            Self::new(move || Ok(completion.clone()))
+            Self::new(move |_| Ok(completion.clone()))
         }
 
         pub async fn wait_for_shutdown(self) {

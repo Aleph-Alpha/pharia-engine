@@ -341,6 +341,17 @@ impl CsiForSkills for SkillInvocationCtx {
         }
     }
 
+    async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+        match self
+            .csi_apis
+            .complete_all(self.api_token.clone(), requests)
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
         match self.csi_apis.chunk(self.api_token.clone(), request).await {
             Ok(chunks) => chunks,
@@ -506,11 +517,7 @@ pub mod tests {
                 skill_path == &self.skill_path
             }
 
-            fn mark_namespace_as_invalid(
-                &mut self,
-                _namespace: String,
-                _e: anyhow::Error,
-            ) {
+            fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
                 panic!("does not add invalid namespace")
             }
 
@@ -518,7 +525,7 @@ pub mod tests {
                 panic!("does not remove invalid namespace")
             }
         }
-        let inference_saboteur = InferenceStub::new(|| Err(anyhow!("Test inference error")));
+        let inference_saboteur = InferenceStub::new(|_| Err(anyhow!("Test inference error")));
         let csi_apis = CsiApis {
             inference: inference_saboteur.api(),
             ..dummy_csi_apis()

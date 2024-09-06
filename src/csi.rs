@@ -28,6 +28,11 @@ pub trait Csi {
         auth: String,
         request: CompletionRequest,
     ) -> Result<Completion, anyhow::Error>;
+    async fn complete_all(
+        &mut self,
+        auth: String,
+        requests: Vec<CompletionRequest>,
+    ) -> Result<Vec<Completion>, anyhow::Error>;
     async fn chunk(
         &mut self,
         auth: String,
@@ -62,6 +67,20 @@ impl Csi for CsiApis {
                 .map_or_else(|| "None".to_owned(), |val| val.to_string()),
         );
         self.inference.complete_text(request, auth).await
+    }
+
+    async fn complete_all(
+        &mut self,
+        auth: String,
+        requests: Vec<CompletionRequest>,
+    ) -> Result<Vec<Completion>, anyhow::Error> {
+        trace!("complete_all: requests.len()={}", requests.len());
+        let mut completions = Vec::new();
+        for request in requests {
+            let completion = self.complete_text(auth.clone(), request).await?;
+            completions.push(completion);
+        }
+        Ok(completions)
     }
 
     async fn chunk(
