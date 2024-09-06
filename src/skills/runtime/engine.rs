@@ -245,8 +245,9 @@ impl WasiView for LinkedCtx {
 
 mod v0_2 {
     use pharia::skill::csi::{
-        ChunkParams, Completion, CompletionParams, FinishReason, Host, Language,
+        ChunkParams, Completion, CompletionParams, CompletionRequest, FinishReason, Host, Language,
     };
+    use tracing::trace;
     use wasmtime::component::bindgen;
 
     use crate::{csi::ChunkRequest, inference, language_selection};
@@ -280,6 +281,18 @@ mod v0_2 {
             };
             let request = inference::CompletionRequest::new(prompt, model).with_params(params);
             self.skill_ctx.complete_text(request).await.into()
+        }
+
+        async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            let mut completions = Vec::new();
+            trace!("complete_all: requests.len()={}", requests.len());
+            for request in requests {
+                let completion = self
+                    .complete(request.model, request.prompt, request.params)
+                    .await;
+                completions.push(completion);
+            }
+            completions
         }
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
@@ -422,11 +435,14 @@ mod tests {
     use std::fs;
 
     use tokio::sync::oneshot;
-    use v0_2::pharia::skill::csi::{Host, Language};
+    use v0_2::pharia::skill::csi::{CompletionParams, CompletionRequest, Host, Language};
 
     use crate::{
         csi::tests::dummy_csi_apis,
-        skills::{actor::SkillInvocationCtx, runtime::wasm::tests::CsiGreetingMock},
+        skills::{
+            actor::SkillInvocationCtx,
+            runtime::wasm::tests::{CsiGreetingMock, CsiGreetingStub},
+        },
         tests::api_token,
     };
 
@@ -451,6 +467,40 @@ mod tests {
         let wasm = wat::parse_str("(module)").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(wasm);
         assert!(version.is_err());
+    }
+
+    #[tokio::test]
+    async fn complete_all_completion_requests_in_respective_order() {
+        // Given a linked context
+        let skill_ctx = Box::new(CsiGreetingStub);
+        let mut ctx = LinkedCtx::new(skill_ctx);
+
+        // When requesting multiple completions
+        let completion_req_1 = CompletionRequest {
+            model: "dummy_model".to_owned(),
+            prompt: "1st_request".to_owned(),
+            params: CompletionParams {
+                max_tokens: None,
+                temperature: None,
+                top_k: None,
+                top_p: None,
+                stop: vec![],
+            },
+        };
+
+        let completion_req_2 = CompletionRequest {
+            prompt: "2nd request".to_owned(),
+            ..completion_req_1.clone()
+        };
+
+        let completions = ctx
+            .complete_all(vec![completion_req_1, completion_req_2])
+            .await;
+
+        // Then the completion must have the same order as the respective requests
+        assert_eq!(completions.len(), 2);
+        assert!(completions.first().unwrap().text.contains("1st"));
+        assert!(completions.get(1).unwrap().text.contains("2nd"));
     }
 
     #[tokio::test]

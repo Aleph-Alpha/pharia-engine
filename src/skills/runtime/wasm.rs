@@ -324,13 +324,14 @@ pub mod tests {
         skill_provider.wait_for_shutdown().await;
     }
 
-    /// A test double for a [`Csi`] implementation which always completes with "Hello".
+    /// A test double for a [`Csi`] implementation which always completes with "Hello
+    /// {request.prompt}".
     pub struct CsiGreetingStub;
 
     #[async_trait]
     impl CsiForSkills for CsiGreetingStub {
-        async fn complete_text(&mut self, _request: CompletionRequest) -> Completion {
-            Completion::from_text("Hello")
+        async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
+            Completion::from_text(format!("Hello {}", request.prompt))
         }
 
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
