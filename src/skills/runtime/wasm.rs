@@ -58,10 +58,6 @@ impl Runtime for WasmRuntime {
         self.provider.remove_skill(skill);
     }
 
-    fn invalidate_cached_skill(&mut self, skill: &SkillPath) -> bool {
-        self.provider.invalidate(skill)
-    }
-
     fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error) {
         self.provider.add_invalid_namespace(namespace, e);
     }
@@ -129,52 +125,6 @@ pub mod tests {
         skill_provider.wait_for_shutdown().await;
 
         assert!(resp.is_err());
-    }
-
-    #[tokio::test]
-    async fn drop_non_existing_skill_from_cache() {
-        // Given a WasmRuntime with no cached skills
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        let mut runtime = WasmRuntime::local(skill_provider.api());
-
-        // When removing a skill from the runtime
-        let result = runtime.invalidate_cached_skill(&SkillPath::from_str("non-cached-skill"));
-
-        drop(runtime);
-        skill_provider.wait_for_shutdown().await;
-
-        // Then
-        assert!(!result);
-    }
-
-    #[tokio::test]
-    async fn drop_existing_skill_from_cache() {
-        // Given a WasmRuntime with a cached skill
-        let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
-        skill_provider.api().upsert(skill_path.clone(), None).await;
-        let mut runtime = WasmRuntime::local(skill_provider.api());
-        runtime.upsert_skill(skill_path.clone(), None);
-        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
-        drop(
-            runtime
-                .run(&skill_path, json!("name"), skill_ctx)
-                .await
-                .unwrap(),
-        );
-
-        // When dropping a skill from the runtime
-        let had_been_in_cache = skill_provider.api().invalidate_cache(skill_path).await;
-        let loaded_skill_count = skill_provider.api().list_cached().await.len();
-
-        drop(runtime);
-        skill_provider.wait_for_shutdown().await;
-
-        // Then the component hash map is empty
-        assert_eq!(loaded_skill_count, 0);
-
-        // And it had actually been cached before
-        assert!(had_been_in_cache);
     }
 
     #[tokio::test]

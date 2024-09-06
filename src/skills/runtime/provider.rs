@@ -361,6 +361,8 @@ pub mod tests {
 
     use super::*;
 
+    pub use super::SkillProviderMsg;
+
     pub fn dummy_skill_provider_api() -> SkillProviderApi {
         let (send, _recv) = mpsc::channel(1);
         SkillProviderApi::new(send)
@@ -430,21 +432,21 @@ pub mod tests {
 
     #[tokio::test]
     async fn cached_skill_removed() {
-        // given one cached skill
+        // Given one cached skill
         let skill_path = SkillPath::new("local", "greet_skill");
         let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
         provider.fetch(&skill_path, &engine).await.unwrap();
 
-        // when we remove the skill
+        // When we remove the skill
         provider.remove_skill(&skill_path);
 
-        // then the skill is no longer cached
+        // Then the skill is no longer cached
         assert!(provider.list_cached_skills().next().is_none());
     }
 
     #[tokio::test]
-    async fn error_fetching_skill_in_invalid_namespace() {
+    async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::new("local", "greet_skill");
         let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
@@ -463,22 +465,20 @@ pub mod tests {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new().unwrap());
-        let skill_path_rs = SkillPath::new("local", "greet_skill");
-        let skill_path_py = SkillPath::new("local", "greet-py");
         let skill_provider = SkillProviderActorHandle::new(&local_namespace());
         skill_provider
             .api()
-            .upsert(skill_path_rs.clone(), None)
+            .upsert(SkillPath::new("local", "greet_skill"), None)
             .await;
         skill_provider
             .api()
-            .upsert(skill_path_py.clone(), None)
+            .upsert(SkillPath::new("local", "greet-py"), None)
             .await;
 
         // When fetching "greet_skill" but not "greet-py"
         skill_provider
             .api()
-            .fetch(skill_path_rs.clone(), engine.clone())
+            .fetch(SkillPath::new("local", "greet_skill"), engine.clone())
             .await
             .unwrap();
         // and listing all chached skills
@@ -510,6 +510,42 @@ pub mod tests {
         // Cleanup
         drop(api);
         skill_provider.wait_for_shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn should_remove_invalidated_skill_from_cache() {
+        // Given one cached "greet_skill"
+        let greet_skill = SkillPath::new("local", "greet_skill");
+        let skill_provider = SkillProviderActorHandle::new(&local_namespace());
+        let api = skill_provider.api();
+        api.upsert(greet_skill.clone(), None).await;
+        api.fetch(greet_skill.clone(), Arc::new(Engine::new().unwrap())).await.unwrap();
+
+        // When we invalidate "greet_skill"
+        let skill_had_been_in_cache = api.invalidate_cache(greet_skill.clone()).await;
+
+        // Then greet skill is no longer listed in the cache, but of course still available in the
+        // list of all skills
+        assert!(skill_had_been_in_cache);
+        assert!(api.list_cached().await.is_empty());
+        assert_eq!(api.list().await, vec![greet_skill]);
+    }
+
+    #[tokio::test]
+    async fn invalidation_of_an_uncached_skill() {
+        // Given one "greet_skill" which is not in cache
+        let greet_skill = SkillPath::new("local", "greet_skill");
+        let skill_provider = SkillProviderActorHandle::new(&local_namespace());
+        let api = skill_provider.api();
+        api.upsert(greet_skill.clone(), None).await;
+
+        // When we invalidate "greet_skill"
+        let skill_had_been_in_cache = api.invalidate_cache(greet_skill.clone()).await;
+
+        // Then greet skill is of course still available in the list of all skills. The return value
+        // indicates that greet skill never had been in the cache to begin with
+        assert!(!skill_had_been_in_cache);
+        assert_eq!(api.list().await, vec![greet_skill]);
     }
 
     /// Namespace named local backed by a file registry with "skills" directory

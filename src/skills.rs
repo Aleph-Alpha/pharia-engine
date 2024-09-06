@@ -37,7 +37,7 @@ pub mod tests {
     use rand::Rng;
 
     pub use super::actor::SkillExecutorMessage;
-    pub use super::runtime::{tests::dummy_skill_provider_api, SkillProviderMsg};
+    pub use super::runtime::tests::{dummy_skill_provider_api, SkillProviderMsg};
     use super::SkillPath;
 
     impl SkillPath {

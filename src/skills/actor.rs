@@ -125,17 +125,6 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
-
-    pub async fn drop_from_cache(&self, skill_path: SkillPath) -> bool {
-        let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMessage::Uncache { send, skill_path };
-
-        self.send
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
-        recv.await.unwrap()
-    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -194,12 +183,6 @@ where
                 // Error is expected to happen during shutdown. Ignore result.
                 drop(result);
             }
-            SkillExecutorMessage::Uncache { skill_path, send } => {
-                let response = self.runtime.invalidate_cached_skill(&skill_path);
-                let result = send.send(response);
-                // Error is expected to happen during shutdown. Ignore result
-                let _ = result;
-            }
         }
     }
 
@@ -244,10 +227,6 @@ pub enum SkillExecutorMessage {
         input: Value,
         send: oneshot::Sender<Result<Value, ExecuteSkillError>>,
         api_token: String,
-    },
-    Uncache {
-        skill_path: SkillPath,
-        send: oneshot::Sender<bool>,
     },
 }
 
@@ -331,7 +310,6 @@ impl CsiForSkills for SkillInvocationCtx {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     use anyhow::anyhow;
     use serde_json::json;
@@ -439,7 +417,6 @@ pub mod tests {
         // This mock runtime expects that its skills never complete. The futures invoking them must
         // be dropped
         struct MockRuntime {
-            skill_path: SkillPath,
         }
 
         impl Runtime for MockRuntime {
@@ -465,10 +442,6 @@ pub mod tests {
                 panic!("does not remove skill")
             }
 
-            fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
-                skill_path == &self.skill_path
-            }
-
             fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
                 panic!("does not add invalid namespace")
             }
@@ -484,8 +457,7 @@ pub mod tests {
         };
 
         // When
-        let skill_path = SkillPath::dummy();
-        let runtime = MockRuntime { skill_path };
+        let runtime = MockRuntime { };
         let executer = SkillExecutor::new(runtime, csi_apis);
         let api = executer.api();
         let another_skill_path = SkillPath::dummy();
@@ -553,88 +525,6 @@ pub mod tests {
         assert_eq!(result.unwrap(), "Hello");
     }
 
-    // Tell that `skills` are installed
-    struct LiarRuntime {
-        skills: HashSet<SkillPath>,
-    }
-
-    impl LiarRuntime {
-        pub fn new(skills: &[String]) -> Self {
-            Self {
-                skills: skills.iter().map(|s| SkillPath::from_str(s)).collect(),
-            }
-        }
-    }
-
-    impl Runtime for LiarRuntime {
-        async fn run(
-            &mut self,
-            _skill_path: &SkillPath,
-            _name: Value,
-            _ctx: Box<dyn CsiForSkills + Send>,
-        ) -> Result<Value, ExecuteSkillError> {
-            panic!("Liar runtime does not run skills")
-        }
-
-        fn upsert_skill(&mut self, skill: SkillPath, _tag: Option<String>) {
-            self.skills.insert(skill);
-        }
-
-        fn remove_skill(&mut self, skill: &SkillPath) {
-            self.skills.remove(skill);
-        }
-
-        fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
-            self.skills.iter().any(|s| s == skill_path)
-        }
-
-        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
-            panic!("Liar runtime does not add invalid namespace")
-        }
-
-        fn mark_namespace_as_valid(&mut self, _namespace: &str) {
-            panic!("Liar runtime does not remove invalid namespace")
-        }
-    }
-
-    #[tokio::test]
-    async fn drop_existing_skill() {
-        // Given a runtime with the greet skill
-        let skills = ["haiku_skill".to_owned()];
-        let runtime = LiarRuntime::new(&skills);
-
-        // When
-        let executor = SkillExecutor::new(runtime, dummy_csi_apis());
-        let result = executor
-            .api()
-            .drop_from_cache(SkillPath::from_str("haiku_skill"))
-            .await;
-
-        executor.wait_for_shutdown().await;
-
-        // Then
-        assert!(result);
-    }
-
-    #[tokio::test]
-    async fn drop_non_existing_skill() {
-        // Given a runtime with the greet skill
-        let skills = ["haiku_skill".to_owned()];
-        let runtime = LiarRuntime::new(&skills);
-
-        // When
-        let executor = SkillExecutor::new(runtime, dummy_csi_apis());
-        let result = executor
-            .api()
-            .drop_from_cache(SkillPath::from_str("a_different_skill"))
-            .await;
-
-        executor.wait_for_shutdown().await;
-
-        // Then
-        assert!(!result);
-    }
-
     /// Intended as a test double for the production runtime. This implementation features exactly
     /// one hardcoded skill. The skill is called `greet` in the `local` namespace and it uses
     /// `luminous-nextgen-7b` to create a greeting given a provided name as an input.
@@ -680,10 +570,6 @@ pub mod tests {
 
         fn remove_skill(&mut self, _skill: &SkillPath) {
             panic!("RustRuntime does not remove skill")
-        }
-
-        fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
-            skill_path == &self.skill_path
         }
 
         fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {

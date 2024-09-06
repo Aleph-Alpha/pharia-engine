@@ -15,7 +15,7 @@ use crate::{
 use super::{actor::ExecuteSkillError, SkillPath};
 
 pub use self::{
-    provider::{SkillProvider, SkillProviderActorHandle, SkillProviderApi, SkillProviderMsg},
+    provider::{SkillProvider, SkillProviderActorHandle, SkillProviderApi},
     wasm::WasmRuntime,
 };
 
@@ -43,10 +43,6 @@ pub trait Runtime {
 
     fn remove_skill(&mut self, skill: &SkillPath);
 
-    /// The runtime may handle cache invalidation of skills by itself in the future. For now we cut
-    /// it a bit of slack and just tell it that a skill might have changed.
-    fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool;
-
     fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error);
 
     fn mark_namespace_as_valid(&mut self, namespace: &str);
@@ -70,7 +66,7 @@ pub mod tests {
     use super::*;
     use anyhow::anyhow;
 
-    pub use self::provider::tests::dummy_skill_provider_api;
+    pub use self::provider::tests::{SkillProviderMsg, dummy_skill_provider_api};
 
     pub struct SaboteurRuntime {
         err_msg: String,
@@ -98,10 +94,6 @@ pub mod tests {
 
         fn remove_skill(&mut self, _skill: &SkillPath) {
             panic!("Saboteur runtime does not remove skill")
-        }
-
-        fn invalidate_cached_skill(&mut self, _skill_path: &SkillPath) -> bool {
-            panic!("Saboteur runtime does not drop skills from cache")
         }
 
         fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
