@@ -43,8 +43,6 @@ pub trait Runtime {
 
     fn remove_skill(&mut self, skill: &SkillPath);
 
-    fn skills(&self) -> impl Iterator<Item = &SkillPath>;
-
     /// The runtime may handle cache invalidation of skills by itself in the future. For now we cut
     /// it a bit of slack and just tell it that a skill might have changed.
     fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool;
@@ -100,10 +98,6 @@ pub mod tests {
 
         fn remove_skill(&mut self, _skill: &SkillPath) {
             panic!("Saboteur runtime does not remove skill")
-        }
-
-        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-            std::iter::empty()
         }
 
         fn invalidate_cached_skill(&mut self, _skill_path: &SkillPath) -> bool {

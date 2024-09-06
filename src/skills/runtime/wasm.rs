@@ -58,10 +58,6 @@ impl Runtime for WasmRuntime {
         self.provider.remove_skill(skill);
     }
 
-    fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-        self.provider.skills()
-    }
-
     fn invalidate_cached_skill(&mut self, skill: &SkillPath) -> bool {
         self.provider.invalidate(skill)
     }

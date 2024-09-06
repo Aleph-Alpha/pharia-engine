@@ -459,7 +459,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn only_fetched_skills_are_cached() {
+    async fn should_only_cache_skills_that_have_been_fetched() {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new().unwrap());
@@ -488,6 +488,27 @@ pub mod tests {
         assert_eq!(cached_skills, vec![SkillPath::new("local", "greet_skill")]);
 
         // Cleanup
+        skill_provider.wait_for_shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn should_list_skills_that_have_been_added() {
+        // Given an empty provider
+        let skill_provider = SkillProviderActorHandle::new(&local_namespace());
+        let api = skill_provider.api();
+
+        // When adding a skill
+        api.upsert(SkillPath::new("local", "one"), None).await;
+        api.upsert(SkillPath::new("local", "two"), None).await;
+        let skills = api.list().await;
+
+        // Then the skills is listed by the skill executor api
+        assert_eq!(skills.len(), 2);
+        assert!(skills.contains(&SkillPath::new("local", "one")));
+        assert!(skills.contains(&SkillPath::new("local", "two")));
+
+        // Cleanup
+        drop(api);
         skill_provider.wait_for_shutdown().await;
     }
 

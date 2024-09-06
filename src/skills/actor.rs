@@ -126,17 +126,6 @@ impl SkillExecutorApi {
         recv.await.unwrap()
     }
 
-    pub async fn skills(&self) -> Vec<SkillPath> {
-        let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMessage::Skills { send };
-
-        self.send
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
-        recv.await.unwrap()
-    }
-
     pub async fn drop_from_cache(&self, skill_path: SkillPath) -> bool {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMessage::Uncache { send, skill_path };
@@ -205,12 +194,6 @@ where
                 // Error is expected to happen during shutdown. Ignore result.
                 drop(result);
             }
-            SkillExecutorMessage::Skills { send } => {
-                let response = self.runtime.skills().cloned().collect();
-                let result = send.send(response);
-                // Error is expected to happen during shutdown. Ignore result
-                drop(result);
-            }
             SkillExecutorMessage::Uncache { skill_path, send } => {
                 let response = self.runtime.invalidate_cached_skill(&skill_path);
                 let result = send.send(response);
@@ -261,9 +244,6 @@ pub enum SkillExecutorMessage {
         input: Value,
         send: oneshot::Sender<Result<Value, ExecuteSkillError>>,
         api_token: String,
-    },
-    Skills {
-        send: oneshot::Sender<Vec<SkillPath>>,
     },
     Uncache {
         skill_path: SkillPath,
@@ -351,7 +331,7 @@ impl CsiForSkills for SkillInvocationCtx {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::{collections::HashSet, iter};
+    use std::collections::HashSet;
 
     use anyhow::anyhow;
     use serde_json::json;
@@ -485,10 +465,6 @@ pub mod tests {
                 panic!("does not remove skill")
             }
 
-            fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-                iter::empty()
-            }
-
             fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
                 skill_path == &self.skill_path
             }
@@ -608,10 +584,6 @@ pub mod tests {
             self.skills.remove(skill);
         }
 
-        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-            self.skills.iter()
-        }
-
         fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
             self.skills.iter().any(|s| s == skill_path)
         }
@@ -663,37 +635,6 @@ pub mod tests {
         assert!(!result);
     }
 
-    #[tokio::test]
-    async fn executor_api_add_skills() {
-        // Given a skill executor api
-        let skill_provider = SkillProviderActorHandle::new(&HashMap::new());
-        let csi_apis = dummy_csi_apis();
-        let skill_executor = SkillExecutor::with_cfg(
-            csi_apis,
-            skill_provider.api(),
-            SkillExecutorConfig {
-                namespaces: &HashMap::new(),
-            },
-        );
-        let api = skill_executor.api();
-
-        // When adding a skill
-        let skill_path_1 = SkillPath::dummy();
-        api.upsert_skill(skill_path_1.clone(), None).await;
-        let skill_path_2 = SkillPath::dummy();
-        api.upsert_skill(skill_path_2.clone(), None).await;
-        let skills = api.skills().await;
-
-        drop(api);
-        skill_executor.wait_for_shutdown().await;
-        skill_provider.wait_for_shutdown().await;
-
-        // Then the skills is listed by the skill executor api
-        assert_eq!(skills.len(), 2);
-        assert!(skills.contains(&skill_path_1));
-        assert!(skills.contains(&skill_path_2));
-    }
-
     /// Intended as a test double for the production runtime. This implementation features exactly
     /// one hardcoded skill. The skill is called `greet` in the `local` namespace and it uses
     /// `luminous-nextgen-7b` to create a greeting given a provided name as an input.
@@ -739,10 +680,6 @@ pub mod tests {
 
         fn remove_skill(&mut self, _skill: &SkillPath) {
             panic!("RustRuntime does not remove skill")
-        }
-
-        fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-            std::iter::empty()
         }
 
         fn invalidate_cached_skill(&mut self, skill_path: &SkillPath) -> bool {
