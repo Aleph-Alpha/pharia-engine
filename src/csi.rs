@@ -3,6 +3,7 @@ use tracing::trace;
 
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
+    language_selection::{select_language, Language},
     tokenizers::TokenizersApi,
 };
 
@@ -32,6 +33,18 @@ pub trait Csi {
         auth: String,
         request: ChunkRequest,
     ) -> Result<Vec<String>, anyhow::Error>;
+
+    // While the implementation might not be async, we want the interface to be asynchronous.
+    // It is up to the implementer whether the actual implementation is async.
+    #[allow(clippy::unused_async)]
+    async fn select_language(
+        &mut self,
+        text: String,
+        languages: Vec<Language>,
+    ) -> Option<Language> {
+        // default implementation can be provided here because language selection is stateless
+        select_language(&text, &languages)
+    }
 }
 
 impl Csi for CsiApis {

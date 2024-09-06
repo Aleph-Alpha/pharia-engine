@@ -9,7 +9,7 @@ use crate::{
     configuration_observer::NamespaceConfig,
     csi::{ChunkRequest, Csi as _, CsiApis},
     inference::{Completion, CompletionRequest},
-    language_selection::{select_language, Language},
+    language_selection::Language,
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -353,7 +353,7 @@ impl CsiForSkills for SkillInvocationCtx {
         text: String,
         languages: Vec<Language>,
     ) -> Option<Language> {
-        select_language(&text, &languages)
+        self.csi_apis.select_language(text, languages).await
     }
 }
 
