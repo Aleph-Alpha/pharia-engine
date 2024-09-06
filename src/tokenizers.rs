@@ -17,7 +17,7 @@ impl TokenizersApi {
     }
 
     pub async fn tokenizer_by_model(
-        &mut self,
+        &self,
         api_token: String,
         model_name: String,
     ) -> Result<Arc<Tokenizer>, anyhow::Error> {

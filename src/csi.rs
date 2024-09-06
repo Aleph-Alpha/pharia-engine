@@ -1,4 +1,5 @@
 mod chunking;
+use futures::future::try_join_all;
 use tracing::trace;
 
 use crate::{
@@ -24,17 +25,17 @@ pub struct CsiApis {
 /// See its sibling trait `CsiForSkills`.
 pub trait Csi {
     async fn complete_text(
-        &mut self,
+        &self,
         auth: String,
         request: CompletionRequest,
     ) -> Result<Completion, anyhow::Error>;
     async fn complete_all(
-        &mut self,
+        &self,
         auth: String,
         requests: Vec<CompletionRequest>,
     ) -> Result<Vec<Completion>, anyhow::Error>;
     async fn chunk(
-        &mut self,
+        &self,
         auth: String,
         request: ChunkRequest,
     ) -> Result<Vec<String>, anyhow::Error>;
@@ -54,7 +55,7 @@ pub trait Csi {
 
 impl Csi for CsiApis {
     async fn complete_text(
-        &mut self,
+        &self,
         auth: String,
         request: CompletionRequest,
     ) -> Result<Completion, anyhow::Error> {
@@ -70,21 +71,22 @@ impl Csi for CsiApis {
     }
 
     async fn complete_all(
-        &mut self,
+        &self,
         auth: String,
         requests: Vec<CompletionRequest>,
     ) -> Result<Vec<Completion>, anyhow::Error> {
         trace!("complete_all: requests.len()={}", requests.len());
-        let mut completions = Vec::new();
-        for request in requests {
-            let completion = self.complete_text(auth.clone(), request).await?;
-            completions.push(completion);
-        }
-        Ok(completions)
+        try_join_all(
+            requests
+                .into_iter()
+                .map(|r| self.complete_text(auth.clone(), r))
+                .collect::<Vec<_>>(),
+        )
+        .await
     }
 
     async fn chunk(
-        &mut self,
+        &self,
         auth: String,
         request: ChunkRequest,
     ) -> Result<Vec<String>, anyhow::Error> {
