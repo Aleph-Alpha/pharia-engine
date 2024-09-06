@@ -202,6 +202,13 @@ impl SkillProviderApi {
             .await
             .expect("all api handlers must be shutdown before actors");
     }
+
+    /// Report a namespace as erroneous (e.g. in case its configuration is messed up). Set `None`
+    /// to communicate that a namespace is no longer erroneous.
+    pub async fn set_namespace_error(&self, namespace: String, error: Option<anyhow::Error>) {
+        let msg = SkillProviderMsg::SetNamespaceError { namespace, error };
+        self.sender.send(msg).await.expect("all api handlers must be shutdown before actors");
+    }
 }
 
 pub enum SkillProviderMsg {
@@ -220,6 +227,10 @@ pub enum SkillProviderMsg {
         skill_path: SkillPath,
         tag: Option<String>,
     },
+    SetNamespaceError {
+        namespace: String,
+        error: Option<anyhow::Error>,
+    }
 }
 
 struct SkillProviderActor {
@@ -262,6 +273,13 @@ impl SkillProviderActor {
             }
             SkillProviderMsg::Upsert { skill_path, tag } => {
                 self.provider.upsert_skill(&skill_path, tag);
+            }
+            SkillProviderMsg::SetNamespaceError { namespace, error } => {
+                if let Some(error) = error {
+                    self.provider.add_invalid_namespace(namespace, error);
+                } else {
+                    self.provider.remove_invalid_namespace(&namespace);
+                }
             }
         }
     }

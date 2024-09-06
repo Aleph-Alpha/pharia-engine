@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
@@ -198,6 +198,7 @@ impl ConfigurationObserverActor {
                     self.skill_executor_api
                         .mark_namespace_as_valid(namespace.to_owned())
                         .await;
+                    // self.skill_provider_api.set_namespace_error(namespace.to_owned(), None).await;
                     self.invalid_namespaces.remove(namespace);
                 }
                 incoming
@@ -213,8 +214,9 @@ impl ConfigurationObserverActor {
                     "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
                 self.skill_executor_api
-                    .mark_namespace_as_invalid(namespace.to_owned(), e)
+                    .mark_namespace_as_invalid(namespace.to_owned(), anyhow!("{}",e.to_string()))
                     .await;
+                // self.skill_provider_api.set_namespace_error(namespace.to_owned(), Some(e)).await;
                 self.invalid_namespaces.insert(namespace.to_owned());
                 vec![]
             }
@@ -526,6 +528,7 @@ pub mod tests {
         ));
 
         let msg = receiver_skill_executor.try_recv().unwrap();
+        // let _msg = receiver.try_recv().unwrap();
 
         assert!(matches!(
             msg,
