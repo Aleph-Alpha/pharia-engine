@@ -17,10 +17,10 @@ impl SkillPath {
         Self::new(namespace, name)
     }
 
-    pub fn new(namespace: &str, name: &str) -> Self {
+    pub fn new(namespace: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
-            namespace: namespace.to_owned(),
-            name: name.to_owned(),
+            namespace: namespace.into(),
+            name: name.into(),
         }
     }
 }
