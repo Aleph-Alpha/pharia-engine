@@ -36,7 +36,7 @@ pub mod tests {
     use fake::{Dummy, Fake, Faker};
     use rand::Rng;
 
-    pub use super::actor::SkillExecutorMessage;
+    pub use super::actor::SkillExecutorMsg;
     pub use super::runtime::tests::{dummy_skill_provider_api, SkillProviderMsg};
     use super::SkillPath;
 

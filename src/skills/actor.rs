@@ -27,7 +27,7 @@ pub struct SkillExecutorConfig<'a> {
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
 pub struct SkillExecutor {
-    send: mpsc::Sender<SkillExecutorMessage>,
+    send: mpsc::Sender<SkillExecutorMsg>,
     handle: JoinHandle<()>,
 }
 
@@ -45,7 +45,7 @@ impl SkillExecutor {
 
     /// You may want use this constructor if you want to use a double runtime for testing
     pub fn new<R: Runtime + Send + 'static>(runtime: R, csi_apis: CsiApis) -> Self {
-        let (send, recv) = mpsc::channel::<SkillExecutorMessage>(1);
+        let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
         });
@@ -66,20 +66,12 @@ impl SkillExecutor {
 
 #[derive(Clone)]
 pub struct SkillExecutorApi {
-    send: mpsc::Sender<SkillExecutorMessage>,
+    send: mpsc::Sender<SkillExecutorMsg>,
 }
 
 impl SkillExecutorApi {
-    pub fn new(send: mpsc::Sender<SkillExecutorMessage>) -> Self {
+    pub fn new(send: mpsc::Sender<SkillExecutorMsg>) -> Self {
         Self { send }
-    }
-
-    pub async fn mark_namespace_as_valid(&self, namespace: String) {
-        let msg = SkillExecutorMessage::MarkNamespaceAsValid { namespace };
-        self.send
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
     }
 
     pub async fn execute_skill(
@@ -89,7 +81,7 @@ impl SkillExecutorApi {
         api_token: String,
     ) -> Result<Value, ExecuteSkillError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMessage::Execute {
+        let msg = SkillExecutorMsg {
             skill_path,
             input,
             send,
@@ -116,7 +108,7 @@ pub enum ExecuteSkillError {
 
 struct SkillExecutorActor<R: Runtime> {
     runtime: R,
-    recv: mpsc::Receiver<SkillExecutorMessage>,
+    recv: mpsc::Receiver<SkillExecutorMsg>,
     csi_apis: CsiApis,
 }
 
@@ -124,7 +116,7 @@ impl<R> SkillExecutorActor<R>
 where
     R: Runtime,
 {
-    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMessage>, csi_apis: CsiApis) -> Self {
+    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: CsiApis) -> Self {
         SkillExecutorActor {
             runtime,
             recv,
@@ -138,23 +130,18 @@ where
         }
     }
 
-    async fn act(&mut self, msg: SkillExecutorMessage) {
-        match msg {
-            SkillExecutorMessage::MarkNamespaceAsValid { namespace } => {
-                self.runtime.mark_namespace_as_valid(&namespace);
-            }
-            SkillExecutorMessage::Execute {
-                skill_path,
-                input,
-                send,
-                api_token,
-            } => {
-                let response = self.run_skill(&skill_path, input, api_token).await;
-                let result = send.send(response);
-                // Error is expected to happen during shutdown. Ignore result.
-                drop(result);
-            }
-        }
+    async fn act(&mut self, msg: SkillExecutorMsg) {
+        let SkillExecutorMsg {
+            skill_path,
+            input,
+            send,
+            api_token,
+        } = msg;
+
+        let response = self.run_skill(&skill_path, input, api_token).await;
+        let result = send.send(response);
+        // Error is expected to happen during shutdown. Ignore result.
+        drop(result);
     }
 
     async fn run_skill(
@@ -178,16 +165,11 @@ where
 }
 
 #[derive(Debug)]
-pub enum SkillExecutorMessage {
-    MarkNamespaceAsValid {
-        namespace: String,
-    },
-    Execute {
-        skill_path: SkillPath,
-        input: Value,
-        send: oneshot::Sender<Result<Value, ExecuteSkillError>>,
-        api_token: String,
-    },
+pub struct SkillExecutorMsg {
+    pub skill_path: SkillPath,
+    pub input: Value,
+    pub send: oneshot::Sender<Result<Value, ExecuteSkillError>>,
+    pub api_token: String,
 }
 
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function

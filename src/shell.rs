@@ -307,7 +307,7 @@ mod tests {
 
     use crate::{
         skills::{
-            tests::{dummy_skill_provider_api, SkillExecutorMessage, SkillProviderMsg},
+            tests::{dummy_skill_provider_api, SkillExecutorMsg, SkillProviderMsg},
             ExecuteSkillError, SkillPath,
         },
         tests::api_token,
@@ -329,13 +329,11 @@ mod tests {
     async fn execute_skill() {
         // Given
         let skill_executer_mock = StubSkillExecuter::new(move |msg| {
-            if let SkillExecutorMessage::Execute {
+            let SkillExecutorMsg {
                 skill_path, send, ..
-            } = msg
-            {
-                assert_eq!(skill_path, SkillPath::new("local", "greet_skill"));
-                send.send(Ok(json!("dummy completion"))).unwrap();
-            }
+            } = msg;
+            assert_eq!(skill_path, SkillPath::new("local", "greet_skill"));
+            send.send(Ok(json!("dummy completion"))).unwrap();
         });
         let skill_executor_api = skill_executer_mock.api();
 
@@ -639,12 +637,11 @@ mod tests {
     async fn invalid_namespace_config_is_500_error() {
         // Given a skill executor which has an invalid namespace
         let skill_executor = StubSkillExecuter::new(|msg| {
-            if let SkillExecutorMessage::Execute { send, .. } = msg {
-                send.send(Err(ExecuteSkillError::Other(anyhow!(
-                    "Namespace is invalid"
-                ))))
-                .unwrap();
-            }
+            let SkillExecutorMsg { send, .. } = msg;
+            send.send(Err(ExecuteSkillError::Other(anyhow!(
+                "Namespace is invalid"
+            ))))
+            .unwrap();
         });
         let http = http(skill_executor.api(), dummy_skill_provider_api());
 
@@ -678,10 +675,9 @@ mod tests {
     async fn not_existing_skill_is_400_error() {
         // Given a skill executer which always replies Skill does not exist
         let skill_executer_dummy = StubSkillExecuter::new(|msg| {
-            if let SkillExecutorMessage::Execute { send, .. } = msg {
-                send.send(Err(ExecuteSkillError::SkillDoesNotExist))
-                    .unwrap();
-            }
+            let SkillExecutorMsg { send, .. } = msg;
+            send.send(Err(ExecuteSkillError::SkillDoesNotExist))
+                .unwrap();
         });
         let skill_executer_api = skill_executer_dummy.api();
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
@@ -720,14 +716,12 @@ mod tests {
 
     /// A skill executer double, loaded up with predefined answers.
     struct StubSkillExecuter {
-        send: mpsc::Sender<SkillExecutorMessage>,
+        send: mpsc::Sender<SkillExecutorMsg>,
         handle: JoinHandle<()>,
     }
 
     impl StubSkillExecuter {
-        pub fn new(
-            mut handle: impl FnMut(SkillExecutorMessage) + Send + 'static,
-        ) -> StubSkillExecuter {
+        pub fn new(mut handle: impl FnMut(SkillExecutorMsg) + Send + 'static) -> StubSkillExecuter {
             let (send, mut recv) = mpsc::channel(1);
             let handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
 
-use crate::skills::{SkillExecutorApi, SkillPath, SkillProviderApi};
+use crate::skills::{SkillPath, SkillProviderApi};
 
 use super::{
     namespace_description::{NamespaceDescriptionError, Skill},
@@ -74,7 +74,6 @@ impl ConfigurationObserver {
     }
 
     pub fn with_config(
-        skill_executor_api: SkillExecutorApi,
         skill_provider_api: SkillProviderApi,
         config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
@@ -85,7 +84,6 @@ impl ConfigurationObserver {
             ConfigurationObserverActor::new(
                 ready_sender,
                 shutdown_receiver,
-                skill_executor_api,
                 skill_provider_api,
                 config,
                 update_interval,
@@ -109,7 +107,6 @@ impl ConfigurationObserver {
 struct ConfigurationObserverActor {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
-    skill_executor_api: SkillExecutorApi,
     skill_provider_api: SkillProviderApi,
     config: Box<dyn ObservableConfig + Send>,
     update_interval: Duration,
@@ -138,7 +135,6 @@ impl ConfigurationObserverActor {
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
-        skill_executor_api: SkillExecutorApi,
         skill_provider_api: SkillProviderApi,
         config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
@@ -146,7 +142,6 @@ impl ConfigurationObserverActor {
         Self {
             ready,
             shutdown,
-            skill_executor_api,
             skill_provider_api,
             config,
             update_interval,
@@ -195,9 +190,6 @@ impl ConfigurationObserverActor {
         let incoming = match self.config.skills(namespace).await {
             Ok(incoming) => {
                 if self.invalid_namespaces.contains(namespace) {
-                    self.skill_executor_api
-                        .mark_namespace_as_valid(namespace.to_owned())
-                        .await;
                     self.skill_provider_api
                         .set_namespace_error(namespace.to_owned(), None)
                         .await;
@@ -252,8 +244,7 @@ pub mod tests {
     use tokio::sync::{mpsc, Mutex};
     use tokio::time::timeout;
 
-    use crate::skills::tests::SkillExecutorMessage;
-    use crate::skills::{tests::SkillProviderMsg, SkillExecutorApi, SkillPath};
+    use crate::skills::{tests::SkillProviderMsg, SkillPath};
 
     use super::*;
     use anyhow::anyhow;
@@ -375,14 +366,11 @@ pub mod tests {
     #[tokio::test]
     async fn load_config_during_first_pass() {
         // Given a config that take forever to load
-        let (sender, _) = mpsc::channel::<SkillExecutorMessage>(1);
-        let skill_executor_api = SkillExecutorApi::new(sender);
         let (sender, _) = mpsc::channel::<SkillProviderMsg>(1);
         let skill_provider_api = SkillProviderApi::new(sender);
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
         let mut observer = ConfigurationObserver::with_config(
-            skill_executor_api,
             skill_provider_api,
             config,
             update_interval,
@@ -410,11 +398,8 @@ pub mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(1);
         let skill_provider_api = SkillProviderApi::new(sender);
-        let (sender, mut _receiver) = mpsc::channel::<SkillExecutorMessage>(1);
-        let skill_executor_api = SkillExecutorApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
         let mut observer = ConfigurationObserver::with_config(
-            skill_executor_api,
             skill_provider_api,
             stub_config,
             update_interval,
@@ -439,7 +424,6 @@ pub mod tests {
     impl ConfigurationObserverActor {
         fn with_skills(
             skills: HashMap<String, Vec<Skill>>,
-            skill_executor_api: SkillExecutorApi,
             skill_provider_api: SkillProviderApi,
             config: Box<dyn ObservableConfig + Send>,
         ) -> Self {
@@ -448,7 +432,6 @@ pub mod tests {
             Self {
                 ready,
                 shutdown,
-                skill_executor_api,
                 skill_provider_api,
                 config,
                 update_interval: Duration::from_millis(1),
@@ -496,13 +479,10 @@ pub mod tests {
 
         let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
         let skill_provider_api = SkillProviderApi::new(sender);
-        let (sender, _receiver_skill_executor) = mpsc::channel::<SkillExecutorMessage>(2);
-        let skill_executor_api = SkillExecutorApi::new(sender);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
 
         let mut coa = ConfigurationObserverActor::with_skills(
             namespaces,
-            skill_executor_api,
             skill_provider_api,
             config,
         );
@@ -545,13 +525,10 @@ pub mod tests {
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
-        let (sender, mut _receiver) = mpsc::channel::<SkillExecutorMessage>(1);
-        let skill_executor_api = SkillExecutorApi::new(sender);
         let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(1);
         let skill_provider_api = SkillProviderApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
         let observer = ConfigurationObserver::with_config(
-            skill_executor_api,
             skill_provider_api,
             stub_config,
             update_interval,
@@ -576,8 +553,6 @@ pub mod tests {
         // given an invalid namespace
         let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
         let skill_provider_api = SkillProviderApi::new(sender);
-        let (sender, _receiver) = mpsc::channel::<SkillExecutorMessage>(2);
-        let skill_executor_api = SkillExecutorApi::new(sender);
         let update_interval_ms = 1;
         let update_interval = Duration::from_millis(update_interval_ms);
         let dummy_namespace = "dummy_namespace";
@@ -588,7 +563,6 @@ pub mod tests {
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
         let mut observer = ConfigurationObserver::with_config(
-            skill_executor_api,
             skill_provider_api,
             config,
             update_interval,
