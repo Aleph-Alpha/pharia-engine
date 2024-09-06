@@ -3,7 +3,7 @@ mod runtime;
 use std::fmt;
 
 pub use actor::{ExecuteSkillError, SkillExecutor, SkillExecutorApi, SkillExecutorConfig};
-pub use runtime::SkillProviderActorHandle;
+pub use runtime::{SkillProviderActorHandle, SkillProviderApi, SkillProviderMsg};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SkillPath {

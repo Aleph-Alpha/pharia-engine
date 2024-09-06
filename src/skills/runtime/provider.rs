@@ -120,10 +120,14 @@ impl SkillProvider {
             let bytes = bytes.ok_or_else(|| anyhow!("Sorry, skill {skill_path} not found."))?;
             let skill = CachedSkill::new(engine, bytes)
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
-            self.cached_skills.insert(skill_path.clone(), Arc::new(skill));
+            self.cached_skills
+                .insert(skill_path.clone(), Arc::new(skill));
         }
         Ok(Some(
-            self.cached_skills.get(skill_path).expect("Skill present.").clone(),
+            self.cached_skills
+                .get(skill_path)
+                .expect("Skill present.")
+                .clone(),
         ))
     }
 }
@@ -180,12 +184,24 @@ pub struct SkillProviderApi {
     sender: mpsc::Sender<SkillProviderMsg>,
 }
 
-enum SkillProviderMsg {
-    FetchSkill {
+impl SkillProviderApi {
+    pub fn new(sender: mpsc::Sender<SkillProviderMsg>) -> Self {
+        SkillProviderApi { sender }
+    }
+}
+
+pub enum SkillProviderMsg {
+    Fetch {
         skill_path: SkillPath,
         engine: Arc<Engine>,
         send: oneshot::Sender<Result<Option<Arc<CachedSkill>>, anyhow::Error>>,
     },
+    List {
+        send: oneshot::Sender<Vec<SkillPath>>,
+    },
+    Remove {
+        skill_path: SkillPath,
+    }
 }
 
 struct SkillProviderActor {
@@ -210,13 +226,19 @@ impl SkillProviderActor {
 
     pub async fn act(&mut self, msg: SkillProviderMsg) {
         match msg {
-            SkillProviderMsg::FetchSkill {
+            SkillProviderMsg::Fetch {
                 skill_path,
                 engine,
                 send,
             } => {
                 let result = self.provider.fetch(&skill_path, &engine).await;
                 drop(send.send(result));
+            }
+            SkillProviderMsg::List { send } => {
+                drop(send.send(self.provider.skills().cloned().collect()));
+            }
+            SkillProviderMsg::Remove { skill_path } => {
+                self.provider.remove_skill(&skill_path);
             }
         }
     }

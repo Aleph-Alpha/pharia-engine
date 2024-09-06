@@ -12,7 +12,7 @@ use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use csi::CsiApis;
 use futures::Future;
-use skills::SkillProviderActorHandle;
+use skills::{SkillProviderActorHandle, SkillExecutorApi};
 use tokenizers::Tokenizers;
 use tracing::error;
 
@@ -56,6 +56,7 @@ pub async fn run(
 
     let mut configuration_observer = ConfigurationObserver::with_config(
         skill_executor.api(),
+        skill_provider.api(),
         loaders,
         tokio::time::Duration::from_secs(10),
     );
