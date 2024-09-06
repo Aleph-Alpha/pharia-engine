@@ -168,9 +168,7 @@ impl SkillProviderActorHandle {
     }
 
     pub fn api(&self) -> SkillProviderApi {
-        SkillProviderApi::new(
-            self.sender.clone()
-        )
+        SkillProviderApi::new(self.sender.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -196,6 +194,14 @@ impl SkillProviderApi {
             .await
             .expect("all api handlers must be shutdown before actors");
     }
+
+    pub async fn upsert_skill(&self, skill_path: SkillPath, tag: Option<String>) {
+        let msg = SkillProviderMsg::Upsert { skill_path, tag };
+        self.sender
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+    }
 }
 
 pub enum SkillProviderMsg {
@@ -209,7 +215,11 @@ pub enum SkillProviderMsg {
     },
     Remove {
         skill_path: SkillPath,
-    }
+    },
+    Upsert {
+        skill_path: SkillPath,
+        tag: Option<String>,
+    },
 }
 
 struct SkillProviderActor {
@@ -249,6 +259,9 @@ impl SkillProviderActor {
             }
             SkillProviderMsg::Remove { skill_path } => {
                 self.provider.remove_skill(&skill_path);
+            }
+            SkillProviderMsg::Upsert { skill_path, tag } => {
+                self.provider.upsert_skill(&skill_path, tag);
             }
         }
     }

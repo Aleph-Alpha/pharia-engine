@@ -423,7 +423,7 @@ mod tests {
     use std::fs;
 
     use tokio::sync::oneshot;
-    use v0_2::pharia::skill::csi::{self, Host, Language};
+    use v0_2::pharia::skill::csi::{Host, Language};
 
     use crate::{
         csi::tests::dummy_csi_apis,

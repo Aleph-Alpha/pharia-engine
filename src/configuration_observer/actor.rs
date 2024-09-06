@@ -173,7 +173,7 @@ impl ConfigurationObserverActor {
 
     async fn run(mut self) {
         let mut started = tokio::time::Instant::now();
-        self.load().await;
+        self.report_all_changes().await;
         let _ = self.ready.send(true);
         loop {
             select! {
@@ -181,17 +181,17 @@ impl ConfigurationObserverActor {
                 () = tokio::time::sleep_until(started + self.update_interval) => (),
             };
             started = tokio::time::Instant::now();
-            self.load().await;
+            self.report_all_changes().await;
         }
     }
 
-    async fn load(&mut self) {
+    async fn report_all_changes(&mut self) {
         for namespace in &self.config.namespaces() {
-            self.load_namespace(namespace).await;
+            self.report_changes_in_namespace(namespace).await;
         }
     }
 
-    async fn load_namespace(&mut self, namespace: &str) {
+    async fn report_changes_in_namespace(&mut self, namespace: &str) {
         let incoming = match self.config.skills(namespace).await {
             Ok(incoming) => {
                 if self.invalid_namespaces.contains(namespace) {
@@ -230,6 +230,9 @@ impl ConfigurationObserverActor {
         let diff = Self::compute_diff(&existing, incoming);
         for skill in diff.added_or_changed {
             self.skill_executor_api
+                .upsert_skill(SkillPath::new(namespace, &skill.name), skill.tag.clone())
+                .await;
+            self.skill_provider_api
                 .upsert_skill(SkillPath::new(namespace, &skill.name), skill.tag)
                 .await;
         }
@@ -399,7 +402,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn on_start_reports_all_skills_to_executor_agent() {
+    async fn on_start_reports_all_skills() {
         // Given some configured skills
         let dummy_namespace = "dummy_namespace";
         let dummy_skill = "dummy_skill";
@@ -411,9 +414,9 @@ pub mod tests {
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
-        let (sender, _) = mpsc::channel::<SkillProviderMsg>(1);
+        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(1);
         let skill_provider_api = SkillProviderApi::new(sender);
-        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
+        let (sender, mut _receiver) = mpsc::channel::<SkillExecutorMessage>(1);
         let skill_executor_api = SkillExecutorApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
         let mut observer = ConfigurationObserver::with_config(
@@ -429,14 +432,11 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillExecutorMessage::Upsert {
-                skill: SkillPath {
-                    namespace,
-                    name,
-                },
+            SkillProviderMsg::Upsert {
+                skill_path,
                 tag: None
             }
-            if namespace == dummy_namespace && name == dummy_skill
+            if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
         ));
 
         observer.wait_for_shutdown().await;
@@ -514,7 +514,7 @@ pub mod tests {
         );
 
         // when we load an invalid namespace
-        coa.load_namespace(dummy_namespace).await;
+        coa.report_changes_in_namespace(dummy_namespace).await;
 
         // then mark the namespace as invalid and remove all skills of that namespace
         let _msg = receiver.try_recv().unwrap();
@@ -555,9 +555,9 @@ pub mod tests {
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
-        let (sender, mut receiver) = mpsc::channel::<SkillExecutorMessage>(1);
+        let (sender, mut _receiver) = mpsc::channel::<SkillExecutorMessage>(1);
         let skill_executor_api = SkillExecutorApi::new(sender);
-        let (sender, _) = mpsc::channel::<SkillProviderMsg>(1);
+        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(1);
         let skill_provider_api = SkillProviderApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
         let observer = ConfigurationObserver::with_config(
