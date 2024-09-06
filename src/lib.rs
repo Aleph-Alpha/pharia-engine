@@ -41,11 +41,7 @@ pub async fn run(
     let skill_provider = SkillProviderActorHandle::new(&app_config.operator_config.namespaces);
 
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::with_cfg(
-        csi_apis,
-        skill_provider.api(),
-        app_config.skill_executer_cfg(),
-    );
+    let skill_executor = SkillExecutor::new(csi_apis, skill_provider.api());
 
     // Boot up the configuration observer
     let loaders = Box::new(

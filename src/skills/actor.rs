@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::pending};
 
 use super::{
-    runtime::{CsiForSkills, Runtime, SkillProvider, SkillProviderApi, WasmRuntime},
+    runtime::{CsiForSkills, Runtime, SkillProviderApi, WasmRuntime},
     SkillPath,
 };
 
@@ -33,18 +33,13 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn with_cfg(
-        csi_apis: CsiApis,
-        skill_provider: SkillProviderApi,
-        cfg: SkillExecutorConfig<'_>,
-    ) -> Self {
-        let provider = SkillProvider::new(cfg.namespaces);
-        let runtime = WasmRuntime::with_provider(provider, skill_provider);
-        Self::new(runtime, csi_apis)
+    pub fn new(csi_apis: CsiApis, skill_provider: SkillProviderApi) -> Self {
+        let runtime = WasmRuntime::new(skill_provider);
+        Self::with_runtime(runtime, csi_apis)
     }
 
     /// You may want use this constructor if you want to use a double runtime for testing
-    pub fn new<R: Runtime + Send + 'static>(runtime: R, csi_apis: CsiApis) -> Self {
+    pub fn with_runtime<R: Runtime + Send + 'static>(runtime: R, csi_apis: CsiApis) -> Self {
         let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
@@ -328,12 +323,9 @@ pub mod tests {
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
         let namespaces = HashMap::new();
-        let config = SkillExecutorConfig {
-            namespaces: &namespaces,
-        };
         let skill_provider = SkillProviderActorHandle::new(&namespaces);
         let csi_apis = dummy_csi_apis();
-        let executer = SkillExecutor::with_cfg(csi_apis, skill_provider.api(), config);
+        let executer = SkillExecutor::new(csi_apis, skill_provider.api());
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace
@@ -374,10 +366,6 @@ pub mod tests {
                 .await;
                 panic!("complete_text must pend forever in case of error")
             }
-
-            fn mark_namespace_as_valid(&mut self, _namespace: &str) {
-                panic!("does not remove invalid namespace")
-            }
         }
         let inference_saboteur = InferenceStub::new(|_| Err(anyhow!("Test inference error")));
         let csi_apis = CsiApis {
@@ -387,7 +375,7 @@ pub mod tests {
 
         // When
         let runtime = MockRuntime {};
-        let executer = SkillExecutor::new(runtime, csi_apis);
+        let executer = SkillExecutor::with_runtime(runtime, csi_apis);
         let api = executer.api();
         let another_skill_path = SkillPath::dummy();
         let result = api
@@ -413,7 +401,7 @@ pub mod tests {
             inference: inference.api(),
             ..dummy_csi_apis()
         };
-        let executor = SkillExecutor::new(runtime, csi_apis);
+        let executor = SkillExecutor::with_runtime(runtime, csi_apis);
 
         let result = executor
             .api()
@@ -438,7 +426,7 @@ pub mod tests {
 
         // When
         let runtime = RustRuntime::with_greet_skill();
-        let executor = SkillExecutor::new(runtime, csi_apis);
+        let executor = SkillExecutor::with_runtime(runtime, csi_apis);
         let result = executor
             .api()
             .execute_skill(
@@ -491,10 +479,6 @@ pub mod tests {
             );
             let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
             Ok(json!(ctx.complete_text(request).await.text))
-        }
-
-        fn mark_namespace_as_valid(&mut self, _namespace: &str) {
-            panic!("Rust runtime does not remove invalid namespace")
         }
     }
 }

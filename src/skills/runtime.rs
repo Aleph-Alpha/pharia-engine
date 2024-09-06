@@ -15,7 +15,7 @@ use crate::{
 use super::{actor::ExecuteSkillError, SkillPath};
 
 pub use self::{
-    provider::{SkillProvider, SkillProviderActorHandle, SkillProviderApi},
+    provider::{SkillProviderActorHandle, SkillProviderApi},
     wasm::WasmRuntime,
 };
 
@@ -38,8 +38,6 @@ pub trait Runtime {
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> impl Future<Output = Result<Value, ExecuteSkillError>> + Send;
-
-    fn mark_namespace_as_valid(&mut self, namespace: &str);
 }
 
 /// Cognitive System Interface (CSI) as consumed by Skill developers. In particular some accidential
@@ -80,10 +78,6 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<Value, ExecuteSkillError> {
             Err(ExecuteSkillError::Other(anyhow!(self.err_msg.clone())))
-        }
-
-        fn mark_namespace_as_valid(&mut self, _namespace: &str) {
-            panic!("Saboteur runtime does not remove invalid namespace")
         }
     }
 }
