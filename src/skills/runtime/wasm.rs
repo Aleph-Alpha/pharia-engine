@@ -1,5 +1,4 @@
 use std::sync::Arc;
-
 use serde_json::Value;
 
 use crate::skills::{actor::ExecuteSkillError, SkillPath};
@@ -38,6 +37,11 @@ impl Runtime for WasmRuntime {
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> Result<Value, ExecuteSkillError> {
+        // let skill = self
+        //     .skill_provider_api
+        //     .fetch(skill_path.to_owned(), self.engine.clone())
+        //     .await
+        //     .map_err(ExecuteSkillError::Other)?;
         let skill = self
             .provider
             .fetch(skill_path, &self.engine)

@@ -207,7 +207,29 @@ impl SkillProviderApi {
     /// to communicate that a namespace is no longer erroneous.
     pub async fn set_namespace_error(&self, namespace: String, error: Option<anyhow::Error>) {
         let msg = SkillProviderMsg::SetNamespaceError { namespace, error };
-        self.sender.send(msg).await.expect("all api handlers must be shutdown before actors");
+        self.sender
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+    }
+
+    /// Fetch an exeutable skill
+    pub async fn fetch(
+        &self,
+        skill_path: SkillPath,
+        engine: Arc<Engine>,
+    ) -> Result<Option<Arc<CachedSkill>>, anyhow::Error> {
+        let (send, recv) = oneshot::channel();
+        let msg = SkillProviderMsg::Fetch {
+            skill_path,
+            engine,
+            send,
+        };
+        self.sender
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await.unwrap()
     }
 }
 
@@ -230,7 +252,7 @@ pub enum SkillProviderMsg {
     SetNamespaceError {
         namespace: String,
         error: Option<anyhow::Error>,
-    }
+    },
 }
 
 struct SkillProviderActor {
@@ -372,10 +394,7 @@ mod tests {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::new("local", "greet_skill");
         let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
-        provider.add_invalid_namespace(
-            skill_path.namespace.clone(),
-            anyhow!(""),
-        );
+        provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
         let engine = Engine::new().unwrap();
 
         // when fetching the skill
