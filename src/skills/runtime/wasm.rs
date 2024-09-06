@@ -51,7 +51,7 @@ pub mod tests {
         csi::ChunkRequest,
         inference::{Completion, CompletionRequest},
         language_selection::{select_language, Language},
-        skills::runtime::SkillProviderActorHandle,
+        skills::runtime::SkillProvider,
     };
 
     use super::*;
@@ -61,7 +61,7 @@ pub mod tests {
     #[tokio::test]
     async fn greet_skill_component() {
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
 
         let mut runtime = WasmRuntime::new(skill_provider.api());
@@ -76,7 +76,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);
         let mut runtime = WasmRuntime::new(skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
@@ -93,7 +93,7 @@ pub mod tests {
     async fn rust_greeting_skill() {
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let mut runtime = WasmRuntime::new(skill_provider.api());
 
@@ -112,7 +112,7 @@ pub mod tests {
     async fn python_greeting_skill() {
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let mut runtime = WasmRuntime::new(skill_provider.api());
 
@@ -131,7 +131,7 @@ pub mod tests {
     async fn can_call_preinstantiated_multiple_times() {
         let skill_ctx = Box::new(CsiCounter::new());
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+        let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let mut runtime = WasmRuntime::new(skill_provider.api());
         for i in 1..10 {

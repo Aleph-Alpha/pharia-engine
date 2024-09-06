@@ -18,7 +18,7 @@ use super::{
     CsiForSkills,
 };
 
-pub struct SkillProvider {
+struct SkillProviderState {
     known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, Arc<CachedSkill>>,
     // key: Namespace, value: Registry
@@ -27,13 +27,13 @@ pub struct SkillProvider {
     invalid_namespaces: HashMap<String, anyhow::Error>,
 }
 
-impl SkillProvider {
+impl SkillProviderState {
     pub fn new(namespaces: &HashMap<String, NamespaceConfig>) -> Self {
         let skill_registries = namespaces
             .iter()
             .map(|(k, v)| (k.to_owned(), Self::registry(v)))
             .collect::<HashMap<_, _>>();
-        SkillProvider {
+        SkillProviderState {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
             skill_registries,
@@ -152,19 +152,19 @@ impl CachedSkill {
     }
 }
 
-pub struct SkillProviderActorHandle {
+pub struct SkillProvider {
     sender: mpsc::Sender<SkillProviderMsg>,
     handle: JoinHandle<()>,
 }
 
-impl SkillProviderActorHandle {
+impl SkillProvider {
     pub fn new(namespaces: &HashMap<String, NamespaceConfig>) -> Self {
         let (sender, recv) = mpsc::channel(1);
         let mut actor = SkillProviderActor::new(recv, namespaces);
         let handle = tokio::spawn(async move {
             actor.run().await;
         });
-        SkillProviderActorHandle { sender, handle }
+        SkillProvider { sender, handle }
     }
 
     pub fn api(&self) -> SkillProviderApi {
@@ -300,7 +300,7 @@ pub enum SkillProviderMsg {
 
 struct SkillProviderActor {
     receiver: mpsc::Receiver<SkillProviderMsg>,
-    provider: SkillProvider,
+    provider: SkillProviderState,
 }
 
 impl SkillProviderActor {
@@ -310,7 +310,7 @@ impl SkillProviderActor {
     ) -> Self {
         SkillProviderActor {
             receiver,
-            provider: SkillProvider::new(namespaces),
+            provider: SkillProviderState::new(namespaces),
         }
     }
 
@@ -368,7 +368,7 @@ pub mod tests {
         SkillProviderApi::new(send)
     }
 
-    impl SkillProvider {
+    impl SkillProviderState {
         fn with_namespace_and_skill(skill_path: &SkillPath) -> Self {
             let registry = Registry::File {
                 path: "skills".to_owned(),
@@ -381,7 +381,7 @@ pub mod tests {
             let mut namespaces = HashMap::new();
             namespaces.insert(skill_path.namespace.clone(), ns_cfg);
 
-            let mut provider = SkillProvider::new(&namespaces);
+            let mut provider = SkillProviderState::new(&namespaces);
             provider.upsert_skill(skill_path, None);
             provider
         }
@@ -390,7 +390,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_component_is_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider.fetch(&skill_path, &engine).await;
@@ -401,7 +401,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider
@@ -417,7 +417,7 @@ pub mod tests {
     #[tokio::test]
     async fn namespace_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider
@@ -434,7 +434,7 @@ pub mod tests {
     async fn cached_skill_removed() {
         // Given one cached skill
         let skill_path = SkillPath::new("local", "greet_skill");
-        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
         provider.fetch(&skill_path, &engine).await.unwrap();
 
@@ -449,7 +449,7 @@ pub mod tests {
     async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::new("local", "greet_skill");
-        let mut provider = SkillProvider::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
         let engine = Engine::new().unwrap();
 
@@ -465,7 +465,7 @@ pub mod tests {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new().unwrap());
-        let skill_provider = SkillProviderActorHandle::new(&local_namespace());
+        let skill_provider = SkillProvider::new(&local_namespace());
         skill_provider
             .api()
             .upsert(SkillPath::new("local", "greet_skill"), None)
@@ -494,7 +494,7 @@ pub mod tests {
     #[tokio::test]
     async fn should_list_skills_that_have_been_added() {
         // Given an empty provider
-        let skill_provider = SkillProviderActorHandle::new(&local_namespace());
+        let skill_provider = SkillProvider::new(&local_namespace());
         let api = skill_provider.api();
 
         // When adding a skill
@@ -516,7 +516,7 @@ pub mod tests {
     async fn should_remove_invalidated_skill_from_cache() {
         // Given one cached "greet_skill"
         let greet_skill = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProviderActorHandle::new(&local_namespace());
+        let skill_provider = SkillProvider::new(&local_namespace());
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
         api.fetch(greet_skill.clone(), Arc::new(Engine::new().unwrap()))
@@ -537,7 +537,7 @@ pub mod tests {
     async fn invalidation_of_an_uncached_skill() {
         // Given one "greet_skill" which is not in cache
         let greet_skill = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProviderActorHandle::new(&local_namespace());
+        let skill_provider = SkillProvider::new(&local_namespace());
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
 

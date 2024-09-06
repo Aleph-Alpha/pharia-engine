@@ -1,6 +1,6 @@
 use std::{env, net::SocketAddr};
 
-use crate::{configuration_observer::OperatorConfig, skills::SkillExecutorConfig};
+use crate::configuration_observer::OperatorConfig;
 
 pub struct AppConfig {
     pub tcp_addr: SocketAddr,
@@ -35,13 +35,6 @@ impl AppConfig {
             tcp_addr: addr.parse().unwrap(),
             inference_addr,
             operator_config,
-        }
-    }
-
-    #[must_use]
-    pub fn skill_executer_cfg(&self) -> SkillExecutorConfig<'_> {
-        SkillExecutorConfig {
-            namespaces: &self.operator_config.namespaces,
         }
     }
 }

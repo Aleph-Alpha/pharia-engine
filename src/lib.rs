@@ -12,7 +12,7 @@ use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use csi::CsiApis;
 use futures::Future;
-use skills::SkillProviderActorHandle;
+use skills::SkillProvider;
 use tokenizers::Tokenizers;
 use tracing::error;
 
@@ -38,7 +38,7 @@ pub async fn run(
         inference: inference.api(),
         tokenizers: tokenizers.api(),
     };
-    let skill_provider = SkillProviderActorHandle::new(&app_config.operator_config.namespaces);
+    let skill_provider = SkillProvider::new(&app_config.operator_config.namespaces);
 
     // Boot up runtime we need to execute Skills
     let skill_executor = SkillExecutor::new(csi_apis, skill_provider.api());

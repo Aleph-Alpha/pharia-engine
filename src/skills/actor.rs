@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::pending};
+use std::future::pending;
 
 use super::{
     runtime::{CsiForSkills, Runtime, SkillProviderApi, WasmRuntime},
@@ -6,7 +6,6 @@ use super::{
 };
 
 use crate::{
-    configuration_observer::NamespaceConfig,
     csi::{ChunkRequest, Csi as _, CsiApis},
     inference::{Completion, CompletionRequest},
     language_selection::Language,
@@ -18,12 +17,6 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-
-/// All configuration values our skill executor cares about, independent of where they are in the
-/// [`crate::AppConfig`]
-pub struct SkillExecutorConfig<'a> {
-    pub namespaces: &'a HashMap<String, NamespaceConfig>,
-}
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
 pub struct SkillExecutor {
@@ -246,6 +239,8 @@ impl CsiForSkills for SkillInvocationCtx {
 
 #[cfg(test)]
 pub mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     use anyhow::anyhow;
@@ -254,7 +249,7 @@ pub mod tests {
     use crate::{
         csi::tests::dummy_csi_apis,
         inference::{tests::InferenceStub, CompletionRequest},
-        skills::{runtime::tests::SaboteurRuntime, SkillProviderActorHandle},
+        skills::{runtime::tests::SaboteurRuntime, SkillProvider},
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
     };
 
@@ -323,7 +318,7 @@ pub mod tests {
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
         let namespaces = HashMap::new();
-        let skill_provider = SkillProviderActorHandle::new(&namespaces);
+        let skill_provider = SkillProvider::new(&namespaces);
         let csi_apis = dummy_csi_apis();
         let executer = SkillExecutor::new(csi_apis, skill_provider.api());
         let api = executer.api();
