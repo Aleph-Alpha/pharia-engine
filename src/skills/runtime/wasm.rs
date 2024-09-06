@@ -37,9 +37,6 @@ impl Runtime for WasmRuntime {
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> Result<Value, ExecuteSkillError> {
-        // We still need to call the "old" provider directly in order to support the listing of
-        // cached skills accuratly.
-        let _skill = self.provider.fetch(skill_path, &self.engine).await;
         let skill = self
             .skill_provider_api
             .fetch(skill_path.to_owned(), self.engine.clone())
@@ -206,45 +203,28 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn skills_are_listed() {
-        // given a runtime with two installed skills
+    async fn list_cached_skills() {
+        // Given local is a configured namespace, backed by a file repository with "greet_skill"
+        // and "greet-py"
+        let engine = Arc::new(Engine::new().unwrap());
         let skill_path_rs = SkillPath::new("local", "greet_skill");
         let skill_path_py = SkillPath::new("local", "greet-py");
         let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+
+        // when adding these two skills and fetching them
         skill_provider.api().upsert(skill_path_rs.clone(), None).await;
         skill_provider.api().upsert(skill_path_py.clone(), None).await;
-        let mut runtime = WasmRuntime::local(skill_provider.api());
-        runtime.upsert_skill(skill_path_rs.clone(), None);
-        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
-        drop(
-            runtime
-                .run(&skill_path_rs, json!("name"), skill_ctx)
-                .await
-                .unwrap(),
-        );
+        skill_provider.api().fetch(skill_path_rs.clone(), engine.clone()).await.unwrap();
+        skill_provider.api().fetch(skill_path_py.clone(), engine.clone()).await.unwrap();
+        let skills = skill_provider.api().list_cached().await;
 
-        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
-        runtime.upsert_skill(skill_path_py.clone(), None);
+        skill_provider.wait_for_shutdown().await;
 
-        drop(
-            runtime
-                .run(&skill_path_py, json!("name"), skill_ctx)
-                .await
-                .unwrap(),
-        );
-
-        // when querying skills
-        let skills = runtime.loaded_skills();
-
-        // convert to a set
-        let skills = skills.cloned().collect::<HashSet<_>>();
+        // then they will appear in the list of cached skills after in any order
+        let skills = skills.into_iter().collect::<HashSet<_>>();
         let mut expected = HashSet::new();
         expected.insert(skill_path_rs);
         expected.insert(skill_path_py);
-
-        drop(runtime);
-        skill_provider.wait_for_shutdown().await;
-
         assert_eq!(skills, expected);
     }
 

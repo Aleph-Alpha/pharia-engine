@@ -337,7 +337,7 @@ impl SkillProviderActor {
                 drop(send.send(self.provider.list_cached_skills().cloned().collect()));
             }
             SkillProviderMsg::InvalidateCache { skill_path, send } => {
-                drop(send.send(self.provider.invalidate(&skill_path)));
+                let _ = send.send(self.provider.invalidate(&skill_path));
             }
         }
     }
@@ -345,6 +345,10 @@ impl SkillProviderActor {
 
 #[cfg(test)]
 pub mod tests {
+
+    use std::collections::HashSet;
+
+    use crate::OperatorConfig;
 
     use super::*;
 
@@ -443,5 +447,31 @@ pub mod tests {
 
         // then it returns an error
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn list_cached_skills() {
+        // Given local is a configured namespace, backed by a file repository with "greet_skill"
+        // and "greet-py"
+        let engine = Arc::new(Engine::new().unwrap());
+        let skill_path_rs = SkillPath::new("local", "greet_skill");
+        let skill_path_py = SkillPath::new("local", "greet-py");
+        let skill_provider = SkillProviderActorHandle::new(&OperatorConfig::local().namespaces);
+
+        // when adding these two skills and fetching them
+        skill_provider.api().upsert(skill_path_rs.clone(), None).await;
+        skill_provider.api().upsert(skill_path_py.clone(), None).await;
+        skill_provider.api().fetch(skill_path_rs.clone(), engine.clone()).await.unwrap();
+        skill_provider.api().fetch(skill_path_py.clone(), engine.clone()).await.unwrap();
+        let skills = skill_provider.api().list_cached().await;
+
+        skill_provider.wait_for_shutdown().await;
+
+        // then they will appear in the list of cached skills after in any order
+        let skills = skills.into_iter().collect::<HashSet<_>>();
+        let mut expected = HashSet::new();
+        expected.insert(skill_path_rs);
+        expected.insert(skill_path_py);
+        assert_eq!(skills, expected);
     }
 }
