@@ -39,8 +39,6 @@ pub trait Runtime {
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> impl Future<Output = Result<Value, ExecuteSkillError>> + Send;
 
-    fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error);
-
     fn mark_namespace_as_valid(&mut self, namespace: &str);
 }
 
@@ -82,10 +80,6 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<Value, ExecuteSkillError> {
             Err(ExecuteSkillError::Other(anyhow!(self.err_msg.clone())))
-        }
-
-        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
-            panic!("Saboteur runtime does not add invalid namespace")
         }
 
         fn mark_namespace_as_valid(&mut self, _namespace: &str) {

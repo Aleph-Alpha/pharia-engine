@@ -74,14 +74,6 @@ impl SkillExecutorApi {
         Self { send }
     }
 
-    pub async fn mark_namespace_as_invalid(&self, namespace: String, e: anyhow::Error) {
-        let msg = SkillExecutorMessage::MarkNamespaceAsInvalid { namespace, e };
-        self.send
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
-    }
-
     pub async fn mark_namespace_as_valid(&self, namespace: String) {
         let msg = SkillExecutorMessage::MarkNamespaceAsValid { namespace };
         self.send
@@ -148,9 +140,6 @@ where
 
     async fn act(&mut self, msg: SkillExecutorMessage) {
         match msg {
-            SkillExecutorMessage::MarkNamespaceAsInvalid { namespace, e } => {
-                self.runtime.mark_namespace_as_invalid(namespace, e);
-            }
             SkillExecutorMessage::MarkNamespaceAsValid { namespace } => {
                 self.runtime.mark_namespace_as_valid(&namespace);
             }
@@ -190,10 +179,6 @@ where
 
 #[derive(Debug)]
 pub enum SkillExecutorMessage {
-    MarkNamespaceAsInvalid {
-        namespace: String,
-        e: anyhow::Error,
-    },
     MarkNamespaceAsValid {
         namespace: String,
     },
@@ -408,10 +393,6 @@ pub mod tests {
                 panic!("complete_text must pend forever in case of error")
             }
 
-            fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
-                panic!("does not add invalid namespace")
-            }
-
             fn mark_namespace_as_valid(&mut self, _namespace: &str) {
                 panic!("does not remove invalid namespace")
             }
@@ -528,10 +509,6 @@ pub mod tests {
             );
             let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
             Ok(json!(ctx.complete_text(request).await.text))
-        }
-
-        fn mark_namespace_as_invalid(&mut self, _namespace: String, _e: anyhow::Error) {
-            panic!("Rust runtime does not add invalid namespace")
         }
 
         fn mark_namespace_as_valid(&mut self, _namespace: &str) {

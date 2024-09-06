@@ -50,10 +50,6 @@ impl Runtime for WasmRuntime {
             .map_err(ExecuteSkillError::Other)
     }
 
-    fn mark_namespace_as_invalid(&mut self, namespace: String, e: anyhow::Error) {
-        self.provider.add_invalid_namespace(namespace, e);
-    }
-
     fn mark_namespace_as_valid(&mut self, namespace: &str) {
         self.provider.remove_invalid_namespace(namespace);
     }

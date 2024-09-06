@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
@@ -215,9 +215,6 @@ impl ConfigurationObserverActor {
                 error!(
                     "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
-                self.skill_executor_api
-                    .mark_namespace_as_invalid(namespace.to_owned(), anyhow!("{}", e.to_string()))
-                    .await;
                 self.skill_provider_api
                     .set_namespace_error(namespace.to_owned(), Some(e))
                     .await;
@@ -499,7 +496,7 @@ pub mod tests {
 
         let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
         let skill_provider_api = SkillProviderApi::new(sender);
-        let (sender, mut receiver_skill_executor) = mpsc::channel::<SkillExecutorMessage>(2);
+        let (sender, _receiver_skill_executor) = mpsc::channel::<SkillExecutorMessage>(2);
         let skill_executor_api = SkillExecutorApi::new(sender);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
 
@@ -515,7 +512,6 @@ pub mod tests {
 
         // then mark the namespace as invalid and remove all skills of that namespace
         let msg = receiver.try_recv().unwrap();
-        let _msg = receiver_skill_executor.try_recv().unwrap();
 
         assert!(matches!(
             msg,
@@ -580,7 +576,7 @@ pub mod tests {
         // given an invalid namespace
         let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
         let skill_provider_api = SkillProviderApi::new(sender);
-        let (sender, mut receiver_exec) = mpsc::channel::<SkillExecutorMessage>(2);
+        let (sender, _receiver) = mpsc::channel::<SkillExecutorMessage>(2);
         let skill_executor_api = SkillExecutorApi::new(sender);
         let update_interval_ms = 1;
         let update_interval = Duration::from_millis(update_interval_ms);
@@ -599,7 +595,6 @@ pub mod tests {
         );
         observer.wait_for_ready().await;
         receiver.recv().await.unwrap();
-        receiver_exec.recv().await.unwrap();
 
         // when the namespace become valid
         let dummy_skill = "dummy_skill";
