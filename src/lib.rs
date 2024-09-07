@@ -94,7 +94,7 @@ pub async fn run(
 mod tests {
     use std::env;
     use std::future::ready;
-    use std::sync::OnceLock;
+    use std::sync::LazyLock;
     use std::time::Duration;
 
     use configuration_observer::OperatorConfig;
@@ -105,21 +105,31 @@ mod tests {
 
     /// API Token used by tests to authenticate requests.
     pub fn api_token() -> &'static str {
-        static API_TOKEN: OnceLock<String> = OnceLock::new();
-        API_TOKEN.get_or_init(|| {
+        static API_TOKEN: LazyLock<String> = LazyLock::new(|| {
             drop(dotenv());
             env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
-        })
+        });
+        &API_TOKEN
     }
 
     /// Inference address used by tests.
     pub fn inference_address() -> &'static str {
-        static AA_INFERENCE_ADDRESS: OnceLock<String> = OnceLock::new();
-        AA_INFERENCE_ADDRESS.get_or_init(|| {
+        static AA_INFERENCE_ADDRESS: LazyLock<String> = LazyLock::new(|| {
             drop(dotenv());
             env::var("AA_INFERENCE_ADDRESS")
                 .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned())
-        })
+        });
+        &AA_INFERENCE_ADDRESS
+    }
+
+    /// Inference address used by tests.
+    pub fn document_index_address() -> &'static str {
+        static DOCUMENT_INDEX_ADDRESS: LazyLock<String> = LazyLock::new(|| {
+            drop(dotenv());
+            env::var("DOCUMENT_INDEX_ADDRESS")
+                .unwrap_or_else(|_| "https://document-index.aleph-alpha.com".to_owned())
+        });
+        &DOCUMENT_INDEX_ADDRESS
     }
 
     // tests if the shutdown procedure is executed properly (not blocking)

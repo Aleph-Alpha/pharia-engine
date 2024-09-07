@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use itertools::Itertools;
     use reqwest::ClientBuilder;
     use serde_json::json;
+
+    use crate::tests::{api_token, document_index_address};
 
     /// Search a Document Index collection
     struct SearchRequest {
@@ -80,7 +80,7 @@ mod tests {
         async fn search(
             &self,
             request: SearchRequest,
-            api_token: String,
+            api_token: &str,
         ) -> anyhow::Result<Vec<SearchResult>> {
             let SearchRequest {
                 query,
@@ -99,7 +99,7 @@ mod tests {
                     "{}/collections/{namespace}/{collection}/indexes/{index}/search",
                     &self.host
                 ))
-                .bearer_auth(&api_token)
+                .bearer_auth(api_token)
                 .json(&json!({ "query": [{ "modality": "text", "text": query }], "max_results": max_results }))
                 .send()
                 .await?
@@ -178,9 +178,8 @@ mod tests {
     #[tokio::test]
     async fn search_request() {
         // Given a search client pointed at the document index
-        drop(dotenvy::dotenv());
-        let host = env::var("DOCUMENT_INDEX_ADDRESS").unwrap();
-        let api_token = env::var("AA_API_TOKEN").unwrap();
+        let host = document_index_address().to_owned();
+        let api_token = api_token();
         let client = SearchClient::new(host).unwrap();
 
         // When making a query on an existing collection
@@ -199,9 +198,8 @@ mod tests {
     #[tokio::test]
     async fn multiple_results() {
         // Given a search client pointed at the document index
-        drop(dotenvy::dotenv());
-        let host = env::var("DOCUMENT_INDEX_ADDRESS").unwrap();
-        let api_token = env::var("AA_API_TOKEN").unwrap();
+        let host = document_index_address().to_owned();
+        let api_token = api_token();
         let client = SearchClient::new(host).unwrap();
         let max_results = 5;
 
