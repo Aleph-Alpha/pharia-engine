@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
     use reqwest::ClientBuilder;
     use serde_json::json;
 
@@ -107,7 +106,12 @@ mod tests {
                 min_score,
             } = request;
 
-            let mut payload = json!({ "query": [{ "modality": "text", "text": query }], "max_results": max_results });
+            let mut payload = json!({
+                "query": [{ "modality": "text", "text": query }],
+                "max_results": max_results,
+                // Make sure we only get text results
+                "filters": [{ "with": [{ "modality": "text" }]}]
+            });
             if let Some(min_score) = min_score {
                 payload["min_score"] = json!(min_score);
             }
@@ -128,8 +132,7 @@ mod tests {
 
             let results = results
                 .into_iter()
-                .map(<Option<SearchResult>>::try_from)
-                .filter_map_ok(|r| r)
+                .map(SearchResult::try_from)
                 .collect::<Result<_, _>>()?;
 
             Ok(results)
@@ -148,11 +151,8 @@ mod tests {
         #[derive(Debug, Deserialize)]
         #[serde(rename_all = "snake_case", tag = "modality")]
         enum Modality {
-            Text {
-                text: String,
-            },
-            /// Also returns a `bytes` field that we are ignoring for now
-            Image,
+            // Based on the filters, we will only ever get text for now.
+            Text { text: String },
         }
 
         /// The name of a given document
@@ -169,7 +169,7 @@ mod tests {
             score: f64,
         }
 
-        impl TryFrom<RawSearchResult> for Option<SearchResult> {
+        impl TryFrom<RawSearchResult> for SearchResult {
             type Error = anyhow::Error;
 
             fn try_from(result: RawSearchResult) -> Result<Self, Self::Error> {
@@ -186,12 +186,11 @@ mod tests {
                 }
 
                 Ok(match section.remove(0) {
-                    Modality::Text { text } => Some(SearchResult {
+                    Modality::Text { text } => SearchResult {
                         document_name: document_path.name,
                         section: text,
                         score,
-                    }),
-                    Modality::Image => None,
+                    },
                 })
             }
         }
