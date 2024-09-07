@@ -14,6 +14,9 @@ mod tests {
         index: IndexPath,
         /// The maximum number of results to return. Defaults to 1
         max_results: usize,
+        /// The minimum score each result should have to be returned.
+        /// By default, all results are returned, up to the `max_results`.
+        min_score: Option<f64>,
     }
 
     impl SearchRequest {
@@ -22,11 +25,17 @@ mod tests {
                 query: query.into(),
                 index,
                 max_results: 1,
+                min_score: None,
             }
         }
 
         fn with_max_results(mut self, max_results: usize) -> Self {
             self.max_results = max_results;
+            self
+        }
+
+        fn with_min_score(mut self, min_score: f64) -> Self {
+            self.min_score = Some(min_score);
             self
         }
     }
@@ -57,8 +66,12 @@ mod tests {
 
     /// A section of a document that is returned from a search request
     struct SearchResult {
+        /// Which document this search result can be found in
         document_name: String,
+        /// The section of the document returned by the search
         section: String,
+        /// The semantic similarity of the text to the query
+        score: f64,
     }
 
     /// Sends HTTP Request to Document Index API
@@ -91,7 +104,13 @@ mod tests {
                         index,
                     },
                 max_results,
+                min_score,
             } = request;
+
+            let mut payload = json!({ "query": [{ "modality": "text", "text": query }], "max_results": max_results });
+            if let Some(min_score) = min_score {
+                payload["min_score"] = json!(min_score);
+            }
 
             let results = self
                 .http
@@ -100,7 +119,7 @@ mod tests {
                     &self.host
                 ))
                 .bearer_auth(api_token)
-                .json(&json!({ "query": [{ "modality": "text", "text": query }], "max_results": max_results }))
+                .json(&payload)
                 .send()
                 .await?
                 .error_for_status()?
@@ -147,6 +166,7 @@ mod tests {
         pub struct RawSearchResult {
             document_path: DocumentPath,
             section: Vec<Modality>,
+            score: f64,
         }
 
         impl TryFrom<RawSearchResult> for Option<SearchResult> {
@@ -156,6 +176,7 @@ mod tests {
                 let RawSearchResult {
                     mut section,
                     document_path,
+                    score,
                 } = result;
                 // Current behavior is that chunking only ever happens within an item
                 if section.len() > 1 {
@@ -168,6 +189,7 @@ mod tests {
                     Modality::Text { text } => Some(SearchResult {
                         document_name: document_path.name,
                         section: text,
+                        score,
                     }),
                     Modality::Image => None,
                 })
@@ -217,5 +239,28 @@ mod tests {
             .iter()
             .all(|r| r.document_name.contains("Heidelberg")));
         assert!(results.iter().all(|r| r.section.contains("Heidelberg")));
+    }
+
+    #[tokio::test]
+    async fn min_score() {
+        // Given a search client pointed at the document index
+        let host = document_index_address().to_owned();
+        let api_token = api_token();
+        let client = SearchClient::new(host).unwrap();
+        let max_results = 5;
+        let min_score = 0.725;
+
+        // When making a query on an existing collection
+        let request = SearchRequest::new(
+            "What is the population of Heidelberg?",
+            IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
+        )
+        .with_max_results(max_results)
+        .with_min_score(min_score);
+        let results = client.search(request, api_token).await.unwrap();
+
+        // Then we get at least one result
+        assert_eq!(results.len(), 4);
+        assert!(results.iter().all(|r| r.score >= min_score));
     }
 }
