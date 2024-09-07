@@ -12,6 +12,8 @@ mod tests {
         query: String,
         /// Where you want to search in
         index: IndexPath,
+        /// The maximum number of results to return. Defaults to 1
+        max_results: usize,
     }
 
     impl SearchRequest {
@@ -19,7 +21,13 @@ mod tests {
             Self {
                 query: query.into(),
                 index,
+                max_results: 1,
             }
+        }
+
+        fn with_max_results(mut self, max_results: usize) -> Self {
+            self.max_results = max_results;
+            self
         }
     }
 
@@ -89,6 +97,7 @@ mod tests {
                         collection,
                         index,
                     },
+                max_results,
             } = request;
 
             let results = self
@@ -97,8 +106,8 @@ mod tests {
                     "{}/collections/{namespace}/{collection}/indexes/{index}/search",
                     &self.host
                 ))
-                .bearer_auth(api_token)
-                .json(&json!({ "query": [{ "modality": "text", "text": query }] }))
+                .bearer_auth(&api_token)
+                .json(&json!({ "query": [{ "modality": "text", "text": query }], "max_results": max_results }))
                 .send()
                 .await?
                 .error_for_status()?
@@ -107,6 +116,7 @@ mod tests {
 
             let results = results
                 .into_iter()
+                // Flattening at the moment because all results will be a list of 1 item. We always chunk within items at the moment.
                 .flat_map(|result| result.section)
                 .filter_map(|section| match section {
                     Modality::Text { text } => Some(text),
@@ -136,5 +146,27 @@ mod tests {
         // Then we get at least one result
         assert_eq!(results.len(), 1);
         assert!(results[0].contains("Heidelberg"));
+    }
+
+    #[tokio::test]
+    async fn multiple_results() {
+        // Given a search client pointed at the document index
+        drop(dotenvy::dotenv());
+        let host = env::var("DOCUMENT_INDEX_ADDRESS").unwrap();
+        let api_token = env::var("AA_API_TOKEN").unwrap();
+        let client = SearchClient::new(host).unwrap();
+        let max_results = 5;
+
+        // When making a query on an existing collection
+        let request = SearchRequest::new(
+            "What is the population of Heidelberg?",
+            IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
+        )
+        .with_max_results(max_results);
+        let results = client.search(request, api_token).await.unwrap();
+
+        // Then we get at least one result
+        assert_eq!(results.len(), max_results);
+        assert!(results.iter().all(|r| r.contains("Heidelberg")));
     }
 }
