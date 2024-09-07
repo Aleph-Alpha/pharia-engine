@@ -2925,6 +2925,7 @@ dependencies = [
  "fake",
  "futures",
  "http-body-util",
+ "itertools 0.13.0",
  "libc",
  "lingua",
  "mime",

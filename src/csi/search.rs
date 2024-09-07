@@ -2,6 +2,8 @@
 mod tests {
     use std::env;
 
+    use anyhow::anyhow;
+    use itertools::Itertools;
     use reqwest::ClientBuilder;
     use serde::Deserialize;
     use serde_json::json;
@@ -55,10 +57,38 @@ mod tests {
         }
     }
 
+    /// A section of a document that is returned from a search request
+    struct SearchResult {
+        section: String,
+    }
+
+    impl TryFrom<RawSearchResult> for Option<SearchResult> {
+        type Error = anyhow::Error;
+
+        fn try_from(result: RawSearchResult) -> Result<Self, Self::Error> {
+            let RawSearchResult { mut section } = result;
+            // Current behavior is that chunking only ever happens within an item
+            if section.len() > 1 {
+                return Err(anyhow!(
+                    "Document Index result has more than one item in a section."
+                ));
+            }
+
+            Ok(match section.remove(0) {
+                Modality::Text { text } => Some(SearchResult { section: text }),
+                Modality::Image => None,
+            })
+        }
+    }
+
+    /// Modality of the search result in the API
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case", tag = "modality")]
     enum Modality {
-        Text { text: String },
+        Text {
+            text: String,
+        },
+        /// Also returns a `bytes` field that we are ignoring for now
         Image,
     }
 
@@ -88,7 +118,7 @@ mod tests {
             &self,
             request: SearchRequest,
             api_token: String,
-        ) -> anyhow::Result<Vec<String>> {
+        ) -> anyhow::Result<Vec<SearchResult>> {
             let SearchRequest {
                 query,
                 index:
@@ -116,13 +146,9 @@ mod tests {
 
             let results = results
                 .into_iter()
-                // Flattening at the moment because all results will be a list of 1 item. We always chunk within items at the moment.
-                .flat_map(|result| result.section)
-                .filter_map(|section| match section {
-                    Modality::Text { text } => Some(text),
-                    Modality::Image => None,
-                })
-                .collect();
+                .map(<Option<SearchResult>>::try_from)
+                .filter_map_ok(|r| r)
+                .collect::<Result<_, _>>()?;
 
             Ok(results)
         }
@@ -145,7 +171,7 @@ mod tests {
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
-        assert!(results[0].contains("Heidelberg"));
+        assert!(results[0].section.contains("Heidelberg"));
     }
 
     #[tokio::test]
@@ -167,6 +193,6 @@ mod tests {
 
         // Then we get at least one result
         assert_eq!(results.len(), max_results);
-        assert!(results.iter().all(|r| r.contains("Heidelberg")));
+        assert!(results.iter().all(|r| r.section.contains("Heidelberg")));
     }
 }

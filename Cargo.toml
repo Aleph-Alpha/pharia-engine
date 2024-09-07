@@ -19,7 +19,7 @@ dbg-macro = "warn"
 # even if we do not do so know. IMHO this lint was created without keeping in mind that code needs
 # to change. This leads to false positives.
 needless-pass-by-value = "allow"
-# This is a) not a library and 
+# This is a) not a library and
 # b) this leads to false positives if you use unwrap for unreachable errors
 missing_panics_doc = "allow"
 pedantic = { level = "warn", priority = -1 }
@@ -68,15 +68,22 @@ wasmtime-wasi = "24.0.0"
 wit-parser = "0.216.0"
 url = "2.5.2"
 thiserror = "1.0.63"
-tokenizers = { version = "0.20.0", default-features = false, features = ["onig", "esaxx_fast"] }
+tokenizers = { version = "0.20.0", default-features = false, features = [
+    "onig",
+    "esaxx_fast",
+] }
 text-splitter = { version = "0.16.0", features = ["tokenizers"] }
-lingua = { version = "1.6.2", default-features = false, features = ["english", "german"] }
+lingua = { version = "1.6.2", default-features = false, features = [
+    "english",
+    "german",
+] }
 opentelemetry = "0.24.0"
 opentelemetry_sdk = { version = "0.24.1", features = ["rt-tokio"] }
 opentelemetry-stdout = { version = "0.5.0", features = ["trace"] }
 tracing-opentelemetry = "0.25.0"
 opentelemetry-otlp = "0.17.0"
 opentelemetry-semantic-conventions = "0.16.0"
+itertools = "0.13.0"
 
 [dev-dependencies]
 test-skills = { path = "./test-skills" }
