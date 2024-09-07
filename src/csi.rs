@@ -1,4 +1,3 @@
-mod chunking;
 use futures::future::try_join_all;
 use tracing::trace;
 
@@ -9,6 +8,9 @@ use crate::{
 };
 
 pub use self::chunking::ChunkRequest;
+
+mod chunking;
+mod search;
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
 ///
