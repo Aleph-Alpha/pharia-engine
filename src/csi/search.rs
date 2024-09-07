@@ -2,10 +2,8 @@
 mod tests {
     use std::env;
 
-    use anyhow::anyhow;
     use itertools::Itertools;
     use reqwest::ClientBuilder;
-    use serde::Deserialize;
     use serde_json::json;
 
     /// Search a Document Index collection
@@ -63,55 +61,6 @@ mod tests {
         section: String,
     }
 
-    impl TryFrom<RawSearchResult> for Option<SearchResult> {
-        type Error = anyhow::Error;
-
-        fn try_from(result: RawSearchResult) -> Result<Self, Self::Error> {
-            let RawSearchResult {
-                mut section,
-                document_path,
-            } = result;
-            // Current behavior is that chunking only ever happens within an item
-            if section.len() > 1 {
-                return Err(anyhow!(
-                    "Document Index result has more than one item in a section."
-                ));
-            }
-
-            Ok(match section.remove(0) {
-                Modality::Text { text } => Some(SearchResult {
-                    document_name: document_path.name,
-                    section: text,
-                }),
-                Modality::Image => None,
-            })
-        }
-    }
-
-    /// Modality of the search result in the API
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "snake_case", tag = "modality")]
-    enum Modality {
-        Text {
-            text: String,
-        },
-        /// Also returns a `bytes` field that we are ignoring for now
-        Image,
-    }
-
-    /// The name of a given document
-    #[derive(Debug, Deserialize)]
-    struct DocumentPath {
-        name: String,
-    }
-
-    /// A result for a given search that comes back from the API
-    #[derive(Debug, Deserialize)]
-    struct RawSearchResult {
-        document_path: DocumentPath,
-        section: Vec<Modality>,
-    }
-
     /// Sends HTTP Request to Document Index API
     struct SearchClient {
         /// The base host to use for all API requests
@@ -155,7 +104,7 @@ mod tests {
                 .send()
                 .await?
                 .error_for_status()?
-                .json::<Vec<RawSearchResult>>()
+                .json::<Vec<parsing::RawSearchResult>>()
                 .await?;
 
             let results = results
@@ -165,6 +114,64 @@ mod tests {
                 .collect::<Result<_, _>>()?;
 
             Ok(results)
+        }
+    }
+
+    /// The following structs are just for parsing the results of the API before being transformed
+    /// into the public API.
+    mod parsing {
+        use anyhow::anyhow;
+        use serde::Deserialize;
+
+        use super::SearchResult;
+
+        /// Modality of the search result in the API
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "snake_case", tag = "modality")]
+        enum Modality {
+            Text {
+                text: String,
+            },
+            /// Also returns a `bytes` field that we are ignoring for now
+            Image,
+        }
+
+        /// The name of a given document
+        #[derive(Debug, Deserialize)]
+        struct DocumentPath {
+            name: String,
+        }
+
+        /// A result for a given search that comes back from the API
+        #[derive(Debug, Deserialize)]
+        pub struct RawSearchResult {
+            document_path: DocumentPath,
+            section: Vec<Modality>,
+        }
+
+        impl TryFrom<RawSearchResult> for Option<SearchResult> {
+            type Error = anyhow::Error;
+
+            fn try_from(result: RawSearchResult) -> Result<Self, Self::Error> {
+                let RawSearchResult {
+                    mut section,
+                    document_path,
+                } = result;
+                // Current behavior is that chunking only ever happens within an item
+                if section.len() > 1 {
+                    return Err(anyhow!(
+                        "Document Index result has more than one item in a section."
+                    ));
+                }
+
+                Ok(match section.remove(0) {
+                    Modality::Text { text } => Some(SearchResult {
+                        document_name: document_path.name,
+                        section: text,
+                    }),
+                    Modality::Image => None,
+                })
+            }
         }
     }
 
