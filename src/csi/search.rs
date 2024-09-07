@@ -59,6 +59,7 @@ mod tests {
 
     /// A section of a document that is returned from a search request
     struct SearchResult {
+        document_name: String,
         section: String,
     }
 
@@ -66,7 +67,10 @@ mod tests {
         type Error = anyhow::Error;
 
         fn try_from(result: RawSearchResult) -> Result<Self, Self::Error> {
-            let RawSearchResult { mut section } = result;
+            let RawSearchResult {
+                mut section,
+                document_path,
+            } = result;
             // Current behavior is that chunking only ever happens within an item
             if section.len() > 1 {
                 return Err(anyhow!(
@@ -75,7 +79,10 @@ mod tests {
             }
 
             Ok(match section.remove(0) {
-                Modality::Text { text } => Some(SearchResult { section: text }),
+                Modality::Text { text } => Some(SearchResult {
+                    document_name: document_path.name,
+                    section: text,
+                }),
                 Modality::Image => None,
             })
         }
@@ -92,9 +99,16 @@ mod tests {
         Image,
     }
 
+    /// The name of a given document
+    #[derive(Debug, Deserialize)]
+    struct DocumentPath {
+        name: String,
+    }
+
     /// A result for a given search that comes back from the API
     #[derive(Debug, Deserialize)]
     struct RawSearchResult {
+        document_path: DocumentPath,
         section: Vec<Modality>,
     }
 
@@ -171,6 +185,7 @@ mod tests {
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
+        assert!(results[0].document_name.contains("Heidelberg"));
         assert!(results[0].section.contains("Heidelberg"));
     }
 
@@ -193,6 +208,9 @@ mod tests {
 
         // Then we get at least one result
         assert_eq!(results.len(), max_results);
+        assert!(results
+            .iter()
+            .all(|r| r.document_name.contains("Heidelberg")));
         assert!(results.iter().all(|r| r.section.contains("Heidelberg")));
     }
 }
