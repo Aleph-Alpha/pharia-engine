@@ -17,15 +17,9 @@ There are some prerequisites you need to install once
 ```shell
 # We need the Wasm target to be able to compile the skills
 rustup target add wasm32-wasi
-# The wasm-tools are also required for our skill build tooling
-cargo install wasm-tools
 ```
 
-Every time we change the example skill we need to rebuild them.
-
-```shell
-./build-skill.sh
-```
+Every time we change the example skill we need to delete the `.wasm` file in the `./skills` folder, so it gets rebuild.
 
 ### Building and running the kernel container using Podman
 

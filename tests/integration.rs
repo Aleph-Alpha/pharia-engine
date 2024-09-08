@@ -5,6 +5,7 @@ use dotenvy::dotenv;
 use pharia_kernel::{run, AppConfig, OperatorConfig};
 use reqwest::{header, Body};
 use serde_json::json;
+use test_skills::given_greet_skill;
 use tokio::{sync::oneshot, task::JoinHandle};
 
 struct Kernel {
@@ -45,6 +46,8 @@ impl Kernel {
 #[tokio::test]
 async fn execute_skill() {
     const PORT: u16 = 9_000;
+
+    given_greet_skill();
     let kernel = Kernel::with_port(PORT).await;
 
     let api_token = api_token();

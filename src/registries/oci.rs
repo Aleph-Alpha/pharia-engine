@@ -88,6 +88,7 @@ mod tests {
     use dotenvy::dotenv;
     use oci_client::{secrets::RegistryAuth, Reference};
     use oci_wasm::WasmConfig;
+    use test_skills::given_greet_skill;
     use wasmtime::{component::Component, Config, Engine};
 
     use super::OciRegistry;
@@ -136,6 +137,7 @@ mod tests {
     #[tokio::test]
     async fn oci_push_and_pull_skill() {
         // given skill in local directory is pushed to registry
+        given_greet_skill();
         drop(dotenvy::dotenv());
         let registry =
             OciRegistry::from_env().expect("Please configure registry, see .env.example");

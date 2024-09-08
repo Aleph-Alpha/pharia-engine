@@ -461,6 +461,7 @@ mod unversioned {
 mod tests {
     use std::fs;
 
+    use test_skills::{given_greet_py, given_greet_py_v0_2, given_greet_skill, given_greet_skill_v0_1, given_greet_skill_v0_2};
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{CompletionParams, CompletionRequest, Host, Language};
 
@@ -475,6 +476,7 @@ mod tests {
 
     #[test]
     fn can_parse_module() {
+        given_greet_skill();
         let wasm = fs::read("skills/greet_skill.wasm").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(wasm).unwrap();
         assert_eq!(version, None);
@@ -563,6 +565,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_1_module() {
         // Given a skill loaded by our engine
+        given_greet_skill_v0_1();
         let wasm = fs::read("skills/greet_skill_v0_1.wasm").unwrap();
         let engine = Engine::new().unwrap();
         let skill = engine.instantiate_pre_skill(wasm).unwrap();
@@ -579,6 +582,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_2_module() {
         // Given a skill loaded by our engine
+        given_greet_skill_v0_2();
         let wasm = fs::read("skills/greet_skill_v0_2.wasm").unwrap();
         let engine = Engine::new().unwrap();
         let skill = engine.instantiate_pre_skill(wasm).unwrap();
@@ -595,6 +599,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_unversioned_py_module() {
         // Given a skill loaded by our engine
+        given_greet_py();
         let wasm = fs::read("skills/greet-py.wasm").unwrap();
         let engine = Engine::new().unwrap();
         let skill = engine.instantiate_pre_skill(wasm).unwrap();
@@ -611,6 +616,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_2_py_module() {
         // Given a skill loaded by our engine
+        given_greet_py_v0_2();
         let wasm = fs::read("skills/greet-py-v0_2.wasm").unwrap();
         let engine = Engine::new().unwrap();
         let skill = engine.instantiate_pre_skill(wasm).unwrap();

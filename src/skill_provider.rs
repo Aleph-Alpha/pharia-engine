@@ -354,6 +354,8 @@ impl SkillProviderActor {
 #[cfg(test)]
 pub mod tests {
 
+    use test_skills::given_greet_skill;
+
     use super::*;
 
     pub use super::SkillProviderMsg;
@@ -428,6 +430,7 @@ pub mod tests {
     #[tokio::test]
     async fn cached_skill_removed() {
         // Given one cached skill
+        given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
         let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
@@ -457,6 +460,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn should_only_cache_skills_that_have_been_fetched() {
+        given_greet_skill();
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new().unwrap());
@@ -510,6 +514,7 @@ pub mod tests {
     #[tokio::test]
     async fn should_remove_invalidated_skill_from_cache() {
         // Given one cached "greet_skill"
+        given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let skill_provider = SkillProvider::new(&local_namespace());
         let api = skill_provider.api();

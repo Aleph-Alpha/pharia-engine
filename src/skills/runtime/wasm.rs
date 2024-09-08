@@ -60,9 +60,11 @@ pub mod tests {
     use super::*;
     use async_trait::async_trait;
     use serde_json::json;
+    use test_skills::{given_greet_py, given_greet_skill};
 
     #[tokio::test]
     async fn greet_skill_component() {
+        given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
         let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
@@ -94,6 +96,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn rust_greeting_skill() {
+        given_greet_skill();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet_skill");
         let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);
@@ -113,8 +116,9 @@ pub mod tests {
 
     #[tokio::test]
     async fn python_greeting_skill() {
+        given_greet_py();
         let skill_ctx = Box::new(CsiGreetingMock);
-        let skill_path = SkillPath::new("local", "greet_skill");
+        let skill_path = SkillPath::new("local", "greet-py");
         let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let mut runtime = WasmRuntime::new(skill_provider.api());
@@ -132,6 +136,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn can_call_preinstantiated_multiple_times() {
+        given_greet_skill();
         let skill_ctx = Box::new(CsiCounter::new());
         let skill_path = SkillPath::new("local", "greet_skill");
         let skill_provider = SkillProvider::new(&OperatorConfig::local().namespaces);

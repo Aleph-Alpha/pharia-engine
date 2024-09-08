@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*", "pharia-skill"]
+members = ["crates/*", "pharia-skill", "test-skills"]
 
 [workspace.lints.rust]
 future-incompatible = "warn"
@@ -73,6 +73,7 @@ text-splitter = { version = "0.16.0", features = ["tokenizers"] }
 lingua = { version = "1.6.2", default-features = false, features = ["english", "german"] }
 
 [dev-dependencies]
+test-skills = { path = "./test-skills" }
 fake = "2.9.2"
 http-body-util = "0.1.2"
 libc = "0.2.158"
