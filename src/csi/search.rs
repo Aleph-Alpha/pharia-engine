@@ -54,7 +54,9 @@ mod tests {
             let ClientSearchResult {
                 mut section,
                 document_path,
-                score: _,
+                score: _score,
+                start: _start,
+                end: _end,
             } = result;
             // Current behavior is that chunking only ever happens within an item
             if section.len() > 1 {
@@ -201,6 +203,22 @@ mod tests {
             Image { bytes: String },
         }
 
+        /// A position within a document. The cursor is always inclusive of the current position, in both start and end positions.
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "snake_case", tag = "modality")]
+        pub enum Cursor {
+            Text {
+                /// Index of the item in the document
+                item: usize,
+                /// The character position the cursor can be found at within the string.
+                position: usize,
+            },
+            Image {
+                /// Index of the item in the document
+                item: usize,
+            },
+        }
+
         /// The name of a given document
         #[derive(Debug, Deserialize)]
         pub struct DocumentPath {
@@ -213,6 +231,8 @@ mod tests {
             pub document_path: DocumentPath,
             pub section: Vec<Modality>,
             pub score: f64,
+            pub start: Cursor,
+            pub end: Cursor,
         }
 
         /// Sends HTTP Request to Document Index API
