@@ -1,3 +1,5 @@
+use std::env;
+
 use anyhow::Error;
 use opentelemetry::{global, trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
@@ -23,12 +25,16 @@ async fn main() -> Result<(), Error> {
     // Set up two tracing subscribers:
     // * Simple env logger
     // * OpenTelemetry
-    let tracer = init_tracer();
-    tracing_subscriber::registry()
+    let registry = tracing_subscriber::registry()
         .with(EnvFilter::from_env("PHARIA_KERNEL_LOG"))
-        .with(tracing_subscriber::fmt::layer())
-        .with(OpenTelemetryLayer::new(tracer))
-        .init();
+        .with(tracing_subscriber::fmt::layer());
+
+    if let Ok(endpoint) = env::var("OPEN_TELEMETRY_ADDRESS") {
+        let otel_tracer = init_otel_tracer(&endpoint);
+        registry.with(OpenTelemetryLayer::new(otel_tracer)).init();
+    } else {
+        registry.init();
+    }
 
     pharia_kernel::run(app_config, shutdown_signal())
         .await? // We booted everything up and are operational
@@ -36,7 +42,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn init_tracer() -> Tracer {
+fn init_otel_tracer(endpoint: &str) -> Tracer {
     let provider = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_trace_config(
@@ -53,8 +59,7 @@ fn init_tracer() -> Tracer {
         .with_exporter(
             opentelemetry_otlp::new_exporter()
                 .tonic()
-                // Only change this if there's a conflict
-                .with_endpoint("http://localhost:4317"),
+                .with_endpoint(endpoint),
         )
         .install_batch(runtime::Tokio)
         .unwrap();
