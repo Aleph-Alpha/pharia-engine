@@ -461,7 +461,10 @@ mod unversioned {
 mod tests {
     use std::fs;
 
-    use test_skills::{given_greet_py, given_greet_py_v0_2, given_greet_skill, given_greet_skill_v0_1, given_greet_skill_v0_2};
+    use test_skills::{
+        given_greet_py, given_greet_py_v0_2, given_greet_skill, given_greet_skill_v0_1,
+        given_greet_skill_v0_2,
+    };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{CompletionParams, CompletionRequest, Host, Language};
 
@@ -509,6 +512,7 @@ mod tests {
             send_rt_err,
             csi_apis,
             api_token().to_owned(),
+            None,
         ));
         let mut ctx = LinkedCtx::new(skill_ctx);
 
@@ -548,6 +552,7 @@ mod tests {
             send_rt_err,
             dummy_csi_apis(),
             api_token().to_owned(),
+            None,
         ));
         let mut ctx = LinkedCtx::new(skill_ctx);
 

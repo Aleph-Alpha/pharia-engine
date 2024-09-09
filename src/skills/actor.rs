@@ -12,12 +12,15 @@ use crate::{
     skill_provider::SkillProviderApi,
 };
 use async_trait::async_trait;
+use opentelemetry::Context;
 use serde_json::Value;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
+use tracing::{span, Level};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
 pub struct SkillExecutor {
@@ -139,11 +142,18 @@ where
         input: Value,
         api_token: String,
     ) -> Result<Value, ExecuteSkillError> {
+        let span = span!(
+            Level::DEBUG,
+            "execute_skill",
+            skill_path = skill_path.to_string(),
+        );
+        let context = span.context();
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
             self.csi_apis.clone(),
             api_token,
+            Some(context),
         ));
         select! {
             result = self.runtime.run(skill_path, input, ctx) => result,
@@ -172,6 +182,8 @@ pub struct SkillInvocationCtx {
     csi_apis: CsiApis,
     // How the user authenticates with us
     api_token: String,
+    // For tracing, we wire the skill invocation span context with the CSI spans
+    parent_context: Option<Context>,
 }
 
 impl SkillInvocationCtx {
@@ -179,11 +191,13 @@ impl SkillInvocationCtx {
         send_rt_err: oneshot::Sender<anyhow::Error>,
         csi_apis: CsiApis,
         api_token: String,
+        parent_context: Option<Context>,
     ) -> Self {
         SkillInvocationCtx {
             send_rt_err: Some(send_rt_err),
             csi_apis,
             api_token,
+            parent_context,
         }
     }
 
@@ -201,6 +215,10 @@ impl SkillInvocationCtx {
 #[async_trait]
 impl CsiForSkills for SkillInvocationCtx {
     async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
+        let span = span!(Level::DEBUG, "complete_text", model = params.model);
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
         match self
             .csi_apis
             .complete_text(self.api_token.clone(), params)
@@ -212,6 +230,10 @@ impl CsiForSkills for SkillInvocationCtx {
     }
 
     async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+        let span = span!(Level::DEBUG, "complete_all", requests_len = requests.len());
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
         match self
             .csi_apis
             .complete_all(self.api_token.clone(), requests)
@@ -223,6 +245,16 @@ impl CsiForSkills for SkillInvocationCtx {
     }
 
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
+        let span = span!(
+            Level::DEBUG,
+            "chunk",
+            text_len = request.text.len(),
+            model = request.model,
+            max_tokens = request.max_tokens
+        );
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
         match self.csi_apis.chunk(self.api_token.clone(), request).await {
             Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
@@ -234,6 +266,15 @@ impl CsiForSkills for SkillInvocationCtx {
         text: String,
         languages: Vec<Language>,
     ) -> Option<Language> {
+        let span = span!(
+            Level::DEBUG,
+            "select_language",
+            text_len = text.len(),
+            languages_len = languages.len()
+        );
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
         match self.csi_apis.select_language(text, languages).await {
             Ok(language) => language,
             Err(error) => self.send_error(error).await,
@@ -267,7 +308,8 @@ pub mod tests {
             tokenizers: tokenizers.api(),
             ..dummy_csi_apis()
         };
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned());
+        let mut invocation_ctx =
+            SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned(), None);
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -300,7 +342,8 @@ pub mod tests {
             tokenizers,
             ..dummy_csi_apis()
         };
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned());
+        let mut invocation_ctx =
+            SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned(), None);
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
