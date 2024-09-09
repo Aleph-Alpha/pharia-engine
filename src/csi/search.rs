@@ -87,7 +87,7 @@ mod tests {
                     let ClientSearchResult {
                         mut section,
                         document_path,
-                        score: _score,
+                        score: _,
                         start: _start,
                         end: _end,
                     } = result;
@@ -203,12 +203,15 @@ mod tests {
         pub enum Cursor {
             Text {
                 /// Index of the item in the document
+                #[expect(dead_code)]
                 item: usize,
                 /// The character position the cursor can be found at within the string.
+                #[expect(dead_code)]
                 position: usize,
             },
             Image {
                 /// Index of the item in the document
+                #[expect(dead_code)]
                 item: usize,
             },
         }
