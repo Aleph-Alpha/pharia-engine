@@ -1,20 +1,57 @@
 #[cfg(test)]
 mod tests {
-    use client::{IndexPath, SearchClient, SearchRequest};
+    use client::{
+        IndexPath, Modality, SearchClient, SearchRequest as ClientSearchRequest,
+        SearchResult as ClientSearchResult,
+    };
 
-    /// A section of a document that is returned from a search request
-    struct SearchResult {
-        /// Which document this search result can be found in
-        document_name: String,
-        /// The section of the document returned by the search
-        section: String,
+    /// Search a Document Index collection
+    pub struct SearchRequest {
+        /// Where you want to search in
+        index: IndexPath,
+        /// What you want to search for
+        query: String,
+        /// The maximum number of results to return. Defaults to 1
+        max_results: usize,
+        /// The minimum score each result should have to be returned.
+        /// By default, all results are returned, up to the `max_results`.
+        min_score: Option<f64>,
     }
 
-    impl TryFrom<client::SearchResult> for SearchResult {
+    impl SearchRequest {
+        pub fn new(index: IndexPath, query: impl Into<String>) -> Self {
+            Self {
+                index,
+                query: query.into(),
+                max_results: 1,
+                min_score: None,
+            }
+        }
+
+        pub fn with_max_results(mut self, max_results: usize) -> Self {
+            self.max_results = max_results;
+            self
+        }
+
+        pub fn with_min_score(mut self, min_score: f64) -> Self {
+            self.min_score = Some(min_score);
+            self
+        }
+    }
+
+    /// A section of a document that is returned from a search request
+    pub struct SearchResult {
+        /// Which document this search result can be found in
+        pub document_name: String,
+        /// The section of the document returned by the search
+        pub section: String,
+    }
+
+    impl TryFrom<ClientSearchResult> for SearchResult {
         type Error = anyhow::Error;
 
-        fn try_from(result: client::SearchResult) -> Result<Self, Self::Error> {
-            let client::SearchResult {
+        fn try_from(result: ClientSearchResult) -> Result<Self, Self::Error> {
+            let ClientSearchResult {
                 mut section,
                 document_path,
                 score: _,
@@ -27,10 +64,13 @@ mod tests {
             }
 
             Ok(match section.remove(0) {
-                client::Modality::Text { text } => SearchResult {
+                Modality::Text { text } => SearchResult {
                     document_name: document_path.name,
                     section: text,
                 },
+                Modality::Image { .. } => {
+                    unreachable!("We should have filtered out image results")
+                }
             })
         }
     }
@@ -51,8 +91,24 @@ mod tests {
             request: SearchRequest,
             api_token: &str,
         ) -> anyhow::Result<Vec<SearchResult>> {
+            let SearchRequest {
+                index,
+                query,
+                max_results,
+                min_score,
+            } = request;
             self.client
-                .search(request, api_token)
+                .search(
+                    index,
+                    ClientSearchRequest::new(
+                        vec![Modality::Text { text: query }],
+                        max_results,
+                        min_score,
+                        // Make sure we only recieve results of type text
+                        true,
+                    ),
+                    api_token,
+                )
                 .await?
                 .into_iter()
                 .map(SearchResult::try_from)
@@ -64,41 +120,53 @@ mod tests {
     /// into the public API.
     mod client {
         use reqwest::ClientBuilder;
-        use serde::Deserialize;
+        use serde::{Deserialize, Serialize, Serializer};
         use serde_json::json;
 
         /// Search a Document Index collection
+        #[derive(Debug, Serialize)]
         pub struct SearchRequest {
             /// What you want to search for
-            query: String,
-            /// Where you want to search in
-            index: IndexPath,
+            query: Vec<Modality>,
             /// The maximum number of results to return. Defaults to 1
             max_results: usize,
             /// The minimum score each result should have to be returned.
             /// By default, all results are returned, up to the `max_results`.
+            #[serde(skip_serializing_if = "Option::is_none")]
             min_score: Option<f64>,
+            /// Whether only text chunks should be returned
+            #[serde(serialize_with = "filters", rename = "filters")]
+            text_only: bool,
         }
 
         impl SearchRequest {
-            pub fn new(query: impl Into<String>, index: IndexPath) -> Self {
+            pub fn new(
+                query: Vec<Modality>,
+                max_results: usize,
+                min_score: Option<f64>,
+                text_only: bool,
+            ) -> Self {
                 Self {
-                    query: query.into(),
-                    index,
-                    max_results: 1,
-                    min_score: None,
+                    query,
+                    max_results,
+                    min_score,
+                    text_only,
                 }
             }
+        }
 
-            pub fn with_max_results(mut self, max_results: usize) -> Self {
-                self.max_results = max_results;
-                self
-            }
+        #[expect(clippy::trivially_copy_pass_by_ref)]
+        fn filters<S>(text_only: &bool, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let filters = if *text_only {
+                json!([{ "with": [{ "modality": "text" }]}])
+            } else {
+                json!([])
+            };
 
-            pub fn with_min_score(mut self, min_score: f64) -> Self {
-                self.min_score = Some(min_score);
-                self
-            }
+            filters.serialize(serializer)
         }
 
         /// Which documents you want to search in, and which type of index should be used
@@ -126,11 +194,11 @@ mod tests {
         }
 
         /// Modality of the search result in the API
-        #[derive(Debug, Deserialize)]
+        #[derive(Debug, Deserialize, Serialize)]
         #[serde(rename_all = "snake_case", tag = "modality")]
         pub enum Modality {
-            // Based on the filters, we will only ever get text for now.
             Text { text: String },
+            Image { bytes: String },
         }
 
         /// The name of a given document
@@ -165,30 +233,15 @@ mod tests {
 
             pub async fn search(
                 &self,
+                index: IndexPath,
                 request: SearchRequest,
                 api_token: &str,
             ) -> anyhow::Result<Vec<SearchResult>> {
-                let SearchRequest {
-                    query,
-                    index:
-                        IndexPath {
-                            namespace,
-                            collection,
-                            index,
-                        },
-                    max_results,
-                    min_score,
-                } = request;
-
-                let mut payload = json!({
-                    "query": [{ "modality": "text", "text": query }],
-                    "max_results": max_results,
-                    // Make sure we only get text results
-                    "filters": [{ "with": [{ "modality": "text" }]}]
-                });
-                if let Some(min_score) = min_score {
-                    payload["min_score"] = json!(min_score);
-                }
+                let IndexPath {
+                    namespace,
+                    collection,
+                    index,
+                } = index;
 
                 Ok(self
                     .http
@@ -197,7 +250,7 @@ mod tests {
                         &self.host
                     ))
                     .bearer_auth(api_token)
-                    .json(&payload)
+                    .json(&request)
                     .send()
                     .await?
                     .error_for_status()?
@@ -222,15 +275,18 @@ mod tests {
                 let min_score = 0.725;
 
                 // When making a query on an existing collection
+                let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
                 let request = SearchRequest::new(
-                    "What is the population of Heidelberg?",
-                    IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
-                )
-                .with_max_results(max_results)
-                .with_min_score(min_score);
-                let results = client.search(request, api_token).await.unwrap();
+                    vec![Modality::Text {
+                        text: "What is the population of Heidelberg?".to_owned(),
+                    }],
+                    max_results,
+                    Some(min_score),
+                    true,
+                );
+                let results = client.search(index, request, api_token).await.unwrap();
 
-                // Then we get at least one result
+                // Then we get less than 5 results
                 assert_eq!(results.len(), 4);
                 assert!(results.iter().all(|r| r.score >= min_score));
             }
@@ -244,13 +300,12 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let client = SearchClient::new(host).unwrap();
-        let search = Search::new(client);
+        let search = Search::new(SearchClient::new(host).unwrap());
 
         // When making a query on an existing collection
         let request = SearchRequest::new(
-            "What is the population of Heidelberg?",
             IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
+            "What is the population of Heidelberg?",
         );
         let results = search.search(request, api_token).await.unwrap();
 
@@ -265,14 +320,13 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let client = SearchClient::new(host).unwrap();
-        let search = Search::new(client);
+        let search = Search::new(SearchClient::new(host).unwrap());
         let max_results = 5;
 
         // When making a query on an existing collection
         let request = SearchRequest::new(
-            "What is the population of Heidelberg?",
             IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
+            "What is the population of Heidelberg?",
         )
         .with_max_results(max_results);
         let results = search.search(request, api_token).await.unwrap();
@@ -283,5 +337,27 @@ mod tests {
             .iter()
             .all(|r| r.document_name.contains("Heidelberg")));
         assert!(results.iter().all(|r| r.section.contains("Heidelberg")));
+    }
+
+    #[tokio::test]
+    async fn min_score() {
+        // Given a search client pointed at the document index
+        let host = document_index_address().to_owned();
+        let api_token = api_token();
+        let search = Search::new(SearchClient::new(host).unwrap());
+        let max_results = 5;
+        let min_score = 0.725;
+
+        // When making a query on an existing collection
+        let request = SearchRequest::new(
+            IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
+            "What is the population of Heidelberg?",
+        )
+        .with_max_results(max_results)
+        .with_min_score(min_score);
+        let results = search.search(request, api_token).await.unwrap();
+
+        // Then we get less than 5 results
+        assert_eq!(results.len(), 4);
     }
 }
