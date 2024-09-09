@@ -47,36 +47,6 @@ mod tests {
         pub section: String,
     }
 
-    impl TryFrom<ClientSearchResult> for SearchResult {
-        type Error = anyhow::Error;
-
-        fn try_from(result: ClientSearchResult) -> Result<Self, Self::Error> {
-            let ClientSearchResult {
-                mut section,
-                document_path,
-                score: _score,
-                start: _start,
-                end: _end,
-            } = result;
-            // Current behavior is that chunking only ever happens within an item
-            if section.len() > 1 {
-                return Err(anyhow::anyhow!(
-                    "Document Index result has more than one item in a section."
-                ));
-            }
-
-            Ok(match section.remove(0) {
-                Modality::Text { text } => SearchResult {
-                    document_name: document_path.name,
-                    section: text,
-                },
-                Modality::Image { .. } => {
-                    unreachable!("We should have filtered out image results")
-                }
-            })
-        }
-    }
-
     /// Allows for searching different collections in the Document Index
     struct Search {
         /// Internal client to interact with the Document Index API
@@ -113,7 +83,31 @@ mod tests {
                 )
                 .await?
                 .into_iter()
-                .map(SearchResult::try_from)
+                .map(|result| {
+                    let ClientSearchResult {
+                        mut section,
+                        document_path,
+                        score: _score,
+                        start: _start,
+                        end: _end,
+                    } = result;
+                    // Current behavior is that chunking only ever happens within an item
+                    if section.len() > 1 {
+                        return Err(anyhow::anyhow!(
+                            "Document Index result has more than one item in a section."
+                        ));
+                    }
+
+                    Ok(match section.remove(0) {
+                        Modality::Text { text } => SearchResult {
+                            document_name: document_path.name,
+                            section: text,
+                        },
+                        Modality::Image { .. } => {
+                            unreachable!("We should have filtered out image results")
+                        }
+                    })
+                })
                 .collect()
         }
     }
