@@ -21,7 +21,7 @@ use tower_http::{
     decompression::DecompressionLayer,
     sensitive_headers::SetSensitiveRequestHeadersLayer,
     services::{ServeDir, ServeFile},
-    trace::{DefaultOnResponse, TraceLayer},
+    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
 use tracing::{info, info_span, Level};
 use utoipa::{
@@ -146,6 +146,7 @@ pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillProvi
                                 matched_path,
                             )
                         })
+                        .on_request(DefaultOnRequest::new().level(Level::INFO))
                         .on_response(DefaultOnResponse::new().level(Level::INFO)),
                 )
                 // Compress responses
