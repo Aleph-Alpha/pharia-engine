@@ -8,6 +8,8 @@ pub struct AppConfig {
     /// stack, as well as used to fetch Tokenizers for said models.
     pub inference_addr: String,
     pub operator_config: OperatorConfig,
+    pub log_level: Option<String>,
+    pub open_telemetry_endpoint: Option<String>,
 }
 
 impl AppConfig {
@@ -23,6 +25,10 @@ impl AppConfig {
         let inference_addr = env::var("AA_INFERENCE_ADDRESS")
             .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
 
+        let log_level = env::var("LOG_LEVEL").ok();
+
+        let open_telemetry_endpoint = env::var("OPEN_TELEMETRY_ENDPOINT").ok();
+
         assert!(
             !inference_addr.is_empty(),
             "The inference address must be provided."
@@ -35,6 +41,8 @@ impl AppConfig {
             tcp_addr: addr.parse().unwrap(),
             inference_addr,
             operator_config,
+            log_level,
+            open_telemetry_endpoint,
         }
     }
 }

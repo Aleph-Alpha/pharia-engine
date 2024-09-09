@@ -120,6 +120,8 @@ impl Kernel {
                 "#,
             )
             .unwrap(),
+            log_level: None,
+            open_telemetry_endpoint: None,
         };
         Self::new(app_config).await
     }

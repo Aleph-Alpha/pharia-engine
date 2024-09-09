@@ -3,6 +3,7 @@ mod configuration_observer;
 mod csi;
 mod inference;
 mod language_selection;
+mod logging;
 mod registries;
 mod shell;
 mod skill_provider;
@@ -13,6 +14,7 @@ use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
 use csi::CsiApis;
 use futures::Future;
+use logging::initialize_tracing;
 use skill_provider::SkillProvider;
 use tokenizers::Tokenizers;
 use tracing::error;
@@ -32,6 +34,8 @@ pub async fn run(
     app_config: AppConfig,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> Result<impl Future<Output = ()>, Error> {
+    initialize_tracing(&app_config)?;
+
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr.clone());
     let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();
@@ -125,12 +129,14 @@ mod tests {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::empty(),
+            log_level: None,
+            open_telemetry_endpoint: None,
         };
 
         let shutdown_completed = super::run(config, ready(())).await.unwrap();
 
-        //wasm runtime needs some time to shutdown (at least on Daniel's machine), so the time out
-        //has been increased to 2sec
+        // wasm runtime needs some time to shutdown (at least on Daniel's machine), so the time out
+        // has been increased to 2sec
         let r = tokio::time::timeout(Duration::from_secs(2), shutdown_completed).await;
         assert_ok!(r);
     }
