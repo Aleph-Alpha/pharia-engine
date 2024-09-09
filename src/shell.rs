@@ -157,11 +157,13 @@ pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillProvi
 #[derive(Deserialize, Serialize, ToSchema)]
 struct ExecuteSkillArgs {
     /// The qualified name of the skill to invoke. The qualified name consists of a namespace and
-    /// a skillname (e.g. 'acme/greet').
+    /// a skillname (e.g. "acme/summarize").
     /// If the namespace is omitted, the default 'pharia-kernel-team' namespace is used.
     ///
     skill: String,
-    /// The expected input for the skill.
+    /// The expected input for the skill in JSON format. Examples:
+    /// * "input": "Hello"
+    /// * "input": {"text": "some text to be summarized", "length": "short"}
     input: Value,
 }
 
