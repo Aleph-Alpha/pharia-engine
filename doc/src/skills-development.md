@@ -10,8 +10,8 @@ Just all the commands needed to setup your environment at a glance. Read the nex
 
 ```shell
 curl https://pharia-kernel.aleph-alpha.stackit.run/skill.wit > skill.wit
-python -m venv venv
-source venv/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 pip install componentize-py
 componentize-py -d skill.wit -w skill bindings .
 # ... write skill code in e.g. haiku.py ...
@@ -153,18 +153,19 @@ componentize-py -d skill.wit -w skill bindings .
 This will create a `skill` module containing bindings to the Cognitive System Interface in the current directory. You can now import this module in your Python code. Here is an example of a Skill creating a haiku using the `skill` module.
 
 ```Python
-import skill
+import skill.exports
 from skill.imports import csi
-from skill.imports.csi import CompletionParams
+import json
 
-class SkillHandler(skill.Skill):
-    def run(self, in_: str):
+class SkillHandler(skill.exports.SkillHandler):
+    def run(self, input: bytes) -> bytes:
+        input = json.loads(input)
         prompt = f"""Write a haiku about {in_}
 
 ### Response:"""
-        params = CompletionParams(max_tokens=None, temperature=None, top_k=None, top_p=None, stop=[])
-        return csi.complete("luminous-extended-control", prompt=prompt, params=params).text
-
+        params = csi.CompletionParams(100, None, None, None, [])
+        completion = csi.complete( "luminous-extended-control", prompt, params)
+        return json.dumps(completion.text).encode()
 ```
 
 Now that we have written our Skill, we need to compile it into a component.
