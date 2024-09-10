@@ -6,6 +6,8 @@ use std::{
 };
 use tempfile::{tempdir, TempDir};
 
+const WASI_TARGET: &str = "wasm32-wasip1";
+
 /// Creates `greet_skill.wasm` in `skills` directory, based on `crates/greet-skill`
 pub fn given_greet_skill() {
     given_rust_skill("greet-skill");
@@ -46,9 +48,9 @@ fn given_rust_skill(package_name: &str) {
 /// In a nutshell this executes the following commands
 /// 
 /// ```shell
-/// cargo build -p greet-skill-v0_2 --target wasm32-wasi --release
+/// cargo build -p greet-skill-v0_2 --target wasm32-wasip1 --release
 /// wasm-tools component new \
-///     ./target/wasm32-wasi/release/greet_skill_v0_2.wasm \
+///     ./target/wasm32-wasip1/release/greet_skill_v0_2.wasm \
 ///     -o ./skills/greet_skill_v0_2.wasm \
 ///     --adapt ./wasi_snapshot_preview1.reactor-24.0.0.wasm
 /// wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
@@ -58,14 +60,14 @@ fn build_rust_skill(package_name: &str) {
 
     // Build the release artefact for web assembly target
     //
-    // cargo build -p greet-skill-v0_2 --target wasm32-wasi --release
+    // cargo build -p greet-skill-v0_2 --target wasm32-wasip1 --release
     Command::new("cargo")
         .args([
             "build",
             "-p",
             package_name,
             "--target",
-            "wasm32-wasi",
+            WASI_TARGET,
             "--release",
         ])
         .status()
@@ -74,14 +76,14 @@ fn build_rust_skill(package_name: &str) {
     // Make it a web assembly component
     //
     // wasm-tools component new \
-    //      ./target/wasm32-wasi/release/greet_skill_v0_2.wasm \
+    //      ./target/wasm32-wasip1/release/greet_skill_v0_2.wasm \
     //      -o ./skills/greet_skill_v0_2.wasm \
     //      --adapt ./wasi_snapshot_preview1.reactor-24.0.0.wasm
     Command::new("wasm-tools")
         .args([
             "component",
             "new",
-            &format!("./target/wasm32-wasi/release/{snake_case}.wasm"),
+            &format!("./target/{WASI_TARGET}/release/{snake_case}.wasm"),
             "-o",
             &format!("./skills/{snake_case}.wasm"),
             "--adapt",
