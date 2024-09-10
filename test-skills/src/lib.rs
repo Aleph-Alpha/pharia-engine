@@ -43,9 +43,22 @@ fn given_rust_skill(package_name: &str) {
     }
 }
 
+/// In a nutshell this executes the following commands
+/// 
+/// ```shell
+/// cargo build -p greet-skill-v0_2 --target wasm32-wasi --release
+/// wasm-tools component new \
+///     ./target/wasm32-wasi/release/greet_skill_v0_2.wasm \
+///     -o ./skills/greet_skill_v0_2.wasm \
+///     --adapt ./wasi_snapshot_preview1.reactor-24.0.0.wasm
+/// wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
+/// ```
 fn build_rust_skill(package_name: &str) {
     let snake_case = change_case::snake_case(package_name);
 
+    // Build the release artefact for web assembly target
+    //
+    // cargo build -p greet-skill-v0_2 --target wasm32-wasi --release
     Command::new("cargo")
         .args([
             "build",
@@ -57,6 +70,13 @@ fn build_rust_skill(package_name: &str) {
         ])
         .status()
         .unwrap();
+
+    // Make it a web assembly component
+    //
+    // wasm-tools component new \
+    //      ./target/wasm32-wasi/release/greet_skill_v0_2.wasm \
+    //      -o ./skills/greet_skill_v0_2.wasm \
+    //      --adapt ./wasi_snapshot_preview1.reactor-24.0.0.wasm
     Command::new("wasm-tools")
         .args([
             "component",
@@ -69,6 +89,8 @@ fn build_rust_skill(package_name: &str) {
         ])
         .status()
         .unwrap();
+
+    // wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
     Command::new("wasm-tools")
         .args([
             "strip",
@@ -107,6 +129,8 @@ fn build_python_skill(package_name: &str, wit_version: &str) {
         &format!("./skills/{package_name}.wasm"),
     ]));
 
+    // Make resulting skill component smaller
+    //
     // wasm-tools strip ./skills/greet-py.wasm -o ./skills/greet-py.wasm
     Command::new("wasm-tools")
         .args([
