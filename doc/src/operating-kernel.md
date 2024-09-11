@@ -63,8 +63,22 @@ SKILL_REGISTRY_PASSWORD=****
 
 ## Logging
 
-By default, only logs of `ERROR` level are output. You can change this by setting the `PHARIA_KERNEL_LOG` environment variable to one of `debug`, `info`, `warn`, or `error` (default).
+By default, only logs of `ERROR` level are output. You can change this by setting the `LOG_LEVEL` environment variable to one of `trace`, `debug`, `info`, `warn`, or `error` (default).
 
 ```shell
-PHARIA_KERNEL_LOG=info
+LOG_LEVEL=info
+```
+
+## Observability
+
+Pharia Kernel can be configured to use an OpenTelemetry Collector endpoint by setting the `OPEN_TELEMETRY_ENDPOINT` environment variable.
+
+```shell
+OPEN_TELEMETRY_ENDPOINT=http://127.0.0.1:4317
+```
+
+For local testing, a supported collector like the Jaeger [All in One](https://www.jaegertracing.io/docs/1.60/getting-started/#all-in-one) executable can be used:
+
+```shell
+podman run -d -p4317:4317 -p16686:16686 jaegertracing/all-in-one
 ```
