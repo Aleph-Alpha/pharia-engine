@@ -51,7 +51,6 @@ cargo_test:
     - apt-get -y install python3-venv
     - cargo install wit-bindgen-cli
     - rustup target add wasm32-wasip1
-    - ./build-skill.sh
     - ./build-skill-py.sh
     - cargo test --workspace --all-features
 
