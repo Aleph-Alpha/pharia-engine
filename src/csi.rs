@@ -22,8 +22,8 @@ pub struct CsiApis {
     pub tokenizers: TokenizersApi,
 }
 
-/// Cognitive Sytem Interface (CSI) as consumed internally by Pharia Kernel, before the CSI is
-/// passed to the end user in Skill code we further strip away some of the accidential complexity.
+/// Cognitive System Interface (CSI) as consumed internally by Pharia Kernel, before the CSI is
+/// passed to the end user in Skill code we further strip away some of the accidental complexity.
 /// See its sibling trait `CsiForSkills`.
 pub trait Csi {
     async fn complete_text(
