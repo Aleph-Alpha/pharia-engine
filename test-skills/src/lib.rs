@@ -2,7 +2,7 @@ use anyhow::{bail, Context as _, Error};
 use std::{
     path::Path,
     process::Command,
-    sync::OnceLock,
+    sync::{LazyLock, OnceLock},
 };
 use tempfile::{tempdir, TempDir};
 
@@ -10,26 +10,41 @@ const WASI_TARGET: &str = "wasm32-wasip1";
 
 /// Creates `greet_skill.wasm` in `skills` directory, based on `crates/greet-skill`
 pub fn given_greet_skill() {
-    given_rust_skill("greet-skill");
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("greet-skill");
+    });
+    *WASM_BUILD;
 }
 
 /// Creates `greet_skill_v0_1.wasm` in `skills` directory, based on `crates/greet-skill-v0_1`
 pub fn given_greet_skill_v0_1() {
-    given_rust_skill("greet-skill-v0_1");
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("greet-skill-v0_1");
+    });
+    *WASM_BUILD;
 }
 
 /// Creates `greet_skill_v0_2.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
 pub fn given_greet_skill_v0_2() {
-    given_rust_skill("greet-skill-v0_2");
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("greet-skill-v0_2");
+    });
+    *WASM_BUILD;
 }
 
 /// Creates `greet-py.wasm` in `skills` directory, based on `greet-py`
 pub fn given_greet_py() {
-    given_python_skill("greet-py", "unversioned");
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_python_skill("greet-py", "unversioned");
+    });
+    *WASM_BUILD;
 }
 
 pub fn given_greet_py_v0_2() {
-    given_python_skill("greet-py-v0_2", "0.2");
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_python_skill("greet-py-v0_2", "0.2");
+    });
+    *WASM_BUILD;
 }
 
 fn given_python_skill(package_name: &str, wit_version: &str) {
@@ -46,7 +61,7 @@ fn given_rust_skill(package_name: &str) {
 }
 
 /// In a nutshell this executes the following commands
-/// 
+///
 /// ```shell
 /// cargo build -p greet-skill-v0_2 --target wasm32-wasip1 --release
 /// wasm-tools component new \
