@@ -81,22 +81,20 @@ image_build:
     - podman push $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
     - echo -e "\e[0Ksection_end:`date +%s`:my_section\r\e[0K"
 
-# TEMPORAR DISABLED DUE TO TOOLING ISSUE
-
-# sbom_vulnerability_scan:
-#   extends: .sbom_vulnerability_scan
-#   stage: image_build
-#   rules:
-#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-#       needs:
-#         - image_build
-#       variables:
-#         ARTIFACT_NAME: $CI_PROJECT_NAME
-#         FULL_IMAGE_NAME: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
-#     - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_SECURITY_SCAN == "true"
-#       variables:
-#         ARTIFACT_NAME: $CI_PROJECT_NAME:latest
-#         FULL_IMAGE_NAME: $KERNEL_IMAGE:latest
+sbom_vulnerability_scan:
+  extends: .sbom_vulnerability_scan
+  stage: image_build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      needs:
+        - image_build
+      variables:
+        ARTIFACT_NAME: $CI_PROJECT_NAME
+        FULL_IMAGE_NAME: $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_SECURITY_SCAN == "true"
+      variables:
+        ARTIFACT_NAME: $CI_PROJECT_NAME:latest
+        FULL_IMAGE_NAME: $KERNEL_IMAGE:latest
 
 skill_image_build:
   stage: image_build
@@ -124,22 +122,20 @@ skill_image_build:
     - podman push $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA
     - echo -e "\e[0Ksection_end:`date +%s`:my_section\r\e[0K"
 
-# TEMPORAR DISABLED DUE TO TOOLING ISSUE
-
-# skill_sbom_vulnerability_scan:
-#   extends: .sbom_vulnerability_scan
-#   stage: image_build
-#   rules:
-#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-#       needs:
-#         - skill_image_build
-#       variables:
-#         ARTIFACT_NAME: $SKILL_ARTIFACT_NAME
-#         FULL_IMAGE_NAME: $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA
-#     - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_SECURITY_SCAN == "true"
-#       variables:
-#         ARTIFACT_NAME: $SKILL_ARTIFACT_NAME:latest
-#         FULL_IMAGE_NAME: $SKILL_IMAGE:latest
+skill_sbom_vulnerability_scan:
+  extends: .sbom_vulnerability_scan
+  stage: image_build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      needs:
+        - skill_image_build
+      variables:
+        ARTIFACT_NAME: $SKILL_ARTIFACT_NAME
+        FULL_IMAGE_NAME: $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_SECURITY_SCAN == "true"
+      variables:
+        ARTIFACT_NAME: $SKILL_ARTIFACT_NAME:latest
+        FULL_IMAGE_NAME: $SKILL_IMAGE:latest
 
 container_test:
   stage: image_test
