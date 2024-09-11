@@ -9,7 +9,7 @@ use super::{
     NamespaceDescriptionLoader,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct OperatorConfig {
     pub namespaces: HashMap<String, NamespaceConfig>,
 }
@@ -42,7 +42,7 @@ impl OperatorConfig {
         .unwrap()
     }
 }
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Registry {
     File {
@@ -54,48 +54,59 @@ pub enum Registry {
     },
 }
 
-#[derive(Deserialize, Clone)]
-pub struct NamespaceConfig {
-    pub config_url: String,
-    pub config_access_token_env_var: Option<String>,
-    pub registry: Registry,
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(untagged)]
+pub enum NamespaceConfig {
+    TeamOwned {
+        config_url: String,
+        config_access_token_env_var: Option<String>,
+        registry: Registry,
+    },
 }
 
 impl NamespaceConfig {
     pub fn loader(&self) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + 'static>> {
-        let url = Url::parse(&self.config_url)?;
-        match url.scheme() {
-            "https" | "http" => {
-                let config_access_token = self
-                    .config_access_token_env_var
-                    .as_ref()
-                    .map(env::var)
-                    .transpose()
-                    .with_context(|| {
-                        format!(
-                            "Missing environment variable: {}",
-                            self.config_access_token_env_var.as_ref().unwrap()
-                        )
-                    })?;
-                Ok(Box::new(HttpLoader::from_url(
-                    &self.config_url,
-                    config_access_token,
-                )))
+        match self {
+            NamespaceConfig::TeamOwned {
+                config_url,
+                config_access_token_env_var,
+                // Registry does not change dynamically at the moment
+                registry: _,
+            } => {
+                let url = Url::parse(config_url)?;
+                match url.scheme() {
+                    "https" | "http" => {
+                        let config_access_token = config_access_token_env_var
+                            .as_ref()
+                            .map(env::var)
+                            .transpose()
+                            .with_context(|| {
+                                format!(
+                                    "Missing environment variable: {}",
+                                    config_access_token_env_var.as_ref().unwrap()
+                                )
+                            })?;
+                        Ok(Box::new(HttpLoader::from_url(
+                            config_url,
+                            config_access_token,
+                        )))
+                    }
+                    "file" => {
+                        // remove leading "file://"
+                        let file_path = &config_url[7..];
+                        let loader = FileLoader::new(file_path.into());
+                        Ok(Box::new(loader))
+                    }
+                    scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
+                }
             }
-            "file" => {
-                // remove leading "file://"
-                let file_path = &self.config_url[7..];
-                let loader = FileLoader::new(file_path.into());
-                Ok(Box::new(loader))
-            }
-            scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::configuration_observer::config::Registry;
+    use crate::configuration_observer::{config::Registry, NamespaceConfig};
 
     use super::OperatorConfig;
 
@@ -137,14 +148,15 @@ mod tests {
             "#,
         )
         .unwrap();
-        let config_access_token_env_var = config
-            .namespaces
-            .get("dummy_team")
-            .unwrap()
-            .config_access_token_env_var
-            .as_ref()
-            .unwrap();
-        assert_eq!(config_access_token_env_var, "GITLAB_CONFIG_ACCESS_TOKEN");
+        let namespace_cfg = config.namespaces.get("dummy_team").unwrap();
+        let expected = NamespaceConfig::TeamOwned {
+            config_url: "file://dummy_config_url".to_owned(),
+            config_access_token_env_var: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
+            registry: Registry::File {
+                path: "dummy_file_path".to_owned(),
+            },
+        };
+        assert_eq!(namespace_cfg, &expected);
     }
 
     #[test]
@@ -170,14 +182,34 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(config.namespaces.len(), 2);
-        assert!(matches!(
-            &config.namespaces["pharia-kernel-team"].registry,
-            Registry::Oci { .. }
-        ));
-        assert!(matches!(
-            &config.namespaces["pharia-kernel-team-local"].registry,
-            Registry::File { .. }
-        ));
+        let expected = OperatorConfig {
+            namespaces: [
+                (
+                    "pharia-kernel-team".to_owned(),
+                    NamespaceConfig::TeamOwned {
+                        config_url: "https://dummy_url".to_owned(),
+                        config_access_token_env_var: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
+                        registry: Registry::Oci {
+                            registry: "registry.gitlab.aleph-alpha.de".to_owned(),
+                            repository: "engineering/pharia-skills/skills".to_owned(),
+                        },
+                    },
+                ),
+                (
+                    "pharia-kernel-team-local".to_owned(),
+                    NamespaceConfig::TeamOwned {
+                        config_url: "https://dummy_url".to_owned(),
+                        config_access_token_env_var: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
+                        registry: Registry::File {
+                            path: "/temp/skills".to_owned(),
+                        },
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        };
+
+        assert_eq!(config, expected);
     }
 }

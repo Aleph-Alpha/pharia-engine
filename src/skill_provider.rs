@@ -37,7 +37,10 @@ impl SkillProviderState {
     }
 
     fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send> {
-        match &namespace_config.registry {
+        let registry = match namespace_config {
+            NamespaceConfig::TeamOwned { registry, .. } => registry,
+        };
+        match registry {
             Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
             Registry::Oci {
                 repository,
@@ -370,7 +373,7 @@ pub mod tests {
             let registry = Registry::File {
                 path: "skills".to_owned(),
             };
-            let ns_cfg = NamespaceConfig {
+            let ns_cfg = NamespaceConfig::TeamOwned {
                 config_url: "file://namespace.toml".to_owned(),
                 config_access_token_env_var: None,
                 registry,
@@ -552,7 +555,7 @@ pub mod tests {
 
     /// Namespace named local backed by a file registry with "skills" directory
     fn local_namespace() -> HashMap<String, NamespaceConfig> {
-        let namespace_cfg = NamespaceConfig {
+        let namespace_cfg = NamespaceConfig::TeamOwned {
             config_url: "file://namespace.toml".to_owned(),
             config_access_token_env_var: None,
             registry: Registry::File {
