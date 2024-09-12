@@ -177,8 +177,10 @@ fn run_in_venv(venv_path: &Path, args: &[&str]) -> Result<Vec<u8>, Error> {
     if !output.status.success() {
         let standard_error = String::from_utf8_lossy(&output.stderr);
         bail!(
-            "Failed to run commond in virtual environment. Standard Error\n{}",
-            standard_error
+            "Failed to run commond in virtual environment. Args:\n\
+            {args:?}\n\
+            Standard Error:\n\
+            {standard_error}",
         )
     }
 
@@ -204,7 +206,7 @@ impl Venv {
         create_virtual_enviroment(&venv_path)?;
         run_in_venv(
             &venv_path,
-            &["python", "-m", "pip", "install", "componentize-py"],
+            &["python3", "-m", "pip", "install", "componentize-py"],
         )?;
 
         Ok(Venv { directory })
