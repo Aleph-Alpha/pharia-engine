@@ -120,7 +120,7 @@ impl Kernel {
                 "#,
             )
             .unwrap(),
-            config_update_interval: Duration::from_secs(10),
+            namespace_update_interval: Duration::from_secs(10),
             log_level: None,
             open_telemetry_endpoint: None,
         };

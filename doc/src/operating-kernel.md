@@ -63,11 +63,10 @@ SKILL_REGISTRY_PASSWORD=****
 
 ## Update interval 
 
-The environment variable `CONFIG_UPDATE_INTERVAL` can optionally be set to change the duration in seconds between updating namespace configurations.
-The default is 10 seconds.
+The environment variable `NAMESPACE_UPDATE_INTERVAL` controls how much time the kernel waits between checking for changes in namespace configurations. The default is 10 seconds.
 
 ```shell
-CONFIG_UPDATE_INTERVAL=10
+NAMESPACE_UPDATE_INTERVAL=10s
 ```
 
 ## Logging
