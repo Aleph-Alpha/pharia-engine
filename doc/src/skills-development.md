@@ -246,28 +246,53 @@ In order to run Pharia Kernel, you need to provide an operator and a namespace c
 
 1. Create the operator configuration:
 
+The operator configuration lists the skill namespaces which are available in the Pharia Kernel.  
+For local skill development you just need to list one namespace you want to use for your local Pharia Kernel (e.g. 'local').  
+You can deploy your skill to the production Pharia Kernel under a different namesspace-name any time.
+
+
 ```shell
-    touch operator-config.toml
+    # create operator config file
+    touch operator-config.toml 
+
+    # define namespace entry (named 'local')
     echo "[namespaces.local]" >> operator-config.toml 
+
+    # set the namespace's config file location
     echo 'config_url = "file://namespace.toml"' >> operator-config.toml 
+    
+    # set the namespace's skill registry (using a local file registry)
     echo 'registry = { type = "file", path = "skills" }' >> operator-config.toml 
+
+    # create the local skill registry
+    mkdir skills
 ```
 
 2. Create the namespace configuration:
+
+The namespace configuration lists all available skills for the respective namespace.  
+You need to list the skill names you want to develop locally, e.g.:
 
 ```shell
     touch namespace.toml
     echo 'skills = [ { name = "my_skill" } ]' >> namespace.toml 
 ```
+The namespace configuration is polled by the Pharia Kernel once a minute.
 
 3. Start the container:
+
 ```shell
     podman run \
         -v ./operator-config.toml:/app/operator-config.toml \
+        -v ./namespace.toml:/app/namespace.toml \
+        -v ./skills:/app/skills \
         -e AA_API_TOKEN=$AA_API_TOKEN \
+        -e LOG_LEVEL=debug \
+        -p 8081:8081 \
         pharia-kernel
 ```
-:information_source: You can ignore any skill loading errors for now.
+You can view the Pharia-Kernel's API documentation at http://127.0.0.1:8081/api-docs
+
 
 ## Build your skill
 
@@ -325,23 +350,29 @@ In order to run Pharia Kernel, you need to provide an operator and a namespace c
 3. Compile your skill:
 
 ```shell
-    componentize-py -d skill.wit -w skill componentize my_skill -o ./my_skill.wasm
+    componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
 ```
 
-4. Restart the container
+4. Execute your skill:
+```shell
+    curl -v -X POST 127.0.0.1:8081/execute_skill \
+        -H "Authorization: Bearer $AA_API_TOKEN" \
+        -H 'Content-Type: application/json' \
+        -d '{"skill":"local/my_skill", "input":"Homer"}'
+```
+
+5. Iterate
+
+Whenever you change the skill code, you have to compile it again and you have to invalidate the Pharia Kernel's skill chach
+in order to load the new skill version.
 
 ```shell
-    podman run \
-        -v ./operator-config.toml:/app/operator-config.toml \
-        -v ./namespace.toml:/app/namespace.toml \
-        -v ./my_skill.wasm:/app/skills/my_skill.wasm \
-        -e AA_API_TOKEN=$AA_API_TOKEN \
-        -e LOG_LEVEL=debug \
-        -p 8081:8081 \
-        pharia-kernel
-```
+    # compile the skill
+    componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
 
-:warning: Whenever you change the skill code, you have to compile it again and you have to restart the kernel in order to load the new skill version.
+    # invalidate the cached version of 'my_skill'
+    curl -v -X DELETE 127.0.0.1:8081/cached_skills/my_skill
+```
 
 # Monitoring skill execution
 
