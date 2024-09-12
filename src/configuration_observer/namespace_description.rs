@@ -55,7 +55,7 @@ pub trait NamespaceDescriptionLoader {
     async fn description(&mut self) -> NamespaceDescriptionResult;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NamespaceDescription {
     pub skills: Vec<Skill>,
 }
@@ -161,6 +161,13 @@ impl NamespaceDescriptionLoader for HttpLoader {
             )
         }).map_err(NamespaceDescriptionError::Recoverable)?;
         Ok(desc)
+    }
+}
+
+#[async_trait]
+impl NamespaceDescriptionLoader for NamespaceDescription {
+    async fn description(&mut self) -> NamespaceDescriptionResult {
+        Ok(self.clone())
     }
 }
 

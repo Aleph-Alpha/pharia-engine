@@ -27,11 +27,11 @@ impl Kernel {
         }
     }
 
-    async fn with_port(port: u16) -> Self {
+    async fn with_port(port: u16, skills: &[&str]) -> Self {
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
-            operator_config: OperatorConfig::local(),
+            operator_config: OperatorConfig::local(skills),
             namespace_update_interval: Duration::from_secs(10),
             log_level: None,
             open_telemetry_endpoint: None,
@@ -51,7 +51,7 @@ async fn execute_skill() {
     const PORT: u16 = 9_000;
 
     given_greet_skill();
-    let kernel = Kernel::with_port(PORT).await;
+    let kernel = Kernel::with_port(PORT, &["greet_skill"]).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();

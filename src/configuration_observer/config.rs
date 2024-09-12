@@ -9,7 +9,7 @@ use serde::Deserialize;
 use url::Url;
 
 use super::{
-    namespace_description::{FileLoader, HttpLoader, WatchLoader},
+    namespace_description::{FileLoader, HttpLoader, NamespaceDescription, Skill, WatchLoader},
     NamespaceDescriptionLoader,
 };
 
@@ -32,18 +32,26 @@ impl OperatorConfig {
         Ok(toml::from_str(config)?)
     }
 
-    /// # Panics
-    /// Cannot parse config.
     #[must_use]
-    pub fn local() -> Self {
-        Self::from_toml(
-            r#"
-                [namespaces.local]
-                config_url = "file://namespace.toml"
-                registry = { type = "file", path = "skills" }
-            "#,
-        )
-        .unwrap()
+    pub fn local(skills: &[&str]) -> Self {
+        OperatorConfig {
+            namespaces: [(
+                "local".to_owned(),
+                NamespaceConfig::InPlace {
+                    skills: skills
+                        .iter()
+                        .map(|&name| Skill {
+                            name: name.to_owned(),
+                            tag: None,
+                        })
+                        .collect(),
+                    registry: Registry::File {
+                        path: "skills".to_owned(),
+                    },
+                },
+            )]
+            .into(),
+        }
     }
 
     #[must_use]
@@ -73,23 +81,35 @@ pub enum Registry {
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(untagged)]
 pub enum NamespaceConfig {
+    /// Namespaces are our way to enable teams to deploy skills in self service via Git Ops. This
+    /// implies that the skills in team owned namespaces are configured by a team rather than the
+    /// operaters of Pharia Kernel, which in turn means we only refer the teams documentation here.
     TeamOwned {
         config_url: String,
         config_access_token_env_var: Option<String>,
         registry: Registry,
     },
-    Watch {
-        directory: PathBuf,
+    /// For development it is convinient to just watch a local repository for changing skills
+    /// without the need for reconfiguration.
+    Watch { directory: PathBuf },
+    /// Rather than referencing a configuration there skills are listed, this variant just lists
+    /// them in place in the application config. As such these skills are owned by the operators.
+    /// This behavior is especially useful to make sure certain skills are found in integartion
+    /// tests.
+    InPlace {
+        skills: Vec<Skill>,
+        registry: Registry,
     },
 }
 
 impl NamespaceConfig {
     pub fn registry(&self) -> Registry {
         match self {
-            NamespaceConfig::TeamOwned { registry, .. } => registry.clone(),
             NamespaceConfig::Watch { directory } => Registry::File {
                 path: directory.to_str().unwrap().to_owned(),
             },
+            NamespaceConfig::InPlace { registry, .. }
+            | NamespaceConfig::TeamOwned { registry, .. } => registry.clone(),
         }
     }
 
@@ -131,6 +151,12 @@ impl NamespaceConfig {
             NamespaceConfig::Watch { directory } => {
                 Ok(Box::new(WatchLoader::new(directory.to_owned())))
             }
+            NamespaceConfig::InPlace {
+                skills,
+                registry: _,
+            } => Ok(Box::new(NamespaceDescription {
+                skills: skills.clone(),
+            })),
         }
     }
 }
@@ -152,7 +178,7 @@ mod tests {
 
     #[test]
     fn deserialize_config_with_file_registry() {
-        let config = OperatorConfig::local();
+        let config = OperatorConfig::local(&[]);
         assert!(config.namespaces.contains_key("local"));
     }
 
