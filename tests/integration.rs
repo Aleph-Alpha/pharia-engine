@@ -32,6 +32,7 @@ impl Kernel {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::local(),
+            config_update_interval: Duration::from_secs(10),
             log_level: None,
             open_telemetry_endpoint: None,
         };

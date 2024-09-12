@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use std::{env, io, net::SocketAddr};
+use std::{env, io, net::SocketAddr, time::Duration};
 
 use crate::configuration_observer::OperatorConfig;
 
@@ -9,6 +9,7 @@ pub struct AppConfig {
     /// stack, as well as used to fetch Tokenizers for said models.
     pub inference_addr: String,
     pub operator_config: OperatorConfig,
+    pub config_update_interval: Duration,
     pub log_level: Option<String>,
     pub open_telemetry_endpoint: Option<String>,
 }
@@ -38,6 +39,12 @@ impl AppConfig {
             "The inference address must be provided."
         );
 
+        let config_update_interval = Duration::from_secs(
+            env::var("CONFIG_UPDATE_INTERVAL")
+                .map(|v| v.parse::<u64>())?
+                .unwrap_or(10),
+        );
+
         let operator_config = match OperatorConfig::from_file("operator-config.toml") {
             Ok(operator_config) => operator_config,
             Err(err) => match err.downcast::<io::Error>() {
@@ -63,6 +70,7 @@ impl AppConfig {
             tcp_addr: addr.parse().unwrap(),
             inference_addr,
             operator_config,
+            config_update_interval,
             log_level,
             open_telemetry_endpoint,
         })

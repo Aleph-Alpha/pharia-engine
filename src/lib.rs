@@ -57,7 +57,7 @@ pub async fn run(
     let mut configuration_observer = ConfigurationObserver::with_config(
         skill_provider.api(),
         loaders,
-        tokio::time::Duration::from_secs(10),
+        app_config.config_update_interval,
     );
 
     // Wait for first pass of the configuration so that the configured skills are loaded
@@ -139,6 +139,7 @@ mod tests {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::empty(),
+            config_update_interval: Duration::from_secs(10),
             log_level: None,
             open_telemetry_endpoint: None,
         };

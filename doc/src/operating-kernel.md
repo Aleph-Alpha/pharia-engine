@@ -61,6 +61,15 @@ SKILL_REGISTRY_USER=Joe.Plumber
 SKILL_REGISTRY_PASSWORD=****
 ```
 
+## Update interval 
+
+The environment variable `CONFIG_UPDATE_INTERVAL` can optionally be set to change the duration in seconds between updating namespace configurations.
+The default is 10 seconds.
+
+```shell
+CONFIG_UPDATE_INTERVAL=10
+```
+
 ## Logging
 
 By default, only logs of `ERROR` level are output. You can change this by setting the `LOG_LEVEL` environment variable to one of `trace`, `debug`, `info`, `warn`, or `error` (default).
@@ -68,6 +77,7 @@ By default, only logs of `ERROR` level are output. You can change this by settin
 ```shell
 LOG_LEVEL=info
 ```
+
 
 ## Observability
 

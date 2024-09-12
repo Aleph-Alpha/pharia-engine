@@ -262,6 +262,7 @@ Any changes in this folder will be picked up by the Pharia Kernel automatically.
     podman run \
         -v ./skills:/app/skills \
         -e AA_API_TOKEN=$AA_API_TOKEN \
+        -e CONFIG_UPDATE_INTERVAL=1 \
         -e LOG_LEVEL=debug \
         -p 8081:8081 \
         pharia-kernel
@@ -363,8 +364,9 @@ Specify the collector endpoint via the environment variable `OPEN_TELEMETRY_ENDP
 
 ```shell
     podman run \
-        -v ./my_skill.wasm:/app/skills/my_skill.wasm \
+        -v ./skills:/app/skills \
         -e AA_API_TOKEN=$AA_API_TOKEN \
+        -e CONFIG_UPDATE_INTERVAL=1 \
         -e OPEN_TELEMETRY_ENDPOINT=http://host.containers.internal:4317 \
         -p 8081:8081 \
         pharia-kernel

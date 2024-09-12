@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::Write, path::Path};
+use std::{env, fs::File, io::Write, path::Path, time::Duration};
 
 use assert_cmd::Command;
 use pharia_kernel::{run, AppConfig, OperatorConfig};
@@ -120,6 +120,7 @@ impl Kernel {
                 "#,
             )
             .unwrap(),
+            config_update_interval: Duration::from_secs(10),
             log_level: None,
             open_telemetry_endpoint: None,
         };
