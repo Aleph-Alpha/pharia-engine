@@ -6,6 +6,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
+use tracing::info;
 
 use crate::{
     configuration_observer::{NamespaceConfig, Registry},
@@ -59,12 +60,17 @@ impl SkillProviderState {
     }
 
     pub fn upsert_skill(&mut self, skill: &SkillPath, tag: Option<String>) {
+        info!(
+            "New or changed skill: {skill} with tag {}",
+            tag.as_deref().unwrap_or("None")
+        );
         if self.known_skills.insert(skill.clone(), tag).is_some() {
             self.invalidate(skill);
         }
     }
 
     pub fn remove_skill(&mut self, skill: &SkillPath) {
+        info!("Removed skill: {skill}");
         self.known_skills.remove(skill);
         self.invalidate(skill);
     }

@@ -122,10 +122,11 @@ struct Diff {
 }
 
 impl Diff {
-    fn new(added: Vec<Skill>, removed: Vec<Skill>) -> Self {
+    fn new(added: Vec<Skill>, mut removed: Vec<Skill>) -> Self {
         // Do not list skills as removed if only the tag changed.
+        removed.retain(|r| added.iter().all(|a| a.name != r.name));
         Self {
-            removed: removed.into_iter().filter(|r| !added.contains(r)).collect(),
+            removed,
             added_or_changed: added,
         }
     }
@@ -362,9 +363,9 @@ pub mod tests {
         let diff =
             ConfigurationObserverActor::compute_diff(&[existing.clone()], &[incoming.clone()]);
 
-        // Then the new version is added and the old version is removed
+        // Then the new version is added and the old version is not removed as only the tag changed
         assert_eq!(diff.added_or_changed, vec![incoming]);
-        assert_eq!(diff.removed, vec![existing]);
+        assert!(diff.removed.is_empty());
     }
 
     #[tokio::test]
