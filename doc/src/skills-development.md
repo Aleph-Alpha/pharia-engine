@@ -363,7 +363,7 @@ You can view the Pharia-Kernel's API documentation at http://127.0.0.1:8081/api-
 
 5. Iterate
 
-Whenever you change the skill code, you have to compile it again and you have to invalidate the Pharia Kernel's skill chach
+Whenever you change the skill code, you have to compile it again and you have to invalidate the Pharia Kernel's skill cache
 in order to load the new skill version.
 
 ```shell
@@ -371,7 +371,7 @@ in order to load the new skill version.
     componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
 
     # invalidate the cached version of 'my_skill'
-    curl -v -X DELETE 127.0.0.1:8081/cached_skills/my_skill
+    curl -v -X DELETE 127.0.0.1:8081/cached_skills/local%2fmy_skill
 ```
 
 # Monitoring skill execution
