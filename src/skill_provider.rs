@@ -37,10 +37,7 @@ impl SkillProviderState {
     }
 
     fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send> {
-        let registry = match namespace_config {
-            NamespaceConfig::TeamOwned { registry, .. } => registry,
-        };
-        match registry {
+        match namespace_config.registry() {
             Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
             Registry::Oci {
                 repository,

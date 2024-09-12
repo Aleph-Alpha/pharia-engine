@@ -1,6 +1,10 @@
-use std::path::PathBuf;
+use std::{
+    fs::{self, DirEntry},
+    path::PathBuf,
+    time::SystemTime,
+};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
@@ -22,6 +26,27 @@ pub struct Skill {
     pub tag: Option<String>,
 }
 
+impl Skill {
+    fn from(value: DirEntry) -> anyhow::Result<Self> {
+        let name = value
+            .path()
+            .file_stem()
+            .ok_or_else(|| anyhow!("Invalid file name for skill."))?
+            .to_str()
+            .ok_or_else(|| anyhow!("Invalid UTF-8 name for skill."))?
+            .to_owned();
+        let tag = Some(
+            value
+                .metadata()?
+                .modified()?
+                .duration_since(SystemTime::UNIX_EPOCH)?
+                .as_millis()
+                .to_string(),
+        );
+        Ok(Self { name, tag })
+    }
+}
+
 // this is actual more of a namespace skill config
 // namespace is not good, as a namespace could list skills,
 // but could also load skills
@@ -39,6 +64,33 @@ impl NamespaceDescription {
     pub fn from_str(config: &str) -> anyhow::Result<Self> {
         let tc = toml::from_str(config)?;
         Ok(tc)
+    }
+}
+
+pub struct WatchLoader {
+    directory: PathBuf,
+}
+
+impl WatchLoader {
+    pub fn new(directory: PathBuf) -> Self {
+        Self { directory }
+    }
+}
+
+#[async_trait]
+impl NamespaceDescriptionLoader for WatchLoader {
+    async fn description(&mut self) -> NamespaceDescriptionResult {
+        if !self.directory.is_dir() {
+            return Err(NamespaceDescriptionError::Unrecoverable(anyhow!(
+                "The directory to watch '{:?}' is not a directory.",
+                self.directory
+            )));
+        }
+        let skills = fs::read_dir(self.directory.clone())
+            .map_err(|e| NamespaceDescriptionError::Unrecoverable(e.into()))?
+            .filter_map(|result| result.ok().and_then(|entry| Skill::from(entry).ok()))
+            .collect();
+        Ok(NamespaceDescription { skills })
     }
 }
 

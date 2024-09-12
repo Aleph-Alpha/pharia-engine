@@ -1,11 +1,15 @@
-use std::{collections::HashMap, env, fs, path::Path};
+use std::{
+    collections::HashMap,
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use url::Url;
 
 use super::{
-    namespace_description::{FileLoader, HttpLoader},
+    namespace_description::{FileLoader, HttpLoader, WatchLoader},
     NamespaceDescriptionLoader,
 };
 
@@ -41,6 +45,18 @@ impl OperatorConfig {
         )
         .unwrap()
     }
+
+    #[must_use]
+    pub fn dev() -> Self {
+        let namespaces = [(
+            "dev".to_owned(),
+            NamespaceConfig::Watch {
+                directory: "skills".into(),
+            },
+        )]
+        .into();
+        Self { namespaces }
+    }
 }
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case", tag = "type")]
@@ -62,9 +78,21 @@ pub enum NamespaceConfig {
         config_access_token_env_var: Option<String>,
         registry: Registry,
     },
+    Watch {
+        directory: PathBuf,
+    },
 }
 
 impl NamespaceConfig {
+    pub fn registry(&self) -> Registry {
+        match self {
+            NamespaceConfig::TeamOwned { registry, .. } => registry.clone(),
+            NamespaceConfig::Watch { directory } => Registry::File {
+                path: directory.to_str().unwrap().to_owned(),
+            },
+        }
+    }
+
     pub fn loader(&self) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + 'static>> {
         match self {
             NamespaceConfig::TeamOwned {
@@ -100,6 +128,9 @@ impl NamespaceConfig {
                     scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
                 }
             }
+            NamespaceConfig::Watch { directory } => {
+                Ok(Box::new(WatchLoader::new(directory.to_owned())))
+            }
         }
     }
 }
@@ -123,6 +154,22 @@ mod tests {
     fn deserialize_config_with_file_registry() {
         let config = OperatorConfig::local();
         assert!(config.namespaces.contains_key("local"));
+    }
+
+    #[test]
+    fn deserialize_watch_config() {
+        let config = OperatorConfig::from_toml(
+            r#"
+            [namespaces.local]
+            directory = "skills"
+            "#,
+        )
+        .unwrap();
+        let local_namespace = config.namespaces.get("local").unwrap();
+
+        let registry = local_namespace.registry();
+
+        assert!(matches!(registry, Registry::File { path } if path == "skills"));
     }
 
     #[test]

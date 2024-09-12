@@ -253,23 +253,13 @@ For local skill development you need a folder that serves as a skill registry to
     mkdir skills
 ```
 
-2. Create the namespace configuration:
+All skills in this folder are exposed in the namespace "local".
+Any changes in this folder will be picked up by the Pharia Kernel automatically.
 
-The namespace configuration lists all available skills for the respective namespace.  
-You need to list the skill names you want to develop locally, e.g.:
-
-```shell
-    touch namespace.toml
-    echo 'skills = [ { name = "my_skill" } ]' >> namespace.toml 
-```
-
-The namespace configuration is polled by the Pharia Kernel once a minute.
-
-3. Start the container:
+2. Start the container:
 
 ```shell
     podman run \
-        -v ./namespace.toml:/app/namespace.toml \
         -v ./skills:/app/skills \
         -e AA_API_TOKEN=$AA_API_TOKEN \
         -e LOG_LEVEL=debug \
@@ -288,7 +278,7 @@ You can view the Pharia-Kernel's API documentation at <http://127.0.0.1:8081/api
     curl http://127.0.0.1:8081/skill.wit > skill.wit
 
     # create python venv
-    python -m venv .venv 
+    python -m venv .venv
     source .venv/bin/activate
     pip install componentize-py
 
@@ -373,7 +363,6 @@ Specify the collector endpoint via the environment variable `OPEN_TELEMETRY_ENDP
 
 ```shell
     podman run \
-        -v ./namespace.toml:/app/namespace.toml \
         -v ./my_skill.wasm:/app/skills/my_skill.wasm \
         -e AA_API_TOKEN=$AA_API_TOKEN \
         -e OPEN_TELEMETRY_ENDPOINT=http://host.containers.internal:4317 \

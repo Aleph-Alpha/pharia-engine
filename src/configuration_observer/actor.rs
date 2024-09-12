@@ -237,13 +237,16 @@ impl ConfigurationObserverActor {
 #[cfg(test)]
 pub mod tests {
     use std::collections::HashMap;
+    use std::fs;
     use std::future::pending;
     use std::sync::Arc;
 
     use futures::executor::block_on;
+    use tempfile::tempdir;
     use tokio::sync::{mpsc, Mutex};
     use tokio::time::timeout;
 
+    use crate::configuration_observer::NamespaceConfig;
     use crate::skill_provider::tests::SkillProviderMsg;
     use crate::skills::SkillPath;
 
@@ -379,6 +382,53 @@ pub mod tests {
 
         // Then it will timeout
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn watch_skills_in_empty_directory() {
+        let temp_dir = tempdir().unwrap();
+        let namespaces = [(
+            "local".to_owned(),
+            NamespaceConfig::Watch {
+                directory: temp_dir.path().to_owned(),
+            },
+        )]
+        .into_iter()
+        .collect();
+        let config = OperatorConfig { namespaces };
+
+        let mut loaders = NamespaceDescriptionLoaders::new(config).unwrap();
+
+        let namespaces = loaders.namespaces();
+        assert_eq!(namespaces.len(), 1);
+        assert!(loaders.skills(&namespaces[0]).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn watch_skills_in_directory() {
+        let temp_dir = tempdir().unwrap();
+        let directory = temp_dir.path();
+        fs::File::create(directory.join("skill_1.wasm")).unwrap();
+        fs::File::create(directory.join("skill_2.wasm")).unwrap();
+        let namespaces = [(
+            "local".to_owned(),
+            NamespaceConfig::Watch {
+                directory: directory.to_owned(),
+            },
+        )]
+        .into_iter()
+        .collect();
+        let config = OperatorConfig { namespaces };
+
+        let mut loaders = NamespaceDescriptionLoaders::new(config).unwrap();
+
+        let namespaces = loaders.namespaces();
+        assert_eq!(namespaces.len(), 1);
+        let skills = loaders.skills(&namespaces[0]).await.unwrap();
+        assert_eq!(skills.len(), 2);
+        assert!(skills
+            .iter()
+            .all(|s| s.name == "skill_1" || s.name == "skill_2"));
     }
 
     #[tokio::test]

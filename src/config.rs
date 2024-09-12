@@ -43,14 +43,8 @@ impl AppConfig {
             Err(err) => match err.downcast::<io::Error>() {
                 Ok(ioerror) if ioerror.kind() == io::ErrorKind::NotFound => {
                     // println! as the logger is not yet instantiated
-                    println!("Info: The 'operator-config.toml' is not found, fallback to the namespace 'local' with the path 'skills' as the registry.");
-                    OperatorConfig::from_toml(
-                        r#"
-                        [namespaces.local]
-                        config_url = "file://namespace.toml"
-                        registry = { type = "file", path = "skills" }
-                    "#,
-                    )?
+                    println!("Info: The 'operator-config.toml' is not found, fallback to the namespace 'dev' with the path 'skills' as the registry.");
+                    OperatorConfig::dev()
                 }
                 Ok(err) => {
                     return Err(anyhow!(
