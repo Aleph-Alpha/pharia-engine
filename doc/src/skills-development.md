@@ -226,9 +226,9 @@ Congratulations! Your Skill is now deployed. You can now use the HTTP API to cal
 ## Get Pharia Kernel image
 
 1. Access JFrog Artifactory via token:
-    - Login to [JFrog](https://alephalpha.jfrog.io/ui/login/)
-    - Click on 'Edit Profile'
-    - Click on 'Generate an Identity Token'
+    * Login to [JFrog](https://alephalpha.jfrog.io/ui/login/)
+    * Click on 'Edit Profile'
+    * Click on 'Generate an Identity Token'
 
 2. Pull Pharia Kernel image
 
@@ -242,29 +242,14 @@ podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest pharia-
 
 ## Start Pharia Kernel container
 
-In order to run Pharia Kernel, you need to provide an operator and a namespace configuration:
+In order to run Pharia Kernel, you need to provide a namespace configuration:
 
-1. Create the operator configuration:
+1. Create a `skills` folder
 
-The operator configuration lists the skill namespaces which are available in the Pharia Kernel.  
-For local skill development you just need to list one namespace you want to use for your local Pharia Kernel (e.g. 'local').  
-You can deploy your skill to the production Pharia Kernel under a different namesspace-name any time.
-
+For local skill development you need a folder that serves as a skill registry to store all compiled skills.
 
 ```shell
-    # create operator config file
-    touch operator-config.toml 
-
-    # define namespace entry (named 'local')
-    echo "[namespaces.local]" >> operator-config.toml 
-
-    # set the namespace's config file location
-    echo 'config_url = "file://namespace.toml"' >> operator-config.toml 
-    
-    # set the namespace's skill registry (using a local file registry)
-    echo 'registry = { type = "file", path = "skills" }' >> operator-config.toml 
-
-    # create the local skill registry
+    # create the local skills folder
     mkdir skills
 ```
 
@@ -277,13 +262,13 @@ You need to list the skill names you want to develop locally, e.g.:
     touch namespace.toml
     echo 'skills = [ { name = "my_skill" } ]' >> namespace.toml 
 ```
+
 The namespace configuration is polled by the Pharia Kernel once a minute.
 
 3. Start the container:
 
 ```shell
     podman run \
-        -v ./operator-config.toml:/app/operator-config.toml \
         -v ./namespace.toml:/app/namespace.toml \
         -v ./skills:/app/skills \
         -e AA_API_TOKEN=$AA_API_TOKEN \
@@ -291,12 +276,13 @@ The namespace configuration is polled by the Pharia Kernel once a minute.
         -p 8081:8081 \
         pharia-kernel
 ```
-You can view the Pharia-Kernel's API documentation at http://127.0.0.1:8081/api-docs
 
+You can view the Pharia-Kernel's API documentation at <http://127.0.0.1:8081/api-docs>
 
 ## Build your skill
 
 1. Set up a virtual python environment:
+
 ```shell
     # fetch the wit world
     curl http://127.0.0.1:8081/skill.wit > skill.wit
@@ -354,6 +340,7 @@ You can view the Pharia-Kernel's API documentation at http://127.0.0.1:8081/api-
 ```
 
 4. Execute your skill:
+
 ```shell
     curl -v -X POST 127.0.0.1:8081/execute_skill \
         -H "Authorization: Bearer $AA_API_TOKEN" \
@@ -381,11 +368,11 @@ You can monitor you skill by connecting the Pharia Kernel to an OpenTelemetry co
 ```shell
     podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
+
 Specify the collector endpoint via the environment variable `OPEN_TELEMETRY_ENDPOINT`:
 
 ```shell
     podman run \
-        -v ./operator-config.toml:/app/operator-config.toml \
         -v ./namespace.toml:/app/namespace.toml \
         -v ./my_skill.wasm:/app/skills/my_skill.wasm \
         -e AA_API_TOKEN=$AA_API_TOKEN \
@@ -395,5 +382,3 @@ Specify the collector endpoint via the environment variable `OPEN_TELEMETRY_ENDP
 ```
 
 You can view the monitoring at your [local Jaeger instance](http://localhost:16686)
-
-

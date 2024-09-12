@@ -1,4 +1,5 @@
-use std::{env, net::SocketAddr};
+use anyhow::anyhow;
+use std::{env, io, net::SocketAddr};
 
 use crate::configuration_observer::OperatorConfig;
 
@@ -16,8 +17,11 @@ impl AppConfig {
     /// # Panics
     ///
     /// Will panic if the `PHARIA_KERNEL_ADDRESS` environment variable is not parseable as a TCP Address.
-    #[must_use]
-    pub fn from_env() -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Will return error if operator config exists but is invalid.
+    pub fn from_env() -> anyhow::Result<Self> {
         drop(dotenvy::dotenv());
 
         let addr = env::var("PHARIA_KERNEL_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8081".to_owned());
@@ -34,15 +38,39 @@ impl AppConfig {
             "The inference address must be provided."
         );
 
-        let operator_config = OperatorConfig::from_file("operator-config.toml")
-            .expect("The provided operator configuration must be valid.");
+        let operator_config = match OperatorConfig::from_file("operator-config.toml") {
+            Ok(operator_config) => operator_config,
+            Err(err) => match err.downcast::<io::Error>() {
+                Ok(ioerror) if ioerror.kind() == io::ErrorKind::NotFound => {
+                    // println! as the logger is not yet instantiated
+                    println!("Info: The 'operator-config.toml' is not found, fallback to the namespace 'local' with the path 'skills' as the registry.");
+                    OperatorConfig::from_toml(
+                        r#"
+                        [namespaces.local]
+                        config_url = "file://namespace.toml"
+                        registry = { type = "file", path = "skills" }
+                    "#,
+                    )?
+                }
+                Ok(err) => {
+                    return Err(anyhow!(
+                        "The provided operator configuration must be valid: {err}"
+                    ))
+                }
+                Err(err) => {
+                    return Err(anyhow!(
+                        "The provided operator configuration must be valid: {err}"
+                    ))
+                }
+            },
+        };
 
-        AppConfig {
+        Ok(AppConfig {
             tcp_addr: addr.parse().unwrap(),
             inference_addr,
             operator_config,
             log_level,
             open_telemetry_endpoint,
-        }
+        })
     }
 }
