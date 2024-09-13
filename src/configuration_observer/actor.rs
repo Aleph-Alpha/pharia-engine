@@ -124,13 +124,22 @@ struct ConfigurationObserverActor {
 #[derive(Debug)]
 struct Diff {
     added_or_changed: Vec<SkillDescription>,
-    removed: Vec<SkillDescription>,
+    removed: Vec<String>,
 }
 
 impl Diff {
-    fn new(added: Vec<SkillDescription>, mut removed: Vec<SkillDescription>) -> Self {
+    fn new(added: Vec<SkillDescription>, removed: Vec<SkillDescription>) -> Self {
         // Do not list skills as removed if only the tag changed.
-        removed.retain(|r| added.iter().all(|a| a.name != r.name));
+        let removed = removed
+            .into_iter()
+            .filter_map(|r| {
+                if added.iter().all(|a| a.name != r.name) {
+                    Some(r.name)
+                } else {
+                    None
+                }
+            })
+            .collect();
         Self {
             removed,
             added_or_changed: added,
@@ -233,9 +242,9 @@ impl ConfigurationObserverActor {
                 .await;
         }
 
-        for skill in diff.removed {
+        for skill_name in diff.removed {
             self.skill_provider_api
-                .remove(SkillPath::new(namespace, &skill.name))
+                .remove(SkillPath::new(namespace, &skill_name))
                 .await;
         }
     }
@@ -359,7 +368,7 @@ pub mod tests {
             diff.added_or_changed,
             vec![SkillDescription::with_name("new_skill")]
         );
-        assert_eq!(diff.removed, vec![SkillDescription::with_name("old_skill")]);
+        assert_eq!(diff.removed, vec!["old_skill"]);
     }
 
     #[test]
