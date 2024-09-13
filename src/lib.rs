@@ -140,7 +140,7 @@ mod tests {
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::empty(),
             namespace_update_interval: Duration::from_secs(10),
-            log_level: None,
+            log_level: "info".to_owned(),
             open_telemetry_endpoint: None,
         };
 

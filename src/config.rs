@@ -10,7 +10,7 @@ pub struct AppConfig {
     pub inference_addr: String,
     pub operator_config: OperatorConfig,
     pub namespace_update_interval: Duration,
-    pub log_level: Option<String>,
+    pub log_level: String,
     pub open_telemetry_endpoint: Option<String>,
 }
 
@@ -30,7 +30,7 @@ impl AppConfig {
         let inference_addr = env::var("AA_INFERENCE_ADDRESS")
             .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
 
-        let log_level = env::var("LOG_LEVEL").ok();
+        let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "error".to_owned());
 
         let open_telemetry_endpoint = env::var("OPEN_TELEMETRY_ENDPOINT").ok();
 

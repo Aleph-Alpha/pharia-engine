@@ -20,7 +20,7 @@ pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<()> {
     // Set up two tracing subscribers:
     // * Simple env logger
     // * OpenTelemetry
-    let env_filter = EnvFilter::from_str(app_config.log_level.as_deref().unwrap_or("error"))?;
+    let env_filter = EnvFilter::from_str(&app_config.log_level)?;
     let registry = tracing_subscriber::registry()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer());

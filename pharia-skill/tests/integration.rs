@@ -121,7 +121,7 @@ impl Kernel {
             )
             .unwrap(),
             namespace_update_interval: Duration::from_secs(10),
-            log_level: None,
+            log_level: "info".to_owned(),
             open_telemetry_endpoint: None,
         };
         Self::new(app_config).await
