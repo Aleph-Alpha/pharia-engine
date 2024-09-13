@@ -8,14 +8,17 @@ use tracing::error;
 use crate::{skill_provider::SkillProviderApi, skills::SkillPath};
 
 use super::{
-    namespace_description::{NamespaceDescriptionError, Skill},
+    namespace_description::{NamespaceDescriptionError, SkillDescription},
     NamespaceDescriptionLoader, OperatorConfig,
 };
 
 #[async_trait]
 pub trait ObservableConfig {
     fn namespaces(&self) -> Vec<String>;
-    async fn skills(&mut self, namespace: &str) -> Result<Vec<Skill>, NamespaceDescriptionError>;
+    async fn skills(
+        &mut self,
+        namespace: &str,
+    ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError>;
 }
 
 pub struct NamespaceDescriptionLoaders {
@@ -46,7 +49,10 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
         self.namespaces.keys().cloned().collect()
     }
 
-    async fn skills(&mut self, namespace: &str) -> Result<Vec<Skill>, NamespaceDescriptionError> {
+    async fn skills(
+        &mut self,
+        namespace: &str,
+    ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
         let skills = self
             .namespaces
             .get_mut(namespace)
@@ -110,19 +116,19 @@ struct ConfigurationObserverActor {
     skill_provider_api: SkillProviderApi,
     config: Box<dyn ObservableConfig + Send>,
     update_interval: Duration,
-    skills: HashMap<String, Vec<Skill>>,
+    skills: HashMap<String, Vec<SkillDescription>>,
     invalid_namespaces: HashSet<String>,
 }
 
 /// Keep track of changes that need to be propagated to the skill provider.
 #[derive(Debug)]
 struct Diff {
-    added_or_changed: Vec<Skill>,
-    removed: Vec<Skill>,
+    added_or_changed: Vec<SkillDescription>,
+    removed: Vec<SkillDescription>,
 }
 
 impl Diff {
-    fn new(added: Vec<Skill>, mut removed: Vec<Skill>) -> Self {
+    fn new(added: Vec<SkillDescription>, mut removed: Vec<SkillDescription>) -> Self {
         // Do not list skills as removed if only the tag changed.
         removed.retain(|r| added.iter().all(|a| a.name != r.name));
         Self {
@@ -151,7 +157,7 @@ impl ConfigurationObserverActor {
         }
     }
 
-    fn compute_diff(existing: &[Skill], incoming: &[Skill]) -> Diff {
+    fn compute_diff(existing: &[SkillDescription], incoming: &[SkillDescription]) -> Diff {
         let existing = existing.iter().collect::<HashSet<_>>();
         let incoming = incoming.iter().collect::<HashSet<_>>();
 
@@ -273,17 +279,17 @@ pub mod tests {
         async fn skills(
             &mut self,
             namespace: &str,
-        ) -> Result<Vec<Skill>, NamespaceDescriptionError> {
+        ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             self.config.lock().await.skills(namespace).await
         }
     }
 
     pub struct StubConfig {
-        namespaces: HashMap<String, Vec<Skill>>,
+        namespaces: HashMap<String, Vec<SkillDescription>>,
     }
 
     impl StubConfig {
-        pub fn new(namespaces: HashMap<String, Vec<Skill>>) -> Self {
+        pub fn new(namespaces: HashMap<String, Vec<SkillDescription>>) -> Self {
             Self { namespaces }
         }
     }
@@ -297,7 +303,7 @@ pub mod tests {
         async fn skills(
             &mut self,
             namespace: &str,
-        ) -> Result<Vec<Skill>, NamespaceDescriptionError> {
+        ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             Ok(self
                 .namespaces
                 .get(namespace)
@@ -317,12 +323,12 @@ pub mod tests {
         async fn skills(
             &mut self,
             _namespace: &str,
-        ) -> Result<Vec<Skill>, NamespaceDescriptionError> {
+        ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             pending().await
         }
     }
 
-    impl Skill {
+    impl SkillDescription {
         fn with_name(name: &str) -> Self {
             Self::new(name, None)
         }
@@ -338,26 +344,29 @@ pub mod tests {
     #[test]
     fn diff_is_computed() {
         let incoming = vec![
-            Skill::with_name("new_skill"),
-            Skill::with_name("existing_skill"),
+            SkillDescription::with_name("new_skill"),
+            SkillDescription::with_name("existing_skill"),
         ];
         let existing = vec![
-            Skill::with_name("existing_skill"),
-            Skill::with_name("old_skill"),
+            SkillDescription::with_name("existing_skill"),
+            SkillDescription::with_name("old_skill"),
         ];
 
         let diff = ConfigurationObserverActor::compute_diff(&existing, &incoming);
 
         // when the observer checks for new skills
-        assert_eq!(diff.added_or_changed, vec![Skill::with_name("new_skill")]);
-        assert_eq!(diff.removed, vec![Skill::with_name("old_skill")]);
+        assert_eq!(
+            diff.added_or_changed,
+            vec![SkillDescription::with_name("new_skill")]
+        );
+        assert_eq!(diff.removed, vec![SkillDescription::with_name("old_skill")]);
     }
 
     #[test]
     fn diff_is_computed_over_versions() {
         // Given a skill has a new version
-        let existing = Skill::new("existing_skill", Some("v1"));
-        let incoming = Skill::new("existing_skill", Some("v2"));
+        let existing = SkillDescription::new("existing_skill", Some("v1"));
+        let incoming = SkillDescription::new("existing_skill", Some("v2"));
 
         // When the observer checks for new skills
         let diff =
@@ -440,7 +449,7 @@ pub mod tests {
         let update_interval_ms = 1;
         let namespaces = HashMap::from([(
             dummy_namespace.to_owned(),
-            vec![Skill::with_name(dummy_skill)],
+            vec![SkillDescription::with_name(dummy_skill)],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
@@ -469,7 +478,7 @@ pub mod tests {
 
     impl ConfigurationObserverActor {
         fn with_skills(
-            skills: HashMap<String, Vec<Skill>>,
+            skills: HashMap<String, Vec<SkillDescription>>,
             skill_provider_api: SkillProviderApi,
             config: Box<dyn ObservableConfig + Send>,
         ) -> Self {
@@ -506,7 +515,7 @@ pub mod tests {
         async fn skills(
             &mut self,
             _namespace: &str,
-        ) -> Result<Vec<Skill>, NamespaceDescriptionError> {
+        ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             Err(NamespaceDescriptionError::Unrecoverable(anyhow!(
                 "SaboteurConfig will always fail."
             )))
@@ -520,7 +529,7 @@ pub mod tests {
         let dummy_skill = "dummy_skill";
         let namespaces = HashMap::from([(
             dummy_namespace.to_owned(),
-            vec![Skill::with_name(dummy_skill)],
+            vec![SkillDescription::with_name(dummy_skill)],
         )]);
 
         let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
@@ -563,7 +572,7 @@ pub mod tests {
         let update_interval_ms = 1;
         let namespaces = HashMap::from([(
             dummy_namespace.to_owned(),
-            vec![Skill::with_name(dummy_skill)],
+            vec![SkillDescription::with_name(dummy_skill)],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
@@ -611,7 +620,7 @@ pub mod tests {
         let dummy_skill = "dummy_skill";
         let namespaces = HashMap::from([(
             dummy_namespace.to_owned(),
-            vec![Skill::with_name(dummy_skill)],
+            vec![SkillDescription::with_name(dummy_skill)],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
         *config_arc_clone.lock().await = stub_config;

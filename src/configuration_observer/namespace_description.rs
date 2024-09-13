@@ -21,12 +21,12 @@ pub enum NamespaceDescriptionError {
 type NamespaceDescriptionResult = Result<NamespaceDescription, NamespaceDescriptionError>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct Skill {
+pub struct SkillDescription {
     pub name: String,
     pub tag: Option<String>,
 }
 
-impl Skill {
+impl SkillDescription {
     fn from(value: DirEntry) -> anyhow::Result<Self> {
         let name = value
             .path()
@@ -57,7 +57,7 @@ pub trait NamespaceDescriptionLoader {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NamespaceDescription {
-    pub skills: Vec<Skill>,
+    pub skills: Vec<SkillDescription>,
 }
 
 impl NamespaceDescription {
@@ -88,7 +88,11 @@ impl NamespaceDescriptionLoader for WatchLoader {
         }
         let skills = fs::read_dir(self.directory.clone())
             .map_err(|e| NamespaceDescriptionError::Unrecoverable(e.into()))?
-            .filter_map(|result| result.ok().and_then(|entry| Skill::from(entry).ok()))
+            .filter_map(|result| {
+                result
+                    .ok()
+                    .and_then(|entry| SkillDescription::from(entry).ok())
+            })
             .collect();
         Ok(NamespaceDescription { skills })
     }

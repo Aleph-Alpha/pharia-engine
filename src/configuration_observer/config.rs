@@ -9,7 +9,9 @@ use serde::Deserialize;
 use url::Url;
 
 use super::{
-    namespace_description::{FileLoader, HttpLoader, NamespaceDescription, Skill, WatchLoader},
+    namespace_description::{
+        FileLoader, HttpLoader, NamespaceDescription, SkillDescription, WatchLoader,
+    },
     NamespaceDescriptionLoader,
 };
 
@@ -40,7 +42,7 @@ impl OperatorConfig {
                 NamespaceConfig::InPlace {
                     skills: skills
                         .iter()
-                        .map(|&name| Skill {
+                        .map(|&name| SkillDescription {
                             name: name.to_owned(),
                             tag: None,
                         })
@@ -97,7 +99,7 @@ pub enum NamespaceConfig {
     /// This behavior is especially useful to make sure certain skills are found in integartion
     /// tests.
     InPlace {
-        skills: Vec<Skill>,
+        skills: Vec<SkillDescription>,
         registry: Registry,
     },
 }
