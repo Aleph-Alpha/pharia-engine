@@ -7,8 +7,6 @@ mod tests {
 
     /// Search a Document Index collection
     pub struct SearchRequest {
-        /// Where you want to search in
-        index: IndexPath,
         /// What you want to search for
         query: String,
         /// The maximum number of results to return. Defaults to 1
@@ -19,9 +17,8 @@ mod tests {
     }
 
     impl SearchRequest {
-        pub fn new(index: IndexPath, query: impl Into<String>) -> Self {
+        pub fn new(query: impl Into<String>) -> Self {
             Self {
-                index,
                 query: query.into(),
                 max_results: 1,
                 min_score: None,
@@ -60,11 +57,11 @@ mod tests {
 
         async fn search(
             &self,
+            index: IndexPath,
             request: SearchRequest,
             api_token: &str,
         ) -> anyhow::Result<Vec<SearchResult>> {
             let SearchRequest {
-                index,
                 query,
                 max_results,
                 min_score,
@@ -116,11 +113,11 @@ mod tests {
     /// into the public API.
     mod client {
         use reqwest::ClientBuilder;
-        use serde::{Deserialize, Serialize, Serializer};
+        use serde::{Deserialize, Serialize};
         use serde_json::json;
 
         /// Search a Document Index collection
-        #[derive(Debug, Serialize)]
+        #[derive(Debug)]
         pub struct SearchRequest {
             /// What you want to search for
             query: Vec<Modality>,
@@ -128,10 +125,8 @@ mod tests {
             max_results: usize,
             /// The minimum score each result should have to be returned.
             /// By default, all results are returned, up to the `max_results`.
-            #[serde(skip_serializing_if = "Option::is_none")]
             min_score: Option<f64>,
             /// Whether only text chunks should be returned
-            #[serde(serialize_with = "filters", rename = "filters")]
             text_only: bool,
         }
 
@@ -149,20 +144,6 @@ mod tests {
                     text_only,
                 }
             }
-        }
-
-        #[expect(clippy::trivially_copy_pass_by_ref)]
-        fn filters<S>(text_only: &bool, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            let filters = if *text_only {
-                json!([{ "with": [{ "modality": "text" }]}])
-            } else {
-                json!([])
-            };
-
-            filters.serialize(serializer)
         }
 
         /// Which documents you want to search in, and which type of index should be used
@@ -259,6 +240,21 @@ mod tests {
                     collection,
                     index,
                 } = index;
+                let SearchRequest {
+                    query,
+                    max_results,
+                    min_score,
+                    text_only,
+                } = request;
+
+                let mut body = json!({
+                    "query": query,
+                    "max_results": max_results,
+                    "min_score": min_score,
+                });
+                if text_only {
+                    body["filters"] = json!([{ "with": [{ "modality": "text" }]}]);
+                }
 
                 Ok(self
                     .http
@@ -267,7 +263,7 @@ mod tests {
                         &self.host
                     ))
                     .bearer_auth(api_token)
-                    .json(&request)
+                    .json(&body)
                     .send()
                     .await?
                     .error_for_status()?
@@ -320,11 +316,9 @@ mod tests {
         let search = Search::new(SearchClient::new(host).unwrap());
 
         // When making a query on an existing collection
-        let request = SearchRequest::new(
-            IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
-            "What is the population of Heidelberg?",
-        );
-        let results = search.search(request, api_token).await.unwrap();
+        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
+        let request = SearchRequest::new("What is the population of Heidelberg?");
+        let results = search.search(index, request, api_token).await.unwrap();
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
@@ -341,12 +335,10 @@ mod tests {
         let max_results = 5;
 
         // When making a query on an existing collection
-        let request = SearchRequest::new(
-            IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
-            "What is the population of Heidelberg?",
-        )
-        .with_max_results(max_results);
-        let results = search.search(request, api_token).await.unwrap();
+        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
+        let request = SearchRequest::new("What is the population of Heidelberg?")
+            .with_max_results(max_results);
+        let results = search.search(index, request, api_token).await.unwrap();
 
         // Then we get at least one result
         assert_eq!(results.len(), max_results);
@@ -366,13 +358,11 @@ mod tests {
         let min_score = 0.725;
 
         // When making a query on an existing collection
-        let request = SearchRequest::new(
-            IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64"),
-            "What is the population of Heidelberg?",
-        )
-        .with_max_results(max_results)
-        .with_min_score(min_score);
-        let results = search.search(request, api_token).await.unwrap();
+        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
+        let request = SearchRequest::new("What is the population of Heidelberg?")
+            .with_max_results(max_results)
+            .with_min_score(min_score);
+        let results = search.search(index, request, api_token).await.unwrap();
 
         // Then we get less than 5 results
         assert_eq!(results.len(), 4);
