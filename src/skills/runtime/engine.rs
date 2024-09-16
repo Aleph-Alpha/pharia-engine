@@ -150,7 +150,18 @@ impl Skill {
                 let result = bindings
                     .pharia_skill_skill_handler()
                     .call_run(store, &input)
-                    .await??;
+                    .await?;
+                let result = match result {
+                    Ok(result) => result,
+                    Err(e) => {
+                        if let v0_2::exports::pharia::skill::skill_handler::Error::Internal(e) = e {
+                            tracing::error!("Failed to run skill, internal skill error:\n{e}");
+                            return Err(anyhow!("Internal skill error:\n{e}"));
+                        }
+                        tracing::error!("Failed to run skill: {e}");
+                        return Err(e.into());
+                    }
+                };
                 Ok(serde_json::from_slice(&result)?)
             }
             Self::V0_1(skill) => {
@@ -159,7 +170,18 @@ impl Skill {
                 let result = bindings
                     .pharia_skill_skill_handler()
                     .call_run(store, &input)
-                    .await??;
+                    .await?;
+                let result = match result {
+                    Ok(result) => result,
+                    Err(e) => {
+                        if let v0_1::exports::pharia::skill::skill_handler::Error::Internal(e) = e {
+                            tracing::error!("Failed to run skill, internal skill error:\n{e}");
+                            return Err(anyhow!("Internal skill error:\n{e}"));
+                        }
+                        tracing::error!("Failed to run skill: {e}");
+                        return Err(e.into());
+                    }
+                };
                 Ok(serde_json::from_slice(&result)?)
             }
             Self::Unversioned(skill) => {
