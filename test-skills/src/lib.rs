@@ -168,7 +168,7 @@ fn run_in_venv(venv_path: &Path, args: &[&str]) -> Result<Vec<u8>, Error> {
     } else {
         let mut cmd = Command::new("sh");
         let cmd_in_venv = args.join(" ");
-        let inner_cmd = format!(". {activate_path} && {cmd_in_venv}");
+        let inner_cmd = format!("\". {activate_path} && {cmd_in_venv}\"");
         cmd.args(["-c", &inner_cmd]);
         cmd
     };
