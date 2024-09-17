@@ -64,15 +64,17 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
     }
 }
 
-/// Periodically observes changes in remote repositories containing
-/// skill configurations and reports detected changes to the skill executor
-pub struct ConfigurationObserver {
+/// Watches for changes in namespaces configuration. In particuler which skills should currently be
+/// served. These changes are communicated back to the skill provider, so it would serve the version
+/// the skill operator intends to serve from then on. This enables Skill Operatores to roll out
+/// skills at runtime in self service.
+pub struct NamespaceWatcher {
     ready: tokio::sync::watch::Receiver<bool>,
     shutdown: tokio::sync::watch::Sender<bool>,
     handle: JoinHandle<()>,
 }
 
-impl ConfigurationObserver {
+impl NamespaceWatcher {
     /// Completes after attempted to load all config once.
     /// This ensures that the requests are only accepted after initialization.
     pub async fn wait_for_ready(&mut self) {
@@ -262,7 +264,7 @@ pub mod tests {
     use tokio::sync::{mpsc, Mutex};
     use tokio::time::timeout;
 
-    use crate::configuration_observer::NamespaceConfig;
+    use crate::namespace_watcher::NamespaceConfig;
     use crate::skill_provider::tests::SkillProviderMsg;
     use crate::skills::SkillPath;
 
@@ -394,7 +396,7 @@ pub mod tests {
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
         let mut observer =
-            ConfigurationObserver::with_config(skill_provider_api, config, update_interval);
+            NamespaceWatcher::with_config(skill_provider_api, config, update_interval);
 
         // When waiting for the first pass
         let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
@@ -467,7 +469,7 @@ pub mod tests {
         let skill_provider_api = SkillProviderApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
         let mut observer =
-            ConfigurationObserver::with_config(skill_provider_api, stub_config, update_interval);
+            NamespaceWatcher::with_config(skill_provider_api, stub_config, update_interval);
         observer.wait_for_ready().await;
 
         // Then one new skill message is send for each skill configured
@@ -590,7 +592,7 @@ pub mod tests {
         let skill_provider_api = SkillProviderApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
         let observer =
-            ConfigurationObserver::with_config(skill_provider_api, stub_config, update_interval);
+            NamespaceWatcher::with_config(skill_provider_api, stub_config, update_interval);
 
         // Then only one new skill message is send for each skill configured
         receiver.recv().await.unwrap();
@@ -621,7 +623,7 @@ pub mod tests {
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
         let mut observer =
-            ConfigurationObserver::with_config(skill_provider_api, config, update_interval);
+            NamespaceWatcher::with_config(skill_provider_api, config, update_interval);
         observer.wait_for_ready().await;
         receiver.recv().await.unwrap();
 

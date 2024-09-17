@@ -9,7 +9,7 @@ use tokio::{
 use tracing::info;
 
 use crate::{
-    configuration_observer::{NamespaceConfig, Registry},
+    namespace_watcher::{NamespaceConfig, Registry},
     registries::{FileRegistry, OciRegistry, SkillRegistry},
     skills::{CsiForSkills, Engine, Skill, SkillPath},
 };

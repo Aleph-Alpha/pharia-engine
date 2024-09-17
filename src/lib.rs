@@ -1,5 +1,5 @@
 mod config;
-mod configuration_observer;
+mod namespace_watcher;
 mod csi;
 mod inference;
 mod language_selection;
@@ -11,7 +11,7 @@ mod skills;
 mod tokenizers;
 
 use anyhow::{Context, Error};
-use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
+use namespace_watcher::{NamespaceWatcher, NamespaceDescriptionLoaders};
 use csi::CsiDrivers;
 use futures::Future;
 use logging::initialize_tracing;
@@ -22,7 +22,7 @@ use tracing::error;
 use self::{inference::Inference, skills::SkillExecutor};
 
 pub use config::AppConfig;
-pub use configuration_observer::OperatorConfig;
+pub use namespace_watcher::OperatorConfig;
 
 /// Boots up all the actors making up the kernel. The result of this method is also a future, which
 /// signals that all resources have been shutdown.
@@ -54,14 +54,14 @@ pub async fn run(
             .context("Unable to read the configuration for namespaces")?,
     );
 
-    let mut configuration_observer = ConfigurationObserver::with_config(
+    let mut namespace_watcher = NamespaceWatcher::with_config(
         skill_provider.api(),
         loaders,
         app_config.namespace_update_interval,
     );
 
     // Wait for first pass of the configuration so that the configured skills are loaded
-    configuration_observer.wait_for_ready().await;
+    namespace_watcher.wait_for_ready().await;
 
     let shell_shutdown = shell::run(
         app_config.tcp_addr,
@@ -82,7 +82,7 @@ pub async fn run(
 
         // Shutdown everything we started. We reverse the order for the shutdown so all the required
         // actors are still answering for each component.
-        configuration_observer.wait_for_shutdown().await;
+        namespace_watcher.wait_for_shutdown().await;
         skill_executor.wait_for_shutdown().await;
         skill_provider.wait_for_shutdown().await;
         tokenizers.wait_for_shutdown().await;
@@ -97,7 +97,7 @@ mod tests {
     use std::sync::LazyLock;
     use std::time::Duration;
 
-    use configuration_observer::OperatorConfig;
+    use namespace_watcher::OperatorConfig;
     use dotenvy::dotenv;
     use tokio_test::assert_ok;
 

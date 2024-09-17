@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use std::{env, io, net::SocketAddr, time::Duration};
 
-use crate::configuration_observer::OperatorConfig;
+use crate::namespace_watcher::OperatorConfig;
 
 pub struct AppConfig {
     pub tcp_addr: SocketAddr,

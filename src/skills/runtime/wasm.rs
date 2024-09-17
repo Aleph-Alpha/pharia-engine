@@ -50,7 +50,7 @@ pub mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        configuration_observer::OperatorConfig,
+        namespace_watcher::OperatorConfig,
         csi::ChunkRequest,
         inference::{Completion, CompletionRequest},
         language_selection::{select_language, Language},

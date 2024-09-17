@@ -165,7 +165,7 @@ impl NamespaceConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::configuration_observer::{config::Registry, NamespaceConfig};
+    use crate::namespace_watcher::{config::Registry, NamespaceConfig};
 
     use super::OperatorConfig;
 
