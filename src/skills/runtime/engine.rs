@@ -495,7 +495,7 @@ mod tests {
     use v0_2::pharia::skill::csi::{CompletionParams, CompletionRequest, Host, Language};
 
     use crate::{
-        csi::{tests::dummy_csi_apis, CsiApis},
+        csi::{tests::dummy_csi_apis, CsiDrivers},
         inference::{self, tests::InferenceStub},
         skills::{actor::SkillInvocationCtx, runtime::wasm::tests::CsiGreetingMock},
         tests::api_token,
@@ -529,7 +529,7 @@ mod tests {
     async fn complete_all_completion_requests_in_respective_order() {
         // Given a linked context
         let inference_stub = InferenceStub::new(|r| Ok(inference::Completion::from_text(r.prompt)));
-        let csi_apis = CsiApis {
+        let csi_apis = CsiDrivers {
             inference: inference_stub.api(),
             ..dummy_csi_apis()
         };

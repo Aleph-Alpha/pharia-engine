@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::{
-    csi::{ChunkRequest, Csi as _, CsiApis},
+    csi::{ChunkRequest, Csi as _, CsiDrivers},
     inference::{Completion, CompletionRequest},
     language_selection::Language,
     skill_provider::SkillProviderApi,
@@ -30,13 +30,13 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(csi_apis: CsiApis, skill_provider: SkillProviderApi) -> Self {
+    pub fn new(csi_apis: CsiDrivers, skill_provider: SkillProviderApi) -> Self {
         let runtime = WasmRuntime::new(skill_provider);
         Self::with_runtime(runtime, csi_apis)
     }
 
     /// You may want use this constructor if you want to use a double runtime for testing
-    pub fn with_runtime<R: Runtime + Send + 'static>(runtime: R, csi_apis: CsiApis) -> Self {
+    pub fn with_runtime<R: Runtime + Send + 'static>(runtime: R, csi_apis: CsiDrivers) -> Self {
         let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
@@ -101,14 +101,14 @@ pub enum ExecuteSkillError {
 struct SkillExecutorActor<R: Runtime> {
     runtime: R,
     recv: mpsc::Receiver<SkillExecutorMsg>,
-    csi_apis: CsiApis,
+    csi_apis: CsiDrivers,
 }
 
 impl<R> SkillExecutorActor<R>
 where
     R: Runtime,
 {
-    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: CsiApis) -> Self {
+    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: CsiDrivers) -> Self {
         SkillExecutorActor {
             runtime,
             recv,
@@ -179,7 +179,7 @@ pub struct SkillInvocationCtx {
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
     send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
-    csi_apis: CsiApis,
+    csi_apis: CsiDrivers,
     // How the user authenticates with us
     api_token: String,
     // For tracing, we wire the skill invocation span context with the CSI spans
@@ -189,7 +189,7 @@ pub struct SkillInvocationCtx {
 impl SkillInvocationCtx {
     pub fn new(
         send_rt_err: oneshot::Sender<anyhow::Error>,
-        csi_apis: CsiApis,
+        csi_apis: CsiDrivers,
         api_token: String,
         parent_context: Option<Context>,
     ) -> Self {
@@ -304,7 +304,7 @@ pub mod tests {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
         let tokenizers = FakeTokenizers::new();
-        let csi_apis = CsiApis {
+        let csi_apis = CsiDrivers {
             tokenizers: tokenizers.api(),
             ..dummy_csi_apis()
         };
@@ -338,7 +338,7 @@ pub mod tests {
             let TokenizersMsg::TokenizerByModel { send, .. } = recv_tokenizer.recv().await.unwrap();
             send.send(Err(anyhow!("Failed to load tokenizer")))
         });
-        let csi_apis = CsiApis {
+        let csi_apis = CsiDrivers {
             tokenizers,
             ..dummy_csi_apis()
         };
@@ -411,7 +411,7 @@ pub mod tests {
             }
         }
         let inference_saboteur = InferenceStub::new(|_| Err(anyhow!("Test inference error")));
-        let csi_apis = CsiApis {
+        let csi_apis = CsiDrivers {
             inference: inference_saboteur.api(),
             ..dummy_csi_apis()
         };
@@ -440,7 +440,7 @@ pub mod tests {
         let error_msg = "out-of-cheese".to_owned();
         let inference = InferenceStub::with_completion("Hello".to_owned());
         let runtime = SaboteurRuntime::new(error_msg.clone());
-        let csi_apis = CsiApis {
+        let csi_apis = CsiDrivers {
             inference: inference.api(),
             ..dummy_csi_apis()
         };
@@ -462,7 +462,7 @@ pub mod tests {
     async fn greeting_skill() {
         // Given
         let inference = InferenceStub::with_completion("Hello".to_owned());
-        let csi_apis = CsiApis {
+        let csi_apis = CsiDrivers {
             inference: inference.api(),
             ..dummy_csi_apis()
         };

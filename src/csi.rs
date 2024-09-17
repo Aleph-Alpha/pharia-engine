@@ -16,7 +16,7 @@ mod search;
 ///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
-pub struct CsiApis {
+pub struct CsiDrivers {
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
     pub tokenizers: TokenizersApi,
@@ -55,7 +55,7 @@ pub trait Csi {
     }
 }
 
-impl Csi for CsiApis {
+impl Csi for CsiDrivers {
     async fn complete_text(
         &self,
         auth: String,
@@ -121,16 +121,16 @@ pub mod tests {
 
     use crate::{inference::InferenceApi, tokenizers::TokenizersApi};
 
-    use super::CsiApis;
+    use super::CsiDrivers;
 
-    pub fn dummy_csi_apis() -> CsiApis {
+    pub fn dummy_csi_apis() -> CsiDrivers {
         let (send, _recv) = mpsc::channel(1);
         let inference = InferenceApi::new(send);
 
         let (send, _recv) = mpsc::channel(1);
         let tokenizers = TokenizersApi::new(send);
 
-        CsiApis {
+        CsiDrivers {
             inference,
             tokenizers,
         }

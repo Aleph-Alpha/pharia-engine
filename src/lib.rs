@@ -12,7 +12,7 @@ mod tokenizers;
 
 use anyhow::{Context, Error};
 use configuration_observer::{ConfigurationObserver, NamespaceDescriptionLoaders};
-use csi::CsiApis;
+use csi::CsiDrivers;
 use futures::Future;
 use logging::initialize_tracing;
 use skill_provider::SkillProvider;
@@ -39,14 +39,14 @@ pub async fn run(
     // Boot up the drivers which power the CSI. Right now we only have inference.
     let inference = Inference::new(app_config.inference_addr.clone());
     let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();
-    let csi_apis = CsiApis {
+    let csi_drivers = CsiDrivers {
         inference: inference.api(),
         tokenizers: tokenizers.api(),
     };
     let skill_provider = SkillProvider::new(&app_config.operator_config.namespaces);
 
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::new(csi_apis, skill_provider.api());
+    let skill_executor = SkillExecutor::new(csi_drivers, skill_provider.api());
 
     // Boot up the configuration observer
     let loaders = Box::new(
