@@ -2,11 +2,11 @@
 
 ## Developing Skills
 
-A Skill is a WebAssembly Component compiled against our WIT (**W**ebAssembly **I**nterface **T**ypes) we call the **C**ognitive **S**ystem **I**nterface (CSI). The good thing is that you can compile almost any language into WebAssembly. Here we explain only how it works for Python.
+A Skill is a WebAssembly Component compiled against our WIT (**W**ebAssembly **I**nterface **T**ypes) we call the **C**ognitive **S**ystem **I**nterface (CSI). The good thing is that you can compile almost any language into WebAssembly. Here we explain how it works for Python.
 
 ## Cheatsheet
 
-Just all the commands needed to setup your environment at a glance. Read the next chapter to understand them.
+Just all the commands needed to setup your environment at a glance. Read the next chapters to understand them.
 
 ```shell
 curl https://pharia-kernel.aleph-alpha.stackit.run/skill.wit > skill.wit
@@ -22,7 +22,7 @@ componentize-py -d skill.wit -w skill componentize haiku -o ./haiku.wasm
 
 This is a step-by-step instruction of how to write Skills. There is also an example repository at <https://gitlab.aleph-alpha.de/engineering/haiku-skill-python> for you to explore.
 
-First you need to create the Python bindings for the Cognitive System Interface. In order to do so, you need a copy of `./skill.wit`. For the purpose of this documentation we assume the base url is `https://pharia-kernel.aleph-alpha.stackit.run`. Please replace it with your URL of Pharia Kernel hosted by your operations team. Pharia Kernel serves the most recent version at `{base_url}/skill.wit` so in our example it would be `https://pharia-kernel.aleph-alpha.stackit.run/skill.wit`. Just access the route and copy the contents as `skill.wit` in your development directory.
+First you need to create the Python bindings for the Cognitive System Interface. In order to do so, you need a copy of `./skill.wit`. For the purpose of this documentation we assume the `base_url` is `https://pharia-kernel.aleph-alpha.stackit.run`. Please replace it with your URL of the Pharia Kernel hosted by your operations team. Pharia Kernel serves the most recent version at `{base_url}/skill.wit` so in our example it would be `https://pharia-kernel.aleph-alpha.stackit.run/skill.wit`. Download the contents as `skill.wit` into your development directory.
 
 The current version looks like this:
 
@@ -138,7 +138,7 @@ interface csi {
 }
 ```
 
-To convert the `skill.wit` into bindings you need to install `componentize-py`. Choose the virtualization of your choice (conda, virtual env, ...) and pip install it.
+To convert the `skill.wit` into bindings you need to install `componentize-py`. Choose the Python virtualization of your choice and pip install it. We use `venv` in the following examples.
 
 ```shell
 pip install componentize-py
@@ -160,7 +160,7 @@ import json
 class SkillHandler(skill.exports.SkillHandler):
     def run(self, input: bytes) -> bytes:
         input = json.loads(input)
-        prompt = f"""Write a haiku about {in_}
+        prompt = f"""Write a haiku about {input}
 
 ### Response:"""
         params = csi.CompletionParams(100, None, None, None, [])
@@ -180,10 +180,10 @@ This will create a file called `haiku.wasm`, which can now be deployed into Phar
 
 In order to make a Skill available in Pharia Kernel two criteria need to be met:
 
-* The skill must be deployed as a component to an OCI registry (for local development a directory might also suffice)
+* The skill must be deployed as a component to an OCI registry (a directory might also suffice for local development)
 * The skill must be configured in the namespace configuration (a `toml` file, typically checked into a Git repository)
 
-If your team does not own a namespace yet, you can request one from your Pharia Kernel operators. They will associate it with a `namespace.toml` which lists the skills you want to deploy as well as an OCI registry to load the skill code into. Ideally your team owns both, so you can deploy skills in self service.
+If your team does not own a namespace yet, you can request one from your Pharia Kernel operators. They will associate it with a `namespace.toml`, which lists the skills you want to deploy, as well as an OCI registry to load the skill code into. Ideally, your team owns both, so you can deploy skills in self service.
 
 The TOML file lists all skills in the namespace. Here is an example:
 
@@ -209,17 +209,17 @@ podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-skill:latest
 podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-skill:latest pharia-skill
 ```
 
-Feel free to use `docker` instead, if you are more familiar with that tooling.
+Only `podman` is tested, but `docker` should be a dropin replacement.
 
-With the tooling available we can now upload the Skill.
+With the tooling available, we can now upload the Skill.
 
 ```shell
 podman run -v ./haiku.wasm:/haiku.wasm pharia-skill publish -R registry.gitlab.aleph-alpha.de -r engineering/pharia-skills/skills -u DUMMY_USER_NAME -p $GITLAB_TOKEN ./haiku.wasm
 ```
 
-With our Gitlab registry, any user name will work, as long as you use a token. You can generate a token on your profile page. It is important to give write privilege.
+With our Gitlab registry, any user name will work, as long as you use a access token. You can generate a token on your profile page. It is necessary to include write privilege.
 
-Congratulations! Your Skill is now deployed. You can now use the HTTP API to call it.
+Congratulations! Your Skill is now deployed. You can now use the [HTTP API](https://pharia-kernel.aleph-alpha.stackit.run/api-docs#tag/skills/POST/execute_skill) to call it.
 
 # Local Pharia Kernel setup
 
@@ -233,8 +233,10 @@ Congratulations! Your Skill is now deployed. You can now use the HTTP API to cal
 2. Pull Pharia Kernel image
 
 ```shell
-podman login alephalpha.jfrog.io/pharia-kernel-images # login in interactive mode
-podman login alephalpha.jfrog.io/pharia-kernel-images -u $JFROG_USER -p $JFROG_PASSWORD # login in non-interactive mode
+# login in interactive mode
+podman login alephalpha.jfrog.io/pharia-kernel-images
+# login in non-interactive mode
+podman login alephalpha.jfrog.io/pharia-kernel-images -u $JFROG_USER -p $JFROG_PASSWORD
 
 podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest
 podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest pharia-kernel
@@ -246,15 +248,15 @@ In order to run Pharia Kernel, you need to provide a namespace configuration:
 
 1. Create a `skills` folder
 
-For local skill development you need a folder that serves as a skill registry to store all compiled skills.
+For local skill development, you need a folder that serves as a skill registry to store all compiled skills.
 
 ```shell
     # create the local skills folder
     mkdir skills
 ```
 
-All skills in this folder are exposed in the namespace "local".
-Any changes in this folder will be picked up by the Pharia Kernel automatically.
+All skills in this folder are exposed in the namespace "dev".
+Any changes in this folder will be picked up by the Pharia Kernel automatically. The `operator-config.toml` and `namespace.toml` should not be provided.
 
 2. Start the container:
 
@@ -263,7 +265,7 @@ Any changes in this folder will be picked up by the Pharia Kernel automatically.
         -v ./skills:/app/skills \
         -e AA_API_TOKEN=$AA_API_TOKEN \
         -e NAMESPACE_UPDATE_INTERVAL=1s \
-        -e LOG_LEVEL=debug \
+        -e LOG_LEVEL="pharia_kernel=debug" \
         -p 8081:8081 \
         pharia-kernel
 ```
@@ -272,10 +274,10 @@ You can view the Pharia-Kernel's API documentation at <http://127.0.0.1:8081/api
 
 ## Build your skill
 
-1. Set up a virtual python environment:
+1. Set up a virtual Python environment:
 
 ```shell
-    # fetch the wit world
+    # fetch the WIT world
     curl http://127.0.0.1:8081/skill.wit > skill.wit
 
     # create python venv
@@ -336,25 +338,21 @@ You can view the Pharia-Kernel's API documentation at <http://127.0.0.1:8081/api
     curl -v -X POST 127.0.0.1:8081/execute_skill \
         -H "Authorization: Bearer $AA_API_TOKEN" \
         -H 'Content-Type: application/json' \
-        -d '{"skill":"local/my_skill", "input":"Homer"}'
+        -d '{"skill":"dev/my_skill", "input":"Homer"}'
 ```
 
 5. Iterate
 
-Whenever you change the skill code, you have to compile it again and you have to invalidate the Pharia Kernel's skill cache
-in order to load the new skill version.
+Whenever the skill code is changed, you have to compile it again. The new skill version will be picked up by the Pharia Kernel.
 
 ```shell
     # compile the skill
     componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
-
-    # invalidate the cached version of 'my_skill'
-    curl -v -X DELETE 127.0.0.1:8081/cached_skills/local%2fmy_skill
 ```
 
 # Monitoring skill execution
 
-You can monitor you skill by connecting the Pharia Kernel to an OpenTelemetry collector, e.g. Jaeger:
+You can monitor your skill by connecting the Pharia Kernel to an OpenTelemetry collector, e.g. Jaeger:
 
 ```shell
     podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
@@ -372,4 +370,4 @@ Specify the collector endpoint via the environment variable `OPEN_TELEMETRY_ENDP
         pharia-kernel
 ```
 
-You can view the monitoring at your [local Jaeger instance](http://localhost:16686)
+You can view the monitoring via your local Jaeger instance at <http://localhost:16686>.
