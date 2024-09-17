@@ -153,14 +153,16 @@ impl Skill {
                     .await?;
                 let result = match result {
                     Ok(result) => result,
-                    Err(e) => {
-                        if let v0_2::exports::pharia::skill::skill_handler::Error::Internal(e) = e {
+                    Err(e) => match e {
+                        v0_2::exports::pharia::skill::skill_handler::Error::Internal(e) => {
                             tracing::error!("Failed to run skill, internal skill error:\n{e}");
                             return Err(anyhow!("Internal skill error:\n{e}"));
                         }
-                        tracing::error!("Failed to run skill: {e}");
-                        return Err(e.into());
-                    }
+                        v0_2::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                            tracing::error!("Failed to run skill, invalid input:\n{e}");
+                            return Err(anyhow!("Invalid input:\n{e}"));
+                        }
+                    },
                 };
                 Ok(serde_json::from_slice(&result)?)
             }
@@ -173,14 +175,16 @@ impl Skill {
                     .await?;
                 let result = match result {
                     Ok(result) => result,
-                    Err(e) => {
-                        if let v0_1::exports::pharia::skill::skill_handler::Error::Internal(e) = e {
+                    Err(e) => match e {
+                        v0_1::exports::pharia::skill::skill_handler::Error::Internal(e) => {
                             tracing::error!("Failed to run skill, internal skill error:\n{e}");
                             return Err(anyhow!("Internal skill error:\n{e}"));
                         }
-                        tracing::error!("Failed to run skill: {e}");
-                        return Err(e.into());
-                    }
+                        v0_1::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                            tracing::error!("Failed to run skill, invalid input:\n{e}");
+                            return Err(anyhow!("Invalid input:\n{e}"));
+                        }
+                    },
                 };
                 Ok(serde_json::from_slice(&result)?)
             }
