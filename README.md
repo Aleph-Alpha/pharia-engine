@@ -1,10 +1,6 @@
 # Pharia Kernel
 
-Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in a number of languages, including Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the cognitive system interface. This enables to deploy RAG usecases serverless.
-
-The entire Stack including Kernel, Inference, Document Index, etc is called **Pharia OS**.
-
-![Block Diagram Pharia OS](./tam/pharia-os-running.drawio.svg)
+Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in any language which compiles to web assembly. Yet we provide an SDK and dedicated support for Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the cognitive system interface. This enables to deploy RAG usecases serverless. Writing skills for the kernel is more constrained then shipping an end to end use case in a custom docker container. Yet these constrains allow us to make opinionated decisions for the skill developer. We strive to take away only the decisions and responsibilities a skill developer may find "boring" (such as authentication, parralization of inference calls). In more technical terms we aim to reduce the accidential complexity the skill developer has to engage with.
 
 ## Contributing
 
