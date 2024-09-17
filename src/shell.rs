@@ -34,7 +34,7 @@ use utoipa::{
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    skill_provider::SkillProviderApi,
+    skill_store::SkillProviderApi,
     skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
 };
 
@@ -312,7 +312,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        skill_provider::tests::{dummy_skill_provider_api, SkillProviderMsg},
+        skill_store::tests::{dummy_skill_provider_api, SkillProviderMsg},
         skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
         tests::api_token,
     };

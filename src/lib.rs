@@ -6,7 +6,7 @@ mod language_selection;
 mod logging;
 mod registries;
 mod shell;
-mod skill_provider;
+mod skill_store;
 mod skills;
 mod tokenizers;
 
@@ -15,7 +15,7 @@ use namespace_watcher::{NamespaceWatcher, NamespaceDescriptionLoaders};
 use csi::CsiDrivers;
 use futures::Future;
 use logging::initialize_tracing;
-use skill_provider::SkillProvider;
+use skill_store::SkillStore;
 use tokenizers::Tokenizers;
 use tracing::error;
 
@@ -43,10 +43,10 @@ pub async fn run(
         inference: inference.api(),
         tokenizers: tokenizers.api(),
     };
-    let skill_provider = SkillProvider::new(&app_config.operator_config.namespaces);
+    let skill_store = SkillStore::new(&app_config.operator_config.namespaces);
 
     // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::new(csi_drivers, skill_provider.api());
+    let skill_executor = SkillExecutor::new(csi_drivers, skill_store.api());
 
     // Boot up the configuration observer
     let loaders = Box::new(
@@ -55,7 +55,7 @@ pub async fn run(
     );
 
     let mut namespace_watcher = NamespaceWatcher::with_config(
-        skill_provider.api(),
+        skill_store.api(),
         loaders,
         app_config.namespace_update_interval,
     );
@@ -66,7 +66,7 @@ pub async fn run(
     let shell_shutdown = shell::run(
         app_config.tcp_addr,
         skill_executor.api(),
-        skill_provider.api(),
+        skill_store.api(),
         shutdown_signal,
     )
     .await;
@@ -84,7 +84,7 @@ pub async fn run(
         // actors are still answering for each component.
         namespace_watcher.wait_for_shutdown().await;
         skill_executor.wait_for_shutdown().await;
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
         tokenizers.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
     })

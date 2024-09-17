@@ -154,19 +154,19 @@ impl CachedSkill {
     }
 }
 
-pub struct SkillProvider {
+pub struct SkillStore {
     sender: mpsc::Sender<SkillProviderMsg>,
     handle: JoinHandle<()>,
 }
 
-impl SkillProvider {
+impl SkillStore {
     pub fn new(namespaces: &HashMap<String, NamespaceConfig>) -> Self {
         let (sender, recv) = mpsc::channel(1);
         let mut actor = SkillProviderActor::new(recv, namespaces);
         let handle = tokio::spawn(async move {
             actor.run().await;
         });
-        SkillProvider { sender, handle }
+        SkillStore { sender, handle }
     }
 
     pub fn api(&self) -> SkillProviderApi {
@@ -471,7 +471,7 @@ pub mod tests {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new().unwrap());
-        let skill_provider = SkillProvider::new(&local_namespace());
+        let skill_provider = SkillStore::new(&local_namespace());
         skill_provider
             .api()
             .upsert(SkillPath::new("local", "greet_skill"), None)
@@ -500,7 +500,7 @@ pub mod tests {
     #[tokio::test]
     async fn should_list_skills_that_have_been_added() {
         // Given an empty provider
-        let skill_provider = SkillProvider::new(&local_namespace());
+        let skill_provider = SkillStore::new(&local_namespace());
         let api = skill_provider.api();
 
         // When adding a skill
@@ -523,7 +523,7 @@ pub mod tests {
         // Given one cached "greet_skill"
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProvider::new(&local_namespace());
+        let skill_provider = SkillStore::new(&local_namespace());
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
         api.fetch(greet_skill.clone(), Arc::new(Engine::new().unwrap()))
@@ -544,7 +544,7 @@ pub mod tests {
     async fn invalidation_of_an_uncached_skill() {
         // Given one "greet_skill" which is not in cache
         let greet_skill = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillProvider::new(&local_namespace());
+        let skill_provider = SkillStore::new(&local_namespace());
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
 

@@ -9,7 +9,7 @@ use crate::{
     csi::{ChunkRequest, Csi as _, CsiDrivers},
     inference::{Completion, CompletionRequest},
     language_selection::Language,
-    skill_provider::SkillProviderApi,
+    skill_store::SkillProviderApi,
 };
 use async_trait::async_trait;
 use opentelemetry::Context;
@@ -294,7 +294,7 @@ pub mod tests {
     use crate::{
         csi::tests::dummy_csi_apis,
         inference::{tests::InferenceStub, CompletionRequest},
-        skill_provider::SkillProvider,
+        skill_store::SkillStore,
         skills::runtime::tests::SaboteurRuntime,
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
     };
@@ -366,7 +366,7 @@ pub mod tests {
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
         let namespaces = HashMap::new();
-        let skill_provider = SkillProvider::new(&namespaces);
+        let skill_provider = SkillStore::new(&namespaces);
         let csi_apis = dummy_csi_apis();
         let executer = SkillExecutor::new(csi_apis, skill_provider.api());
         let api = executer.api();
