@@ -2,7 +2,7 @@ use serde_json::Value;
 use std::sync::Arc;
 
 use crate::{
-    skill_store::SkillProviderApi,
+    skill_store::SkillStoreApi,
     skills::{actor::ExecuteSkillError, SkillPath},
 };
 
@@ -12,11 +12,11 @@ pub struct WasmRuntime {
     /// Used to execute skills. We will share the engine with multiple running skills, and skill
     /// provider to convert bytes into executable skills.
     engine: Arc<Engine>,
-    skill_provider_api: SkillProviderApi,
+    skill_provider_api: SkillStoreApi,
 }
 
 impl WasmRuntime {
-    pub fn new(skill_provider_api: SkillProviderApi) -> Self {
+    pub fn new(skill_provider_api: SkillStoreApi) -> Self {
         Self {
             engine: Arc::new(Engine::new().expect("engine creation failed")),
             skill_provider_api,

@@ -34,7 +34,7 @@ use utoipa::{
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    skill_store::SkillProviderApi,
+    skill_store::SkillStoreApi,
     skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
 };
 
@@ -90,7 +90,7 @@ async fn serve_docs() -> Json<openapi::OpenApi> {
 pub async fn run(
     addr: impl Into<SocketAddr>,
     skill_executor_api: SkillExecutorApi,
-    skill_provider_api: SkillProviderApi,
+    skill_provider_api: SkillStoreApi,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> impl Future<Output = anyhow::Result<()>> {
     let addr = addr.into();
@@ -108,7 +108,7 @@ pub async fn run(
     }
 }
 
-pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillProviderApi) -> Router {
+pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillStoreApi) -> Router {
     let serve_dir =
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
 
@@ -225,7 +225,7 @@ async fn execute_skill(
     ),
 )]
 async fn skills(
-    State(skill_provider_api): State<SkillProviderApi>,
+    State(skill_provider_api): State<SkillStoreApi>,
 ) -> (StatusCode, Json<Vec<String>>) {
     let response = skill_provider_api.list().await;
     let response = response.iter().map(ToString::to_string).collect();
@@ -247,7 +247,7 @@ async fn skills(
     ),
 )]
 async fn cached_skills(
-    State(skill_provider_api): State<SkillProviderApi>,
+    State(skill_provider_api): State<SkillStoreApi>,
 ) -> (StatusCode, Json<Vec<String>>) {
     let response = skill_provider_api.list_cached().await;
     let response = response.iter().map(ToString::to_string).collect();
@@ -271,7 +271,7 @@ async fn cached_skills(
     ),
 )]
 async fn drop_cached_skill(
-    State(skill_provider_api): State<SkillProviderApi>,
+    State(skill_provider_api): State<SkillStoreApi>,
     Path(name): Path<String>,
 ) -> (StatusCode, Json<String>) {
     let skill_path = SkillPath::from_str(&name);
@@ -405,7 +405,7 @@ mod tests {
     async fn list_cached_skills_for_user() {
         let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
-        let skill_provider_api = SkillProviderApi::new(send);
+        let skill_provider_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
             if let SkillProviderMsg::ListCached { send } = recv.recv().await.unwrap() {
                 send.send(vec![
@@ -444,7 +444,7 @@ mod tests {
         let skill_path = Arc::new(Mutex::new(None));
         let skill_path_clone = skill_path.clone();
         let (send, mut recv) = mpsc::channel(1);
-        let skill_provider_api = SkillProviderApi::new(send);
+        let skill_provider_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
             if let SkillProviderMsg::InvalidateCache { skill_path, send } =
                 recv.recv().await.unwrap()
@@ -492,7 +492,7 @@ mod tests {
         let skill_path = Arc::new(Mutex::new(None));
         let skill_path_clone = skill_path.clone();
         let (send, mut recv) = mpsc::channel(1);
-        let skill_provider_api = SkillProviderApi::new(send);
+        let skill_provider_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
             if let SkillProviderMsg::InvalidateCache { skill_path, send } =
                 recv.recv().await.unwrap()
@@ -605,7 +605,7 @@ mod tests {
         // Given we can provide two skills "ns_one/one" and "ns_two/two"
         let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
-        let skill_provider_api = SkillProviderApi::new(send);
+        let skill_provider_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
             if let SkillProviderMsg::List { send } = recv.recv().await.unwrap() {
                 send.send(vec![

@@ -9,7 +9,7 @@ use crate::{
     csi::{ChunkRequest, Csi as _, CsiDrivers},
     inference::{Completion, CompletionRequest},
     language_selection::Language,
-    skill_store::SkillProviderApi,
+    skill_store::SkillStoreApi,
 };
 use async_trait::async_trait;
 use opentelemetry::Context;
@@ -30,7 +30,7 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(csi_apis: CsiDrivers, skill_provider: SkillProviderApi) -> Self {
+    pub fn new(csi_apis: CsiDrivers, skill_provider: SkillStoreApi) -> Self {
         let runtime = WasmRuntime::new(skill_provider);
         Self::with_runtime(runtime, csi_apis)
     }

@@ -14,7 +14,7 @@ use crate::{
     skills::{CsiForSkills, Engine, Skill, SkillPath},
 };
 
-struct SkillProviderState {
+struct SkillStoreState {
     known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, Arc<CachedSkill>>,
     // key: Namespace, value: Registry
@@ -23,13 +23,13 @@ struct SkillProviderState {
     invalid_namespaces: HashMap<String, anyhow::Error>,
 }
 
-impl SkillProviderState {
+impl SkillStoreState {
     pub fn new(namespaces: &HashMap<String, NamespaceConfig>) -> Self {
         let skill_registries = namespaces
             .iter()
             .map(|(k, v)| (k.to_owned(), Self::registry(v)))
             .collect::<HashMap<_, _>>();
-        SkillProviderState {
+        SkillStoreState {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
             skill_registries,
@@ -169,8 +169,8 @@ impl SkillStore {
         SkillStore { sender, handle }
     }
 
-    pub fn api(&self) -> SkillProviderApi {
-        SkillProviderApi::new(self.sender.clone())
+    pub fn api(&self) -> SkillStoreApi {
+        SkillStoreApi::new(self.sender.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -181,13 +181,13 @@ impl SkillStore {
 }
 
 #[derive(Clone)]
-pub struct SkillProviderApi {
+pub struct SkillStoreApi {
     sender: mpsc::Sender<SkillProviderMsg>,
 }
 
-impl SkillProviderApi {
+impl SkillStoreApi {
     pub fn new(sender: mpsc::Sender<SkillProviderMsg>) -> Self {
-        SkillProviderApi { sender }
+        SkillStoreApi { sender }
     }
 
     pub async fn remove(&self, skill_path: SkillPath) {
@@ -302,7 +302,7 @@ pub enum SkillProviderMsg {
 
 struct SkillProviderActor {
     receiver: mpsc::Receiver<SkillProviderMsg>,
-    provider: SkillProviderState,
+    provider: SkillStoreState,
 }
 
 impl SkillProviderActor {
@@ -312,7 +312,7 @@ impl SkillProviderActor {
     ) -> Self {
         SkillProviderActor {
             receiver,
-            provider: SkillProviderState::new(namespaces),
+            provider: SkillStoreState::new(namespaces),
         }
     }
 
@@ -367,12 +367,12 @@ pub mod tests {
 
     pub use super::SkillProviderMsg;
 
-    pub fn dummy_skill_provider_api() -> SkillProviderApi {
+    pub fn dummy_skill_provider_api() -> SkillStoreApi {
         let (send, _recv) = mpsc::channel(1);
-        SkillProviderApi::new(send)
+        SkillStoreApi::new(send)
     }
 
-    impl SkillProviderState {
+    impl SkillStoreState {
         fn with_namespace_and_skill(skill_path: &SkillPath) -> Self {
             let registry = Registry::File {
                 path: "skills".to_owned(),
@@ -385,7 +385,7 @@ pub mod tests {
             let mut namespaces = HashMap::new();
             namespaces.insert(skill_path.namespace.clone(), ns_cfg);
 
-            let mut provider = SkillProviderState::new(&namespaces);
+            let mut provider = SkillStoreState::new(&namespaces);
             provider.upsert_skill(skill_path, None);
             provider
         }
@@ -394,7 +394,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_component_is_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider.fetch(&skill_path, &engine).await;
@@ -405,7 +405,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider
@@ -421,7 +421,7 @@ pub mod tests {
     #[tokio::test]
     async fn namespace_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
 
         let result = provider
@@ -439,7 +439,7 @@ pub mod tests {
         // Given one cached skill
         given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
-        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
         let engine = Engine::new().unwrap();
         provider.fetch(&skill_path, &engine).await.unwrap();
 
@@ -454,7 +454,7 @@ pub mod tests {
     async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::new("local", "greet_skill");
-        let mut provider = SkillProviderState::with_namespace_and_skill(&skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
         let engine = Engine::new().unwrap();
 
