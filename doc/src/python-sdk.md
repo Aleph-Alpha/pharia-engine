@@ -1,4 +1,4 @@
-# Pharia Kernel Python SDK
+# Developing Skills in Python
 
 A Python SDK is provided to further ease your skill development.
 
@@ -70,31 +70,4 @@ You now create the file `haiku.wasm`, ready to be uploaded.
 ```shell
 pip install componentize-py
 componentize-py -w skill componentize haiku -o ./haiku.wasm -p . -p wasi_deps
-```
-
-
-## Deploying Skills
-
-Pharia Skill is provided as a tool for deploying Skills.
-
-```shell
-podman login alephalpha.jfrog.io/pharia-kernel-images -u $JFROG_USER -p $JFROG_PASSWORD
-podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-skill:latest
-podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-skill:latest pharia-skill
-```
-
-With the tooling available, you can now upload the Skill. e.g. for the `playgound` namespace, a skill registry is provided at <https://gitlab.aleph-alpha.de/engineering/pharia-kernel-playground>.
-
-```shell
-podman run -v ./haiku.wasm:/haiku.wasm pharia-skill publish -R registry.gitlab.aleph-alpha.de -r engineering/pharia-kernel-playground/skills -u DUMMY_USER_NAME -p $GITLAB_TOKEN -t latest ./haiku.wasm
-```
-
-## Configuring namespace
-
-We have to configure the `namespace.toml` for the deployed skills to be loaded in Pharia Kernel.
-We have to extend the existing `skills` entries by providing the `name` and the optional `tag` fields.
-
-```toml
-# namespace.toml
-skills = [{ name = "haiku", tag = "latest" }]
 ```
