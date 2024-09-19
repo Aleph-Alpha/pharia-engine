@@ -217,6 +217,6 @@ With the tooling available, we can now upload the Skill.
 podman run -v ./haiku.wasm:/haiku.wasm pharia-skill publish -R registry.gitlab.aleph-alpha.de -r engineering/pharia-skills/skills -u DUMMY_USER_NAME -p $GITLAB_TOKEN ./haiku.wasm
 ```
 
-With our Gitlab registry, any user name will work, as long as you use a access token. You can generate a token on your profile page. It is necessary to include write privilege.
+With our GitLab registry, any user name will work, as long as you use a access token. You can generate a token on your profile page. It is necessary to include write privilege.
 
 Congratulations! Your Skill is now deployed. You can now use the [HTTP API](https://pharia-kernel.aleph-alpha.stackit.run/api-docs#tag/skills/POST/execute_skill) to call it.
