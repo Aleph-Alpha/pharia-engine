@@ -18,6 +18,10 @@ fi
 function time_shutdown () {
     for run in {1..10}; do
         podman run -d -p 8081:8081 --name $INTERNAL_NAME $CONTAINER_NAME
+
+        # wait for the container to boot up before attempting to stop it
+        sleep 1
+
         SECONDS=0
         START_TIME=$SECONDS
         podman stop -f name=$INTERNAL_NAME
