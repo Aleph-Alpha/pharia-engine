@@ -121,20 +121,8 @@ fn build_rust_skill(package_name: &str) {
 
 fn build_python_skill(package_name: &str, wit_version: &str) {
     let venv = static_venv();
-    // componentize-py -d wit/skill@unversioned/skill.wit -w skill bindings greet-py
-    //
-    // We ignore the error, because this fails if the file already exists, but this might be fine
-    drop(venv.run(&[
-        "componentize-py",
-        "-d",
-        &format!("wit/skill@{wit_version}/skill.wit"),
-        "-w",
-        "skill",
-        "bindings",
-        package_name,
-    ]));
-    // componentize-py -d wit/skill@unversioned/skill.wit -w skill componentize greet-py.app -o ./skills/greet-py.wasm
-    drop(venv.run(&[
+
+    venv.run(&[
         "componentize-py",
         "-d",
         &format!("wit/skill@{wit_version}/skill.wit"),
@@ -144,7 +132,7 @@ fn build_python_skill(package_name: &str, wit_version: &str) {
         &format!("{package_name}.app"),
         "-o",
         &format!("./skills/{package_name}.wasm"),
-    ]));
+    ]).unwrap();
 
     // Make resulting skill component smaller
     //
