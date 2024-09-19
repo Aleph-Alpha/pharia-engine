@@ -61,7 +61,7 @@ SKILL_REGISTRY_USER=Joe.Plumber
 SKILL_REGISTRY_PASSWORD=****
 ```
 
-## Update interval 
+## Update interval
 
 The environment variable `NAMESPACE_UPDATE_INTERVAL` controls how much time the kernel waits between checking for changes in namespace configurations. The default is 10 seconds.
 
@@ -76,7 +76,6 @@ By default, only logs of `ERROR` level are output. You can change this by settin
 ```shell
 LOG_LEVEL=info
 ```
-
 
 ## Observability
 

@@ -221,9 +221,9 @@ With our Gitlab registry, any user name will work, as long as you use a access t
 
 Congratulations! Your Skill is now deployed. You can now use the [HTTP API](https://pharia-kernel.aleph-alpha.stackit.run/api-docs#tag/skills/POST/execute_skill) to call it.
 
-# Local Pharia Kernel setup
+## Local Pharia Kernel setup
 
-## Get Pharia Kernel image
+### Get Pharia Kernel image
 
 1. Access JFrog Artifactory via token:
     * Login to [JFrog](https://alephalpha.jfrog.io/ui/login/)
@@ -242,52 +242,52 @@ podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest
 podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest pharia-kernel
 ```
 
-## Start Pharia Kernel container
+### Start Pharia Kernel container
 
 In order to run Pharia Kernel, you need to provide a namespace configuration:
 
 1. Create a `skills` folder
 
-For local skill development, you need a folder that serves as a skill registry to store all compiled skills.
+    For local skill development, you need a folder that serves as a skill registry to store all compiled skills.
 
-```shell
-    # create the local skills folder
-    mkdir skills
-```
+    ```shell
+        # create the local skills folder
+        mkdir skills
+    ```
 
-All skills in this folder are exposed in the namespace "dev".
-Any changes in this folder will be picked up by the Pharia Kernel automatically. The `operator-config.toml` and `namespace.toml` should not be provided.
+    All skills in this folder are exposed in the namespace "dev".
+    Any changes in this folder will be picked up by the Pharia Kernel automatically. The `operator-config.toml` and `namespace.toml` should not be provided.
 
 2. Start the container:
 
-```shell
-    podman run \
-        -v ./skills:/app/skills \
-        -e AA_API_TOKEN=$AA_API_TOKEN \
-        -e NAMESPACE_UPDATE_INTERVAL=1s \
-        -e LOG_LEVEL="pharia_kernel=debug" \
-        -p 8081:8081 \
-        pharia-kernel
-```
+    ```shell
+        podman run \
+            -v ./skills:/app/skills \
+            -e AA_API_TOKEN=$AA_API_TOKEN \
+            -e NAMESPACE_UPDATE_INTERVAL=1s \
+            -e LOG_LEVEL="pharia_kernel=debug" \
+            -p 8081:8081 \
+            pharia-kernel
+    ```
 
-You can view the Pharia-Kernel's API documentation at <http://127.0.0.1:8081/api-docs>
+    You can view the Pharia-Kernel's API documentation at <http://127.0.0.1:8081/api-docs>
 
-## Build your skill
+### Build your skill
 
 1. Set up a virtual Python environment:
 
-```shell
-    # fetch the WIT world
-    curl http://127.0.0.1:8081/skill.wit > skill.wit
+    ```shell
+        # fetch the WIT world
+        curl http://127.0.0.1:8081/skill.wit > skill.wit
 
-    # create python venv
-    python -m venv .venv
-    source .venv/bin/activate
-    pip install componentize-py
+        # create python venv
+        python -m venv .venv
+        source .venv/bin/activate
+        pip install componentize-py
 
-    # create the wit bindings
-    componentize-py -d skill.wit -w skill bindings .
-```
+        # create the wit bindings
+        componentize-py -d skill.wit -w skill bindings .
+    ```
 
 2. Write your skill `my_skill.py`:
 
@@ -328,29 +328,29 @@ You can view the Pharia-Kernel's API documentation at <http://127.0.0.1:8081/api
 
 3. Compile your skill:
 
-```shell
-    componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
-```
+    ```shell
+        componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
+    ```
 
 4. Execute your skill:
 
-```shell
-    curl -v -X POST 127.0.0.1:8081/execute_skill \
-        -H "Authorization: Bearer $AA_API_TOKEN" \
-        -H 'Content-Type: application/json' \
-        -d '{"skill":"dev/my_skill", "input":"Homer"}'
-```
+    ```shell
+        curl -v -X POST 127.0.0.1:8081/execute_skill \
+            -H "Authorization: Bearer $AA_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"skill":"dev/my_skill", "input":"Homer"}'
+    ```
 
 5. Iterate
 
-Whenever the skill code is changed, you have to compile it again. The new skill version will be picked up by the Pharia Kernel.
+    Whenever the skill code is changed, you have to compile it again. The new skill version will be picked up by the Pharia Kernel.
 
-```shell
-    # compile the skill
-    componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
-```
+    ```shell
+        # compile the skill
+        componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
+    ```
 
-# Monitoring skill execution
+### Monitoring local skill execution
 
 You can monitor your skill by connecting the Pharia Kernel to an OpenTelemetry collector, e.g. Jaeger:
 

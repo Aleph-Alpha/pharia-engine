@@ -1,6 +1,6 @@
 # Pharia Kernel
 
-Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in any language which compiles to web assembly. Yet we provide an SDK and dedicated support for Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the cognitive system interface. This enables to deploy RAG usecases serverless. Writing skills for the kernel is more constrained then shipping an end to end use case in a custom docker container. Yet these constrains allow us to make opinionated decisions for the skill developer. We strive to take away only the decisions and responsibilities a skill developer may find "boring" (such as authentication, parralization of inference calls). In more technical terms we aim to reduce the accidential complexity the skill developer has to engage with.
+Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in any language which compiles to web assembly. Yet we provide a SDK and dedicated support for Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the cognitive system interface. This enables to deploy RAG usecases serverless. Writing skills for the kernel is more constrained then shipping an end to end use case in a custom docker container. Yet these constrains allow us to make opinionated decisions for the skill developer. We strive to take away only the decisions and responsibilities a skill developer may find "boring" (such as authentication, parralization of inference calls). In more technical terms we aim to reduce the accidential complexity the skill developer has to engage with.
 
 ## Contributing
 
@@ -141,31 +141,11 @@ Manually: see [plantUML installation](https://plantuml.com/starting)
 
 PlantUml requires `graphviz` and needs to be executable via `plantuml` command. You can run a health-check with `plantuml -version`
 
-## pushing skill oci
-
-login to container registry:
-
-```shell
-podman login registry.gitlab.aleph-alpha.de
-```
-
-push container:
-
-```shell
-wasm-to-oci push skills/greet-py.wasm registry.gitlab.aleph-alpha.de/engineering/pharia-skills/skills/greet-py:v1
-```
-
-pull container:
-
-```shell
-wasm-to-oci pull registry.gitlab.aleph-alpha.de/engineering/pharia-skills/skills/greet-py:v1 --out skills/oci.wasm
-```
-
 ## Deploying Pharia Kernel on Customer side
 
 **Pharia Kernel** is intended to be installed **on premise** by the customer it. It is deployed, as are all other modules of the **Pharia OS**, to the JFrog Artifactory. Our colleagues at the Pharia OS Team are going to develop tooling for deploying tooling for rolling it out. Until they come up with a name it is here called "Pharia Up".
 
-![Block Diagram Pharia OS deploy](./tam/pharia-os-deployment.drawio.svg)
+![Block Diagram Pharia OS deploy][deployment]
 
 ## Helpful links for internal deployment
 
@@ -174,3 +154,5 @@ The current prototype is deployed at <https://pharia-kernel.aleph-alpha.stackit.
 The status page for uptime robot is found at: <https://stats.uptimerobot.com/gjXpoIPMnv>
 
 The secrets for the deployment can be added to the vault: <https://vault.management-prod01.stackit.run/ui/vault/secrets/c-aa01/list/projects/pharia-kernel/>
+
+[deployment]: ./tam/deployment.drawio.svg
