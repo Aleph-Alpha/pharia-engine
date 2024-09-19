@@ -4,6 +4,7 @@
 
 - [Executing Skills](./skill-execution.md)
 - [Developing and deploying Skills](./skills-development.md)
+  - [Developing Skills in Python](./python-sdk.md)
   - [Running Pharia Kernel locally](./local-setup.md)
 - [Operating Pharia Kernel](./operating-kernel.md))
 
