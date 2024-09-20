@@ -10,7 +10,8 @@ oci-client = "0.12.1"
 oci-wasm = "0.0.5"
 reqwest = "0.12.7"
 serde_json = "1.0.128"
-tokio = { version = "1.40.0", features = [
+# Pinned because of opentelemetry crates
+tokio = { version = "~1.38.0", features = [
     "macros",
     "rt-multi-thread",
     "signal",
@@ -23,5 +24,5 @@ workspace = true
 assert_cmd = "2.0.16"
 dotenvy = "0.15.7"
 predicates = "3.1.2"
-wat = "1.216.0"
+wat = "1.217.0"
 pharia-kernel = { path = ".." }
