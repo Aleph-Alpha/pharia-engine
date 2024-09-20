@@ -67,7 +67,7 @@ fn given_rust_skill(package_name: &str) {
 /// wasm-tools component new \
 ///     ./target/wasm32-wasip1/release/greet_skill_v0_2.wasm \
 ///     -o ./skills/greet_skill_v0_2.wasm \
-///     --adapt ./wasi_snapshot_preview1.reactor-24.0.0.wasm
+///     --adapt ./wasi_snapshot_preview1.reactor-25.0.0.wasm
 /// wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
 /// ```
 fn build_rust_skill(package_name: &str) {
@@ -93,7 +93,7 @@ fn build_rust_skill(package_name: &str) {
     // wasm-tools component new \
     //      ./target/wasm32-wasip1/release/greet_skill_v0_2.wasm \
     //      -o ./skills/greet_skill_v0_2.wasm \
-    //      --adapt ./wasi_snapshot_preview1.reactor-24.0.0.wasm
+    //      --adapt ./wasi_snapshot_preview1.reactor-25.0.0.wasm
     Command::new("wasm-tools")
         .args([
             "component",
@@ -102,7 +102,7 @@ fn build_rust_skill(package_name: &str) {
             "-o",
             &format!("./skills/{snake_case}.wasm"),
             "--adapt",
-            "./wasi_snapshot_preview1.reactor-24.0.0.wasm",
+            "./wasi_snapshot_preview1.reactor-25.0.0.wasm",
         ])
         .status()
         .unwrap();
@@ -132,7 +132,8 @@ fn build_python_skill(package_name: &str, wit_version: &str) {
         &format!("{package_name}.app"),
         "-o",
         &format!("./skills/{package_name}.wasm"),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     // Make resulting skill component smaller
     //
@@ -157,7 +158,7 @@ fn run_in_venv(venv_path: &Path, args: &[&str]) -> Result<Vec<u8>, Error> {
     // interpreter directly on other platforms
 
     let mut cmd = if cfg!(target_os = "windows") {
-        let activate_path = format!("{venv_path}\\Scripts\\activate.bat"); 
+        let activate_path = format!("{venv_path}\\Scripts\\activate.bat");
         let mut cmd = Command::new("cmd");
         cmd.args(["/C", &activate_path, "&&"]).args(args);
         cmd

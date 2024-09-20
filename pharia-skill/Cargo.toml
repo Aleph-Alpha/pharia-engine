@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.5.17", features = ["env", "derive"] }
+clap = { version = "4.5.18", features = ["env", "derive"] }
 mime = "0.3.17"
 oci-client = "0.12.1"
 oci-wasm = "0.0.5"
