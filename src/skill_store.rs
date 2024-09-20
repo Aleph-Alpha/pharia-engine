@@ -1,7 +1,6 @@
 use std::{collections::HashMap, env, sync::Arc};
 
 use anyhow::{anyhow, Context};
-use serde_json::Value;
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
@@ -11,12 +10,12 @@ use tracing::info;
 use crate::{
     namespace_watcher::{NamespaceConfig, Registry},
     registries::{FileRegistry, OciRegistry, SkillRegistry},
-    skills::{CsiForSkills, Engine, Skill, SkillPath},
+    skills::{Engine, Skill, SkillPath},
 };
 
 struct SkillStoreState {
     known_skills: HashMap<SkillPath, Option<String>>,
-    cached_skills: HashMap<SkillPath, Arc<CachedSkill>>,
+    cached_skills: HashMap<SkillPath, Arc<Skill>>,
     // key: Namespace, value: Registry
     skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
     // key: Namespace, value: Error
@@ -100,7 +99,7 @@ impl SkillStoreState {
         &mut self,
         skill_path: &SkillPath,
         engine: &Engine,
-    ) -> anyhow::Result<Option<Arc<CachedSkill>>> {
+    ) -> anyhow::Result<Option<Arc<Skill>>> {
         if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
             return Err(anyhow!("Invalid namespace: {error}"));
         }
@@ -120,7 +119,7 @@ impl SkillStoreState {
                 .await?;
             let bytes =
                 bytes.ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
-            let skill = CachedSkill::new(engine, bytes)
+            let skill = Skill::new(engine, bytes)
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
             self.cached_skills
                 .insert(skill_path.clone(), Arc::new(skill));
@@ -134,25 +133,25 @@ impl SkillStoreState {
     }
 }
 
-pub struct CachedSkill {
-    skill: Skill,
-}
+// pub struct CachedSkill {
+//     skill: Skill,
+// }
 
-impl CachedSkill {
-    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
-        let skill = engine.instantiate_pre_skill(bytes)?;
-        Ok(Self { skill })
-    }
+// impl CachedSkill {
+//     pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+//         let skill = engine.instantiate_pre_skill(bytes)?;
+//         Ok(Self { skill })
+//     }
 
-    pub async fn run(
-        &self,
-        engine: &Engine,
-        ctx: Box<dyn CsiForSkills + Send>,
-        input: Value,
-    ) -> anyhow::Result<Value> {
-        self.skill.run(engine, ctx, input).await
-    }
-}
+//     pub async fn run(
+//         &self,
+//         engine: &Engine,
+//         ctx: Box<dyn CsiForSkills + Send>,
+//         input: Value,
+//     ) -> anyhow::Result<Value> {
+//         self.skill.run(engine, ctx, input).await
+//     }
+// }
 
 pub struct SkillStore {
     sender: mpsc::Sender<SkillProviderMsg>,
@@ -221,7 +220,7 @@ impl SkillStoreApi {
         &self,
         skill_path: SkillPath,
         engine: Arc<Engine>,
-    ) -> Result<Option<Arc<CachedSkill>>, anyhow::Error> {
+    ) -> Result<Option<Arc<Skill>>, anyhow::Error> {
         let (send, recv) = oneshot::channel();
         let msg = SkillProviderMsg::Fetch {
             skill_path,
@@ -275,7 +274,7 @@ pub enum SkillProviderMsg {
     Fetch {
         skill_path: SkillPath,
         engine: Arc<Engine>,
-        send: oneshot::Sender<Result<Option<Arc<CachedSkill>>, anyhow::Error>>,
+        send: oneshot::Sender<Result<Option<Arc<Skill>>, anyhow::Error>>,
     },
     List {
         send: oneshot::Sender<Vec<SkillPath>>,
