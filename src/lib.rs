@@ -10,6 +10,8 @@ mod skill_store;
 mod skills;
 mod tokenizers;
 
+use std::pin::Pin;
+
 use anyhow::{Context, Error};
 use csi::CsiDrivers;
 use futures::Future;
@@ -24,6 +26,92 @@ use self::{inference::Inference, skills::SkillExecutor};
 pub use config::AppConfig;
 pub use namespace_watcher::OperatorConfig;
 
+pub struct Kernel {
+    inference: Inference,
+    tokenizers: Tokenizers,
+    skill_store: SkillStore,
+    skill_executor: SkillExecutor,
+    namespace_watcher: NamespaceWatcher,
+    // We do **not** want to bubble up an error during shell initialization or execution. We want to
+    // shutdown the other actors, in case booting up the shell fails.
+    shell_shutdown: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
+}
+
+impl Kernel {
+    /// Boots up all the actors making up the kernel.
+    /// 
+    /// # Errors
+    /// 
+    /// Fails if application can not read the namespace configuration. Errors in booting up the
+    /// shell are only exposed once waiting for the shutdown
+    pub async fn new(
+        app_config: AppConfig,
+        shutdown_signal: impl Future<Output = ()> + Send + 'static,
+    ) -> Result<Self, Error> {
+        initialize_tracing(&app_config)?;
+        let loaders = Box::new(
+            NamespaceDescriptionLoaders::new(app_config.operator_config.clone())
+                .context("Unable to read the configuration for namespaces")?,
+        );
+
+        // Boot up the drivers which power the CSI. Right now we only have inference.
+        let inference = Inference::new(app_config.inference_addr.clone());
+        let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();
+        let csi_drivers = CsiDrivers {
+            inference: inference.api(),
+            tokenizers: tokenizers.api(),
+        };
+        let skill_store = SkillStore::new(&app_config.operator_config.namespaces);
+    
+        // Boot up runtime we need to execute Skills
+        let skill_executor = SkillExecutor::new(csi_drivers, skill_store.api());
+    
+        let mut namespace_watcher = NamespaceWatcher::with_config(
+            skill_store.api(),
+            loaders,
+            app_config.namespace_update_interval,
+        );
+    
+        // Wait for first pass of the configuration so that the configured skills are loaded
+        namespace_watcher.wait_for_ready().await;
+    
+        let shell_shutdown = shell::run(
+            app_config.tcp_addr,
+            skill_executor.api(),
+            skill_store.api(),
+            shutdown_signal,
+        )
+        .await;
+
+        Ok(Kernel {
+            inference,
+            tokenizers,
+            skill_store,
+            skill_executor,
+            namespace_watcher,
+            shell_shutdown: Box::pin(shell_shutdown),
+        })
+    }
+
+    pub async fn wait_for_shutdown(self) {
+        // Make skills available via http interface. If we get the signal for shutdown the future
+        // will complete.
+        if let Err(e) = self.shell_shutdown.await {
+            // We do **not** want to bubble up an error during shell initialization or execution. We
+            // want to shutdown the other actors before finishing this function.
+            error!("Could not boot shell: {e}");
+        }
+
+        // Shutdown everything we started. We reverse the order for the shutdown so all the required
+        // actors are still answering for each component.
+        self.namespace_watcher.wait_for_shutdown().await;
+        self.skill_executor.wait_for_shutdown().await;
+        self.skill_store.wait_for_shutdown().await;
+        self.tokenizers.wait_for_shutdown().await;
+        self.inference.wait_for_shutdown().await;
+    }
+}
+
 /// Boots up all the actors making up the kernel. The result of this method is also a future, which
 /// signals that all resources have been shutdown.
 ///
@@ -34,60 +122,8 @@ pub async fn run(
     app_config: AppConfig,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> Result<impl Future<Output = ()>, Error> {
-    initialize_tracing(&app_config)?;
-
-    // Boot up the drivers which power the CSI. Right now we only have inference.
-    let inference = Inference::new(app_config.inference_addr.clone());
-    let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();
-    let csi_drivers = CsiDrivers {
-        inference: inference.api(),
-        tokenizers: tokenizers.api(),
-    };
-    let skill_store = SkillStore::new(&app_config.operator_config.namespaces);
-
-    // Boot up runtime we need to execute Skills
-    let skill_executor = SkillExecutor::new(csi_drivers, skill_store.api());
-
-    // Boot up the configuration observer
-    let loaders = Box::new(
-        NamespaceDescriptionLoaders::new(app_config.operator_config)
-            .context("Unable to read the configuration for namespaces")?,
-    );
-
-    let mut namespace_watcher = NamespaceWatcher::with_config(
-        skill_store.api(),
-        loaders,
-        app_config.namespace_update_interval,
-    );
-
-    // Wait for first pass of the configuration so that the configured skills are loaded
-    namespace_watcher.wait_for_ready().await;
-
-    let shell_shutdown = shell::run(
-        app_config.tcp_addr,
-        skill_executor.api(),
-        skill_store.api(),
-        shutdown_signal,
-    )
-    .await;
-
-    Ok(async {
-        // Make skills available via http interface. If we get the signal for shutdown the future
-        // will complete.
-        if let Err(e) = shell_shutdown.await {
-            // We do **not** want to bubble up an error during shell initialization or execution. We
-            // want to shutdown the other actors before finishing this function.
-            error!("Could not boot shell: {e}");
-        }
-
-        // Shutdown everything we started. We reverse the order for the shutdown so all the required
-        // actors are still answering for each component.
-        namespace_watcher.wait_for_shutdown().await;
-        skill_executor.wait_for_shutdown().await;
-        skill_store.wait_for_shutdown().await;
-        tokenizers.wait_for_shutdown().await;
-        inference.wait_for_shutdown().await;
-    })
+    let kernel = Kernel::new(app_config, shutdown_signal).await?;
+    Ok(kernel.wait_for_shutdown())
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use std::{env, io, net::SocketAddr, time::Duration};
 
 use crate::namespace_watcher::OperatorConfig;
 
+#[derive(Clone)]
 pub struct AppConfig {
     pub tcp_addr: SocketAddr,
     /// This base URL is used to do inference against models hosted by the Aleph Alpha inference

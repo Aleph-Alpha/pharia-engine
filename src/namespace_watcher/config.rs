@@ -15,7 +15,7 @@ use super::{
     NamespaceDescriptionLoader,
 };
 
-#[derive(Deserialize, PartialEq, Eq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct OperatorConfig {
     pub namespaces: HashMap<String, NamespaceConfig>,
 }
