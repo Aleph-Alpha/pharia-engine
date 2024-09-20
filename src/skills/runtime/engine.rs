@@ -5,7 +5,7 @@ use semver::Version;
 use serde_json::{json, Value};
 use strum::{EnumIter, IntoEnumIterator};
 use wasmtime::{
-    component::{Component, Linker as WasmtimeLinker},
+    component::{Component, InstancePre, Linker as WasmtimeLinker},
     Config, Engine as WasmtimeEngine, OptLevel, Store, UpdateDeadline,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
@@ -79,29 +79,18 @@ impl Engine {
         })
     }
 
-    /// Extracts the version of the skill WIT world from the provided bytes,
-    /// and links it to the appropriate version in the linker.
-    pub fn instantiate_pre_skill(&self, bytes: impl AsRef<[u8]>) -> anyhow::Result<Skill> {
-        let skill_version = SupportedVersion::extract(&bytes)?;
+    /// Creates a pre-instantiation of a skill. It resolves the imports and does the linking,
+    /// but it still needs to be turned into a concrete skill version implementation.
+    pub fn instantiate_pre(
+        &self,
+        bytes: impl AsRef<[u8]>,
+    ) -> anyhow::Result<InstancePre<LinkedCtx>> {
         let component = Component::new(&self.inner, bytes)?;
-        let pre = self.linker.instantiate_pre(&component)?;
-
-        match skill_version {
-            SupportedVersion::V0_2 => {
-                let skill = v0_2::SkillPre::new(pre)?;
-                Ok(Skill::V0_2(skill))
-            }
-            SupportedVersion::V0_1 => {
-                let skill = v0_1::SkillPre::new(pre)?;
-                Ok(Skill::V0_1(skill))
-            }
-            SupportedVersion::Unversioned => {
-                let skill = unversioned::SkillPre::new(pre)?;
-                Ok(Skill::Unversioned(skill))
-            }
-        }
+        self.linker.instantiate_pre(&component)
     }
 
+    /// Generates a store for a specific invocation.
+    /// This will yield after every tick, as well as halt execution after `Self::MAX_EXUCUTION_TIME`.
     fn store<T>(&self, data: T) -> Store<T> {
         let mut store = Store::new(&self.inner, data);
         // Check after the next tick
@@ -136,9 +125,26 @@ pub enum Skill {
 }
 
 impl Skill {
+    /// Extracts the version of the skill WIT world from the provided bytes,
+    /// and links it to the appropriate version in the linker.
     pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
-        let skill = engine.instantiate_pre_skill(bytes)?;
-        Ok(skill)
+        let skill_version = SupportedVersion::extract(&bytes)?;
+        let pre = engine.instantiate_pre(&bytes)?;
+
+        match skill_version {
+            SupportedVersion::V0_2 => {
+                let skill = v0_2::SkillPre::new(pre)?;
+                Ok(Skill::V0_2(skill))
+            }
+            SupportedVersion::V0_1 => {
+                let skill = v0_1::SkillPre::new(pre)?;
+                Ok(Skill::V0_1(skill))
+            }
+            SupportedVersion::Unversioned => {
+                let skill = unversioned::SkillPre::new(pre)?;
+                Ok(Skill::Unversioned(skill))
+            }
+        }
     }
 
     pub async fn run(
@@ -604,7 +610,7 @@ mod tests {
         given_greet_skill_v0_1();
         let wasm = fs::read("skills/greet_skill_v0_1.wasm").unwrap();
         let engine = Engine::new().unwrap();
-        let skill = engine.instantiate_pre_skill(wasm).unwrap();
+        let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -621,7 +627,7 @@ mod tests {
         given_greet_skill_v0_2();
         let wasm = fs::read("skills/greet_skill_v0_2.wasm").unwrap();
         let engine = Engine::new().unwrap();
-        let skill = engine.instantiate_pre_skill(wasm).unwrap();
+        let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -638,7 +644,7 @@ mod tests {
         given_greet_py();
         let wasm = fs::read("skills/greet-py.wasm").unwrap();
         let engine = Engine::new().unwrap();
-        let skill = engine.instantiate_pre_skill(wasm).unwrap();
+        let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -655,7 +661,7 @@ mod tests {
         given_greet_py_v0_2();
         let wasm = fs::read("skills/greet-py-v0_2.wasm").unwrap();
         let engine = Engine::new().unwrap();
-        let skill = engine.instantiate_pre_skill(wasm).unwrap();
+        let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
