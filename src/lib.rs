@@ -17,6 +17,7 @@ use csi::CsiDrivers;
 use futures::Future;
 use logging::initialize_tracing;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
+use shell::Shell;
 use skill_store::SkillStore;
 use tokenizers::Tokenizers;
 use tracing::error;
@@ -75,8 +76,8 @@ impl Kernel {
     
         // Wait for first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
-    
-        let shell_shutdown = shell::run(
+
+        let shell = Shell::new(
             app_config.tcp_addr,
             skill_executor.api(),
             skill_store.api(),
@@ -90,7 +91,7 @@ impl Kernel {
             skill_store,
             skill_executor,
             namespace_watcher,
-            shell_shutdown: Box::pin(shell_shutdown),
+            shell_shutdown: Box::pin(shell.wait_for_shutdown()),
         })
     }
 

@@ -14,7 +14,7 @@ use axum_extra::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -38,49 +38,31 @@ use crate::{
     skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
 };
 
-#[derive(OpenApi)]
-#[openapi(
-    info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, skills, cached_skills, execute_skill, drop_cached_skill, skill_wit),
-    modifiers(&SecurityAddon),
-    components(schemas(ExecuteSkillArgs)),
-    tags(
-        (name = "skills"),
-        (name = "docs"),
-    )
-)]
-struct ApiDoc;
-
-struct SecurityAddon;
-
-impl Modify for SecurityAddon {
-    fn modify(&self, openapi: &mut openapi::OpenApi) {
-        let components = openapi.components.get_or_insert_with(Default::default);
-        components.add_security_scheme(
-            "api_token",
-            SecurityScheme::Http(
-                HttpBuilder::new()
-                    .scheme(HttpAuthScheme::Bearer)
-                    .bearer_format("JWT")
-                    .build(),
-            ),
-        );
-    }
+pub struct Shell {
+    handle: JoinHandle<Result<(), anyhow::Error>>,
 }
 
-/// openapi.json
-///
-/// Return JSON version of an OpenAPI schema
-#[utoipa::path(
-    get,
-    path = "/openapi.json",
-    tag = "docs",
-    responses(
-        (status = 200, description = "JSON file", body = ())
-    ),
-)]
-async fn serve_docs() -> Json<openapi::OpenApi> {
-    Json(ApiDoc::openapi())
+impl Shell {
+    pub async fn new(
+        addr: impl Into<SocketAddr>,
+        skill_executor_api: SkillExecutorApi,
+        skill_provider_api: SkillStoreApi,
+        shutdown_signal: impl Future<Output = ()> + Send + 'static,
+    ) -> Self {
+        let listener = run(
+            addr,
+            skill_executor_api,
+            skill_provider_api,
+            shutdown_signal,
+        )
+        .await;
+        let handle = tokio::spawn(listener);
+        Self { handle }
+    }
+
+    pub async fn wait_for_shutdown(self) -> Result<(), anyhow::Error>{
+        self.handle.await.unwrap()
+    }
 }
 
 /// Start a shell listening to incoming requests at the given address.
@@ -92,7 +74,7 @@ pub async fn run(
     skill_executor_api: SkillExecutorApi,
     skill_provider_api: SkillStoreApi,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
-) -> impl Future<Output = anyhow::Result<()>> {
+) -> impl Future<Output = anyhow::Result<()>> + 'static {
     let addr = addr.into();
     let listener = TcpListener::bind(addr).await.context(format!(
         "Could not bind a tcp listener to '{addr}' please check environment vars for \
@@ -153,6 +135,51 @@ pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillStore
                 .layer(CompressionLayer::new())
                 .layer(DecompressionLayer::new()),
         )
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    info(description = "The best place to run serverless AI applications."),
+    paths(serve_docs, skills, cached_skills, execute_skill, drop_cached_skill, skill_wit),
+    modifiers(&SecurityAddon),
+    components(schemas(ExecuteSkillArgs)),
+    tags(
+        (name = "skills"),
+        (name = "docs"),
+    )
+)]
+struct ApiDoc;
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut openapi::OpenApi) {
+        let components = openapi.components.get_or_insert_with(Default::default);
+        components.add_security_scheme(
+            "api_token",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
+                    .build(),
+            ),
+        );
+    }
+}
+
+/// openapi.json
+///
+/// Return JSON version of an OpenAPI schema
+#[utoipa::path(
+    get,
+    path = "/openapi.json",
+    tag = "docs",
+    responses(
+        (status = 200, description = "JSON file", body = ())
+    ),
+)]
+async fn serve_docs() -> Json<openapi::OpenApi> {
+    Json(ApiDoc::openapi())
 }
 
 #[derive(Deserialize, Serialize, ToSchema)]
