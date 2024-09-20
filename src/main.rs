@@ -1,16 +1,16 @@
 use anyhow::Error;
 use tokio::signal;
 
-use pharia_kernel::AppConfig;
+use pharia_kernel::{AppConfig, Kernel};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     drop(dotenvy::dotenv());
     let app_config = AppConfig::from_env()?;
 
-    pharia_kernel::run(app_config, shutdown_signal())
-        .await? // We booted everything up and are operational
-        .await; // We shut everything down, and released all resources.
+    let kernel = Kernel::new(app_config, shutdown_signal()).await?;
+    kernel.run().await;
+
     Ok(())
 }
 

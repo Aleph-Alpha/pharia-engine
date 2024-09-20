@@ -135,26 +135,6 @@ impl SkillStoreState {
     }
 }
 
-// pub struct CachedSkill {
-//     skill: Skill,
-// }
-
-// impl CachedSkill {
-//     pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
-//         let skill = engine.instantiate_pre_skill(bytes)?;
-//         Ok(Self { skill })
-//     }
-
-//     pub async fn run(
-//         &self,
-//         engine: &Engine,
-//         ctx: Box<dyn CsiForSkills + Send>,
-//         input: Value,
-//     ) -> anyhow::Result<Value> {
-//         self.skill.run(engine, ctx, input).await
-//     }
-// }
-
 pub struct SkillStore {
     sender: mpsc::Sender<SkillProviderMsg>,
     handle: JoinHandle<()>,

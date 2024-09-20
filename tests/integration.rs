@@ -2,28 +2,29 @@ use std::{env, sync::OnceLock, time::Duration};
 
 use axum::http;
 use dotenvy::dotenv;
-use pharia_kernel::{run, AppConfig, OperatorConfig};
+use pharia_kernel::{AppConfig, Kernel, OperatorConfig};
 use reqwest::{header, Body};
 use serde_json::json;
 use test_skills::given_greet_skill;
 use tokio::{sync::oneshot, task::JoinHandle};
 
-struct Kernel {
-    handle: JoinHandle<()>,
+struct TestKernel {
     shutdown_trigger: oneshot::Sender<()>,
+    handle: JoinHandle<()>,
 }
 
-impl Kernel {
+impl TestKernel {
     async fn new(app_config: AppConfig) -> Self {
         let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
-        let wait_for_shutdown = run(app_config, shutdown_signal).await.unwrap();
-        let handle = tokio::spawn(wait_for_shutdown);
+        // Wait for socket listener to be bound
+        let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
+        let handle = tokio::spawn(async move { kernel.run().await });
         Self {
-            handle,
             shutdown_trigger,
+            handle,
         }
     }
 
@@ -51,7 +52,7 @@ async fn execute_skill() {
     const PORT: u16 = 9_000;
 
     given_greet_skill();
-    let kernel = Kernel::with_port(PORT, &["greet_skill"]).await;
+    let kernel = TestKernel::with_port(PORT, &["greet_skill"]).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();

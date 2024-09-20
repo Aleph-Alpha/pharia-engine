@@ -1,7 +1,7 @@
 use std::{env, fs::File, io::Write, path::Path, time::Duration};
 
 use assert_cmd::Command;
-use pharia_kernel::{run, AppConfig, OperatorConfig};
+use pharia_kernel::{AppConfig, Kernel, OperatorConfig};
 use predicates::str::contains;
 use tokio::{sync::oneshot, task::JoinHandle};
 
@@ -65,7 +65,7 @@ fn publish_minimal_args() {
 async fn run_skill() {
     // given a Pharia Kernel instance
     const PORT: u16 = 9_000;
-    let kernel = Kernel::with_port(PORT).await;
+    let kernel = TestKernel::with_port(PORT).await;
 
     // when running a skill
     drop(dotenvy::dotenv());
@@ -89,19 +89,19 @@ async fn run_skill() {
     kernel.shutdown().await;
 }
 
-struct Kernel {
+struct TestKernel {
     handle: JoinHandle<()>,
     shutdown_trigger: oneshot::Sender<()>,
 }
 
-impl Kernel {
+impl TestKernel {
     async fn new(app_config: AppConfig) -> Self {
         let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
-        let wait_for_shutdown = run(app_config, shutdown_signal).await.unwrap();
-        let handle = tokio::spawn(wait_for_shutdown);
+        let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
+        let handle = tokio::spawn(kernel.run());
         Self {
             handle,
             shutdown_trigger,

@@ -38,7 +38,8 @@ pub struct Kernel {
 }
 
 impl Kernel {
-    /// Boots up all the actors making up the kernel.
+    /// Boots up all the actors making up the kernel. If completed the binding operation of the
+    /// listener is completed, but no requests are actively handled yet.
     /// 
     /// # Errors
     /// 
@@ -93,7 +94,8 @@ impl Kernel {
         })
     }
 
-    pub async fn wait_for_shutdown(self) {
+    /// Runs Kernel until it shuts down
+    pub async fn run(self) {
         // Make skills available via http interface. If we get the signal for shutdown the future
         // will complete.
         if let Err(e) = self.shell_shutdown.await {
@@ -110,20 +112,6 @@ impl Kernel {
         self.tokenizers.wait_for_shutdown().await;
         self.inference.wait_for_shutdown().await;
     }
-}
-
-/// Boots up all the actors making up the kernel. The result of this method is also a future, which
-/// signals that all resources have been shutdown.
-///
-/// # Errors
-///
-/// Errors if the configuration is invalid
-pub async fn run(
-    app_config: AppConfig,
-    shutdown_signal: impl Future<Output = ()> + Send + 'static,
-) -> Result<impl Future<Output = ()>, Error> {
-    let kernel = Kernel::new(app_config, shutdown_signal).await?;
-    Ok(kernel.wait_for_shutdown())
 }
 
 #[cfg(test)]
@@ -179,8 +167,9 @@ mod tests {
             log_level: "info".to_owned(),
             open_telemetry_endpoint: None,
         };
+        let kernel = Kernel::new(config, ready(())).await.unwrap();
 
-        let shutdown_completed = super::run(config, ready(())).await.unwrap();
+        let shutdown_completed = kernel.run();
 
         // wasm runtime needs some time to shutdown (at least on Daniel's machine), so the time out
         // has been increased to 2sec
