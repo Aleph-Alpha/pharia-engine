@@ -18,7 +18,6 @@ use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use shell::Shell;
 use skill_store::SkillStore;
 use tokenizers::Tokenizers;
-use tracing::error;
 
 use self::{inference::Inference, skills::SkillExecutor};
 
@@ -37,9 +36,9 @@ pub struct Kernel {
 impl Kernel {
     /// Boots up all the actors making up the kernel. If completed the binding operation of the
     /// listener is completed, but no requests are actively handled yet.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Fails if application can not read the namespace configuration. Errors in booting up the
     /// shell are only exposed once waiting for the shutdown
     pub async fn new(
@@ -60,26 +59,41 @@ impl Kernel {
             tokenizers: tokenizers.api(),
         };
         let skill_store = SkillStore::new(&app_config.operator_config.namespaces);
-    
+
         // Boot up runtime we need to execute Skills
         let skill_executor = SkillExecutor::new(csi_drivers, skill_store.api());
-    
+
         let mut namespace_watcher = NamespaceWatcher::with_config(
             skill_store.api(),
             loaders,
             app_config.namespace_update_interval,
         );
-    
+
         // Wait for first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        let shell = Shell::new(
+        let shell = match Shell::new(
             app_config.tcp_addr,
             skill_executor.api(),
             skill_store.api(),
             shutdown_signal,
         )
-        .await;
+        .await
+        {
+            Ok(shell) => shell,
+            Err(e) => {
+                // In case construction of shell goes wrong (e.g. we can not bind the port) we
+                // shutdown all the other actors we created so far, so they do not live on in
+                // detached threads.
+                namespace_watcher.wait_for_shutdown().await;
+                skill_executor.wait_for_shutdown().await;
+                skill_store.wait_for_shutdown().await;
+                tokenizers.wait_for_shutdown().await;
+                inference.wait_for_shutdown().await;
+                // Bubble up error, after resources have been freed
+                return Err(e);
+            }
+        };
 
         Ok(Kernel {
             inference,
@@ -94,16 +108,9 @@ impl Kernel {
     /// Waits for the kernel to shut down and free all its resources. The shutdown begins once the
     /// shutdown signal passed in [`Kernel::new`] runs to completion
     pub async fn wait_for_shutdown(self) {
-        // Make skills available via http interface. If we get the signal for shutdown the future
-        // will complete.
-        if let Err(e) = self.shell.wait_for_shutdown().await {
-            // We do **not** want to bubble up an error during shell initialization or execution. We
-            // want to shutdown the other actors before finishing this function.
-            error!("Could not boot shell: {e}");
-        }
-
         // Shutdown everything we started. We reverse the order for the shutdown so all the required
         // actors are still answering for each component.
+        self.shell.wait_for_shutdown().await;
         self.namespace_watcher.wait_for_shutdown().await;
         self.skill_executor.wait_for_shutdown().await;
         self.skill_store.wait_for_shutdown().await;

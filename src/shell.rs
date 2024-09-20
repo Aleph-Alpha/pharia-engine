@@ -23,7 +23,7 @@ use tower_http::{
     services::{ServeDir, ServeFile},
     trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
-use tracing::{info, info_span, Level};
+use tracing::{error, info, info_span, Level};
 use utoipa::{
     openapi::{
         self,
@@ -39,54 +39,38 @@ use crate::{
 };
 
 pub struct Shell {
-    handle: JoinHandle<Result<(), anyhow::Error>>,
+    handle: JoinHandle<()>,
 }
 
 impl Shell {
+    /// Start a shell listening to incoming requests at the given address. Successful construction
+    /// implies that the listener is bound to the endpoint.
     pub async fn new(
         addr: impl Into<SocketAddr>,
         skill_executor_api: SkillExecutorApi,
         skill_provider_api: SkillStoreApi,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
-    ) -> Self {
-        let listener = run(
-            addr,
-            skill_executor_api,
-            skill_provider_api,
-            shutdown_signal,
-        )
-        .await;
-        let handle = tokio::spawn(listener);
-        Self { handle }
+    ) -> Result<Self, anyhow::Error> {
+        let addr = addr.into();
+        // It is important to construct the listener outside of the `spawn` invocation. We need to
+        // guarantee the listener is already bound to the port, once `Self` is constructed.
+        let listener = TcpListener::bind(addr)
+            .await
+            .context(format!("Could not bind a tcp listener to '{addr}'"))?;
+        info!("Listening on: {addr}");
+        let handle = tokio::spawn(async {
+            let res = axum::serve(listener, http(skill_executor_api, skill_provider_api))
+                .with_graceful_shutdown(shutdown_signal)
+                .await;
+            if let Err(e) = res {
+                error!("Error terminating shell: {e}");
+            }
+        });
+        Ok(Self { handle })
     }
 
-    pub async fn wait_for_shutdown(self) -> Result<(), anyhow::Error>{
-        self.handle.await.unwrap()
-    }
-}
-
-/// Start a shell listening to incoming requests at the given address.
-///
-/// The outer future awaits the bind operation of the listener.
-/// The inner future awaits the shutdown.
-pub async fn run(
-    addr: impl Into<SocketAddr>,
-    skill_executor_api: SkillExecutorApi,
-    skill_provider_api: SkillStoreApi,
-    shutdown_signal: impl Future<Output = ()> + Send + 'static,
-) -> impl Future<Output = anyhow::Result<()>> + 'static {
-    let addr = addr.into();
-    let listener = TcpListener::bind(addr).await.context(format!(
-        "Could not bind a tcp listener to '{addr}' please check environment vars for \
-        PHARIA_KERNEL_ADDRESS."
-    ));
-    info!("Listening on: {addr}");
-
-    async {
-        axum::serve(listener?, http(skill_executor_api, skill_provider_api))
-            .with_graceful_shutdown(shutdown_signal)
-            .await?;
-        Ok(())
+    pub async fn wait_for_shutdown(self) {
+        self.handle.await.unwrap();
     }
 }
 
