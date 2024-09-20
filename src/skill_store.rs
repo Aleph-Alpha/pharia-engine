@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, sync::Arc};
 use anyhow::{anyhow, Context};
 use tokio::{
     sync::{mpsc, oneshot},
-    task::JoinHandle,
+    task::{spawn_blocking, JoinHandle},
 };
 use tracing::info;
 
@@ -98,7 +98,7 @@ impl SkillStoreState {
     pub async fn fetch(
         &mut self,
         skill_path: &SkillPath,
-        engine: &Engine,
+        engine: Arc<Engine>,
     ) -> anyhow::Result<Option<Arc<Skill>>> {
         if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
             return Err(anyhow!("Invalid namespace: {error}"));
@@ -119,7 +119,9 @@ impl SkillStoreState {
                 .await?;
             let bytes =
                 bytes.ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
-            let skill = Skill::new(engine, bytes)
+            let skill = spawn_blocking(move || Skill::new(&engine, bytes))
+                .await
+                .expect("Spawend linking thread must run to completion without being poisened.")
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
             self.cached_skills
                 .insert(skill_path.clone(), Arc::new(skill));
@@ -328,7 +330,7 @@ impl SkillProviderActor {
                 engine,
                 send,
             } => {
-                let result = self.provider.fetch(&skill_path, &engine).await;
+                let result = self.provider.fetch(&skill_path, engine).await;
                 drop(send.send(result));
             }
             SkillProviderMsg::List { send } => {
@@ -394,9 +396,9 @@ pub mod tests {
     async fn skill_component_is_in_config() {
         let skill_path = SkillPath::dummy();
         let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
-        let engine = Engine::new().unwrap();
+        let engine = Arc::new(Engine::new().unwrap());
 
-        let result = provider.fetch(&skill_path, &engine).await;
+        let result = provider.fetch(&skill_path, engine).await;
 
         assert!(result.is_err());
     }
@@ -405,12 +407,12 @@ pub mod tests {
     async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
         let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
-        let engine = Engine::new().unwrap();
+        let engine = Arc::new(Engine::new().unwrap());
 
         let result = provider
             .fetch(
                 &SkillPath::new(&skill_path.namespace, "non_existing_skill"),
-                &engine,
+                engine,
             )
             .await;
 
@@ -421,12 +423,12 @@ pub mod tests {
     async fn namespace_not_in_config() {
         let skill_path = SkillPath::dummy();
         let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
-        let engine = Engine::new().unwrap();
+        let engine = Arc::new(Engine::new().unwrap());
 
         let result = provider
             .fetch(
                 &SkillPath::new("non_existing_namespace", &skill_path.name),
-                &engine,
+                engine,
             )
             .await;
 
@@ -439,8 +441,8 @@ pub mod tests {
         given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
         let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
-        let engine = Engine::new().unwrap();
-        provider.fetch(&skill_path, &engine).await.unwrap();
+        let engine = Arc::new(Engine::new().unwrap());
+        provider.fetch(&skill_path, engine).await.unwrap();
 
         // When we remove the skill
         provider.remove_skill(&skill_path);
@@ -455,10 +457,10 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet_skill");
         let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
-        let engine = Engine::new().unwrap();
+        let engine = Arc::new(Engine::new().unwrap());
 
         // when fetching the skill
-        let result = provider.fetch(&skill_path, &engine).await;
+        let result = provider.fetch(&skill_path, engine).await;
 
         // then it returns an error
         assert!(result.is_err());
