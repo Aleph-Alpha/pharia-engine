@@ -3,7 +3,7 @@ use std::{env, fs::File, io::Write, path::Path, time::Duration};
 use assert_cmd::Command;
 use pharia_kernel::{AppConfig, Kernel, OperatorConfig};
 use predicates::str::contains;
-use tokio::{sync::oneshot, task::JoinHandle};
+use tokio::sync::oneshot;
 
 #[test]
 fn invalid_args() {
@@ -90,7 +90,7 @@ async fn run_skill() {
 }
 
 struct TestKernel {
-    handle: JoinHandle<()>,
+    kernel: Kernel,
     shutdown_trigger: oneshot::Sender<()>,
 }
 
@@ -101,9 +101,8 @@ impl TestKernel {
             shutdown_capture.await.unwrap();
         };
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
-        let handle = tokio::spawn(kernel.run());
         Self {
-            handle,
+            kernel,
             shutdown_trigger,
         }
     }
@@ -129,6 +128,6 @@ impl TestKernel {
 
     async fn shutdown(self) {
         self.shutdown_trigger.send(()).unwrap();
-        self.handle.await.unwrap();
+        self.kernel.wait_for_shutdown().await;
     }
 }

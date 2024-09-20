@@ -9,7 +9,7 @@ async fn main() -> Result<(), Error> {
     let app_config = AppConfig::from_env()?;
 
     let kernel = Kernel::new(app_config, shutdown_signal()).await?;
-    kernel.run().await;
+    kernel.wait_for_shutdown().await;
 
     Ok(())
 }

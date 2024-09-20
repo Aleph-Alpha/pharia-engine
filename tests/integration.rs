@@ -6,11 +6,11 @@ use pharia_kernel::{AppConfig, Kernel, OperatorConfig};
 use reqwest::{header, Body};
 use serde_json::json;
 use test_skills::given_greet_skill;
-use tokio::{sync::oneshot, task::JoinHandle};
+use tokio::sync::oneshot;
 
 struct TestKernel {
     shutdown_trigger: oneshot::Sender<()>,
-    handle: JoinHandle<()>,
+    kernel: Kernel,
 }
 
 impl TestKernel {
@@ -21,10 +21,9 @@ impl TestKernel {
         };
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
-        let handle = tokio::spawn(async move { kernel.run().await });
         Self {
             shutdown_trigger,
-            handle,
+            kernel,
         }
     }
 
@@ -42,7 +41,7 @@ impl TestKernel {
 
     async fn shutdown(self) {
         self.shutdown_trigger.send(()).unwrap();
-        self.handle.await.unwrap();
+        self.kernel.wait_for_shutdown().await;
     }
 }
 

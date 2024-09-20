@@ -10,8 +10,6 @@ mod skill_store;
 mod skills;
 mod tokenizers;
 
-use std::pin::Pin;
-
 use anyhow::{Context, Error};
 use csi::CsiDrivers;
 use futures::Future;
@@ -33,9 +31,7 @@ pub struct Kernel {
     skill_store: SkillStore,
     skill_executor: SkillExecutor,
     namespace_watcher: NamespaceWatcher,
-    // We do **not** want to bubble up an error during shell initialization or execution. We want to
-    // shutdown the other actors, in case booting up the shell fails.
-    shell_shutdown: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
+    shell: Shell,
 }
 
 impl Kernel {
@@ -91,15 +87,16 @@ impl Kernel {
             skill_store,
             skill_executor,
             namespace_watcher,
-            shell_shutdown: Box::pin(shell.wait_for_shutdown()),
+            shell,
         })
     }
 
-    /// Runs Kernel until it shuts down
-    pub async fn run(self) {
+    /// Waits for the kernel to shut down and free all its resources. The shutdown begins once the
+    /// shutdown signal passed in [`Kernel::new`] runs to completion
+    pub async fn wait_for_shutdown(self) {
         // Make skills available via http interface. If we get the signal for shutdown the future
         // will complete.
-        if let Err(e) = self.shell_shutdown.await {
+        if let Err(e) = self.shell.wait_for_shutdown().await {
             // We do **not** want to bubble up an error during shell initialization or execution. We
             // want to shutdown the other actors before finishing this function.
             error!("Could not boot shell: {e}");
@@ -170,7 +167,7 @@ mod tests {
         };
         let kernel = Kernel::new(config, ready(())).await.unwrap();
 
-        let shutdown_completed = kernel.run();
+        let shutdown_completed = kernel.wait_for_shutdown();
 
         // wasm runtime needs some time to shutdown (at least on Daniel's machine), so the time out
         // has been increased to 2sec
