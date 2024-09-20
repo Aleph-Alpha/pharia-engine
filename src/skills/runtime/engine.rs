@@ -59,19 +59,7 @@ impl Engine {
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker)?;
         // Skill world from bindgen
-        for version in SupportedVersion::iter() {
-            match version {
-                SupportedVersion::V0_2 => {
-                    v0_2::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
-                }
-                SupportedVersion::V0_1 => {
-                    v0_1::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
-                }
-                SupportedVersion::Unversioned => {
-                    unversioned::Skill::add_to_linker(&mut linker, |state: &mut LinkedCtx| state)?;
-                }
-            }
-        }
+        Skill::add_to_linker(&mut linker)?;
 
         Ok(Self {
             inner: engine,
@@ -145,6 +133,26 @@ impl Skill {
                 Ok(Skill::Unversioned(skill))
             }
         }
+    }
+
+    /// Links all currently supported versions of the skill world to the engine
+    fn add_to_linker(linker: &mut WasmtimeLinker<LinkedCtx>) -> anyhow::Result<()> {
+        // Skill world from bindgen
+        for version in SupportedVersion::iter() {
+            match version {
+                SupportedVersion::V0_2 => {
+                    v0_2::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
+                }
+                SupportedVersion::V0_1 => {
+                    v0_1::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
+                }
+                SupportedVersion::Unversioned => {
+                    unversioned::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn run(
