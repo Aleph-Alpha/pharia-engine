@@ -1,4 +1,4 @@
-use std::{env, sync::OnceLock, time::Duration};
+use std::{env, net::TcpListener, sync::OnceLock, time::Duration};
 
 use axum::http;
 use dotenvy::dotenv;
@@ -48,17 +48,17 @@ impl TestKernel {
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn execute_skill() {
-    const PORT: u16 = 9_000;
+    let port = free_test_port();
 
     given_greet_skill();
-    let kernel = TestKernel::with_port(PORT, &["greet_skill"]).await;
+    let kernel = TestKernel::with_port(port, &["greet_skill"]).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
     auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
-        .post(format!("http://127.0.0.1:{PORT}/execute_skill"))
+        .post(format!("http://127.0.0.1:{port}/execute_skill"))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
         .body(Body::from(
@@ -83,4 +83,9 @@ fn api_token() -> &'static str {
         drop(dotenv());
         env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
     })
+}
+
+/// Ask the operating system for the next free port
+fn free_test_port() -> u16 {
+    TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port()
 }
