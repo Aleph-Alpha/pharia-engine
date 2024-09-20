@@ -153,23 +153,17 @@ fn run_in_venv(venv_path: &Path, args: &[&str]) -> Result<Vec<u8>, Error> {
     let venv_path = venv_path
         .to_str()
         .context("Path to virtual environment must be representable in UTF-8.")?;
-    // Run the Python interpreter in the virtual environment. Use cmd on windows or sh on other
-    // systems to execute the virtual environment and Python in the same process
-    let activate_path = if cfg!(target_os = "windows") {
-        format!("{venv_path}\\Scripts\\activate.bat")
-    } else {
-        format!("{venv_path}/bin/activate")
-    };
+    // Run the Python interpreter in the virtual environment. Use cmd on windows or python
+    // interpreter directly on other platforms
 
     let mut cmd = if cfg!(target_os = "windows") {
+        let activate_path = format!("{venv_path}\\Scripts\\activate.bat"); 
         let mut cmd = Command::new("cmd");
         cmd.args(["/C", &activate_path, "&&"]).args(args);
         cmd
     } else {
-        let mut cmd = Command::new("sh");
-        let cmd_in_venv = args.join(" ");
-        let inner_cmd = format!("\". {activate_path} && {cmd_in_venv}\"");
-        cmd.args(["-c", &inner_cmd]);
+        let mut cmd = Command::new(format!("{venv_path}/bin/{}", args[0]));
+        cmd.args(&args[1..]);
         cmd
     };
 
