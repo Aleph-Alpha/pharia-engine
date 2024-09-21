@@ -397,7 +397,7 @@ pub mod tests {
 
         impl Runtime for MockRuntime {
             async fn run(
-                &mut self,
+                &self,
                 _: &SkillPath,
                 _: Value,
                 mut ctx: Box<dyn CsiForSkills + Send>,
@@ -501,7 +501,7 @@ pub mod tests {
 
     impl Runtime for RustRuntime {
         async fn run(
-            &mut self,
+            &self,
             skill_path: &SkillPath,
             input: Value,
             mut ctx: Box<dyn CsiForSkills + Send>,

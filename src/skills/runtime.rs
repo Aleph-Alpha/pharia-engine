@@ -32,7 +32,7 @@ pub trait Runtime {
 
     /// Executes a skill and return its result.
     fn run(
-        &mut self,
+        &self,
         skill_path: &SkillPath,
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
@@ -69,7 +69,7 @@ pub mod tests {
 
     impl Runtime for SaboteurRuntime {
         async fn run(
-            &mut self,
+            &self,
             _skill_path: &SkillPath,
             _input: Value,
             _ctx: Box<dyn CsiForSkills + Send>,
