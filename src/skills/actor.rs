@@ -36,7 +36,10 @@ impl SkillExecutor {
     }
 
     /// You may want use this constructor if you want to use a double runtime for testing
-    pub fn with_runtime<R: Runtime + Send + 'static>(runtime: R, csi_apis: CsiDrivers) -> Self {
+    pub fn with_runtime<R: Runtime + Send + Sync + 'static>(
+        runtime: R,
+        csi_apis: CsiDrivers,
+    ) -> Self {
         let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
@@ -122,7 +125,7 @@ where
         }
     }
 
-    async fn act(&mut self, msg: SkillExecutorMsg) {
+    async fn act(&self, msg: SkillExecutorMsg) {
         let SkillExecutorMsg {
             skill_path,
             input,
@@ -137,7 +140,7 @@ where
     }
 
     async fn run_skill(
-        &mut self,
+        &self,
         skill_path: &SkillPath,
         input: Value,
         api_token: String,
