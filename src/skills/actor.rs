@@ -120,8 +120,14 @@ where
     }
 
     async fn run(&mut self) {
-        while let Some(msg) = self.recv.recv().await {
-            self.act(msg).await;
+        loop {
+            select! {
+                msg = self.recv.recv() => match msg {
+                    Some(msg) => self.act(msg).await,
+                    // Senders are gone, break out of the loop for shutdown.
+                    None => break
+                },
+            }
         }
     }
 
