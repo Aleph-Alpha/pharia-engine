@@ -50,10 +50,10 @@ pub mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        namespace_watcher::OperatorConfig,
         csi::ChunkRequest,
         inference::{Completion, CompletionRequest},
         language_selection::{select_language, Language},
+        namespace_watcher::OperatorConfig,
         skill_store::SkillStore,
     };
 
@@ -66,8 +66,7 @@ pub mod tests {
     async fn greet_skill_component() {
         given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider =
-            SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
+        let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
 
         let mut runtime = WasmRuntime::new(skill_provider.api());
@@ -100,8 +99,7 @@ pub mod tests {
         given_greet_skill();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider =
-            SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
+        let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let mut runtime = WasmRuntime::new(skill_provider.api());
 
@@ -121,8 +119,7 @@ pub mod tests {
         given_greet_py();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet-py");
-        let skill_provider =
-            SkillStore::new(&OperatorConfig::local(&["greet-py"]).namespaces);
+        let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet-py"]).namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let mut runtime = WasmRuntime::new(skill_provider.api());
 
@@ -142,8 +139,7 @@ pub mod tests {
         given_greet_skill();
         let skill_ctx = Box::new(CsiCounter::new());
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider =
-            SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
+        let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let mut runtime = WasmRuntime::new(skill_provider.api());
         for i in 1..10 {

@@ -380,8 +380,7 @@ pub mod tests {
         let incoming = SkillDescription::new("existing_skill", Some("v2"));
 
         // When the observer checks for new skills
-        let diff =
-            NamespaceWatcherActor::compute_diff(&[existing.clone()], &[incoming.clone()]);
+        let diff = NamespaceWatcherActor::compute_diff(&[existing.clone()], &[incoming.clone()]);
 
         // Then the new version is added and the old version is not removed as only the tag changed
         assert_eq!(diff.added_or_changed, vec![incoming]);
@@ -547,8 +546,7 @@ pub mod tests {
         let skill_provider_api = SkillStoreApi::new(sender);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
 
-        let mut coa =
-            NamespaceWatcherActor::with_skills(namespaces, skill_provider_api, config);
+        let mut coa = NamespaceWatcherActor::with_skills(namespaces, skill_provider_api, config);
 
         // when we load an invalid namespace
         coa.report_changes_in_namespace(dummy_namespace).await;

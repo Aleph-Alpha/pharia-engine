@@ -1,9 +1,9 @@
 mod config;
-mod namespace_watcher;
 mod csi;
 mod inference;
 mod language_selection;
 mod logging;
+mod namespace_watcher;
 mod registries;
 mod shell;
 mod skill_store;
@@ -11,10 +11,10 @@ mod skills;
 mod tokenizers;
 
 use anyhow::{Context, Error};
-use namespace_watcher::{NamespaceWatcher, NamespaceDescriptionLoaders};
 use csi::CsiDrivers;
 use futures::Future;
 use logging::initialize_tracing;
+use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use skill_store::SkillStore;
 use tokenizers::Tokenizers;
 use tracing::error;
@@ -97,8 +97,8 @@ mod tests {
     use std::sync::LazyLock;
     use std::time::Duration;
 
-    use namespace_watcher::OperatorConfig;
     use dotenvy::dotenv;
+    use namespace_watcher::OperatorConfig;
     use tokio_test::assert_ok;
 
     use super::*;

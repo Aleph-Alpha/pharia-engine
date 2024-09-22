@@ -136,8 +136,7 @@ pub enum Skill {
 }
 
 impl Skill {
-
-    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self>{
+    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         let skill = engine.instantiate_pre_skill(bytes)?;
         Ok(skill)
     }
