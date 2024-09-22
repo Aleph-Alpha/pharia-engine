@@ -1,4 +1,20 @@
-use std::future::pending;
+use std::{
+    future::{pending, Future},
+    pin::Pin,
+    sync::Arc,
+};
+
+use async_trait::async_trait;
+use futures::{stream::FuturesUnordered, StreamExt};
+use opentelemetry::Context;
+use serde_json::Value;
+use tokio::{
+    select,
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
+use tracing::{span, Level};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::{
     runtime::{CsiForSkills, Runtime, WasmRuntime},
@@ -11,16 +27,6 @@ use crate::{
     language_selection::Language,
     skill_store::SkillStoreApi,
 };
-use async_trait::async_trait;
-use opentelemetry::Context;
-use serde_json::Value;
-use tokio::{
-    select,
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
-use tracing::{span, Level};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 /// Starts and stops the execution of skills as it owns the skill executer actor.
 pub struct SkillExecutor {
@@ -102,73 +108,49 @@ pub enum ExecuteSkillError {
 }
 
 struct SkillExecutorActor<R: Runtime> {
-    runtime: R,
+    runtime: Arc<R>,
     recv: mpsc::Receiver<SkillExecutorMsg>,
     csi_apis: CsiDrivers,
+    running_skills: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
 impl<R> SkillExecutorActor<R>
 where
-    R: Runtime,
+    R: Runtime + Send + Sync + 'static,
 {
     fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: CsiDrivers) -> Self {
         SkillExecutorActor {
-            runtime,
+            runtime: Arc::new(runtime),
             recv,
             csi_apis,
+            running_skills: FuturesUnordered::new(),
         }
     }
 
     async fn run(&mut self) {
         loop {
+            // While there are messages and running skills, poll both.
+            // If there is a message, add it to the queue.
+            // If there are skills, make progress on them.
             select! {
                 msg = self.recv.recv() => match msg {
-                    Some(msg) => self.act(msg).await,
+                    Some(msg) => self.act(msg),
                     // Senders are gone, break out of the loop for shutdown.
                     None => break
                 },
+                // FuturesUnordered will let them run in parallel. It will
+                // yield once one of them is completed.
+                () = self.running_skills.select_next_some(), if !self.running_skills.is_empty()  => {}
             }
         }
     }
 
-    async fn act(&self, msg: SkillExecutorMsg) {
-        let SkillExecutorMsg {
-            skill_path,
-            input,
-            send,
-            api_token,
-        } = msg;
-
-        let response = self.run_skill(&skill_path, input, api_token).await;
-        let result = send.send(response);
-        // Error is expected to happen during shutdown. Ignore result.
-        drop(result);
-    }
-
-    async fn run_skill(
-        &self,
-        skill_path: &SkillPath,
-        input: Value,
-        api_token: String,
-    ) -> Result<Value, ExecuteSkillError> {
-        let span = span!(
-            Level::DEBUG,
-            "execute_skill",
-            skill_path = skill_path.to_string(),
-        );
-        let context = span.context();
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let ctx = Box::new(SkillInvocationCtx::new(
-            send_rt_err,
-            self.csi_apis.clone(),
-            api_token,
-            Some(context),
-        ));
-        select! {
-            result = self.runtime.run(skill_path, input, ctx) => result,
-            // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(ExecuteSkillError::Other(error))
-        }
+    fn act(&mut self, msg: SkillExecutorMsg) {
+        let csi_apis = self.csi_apis.clone();
+        let runtime = self.runtime.clone();
+        self.running_skills.push(Box::pin(async move {
+            msg.run_skill(csi_apis, runtime.as_ref()).await;
+        }));
     }
 }
 
@@ -178,6 +160,38 @@ pub struct SkillExecutorMsg {
     pub input: Value,
     pub send: oneshot::Sender<Result<Value, ExecuteSkillError>>,
     pub api_token: String,
+}
+
+impl SkillExecutorMsg {
+    async fn run_skill(self, csi_apis: CsiDrivers, runtime: &impl Runtime) {
+        let SkillExecutorMsg {
+            skill_path,
+            input,
+            send,
+            api_token,
+        } = self;
+
+        let span = span!(
+            Level::DEBUG,
+            "execute_skill",
+            skill_path = skill_path.to_string(),
+        );
+        let context = span.context();
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let ctx = Box::new(SkillInvocationCtx::new(
+            send_rt_err,
+            csi_apis,
+            api_token,
+            Some(context),
+        ));
+        let response = select! {
+            result = runtime.run(&skill_path, input, ctx) => result,
+            // An error occurred during skill execution.
+            Ok(error) = recv_rt_err => Err(ExecuteSkillError::Other(error))
+        };
+        // Error is expected to happen during shutdown. Ignore result.
+        drop(send.send(response));
+    }
 }
 
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
@@ -299,10 +313,14 @@ pub mod tests {
 
     use anyhow::anyhow;
     use serde_json::json;
+    use tokio::try_join;
 
     use crate::{
         csi::tests::dummy_csi_apis,
-        inference::{tests::InferenceStub, CompletionRequest},
+        inference::{
+            tests::{AssertConcurrentClient, InferenceStub},
+            CompletionRequest, Inference,
+        },
         skill_store::SkillStore,
         skills::runtime::tests::SaboteurRuntime,
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
@@ -492,6 +510,37 @@ pub mod tests {
 
         // Then
         assert_eq!(result.unwrap(), "Hello");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn concurrent_skill_execution() {
+        // Given
+        let client = AssertConcurrentClient::new(2);
+        let inference = Inference::with_client(client);
+        let csi_apis = CsiDrivers {
+            inference: inference.api(),
+            ..dummy_csi_apis()
+        };
+        let runtime = RustRuntime::with_greet_skill();
+        let executor = SkillExecutor::with_runtime(runtime, csi_apis);
+        let api = executor.api();
+
+        // When executing tw tasks in parallel
+        let skill_path = SkillPath::new("local", "greet");
+        let input = json!("Hello");
+        let token = "TOKEN_NOT_REQUIRED";
+        let result = try_join!(
+            api.execute_skill(skill_path.clone(), input.clone(), token.to_owned()),
+            api.execute_skill(skill_path, input, token.to_owned()),
+        );
+
+        drop(api);
+        executor.wait_for_shutdown().await;
+        inference.wait_for_shutdown().await;
+
+        // Then they both have completed with the same values
+        let (result1, result2) = result.unwrap();
+        assert_eq!(result1, result2);
     }
 
     /// Intended as a test double for the production runtime. This implementation features exactly

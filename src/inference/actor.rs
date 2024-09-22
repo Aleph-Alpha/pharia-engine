@@ -336,13 +336,13 @@ pub mod tests {
 
     /// This Client will only resolve a completion once the correct number of
     /// requests have been reached.
-    struct AssertConcurrentClient {
+    pub struct AssertConcurrentClient {
         /// Number of requests we are still waiting on
         expected_concurrent_requests: AtomicUsize,
     }
 
     impl AssertConcurrentClient {
-        fn new(expected_concurrent_requests: impl Into<AtomicUsize>) -> Self {
+        pub fn new(expected_concurrent_requests: impl Into<AtomicUsize>) -> Self {
             Self {
                 expected_concurrent_requests: expected_concurrent_requests.into(),
             }
