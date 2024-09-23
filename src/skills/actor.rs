@@ -282,10 +282,7 @@ impl CsiForSkills for SkillInvocationCtx {
         }
     }
 
-    async fn select_language(
-        &mut self,
-        request: SelectLanguageRequest,
-    ) -> Option<Language> {
+    async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language> {
         let span = span!(
             Level::DEBUG,
             "select_language",

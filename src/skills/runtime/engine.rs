@@ -294,7 +294,11 @@ mod v0_2 {
     };
     use wasmtime::component::bindgen;
 
-    use crate::{csi::ChunkRequest, inference, language_selection::{self, SelectLanguageRequest}};
+    use crate::{
+        csi::ChunkRequest,
+        inference,
+        language_selection::{self, SelectLanguageRequest},
+    };
 
     use super::LinkedCtx;
 

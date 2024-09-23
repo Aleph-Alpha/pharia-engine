@@ -32,14 +32,18 @@ pub struct SelectLanguageRequest {
     pub languages: Vec<Language>,
 }
 
-impl<'a> SelectLanguageRequest {
+impl SelectLanguageRequest {
     pub fn new(text: String, languages: Vec<Language>) -> Self {
         Self { text, languages }
     }
 }
 
-pub fn select_language (request: SelectLanguageRequest) -> Option<Language> {
-    let languages = request.languages.iter().map(|&l| l.into()).collect::<Vec<_>>();
+pub fn select_language(request: SelectLanguageRequest) -> Option<Language> {
+    let languages = request
+        .languages
+        .iter()
+        .map(|&l| l.into())
+        .collect::<Vec<_>>();
     let detector = LanguageDetectorBuilder::from_languages(&languages)
         .with_minimum_relative_distance(0.5) // empirical value that makes the tests pass ;-)
         .build();
@@ -60,10 +64,7 @@ mod tests {
     fn language_selected_for_english_text() {
         let text = "A little bit is better than nothing.".to_owned();
         let languages = vec![Language::Eng, Language::Deu];
-        let request = SelectLanguageRequest {
-            text,
-            languages,
-        };
+        let request = SelectLanguageRequest { text, languages };
         let language = select_language(request);
 
         assert!(language.is_some());
@@ -74,10 +75,7 @@ mod tests {
     fn language_selected_for_german_text() {
         let text = "Ich spreche Deutsch nur ein bisschen.".to_owned();
         let languages = vec![Language::Eng, Language::Deu];
-        let request = SelectLanguageRequest {
-            text,
-            languages,
-        };
+        let request = SelectLanguageRequest { text, languages };
         let language = select_language(request);
 
         assert!(language.is_some());
@@ -88,10 +86,7 @@ mod tests {
     fn no_language_selected_for_french_text() {
         let text = "Parlez-vous français?".to_owned();
         let languages = vec![Language::Eng, Language::Deu];
-        let request = SelectLanguageRequest {
-            text,
-            languages,
-        };
+        let request = SelectLanguageRequest { text, languages };
         let language = select_language(request);
         assert!(language.is_none());
     }

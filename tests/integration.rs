@@ -87,5 +87,9 @@ fn api_token() -> &'static str {
 
 /// Ask the operating system for the next free port
 fn free_test_port() -> u16 {
-    TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port()
+    TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port()
 }
