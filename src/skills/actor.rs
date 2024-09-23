@@ -134,7 +134,13 @@ where
             // If there are skills, make progress on them.
             select! {
                 msg = self.recv.recv() => match msg {
-                    Some(msg) => self.act(msg),
+                    Some(msg) => {
+                        let csi_apis = self.csi_apis.clone();
+                        let runtime = self.runtime.clone();
+                        self.running_skills.push(Box::pin(async move {
+                            msg.run_skill(csi_apis, runtime.as_ref()).await;
+                        }));
+                    },
                     // Senders are gone, break out of the loop for shutdown.
                     None => break
                 },
@@ -143,14 +149,6 @@ where
                 () = self.running_skills.select_next_some(), if !self.running_skills.is_empty()  => {}
             }
         }
-    }
-
-    fn act(&mut self, msg: SkillExecutorMsg) {
-        let csi_apis = self.csi_apis.clone();
-        let runtime = self.runtime.clone();
-        self.running_skills.push(Box::pin(async move {
-            msg.run_skill(csi_apis, runtime.as_ref()).await;
-        }));
     }
 }
 
