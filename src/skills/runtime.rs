@@ -8,7 +8,7 @@ use std::future::Future;
 use crate::{
     csi::ChunkRequest,
     inference::{Completion, CompletionRequest},
-    language_selection::Language,
+    language_selection::{Language, SelectLanguageRequest},
 };
 
 use super::{actor::ExecuteSkillError, SkillPath};
@@ -48,7 +48,7 @@ pub trait CsiForSkills {
     async fn complete_text(&mut self, request: CompletionRequest) -> Completion;
     async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
-    async fn select_language(&mut self, text: String, languages: Vec<Language>)
+    async fn select_language(&mut self, request: SelectLanguageRequest)
         -> Option<Language>;
 }
 

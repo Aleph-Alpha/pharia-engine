@@ -24,7 +24,7 @@ use super::{
 use crate::{
     csi::{ChunkRequest, Csi as _, CsiDrivers},
     inference::{Completion, CompletionRequest},
-    language_selection::Language,
+    language_selection::{Language, SelectLanguageRequest},
     skill_store::SkillStoreApi,
 };
 
@@ -284,19 +284,18 @@ impl CsiForSkills for SkillInvocationCtx {
 
     async fn select_language(
         &mut self,
-        text: String,
-        languages: Vec<Language>,
+        request: SelectLanguageRequest,
     ) -> Option<Language> {
         let span = span!(
             Level::DEBUG,
             "select_language",
-            text_len = text.len(),
-            languages_len = languages.len()
+            text_len = request.text.len(),
+            languages_len = request.languages.len()
         );
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }
-        match self.csi_apis.select_language(text, languages).await {
+        match self.csi_apis.select_language(request).await {
             Ok(language) => language,
             Err(error) => self.send_error(error).await,
         }

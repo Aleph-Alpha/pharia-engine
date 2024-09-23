@@ -294,7 +294,7 @@ mod v0_2 {
     };
     use wasmtime::component::bindgen;
 
-    use crate::{csi::ChunkRequest, inference, language_selection};
+    use crate::{csi::ChunkRequest, inference, language_selection::{self, SelectLanguageRequest}};
 
     use super::LinkedCtx;
 
@@ -385,8 +385,9 @@ mod v0_2 {
                     Language::Deu => language_selection::Language::Deu,
                 })
                 .collect::<Vec<_>>();
+            let request = SelectLanguageRequest::new(text, languages);
             self.skill_ctx
-                .select_language(text, languages)
+                .select_language(request)
                 .await
                 .map(|l| match l {
                     language_selection::Language::Eng => Language::Eng,

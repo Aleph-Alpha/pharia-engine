@@ -54,7 +54,7 @@ pub mod tests {
         inference::{Completion, CompletionRequest},
         language_selection::{select_language, Language},
         namespace_watcher::OperatorConfig,
-        skill_store::SkillStore,
+        skill_store::SkillStore, language_selection::SelectLanguageRequest
     };
 
     use super::*;
@@ -183,10 +183,9 @@ pub mod tests {
 
         async fn select_language(
             &mut self,
-            text: String,
-            languages: Vec<Language>,
+            request: SelectLanguageRequest
         ) -> Option<Language> {
-            select_language(&text, &languages)
+            select_language(request)
         }
     }
 
@@ -228,10 +227,9 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
         async fn select_language(
             &mut self,
-            text: String,
-            languages: Vec<Language>,
+            request: SelectLanguageRequest
         ) -> Option<Language> {
-            select_language(&text, &languages)
+            select_language(request)
         }
     }
 
@@ -264,10 +262,9 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
         async fn select_language(
             &mut self,
-            text: String,
-            languages: Vec<Language>,
+            request: SelectLanguageRequest,
         ) -> Option<Language> {
-            select_language(&text, &languages)
+            select_language(request)
         }
     }
 }

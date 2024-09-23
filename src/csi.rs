@@ -3,7 +3,7 @@ use tracing::trace;
 
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
-    language_selection::{select_language, Language},
+    language_selection::{select_language, Language, SelectLanguageRequest},
     tokenizers::TokenizersApi,
 };
 
@@ -47,11 +47,10 @@ pub trait Csi {
     #[allow(clippy::unused_async)]
     async fn select_language(
         &mut self,
-        text: String,
-        languages: Vec<Language>,
+        request: SelectLanguageRequest,
     ) -> anyhow::Result<Option<Language>> {
         // default implementation can be provided here because language selection is stateless
-        Ok(tokio::task::spawn_blocking(move || select_language(&text, &languages)).await?)
+        Ok(tokio::task::spawn_blocking(move || select_language(request)).await?)
     }
 }
 

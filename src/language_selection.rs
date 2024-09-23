@@ -27,15 +27,26 @@ impl From<lingua::Language> for Language {
     }
 }
 
-pub fn select_language(text: &str, languages: &[Language]) -> Option<Language> {
-    let languages = languages.iter().map(|&l| l.into()).collect::<Vec<_>>();
+pub struct SelectLanguageRequest {
+    pub text: String,
+    pub languages: Vec<Language>,
+}
+
+impl<'a> SelectLanguageRequest {
+    pub fn new(text: String, languages: Vec<Language>) -> Self {
+        Self { text, languages }
+    }
+}
+
+pub fn select_language (request: SelectLanguageRequest) -> Option<Language> {
+    let languages = request.languages.iter().map(|&l| l.into()).collect::<Vec<_>>();
     let detector = LanguageDetectorBuilder::from_languages(&languages)
         .with_minimum_relative_distance(0.5) // empirical value that makes the tests pass ;-)
         .build();
-    let language = detector.detect_language_of(text).map(Into::into);
+    let language = detector.detect_language_of(&request.text).map(Into::into);
     trace!(
         "select_language: text.len()={} languages={languages:?} selected_language={language:?}",
-        text.len()
+        request.text.len()
     );
     language
 }
@@ -47,9 +58,13 @@ mod tests {
 
     #[test]
     fn language_selected_for_english_text() {
-        let text = "A little bit is better than nothing.";
-
-        let language = select_language(text, &[Language::Eng, Language::Deu]);
+        let text = "A little bit is better than nothing.".to_owned();
+        let languages = vec![Language::Eng, Language::Deu];
+        let request = SelectLanguageRequest {
+            text,
+            languages,
+        };
+        let language = select_language(request);
 
         assert!(language.is_some());
         assert_eq!(language.unwrap(), Language::Eng);
@@ -57,8 +72,13 @@ mod tests {
 
     #[test]
     fn language_selected_for_german_text() {
-        let text = "Ich spreche Deutsch nur ein bisschen.";
-        let language = select_language(text, &[Language::Eng, Language::Deu]);
+        let text = "Ich spreche Deutsch nur ein bisschen.".to_owned();
+        let languages = vec![Language::Eng, Language::Deu];
+        let request = SelectLanguageRequest {
+            text,
+            languages,
+        };
+        let language = select_language(request);
 
         assert!(language.is_some());
         assert_eq!(language.unwrap(), Language::Deu);
@@ -66,8 +86,13 @@ mod tests {
 
     #[test]
     fn no_language_selected_for_french_text() {
-        let text = "Parlez-vous français?";
-        let language = select_language(text, &[Language::Eng, Language::Deu]);
+        let text = "Parlez-vous français?".to_owned();
+        let languages = vec![Language::Eng, Language::Deu];
+        let request = SelectLanguageRequest {
+            text,
+            languages,
+        };
+        let language = select_language(request);
         assert!(language.is_none());
     }
 }
