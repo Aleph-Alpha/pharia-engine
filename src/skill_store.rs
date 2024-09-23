@@ -97,11 +97,7 @@ impl SkillStoreState {
     }
 
     /// `Some` if the skill can be successfully loaded, `None` if the skill can not be found
-    pub async fn fetch(
-        &mut self,
-        skill_path: &SkillPath,
-        engine: Arc<Engine>,
-    ) -> anyhow::Result<Option<Arc<Skill>>> {
+    pub async fn fetch(&mut self, skill_path: &SkillPath) -> anyhow::Result<Option<Arc<Skill>>> {
         if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
             return Err(anyhow!("Invalid namespace: {error}"));
         }
@@ -121,7 +117,8 @@ impl SkillStoreState {
                 .await?;
             let bytes =
                 bytes.ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
-            let skill = spawn_blocking(move || Skill::new(&engine, bytes))
+            let engine = self.engine.clone();
+            let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
                 .await
                 .expect("Spawend linking thread must run to completion without being poisened.")
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
@@ -200,17 +197,9 @@ impl SkillStoreApi {
     }
 
     /// Fetch an exeutable skill
-    pub async fn fetch(
-        &self,
-        skill_path: SkillPath,
-        engine: Arc<Engine>,
-    ) -> Result<Option<Arc<Skill>>, anyhow::Error> {
+    pub async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, anyhow::Error> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillProviderMsg::Fetch {
-            skill_path,
-            engine,
-            send,
-        };
+        let msg = SkillProviderMsg::Fetch { skill_path, send };
         self.sender
             .send(msg)
             .await
@@ -257,7 +246,6 @@ impl SkillStoreApi {
 pub enum SkillProviderMsg {
     Fetch {
         skill_path: SkillPath,
-        engine: Arc<Engine>,
         send: oneshot::Sender<Result<Option<Arc<Skill>>, anyhow::Error>>,
     },
     List {
@@ -308,12 +296,8 @@ impl SkillProviderActor {
 
     pub async fn act(&mut self, msg: SkillProviderMsg) {
         match msg {
-            SkillProviderMsg::Fetch {
-                skill_path,
-                engine,
-                send,
-            } => {
-                let result = self.provider.fetch(&skill_path, engine).await;
+            SkillProviderMsg::Fetch { skill_path, send } => {
+                let result = self.provider.fetch(&skill_path).await;
                 drop(send.send(result));
             }
             SkillProviderMsg::List { send } => {
@@ -379,9 +363,9 @@ pub mod tests {
     async fn skill_component_is_in_config() {
         let skill_path = SkillPath::dummy();
         let engine = Arc::new(Engine::new().unwrap());
-        let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
-        let result = provider.fetch(&skill_path, engine).await;
+        let result = provider.fetch(&skill_path).await;
 
         assert!(result.is_err());
     }
@@ -390,13 +374,10 @@ pub mod tests {
     async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
         let engine = Arc::new(Engine::new().unwrap());
-        let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
         let result = provider
-            .fetch(
-                &SkillPath::new(&skill_path.namespace, "non_existing_skill"),
-                engine,
-            )
+            .fetch(&SkillPath::new(&skill_path.namespace, "non_existing_skill"))
             .await;
 
         assert!(matches!(result, Ok(None)));
@@ -406,13 +387,10 @@ pub mod tests {
     async fn namespace_not_in_config() {
         let skill_path = SkillPath::dummy();
         let engine = Arc::new(Engine::new().unwrap());
-        let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
         let result = provider
-            .fetch(
-                &SkillPath::new("non_existing_namespace", &skill_path.name),
-                engine,
-            )
+            .fetch(&SkillPath::new("non_existing_namespace", &skill_path.name))
             .await;
 
         assert!(matches!(result, Ok(None)));
@@ -424,8 +402,8 @@ pub mod tests {
         given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new().unwrap());
-        let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
-        provider.fetch(&skill_path, engine).await.unwrap();
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
+        provider.fetch(&skill_path).await.unwrap();
 
         // When we remove the skill
         provider.remove_skill(&skill_path);
@@ -439,11 +417,11 @@ pub mod tests {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new().unwrap());
-        let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
 
         // when fetching the skill
-        let result = provider.fetch(&skill_path, engine).await;
+        let result = provider.fetch(&skill_path).await;
 
         // then it returns an error
         assert!(result.is_err());
@@ -455,7 +433,7 @@ pub mod tests {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new().unwrap());
-        let skill_provider = SkillStore::new(engine.clone(), &local_namespace());
+        let skill_provider = SkillStore::new(engine, &local_namespace());
         skill_provider
             .api()
             .upsert(SkillPath::new("local", "greet_skill"), None)
@@ -468,7 +446,7 @@ pub mod tests {
         // When fetching "greet_skill" but not "greet-py"
         skill_provider
             .api()
-            .fetch(SkillPath::new("local", "greet_skill"), engine.clone())
+            .fetch(SkillPath::new("local", "greet_skill"))
             .await
             .unwrap();
         // and listing all chached skills
@@ -509,10 +487,10 @@ pub mod tests {
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new().unwrap());
-        let skill_provider = SkillStore::new(engine.clone(), &local_namespace());
+        let skill_provider = SkillStore::new(engine, &local_namespace());
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
-        api.fetch(greet_skill.clone(), engine).await.unwrap();
+        api.fetch(greet_skill.clone()).await.unwrap();
 
         // When we invalidate "greet_skill"
         let skill_had_been_in_cache = api.invalidate_cache(greet_skill.clone()).await;
