@@ -10,6 +10,8 @@ mod skill_store;
 mod skills;
 mod tokenizers;
 
+use std::sync::Arc;
+
 use anyhow::{Context, Error};
 use csi::CsiDrivers;
 use futures::Future;
@@ -17,6 +19,7 @@ use logging::initialize_tracing;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use shell::Shell;
 use skill_store::SkillStore;
+use skills::Engine;
 use tokenizers::Tokenizers;
 
 use self::{inference::Inference, skills::SkillExecutor};
@@ -50,10 +53,11 @@ impl Kernel {
             NamespaceDescriptionLoaders::new(app_config.operator_config.clone())
                 .context("Unable to read the configuration for namespaces")?,
         );
+        let engine = Arc::new(Engine::new().context("engine creation failed")?);
 
         // Boot up the drivers which power the CSI. Right now we only have inference.
-        let inference = Inference::new(app_config.inference_addr.clone());
         let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();
+        let inference = Inference::new(app_config.inference_addr.clone());
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
             tokenizers: tokenizers.api(),
@@ -61,7 +65,7 @@ impl Kernel {
         let skill_store = SkillStore::new(&app_config.operator_config.namespaces);
 
         // Boot up runtime we need to execute Skills
-        let skill_executor = SkillExecutor::new(csi_drivers, skill_store.api());
+        let skill_executor = SkillExecutor::new(engine, csi_drivers, skill_store.api());
 
         let mut namespace_watcher = NamespaceWatcher::with_config(
             skill_store.api(),

@@ -18,7 +18,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::{
     runtime::{CsiForSkills, Runtime, WasmRuntime},
-    SkillPath,
+    Engine, SkillPath,
 };
 
 use crate::{
@@ -36,8 +36,8 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(csi_apis: CsiDrivers, skill_provider: SkillStoreApi) -> Self {
-        let runtime = WasmRuntime::new(skill_provider);
+    pub fn new(engine: Arc<Engine>, csi_apis: CsiDrivers, skill_provider: SkillStoreApi) -> Self {
+        let runtime = WasmRuntime::new(engine, skill_provider);
         Self::with_runtime(runtime, csi_apis)
     }
 
@@ -392,7 +392,8 @@ pub mod tests {
         let namespaces = HashMap::new();
         let skill_provider = SkillStore::new(&namespaces);
         let csi_apis = dummy_csi_apis();
-        let executer = SkillExecutor::new(csi_apis, skill_provider.api());
+        let engine = Arc::new(Engine::new().unwrap());
+        let executer = SkillExecutor::new(engine, csi_apis, skill_provider.api());
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace

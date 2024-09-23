@@ -16,9 +16,9 @@ pub struct WasmRuntime {
 }
 
 impl WasmRuntime {
-    pub fn new(skill_provider_api: SkillStoreApi) -> Self {
+    pub fn new(engine: Arc<Engine>, skill_provider_api: SkillStoreApi) -> Self {
         Self {
-            engine: Arc::new(Engine::new().expect("engine creation failed")),
+            engine,
             skill_provider_api,
         }
     }
@@ -68,8 +68,8 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet_skill");
         let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
-
-        let runtime = WasmRuntime::new(skill_provider.api());
+        let engine = Arc::new(Engine::new().unwrap());
+        let runtime = WasmRuntime::new(engine, skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
 
@@ -82,7 +82,8 @@ pub mod tests {
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
         let skill_provider = SkillStore::new(&OperatorConfig::local(&[]).namespaces);
-        let runtime = WasmRuntime::new(skill_provider.api());
+        let engine = Arc::new(Engine::new().unwrap());
+        let runtime = WasmRuntime::new(engine, skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
             .run(&SkillPath::dummy(), json!("name"), skill_ctx)
@@ -101,7 +102,8 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet_skill");
         let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
-        let runtime = WasmRuntime::new(skill_provider.api());
+        let engine = Arc::new(Engine::new().unwrap());
+        let runtime = WasmRuntime::new(engine, skill_provider.api());
 
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -121,7 +123,8 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet-py");
         let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet-py"]).namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
-        let runtime = WasmRuntime::new(skill_provider.api());
+        let engine = Arc::new(Engine::new().unwrap());
+        let runtime = WasmRuntime::new(engine, skill_provider.api());
 
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -141,7 +144,8 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet_skill");
         let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
         skill_provider.api().upsert(skill_path.clone(), None).await;
-        let runtime = WasmRuntime::new(skill_provider.api());
+        let engine = Arc::new(Engine::new().unwrap());
+        let runtime = WasmRuntime::new(engine, skill_provider.api());
         for i in 1..10 {
             let resp = runtime
                 .run(&skill_path, json!("Homer"), skill_ctx.clone())
