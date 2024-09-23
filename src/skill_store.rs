@@ -102,7 +102,9 @@ impl SkillStoreState {
             return Err(anyhow!("Invalid namespace: {error}"));
         }
 
-        if !self.cached_skills.contains_key(skill_path) {
+        let skill = if let Some(skill) = self.cached_skills.get(skill_path) {
+            skill.clone()
+        } else {
             let Some(tag) = self.known_skills.get(skill_path) else {
                 return Ok(None);
             };
@@ -122,15 +124,12 @@ impl SkillStoreState {
                 .await
                 .expect("Spawend linking thread must run to completion without being poisened.")
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
-            self.cached_skills
-                .insert(skill_path.clone(), Arc::new(skill));
-        }
-        Ok(Some(
-            self.cached_skills
-                .get(skill_path)
-                .expect("Skill present.")
-                .clone(),
-        ))
+            let skill = Arc::new(skill);
+            self.cached_skills.insert(skill_path.clone(), skill.clone());
+            skill
+        };
+
+        Ok(Some(skill))
     }
 }
 
