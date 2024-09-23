@@ -62,7 +62,7 @@ impl Kernel {
             inference: inference.api(),
             tokenizers: tokenizers.api(),
         };
-        let skill_store = SkillStore::new(&app_config.operator_config.namespaces);
+        let skill_store = SkillStore::new(engine.clone(), &app_config.operator_config.namespaces);
 
         // Boot up runtime we need to execute Skills
         let skill_executor = SkillExecutor::new(engine, csi_drivers, skill_store.api());

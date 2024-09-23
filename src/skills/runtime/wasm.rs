@@ -66,9 +66,12 @@ pub mod tests {
     async fn greet_skill_component() {
         given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
-        skill_provider.api().upsert(skill_path.clone(), None).await;
         let engine = Arc::new(Engine::new().unwrap());
+        let skill_provider = SkillStore::new(
+            engine.clone(),
+            &OperatorConfig::local(&["greet_skill"]).namespaces,
+        );
+        skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
@@ -81,8 +84,9 @@ pub mod tests {
 
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
-        let skill_provider = SkillStore::new(&OperatorConfig::local(&[]).namespaces);
         let engine = Arc::new(Engine::new().unwrap());
+        let skill_provider =
+            SkillStore::new(engine.clone(), &OperatorConfig::local(&[]).namespaces);
         let runtime = WasmRuntime::new(engine, skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
@@ -100,9 +104,12 @@ pub mod tests {
         given_greet_skill();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
-        skill_provider.api().upsert(skill_path.clone(), None).await;
         let engine = Arc::new(Engine::new().unwrap());
+        let skill_provider = SkillStore::new(
+            engine.clone(),
+            &OperatorConfig::local(&["greet_skill"]).namespaces,
+        );
+        skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
 
         let actual = runtime
@@ -121,9 +128,12 @@ pub mod tests {
         given_greet_py();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet-py");
-        let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet-py"]).namespaces);
-        skill_provider.api().upsert(skill_path.clone(), None).await;
         let engine = Arc::new(Engine::new().unwrap());
+        let skill_provider = SkillStore::new(
+            engine.clone(),
+            &OperatorConfig::local(&["greet-py"]).namespaces,
+        );
+        skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
 
         let actual = runtime
@@ -142,9 +152,12 @@ pub mod tests {
         given_greet_skill();
         let skill_ctx = Box::new(CsiCounter::new());
         let skill_path = SkillPath::new("local", "greet_skill");
-        let skill_provider = SkillStore::new(&OperatorConfig::local(&["greet_skill"]).namespaces);
-        skill_provider.api().upsert(skill_path.clone(), None).await;
         let engine = Arc::new(Engine::new().unwrap());
+        let skill_provider = SkillStore::new(
+            engine.clone(),
+            &OperatorConfig::local(&["greet_skill"]).namespaces,
+        );
+        skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
         for i in 1..10 {
             let resp = runtime

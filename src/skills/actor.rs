@@ -390,9 +390,9 @@ pub mod tests {
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
         let namespaces = HashMap::new();
-        let skill_provider = SkillStore::new(&namespaces);
-        let csi_apis = dummy_csi_apis();
         let engine = Arc::new(Engine::new().unwrap());
+        let skill_provider = SkillStore::new(engine.clone(), &namespaces);
+        let csi_apis = dummy_csi_apis();
         let executer = SkillExecutor::new(engine, csi_apis, skill_provider.api());
         let api = executer.api();
 
