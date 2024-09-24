@@ -1,4 +1,3 @@
-
 use std::{future::Future, iter::once, net::SocketAddr};
 
 use anyhow::Context;
@@ -24,8 +23,8 @@ use tower_http::{
 };
 use tracing::{error, info, info_span, Level};
 
-struct CsiShell {
-    handle: JoinHandle<()>
+pub struct CsiShell {
+    handle: JoinHandle<()>,
 }
 
 impl CsiShell {
@@ -38,9 +37,9 @@ impl CsiShell {
         let addr = addr.into();
         // It is important to construct the listener outside of the `spawn` invocation. We need to
         // guarantee the listener is already bound to the port, once `Self` is constructed.
-        let listener = TcpListener::bind(addr)
-            .await
-            .context(format!("Could not bind a tcp listener for CSI shell to '{addr}'"))?;
+        let listener = TcpListener::bind(addr).await.context(format!(
+            "Could not bind a tcp listener for CSI shell to '{addr}'"
+        ))?;
         info!("Listening on: {addr}");
         let handle = tokio::spawn(async {
             let res = axum::serve(listener, http())
@@ -59,46 +58,45 @@ impl CsiShell {
 }
 
 pub fn http() -> Router {
-    Router::new()
-        .route("/csi", post(http_csi_handle))
-        .layer(
-            ServiceBuilder::new()
-                // Mark the `Authorization` request header as sensitive so it doesn't show in logs
-                .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION)))
-                // High level logging of requests and responses
-                .layer(
-                    TraceLayer::new_for_http()
-                        .make_span_with(|request: &Request<_>| {
-                            // Log the matched route's path (with placeholders not filled in).
-                            // Use request.uri() or OriginalUri if you want the real path.
-                            let matched_path = request
-                                .extensions()
-                                .get::<MatchedPath>()
-                                .map(MatchedPath::as_str);
+    Router::new().route("/csi", post(http_csi_handle)).layer(
+        ServiceBuilder::new()
+            // Mark the `Authorization` request header as sensitive so it doesn't show in logs
+            .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION)))
+            // High level logging of requests and responses
+            .layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(|request: &Request<_>| {
+                        // Log the matched route's path (with placeholders not filled in).
+                        // Use request.uri() or OriginalUri if you want the real path.
+                        let matched_path = request
+                            .extensions()
+                            .get::<MatchedPath>()
+                            .map(MatchedPath::as_str);
 
-                            info_span!(
-                                "http_request",
-                                method = ?request.method(),
-                                matched_path,
-                            )
-                        })
-                        .on_request(DefaultOnRequest::new().level(Level::INFO))
-                        .on_response(DefaultOnResponse::new().level(Level::INFO)),
-                )
-                // Compress responses
-                .layer(CompressionLayer::new())
-                .layer(DecompressionLayer::new()),
-        )
+                        info_span!(
+                            "http_request",
+                            method = ?request.method(),
+                            matched_path,
+                        )
+                    })
+                    .on_request(DefaultOnRequest::new().level(Level::INFO))
+                    .on_response(DefaultOnResponse::new().level(Level::INFO)),
+            )
+            // Compress responses
+            .layer(CompressionLayer::new())
+            .layer(DecompressionLayer::new()),
+    )
 }
 
 async fn http_csi_handle(
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<VersionedCsiRequest>,
 ) -> (StatusCode, Json<Value>) {
-    (StatusCode::OK, Json(Value::String("dummy completion".to_owned())))
-}    
-
-
+    (
+        StatusCode::OK,
+        Json(Value::String("dummy completion".to_owned())),
+    )
+}
 
 /// This structs allows us to represent versioned interactions with the CSI.
 /// The members of this enum provide the glue code to translate between a function
@@ -131,7 +129,6 @@ pub struct CompletionParams {
     pub top_p: Option<f32>,
     pub stop: Vec<String>,
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -169,11 +166,10 @@ mod tests {
         // Then it should be deserialized successfully
         assert!(result.is_ok());
     }
- 
 
     #[tokio::test]
     async fn http_csi_handle_returns_completion() {
-        // Given a versioned csi request 
+        // Given a versioned csi request
         let completion_request = CompletionRequest {
             model: "llama-3.1-8b-instruct".to_owned(),
             prompt: "Hello".to_owned(),
@@ -183,7 +179,7 @@ mod tests {
                 top_k: None,
                 top_p: None,
                 stop: vec![],
-            }
+            },
         };
         let request = VersionedCsiRequest::V0_2(V0_2CsiRequest::Complete(completion_request));
 

@@ -12,6 +12,7 @@ struct TestKernel {
     shutdown_trigger: oneshot::Sender<()>,
     kernel: Kernel,
     port: u16,
+    csi_port: u16,
 }
 
 impl TestKernel {
@@ -21,6 +22,7 @@ impl TestKernel {
             shutdown_capture.await.unwrap();
         };
         let port = app_config.tcp_addr.port();
+        let csi_port = app_config.csi_addr.port();
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
 
@@ -28,6 +30,7 @@ impl TestKernel {
             shutdown_trigger,
             kernel,
             port,
+            csi_port,
         }
     }
 
@@ -48,6 +51,10 @@ impl TestKernel {
 
     fn port(&self) -> u16 {
         self.port
+    }
+
+    fn csi_port(&self) -> u16 {
+        self.csi_port
     }
 
     async fn shutdown(self) {
@@ -81,6 +88,47 @@ async fn execute_skill() {
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
     assert!(body.contains("Homer"));
+
+    kernel.shutdown().await;
+}
+
+#[cfg_attr(not(feature = "test_inference"), ignore)]
+#[tokio::test]
+async fn completion_via_remote_csi() {
+    let kernel = TestKernel::with_skills(&[]).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!("http://127.0.0.1:{}/csi", kernel.csi_port()))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(
+            json!({
+                "version": "v0_2",
+                "function": "complete",
+                "prompt": "Hello",
+                "model": "llama-3.1-8b-instruct",
+                "params": {
+                    "max_tokens": 128,
+                    "temperature": null,
+                    "top_k": null,
+                    "top_p": null,
+                    "stop": []
+                }
+            })
+            .to_string(),
+        ))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let body = resp.text().await.unwrap();
+    assert!(body.contains("dummy completion"));
 
     kernel.shutdown().await;
 }

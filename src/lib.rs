@@ -15,6 +15,8 @@ use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use csi::CsiDrivers;
+use csi_shell::CsiShell;
+use futures::future::FutureExt;
 use futures::Future;
 use logging::initialize_tracing;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
@@ -35,6 +37,7 @@ pub struct Kernel {
     skill_executor: SkillExecutor,
     namespace_watcher: NamespaceWatcher,
     shell: Shell,
+    csi_shell: CsiShell,
 }
 
 impl Kernel {
@@ -77,15 +80,17 @@ impl Kernel {
         // Wait for first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        let shell = match Shell::new(
+        let shared_shutdown_signal = shutdown_signal.shared();
+
+        let csi_shell_fut = CsiShell::new(app_config.csi_addr, shared_shutdown_signal.clone());
+        let shell_fut = Shell::new(
             app_config.tcp_addr,
             skill_executor.api(),
             skill_store.api(),
-            shutdown_signal,
-        )
-        .await
-        {
-            Ok(shell) => shell,
+            shared_shutdown_signal.clone(),
+        );
+        let (csi_shell, shell) = match tokio::try_join!(csi_shell_fut, shell_fut) {
+            Ok((csi_shell, shell)) => (csi_shell, shell),
             Err(e) => {
                 // In case construction of shell goes wrong (e.g. we can not bind the port) we
                 // shutdown all the other actors we created so far, so they do not live on in
@@ -107,6 +112,7 @@ impl Kernel {
             skill_executor,
             namespace_watcher,
             shell,
+            csi_shell,
         })
     }
 
@@ -116,6 +122,7 @@ impl Kernel {
         // Shutdown everything we started. We reverse the order for the shutdown so all the required
         // actors are still answering for each component.
         self.shell.wait_for_shutdown().await;
+        self.csi_shell.wait_for_shutdown().await;
         self.namespace_watcher.wait_for_shutdown().await;
         self.skill_executor.wait_for_shutdown().await;
         self.skill_store.wait_for_shutdown().await;
