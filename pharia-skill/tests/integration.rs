@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::Write, path::Path, time::Duration};
+use std::{env, fs::File, io::Write, net::TcpListener, path::Path, time::Duration};
 
 use assert_cmd::Command;
 use pharia_kernel::{AppConfig, Kernel, OperatorConfig};
@@ -64,8 +64,7 @@ fn publish_minimal_args() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn run_skill() {
     // given a Pharia Kernel instance
-    const PORT: u16 = 9_000;
-    let kernel = TestKernel::with_port(PORT).await;
+    let kernel = TestKernel::with_defaults().await;
 
     // when running a skill
     drop(dotenvy::dotenv());
@@ -77,7 +76,7 @@ async fn run_skill() {
         .arg("-i")
         .arg("Homer")
         .arg("-l")
-        .arg(format!("http://127.0.0.1:{PORT}"))
+        .arg(format!("http://127.0.0.1:{}", kernel.port()))
         .env(
             "AA_API_TOKEN",
             env::var("AA_API_TOKEN").expect("AA_API_TOKEN must be set."),
@@ -92,6 +91,7 @@ async fn run_skill() {
 struct TestKernel {
     kernel: Kernel,
     shutdown_trigger: oneshot::Sender<()>,
+    port: u16,
 }
 
 impl TestKernel {
@@ -100,16 +100,21 @@ impl TestKernel {
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
+        let port = app_config.tcp_addr.port();
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
         Self {
             kernel,
             shutdown_trigger,
+            port,
         }
     }
 
-    async fn with_port(port: u16) -> Self {
+    async fn with_defaults() -> Self {
+        let port = free_test_port();
+        let csi_port = free_test_port();
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
+            csi_addr: format!("127.0.0.1:{csi_port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::from_toml(
                 r#"
@@ -126,8 +131,21 @@ impl TestKernel {
         Self::new(app_config).await
     }
 
+    fn port(&self) -> u16 {
+        self.port
+    }
+
     async fn shutdown(self) {
         self.shutdown_trigger.send(()).unwrap();
         self.kernel.wait_for_shutdown().await;
     }
+}
+
+/// Ask the operating system for the next free port
+fn free_test_port() -> u16 {
+    TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port()
 }
