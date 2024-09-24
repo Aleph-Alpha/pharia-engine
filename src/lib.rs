@@ -18,7 +18,6 @@ use csi::CsiDrivers;
 use csi_shell::CsiShell;
 use futures::future::FutureExt;
 use futures::Future;
-use logging::initialize_tracing;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use shell::Shell;
 use skill_store::SkillStore;
@@ -28,6 +27,8 @@ use tokenizers::Tokenizers;
 use self::{inference::Inference, skills::SkillExecutor};
 
 pub use config::AppConfig;
+pub use csi_shell::{Completion, FinishReason};
+pub use logging::initialize_tracing;
 pub use namespace_watcher::OperatorConfig;
 
 pub struct Kernel {
@@ -52,7 +53,6 @@ impl Kernel {
         app_config: AppConfig,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, Error> {
-        initialize_tracing(&app_config)?;
         let loaders = Box::new(
             NamespaceDescriptionLoaders::new(app_config.operator_config.clone())
                 .context("Unable to read the configuration for namespaces")?,
@@ -82,7 +82,15 @@ impl Kernel {
 
         let shared_shutdown_signal = shutdown_signal.shared();
 
-        let csi_shell_fut = CsiShell::new(app_config.csi_addr, shared_shutdown_signal.clone());
+        let csi_drivers = CsiDrivers {
+            inference: inference.api(),
+            tokenizers: tokenizers.api(),
+        };
+        let csi_shell_fut = CsiShell::new(
+            app_config.csi_addr,
+            csi_drivers,
+            shared_shutdown_signal.clone(),
+        );
         let shell_fut = Shell::new(
             app_config.tcp_addr,
             skill_executor.api(),

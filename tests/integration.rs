@@ -2,7 +2,7 @@ use std::{env, net::TcpListener, sync::OnceLock, time::Duration};
 
 use axum::http;
 use dotenvy::dotenv;
-use pharia_kernel::{AppConfig, Kernel, OperatorConfig};
+use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, OperatorConfig};
 use reqwest::{header, Body};
 use serde_json::json;
 use test_skills::given_greet_skill;
@@ -109,10 +109,14 @@ async fn completion_via_remote_csi() {
             json!({
                 "version": "v0_2",
                 "function": "complete",
-                "prompt": "Hello",
+                "prompt": "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
                 "model": "llama-3.1-8b-instruct",
                 "params": {
-                    "max_tokens": 128,
+                    "max_tokens": 64,
                     "temperature": null,
                     "top_k": null,
                     "top_p": null,
@@ -127,8 +131,10 @@ async fn completion_via_remote_csi() {
         .unwrap();
 
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
-    let body = resp.text().await.unwrap();
-    assert!(body.contains("dummy completion"));
+    let body = resp.bytes().await.unwrap();
+    let completion = serde_json::from_slice::<Completion>(&body).unwrap();
+    assert!(completion.text.contains("Homer"));
+    assert!(matches!(completion.finish_reason, FinishReason::Stop));
 
     kernel.shutdown().await;
 }

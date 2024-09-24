@@ -16,10 +16,13 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 use crate::AppConfig;
 
+/// Set up two tracing subscribers:
+/// * Simple env logger
+/// * OpenTelemetry
+///
+/// # Errors
+/// Failed to parse the log level provided by the configuration.
 pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<()> {
-    // Set up two tracing subscribers:
-    // * Simple env logger
-    // * OpenTelemetry
     let env_filter = EnvFilter::from_str(&app_config.log_level)?;
     let registry = tracing_subscriber::registry()
         .with(env_filter)

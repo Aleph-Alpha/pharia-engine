@@ -1,12 +1,13 @@
 use anyhow::Error;
 use tokio::signal;
 
-use pharia_kernel::{AppConfig, Kernel};
+use pharia_kernel::{initialize_tracing, AppConfig, Kernel};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     drop(dotenvy::dotenv());
     let app_config = AppConfig::from_env()?;
+    initialize_tracing(&app_config)?;
 
     let kernel = Kernel::new(app_config, shutdown_signal()).await?;
     kernel.wait_for_shutdown().await;
