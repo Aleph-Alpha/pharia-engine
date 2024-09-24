@@ -1,5 +1,6 @@
 mod config;
 mod csi;
+mod csi_shell;
 mod inference;
 mod language_selection;
 mod logging;
