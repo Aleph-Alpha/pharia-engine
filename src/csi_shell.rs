@@ -103,51 +103,10 @@ async fn http_csi_handle(
     Json(args): Json<VersionedCsiRequest>,
 ) -> (StatusCode, Json<Value>) {
     let result = match args {
-        VersionedCsiRequest::V0_2(V0_2CsiRequest::Complete(request)) => {
-            let CompletionRequest {
-                model,
-                prompt,
-                params:
-                    CompletionParams {
-                        max_tokens,
-                        temperature,
-                        top_k,
-                        top_p,
-                        stop,
-                    },
-            } = request;
-
-            let params = inference::CompletionParams {
-                max_tokens,
-                temperature,
-                top_k,
-                top_p,
-                stop,
-            };
-
-            let request = inference::CompletionRequest {
-                prompt,
-                model,
-                params,
-            };
-
-            drivers
-                .complete_text(bearer.token().to_owned(), request)
-                .await
-                .map(
-                    |inference::Completion {
-                         text,
-                         finish_reason,
-                     }| Completion {
-                        text,
-                        finish_reason: match finish_reason {
-                            inference::FinishReason::Stop => FinishReason::Stop,
-                            inference::FinishReason::Length => FinishReason::Length,
-                            inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
-                        },
-                    },
-                )
-        }
+        VersionedCsiRequest::V0_2(V0_2CsiRequest::Complete(request)) => drivers
+            .complete_text(bearer.token().to_owned(), request.into())
+            .await
+            .map(Completion::from),
     };
     (StatusCode::OK, Json(json!(result.unwrap())))
 }
@@ -175,6 +134,22 @@ pub struct CompletionRequest {
     pub params: CompletionParams,
 }
 
+impl From<CompletionRequest> for inference::CompletionRequest {
+    fn from(value: CompletionRequest) -> Self {
+        let CompletionRequest {
+            model,
+            prompt,
+            params,
+        } = value;
+
+        Self {
+            prompt,
+            model,
+            params: params.into(),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CompletionParams {
     pub max_tokens: Option<u32>,
@@ -184,6 +159,26 @@ pub struct CompletionParams {
     pub stop: Vec<String>,
 }
 
+impl From<CompletionParams> for inference::CompletionParams {
+    fn from(value: CompletionParams) -> Self {
+        let CompletionParams {
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+        } = value;
+
+        Self {
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub enum FinishReason {
     Stop,
@@ -191,10 +186,33 @@ pub enum FinishReason {
     ContentFilter,
 }
 
+impl From<inference::FinishReason> for FinishReason {
+    fn from(value: inference::FinishReason) -> Self {
+        match value {
+            inference::FinishReason::Stop => FinishReason::Stop,
+            inference::FinishReason::Length => FinishReason::Length,
+            inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct Completion {
     pub text: String,
     pub finish_reason: FinishReason,
+}
+
+impl From<inference::Completion> for Completion {
+    fn from(value: inference::Completion) -> Self {
+        let inference::Completion {
+            text,
+            finish_reason,
+        } = value;
+        Self {
+            text,
+            finish_reason: finish_reason.into(),
+        }
+    }
 }
 
 #[cfg(test)]
