@@ -180,6 +180,7 @@ impl From<CompletionParams> for inference::CompletionParams {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FinishReason {
     Stop,
     Length,
