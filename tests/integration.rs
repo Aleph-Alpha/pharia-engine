@@ -1,4 +1,9 @@
-use std::{env, net::TcpListener, sync::OnceLock, time::Duration};
+use std::{
+    env,
+    net::{SocketAddr, TcpListener},
+    sync::OnceLock,
+    time::Duration,
+};
 
 use axum::http;
 use dotenvy::dotenv;
@@ -11,6 +16,7 @@ use tokio::sync::oneshot;
 struct TestKernel {
     shutdown_trigger: oneshot::Sender<()>,
     kernel: Kernel,
+    port: u16,
 }
 
 impl TestKernel {
@@ -19,15 +25,19 @@ impl TestKernel {
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
+        let port = app_config.tcp_addr.port();
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
+
         Self {
             shutdown_trigger,
             kernel,
+            port,
         }
     }
 
-    async fn with_port(port: u16, skills: &[&str]) -> Self {
+    async fn with_skills(skills: &[&str]) -> Self {
+        let port = free_test_port();
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
@@ -39,6 +49,10 @@ impl TestKernel {
         Self::new(app_config).await
     }
 
+    fn port(&self) -> u16 {
+        self.port
+    }
+
     async fn shutdown(self) {
         self.shutdown_trigger.send(()).unwrap();
         self.kernel.wait_for_shutdown().await;
@@ -48,17 +62,15 @@ impl TestKernel {
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn execute_skill() {
-    let port = free_test_port();
-
     given_greet_skill();
-    let kernel = TestKernel::with_port(port, &["greet_skill"]).await;
+    let kernel = TestKernel::with_skills(&["greet_skill"]).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
     auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
-        .post(format!("http://127.0.0.1:{port}/execute_skill"))
+        .post(format!("http://127.0.0.1:{}/execute_skill", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
         .body(Body::from(
