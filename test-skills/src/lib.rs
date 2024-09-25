@@ -1,7 +1,7 @@
-use anyhow::{bail, Context as _, Error};
+use anyhow::{anyhow, bail, Context as _, Error};
 use std::{
     path::Path,
-    process::Command,
+    process::{Command, Output},
     sync::{LazyLock, OnceLock},
 };
 use tempfile::{tempdir, TempDir};
@@ -76,7 +76,7 @@ fn build_rust_skill(package_name: &str) {
     // Build the release artefact for web assembly target
     //
     // cargo build -p greet-skill-v0_2 --target wasm32-wasip1 --release
-    Command::new("cargo")
+    let output = Command::new("cargo")
         .args([
             "build",
             "-p",
@@ -85,8 +85,9 @@ fn build_rust_skill(package_name: &str) {
             WASI_TARGET,
             "--release",
         ])
-        .status()
+        .output()
         .unwrap();
+    error_on_status("Building web assembly failed.", output).unwrap();
 
     // Make it a web assembly component
     //
@@ -94,7 +95,7 @@ fn build_rust_skill(package_name: &str) {
     //      ./target/wasm32-wasip1/release/greet_skill_v0_2.wasm \
     //      -o ./skills/greet_skill_v0_2.wasm \
     //      --adapt ./wasi_snapshot_preview1.reactor-25.0.0.wasm
-    Command::new("wasm-tools")
+    let output = Command::new("wasm-tools")
         .args([
             "component",
             "new",
@@ -104,19 +105,21 @@ fn build_rust_skill(package_name: &str) {
             "--adapt",
             "./wasi_snapshot_preview1.reactor-25.0.0.wasm",
         ])
-        .status()
-        .unwrap();
+        .output()
+        .expect("Error executing wasm-tools");
+    error_on_status("Creating web assembly component failed.", output).unwrap();
 
     // wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
-    Command::new("wasm-tools")
+    let output = Command::new("wasm-tools")
         .args([
             "strip",
             &format!("./skills/{snake_case}.wasm"),
             "-o",
             &format!("./skills/{snake_case}.wasm"),
         ])
-        .status()
+        .output()
         .unwrap();
+    error_on_status("Stripping web assembly component", output).unwrap();
 }
 
 fn build_python_skill(package_name: &str, wit_version: &str) {
@@ -221,12 +224,18 @@ fn create_virtual_enviroment(venv_path: &Path) -> Result<(), Error> {
         .args(["-m", "venv", venv_path])
         .output()
         .context("Failed to start 'python' command.")?;
-    if !output.status.success() {
-        let standard_error = String::from_utf8_lossy(&output.stderr);
-        bail!(
-            "Failed to create virtual environment for Python Skill building. Stderr:\n{}",
-            standard_error
-        )
-    }
+    error_on_status(
+        "Failed to create virtual environment for Python Skill building.",
+        output,
+    )?;
     Ok(())
+}
+
+fn error_on_status(context: &str, output: Output) -> Result<(), anyhow::Error> {
+    if output.status.success() {
+        Ok(())
+    } else {
+        let standard_error = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow!("{context}\nStandard error:\n{standard_error}"))
+    }
 }
