@@ -9,7 +9,7 @@ use crate::{
 
 pub use self::chunking::ChunkRequest;
 
-mod chunking;
+pub mod chunking;
 mod search;
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
@@ -46,7 +46,7 @@ pub trait Csi {
     // It is up to the implementer whether the actual implementation is async.
     #[allow(clippy::unused_async)]
     async fn select_language(
-        &mut self,
+        &self,
         request: SelectLanguageRequest,
     ) -> anyhow::Result<Option<Language>> {
         // default implementation can be provided here because language selection is stateless

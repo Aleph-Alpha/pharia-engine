@@ -24,8 +24,8 @@ use tower_http::{
 use tracing::{error, info, info_span, Level};
 
 use crate::{
-    csi::{Csi, CsiDrivers},
-    inference,
+    csi::{chunking, Csi, CsiDrivers},
+    inference, language_selection,
 };
 
 pub struct CsiShell {
@@ -103,12 +103,39 @@ async fn http_csi_handle(
     Json(args): Json<VersionedCsiRequest>,
 ) -> (StatusCode, Json<Value>) {
     let result = match args {
-        VersionedCsiRequest::V0_2(V0_2CsiRequest::Complete(request)) => drivers
-            .complete_text(bearer.token().to_owned(), request.into())
-            .await
-            .map(Completion::from),
+        VersionedCsiRequest::V0_2(request) => match request {
+            V0_2CsiRequest::Complete(completion_request) => drivers
+                .complete_text(bearer.token().to_owned(), completion_request.into())
+                .await
+                .map(|r| json!(Completion::from(r))),
+            V0_2CsiRequest::Chunk(chunk_request) => drivers
+                .chunk(bearer.token().to_owned(), chunk_request.into())
+                .await
+                .map(|r| json!(r)),
+            V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
+                .select_language(select_language_request.into())
+                .await
+                .map(|r| json!(r.map(Language::from))),
+            V0_2CsiRequest::CompleteAll(complete_all_request) => drivers
+                .complete_all(
+                    bearer.token().to_owned(),
+                    complete_all_request
+                        .requests
+                        .into_iter()
+                        .map(inference::CompletionRequest::from)
+                        .collect(),
+                )
+                .await
+                .map(|v| json!(v.into_iter().map(Completion::from).collect::<Vec<_>>())),
+        },
     };
-    (StatusCode::OK, Json(json!(result.unwrap())))
+    match result {
+        Ok(result) => (StatusCode::OK, Json(result)),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!(e.to_string())),
+        ),
+    }
 }
 
 /// This structs allows us to represent versioned interactions with the CSI.
@@ -125,6 +152,9 @@ pub enum VersionedCsiRequest {
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum V0_2CsiRequest {
     Complete(CompletionRequest),
+    Chunk(ChunkRequest),
+    SelectLanguage(SelectLanguageRequest),
+    CompleteAll(CompleteAllRequest),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -214,6 +244,83 @@ impl From<inference::Completion> for Completion {
             finish_reason: finish_reason.into(),
         }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ChunkRequest {
+    pub text: String,
+    pub params: ChunkParams,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ChunkParams {
+    pub model: String,
+    pub max_tokens: u32,
+}
+
+impl From<ChunkRequest> for chunking::ChunkRequest {
+    fn from(value: ChunkRequest) -> Self {
+        let ChunkRequest {
+            text,
+            params: ChunkParams { model, max_tokens },
+        } = value;
+
+        Self {
+            text,
+            model,
+            max_tokens,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SelectLanguageRequest {
+    pub text: String,
+    pub languages: Vec<Language>,
+}
+
+impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
+    fn from(value: SelectLanguageRequest) -> Self {
+        let SelectLanguageRequest { text, languages } = value;
+        Self {
+            text,
+            languages: languages
+                .into_iter()
+                .map(language_selection::Language::from)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Language {
+    /// english
+    Eng,
+    /// german
+    Deu,
+}
+
+impl From<Language> for language_selection::Language {
+    fn from(value: Language) -> Self {
+        match value {
+            Language::Eng => language_selection::Language::Eng,
+            Language::Deu => language_selection::Language::Deu,
+        }
+    }
+}
+impl From<language_selection::Language> for Language {
+    fn from(value: language_selection::Language) -> Self {
+        match value {
+            language_selection::Language::Eng => Language::Eng,
+            language_selection::Language::Deu => Language::Deu,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CompleteAllRequest {
+    pub requests: Vec<CompletionRequest>,
 }
 
 #[cfg(test)]
