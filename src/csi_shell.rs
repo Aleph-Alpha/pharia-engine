@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 use crate::{
     csi::{chunking, Csi, CsiDrivers},
-    inference, language_selection,
+    inference, language_selection::SelectLanguageRequest,
 };
 
 pub async fn http_csi_handle(
@@ -27,9 +27,9 @@ pub async fn http_csi_handle(
                 .await
                 .map(|r| json!(r)),
             V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
-                .select_language(select_language_request.into())
+                .select_language(select_language_request)
                 .await
-                .map(|r| json!(r.map(Language::from))),
+                .map(|r| json!(r)),
             V0_2CsiRequest::CompleteAll(complete_all_request) => drivers
                 .complete_all(
                     bearer.token().to_owned(),
@@ -188,50 +188,6 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SelectLanguageRequest {
-    pub text: String,
-    pub languages: Vec<Language>,
-}
-
-impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
-    fn from(value: SelectLanguageRequest) -> Self {
-        let SelectLanguageRequest { text, languages } = value;
-        Self {
-            text,
-            languages: languages
-                .into_iter()
-                .map(language_selection::Language::from)
-                .collect(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Language {
-    /// english
-    Eng,
-    /// german
-    Deu,
-}
-
-impl From<Language> for language_selection::Language {
-    fn from(value: Language) -> Self {
-        match value {
-            Language::Eng => language_selection::Language::Eng,
-            Language::Deu => language_selection::Language::Deu,
-        }
-    }
-}
-impl From<language_selection::Language> for Language {
-    fn from(value: language_selection::Language) -> Self {
-        match value {
-            language_selection::Language::Eng => Language::Eng,
-            language_selection::Language::Deu => Language::Deu,
-        }
-    }
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CompleteAllRequest {

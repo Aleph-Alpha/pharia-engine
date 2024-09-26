@@ -1,7 +1,9 @@
 use lingua::LanguageDetectorBuilder;
+use serde::{Deserialize, Serialize};
 use tracing::trace;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Language {
     /// english
     Eng,
@@ -27,6 +29,8 @@ impl From<lingua::Language> for Language {
     }
 }
 
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SelectLanguageRequest {
     pub text: String,
     pub languages: Vec<Language>,
