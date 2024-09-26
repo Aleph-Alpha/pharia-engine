@@ -1,9 +1,14 @@
 use serde::{Deserialize, Serialize};
 use text_splitter::{ChunkConfig, TextSplitter};
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct ChunkRequest {
     pub text: String,
+    pub params: ChunkParams,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
 }
@@ -12,8 +17,7 @@ impl ChunkRequest {
     pub fn new(text: String, model: String, max_tokens: u32) -> Self {
         Self {
             text,
-            model,
-            max_tokens,
+            params: ChunkParams { model, max_tokens },
         }
     }
 }

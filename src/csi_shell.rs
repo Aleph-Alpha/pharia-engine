@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    csi::{chunking, Csi, CsiDrivers},
+    csi::{ChunkRequest, Csi, CsiDrivers},
     inference::{self, CompletionRequest}, language_selection::SelectLanguageRequest,
 };
 
@@ -23,7 +23,7 @@ pub async fn http_csi_handle(
                 .await
                 .map(|r| json!(r)),
             V0_2CsiRequest::Chunk(chunk_request) => drivers
-                .chunk(bearer.token().to_owned(), chunk_request.into())
+                .chunk(bearer.token().to_owned(), chunk_request)
                 .await
                 .map(|r| json!(r)),
             V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
@@ -72,32 +72,6 @@ pub enum V0_2CsiRequest {
     CompleteAll(CompleteAllRequest),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ChunkRequest {
-    pub text: String,
-    pub params: ChunkParams,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ChunkParams {
-    pub model: String,
-    pub max_tokens: u32,
-}
-
-impl From<ChunkRequest> for chunking::ChunkRequest {
-    fn from(value: ChunkRequest) -> Self {
-        let ChunkRequest {
-            text,
-            params: ChunkParams { model, max_tokens },
-        } = value;
-
-        Self {
-            text,
-            model,
-            max_tokens,
-        }
-    }
-}
 
 
 #[derive(Debug, Deserialize, Serialize)]

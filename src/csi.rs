@@ -1,3 +1,4 @@
+use chunking::ChunkParams;
 use futures::future::try_join_all;
 use tracing::trace;
 
@@ -93,8 +94,9 @@ impl Csi for CsiDrivers {
     ) -> Result<Vec<String>, anyhow::Error> {
         let ChunkRequest {
             text,
-            model,
-            max_tokens,
+            params: ChunkParams {
+                model, max_tokens
+            }
         } = request;
         let text_len = text.len();
 
@@ -105,7 +107,7 @@ impl Csi for CsiDrivers {
                 .await?;
 
         trace!(
-            "chunk: textlen={} max_tokens={} -> chunks.len()={}",
+            "chunk: text_len={} max_tokens={} -> chunks.len()={}",
             text_len,
             max_tokens,
             chunks.len()

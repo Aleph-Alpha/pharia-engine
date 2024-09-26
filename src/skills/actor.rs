@@ -22,7 +22,7 @@ use super::{
 };
 
 use crate::{
-    csi::{ChunkRequest, Csi as _, CsiDrivers},
+    csi::{chunking::ChunkParams, ChunkRequest, Csi as _, CsiDrivers},
     inference::{Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     skill_store::SkillStoreApi,
@@ -194,7 +194,7 @@ impl SkillExecutorMsg {
 
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
 /// calls to csi, to the respective drivers and forwarding runtime errors directly to the actor
-/// so the User defined code must not worry about accidential complexity.
+/// so the User defined code must not worry about accidental complexity.
 pub struct SkillInvocationCtx {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and
@@ -266,12 +266,13 @@ impl CsiForSkills for SkillInvocationCtx {
     }
 
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
+        let ChunkParams { model, max_tokens}  = &request.params;
         let span = span!(
             Level::DEBUG,
             "chunk",
             text_len = request.text.len(),
-            model = request.model,
-            max_tokens = request.max_tokens
+            model = model,
+            max_tokens = max_tokens,
         );
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
@@ -337,8 +338,10 @@ pub mod tests {
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
-            model,
-            max_tokens,
+            params: ChunkParams {
+                model,
+                max_tokens,
+            }
         };
         let chunks = invocation_ctx.chunk(request).await;
 
@@ -371,8 +374,10 @@ pub mod tests {
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
-            model,
-            max_tokens,
+            params: ChunkParams {
+                model,
+                max_tokens,
+            }
         };
         let error = select! {
             error = recv => error.unwrap(),
@@ -406,7 +411,7 @@ pub mod tests {
         executer.wait_for_shutdown().await;
         skill_provider.wait_for_shutdown().await;
 
-        // Then result indictaes that the skill is missing
+        // Then result indicates that the skill is missing
         assert!(matches!(result, Err(ExecuteSkillError::SkillDoesNotExist)));
     }
 
