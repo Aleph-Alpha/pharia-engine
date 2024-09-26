@@ -336,12 +336,11 @@ mod tests {
 
     use crate::{
         csi::tests::dummy_csi_apis,
-        csi_shell::{CompletionParams, CompletionRequest, V0_2CsiRequest, VersionedCsiRequest},
-        inference::{self, tests::InferenceStub},
+        csi_shell::{V0_2CsiRequest, VersionedCsiRequest},
+        inference::{self, tests::InferenceStub, Completion, CompletionParams, CompletionRequest},
         skill_store::tests::{dummy_skill_provider_api, SkillProviderMsg},
         skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
         tests::api_token,
-        Completion,
     };
 
     use super::*;
@@ -524,7 +523,7 @@ mod tests {
 
     #[tokio::test]
     async fn drop_cached_skill() {
-        // Given a provider wchich answers invalidate cache with `true`
+        // Given a provider which answers invalidate cache with `true`
         let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.

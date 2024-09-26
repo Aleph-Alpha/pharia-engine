@@ -25,9 +25,9 @@ use tokenizers::Tokenizers;
 use self::{inference::Inference, skills::SkillExecutor};
 
 pub use config::AppConfig;
-pub use csi_shell::{Completion, FinishReason};
 pub use logging::initialize_tracing;
 pub use namespace_watcher::OperatorConfig;
+pub use inference::{Completion, FinishReason};
 
 pub struct Kernel {
     inference: Inference,

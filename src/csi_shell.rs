@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 use crate::{
     csi::{chunking, Csi, CsiDrivers},
-    inference, language_selection::SelectLanguageRequest,
+    inference::{self, CompletionRequest}, language_selection::SelectLanguageRequest,
 };
 
 pub async fn http_csi_handle(
@@ -19,9 +19,9 @@ pub async fn http_csi_handle(
     let result = match args {
         VersionedCsiRequest::V0_2(request) => match request {
             V0_2CsiRequest::Complete(completion_request) => drivers
-                .complete_text(bearer.token().to_owned(), completion_request.into())
+                .complete_text(bearer.token().to_owned(), completion_request)
                 .await
-                .map(|r| json!(Completion::from(r))),
+                .map(|r| json!(r)),
             V0_2CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(bearer.token().to_owned(), chunk_request.into())
                 .await
@@ -40,7 +40,7 @@ pub async fn http_csi_handle(
                         .collect(),
                 )
                 .await
-                .map(|v| json!(v.into_iter().map(Completion::from).collect::<Vec<_>>())),
+                .map(|v| json!(v)),
         },
     };
     match result {
@@ -70,95 +70,6 @@ pub enum V0_2CsiRequest {
     Chunk(ChunkRequest),
     SelectLanguage(SelectLanguageRequest),
     CompleteAll(CompleteAllRequest),
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CompletionRequest {
-    pub model: String,
-    pub prompt: String,
-    pub params: CompletionParams,
-}
-
-impl From<CompletionRequest> for inference::CompletionRequest {
-    fn from(value: CompletionRequest) -> Self {
-        let CompletionRequest {
-            model,
-            prompt,
-            params,
-        } = value;
-
-        Self {
-            prompt,
-            model,
-            params: params.into(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CompletionParams {
-    pub max_tokens: Option<u32>,
-    pub temperature: Option<f64>,
-    pub top_k: Option<u32>,
-    pub top_p: Option<f64>,
-    pub stop: Vec<String>,
-}
-
-impl From<CompletionParams> for inference::CompletionParams {
-    fn from(value: CompletionParams) -> Self {
-        let CompletionParams {
-            max_tokens,
-            temperature,
-            top_k,
-            top_p,
-            stop,
-        } = value;
-
-        Self {
-            max_tokens,
-            temperature,
-            top_k,
-            top_p,
-            stop,
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum FinishReason {
-    Stop,
-    Length,
-    ContentFilter,
-}
-
-impl From<inference::FinishReason> for FinishReason {
-    fn from(value: inference::FinishReason) -> Self {
-        match value {
-            inference::FinishReason::Stop => FinishReason::Stop,
-            inference::FinishReason::Length => FinishReason::Length,
-            inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Completion {
-    pub text: String,
-    pub finish_reason: FinishReason,
-}
-
-impl From<inference::Completion> for Completion {
-    fn from(value: inference::Completion) -> Self {
-        let inference::Completion {
-            text,
-            finish_reason,
-        } = value;
-        Self {
-            text,
-            finish_reason: finish_reason.into(),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
