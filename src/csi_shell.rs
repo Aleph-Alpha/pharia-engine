@@ -97,7 +97,7 @@ pub fn http(drivers: CsiDrivers) -> Router {
         )
 }
 
-async fn http_csi_handle(
+pub async fn http_csi_handle(
     State(drivers): State<CsiDrivers>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<VersionedCsiRequest>,
