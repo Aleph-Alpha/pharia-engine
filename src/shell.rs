@@ -34,8 +34,7 @@ use utoipa::{
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    skill_store::SkillStoreApi,
-    skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
+    csi::CsiDrivers, skill_store::SkillStoreApi, skills::{ExecuteSkillError, SkillExecutorApi, SkillPath}
 };
 
 pub struct Shell {
@@ -49,6 +48,7 @@ impl Shell {
         addr: impl Into<SocketAddr>,
         skill_executor_api: SkillExecutorApi,
         skill_provider_api: SkillStoreApi,
+        csi_drivers: CsiDrivers,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, anyhow::Error> {
         let addr = addr.into();
@@ -59,7 +59,7 @@ impl Shell {
             .context(format!("Could not bind a tcp listener to '{addr}'"))?;
         info!("Listening on: {addr}");
         let handle = tokio::spawn(async {
-            let res = axum::serve(listener, http(skill_executor_api, skill_provider_api))
+            let res = axum::serve(listener, http(skill_executor_api, skill_provider_api, csi_drivers))
                 .with_graceful_shutdown(shutdown_signal)
                 .await;
             if let Err(e) = res {
@@ -74,7 +74,7 @@ impl Shell {
     }
 }
 
-pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillStoreApi) -> Router {
+pub fn http(skill_executor_api: SkillExecutorApi, skill_provider_api: SkillStoreApi, csi_driver: CsiDrivers) -> Router {
     let serve_dir =
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
 
@@ -323,9 +323,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        skill_store::tests::{dummy_skill_provider_api, SkillProviderMsg},
-        skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
-        tests::api_token,
+        csi::tests::dummy_csi_apis, skill_store::tests::{dummy_skill_provider_api, SkillProviderMsg}, skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath}, tests::api_token
     };
 
     use super::*;
@@ -356,7 +354,7 @@ mod tests {
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
-        let http = http(skill_executor_api, dummy_skill_provider_api());
+        let http = http(skill_executor_api, dummy_skill_provider_api(), dummy_csi_apis());
 
         let args = ExecuteSkillArgs {
             skill: "local/greet_skill".to_owned(),
@@ -386,7 +384,7 @@ mod tests {
         let skill_executor = StubSkillExecuter::new(|_| {});
 
         // When
-        let http = http(skill_executor.api(), dummy_skill_provider_api());
+        let http = http(skill_executor.api(), dummy_skill_provider_api(), dummy_csi_apis());
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
             input: json!("Homer"),
@@ -428,7 +426,7 @@ mod tests {
             }
         });
 
-        let http = http(dummy_skill_executer.api(), skill_provider_api);
+        let http = http(dummy_skill_executer.api(), skill_provider_api, dummy_csi_apis());
 
         let resp = http
             .oneshot(
@@ -465,7 +463,7 @@ mod tests {
                 send.send(true).unwrap();
             }
         });
-        let http = http(dummy_skill_executer.api(), skill_provider_api);
+        let http = http(dummy_skill_executer.api(), skill_provider_api, dummy_csi_apis());
 
         // When the skill is deleted
         let resp = http
@@ -513,7 +511,7 @@ mod tests {
                 send.send(false).unwrap();
             }
         });
-        let http = http(dummy_skill_executer.api(), skill_provider_api);
+        let http = http(dummy_skill_executer.api(), skill_provider_api, dummy_csi_apis());
 
         // When the skill is deleted
         let resp = http
@@ -544,7 +542,7 @@ mod tests {
         // drop the receiver, we expect the shell to never try to execute a skill
         let (send, _) = mpsc::channel(1);
         let skill_executor_api = SkillExecutorApi::new(send);
-        let http = http(skill_executor_api, dummy_skill_provider_api());
+        let http = http(skill_executor_api, dummy_skill_provider_api(), dummy_csi_apis());
 
         // When executing a skill with a blank name
         let api_token = api_token();
@@ -576,7 +574,7 @@ mod tests {
         let (send, _recv) = mpsc::channel(1);
         let dummy_skill_executer_api = SkillExecutorApi::new(send);
 
-        let http = http(dummy_skill_executer_api, dummy_skill_provider_api());
+        let http = http(dummy_skill_executer_api, dummy_skill_provider_api(), dummy_csi_apis());
         let resp = http
             .oneshot(
                 Request::builder()
@@ -595,7 +593,7 @@ mod tests {
         let (send, _recv) = mpsc::channel(1);
         let dummy_skill_executer_api = SkillExecutorApi::new(send);
 
-        let http = http(dummy_skill_executer_api, dummy_skill_provider_api());
+        let http = http(dummy_skill_executer_api, dummy_skill_provider_api(), dummy_csi_apis());
         let resp = http
             .oneshot(
                 Request::builder()
@@ -628,7 +626,7 @@ mod tests {
                 panic!("Unexpected message in test")
             }
         });
-        let http = http(dummy_skill_executer.api(), skill_provider_api);
+        let http = http(dummy_skill_executer.api(), skill_provider_api, dummy_csi_apis());
 
         // When
         let resp = http
@@ -658,7 +656,7 @@ mod tests {
             ))))
             .unwrap();
         });
-        let http = http(skill_executor.api(), dummy_skill_provider_api());
+        let http = http(skill_executor.api(), dummy_skill_provider_api(), dummy_csi_apis());
 
         // When executing a skill in the namespace
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
@@ -698,7 +696,7 @@ mod tests {
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
 
         // When executing a skill
-        let http = http(skill_executer_api, dummy_skill_provider_api());
+        let http = http(skill_executer_api, dummy_skill_provider_api(), dummy_csi_apis());
         let args = ExecuteSkillArgs {
             skill: "my_namespace/my_skill".to_owned(),
             input: json!("Homer"),

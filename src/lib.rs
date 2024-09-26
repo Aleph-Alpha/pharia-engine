@@ -88,13 +88,15 @@ impl Kernel {
         };
         let csi_shell_fut = CsiShell::new(
             app_config.csi_addr,
-            csi_drivers,
+            csi_drivers.clone(),
             shared_shutdown_signal.clone(),
         );
         let shell_fut = Shell::new(
             app_config.tcp_addr,
             skill_executor.api(),
             skill_store.api(),
+            csi_drivers,
+            
             shared_shutdown_signal.clone(),
         );
         let (csi_shell, shell) = match tokio::try_join!(csi_shell_fut, shell_fut) {
