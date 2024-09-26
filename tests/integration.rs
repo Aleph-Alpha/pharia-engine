@@ -12,7 +12,6 @@ struct TestKernel {
     shutdown_trigger: oneshot::Sender<()>,
     kernel: Kernel,
     port: u16,
-    csi_port: u16,
 }
 
 impl TestKernel {
@@ -22,7 +21,6 @@ impl TestKernel {
             shutdown_capture.await.unwrap();
         };
         let port = app_config.tcp_addr.port();
-        let csi_port = app_config.csi_addr.port();
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
 
@@ -30,16 +28,13 @@ impl TestKernel {
             shutdown_trigger,
             kernel,
             port,
-            csi_port,
         }
     }
 
     async fn with_skills(skills: &[&str]) -> Self {
         let port = free_test_port();
-        let csi_port = free_test_port();
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
-            csi_addr: format!("127.0.0.1:{csi_port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::local(skills),
             namespace_update_interval: Duration::from_secs(10),
@@ -51,10 +46,6 @@ impl TestKernel {
 
     fn port(&self) -> u16 {
         self.port
-    }
-
-    fn csi_port(&self) -> u16 {
-        self.csi_port
     }
 
     async fn shutdown(self) {
@@ -102,7 +93,7 @@ async fn completion_via_remote_csi() {
     auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
-        .post(format!("http://127.0.0.1:{}/csi", kernel.csi_port()))
+        .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
         .body(Body::from(

@@ -340,7 +340,8 @@ mod tests {
         inference::{self, tests::InferenceStub},
         skill_store::tests::{dummy_skill_provider_api, SkillProviderMsg},
         skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
-        tests::api_token, Completion,
+        tests::api_token,
+        Completion,
     };
 
     use super::*;

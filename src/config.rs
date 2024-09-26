@@ -6,7 +6,6 @@ use crate::namespace_watcher::OperatorConfig;
 #[derive(Clone)]
 pub struct AppConfig {
     pub tcp_addr: SocketAddr,
-    pub csi_addr: SocketAddr,
     /// This base URL is used to do inference against models hosted by the Aleph Alpha inference
     /// stack, as well as used to fetch Tokenizers for said models.
     pub inference_addr: String,
@@ -28,9 +27,6 @@ impl AppConfig {
         drop(dotenvy::dotenv());
 
         let addr = env::var("PHARIA_KERNEL_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8081".to_owned());
-
-        let csi_addr =
-            env::var("PHARIA_KERNEL_CSI_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8082".to_owned());
 
         let inference_addr = env::var("AA_INFERENCE_ADDRESS")
             .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
@@ -72,7 +68,6 @@ impl AppConfig {
 
         Ok(AppConfig {
             tcp_addr: addr.parse().unwrap(),
-            csi_addr: csi_addr.parse().unwrap(),
             inference_addr,
             operator_config,
             namespace_update_interval: namespace_update_interval.into(),
