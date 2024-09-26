@@ -107,7 +107,7 @@ async fn completion_via_remote_csi() {
         .header(header::AUTHORIZATION, auth_value)
         .body(Body::from(
             json!({
-                "version": "v0_2",
+                "version": "0.2",
                 "function": "complete",
                 "prompt": "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 

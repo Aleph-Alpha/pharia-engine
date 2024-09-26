@@ -145,6 +145,7 @@ async fn http_csi_handle(
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "version")]
 pub enum VersionedCsiRequest {
+    #[serde(rename = "0.2")]
     V0_2(V0_2CsiRequest),
 }
 
@@ -342,7 +343,7 @@ mod tests {
     fn csi_v_2_request_is_deserialized() {
         // Given a request in JSON format
         let request = json!({
-            "version": "v0_2",
+            "version": "0.2",
             "function": "complete",
             "prompt": "Hello",
             "model": "llama-3.1-8b-instruct",
