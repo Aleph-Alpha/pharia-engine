@@ -94,9 +94,7 @@ impl Csi for CsiDrivers {
     ) -> Result<Vec<String>, anyhow::Error> {
         let ChunkRequest {
             text,
-            params: ChunkParams {
-                model, max_tokens
-            }
+            params: ChunkParams { model, max_tokens },
         } = request;
         let text_len = text.len();
 

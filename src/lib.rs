@@ -25,9 +25,9 @@ use tokenizers::Tokenizers;
 use self::{inference::Inference, skills::SkillExecutor};
 
 pub use config::AppConfig;
+pub use inference::{Completion, FinishReason};
 pub use logging::initialize_tracing;
 pub use namespace_watcher::OperatorConfig;
-pub use inference::{Completion, FinishReason};
 
 pub struct Kernel {
     inference: Inference,
@@ -66,7 +66,7 @@ impl Kernel {
         let skill_store = SkillStore::new(engine.clone(), &app_config.operator_config.namespaces);
 
         // Boot up runtime we need to execute Skills
-        let skill_executor = SkillExecutor::new(engine, csi_drivers, skill_store.api());
+        let skill_executor = SkillExecutor::new(engine, csi_drivers.clone(), skill_store.api());
 
         let mut namespace_watcher = NamespaceWatcher::with_config(
             skill_store.api(),
@@ -77,10 +77,10 @@ impl Kernel {
         // Wait for first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        let csi_drivers = CsiDrivers {
-            inference: inference.api(),
-            tokenizers: tokenizers.api(),
-        };
+        // let csi_drivers = CsiDrivers {
+        //     inference: inference.api(),
+        //     tokenizers: tokenizers.api(),
+        // };
         let shell = match Shell::new(
             app_config.tcp_addr,
             skill_executor.api(),
