@@ -320,9 +320,9 @@ pub mod tests {
     use tokio::try_join;
 
     use crate::{
-        csi::{tests::dummy_csi_apis, CsiDrivers},
+        csi::{tests::{dummy_csi_apis, StubCsi}, CsiDrivers},
         inference::{
-            tests::{AssertConcurrentClient, InferenceStub},
+            tests::AssertConcurrentClient,
             CompletionRequest, Inference,
         },
         skill_store::{SkillProviderMsg, SkillStore},
@@ -419,53 +419,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn inference_error_during_skill_execution() {
-        // Given
-        // This mock runtime expects that its skills never complete. The futures invoking them must
-        // be dropped
-        struct MockRuntime {}
-
-        impl Runtime for MockRuntime {
-            async fn run(
-                &self,
-                _: &SkillPath,
-                _: Value,
-                mut ctx: Box<dyn CsiForSkills + Send>,
-            ) -> Result<Value, ExecuteSkillError> {
-                ctx.complete_text(CompletionRequest::new(
-                    "dummy".to_owned(),
-                    "dummy".to_owned(),
-                ))
-                .await;
-                panic!("complete_text must pend forever in case of error")
-            }
-        }
-        let inference_saboteur = InferenceStub::new(|_| Err(anyhow!("Test inference error")));
-        let csi_apis = CsiDrivers {
-            inference: inference_saboteur.api(),
-            ..dummy_csi_apis()
-        };
-
-        // When
-        let runtime = MockRuntime {};
-        let executer = SkillExecutor::with_runtime(runtime, csi_apis);
-        let api = executer.api();
-        let another_skill_path = SkillPath::dummy();
-        let result = api
-            .execute_skill(
-                another_skill_path,
-                json!("Dummy input"),
-                "Dummy api token".to_owned(),
-            )
-            .await;
-
-        // Then
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert_eq!(error.to_string(), "Test inference error");
-    }
-
-    #[tokio::test]
     async fn skill_executor_forwards_csi_errors() {
         // Given csi which emits errors for completion request
         let engine = Arc::new(Engine::new().unwrap());
@@ -492,25 +445,22 @@ pub mod tests {
     #[tokio::test]
     async fn greeting_skill() {
         // Given
-        let inference = InferenceStub::with_completion("Hello".to_owned());
-        let csi_apis = CsiDrivers {
-            inference: inference.api(),
-            ..dummy_csi_apis()
-        };
-
+        let csi = StubCsi::with_completion_from_text("Hello");
+        let engine = Arc::new(Engine::new().unwrap());
+        let store = SkillStoreGreetStub::new(engine.clone());
+        
         // When
-        let runtime = RustRuntime::with_greet_skill();
-        let executor = SkillExecutor::with_runtime(runtime, csi_apis);
+        let executor = SkillExecutor::new(engine, csi, store.api());
         let result = executor
             .api()
             .execute_skill(
-                SkillPath::new("local", "greet"),
+                SkillPath::new("test", "greet"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;
         executor.wait_for_shutdown().await;
-        inference.wait_for_shutdown().await;
+        store.wait_for_shutdown().await;
 
         // Then
         assert_eq!(result.unwrap(), "Hello");

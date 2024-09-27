@@ -119,11 +119,15 @@ impl Csi for CsiDrivers {
 
 #[cfg(test)]
 pub mod tests {
+    use std::sync::Arc;
+
+    use anyhow::bail;
     use tokio::sync::mpsc;
+    use async_trait::async_trait;
 
-    use crate::{inference::InferenceApi, tokenizers::TokenizersApi};
+    use crate::{inference::{CompletionRequest, InferenceApi, Completion}, tokenizers::TokenizersApi};
 
-    use super::CsiDrivers;
+    use super::{ChunkRequest, Csi, CsiDrivers};
 
     pub fn dummy_csi_apis() -> CsiDrivers {
         let (send, _recv) = mpsc::channel(1);
@@ -135,6 +139,52 @@ pub mod tests {
         CsiDrivers {
             inference,
             tokenizers,
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct StubCsi {
+        completion: Arc<Box<dyn Fn(CompletionRequest) -> Completion + Send + Sync + 'static>>,
+    }
+
+    impl StubCsi {
+        pub fn with_completion(f: impl Fn(CompletionRequest) -> Completion + Send + Sync + 'static) -> Self {
+            StubCsi {
+                completion: Arc::new(Box::new(f))
+            }
+        }
+
+        pub fn with_completion_from_text(text: impl Into<String>) -> Self {
+            let text: String = text.into();
+            let completion = Completion::from_text(text);
+            StubCsi::with_completion(move |_| completion.clone())
+        }
+    }
+
+    #[async_trait]
+    impl Csi for StubCsi {
+        async fn complete_text(
+            &self,
+            _auth: String,
+            request: CompletionRequest,
+        ) -> Result<Completion, anyhow::Error> {
+            Ok((*self.completion)(request))
+        }
+
+        async fn complete_all(
+            &self,
+            _auth: String,
+            _requests: Vec<CompletionRequest>,
+        ) -> Result<Vec<Completion>, anyhow::Error> {
+            bail!("Test error")
+        }
+
+        async fn chunk(
+            &self,
+            _auth: String,
+            _request: ChunkRequest,
+        ) -> Result<Vec<String>, anyhow::Error> {
+            bail!("Test error")
         }
     }
 }

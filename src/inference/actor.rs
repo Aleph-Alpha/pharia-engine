@@ -260,6 +260,7 @@ pub mod tests {
 
             Self { send, join_handle }
         }
+        
         pub fn with_completion(completion: impl Into<String>) -> Self {
             let completion = Completion::from_text(completion);
             Self::new(move |_| Ok(completion.clone()))

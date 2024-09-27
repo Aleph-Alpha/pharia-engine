@@ -519,10 +519,9 @@ mod tests {
     use v0_2::pharia::skill::csi::{CompletionParams, CompletionRequest, Host, Language};
 
     use crate::{
-        csi::{tests::dummy_csi_apis, CsiDrivers},
-        inference::{self, tests::InferenceStub},
+        csi::tests::{dummy_csi_apis, StubCsi},
         skills::{actor::SkillInvocationCtx, runtime::wasm::tests::CsiGreetingMock},
-        tests::api_token,
+        tests::api_token, Completion,
     };
 
     use super::*;
@@ -552,15 +551,12 @@ mod tests {
     #[tokio::test]
     async fn complete_all_completion_requests_in_respective_order() {
         // Given a linked context
-        let inference_stub = InferenceStub::new(|r| Ok(inference::Completion::from_text(r.prompt)));
-        let csi_apis = CsiDrivers {
-            inference: inference_stub.api(),
-            ..dummy_csi_apis()
-        };
+        let csi = StubCsi::with_completion(|r| Completion::from_text(r.prompt));
+
         let (send_rt_err, _) = oneshot::channel();
         let skill_ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
-            csi_apis,
+            csi,
             api_token().to_owned(),
             None,
         ));
