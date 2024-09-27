@@ -22,7 +22,7 @@ use super::{
 };
 
 use crate::{
-    csi::{chunking::ChunkParams, ChunkRequest, Csi, CsiDrivers},
+    csi::{chunking::ChunkParams, ChunkRequest, Csi},
     inference::{Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     skill_store::SkillStoreApi,
@@ -36,16 +36,20 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new(engine: Arc<Engine>, csi_apis: CsiDrivers, skill_provider: SkillStoreApi) -> Self {
+    pub fn new<C>(engine: Arc<Engine>, csi_apis: C, skill_provider: SkillStoreApi) -> Self
+    where
+        C: Csi + Clone + Send + Sync + 'static,
+    {
         let runtime = WasmRuntime::new(engine, skill_provider);
         Self::with_runtime(runtime, csi_apis)
     }
 
     /// You may want use this constructor if you want to use a double runtime for testing
-    pub fn with_runtime<R: Runtime + Send + Sync + 'static>(
-        runtime: R,
-        csi_apis: CsiDrivers,
-    ) -> Self {
+    pub fn with_runtime<R, C>(runtime: R, csi_apis: C) -> Self
+    where
+        R: Runtime + Send + Sync + 'static,
+        C: Csi + Clone + Send + Sync + 'static,
+    {
         let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
@@ -107,18 +111,19 @@ pub enum ExecuteSkillError {
     Other(anyhow::Error),
 }
 
-struct SkillExecutorActor<R: Runtime> {
+struct SkillExecutorActor<R: Runtime, C> {
     runtime: Arc<R>,
     recv: mpsc::Receiver<SkillExecutorMsg>,
-    csi_apis: CsiDrivers,
+    csi_apis: C,
     running_skills: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
-impl<R> SkillExecutorActor<R>
+impl<R, C> SkillExecutorActor<R, C>
 where
     R: Runtime + Send + Sync + 'static,
+    C: Csi + Clone + Send + Sync + 'static,
 {
-    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: CsiDrivers) -> Self {
+    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: C) -> Self {
         SkillExecutorActor {
             runtime: Arc::new(runtime),
             recv,
@@ -161,7 +166,7 @@ pub struct SkillExecutorMsg {
 }
 
 impl SkillExecutorMsg {
-    async fn run_skill(self, csi_apis: CsiDrivers, runtime: &impl Runtime) {
+    async fn run_skill(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &impl Runtime) {
         let SkillExecutorMsg {
             skill_path,
             input,
@@ -234,7 +239,10 @@ impl<C> SkillInvocationCtx<C> {
 }
 
 #[async_trait]
-impl<C> CsiForSkills for SkillInvocationCtx<C> where C: Csi + Send + Sync {
+impl<C> CsiForSkills for SkillInvocationCtx<C>
+where
+    C: Csi + Send + Sync,
+{
     async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
         let span = span!(Level::DEBUG, "complete_text", model = params.model);
         if let Some(context) = self.parent_context.as_ref() {
@@ -266,7 +274,7 @@ impl<C> CsiForSkills for SkillInvocationCtx<C> where C: Csi + Send + Sync {
     }
 
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
-        let ChunkParams { model, max_tokens}  = &request.params;
+        let ChunkParams { model, max_tokens } = &request.params;
         let span = span!(
             Level::DEBUG,
             "chunk",
@@ -302,22 +310,23 @@ impl<C> CsiForSkills for SkillInvocationCtx<C> where C: Csi + Send + Sync {
 
 #[cfg(test)]
 pub mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, fs};
 
     use super::*;
 
-    use anyhow::anyhow;
+    use anyhow::{anyhow, bail};
     use serde_json::json;
+    use test_skills::given_greet_skill;
     use tokio::try_join;
 
     use crate::{
-        csi::tests::dummy_csi_apis,
+        csi::{tests::dummy_csi_apis, CsiDrivers},
         inference::{
             tests::{AssertConcurrentClient, InferenceStub},
             CompletionRequest, Inference,
         },
-        skill_store::SkillStore,
-        skills::runtime::tests::SaboteurRuntime,
+        skill_store::{SkillProviderMsg, SkillStore},
+        skills::Skill,
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
     };
 
@@ -338,10 +347,7 @@ pub mod tests {
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
-            params: ChunkParams {
-                model,
-                max_tokens,
-            }
+            params: ChunkParams { model, max_tokens },
         };
         let chunks = invocation_ctx.chunk(request).await;
 
@@ -374,10 +380,7 @@ pub mod tests {
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
-            params: ChunkParams {
-                model,
-                max_tokens,
-            }
+            params: ChunkParams { model, max_tokens },
         };
         let error = select! {
             error = recv => error.unwrap(),
@@ -463,26 +466,27 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn skill_executor_forwards_runtime_errors() {
-        let error_msg = "out-of-cheese".to_owned();
-        let inference = InferenceStub::with_completion("Hello".to_owned());
-        let runtime = SaboteurRuntime::new(error_msg.clone());
-        let csi_apis = CsiDrivers {
-            inference: inference.api(),
-            ..dummy_csi_apis()
-        };
-        let executor = SkillExecutor::with_runtime(runtime, csi_apis);
+    async fn skill_executor_forwards_csi_errors() {
+        // Given csi which emits errors for completion request
+        let engine = Arc::new(Engine::new().unwrap());
+        let store = SkillStoreGreetStub::new(engine.clone());
+        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
 
+        // When trying to generate a greeting for Homer using the greet skill
         let result = executor
             .api()
             .execute_skill(
-                SkillPath::dummy(),
-                json!(""),
+                SkillPath::new("test", "greet"),
+                json!("Homer"),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;
 
-        assert_eq!(result.unwrap_err().to_string(), error_msg);
+        executor.wait_for_shutdown().await;
+        store.wait_for_shutdown().await;
+
+        // Then
+        assert_eq!(result.unwrap_err().to_string(), "Test error");
     }
 
     #[tokio::test]
@@ -580,6 +584,79 @@ pub mod tests {
             );
             let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
             Ok(json!(ctx.complete_text(request).await.text))
+        }
+    }
+
+    #[derive(Clone)]
+    struct SaboteurCsi;
+
+    #[async_trait]
+    impl Csi for SaboteurCsi {
+        async fn complete_text(
+            &self,
+            _auth: String,
+            _request: CompletionRequest,
+        ) -> Result<Completion, anyhow::Error> {
+            bail!("Test error")
+        }
+
+        async fn complete_all(
+            &self,
+            _auth: String,
+            _requests: Vec<CompletionRequest>,
+        ) -> Result<Vec<Completion>, anyhow::Error> {
+            bail!("Test error")
+        }
+
+        async fn chunk(
+            &self,
+            _auth: String,
+            _request: ChunkRequest,
+        ) -> Result<Vec<String>, anyhow::Error> {
+            bail!("Test error")
+        }
+    }
+
+    /// Only serves test/greet skill
+    pub struct SkillStoreGreetStub {
+        send: mpsc::Sender<SkillProviderMsg>,
+        join_handle: JoinHandle<()>,
+    }
+
+    impl SkillStoreGreetStub {
+        pub fn new(engine: Arc<Engine>) -> Self {
+            given_greet_skill();
+            let greet_bytes = fs::read("./skills/greet_skill.wasm").unwrap();
+            let skill = Skill::new(&engine, greet_bytes.clone()).unwrap();
+            let skill = Arc::new(skill);
+
+            let (send, mut recv) = mpsc::channel::<SkillProviderMsg>(1);
+            let join_handle = tokio::spawn(async move {
+                while let Some(msg) = recv.recv().await {
+                    match msg {
+                        SkillProviderMsg::Fetch { skill_path, send } => {
+                            let skill = if skill_path == SkillPath::new("test", "greet") {
+                                Some(skill.clone())
+                            } else {
+                                None
+                            };
+                            drop(send.send(Ok(skill)));
+                        }
+                        _ => panic!("Operation unimplemented in test stub"),
+                    }
+                }
+            });
+
+            Self { send, join_handle }
+        }
+
+        pub async fn wait_for_shutdown(self) {
+            drop(self.send);
+            self.join_handle.await.unwrap();
+        }
+
+        pub fn api(&self) -> SkillStoreApi {
+            SkillStoreApi::new(self.send.clone())
         }
     }
 }

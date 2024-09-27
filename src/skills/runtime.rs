@@ -50,30 +50,3 @@ pub trait CsiForSkills {
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
     async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language>;
 }
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use anyhow::anyhow;
-
-    pub struct SaboteurRuntime {
-        err_msg: String,
-    }
-
-    impl SaboteurRuntime {
-        pub fn new(err_msg: String) -> Self {
-            Self { err_msg }
-        }
-    }
-
-    impl Runtime for SaboteurRuntime {
-        async fn run(
-            &self,
-            _skill_path: &SkillPath,
-            _input: Value,
-            _ctx: Box<dyn CsiForSkills + Send>,
-        ) -> Result<Value, ExecuteSkillError> {
-            Err(ExecuteSkillError::Other(anyhow!(self.err_msg.clone())))
-        }
-    }
-}
