@@ -77,10 +77,6 @@ impl Kernel {
         // Wait for first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        // let csi_drivers = CsiDrivers {
-        //     inference: inference.api(),
-        //     tokenizers: tokenizers.api(),
-        // };
         let shell = match Shell::new(
             app_config.tcp_addr,
             skill_executor.api(),
