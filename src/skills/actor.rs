@@ -41,15 +41,6 @@ impl SkillExecutor {
         C: Csi + Clone + Send + Sync + 'static,
     {
         let runtime = WasmRuntime::new(engine, skill_provider);
-        Self::with_runtime(runtime, csi_apis)
-    }
-
-    /// You may want use this constructor if you want to use a double runtime for testing
-    pub fn with_runtime<R, C>(runtime: R, csi_apis: C) -> Self
-    where
-        R: Runtime + Send + Sync + 'static,
-        C: Csi + Clone + Send + Sync + 'static,
-    {
         let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
@@ -111,19 +102,18 @@ pub enum ExecuteSkillError {
     Other(anyhow::Error),
 }
 
-struct SkillExecutorActor<R: Runtime, C> {
-    runtime: Arc<R>,
+struct SkillExecutorActor<C> {
+    runtime: Arc<WasmRuntime>,
     recv: mpsc::Receiver<SkillExecutorMsg>,
     csi_apis: C,
     running_skills: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
-impl<R, C> SkillExecutorActor<R, C>
+impl<C> SkillExecutorActor<C>
 where
-    R: Runtime + Send + Sync + 'static,
     C: Csi + Clone + Send + Sync + 'static,
 {
-    fn new(runtime: R, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: C) -> Self {
+    fn new(runtime: WasmRuntime, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: C) -> Self {
         SkillExecutorActor {
             runtime: Arc::new(runtime),
             recv,
@@ -469,18 +459,19 @@ pub mod tests {
     #[tokio::test(start_paused = true)]
     async fn concurrent_skill_execution() {
         // Given
+        let engine = Arc::new(Engine::new().unwrap());
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
         let csi_apis = CsiDrivers {
             inference: inference.api(),
             ..dummy_csi_apis()
         };
-        let runtime = RustRuntime::with_greet_skill();
-        let executor = SkillExecutor::with_runtime(runtime, csi_apis);
+        let store = SkillStoreGreetStub::new(engine.clone());
+        let executor = SkillExecutor::new(engine, csi_apis, store.api());
         let api = executor.api();
 
         // When executing tw tasks in parallel
-        let skill_path = SkillPath::new("local", "greet");
+        let skill_path = SkillPath::new("test", "greet");
         let input = json!("Hello");
         let token = "TOKEN_NOT_REQUIRED";
         let result = try_join!(
@@ -491,50 +482,11 @@ pub mod tests {
         drop(api);
         executor.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
+        store.wait_for_shutdown().await;
 
         // Then they both have completed with the same values
         let (result1, result2) = result.unwrap();
         assert_eq!(result1, result2);
-    }
-
-    /// Intended as a test double for the production runtime. This implementation features exactly
-    /// one hardcoded skill. The skill is called `greet` in the `local` namespace and it uses
-    /// `luminous-nextgen-7b` to create a greeting given a provided name as an input.
-    pub struct RustRuntime {
-        skill_path: SkillPath,
-    }
-
-    impl RustRuntime {
-        pub fn with_greet_skill() -> Self {
-            let skill_path = SkillPath::new("local", "greet");
-            Self { skill_path }
-        }
-    }
-
-    impl Runtime for RustRuntime {
-        async fn run(
-            &self,
-            skill_path: &SkillPath,
-            input: Value,
-            mut ctx: Box<dyn CsiForSkills + Send>,
-        ) -> Result<Value, ExecuteSkillError> {
-            assert!(
-                skill_path == &self.skill_path,
-                "RustRuntime only supports {} skill",
-                self.skill_path
-            );
-            let prompt = format!(
-                "### Instruction:
-                Provide a nice greeting for the person utilizing its given name
-
-                ### Input:
-                Name: {input}
-
-                ### Response:"
-            );
-            let request = CompletionRequest::new(prompt, "luminous-nextgen-7b".to_owned());
-            Ok(json!(ctx.complete_text(request).await.text))
-        }
     }
 
     #[derive(Clone)]
