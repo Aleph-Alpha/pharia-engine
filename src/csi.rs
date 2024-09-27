@@ -176,9 +176,9 @@ pub mod tests {
         async fn complete_all(
             &self,
             _auth: String,
-            _requests: Vec<CompletionRequest>,
+            requests: Vec<CompletionRequest>,
         ) -> Result<Vec<Completion>, anyhow::Error> {
-            bail!("Test error")
+            requests.into_iter().map(|r|Ok((*self.completion)(r))).collect()
         }
 
         async fn chunk(
