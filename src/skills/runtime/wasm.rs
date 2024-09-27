@@ -6,7 +6,7 @@ use crate::{
     skills::{actor::ExecuteSkillError, SkillPath},
 };
 
-use super::{engine::Engine, CsiForSkills, Runtime};
+use super::{engine::Engine, CsiForSkills};
 
 pub struct WasmRuntime {
     /// Used to execute skills. We will share the engine with multiple running skills, and skill
@@ -22,10 +22,8 @@ impl WasmRuntime {
             skill_provider_api,
         }
     }
-}
 
-impl Runtime for WasmRuntime {
-    async fn run(
+    pub async fn run(
         &self,
         skill_path: &SkillPath,
         input: Value,

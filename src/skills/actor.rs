@@ -17,7 +17,7 @@ use tracing::{span, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::{
-    runtime::{CsiForSkills, Runtime, WasmRuntime},
+    runtime::{CsiForSkills, WasmRuntime},
     Engine, SkillPath,
 };
 
@@ -156,7 +156,7 @@ pub struct SkillExecutorMsg {
 }
 
 impl SkillExecutorMsg {
-    async fn run_skill(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &impl Runtime) {
+    async fn run_skill(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         let SkillExecutorMsg {
             skill_path,
             input,
