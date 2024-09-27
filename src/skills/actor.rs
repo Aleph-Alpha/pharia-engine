@@ -22,7 +22,7 @@ use super::{
 };
 
 use crate::{
-    csi::{chunking::ChunkParams, ChunkRequest, Csi as _, CsiDrivers},
+    csi::{chunking::ChunkParams, ChunkRequest, Csi, CsiDrivers},
     inference::{Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     skill_store::SkillStoreApi,
@@ -195,22 +195,22 @@ impl SkillExecutorMsg {
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
 /// calls to csi, to the respective drivers and forwarding runtime errors directly to the actor
 /// so the User defined code must not worry about accidental complexity.
-pub struct SkillInvocationCtx {
+pub struct SkillInvocationCtx<C> {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
     send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
-    csi_apis: CsiDrivers,
+    csi_apis: C,
     // How the user authenticates with us
     api_token: String,
     // For tracing, we wire the skill invocation span context with the CSI spans
     parent_context: Option<Context>,
 }
 
-impl SkillInvocationCtx {
+impl<C> SkillInvocationCtx<C> {
     pub fn new(
         send_rt_err: oneshot::Sender<anyhow::Error>,
-        csi_apis: CsiDrivers,
+        csi_apis: C,
         api_token: String,
         parent_context: Option<Context>,
     ) -> Self {
@@ -234,7 +234,7 @@ impl SkillInvocationCtx {
 }
 
 #[async_trait]
-impl CsiForSkills for SkillInvocationCtx {
+impl<C> CsiForSkills for SkillInvocationCtx<C> where C: Csi + Send + Sync {
     async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
         let span = span!(Level::DEBUG, "complete_text", model = params.model);
         if let Some(context) = self.parent_context.as_ref() {

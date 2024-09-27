@@ -1,6 +1,7 @@
 use chunking::ChunkParams;
 use futures::future::try_join_all;
 use tracing::trace;
+use async_trait::async_trait;
 
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
@@ -26,6 +27,7 @@ pub struct CsiDrivers {
 /// Cognitive System Interface (CSI) as consumed internally by Pharia Kernel, before the CSI is
 /// passed to the end user in Skill code we further strip away some of the accidental complexity.
 /// See its sibling trait `CsiForSkills`.
+#[async_trait]
 pub trait Csi {
     async fn complete_text(
         &self,
@@ -55,6 +57,7 @@ pub trait Csi {
     }
 }
 
+#[async_trait]
 impl Csi for CsiDrivers {
     async fn complete_text(
         &self,
