@@ -34,11 +34,13 @@ pub trait Csi {
         auth: String,
         request: CompletionRequest,
     ) -> Result<Completion, anyhow::Error>;
+
     async fn complete_all(
         &self,
         auth: String,
         requests: Vec<CompletionRequest>,
     ) -> Result<Vec<Completion>, anyhow::Error>;
+    
     async fn chunk(
         &self,
         auth: String,

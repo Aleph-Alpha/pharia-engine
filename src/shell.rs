@@ -34,7 +34,7 @@ use utoipa::{
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    csi::CsiDrivers,
+    csi::{Csi, CsiDrivers},
     csi_shell::http_csi_handle,
     skill_store::SkillStoreApi,
     skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
@@ -80,16 +80,16 @@ impl Shell {
     }
 }
 
-pub fn http(
+pub fn http<C>(
     skill_executor_api: SkillExecutorApi,
     skill_provider_api: SkillStoreApi,
-    csi_drivers: CsiDrivers,
-) -> Router {
+    csi_drivers: C,
+) -> Router where C: Csi + Clone + Send + Sync + 'static {
     let serve_dir =
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
 
     Router::new()
-        .route("/csi", post(http_csi_handle))
+        .route("/csi", post(http_csi_handle::<C>))
         .with_state(csi_drivers)
         .route("/cached_skills", get(cached_skills))
         .route("/cached_skills/:name", delete(drop_cached_skill))
@@ -335,9 +335,9 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        csi::tests::dummy_csi_apis,
+        csi::tests::{dummy_csi_apis, StubCsi},
         csi_shell::{V0_2CsiRequest, VersionedCsiRequest},
-        inference::{self, tests::InferenceStub, Completion, CompletionParams, CompletionRequest},
+        inference::{self, Completion, CompletionParams, CompletionRequest},
         skill_store::tests::{dummy_skill_provider_api, SkillProviderMsg},
         skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
         tests::api_token,
@@ -376,14 +376,10 @@ mod tests {
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
-        let inference_stub = InferenceStub::new(|r| Ok(inference::Completion::from_text(r.prompt)));
-        let csi_apis = CsiDrivers {
-            inference: inference_stub.api(),
-            ..dummy_csi_apis()
-        };
+        let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
 
         let skill_executor = StubSkillExecuter::new(|_| {});
-        let http = http(skill_executor.api(), dummy_skill_provider_api(), csi_apis);
+        let http = http(skill_executor.api(), dummy_skill_provider_api(), csi);
 
         let resp = http
             .oneshot(
