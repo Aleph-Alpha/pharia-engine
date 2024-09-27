@@ -127,9 +127,49 @@ pub mod tests {
     use tokio::sync::mpsc;
     use async_trait::async_trait;
 
-    use crate::{inference::{CompletionRequest, InferenceApi, Completion}, tokenizers::TokenizersApi};
+    use crate::{inference::{tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi}, tests::api_token, tokenizers::TokenizersApi};
 
     use super::{ChunkRequest, Csi, CsiDrivers};
+
+    #[tokio::test]
+    async fn complete_all_completion_requests_in_respective_order() {
+        // Given a CSI drivers with stub completion
+        let inference_stub = InferenceStub::new(|r| Ok(Completion::from_text(r.prompt)));
+        let csi_apis = CsiDrivers {
+            inference: inference_stub.api(),
+            ..dummy_csi_apis()
+        };
+
+        // When requesting multiple completions
+        let completion_req_1 = CompletionRequest {
+            model: "dummy_model".to_owned(),
+            prompt: "1st_request".to_owned(),
+            params: CompletionParams {
+                max_tokens: None,
+                temperature: None,
+                top_k: None,
+                top_p: None,
+                stop: vec![],
+            },
+        };
+
+        let completion_req_2 = CompletionRequest {
+            prompt: "2nd request".to_owned(),
+            ..completion_req_1.clone()
+        };
+
+        let completions = csi_apis
+            .complete_all(api_token().to_owned(), vec![completion_req_1, completion_req_2])
+            .await.unwrap();
+
+        drop(csi_apis);
+        inference_stub.wait_for_shutdown().await;
+
+        // Then the completion must have the same order as the respective requests
+        assert_eq!(completions.len(), 2);
+        assert!(completions.first().unwrap().text.contains("1st"));
+        assert!(completions.get(1).unwrap().text.contains("2nd"));
+    }
 
     pub fn dummy_csi_apis() -> CsiDrivers {
         let (send, _recv) = mpsc::channel(1);

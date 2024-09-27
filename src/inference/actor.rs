@@ -77,7 +77,7 @@ impl InferenceApi {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct CompletionParams {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
@@ -86,7 +86,7 @@ pub struct CompletionParams {
     pub stop: Vec<String>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
@@ -222,7 +222,7 @@ pub mod tests {
     };
 
     use anyhow::anyhow;
-    use tokio::{time::sleep, try_join};
+    use tokio::{sync::mpsc, task::JoinHandle, time::sleep, try_join};
 
     use crate::inference::client::InferenceClient;
 
@@ -234,6 +234,40 @@ pub mod tests {
                 text: completion.into(),
                 finish_reason: FinishReason::Stop,
             }
+        }
+    }
+
+    /// Always return the same completion
+    pub struct InferenceStub {
+        send: mpsc::Sender<InferenceMessage>,
+        join_handle: JoinHandle<()>,
+    }
+
+    impl InferenceStub {
+        pub fn new(
+            result: impl Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + 'static,
+        ) -> Self {
+            let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
+            let join_handle = tokio::spawn(async move {
+                while let Some(msg) = recv.recv().await {
+                    match msg {
+                        InferenceMessage::CompleteText { request, send, .. } => {
+                            send.send(result(request)).unwrap();
+                        }
+                    }
+                }
+            });
+
+            Self { send, join_handle }
+        }
+
+        pub async fn wait_for_shutdown(self) {
+            drop(self.send);
+            self.join_handle.await.unwrap();
+        }
+
+        pub fn api(&self) -> InferenceApi {
+            InferenceApi::new(self.send.clone())
         }
     }
 

@@ -516,12 +516,12 @@ mod tests {
         given_greet_skill_v0_2,
     };
     use tokio::sync::oneshot;
-    use v0_2::pharia::skill::csi::{CompletionParams, CompletionRequest, Host, Language};
+    use v0_2::pharia::skill::csi::{Host, Language};
 
     use crate::{
-        csi::tests::{dummy_csi_apis, StubCsi},
+        csi::tests::dummy_csi_apis,
         skills::{actor::SkillInvocationCtx, runtime::wasm::tests::CsiGreetingMock},
-        tests::api_token, Completion,
+        tests::api_token,
     };
 
     use super::*;
@@ -546,48 +546,6 @@ mod tests {
         let wasm = wat::parse_str("(module)").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(wasm);
         assert!(version.is_err());
-    }
-
-    #[tokio::test]
-    async fn complete_all_completion_requests_in_respective_order() {
-        // Given a linked context
-        let csi = StubCsi::with_completion(|r| Completion::from_text(r.prompt));
-
-        let (send_rt_err, _) = oneshot::channel();
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            send_rt_err,
-            csi,
-            api_token().to_owned(),
-            None,
-        ));
-        let mut ctx = LinkedCtx::new(skill_ctx);
-
-        // When requesting multiple completions
-        let completion_req_1 = CompletionRequest {
-            model: "dummy_model".to_owned(),
-            prompt: "1st_request".to_owned(),
-            params: CompletionParams {
-                max_tokens: None,
-                temperature: None,
-                top_k: None,
-                top_p: None,
-                stop: vec![],
-            },
-        };
-
-        let completion_req_2 = CompletionRequest {
-            prompt: "2nd request".to_owned(),
-            ..completion_req_1.clone()
-        };
-
-        let completions = ctx
-            .complete_all(vec![completion_req_1, completion_req_2])
-            .await;
-
-        // Then the completion must have the same order as the respective requests
-        assert_eq!(completions.len(), 2);
-        assert!(completions.first().unwrap().text.contains("1st"));
-        assert!(completions.get(1).unwrap().text.contains("2nd"));
     }
 
     #[tokio::test]
