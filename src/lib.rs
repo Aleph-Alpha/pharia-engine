@@ -1,3 +1,4 @@
+mod authorization;
 mod config;
 mod csi;
 mod csi_shell;
@@ -15,6 +16,7 @@ mod tokenizers;
 use std::sync::Arc;
 
 use anyhow::{Context, Error};
+use authorization::Authorization;
 use csi::CsiDrivers;
 use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
@@ -38,6 +40,7 @@ pub struct Kernel {
     skill_store: SkillStore,
     skill_executor: SkillExecutor,
     namespace_watcher: NamespaceWatcher,
+    authorization: Authorization,
     shell: Shell,
 }
 
@@ -82,6 +85,8 @@ impl Kernel {
         // Wait for first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
+        let authorization = Authorization::new();
+
         let shell = match Shell::new(
             app_config.tcp_addr,
             skill_executor.api(),
@@ -96,6 +101,7 @@ impl Kernel {
                 // In case construction of shell goes wrong (e.g. we can not bind the port) we
                 // shutdown all the other actors we created so far, so they do not live on in
                 // detached threads.
+                authorization.wait_for_shutdown().await;
                 namespace_watcher.wait_for_shutdown().await;
                 skill_executor.wait_for_shutdown().await;
                 skill_store.wait_for_shutdown().await;
@@ -114,6 +120,7 @@ impl Kernel {
             skill_store,
             skill_executor,
             namespace_watcher,
+            authorization,
             shell,
         })
     }
@@ -124,6 +131,7 @@ impl Kernel {
         // Shutdown everything we started. We reverse the order for the shutdown so all the required
         // actors are still answering for each component.
         self.shell.wait_for_shutdown().await;
+        self.authorization.wait_for_shutdown().await;
         self.namespace_watcher.wait_for_shutdown().await;
         self.skill_executor.wait_for_shutdown().await;
         self.skill_store.wait_for_shutdown().await;
