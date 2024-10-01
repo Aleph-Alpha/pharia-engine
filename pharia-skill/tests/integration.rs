@@ -114,6 +114,7 @@ impl TestKernel {
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
+            document_index_addr: "https://document-index.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::from_toml(
                 r#"
                     [namespaces.local]

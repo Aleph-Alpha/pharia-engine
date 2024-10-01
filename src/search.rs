@@ -9,7 +9,7 @@ mod actor;
 mod client;
 
 /// Handle to the search actor. Spin this up in order to use the Search API
-struct Search {
+pub struct Search {
     send: mpsc::Sender<SearchMessage>,
     handle: JoinHandle<()>,
 }
@@ -44,7 +44,7 @@ impl Search {
 /// actor is alive and running. This means this handle must be disposed of, before the search
 /// actor can shut down.
 #[derive(Clone)]
-struct SearchApi {
+pub struct SearchApi {
     send: mpsc::Sender<SearchMessage>,
 }
 

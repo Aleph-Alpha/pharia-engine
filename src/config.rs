@@ -9,6 +9,8 @@ pub struct AppConfig {
     /// This base URL is used to do inference against models hosted by the Aleph Alpha inference
     /// stack, as well as used to fetch Tokenizers for said models.
     pub inference_addr: String,
+    /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
+    pub document_index_addr: String,
     pub operator_config: OperatorConfig,
     pub namespace_update_interval: Duration,
     pub log_level: String,
@@ -30,6 +32,9 @@ impl AppConfig {
 
         let inference_addr = env::var("AA_INFERENCE_ADDRESS")
             .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
+
+        let document_index_addr = env::var("DOCUMENT_INDEX_ADDRESS")
+            .unwrap_or_else(|_| "https://document-index.aleph-alpha.com".to_owned());
 
         let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "error".to_owned());
 
@@ -69,6 +74,7 @@ impl AppConfig {
         Ok(AppConfig {
             tcp_addr: addr.parse().unwrap(),
             inference_addr,
+            document_index_addr,
             operator_config,
             namespace_update_interval: namespace_update_interval.into(),
             log_level,

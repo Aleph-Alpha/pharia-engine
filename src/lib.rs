@@ -18,6 +18,7 @@ use anyhow::{Context, Error};
 use csi::CsiDrivers;
 use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
+use search::Search;
 use shell::Shell;
 use skill_store::SkillStore;
 use skills::Engine;
@@ -33,6 +34,7 @@ pub use namespace_watcher::OperatorConfig;
 pub struct Kernel {
     inference: Inference,
     tokenizers: Tokenizers,
+    search: Search,
     skill_store: SkillStore,
     skill_executor: SkillExecutor,
     namespace_watcher: NamespaceWatcher,
@@ -60,6 +62,7 @@ impl Kernel {
         // Boot up the drivers which power the CSI. Right now we only have inference.
         let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();
         let inference = Inference::new(app_config.inference_addr.clone());
+        let search = Search::new(app_config.document_index_addr.clone());
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
             tokenizers: tokenizers.api(),
@@ -97,6 +100,7 @@ impl Kernel {
                 skill_store.wait_for_shutdown().await;
                 tokenizers.wait_for_shutdown().await;
                 inference.wait_for_shutdown().await;
+                search.wait_for_shutdown().await;
                 // Bubble up error, after resources have been freed
                 return Err(e);
             }
@@ -105,6 +109,7 @@ impl Kernel {
         Ok(Kernel {
             inference,
             tokenizers,
+            search,
             skill_store,
             skill_executor,
             namespace_watcher,
@@ -123,6 +128,7 @@ impl Kernel {
         self.skill_store.wait_for_shutdown().await;
         self.tokenizers.wait_for_shutdown().await;
         self.inference.wait_for_shutdown().await;
+        self.search.wait_for_shutdown().await;
     }
 }
 
@@ -174,6 +180,7 @@ mod tests {
         let config = AppConfig {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
+            document_index_addr: "https://document-index.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::empty(),
             namespace_update_interval: Duration::from_secs(10),
             log_level: "info".to_owned(),
