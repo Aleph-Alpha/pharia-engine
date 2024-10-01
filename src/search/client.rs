@@ -44,7 +44,7 @@ impl SearchRequest {
 }
 
 /// Which documents you want to search in, and which type of index should be used
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct IndexPath {
     /// The namespace the collection belongs to
     pub namespace: String,
