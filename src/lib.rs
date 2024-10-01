@@ -6,6 +6,7 @@ mod language_selection;
 mod logging;
 mod namespace_watcher;
 mod registries;
+mod search;
 mod shell;
 mod skill_store;
 mod skills;

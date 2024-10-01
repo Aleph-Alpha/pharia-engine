@@ -12,7 +12,6 @@ use crate::{
 pub use self::chunking::ChunkRequest;
 
 pub mod chunking;
-mod search;
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
 ///
