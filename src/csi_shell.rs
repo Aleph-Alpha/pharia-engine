@@ -8,14 +8,18 @@ use serde_json::{json, Value};
 
 use crate::{
     csi::{ChunkRequest, Csi},
-    inference::{self, CompletionRequest}, language_selection::SelectLanguageRequest,
+    inference::{self, CompletionRequest},
+    language_selection::SelectLanguageRequest,
 };
 
-pub async fn http_csi_handle<C> (
+pub async fn http_csi_handle<C>(
     State(drivers): State<C>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<VersionedCsiRequest>,
-) -> (StatusCode, Json<Value>) where C: Csi + Clone + Sync {
+) -> (StatusCode, Json<Value>)
+where
+    C: Csi + Clone + Sync,
+{
     let result = match args {
         VersionedCsiRequest::V0_2(request) => match request {
             V0_2CsiRequest::Complete(completion_request) => drivers
@@ -71,8 +75,6 @@ pub enum V0_2CsiRequest {
     SelectLanguage(SelectLanguageRequest),
     CompleteAll(CompleteAllRequest),
 }
-
-
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CompleteAllRequest {

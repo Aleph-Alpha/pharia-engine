@@ -310,11 +310,11 @@ pub mod tests {
     use tokio::try_join;
 
     use crate::{
-        csi::{tests::{dummy_csi_apis, StubCsi}, CsiDrivers},
-        inference::{
-            tests::AssertConcurrentClient,
-            CompletionRequest, Inference,
+        csi::{
+            tests::{dummy_csi_apis, StubCsi},
+            CsiDrivers,
         },
+        inference::{tests::AssertConcurrentClient, CompletionRequest, Inference},
         skill_store::{SkillProviderMsg, SkillStore},
         skills::Skill,
         tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
@@ -438,7 +438,7 @@ pub mod tests {
         let csi = StubCsi::with_completion_from_text("Hello");
         let engine = Arc::new(Engine::new().unwrap());
         let store = SkillStoreGreetStub::new(engine.clone());
-        
+
         // When
         let executor = SkillExecutor::new(engine, csi, store.api());
         let result = executor

@@ -84,7 +84,10 @@ pub fn http<C>(
     skill_executor_api: SkillExecutorApi,
     skill_provider_api: SkillStoreApi,
     csi_drivers: C,
-) -> Router where C: Csi + Clone + Send + Sync + 'static {
+) -> Router
+where
+    C: Csi + Clone + Send + Sync + 'static,
+{
     let serve_dir =
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
 

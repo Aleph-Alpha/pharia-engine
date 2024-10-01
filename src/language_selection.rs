@@ -29,7 +29,6 @@ impl From<lingua::Language> for Language {
     }
 }
 
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SelectLanguageRequest {
     pub text: String,

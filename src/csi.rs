@@ -1,7 +1,7 @@
+use async_trait::async_trait;
 use chunking::ChunkParams;
 use futures::future::try_join_all;
 use tracing::trace;
-use async_trait::async_trait;
 
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
@@ -40,7 +40,7 @@ pub trait Csi {
         auth: String,
         requests: Vec<CompletionRequest>,
     ) -> Result<Vec<Completion>, anyhow::Error>;
-    
+
     async fn chunk(
         &self,
         auth: String,
@@ -124,10 +124,16 @@ pub mod tests {
     use std::sync::Arc;
 
     use anyhow::bail;
-    use tokio::sync::mpsc;
     use async_trait::async_trait;
+    use tokio::sync::mpsc;
 
-    use crate::{inference::{tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi}, tests::api_token, tokenizers::TokenizersApi};
+    use crate::{
+        inference::{
+            tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
+        },
+        tests::api_token,
+        tokenizers::TokenizersApi,
+    };
 
     use super::{ChunkRequest, Csi, CsiDrivers};
 
@@ -159,8 +165,12 @@ pub mod tests {
         };
 
         let completions = csi_apis
-            .complete_all(api_token().to_owned(), vec![completion_req_1, completion_req_2])
-            .await.unwrap();
+            .complete_all(
+                api_token().to_owned(),
+                vec![completion_req_1, completion_req_2],
+            )
+            .await
+            .unwrap();
 
         drop(csi_apis);
         inference_stub.wait_for_shutdown().await;
@@ -190,9 +200,11 @@ pub mod tests {
     }
 
     impl StubCsi {
-        pub fn with_completion(f: impl Fn(CompletionRequest) -> Completion + Send + Sync + 'static) -> Self {
+        pub fn with_completion(
+            f: impl Fn(CompletionRequest) -> Completion + Send + Sync + 'static,
+        ) -> Self {
             StubCsi {
-                completion: Arc::new(Box::new(f))
+                completion: Arc::new(Box::new(f)),
             }
         }
 
@@ -218,7 +230,10 @@ pub mod tests {
             _auth: String,
             requests: Vec<CompletionRequest>,
         ) -> Result<Vec<Completion>, anyhow::Error> {
-            requests.into_iter().map(|r|Ok((*self.completion)(r))).collect()
+            requests
+                .into_iter()
+                .map(|r| Ok((*self.completion)(r)))
+                .collect()
         }
 
         async fn chunk(
