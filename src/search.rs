@@ -1,120 +1,81 @@
-use client::{
-    IndexPath, Modality, SearchClient, SearchRequest as ClientSearchRequest,
-    SearchResult as ClientSearchResult,
+use actor::{SearchActor, SearchMessage, SearchRequest, SearchResult};
+use client::{Client, SearchClient};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
 };
 
+mod actor;
 mod client;
 
-/// Search a Document Index collection
-pub struct SearchRequest {
-    /// Where you want to search in
-    index: IndexPath,
-    /// What you want to search for
-    query: String,
-    /// The maximum number of results to return. Defaults to 1
-    max_results: usize,
-    /// The minimum score each result should have to be returned.
-    /// By default, all results are returned, up to the `max_results`.
-    min_score: Option<f64>,
+/// Handle to the search actor. Spin this up in order to use the Search API
+struct Search {
+    send: mpsc::Sender<SearchMessage>,
+    handle: JoinHandle<()>,
 }
 
-impl SearchRequest {
-    pub fn new(index: IndexPath, query: impl Into<String>) -> Self {
-        Self {
-            index,
-            query: query.into(),
-            max_results: 1,
-            min_score: None,
-        }
+impl Search {
+    /// Starts a new search Actor. Calls to this method be balanced by calls to
+    /// [`Self::shutdown`].
+    pub fn new(search_addr: String) -> Self {
+        let client = Client::new(search_addr).unwrap();
+        Self::with_client(client)
     }
 
-    pub fn with_max_results(mut self, max_results: usize) -> Self {
-        self.max_results = max_results;
-        self
+    pub fn with_client(client: impl SearchClient + Send + Sync + 'static) -> Self {
+        let (send, recv) = mpsc::channel::<SearchMessage>(1);
+        let mut actor = SearchActor::new(client, recv);
+        let handle = tokio::spawn(async move { actor.run().await });
+        Self { send, handle }
     }
 
-    pub fn with_min_score(mut self, min_score: f64) -> Self {
-        self.min_score = Some(min_score);
-        self
+    pub fn api(&self) -> SearchApi {
+        SearchApi::new(self.send.clone())
+    }
+
+    /// Inference is going to shutdown, as soon as the last instance of [`InferenceApi`] is dropped.
+    pub async fn wait_for_shutdown(self) {
+        drop(self.send);
+        self.handle.await.unwrap();
     }
 }
 
-/// A section of a document that is returned from a search request
-pub struct SearchResult {
-    /// Which document this search result can be found in
-    pub document_name: String,
-    /// The section of the document returned by the search
-    pub section: String,
+/// Use this to execute tasks with the Search API. The existence of this API handle implies the
+/// actor is alive and running. This means this handle must be disposed of, before the search
+/// actor can shut down.
+#[derive(Clone)]
+struct SearchApi {
+    send: mpsc::Sender<SearchMessage>,
 }
 
-/// Allows for searching different collections in the Document Index
-struct SearchActor<C: SearchClient> {
-    /// Internal client to interact with the Document Index API
-    client: C,
-}
-
-impl<C: SearchClient> SearchActor<C> {
-    fn new(client: C) -> Self {
-        Self { client }
+impl SearchApi {
+    pub fn new(send: mpsc::Sender<SearchMessage>) -> Self {
+        Self { send }
     }
 
-    async fn search(
+    pub async fn search(
         &self,
         request: SearchRequest,
-        api_token: &str,
+        api_token: String,
     ) -> anyhow::Result<Vec<SearchResult>> {
-        let SearchRequest {
-            index,
-            query,
-            max_results,
-            min_score,
-        } = request;
-        self.client
-            .search(
-                index,
-                ClientSearchRequest::new(
-                    vec![Modality::Text { text: query }],
-                    max_results,
-                    min_score,
-                    // Make sure we only recieve results of type text
-                    true,
-                ),
-                api_token,
-            )
-            .await?
-            .into_iter()
-            .map(|result| {
-                let ClientSearchResult {
-                    mut section,
-                    document_path,
-                    score: _,
-                    start: _start,
-                    end: _end,
-                } = result;
-                // Current behavior is that chunking only ever happens within an item
-                if section.len() > 1 {
-                    return Err(anyhow::anyhow!(
-                        "Document Index result has more than one item in a section."
-                    ));
-                }
-
-                Ok(match section.remove(0) {
-                    Modality::Text { text } => SearchResult {
-                        document_name: document_path.name,
-                        section: text,
-                    },
-                    Modality::Image { .. } => {
-                        unreachable!("We should have filtered out image results")
-                    }
-                })
-            })
-            .collect()
+        let (send, recv) = oneshot::channel();
+        let msg = SearchMessage {
+            request,
+            send,
+            api_token,
+        };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await
+            .expect("sender must be alive when awaiting for answers")
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use client::Client;
+    use client::IndexPath;
 
     use crate::tests::{api_token, document_index_address};
 
@@ -124,13 +85,14 @@ mod tests {
     async fn search_request() {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
-        let api_token = api_token();
-        let search = SearchActor::new(Client::new(host).unwrap());
+        let api_token = api_token().to_owned();
+        let search = Search::new(host);
 
         // When making a query on an existing collection
         let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
         let request = SearchRequest::new(index, "What is the population of Heidelberg?");
-        let results = search.search(request, api_token).await.unwrap();
+        let results = search.api().search(request, api_token).await.unwrap();
+        search.wait_for_shutdown().await;
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
@@ -142,15 +104,16 @@ mod tests {
     async fn multiple_results() {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
-        let api_token = api_token();
-        let search = SearchActor::new(Client::new(host).unwrap());
+        let api_token = api_token().to_owned();
+        let search = Search::new(host);
         let max_results = 5;
 
         // When making a query on an existing collection
         let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
         let request = SearchRequest::new(index, "What is the population of Heidelberg?")
             .with_max_results(max_results);
-        let results = search.search(request, api_token).await.unwrap();
+        let results = search.api().search(request, api_token).await.unwrap();
+        search.wait_for_shutdown().await;
 
         // Then we get at least one result
         assert_eq!(results.len(), max_results);
@@ -164,8 +127,8 @@ mod tests {
     async fn min_score() {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
-        let api_token = api_token();
-        let search = SearchActor::new(Client::new(host).unwrap());
+        let api_token = api_token().to_owned();
+        let search = Search::new(host);
         let max_results = 5;
         let min_score = 0.725;
 
@@ -174,7 +137,8 @@ mod tests {
         let request = SearchRequest::new(index, "What is the population of Heidelberg?")
             .with_max_results(max_results)
             .with_min_score(min_score);
-        let results = search.search(request, api_token).await.unwrap();
+        let results = search.api().search(request, api_token).await.unwrap();
+        search.wait_for_shutdown().await;
 
         // Then we get less than 5 results
         assert_eq!(results.len(), 4);

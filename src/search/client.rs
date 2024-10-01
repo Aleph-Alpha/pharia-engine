@@ -1,14 +1,16 @@
+use std::future::Future;
+
 use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 pub trait SearchClient {
-    async fn search(
+    fn search(
         &self,
         index: IndexPath,
         request: SearchRequest,
         api_token: &str,
-    ) -> anyhow::Result<Vec<SearchResult>>;
+    ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
 }
 
 /// Search a Document Index collection
@@ -42,6 +44,7 @@ impl SearchRequest {
 }
 
 /// Which documents you want to search in, and which type of index should be used
+#[derive(Debug)]
 pub struct IndexPath {
     /// The namespace the collection belongs to
     pub namespace: String,
@@ -170,10 +173,78 @@ impl SearchClient for Client {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
     use crate::tests::{api_token, document_index_address};
+
+    pub struct StubClient;
+
+    impl SearchClient for StubClient {
+        async fn search(
+            &self,
+            _index: IndexPath,
+            _request: SearchRequest,
+            _api_token: &str,
+        ) -> anyhow::Result<Vec<SearchResult>> {
+            Ok(vec![])
+        }
+    }
+
+    #[tokio::test]
+    async fn search_request() {
+        // Given a search client pointed at the document index
+        let host = document_index_address().to_owned();
+        let api_token = api_token();
+        let client = Client::new(host).unwrap();
+
+        // When making a query on an existing collection
+        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
+        let request = SearchRequest::new(
+            vec![Modality::Text {
+                text: "What is the population of Heidelberg?".to_owned(),
+            }],
+            1,
+            None,
+            true,
+        );
+        let results = client.search(index, request, api_token).await.unwrap();
+
+        // Then we get at least one result
+        assert_eq!(results.len(), 1);
+        assert!(results[0].document_path.name.contains("Heidelberg"));
+        let Modality::Text { text } = &results[0].section[0] else {
+            panic!("invalid entry");
+        };
+        assert!(text.contains("Heidelberg"));
+    }
+
+    #[tokio::test]
+    async fn multiple_results() {
+        // Given a search client pointed at the document index
+        let host = document_index_address().to_owned();
+        let api_token = api_token();
+        let client = Client::new(host).unwrap();
+        let max_results = 5;
+
+        // When making a query on an existing collection
+        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
+        let request = SearchRequest::new(
+            vec![Modality::Text {
+                text: "What is the population of Heidelberg?".to_owned(),
+            }],
+            max_results,
+            None,
+            true,
+        );
+        let results = client.search(index, request, api_token).await.unwrap();
+
+        // Then we get at least one result
+        assert_eq!(results.len(), max_results);
+        assert!(results
+            .iter()
+            .all(|r| r.document_path.name.contains("Heidelberg")));
+    }
 
     #[tokio::test]
     async fn min_score() {
