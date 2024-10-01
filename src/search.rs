@@ -1,4 +1,4 @@
 mod actor;
 mod client;
 
-pub use actor::Search;
+pub use actor::{Search, SearchApi};

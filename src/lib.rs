@@ -65,6 +65,7 @@ impl Kernel {
         let search = Search::new(app_config.document_index_addr.clone());
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
+            search: search.api(),
             tokenizers: tokenizers.api(),
         };
         let skill_store = SkillStore::new(engine.clone(), &app_config.operator_config.namespaces);

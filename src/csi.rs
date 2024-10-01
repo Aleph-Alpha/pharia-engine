@@ -6,6 +6,7 @@ use tracing::trace;
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
+    search::SearchApi,
     tokenizers::TokenizersApi,
 };
 
@@ -20,6 +21,7 @@ pub mod chunking;
 pub struct CsiDrivers {
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
+    pub search: SearchApi,
     pub tokenizers: TokenizersApi,
 }
 
@@ -130,6 +132,7 @@ pub mod tests {
         inference::{
             tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
         },
+        search::SearchApi,
         tests::api_token,
         tokenizers::TokenizersApi,
     };
@@ -185,10 +188,14 @@ pub mod tests {
         let inference = InferenceApi::new(send);
 
         let (send, _recv) = mpsc::channel(1);
+        let search = SearchApi::new(send);
+
+        let (send, _recv) = mpsc::channel(1);
         let tokenizers = TokenizersApi::new(send);
 
         CsiDrivers {
             inference,
+            search,
             tokenizers,
         }
     }
