@@ -7,6 +7,8 @@ mod client;
 
 /// Search a Document Index collection
 pub struct SearchRequest {
+    /// Where you want to search in
+    index: IndexPath,
     /// What you want to search for
     query: String,
     /// The maximum number of results to return. Defaults to 1
@@ -17,8 +19,9 @@ pub struct SearchRequest {
 }
 
 impl SearchRequest {
-    pub fn new(query: impl Into<String>) -> Self {
+    pub fn new(index: IndexPath, query: impl Into<String>) -> Self {
         Self {
+            index,
             query: query.into(),
             max_results: 1,
             min_score: None,
@@ -45,23 +48,23 @@ pub struct SearchResult {
 }
 
 /// Allows for searching different collections in the Document Index
-struct Search<C: SearchClient> {
+struct SearchActor<C: SearchClient> {
     /// Internal client to interact with the Document Index API
     client: C,
 }
 
-impl<C: SearchClient> Search<C> {
+impl<C: SearchClient> SearchActor<C> {
     fn new(client: C) -> Self {
         Self { client }
     }
 
     async fn search(
         &self,
-        index: IndexPath,
         request: SearchRequest,
         api_token: &str,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let SearchRequest {
+            index,
             query,
             max_results,
             min_score,
@@ -122,12 +125,12 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let search = Search::new(Client::new(host).unwrap());
+        let search = SearchActor::new(Client::new(host).unwrap());
 
         // When making a query on an existing collection
         let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
-        let request = SearchRequest::new("What is the population of Heidelberg?");
-        let results = search.search(index, request, api_token).await.unwrap();
+        let request = SearchRequest::new(index, "What is the population of Heidelberg?");
+        let results = search.search(request, api_token).await.unwrap();
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
@@ -140,14 +143,14 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let search = Search::new(Client::new(host).unwrap());
+        let search = SearchActor::new(Client::new(host).unwrap());
         let max_results = 5;
 
         // When making a query on an existing collection
         let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
-        let request = SearchRequest::new("What is the population of Heidelberg?")
+        let request = SearchRequest::new(index, "What is the population of Heidelberg?")
             .with_max_results(max_results);
-        let results = search.search(index, request, api_token).await.unwrap();
+        let results = search.search(request, api_token).await.unwrap();
 
         // Then we get at least one result
         assert_eq!(results.len(), max_results);
@@ -162,16 +165,16 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let search = Search::new(Client::new(host).unwrap());
+        let search = SearchActor::new(Client::new(host).unwrap());
         let max_results = 5;
         let min_score = 0.725;
 
         // When making a query on an existing collection
         let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
-        let request = SearchRequest::new("What is the population of Heidelberg?")
+        let request = SearchRequest::new(index, "What is the population of Heidelberg?")
             .with_max_results(max_results)
             .with_min_score(min_score);
-        let results = search.search(index, request, api_token).await.unwrap();
+        let results = search.search(request, api_token).await.unwrap();
 
         // Then we get less than 5 results
         assert_eq!(results.len(), 4);
