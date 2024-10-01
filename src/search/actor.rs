@@ -91,27 +91,6 @@ pub struct SearchRequest {
     min_score: Option<f64>,
 }
 
-impl SearchRequest {
-    pub fn new(index: IndexPath, query: impl Into<String>) -> Self {
-        Self {
-            index,
-            query: query.into(),
-            max_results: 1,
-            min_score: None,
-        }
-    }
-
-    pub fn with_max_results(mut self, max_results: usize) -> Self {
-        self.max_results = max_results;
-        self
-    }
-
-    pub fn with_min_score(mut self, min_score: f64) -> Self {
-        self.min_score = Some(min_score);
-        self
-    }
-}
-
 /// A section of a document that is returned from a search request
 #[derive(Debug)]
 pub struct SearchResult {
@@ -211,7 +190,7 @@ impl SearchMessage {
                 let ClientSearchResult {
                     mut section,
                     document_path,
-                    score: _,
+                    score: _score,
                     start: _start,
                     end: _end,
                 } = result;
@@ -248,6 +227,27 @@ mod tests {
     use crate::tests::{api_token, document_index_address};
 
     use super::*;
+
+    impl SearchRequest {
+        pub fn new(index: IndexPath, query: impl Into<String>) -> Self {
+            Self {
+                index,
+                query: query.into(),
+                max_results: 1,
+                min_score: None,
+            }
+        }
+
+        pub fn with_max_results(mut self, max_results: usize) -> Self {
+            self.max_results = max_results;
+            self
+        }
+
+        pub fn with_min_score(mut self, min_score: f64) -> Self {
+            self.min_score = Some(min_score);
+            self
+        }
+    }
 
     #[tokio::test]
     async fn search_request() {

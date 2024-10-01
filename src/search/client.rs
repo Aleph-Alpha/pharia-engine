@@ -54,20 +54,6 @@ pub struct IndexPath {
     pub index: String,
 }
 
-impl IndexPath {
-    pub fn new(
-        namespace: impl Into<String>,
-        collection: impl Into<String>,
-        index: impl Into<String>,
-    ) -> Self {
-        Self {
-            namespace: namespace.into(),
-            collection: collection.into(),
-            index: index.into(),
-        }
-    }
-}
-
 /// Modality of the search result in the API
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "modality")]
@@ -188,6 +174,20 @@ pub mod tests {
             _api_token: &str,
         ) -> anyhow::Result<Vec<SearchResult>> {
             Ok(vec![])
+        }
+    }
+
+    impl IndexPath {
+        pub fn new(
+            namespace: impl Into<String>,
+            collection: impl Into<String>,
+            index: impl Into<String>,
+        ) -> Self {
+            Self {
+                namespace: namespace.into(),
+                collection: collection.into(),
+                index: index.into(),
+            }
         }
     }
 
