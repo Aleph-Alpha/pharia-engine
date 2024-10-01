@@ -45,13 +45,13 @@ pub struct SearchResult {
 }
 
 /// Allows for searching different collections in the Document Index
-struct Search {
+struct Search<C: SearchClient> {
     /// Internal client to interact with the Document Index API
-    client: SearchClient,
+    client: C,
 }
 
-impl Search {
-    fn new(client: SearchClient) -> Self {
+impl<C: SearchClient> Search<C> {
+    fn new(client: C) -> Self {
         Self { client }
     }
 
@@ -111,6 +111,8 @@ impl Search {
 
 #[cfg(test)]
 mod tests {
+    use client::Client;
+
     use crate::tests::{api_token, document_index_address};
 
     use super::*;
@@ -120,7 +122,7 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let search = Search::new(SearchClient::new(host).unwrap());
+        let search = Search::new(Client::new(host).unwrap());
 
         // When making a query on an existing collection
         let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
@@ -138,7 +140,7 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let search = Search::new(SearchClient::new(host).unwrap());
+        let search = Search::new(Client::new(host).unwrap());
         let max_results = 5;
 
         // When making a query on an existing collection
@@ -160,7 +162,7 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let search = Search::new(SearchClient::new(host).unwrap());
+        let search = Search::new(Client::new(host).unwrap());
         let max_results = 5;
         let min_score = 0.725;
 

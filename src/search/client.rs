@@ -2,6 +2,15 @@ use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+pub trait SearchClient {
+    async fn search(
+        &self,
+        index: IndexPath,
+        request: SearchRequest,
+        api_token: &str,
+    ) -> anyhow::Result<Vec<SearchResult>>;
+}
+
 /// Search a Document Index collection
 #[derive(Debug)]
 pub struct SearchRequest {
@@ -100,22 +109,24 @@ pub struct SearchResult {
 }
 
 /// Sends HTTP Request to Document Index API
-pub struct SearchClient {
+pub struct Client {
     /// The base host to use for all API requests
     host: String,
     /// Shared client to reuse connections
     http: reqwest::Client,
 }
 
-impl SearchClient {
+impl Client {
     pub fn new(host: String) -> anyhow::Result<Self> {
         Ok(Self {
             host,
             http: ClientBuilder::new().build()?,
         })
     }
+}
 
-    pub async fn search(
+impl SearchClient for Client {
+    async fn search(
         &self,
         index: IndexPath,
         request: SearchRequest,
@@ -169,7 +180,7 @@ mod tests {
         // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
-        let client = SearchClient::new(host).unwrap();
+        let client = Client::new(host).unwrap();
         let max_results = 5;
         let min_score = 0.725;
 
