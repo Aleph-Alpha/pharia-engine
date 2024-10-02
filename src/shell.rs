@@ -90,7 +90,7 @@ pub fn http<C>(
     csi_drivers: C,
 ) -> Router
 where
-    C: Csi + Clone + Send + Sync + 'static,
+    C: Csi,
 {
     let serve_dir =
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));

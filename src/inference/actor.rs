@@ -26,7 +26,7 @@ impl Inference {
         Self::with_client(client)
     }
 
-    pub fn with_client(client: impl InferenceClient + Send + Sync + 'static) -> Self {
+    pub fn with_client(client: impl InferenceClient) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<InferenceMessage>(1);
         let mut actor = InferenceActor::new(client, recv);
         let handle = tokio::spawn(async move { actor.run().await });
@@ -136,13 +136,13 @@ pub struct Completion {
 }
 
 /// Private implementation of the inference actor running in its own dedicated green thread.
-struct InferenceActor<C: InferenceClient + Send + Sync + 'static> {
+struct InferenceActor<C: InferenceClient> {
     client: Arc<C>,
     recv: mpsc::Receiver<InferenceMessage>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
-impl<C: InferenceClient + Send + Sync + 'static> InferenceActor<C> {
+impl<C: InferenceClient> InferenceActor<C> {
     fn new(client: C, recv: mpsc::Receiver<InferenceMessage>) -> Self {
         InferenceActor {
             client: Arc::new(client),

@@ -27,7 +27,7 @@ impl Search {
         Self::with_client(client)
     }
 
-    pub fn with_client(client: impl SearchClient + Send + Sync + 'static) -> Self {
+    pub fn with_client(client: impl SearchClient) -> Self {
         let (send, recv) = mpsc::channel::<SearchMessage>(1);
         let mut actor = SearchActor::new(client, recv);
         let handle = tokio::spawn(async move { actor.run().await });
@@ -103,14 +103,14 @@ pub struct SearchResult {
 }
 
 /// Allows for searching different collections in the Document Index
-struct SearchActor<C: SearchClient + Send + Sync + 'static> {
+struct SearchActor<C: SearchClient> {
     /// Internal client to interact with the Document Index API
     client: Arc<C>,
     recv: mpsc::Receiver<SearchMessage>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
-impl<C: SearchClient + Send + Sync + 'static> SearchActor<C> {
+impl<C: SearchClient> SearchActor<C> {
     fn new(client: C, recv: mpsc::Receiver<SearchMessage>) -> Self {
         Self {
             client: Arc::new(client),

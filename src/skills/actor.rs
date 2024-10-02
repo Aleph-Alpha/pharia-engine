@@ -38,7 +38,7 @@ impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
     pub fn new<C>(engine: Arc<Engine>, csi_apis: C, skill_provider: SkillStoreApi) -> Self
     where
-        C: Csi + Clone + Send + Sync + 'static,
+        C: Csi,
     {
         let runtime = WasmRuntime::new(engine, skill_provider);
         let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
@@ -111,7 +111,7 @@ struct SkillExecutorActor<C> {
 
 impl<C> SkillExecutorActor<C>
 where
-    C: Csi + Clone + Send + Sync + 'static,
+    C: Csi,
 {
     fn new(runtime: WasmRuntime, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: C) -> Self {
         SkillExecutorActor {
@@ -156,7 +156,7 @@ pub struct SkillExecutorMsg {
 }
 
 impl SkillExecutorMsg {
-    async fn run_skill(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
+    async fn run_skill(self, csi_apis: impl Csi, runtime: &WasmRuntime) {
         let SkillExecutorMsg {
             skill_path,
             input,
@@ -231,7 +231,7 @@ impl<C> SkillInvocationCtx<C> {
 #[async_trait]
 impl<C> CsiForSkills for SkillInvocationCtx<C>
 where
-    C: Csi + Send + Sync,
+    C: Csi,
 {
     async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
         let span = span!(Level::DEBUG, "complete_text", model = params.model);

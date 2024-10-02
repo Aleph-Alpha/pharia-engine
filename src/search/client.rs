@@ -4,7 +4,7 @@ use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-pub trait SearchClient {
+pub trait SearchClient: Send + Sync + 'static {
     fn search(
         &self,
         index: IndexPath,

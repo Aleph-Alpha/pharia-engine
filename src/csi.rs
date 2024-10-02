@@ -32,7 +32,7 @@ where
 /// passed to the end user in Skill code we further strip away some of the accidental complexity.
 /// See its sibling trait `CsiForSkills`.
 #[async_trait]
-pub trait Csi {
+pub trait Csi: Clone + Send + Sync + 'static {
     async fn complete_text(
         &self,
         auth: String,

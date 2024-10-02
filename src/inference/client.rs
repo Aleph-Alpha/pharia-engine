@@ -6,7 +6,7 @@ use aleph_alpha_client::{
 
 use super::{Completion, CompletionParams, CompletionRequest};
 
-pub trait InferenceClient {
+pub trait InferenceClient: Send + Sync + 'static {
     fn complete_text(
         &self,
         request: &CompletionRequest,
