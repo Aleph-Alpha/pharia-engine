@@ -24,6 +24,7 @@ where
 {
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
+    #[expect(dead_code, reason = "Unused so far")]
     pub search: S,
     pub tokenizers: TokenizersApi,
 }
@@ -53,7 +54,6 @@ pub trait Csi: Clone + Send + Sync + 'static {
 
     // While the implementation might not be async, we want the interface to be asynchronous.
     // It is up to the implementer whether the actual implementation is async.
-    #[allow(clippy::unused_async)]
     async fn select_language(
         &self,
         request: SelectLanguageRequest,

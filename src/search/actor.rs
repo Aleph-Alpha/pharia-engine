@@ -92,6 +92,7 @@ pub struct SearchRequest {
 
 /// A section of a document that is returned from a search request
 #[derive(Debug)]
+#[expect(dead_code, reason = "Unused so far")]
 pub struct SearchResult {
     /// Which document this search result can be found in
     pub document_name: String,
