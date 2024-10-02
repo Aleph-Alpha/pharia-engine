@@ -98,6 +98,9 @@ pub struct SearchResult {
     pub document_name: String,
     /// The section of the document returned by the search
     pub section: String,
+    /// How close the result is to the query, calculated based on the distance
+    /// metric of the index used in the search.
+    pub score: f64,
 }
 
 /// Allows for searching different collections in the Document Index
@@ -190,7 +193,7 @@ impl SearchMessage {
                 let ClientSearchResult {
                     mut section,
                     document_path,
-                    score: _score,
+                    score,
                     start: _start,
                     end: _end,
                 } = result;
@@ -205,6 +208,7 @@ impl SearchMessage {
                     Modality::Text { text } => SearchResult {
                         document_name: document_path.name,
                         section: text,
+                        score,
                     },
                     Modality::Image { .. } => {
                         unreachable!("We should have filtered out image results")
