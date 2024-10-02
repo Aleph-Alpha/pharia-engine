@@ -6,6 +6,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
+use tracing::error;
 
 use super::client::{
     Client, IndexPath, Modality, SearchClient, SearchRequest as ClientSearchRequest,
@@ -204,16 +205,17 @@ impl SearchMessage {
                     ));
                 }
 
-                Ok(match section.remove(0) {
-                    Modality::Text { text } => SearchResult {
+                match section.remove(0) {
+                    Modality::Text { text } => Ok(SearchResult {
                         document_name: document_path.name,
                         section: text,
                         score,
-                    },
+                    }),
                     Modality::Image { .. } => {
-                        unreachable!("We should have filtered out image results")
+                        error!("Unexpected image result in Document Index results");
+                        Err(anyhow::anyhow!("Invalid search result"))
                     }
-                })
+                }
             })
             .collect()
     }
