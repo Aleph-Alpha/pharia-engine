@@ -18,10 +18,13 @@ pub mod chunking;
 ///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
-pub struct CsiDrivers {
+pub struct CsiDrivers<S>
+where
+    S: SearchApi,
+{
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
-    pub search: SearchApi,
+    pub search: S,
     pub tokenizers: TokenizersApi,
 }
 
@@ -61,7 +64,10 @@ pub trait Csi {
 }
 
 #[async_trait]
-impl Csi for CsiDrivers {
+impl<S> Csi for CsiDrivers<S>
+where
+    S: SearchApi,
+{
     async fn complete_text(
         &self,
         auth: String,
@@ -132,7 +138,7 @@ pub mod tests {
         inference::{
             tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
         },
-        search::SearchApi,
+        search::tests::SearchMessage,
         tests::api_token,
         tokenizers::TokenizersApi,
     };
@@ -183,12 +189,11 @@ pub mod tests {
         assert!(completions.get(1).unwrap().text.contains("2nd"));
     }
 
-    pub fn dummy_csi_apis() -> CsiDrivers {
+    pub fn dummy_csi_apis() -> CsiDrivers<mpsc::Sender<SearchMessage>> {
         let (send, _recv) = mpsc::channel(1);
         let inference = InferenceApi::new(send);
 
-        let (send, _recv) = mpsc::channel(1);
-        let search = SearchApi::new(send);
+        let (search, _recv) = mpsc::channel(1);
 
         let (send, _recv) = mpsc::channel(1);
         let tokenizers = TokenizersApi::new(send);

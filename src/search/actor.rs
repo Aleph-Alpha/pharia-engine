@@ -34,8 +34,8 @@ impl Search {
         Self { send, handle }
     }
 
-    pub fn api(&self) -> SearchApi {
-        SearchApi::new(self.send.clone())
+    pub fn api(&self) -> impl SearchApi {
+        self.send.clone()
     }
 
     /// Inference is going to shutdown, as soon as the last instance of [`InferenceApi`] is dropped.
@@ -48,17 +48,16 @@ impl Search {
 /// Use this to execute tasks with the Search API. The existence of this API handle implies the
 /// actor is alive and running. This means this handle must be disposed of, before the search
 /// actor can shut down.
-#[derive(Clone)]
-pub struct SearchApi {
-    send: mpsc::Sender<SearchMessage>,
+pub trait SearchApi: Clone + Send + Sync + 'static {
+    async fn search(
+        &self,
+        request: SearchRequest,
+        api_token: String,
+    ) -> anyhow::Result<Vec<SearchResult>>;
 }
 
-impl SearchApi {
-    pub fn new(send: mpsc::Sender<SearchMessage>) -> Self {
-        Self { send }
-    }
-
-    pub async fn search(
+impl SearchApi for mpsc::Sender<SearchMessage> {
+    async fn search(
         &self,
         request: SearchRequest,
         api_token: String,
@@ -69,8 +68,7 @@ impl SearchApi {
             send,
             api_token,
         };
-        self.send
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await

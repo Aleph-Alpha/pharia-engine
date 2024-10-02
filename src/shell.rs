@@ -36,6 +36,7 @@ use utoipa_scalar::{Scalar, Servable};
 use crate::{
     csi::{Csi, CsiDrivers},
     csi_shell::http_csi_handle,
+    search::SearchApi,
     skill_store::SkillStoreApi,
     skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
 };
@@ -47,13 +48,16 @@ pub struct Shell {
 impl Shell {
     /// Start a shell listening to incoming requests at the given address. Successful construction
     /// implies that the listener is bound to the endpoint.
-    pub async fn new(
+    pub async fn new<S>(
         addr: impl Into<SocketAddr>,
         skill_executor_api: SkillExecutorApi,
         skill_provider_api: SkillStoreApi,
-        csi_drivers: CsiDrivers,
+        csi_drivers: CsiDrivers<S>,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, anyhow::Error>
+    where
+        S: SearchApi,
+    {
         let addr = addr.into();
         // It is important to construct the listener outside of the `spawn` invocation. We need to
         // guarantee the listener is already bound to the port, once `Self` is constructed.
