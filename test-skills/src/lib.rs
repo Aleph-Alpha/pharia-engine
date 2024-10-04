@@ -5,6 +5,8 @@ use std::{
     sync::{LazyLock, OnceLock},
 };
 use tempfile::{tempdir, TempDir};
+use wasi_preview1_component_adapter_provider::WASI_SNAPSHOT_PREVIEW1_REACTOR_ADAPTER;
+use wit_component::ComponentEncoder;
 
 const WASI_TARGET: &str = "wasm32-wasip1";
 
@@ -89,25 +91,23 @@ fn build_rust_skill(package_name: &str) {
         .unwrap();
     error_on_status("Building web assembly failed.", output).unwrap();
 
-    // Make it a web assembly component
-    //
-    // wasm-tools component new \
-    //      ./target/wasm32-wasip1/release/greet_skill_v0_2.wasm \
-    //      -o ./skills/greet_skill_v0_2.wasm \
-    //      --adapt ./wasi_snapshot_preview1.reactor-25.0.0.wasm
-    let output = Command::new("wasm-tools")
-        .args([
-            "component",
-            "new",
-            &format!("./target/{WASI_TARGET}/release/{snake_case}.wasm"),
-            "-o",
-            &format!("./skills/{snake_case}.wasm"),
-            "--adapt",
-            "./wasi_snapshot_preview1.reactor-25.0.0.wasm",
-        ])
-        .output()
-        .expect("Error executing wasm-tools");
-    error_on_status("Creating web assembly component failed.", output).unwrap();
+    // Until Rust supports wasi 0.2 natively, we have to adapt wasi 0.1 calls to 0.2
+    let wasm_p1_bytes =
+        std::fs::read(format!("./target/{WASI_TARGET}/release/{snake_case}.wasm")).unwrap();
+
+    let wasm_p2_bytes = ComponentEncoder::default()
+        .module(&wasm_p1_bytes)
+        .unwrap()
+        .adapter(
+            "wasi_snapshot_preview1",
+            WASI_SNAPSHOT_PREVIEW1_REACTOR_ADAPTER,
+        )
+        .unwrap()
+        .validate(true)
+        .encode()
+        .unwrap();
+
+    std::fs::write(format!("./skills/{snake_case}.wasm"), wasm_p2_bytes).unwrap();
 
     // wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
     let output = Command::new("wasm-tools")
