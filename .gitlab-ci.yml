@@ -199,7 +199,7 @@ image_publish:
     - podman tag $KERNEL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
     - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:latest
     - podman push $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$CI_PROJECT_NAME:$IMAGE_ID
-    - TARGET_REPO_ACCESS_TOKEN=$HELM_UPDATE_IMAGE_TAG_TOKEN update_image_tag gitlab.aleph-alpha.de/engineering/pharia-kernel-deployment.git helm-charts/pharia-kernel/values.yaml .deployment.image.tag $IMAGE_ID
+    - TARGET_REPO_ACCESS_TOKEN=$HELM_UPDATE_IMAGE_TAG_TOKEN update_image_tag gitlab.aleph-alpha.de/engineering/pharia-kernel-deployment.git helm-charts/pharia-kernel-git/values.yaml .deployment.image.tag $IMAGE_ID
     # push Pharia Skill image
     - SKILL_IMAGE_ID=$(podman inspect $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA | jq -r '.[].Config.Labels["com.aleph-alpha.image-id"]')
     - podman tag $SKILL_IMAGE:$CI_COMMIT_SHORT_SHA $ARTIFACTORY_HOST/$ARTIFACTORY_REPO/$SKILL_ARTIFACT_NAME:latest
