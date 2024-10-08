@@ -81,7 +81,13 @@ pub enum Cursor {
 
 /// The name of a given document
 #[derive(Debug, Deserialize)]
+#[expect(dead_code)]
 pub struct DocumentPath {
+    /// The namespace the collection belongs to
+    pub namespace: String,
+    /// The collection the document belongs to
+    pub collection: String,
+    /// The name of the document
     pub name: String,
 }
 

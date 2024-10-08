@@ -9,8 +9,8 @@ use tokio::{
 use tracing::error;
 
 use super::client::{
-    Client, IndexPath, Modality, SearchClient, SearchRequest as ClientSearchRequest,
-    SearchResult as ClientSearchResult,
+    Client, Cursor, DocumentPath, IndexPath, Modality, SearchClient,
+    SearchRequest as ClientSearchRequest, SearchResult as ClientSearchResult,
 };
 
 /// Handle to the search actor. Spin this up in order to use the Search API
@@ -95,12 +95,17 @@ pub struct SearchRequest {
 #[expect(dead_code, reason = "Unused so far")]
 pub struct SearchResult {
     /// Which document this search result can be found in
-    pub document_name: String,
+    pub document_path: DocumentPath,
     /// The section of the document returned by the search
     pub section: String,
     /// How close the result is to the query, calculated based on the distance
     /// metric of the index used in the search.
     pub score: f64,
+    /// The position within the document where the section begins. The cursor is always inclusive.
+    pub start: Cursor,
+    /// The position within the document where the section ends.
+    /// The cursor is always inclusive, so the section includes the position represented by this cursor.
+    pub end: Cursor,
 }
 
 /// Allows for searching different collections in the Document Index
@@ -194,8 +199,8 @@ impl SearchMessage {
                     mut section,
                     document_path,
                     score,
-                    start: _start,
-                    end: _end,
+                    start,
+                    end,
                 } = result;
                 // Current behavior is that chunking only ever happens within an item
                 if section.len() > 1 {
@@ -206,9 +211,11 @@ impl SearchMessage {
 
                 match section.remove(0) {
                     Modality::Text { text } => Ok(SearchResult {
-                        document_name: document_path.name,
+                        document_path,
                         section: text,
                         score,
+                        start,
+                        end,
                     }),
                     Modality::Image { .. } => {
                         error!("Unexpected image result in Document Index results");
@@ -269,7 +276,7 @@ mod tests {
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
-        assert!(results[0].document_name.contains("Heidelberg"));
+        assert!(results[0].document_path.name.contains("Heidelberg"));
         assert!(results[0].section.contains("Heidelberg"));
     }
 
@@ -292,7 +299,7 @@ mod tests {
         assert_eq!(results.len(), max_results);
         assert!(results
             .iter()
-            .all(|r| r.document_name.contains("Heidelberg")));
+            .all(|r| r.document_path.name.contains("Heidelberg")));
         assert!(results.iter().all(|r| r.section.contains("Heidelberg")));
     }
 
