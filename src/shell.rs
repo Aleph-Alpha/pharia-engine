@@ -4,7 +4,7 @@ use anyhow::Context;
 use axum::{
     extract::{MatchedPath, Path, State},
     http::{header::AUTHORIZATION, Request, StatusCode},
-    response::Redirect,
+    response::Html,
     routing::{delete, get, post},
     Json, Router,
 };
@@ -105,7 +105,7 @@ where
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
         .route("/openapi.json", get(serve_docs))
         .route("/healthcheck", get(|| async { "ok" }))
-        .route("/", get(|| async { Redirect::permanent("/docs/") }))
+        .route("/", get(index))
         .layer(
             ServiceBuilder::new()
                 // Mark the `Authorization` request header as sensitive so it doesn't show in logs
@@ -164,6 +164,11 @@ impl Modify for SecurityAddon {
             ),
         );
     }
+}
+
+async fn index() -> Html<&'static str> {
+    const INDEX: &str = include_str!("./shell/index.html");
+    Html(INDEX)
 }
 
 /// openapi.json
