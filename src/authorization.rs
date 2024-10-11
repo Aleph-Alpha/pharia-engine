@@ -7,7 +7,7 @@ pub struct Authorization {
 
 impl Authorization {
     pub fn new() -> Authorization {
-        let (send, recv) = mpsc::channel(3);
+        let (send, _recv) = mpsc::channel(3);
         let handle = tokio::spawn(async move {});
         Authorization { send, handle }
     }
@@ -24,12 +24,8 @@ impl Authorization {
     }
 }
 
-pub trait AuthorizationApi {
+pub trait AuthorizationApi {}
 
-}
-
-impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
-
-}
+impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {}
 
 enum AuthorizationMsg {}

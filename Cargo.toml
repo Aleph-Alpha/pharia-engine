@@ -37,7 +37,7 @@ async-trait = "0.1.83"
 axum = { version = "0.7.7", features = ["macros"] }
 axum-extra = { version = "0.9.4", features = ["typed-header"] }
 dotenvy = "0.15.7"
-futures = "0.3.30"
+futures = "0.3.31"
 oci-client = "0.12.1"
 oci-wasm = "0.0.5"
 reqwest = "0.12.8"
@@ -47,7 +47,7 @@ serde_json = "1.0.128"
 toml = "0.8.19"
 strum = { version = "0.26.3", features = ["derive"] }
 # Pinned because of opentelemetry crates
-tokio = { version = "~1.38.0", features = [
+tokio = { version = "1.40.0", features = [
     "macros",
     "rt-multi-thread",
     "signal",
@@ -64,26 +64,28 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 utoipa = { version = "4.2.3", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.1.0", features = ["axum"] }
-wasmtime = "25.0.1"
-wasmtime-wasi = "25.0.1"
-wit-parser = "0.218.0"
+wasmtime = "25.0.2"
+wasmtime-wasi = "25.0.2"
+wit-parser = "0.219.1"
 url = "2.5.2"
 thiserror = "1.0.64"
-tokenizers = { version = "0.20.0", default-features = false, features = [
+tokenizers = { version = "0.20.1", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.16.1", features = ["tokenizers"] }
+text-splitter = { version = "0.17.1", features = ["tokenizers"] }
 lingua = { version = "1.6.2", default-features = false, features = [
     "english",
     "german",
 ] }
-opentelemetry = "0.25.0"
-opentelemetry_sdk = { version = "0.25.0", features = ["rt-tokio"] }
-opentelemetry-stdout = { version = "0.25.0", features = ["trace"] }
-tracing-opentelemetry = "0.26.0"
-opentelemetry-otlp = "0.25.0"
-opentelemetry-semantic-conventions = "0.25.0"
+opentelemetry = "0.26.0"
+opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
+opentelemetry-stdout = { version = "0.26.0", features = ["trace"] }
+tracing-opentelemetry = "0.27.0"
+opentelemetry-otlp = "0.26.0"
+opentelemetry-semantic-conventions = { version = "0.26.0", features = [
+    "semconv_experimental",
+] }
 itertools = "0.13.0"
 humantime = "2.1.0"
 
@@ -96,9 +98,9 @@ mime = "0.3.17"
 rand = "0.8.5"
 tempfile = "3.13.0"
 # Pinned because of opentelemetry crates
-tokio = { version = "~1.38.0", features = ["test-util"] }
+tokio = { version = "1.40.0", features = ["test-util"] }
 tokio-test = "0.4.4"
-wat = "1.218.0"
+wat = "1.219.1"
 
 [features]
 test_inference = []
