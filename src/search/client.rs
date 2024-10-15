@@ -19,7 +19,7 @@ pub struct SearchRequest {
     /// What you want to search for
     query: Vec<Modality>,
     /// The maximum number of results to return. Defaults to 1
-    max_results: usize,
+    max_results: u32,
     /// The minimum score each result should have to be returned.
     /// By default, all results are returned, up to the `max_results`.
     min_score: Option<f64>,
@@ -30,7 +30,7 @@ pub struct SearchRequest {
 impl SearchRequest {
     pub fn new(
         query: Vec<Modality>,
-        max_results: usize,
+        max_results: u32,
         min_score: Option<f64>,
         text_only: bool,
     ) -> Self {
@@ -81,7 +81,6 @@ pub enum Cursor {
 
 /// The name of a given document
 #[derive(Debug, Deserialize)]
-#[expect(dead_code)]
 pub struct DocumentPath {
     /// The namespace the collection belongs to
     pub namespace: String,
@@ -244,7 +243,7 @@ pub mod tests {
         let results = client.search(index, request, api_token).await.unwrap();
 
         // Then we get at least one result
-        assert_eq!(results.len(), max_results);
+        assert_eq!(results.len(), max_results as usize);
         assert!(results
             .iter()
             .all(|r| r.document_path.name.contains("Heidelberg")));

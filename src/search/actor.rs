@@ -1,5 +1,6 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
+use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
 use tokio::{
     select,
@@ -48,6 +49,7 @@ impl Search {
 /// Use this to execute tasks with the Search API. The existence of this API handle implies the
 /// actor is alive and running. This means this handle must be disposed of, before the search
 /// actor can shut down.
+#[async_trait]
 pub trait SearchApi: Clone + Send + Sync + 'static {
     async fn search(
         &self,
@@ -56,6 +58,14 @@ pub trait SearchApi: Clone + Send + Sync + 'static {
     ) -> anyhow::Result<Vec<SearchResult>>;
 }
 
+#[derive(Debug)]
+pub struct SearchResult {
+    pub document_path: DocumentPath,
+    pub content: String,
+    pub score: f64,
+}
+
+#[async_trait]
 impl SearchApi for mpsc::Sender<SearchMessage> {
     async fn search(
         &self,
@@ -80,20 +90,20 @@ impl SearchApi for mpsc::Sender<SearchMessage> {
 #[derive(Debug)]
 pub struct SearchRequest {
     /// Where you want to search in
-    index: IndexPath,
+    pub index: IndexPath,
     /// What you want to search for
-    query: String,
+    pub query: String,
     /// The maximum number of results to return. Defaults to 1
-    max_results: usize,
+    pub max_results: u32,
     /// The minimum score each result should have to be returned.
-    /// By default, all results are returned, up to the `max_results`.
-    min_score: Option<f64>,
+    /// By default, all results are returned, up to the `max_results`.
+    pub min_score: Option<f64>,
 }
 
 /// A section of a document that is returned from a search request
 #[derive(Debug)]
 #[expect(dead_code, reason = "Unused so far")]
-pub struct SearchResult {
+pub struct DocumentIndexSearchResult {
     /// Which document this search result can be found in
     pub document_path: DocumentPath,
     /// The section of the document returned by the search
@@ -165,15 +175,31 @@ impl SearchMessage {
             send,
             api_token,
         } = self;
-        let result = Self::search(client, request, &api_token).await;
-        drop(send.send(result));
+        let results = Self::search(client, request, &api_token).await;
+        let results = results.map(|v| {
+            v.into_iter()
+                .map(
+                    |DocumentIndexSearchResult {
+                         document_path,
+                         section,
+                         score,
+                         ..
+                     }| SearchResult {
+                        document_path,
+                        content: section,
+                        score,
+                    },
+                )
+                .collect()
+        });
+        drop(send.send(results));
     }
 
     async fn search(
         client: &impl SearchClient,
         request: SearchRequest,
         api_token: &str,
-    ) -> anyhow::Result<Vec<SearchResult>> {
+    ) -> anyhow::Result<Vec<DocumentIndexSearchResult>> {
         let SearchRequest {
             index,
             query,
@@ -187,7 +213,7 @@ impl SearchMessage {
                     vec![Modality::Text { text: query }],
                     max_results,
                     min_score,
-                    // Make sure we only recieve results of type text
+                    // Make sure we only receive results of type text
                     true,
                 ),
                 api_token,
@@ -210,7 +236,7 @@ impl SearchMessage {
                 }
 
                 match section.remove(0) {
-                    Modality::Text { text } => Ok(SearchResult {
+                    Modality::Text { text } => Ok(DocumentIndexSearchResult {
                         document_path,
                         section: text,
                         score,
@@ -250,7 +276,7 @@ mod tests {
             }
         }
 
-        pub fn with_max_results(mut self, max_results: usize) -> Self {
+        pub fn with_max_results(mut self, max_results: u32) -> Self {
             self.max_results = max_results;
             self
         }
@@ -277,7 +303,7 @@ mod tests {
         // Then we get at least one result
         assert_eq!(results.len(), 1);
         assert!(results[0].document_path.name.contains("Heidelberg"));
-        assert!(results[0].section.contains("Heidelberg"));
+        assert!(results[0].content.contains("Heidelberg"));
     }
 
     #[tokio::test]
@@ -296,11 +322,11 @@ mod tests {
         search.wait_for_shutdown().await;
 
         // Then we get at least one result
-        assert_eq!(results.len(), max_results);
+        assert_eq!(results.len(), max_results as usize);
         assert!(results
             .iter()
             .all(|r| r.document_path.name.contains("Heidelberg")));
-        assert!(results.iter().all(|r| r.section.contains("Heidelberg")));
+        assert!(results.iter().all(|r| r.content.contains("Heidelberg")));
     }
 
     #[tokio::test]

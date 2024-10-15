@@ -290,7 +290,8 @@ impl WasiView for LinkedCtx {
 
 mod v0_2 {
     use pharia::skill::csi::{
-        ChunkParams, Completion, CompletionParams, CompletionRequest, FinishReason, Host, Language,
+        ChunkParams, Completion, CompletionParams, CompletionRequest, DocumentPath, FinishReason,
+        Host, IndexPath, Language, SearchResult,
     };
     use wasmtime::component::bindgen;
 
@@ -298,11 +299,12 @@ mod v0_2 {
         csi::ChunkRequest,
         inference,
         language_selection::{self, SelectLanguageRequest},
+        search::{self, SearchRequest},
     };
 
     use super::LinkedCtx;
 
-    bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true });
+    bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true, features: ["search"]  });
 
     #[async_trait::async_trait]
     impl Host for LinkedCtx {
@@ -329,6 +331,34 @@ mod v0_2 {
             };
             let request = inference::CompletionRequest::new(prompt, model).with_params(params);
             self.skill_ctx.complete_text(request).await.into()
+        }
+
+        async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
+            let ChunkParams { model, max_tokens } = params;
+            let request = ChunkRequest::new(text, model, max_tokens);
+            self.skill_ctx.chunk(request).await
+        }
+
+        async fn select_language(
+            &mut self,
+            text: String,
+            languages: Vec<Language>,
+        ) -> Option<Language> {
+            let languages = languages
+                .iter()
+                .map(|l| match l {
+                    Language::Eng => language_selection::Language::Eng,
+                    Language::Deu => language_selection::Language::Deu,
+                })
+                .collect::<Vec<_>>();
+            let request = SelectLanguageRequest::new(text, languages);
+            self.skill_ctx
+                .select_language(request)
+                .await
+                .map(|l| match l {
+                    language_selection::Language::Eng => Language::Eng,
+                    language_selection::Language::Deu => Language::Deu,
+                })
         }
 
         async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
@@ -371,32 +401,54 @@ mod v0_2 {
                 .collect()
         }
 
-        async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
-            let ChunkParams { model, max_tokens } = params;
-            let request = ChunkRequest::new(text, model, max_tokens);
-            self.skill_ctx.chunk(request).await
-        }
-
-        async fn select_language(
+        async fn search(
             &mut self,
-            text: String,
-            languages: Vec<Language>,
-        ) -> Option<Language> {
-            let languages = languages
-                .iter()
-                .map(|l| match l {
-                    Language::Eng => language_selection::Language::Eng,
-                    Language::Deu => language_selection::Language::Deu,
-                })
-                .collect::<Vec<_>>();
-            let request = SelectLanguageRequest::new(text, languages);
+            index_path: IndexPath,
+            query: String,
+            max_results: u32,
+            min_score: Option<f64>,
+        ) -> Vec<SearchResult> {
+            let IndexPath {
+                namespace,
+                collection,
+                index,
+            } = index_path;
+            let index = search::IndexPath {
+                namespace,
+                collection,
+                index,
+            };
+            let request = SearchRequest {
+                index,
+                query,
+                max_results,
+                min_score,
+            };
             self.skill_ctx
-                .select_language(request)
+                .search(request)
                 .await
-                .map(|l| match l {
-                    language_selection::Language::Eng => Language::Eng,
-                    language_selection::Language::Deu => Language::Deu,
-                })
+                .into_iter()
+                .map(
+                    |search::SearchResult {
+                         document_path:
+                             search::DocumentPath {
+                                 namespace,
+                                 collection,
+                                 name,
+                             },
+                         content,
+                         score,
+                     }| SearchResult {
+                        document_path: DocumentPath {
+                            namespace,
+                            collection,
+                            name,
+                        },
+                        content,
+                        score,
+                    },
+                )
+                .collect()
         }
     }
 

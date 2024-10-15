@@ -25,6 +25,7 @@ use crate::{
     csi::{chunking::ChunkParams, ChunkRequest, Csi},
     inference::{Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
+    search::{SearchRequest, SearchResult},
     skill_store::SkillStoreApi,
 };
 
@@ -296,6 +297,23 @@ where
             Err(error) => self.send_error(error).await,
         }
     }
+
+    async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult> {
+        let span = span!(
+            Level::DEBUG,
+            "search",
+            namespace = request.index.namespace,
+            collection = request.index.collection,
+            index = request.index.index
+        );
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
+        match self.csi_apis.search(self.api_token.clone(), request).await {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -493,6 +511,14 @@ pub mod tests {
             _auth: String,
             _request: ChunkRequest,
         ) -> Result<Vec<String>, anyhow::Error> {
+            bail!("Test error")
+        }
+
+        async fn search(
+            &self,
+            _auth: String,
+            _request: SearchRequest,
+        ) -> Result<Vec<SearchResult>, anyhow::Error> {
             bail!("Test error")
         }
     }

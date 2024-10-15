@@ -7,6 +7,7 @@ use crate::{
     csi::ChunkRequest,
     inference::{Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
+    search::{SearchRequest, SearchResult},
 };
 
 pub use self::{
@@ -24,4 +25,5 @@ pub trait CsiForSkills {
     async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
     async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language>;
+    async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult>;
 }

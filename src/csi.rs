@@ -7,7 +7,7 @@ use tracing::trace;
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
-    search::SearchMessage,
+    search::{SearchApi, SearchMessage, SearchRequest, SearchResult},
     tokenizers::{TokenizerApi as _, TokenizersMsg},
 };
 
@@ -22,7 +22,6 @@ pub mod chunking;
 pub struct CsiDrivers {
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
-    #[expect(dead_code, reason = "Unused so far")]
     pub search: mpsc::Sender<SearchMessage>,
     pub tokenizers: mpsc::Sender<TokenizersMsg>,
 }
@@ -59,6 +58,12 @@ pub trait Csi {
         // default implementation can be provided here because language selection is stateless
         Ok(tokio::task::spawn_blocking(move || select_language(request)).await?)
     }
+
+    async fn search(
+        &self,
+        auth: String,
+        request: SearchRequest,
+    ) -> Result<Vec<SearchResult>, anyhow::Error>;
 }
 
 #[async_trait]
@@ -119,6 +124,24 @@ impl Csi for CsiDrivers {
         );
         Ok(chunks)
     }
+
+    async fn search(
+        &self,
+        auth: String,
+        request: SearchRequest,
+    ) -> Result<Vec<SearchResult>, anyhow::Error> {
+        let index_path = &request.index;
+        trace!(
+            "search: namespace={} collection={} max_results={} min_score={}",
+            index_path.namespace,
+            index_path.collection,
+            request.max_results,
+            request
+                .min_score
+                .map_or_else(|| "None".to_owned(), |val| val.to_string())
+        );
+        self.search.search(request, auth).await
+    }
 }
 
 #[cfg(test)]
@@ -134,6 +157,7 @@ pub mod tests {
         inference::{
             tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
         },
+        search::{SearchRequest, SearchResult},
         tests::api_token,
         tokenizers::{tests::FakeTokenizers, TokenizerApi as _, TokenizersMsg},
     };
@@ -256,6 +280,14 @@ pub mod tests {
         ) -> Result<Vec<String>, anyhow::Error> {
             panic!("DummyCsi complete_all called");
         }
+
+        async fn search(
+            &self,
+            _auth: String,
+            _request: SearchRequest,
+        ) -> Result<Vec<SearchResult>, anyhow::Error> {
+            panic!("DummyCsi search called")
+        }
     }
 
     #[derive(Clone)]
@@ -285,7 +317,7 @@ pub mod tests {
             &mut self,
             f: impl Fn(ChunkRequest) -> Result<Vec<String>, anyhow::Error> + Send + Sync + 'static,
         ) {
-            self.chunking = Arc::new(Box::new(f))
+            self.chunking = Arc::new(Box::new(f));
         }
 
         pub fn with_completion(
@@ -332,6 +364,14 @@ pub mod tests {
         ) -> Result<Vec<String>, anyhow::Error> {
             (*self.chunking)(request)
         }
+
+        async fn search(
+            &self,
+            _auth: String,
+            _request: SearchRequest,
+        ) -> Result<Vec<SearchResult>, anyhow::Error> {
+            unimplemented!()
+        }
     }
 
     struct FakeTokenizersActor {
@@ -368,6 +408,14 @@ pub mod tests {
         pub async fn shutdown(self) {
             drop(self.send);
             self.handle.await.unwrap();
+        }
+
+        async fn search(
+            &self,
+            _auth: String,
+            _request: SearchRequest,
+        ) -> Result<Vec<SearchResult>, anyhow::Error> {
+            bail!("Test error")
         }
     }
 }
