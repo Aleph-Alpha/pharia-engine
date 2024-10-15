@@ -1,7 +1,7 @@
-use tokio::sync::mpsc;
 use async_trait::async_trait;
 use chunking::ChunkParams;
 use futures::future::try_join_all;
+use tokio::sync::mpsc;
 use tracing::trace;
 
 use crate::{
@@ -19,8 +19,7 @@ pub mod chunking;
 ///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
-pub struct CsiDrivers
-{
+pub struct CsiDrivers {
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
     #[expect(dead_code, reason = "Unused so far")]
@@ -63,8 +62,7 @@ pub trait Csi: Clone + Send + Sync + 'static {
 }
 
 #[async_trait]
-impl Csi for CsiDrivers
-{
+impl Csi for CsiDrivers {
     async fn complete_text(
         &self,
         auth: String,
@@ -198,6 +196,36 @@ pub mod tests {
             inference,
             search,
             tokenizers,
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct DummyCsi;
+
+    #[async_trait]
+    impl Csi for DummyCsi {
+        async fn complete_text(
+            &self,
+            _auth: String,
+            _request: CompletionRequest,
+        ) -> Result<Completion, anyhow::Error> {
+            panic!("DummyCsi complete_text called")
+        }
+
+        async fn complete_all(
+            &self,
+            _auth: String,
+            _requests: Vec<CompletionRequest>,
+        ) -> Result<Vec<Completion>, anyhow::Error> {
+            panic!("DummyCsi complete_all called")
+        }
+
+        async fn chunk(
+            &self,
+            _auth: String,
+            _request: ChunkRequest,
+        ) -> Result<Vec<String>, anyhow::Error> {
+            panic!("DummyCsi chunk called")
         }
     }
 

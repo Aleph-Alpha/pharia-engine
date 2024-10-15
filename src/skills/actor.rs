@@ -311,7 +311,7 @@ pub mod tests {
 
     use crate::{
         csi::{
-            tests::{dummy_csi_apis, StubCsi},
+            tests::{dummy_csi_apis, DummyCsi, StubCsi},
             CsiDrivers,
         },
         inference::{tests::AssertConcurrentClient, CompletionRequest, Inference},
@@ -387,7 +387,7 @@ pub mod tests {
         let namespaces = HashMap::new();
         let engine = Arc::new(Engine::new().unwrap());
         let skill_provider = SkillStore::new(engine.clone(), &namespaces);
-        let csi_apis = dummy_csi_apis();
+        let csi_apis = DummyCsi;
         let executer = SkillExecutor::new(engine, csi_apis, skill_provider.api());
         let api = executer.api();
 

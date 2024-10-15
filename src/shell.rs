@@ -34,7 +34,7 @@ use utoipa::{
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    csi::{Csi, CsiDrivers},
+    csi::Csi,
     csi_shell::http_csi_handle,
     skill_store::SkillStoreApi,
     skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
@@ -51,7 +51,7 @@ impl Shell {
         addr: impl Into<SocketAddr>,
         skill_executor_api: SkillExecutorApi,
         skill_provider_api: SkillStoreApi,
-        csi_drivers: CsiDrivers,
+        csi_drivers: impl Csi,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, anyhow::Error>
     {
@@ -339,7 +339,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        csi::tests::{dummy_csi_apis, StubCsi},
+        csi::tests::{DummyCsi, StubCsi},
         csi_shell::{V0_2CsiRequest, VersionedCsiRequest},
         inference::{self, Completion, CompletionParams, CompletionRequest},
         skill_store::tests::{dummy_skill_provider_api, SkillProviderMsg},
@@ -422,7 +422,7 @@ mod tests {
         let http = http(
             skill_executor_api,
             dummy_skill_provider_api(),
-            dummy_csi_apis(),
+            DummyCsi,
         );
 
         let args = ExecuteSkillArgs {
@@ -456,7 +456,7 @@ mod tests {
         let http = http(
             skill_executor.api(),
             dummy_skill_provider_api(),
-            dummy_csi_apis(),
+            DummyCsi,
         );
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
@@ -502,7 +502,7 @@ mod tests {
         let http = http(
             dummy_skill_executer.api(),
             skill_provider_api,
-            dummy_csi_apis(),
+            DummyCsi,
         );
 
         let resp = http
@@ -543,7 +543,7 @@ mod tests {
         let http = http(
             dummy_skill_executer.api(),
             skill_provider_api,
-            dummy_csi_apis(),
+            DummyCsi,
         );
 
         // When the skill is deleted
@@ -595,7 +595,7 @@ mod tests {
         let http = http(
             dummy_skill_executer.api(),
             skill_provider_api,
-            dummy_csi_apis(),
+            DummyCsi,
         );
 
         // When the skill is deleted
@@ -630,7 +630,7 @@ mod tests {
         let http = http(
             skill_executor_api,
             dummy_skill_provider_api(),
-            dummy_csi_apis(),
+            DummyCsi,
         );
 
         // When executing a skill with a blank name
@@ -666,7 +666,7 @@ mod tests {
         let http = http(
             dummy_skill_executer_api,
             dummy_skill_provider_api(),
-            dummy_csi_apis(),
+            DummyCsi,
         );
         let resp = http
             .oneshot(
@@ -689,7 +689,7 @@ mod tests {
         let http = http(
             dummy_skill_executer_api,
             dummy_skill_provider_api(),
-            dummy_csi_apis(),
+            DummyCsi,
         );
         let resp = http
             .oneshot(
@@ -726,7 +726,7 @@ mod tests {
         let http = http(
             dummy_skill_executer.api(),
             skill_provider_api,
-            dummy_csi_apis(),
+            DummyCsi,
         );
 
         // When
@@ -760,7 +760,7 @@ mod tests {
         let http = http(
             skill_executor.api(),
             dummy_skill_provider_api(),
-            dummy_csi_apis(),
+            DummyCsi,
         );
 
         // When executing a skill in the namespace
@@ -804,7 +804,7 @@ mod tests {
         let http = http(
             skill_executer_api,
             dummy_skill_provider_api(),
-            dummy_csi_apis(),
+            DummyCsi,
         );
         let args = ExecuteSkillArgs {
             skill: "my_namespace/my_skill".to_owned(),
