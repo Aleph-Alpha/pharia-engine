@@ -1,9 +1,5 @@
 mod actor;
 mod client;
 
-pub use actor::{Search, SearchApi};
+pub use actor::{Search, SearchApi, SearchMessage};
 
-#[cfg(test)]
-pub mod tests {
-    pub use super::actor::SearchMessage;
-}

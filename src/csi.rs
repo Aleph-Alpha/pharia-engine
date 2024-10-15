@@ -1,3 +1,4 @@
+use tokio::sync::mpsc;
 use async_trait::async_trait;
 use chunking::ChunkParams;
 use futures::future::try_join_all;
@@ -6,7 +7,7 @@ use tracing::trace;
 use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
-    search::SearchApi,
+    search::SearchMessage,
     tokenizers::TokenizersApi,
 };
 
@@ -18,14 +19,12 @@ pub mod chunking;
 ///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
-pub struct CsiDrivers<S>
-where
-    S: SearchApi,
+pub struct CsiDrivers
 {
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
     #[expect(dead_code, reason = "Unused so far")]
-    pub search: S,
+    pub search: mpsc::Sender<SearchMessage>,
     pub tokenizers: TokenizersApi,
 }
 
@@ -64,9 +63,7 @@ pub trait Csi: Clone + Send + Sync + 'static {
 }
 
 #[async_trait]
-impl<S> Csi for CsiDrivers<S>
-where
-    S: SearchApi,
+impl Csi for CsiDrivers
 {
     async fn complete_text(
         &self,
@@ -138,7 +135,6 @@ pub mod tests {
         inference::{
             tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
         },
-        search::tests::SearchMessage,
         tests::api_token,
         tokenizers::TokenizersApi,
     };
@@ -189,7 +185,7 @@ pub mod tests {
         assert!(completions.get(1).unwrap().text.contains("2nd"));
     }
 
-    pub fn dummy_csi_apis() -> CsiDrivers<mpsc::Sender<SearchMessage>> {
+    pub fn dummy_csi_apis() -> CsiDrivers {
         let (send, _recv) = mpsc::channel(1);
         let inference = InferenceApi::new(send);
 

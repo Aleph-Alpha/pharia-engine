@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use tokio::{sync::mpsc, task::JoinHandle};
 
 pub struct Authorization {

@@ -34,7 +34,7 @@ impl Search {
         Self { send, handle }
     }
 
-    pub fn api(&self) -> impl SearchApi {
+    pub fn api(&self) -> mpsc::Sender<SearchMessage> {
         self.send.clone()
     }
 
