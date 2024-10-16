@@ -127,20 +127,26 @@ pub mod tests {
 
     use anyhow::bail;
     use async_trait::async_trait;
-    use tokio::sync::mpsc;
+    use tokio::{sync::mpsc, task::JoinHandle};
 
     use crate::{
-        csi::chunking::ChunkParams, inference::{
+        csi::chunking::ChunkParams,
+        inference::{
             tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
-        }, tests::api_token, tokenizers::tests::FakeTokenizers
+        },
+        tests::api_token,
+        tokenizers::{
+            tests::FakeTokenizers,
+            TokenizerApi as _, TokenizersMsg,
+        },
     };
 
-    use super::{ChunkRequest, Csi, CsiDrivers};
+    use super::{chunking, ChunkRequest, Csi, CsiDrivers};
 
     #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
-        let tokenizers = FakeTokenizers::new();
+        let tokenizers = FakeTokenizersActor::new();
         let csi_apis = CsiDrivers {
             tokenizers: tokenizers.api(),
             ..dummy_csi_drivers()
@@ -153,7 +159,10 @@ pub mod tests {
             text: "Greet".to_owned(),
             params: ChunkParams { model, max_tokens },
         };
-        let chunks = csi_apis.chunk("dummy_token".to_owned(), request).await.unwrap();
+        let chunks = csi_apis
+            .chunk("dummy_token".to_owned(), request)
+            .await
+            .unwrap();
 
         drop(csi_apis);
         tokenizers.shutdown().await;
@@ -245,10 +254,17 @@ pub mod tests {
 
         async fn chunk(
             &self,
-            _auth: String,
-            _request: ChunkRequest,
+            auth: String,
+            request: ChunkRequest,
         ) -> Result<Vec<String>, anyhow::Error> {
-            panic!("DummyCsi chunk called")
+            let ChunkRequest {
+                text,
+                params: ChunkParams { model, max_tokens },
+            } = request;
+            let tokenizer_api = FakeTokenizers;
+            let tokenizer = tokenizer_api.tokenizer_by_model(auth, model).await?;
+            // Push into the blocking thread pool because this can be expensive for long documents
+            Ok(chunking::chunking(&text, &tokenizer, max_tokens))
         }
     }
 
@@ -300,6 +316,43 @@ pub mod tests {
             _request: ChunkRequest,
         ) -> Result<Vec<String>, anyhow::Error> {
             bail!("Test error")
+        }
+    }
+
+    struct FakeTokenizersActor {
+        send: mpsc::Sender<TokenizersMsg>,
+        handle: JoinHandle<()>,
+    }
+
+    impl FakeTokenizersActor {
+        pub fn new() -> FakeTokenizersActor {
+            let (send, mut recv) = mpsc::channel(1);
+            let handle = tokio::spawn(async move {
+                while let Some(msg) = recv.recv().await {
+                    match msg {
+                        TokenizersMsg::TokenizerByModel {
+                            api_token: _,
+                            model_name,
+                            send,
+                        } => {
+                            let tokenizer = FakeTokenizers
+                                .tokenizer_by_model("dummy_token".to_string(), model_name)
+                                .await;
+                            send.send(tokenizer).unwrap();
+                        }
+                    }
+                }
+            });
+            Self { send, handle }
+        }
+
+        pub fn api(&self) -> mpsc::Sender<TokenizersMsg> {
+            self.send.clone()
+        }
+
+        pub async fn shutdown(self) {
+            drop(self.send);
+            self.handle.await.unwrap();
         }
     }
 }

@@ -317,20 +317,16 @@ pub mod tests {
         inference::{tests::AssertConcurrentClient, CompletionRequest, Inference},
         skill_store::{SkillProviderMsg, SkillStore},
         skills::Skill,
-        tokenizers::{tests::FakeTokenizers, TokenizersMsg},
+        tokenizers::TokenizersMsg,
     };
 
     #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
-        let tokenizers = FakeTokenizers::new();
-        let csi_apis = CsiDrivers {
-            tokenizers: tokenizers.api(),
-            ..dummy_csi_drivers()
-        };
+
         let mut invocation_ctx =
-            SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned(), None);
+            SkillInvocationCtx::new(send, DummyCsi, "dummy token".to_owned(), None);
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -340,9 +336,6 @@ pub mod tests {
             params: ChunkParams { model, max_tokens },
         };
         let chunks = invocation_ctx.chunk(request).await;
-
-        drop(invocation_ctx);
-        tokenizers.shutdown().await;
 
         // Then a single chunk is returned
         assert_eq!(chunks.len(), 1);

@@ -137,15 +137,12 @@ impl TokenizersActor {
 #[cfg(test)]
 pub mod tests {
     use std::sync::Arc;
+    use anyhow::anyhow;
+    use async_trait::async_trait;
 
-    use super::TokenizersMsg;
-    use tokenizers::Tokenizer;
-    use tokio::{sync::mpsc, task::JoinHandle};
+    use super::{TokenizerApi, Tokenizer};
 
-    use crate::{
-        tests::{api_token, inference_address},
-        tokenizers::{TokenizerApi as _, Tokenizers},
-    };
+    use crate::{tests::{api_token, inference_address}, tokenizers::Tokenizers};
 
     /// A real world hugging face tokenizer for testing
     pub fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
@@ -154,40 +151,20 @@ pub mod tests {
     }
 
     /// A skill executer double, loaded up with predefined answers.
-    pub struct FakeTokenizers {
-        send: mpsc::Sender<TokenizersMsg>,
-        handle: JoinHandle<()>,
-    }
+    pub struct FakeTokenizers;
 
-    impl FakeTokenizers {
-        pub fn new() -> FakeTokenizers {
-            let (send, mut recv) = mpsc::channel(1);
-            let handle = tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    match msg {
-                        TokenizersMsg::TokenizerByModel {
-                            api_token: _,
-                            model_name,
-                            send,
-                        } => {
-                            if model_name == "Pharia-1-LLM-7B-control" {
-                                send.send(Ok(Arc::new(pharia_1_llm_7b_control_tokenizer())))
-                                    .unwrap();
-                            }
-                        }
-                    }
-                }
-            });
-            Self { send, handle }
-        }
-
-        pub fn api(&self) -> mpsc::Sender<TokenizersMsg> {
-            self.send.clone()
-        }
-
-        pub async fn shutdown(self) {
-            drop(self.send);
-            self.handle.await.unwrap();
+    #[async_trait]
+    impl TokenizerApi for FakeTokenizers {
+        async fn tokenizer_by_model(
+            &self,
+            _api_token: String,
+            model_name: String,
+        ) -> Result<Arc<Tokenizer>, anyhow::Error> {
+            if model_name == "Pharia-1-LLM-7B-control" {
+                Ok(Arc::new(pharia_1_llm_7b_control_tokenizer()))
+            } else {
+                Err(anyhow!("model '{}' not supported by FakeTokenizers", model_name))
+            }
         }
     }
 
