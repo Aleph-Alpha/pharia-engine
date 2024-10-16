@@ -51,7 +51,7 @@ impl Shell {
         addr: impl Into<SocketAddr>,
         skill_executor_api: SkillExecutorApi,
         skill_provider_api: SkillStoreApi,
-        csi_drivers: impl Csi,
+        csi_drivers: impl Csi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, anyhow::Error> {
         let addr = addr.into();
@@ -86,7 +86,7 @@ pub fn http<C>(
     csi_drivers: C,
 ) -> Router
 where
-    C: Csi,
+    C: Csi + Clone + Send + Sync + 'static,
 {
     let serve_dir =
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
