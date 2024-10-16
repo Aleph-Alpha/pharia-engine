@@ -212,7 +212,7 @@ pub mod tests {
         assert!(completions.get(1).unwrap().text.contains("2nd"));
     }
 
-    pub fn dummy_csi_drivers() -> CsiDrivers {
+    fn dummy_csi_drivers() -> CsiDrivers {
         let (send, _recv) = mpsc::channel(1);
         let inference = InferenceApi::new(send);
 

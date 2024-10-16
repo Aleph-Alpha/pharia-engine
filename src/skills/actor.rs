@@ -310,10 +310,7 @@ pub mod tests {
     use tokio::try_join;
 
     use crate::{
-        csi::{
-            tests::{dummy_csi_drivers, DummyCsi, StubCsi},
-            CsiDrivers,
-        },
+        csi::tests::{DummyCsi, StubCsi},
         inference::{tests::AssertConcurrentClient, CompletionRequest, Inference},
         skill_store::{SkillProviderMsg, SkillStore},
         skills::Skill,
@@ -446,17 +443,14 @@ pub mod tests {
         let engine = Arc::new(Engine::new().unwrap());
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
-        let csi_apis = CsiDrivers {
-            inference: inference.api(),
-            ..dummy_csi_drivers()
-        };
+        let csi = StubCsi::with_completion_from_text("Hello, Homer!");
         let store = SkillStoreGreetStub::new(engine.clone());
-        let executor = SkillExecutor::new(engine, csi_apis, store.api());
+        let executor = SkillExecutor::new(engine, csi, store.api());
         let api = executor.api();
 
         // When executing tw tasks in parallel
         let skill_path = SkillPath::new("test", "greet");
-        let input = json!("Hello");
+        let input = json!("Homer");
         let token = "TOKEN_NOT_REQUIRED";
         let result = try_join!(
             api.execute_skill(skill_path.clone(), input.clone(), token.to_owned()),
