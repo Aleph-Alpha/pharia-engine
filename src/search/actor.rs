@@ -86,7 +86,7 @@ pub struct SearchRequest {
     /// The maximum number of results to return. Defaults to 1
     max_results: usize,
     /// The minimum score each result should have to be returned.
-    /// By default, all results are returned, up to the `max_results`.
+    /// By default, all results are returned, up to the `max_results`.
     min_score: Option<f64>,
 }
 

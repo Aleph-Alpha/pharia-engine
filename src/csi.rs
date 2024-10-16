@@ -135,13 +135,10 @@ pub mod tests {
             tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
         },
         tests::api_token,
-        tokenizers::{
-            tests::FakeTokenizers,
-            TokenizerApi as _, TokenizersMsg,
-        },
+        tokenizers::{tests::FakeTokenizers, TokenizerApi as _, TokenizersMsg},
     };
 
-    use super::{chunking, ChunkRequest, Csi, CsiDrivers};
+    use super::{ChunkRequest, Csi, CsiDrivers};
 
     #[tokio::test]
     async fn chunk() {
@@ -254,31 +251,49 @@ pub mod tests {
 
         async fn chunk(
             &self,
-            auth: String,
-            request: ChunkRequest,
+            _auth: String,
+            _request: ChunkRequest,
         ) -> Result<Vec<String>, anyhow::Error> {
-            let ChunkRequest {
-                text,
-                params: ChunkParams { model, max_tokens },
-            } = request;
-            let tokenizer_api = FakeTokenizers;
-            let tokenizer = tokenizer_api.tokenizer_by_model(auth, model).await?;
-            // Push into the blocking thread pool because this can be expensive for long documents
-            Ok(chunking::chunking(&text, &tokenizer, max_tokens))
+            panic!("DummyCsi complete_all called");
         }
     }
 
     #[derive(Clone)]
     pub struct StubCsi {
-        completion: Arc<Box<dyn Fn(CompletionRequest) -> Completion + Send + Sync + 'static>>,
+        pub completion: Arc<
+            Box<
+                dyn Fn(CompletionRequest) -> Result<Completion, anyhow::Error>
+                    + Send
+                    + Sync
+                    + 'static,
+            >,
+        >,
+        pub chunking: Arc<
+            Box<dyn Fn(ChunkRequest) -> Result<Vec<String>, anyhow::Error> + Send + Sync + 'static>,
+        >,
     }
 
     impl StubCsi {
+        pub fn empty() -> Self {
+            StubCsi {
+                completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
+                chunking: Arc::new(Box::new(|_| bail!("Chunking not set in StubCsi"))),
+            }
+        }
+
+        pub fn set_chunking(
+            &mut self,
+            f: impl Fn(ChunkRequest) -> Result<Vec<String>, anyhow::Error> + Send + Sync + 'static,
+        ) {
+            self.chunking = Arc::new(Box::new(f))
+        }
+
         pub fn with_completion(
             f: impl Fn(CompletionRequest) -> Completion + Send + Sync + 'static,
         ) -> Self {
             StubCsi {
-                completion: Arc::new(Box::new(f)),
+                completion: Arc::new(Box::new(move |cr| Ok(f(cr)))),
+                ..Self::empty()
             }
         }
 
@@ -296,7 +311,7 @@ pub mod tests {
             _auth: String,
             request: CompletionRequest,
         ) -> Result<Completion, anyhow::Error> {
-            Ok((*self.completion)(request))
+            (*self.completion)(request)
         }
 
         async fn complete_all(
@@ -306,16 +321,16 @@ pub mod tests {
         ) -> Result<Vec<Completion>, anyhow::Error> {
             requests
                 .into_iter()
-                .map(|r| Ok((*self.completion)(r)))
+                .map(|r| (*self.completion)(r))
                 .collect()
         }
 
         async fn chunk(
             &self,
             _auth: String,
-            _request: ChunkRequest,
+            request: ChunkRequest,
         ) -> Result<Vec<String>, anyhow::Error> {
-            bail!("Test error")
+            (*self.chunking)(request)
         }
     }
 

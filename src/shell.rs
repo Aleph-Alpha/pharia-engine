@@ -53,8 +53,7 @@ impl Shell {
         skill_provider_api: SkillStoreApi,
         csi_drivers: impl Csi,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
-    ) -> Result<Self, anyhow::Error>
-    {
+    ) -> Result<Self, anyhow::Error> {
         let addr = addr.into();
         // It is important to construct the listener outside of the `spawn` invocation. We need to
         // guarantee the listener is already bound to the port, once `Self` is constructed.
@@ -419,11 +418,7 @@ mod tests {
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
-        let http = http(
-            skill_executor_api,
-            dummy_skill_provider_api(),
-            DummyCsi,
-        );
+        let http = http(skill_executor_api, dummy_skill_provider_api(), DummyCsi);
 
         let args = ExecuteSkillArgs {
             skill: "local/greet_skill".to_owned(),
@@ -453,11 +448,7 @@ mod tests {
         let skill_executor = StubSkillExecuter::new(|_| {});
 
         // When
-        let http = http(
-            skill_executor.api(),
-            dummy_skill_provider_api(),
-            DummyCsi,
-        );
+        let http = http(skill_executor.api(), dummy_skill_provider_api(), DummyCsi);
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
             input: json!("Homer"),
@@ -499,11 +490,7 @@ mod tests {
             }
         });
 
-        let http = http(
-            dummy_skill_executer.api(),
-            skill_provider_api,
-            DummyCsi,
-        );
+        let http = http(dummy_skill_executer.api(), skill_provider_api, DummyCsi);
 
         let resp = http
             .oneshot(
@@ -540,11 +527,7 @@ mod tests {
                 send.send(true).unwrap();
             }
         });
-        let http = http(
-            dummy_skill_executer.api(),
-            skill_provider_api,
-            DummyCsi,
-        );
+        let http = http(dummy_skill_executer.api(), skill_provider_api, DummyCsi);
 
         // When the skill is deleted
         let resp = http
@@ -592,11 +575,7 @@ mod tests {
                 send.send(false).unwrap();
             }
         });
-        let http = http(
-            dummy_skill_executer.api(),
-            skill_provider_api,
-            DummyCsi,
-        );
+        let http = http(dummy_skill_executer.api(), skill_provider_api, DummyCsi);
 
         // When the skill is deleted
         let resp = http
@@ -627,11 +606,7 @@ mod tests {
         // drop the receiver, we expect the shell to never try to execute a skill
         let (send, _) = mpsc::channel(1);
         let skill_executor_api = SkillExecutorApi::new(send);
-        let http = http(
-            skill_executor_api,
-            dummy_skill_provider_api(),
-            DummyCsi,
-        );
+        let http = http(skill_executor_api, dummy_skill_provider_api(), DummyCsi);
 
         // When executing a skill with a blank name
         let api_token = api_token();
@@ -723,11 +698,7 @@ mod tests {
                 panic!("Unexpected message in test")
             }
         });
-        let http = http(
-            dummy_skill_executer.api(),
-            skill_provider_api,
-            DummyCsi,
-        );
+        let http = http(dummy_skill_executer.api(), skill_provider_api, DummyCsi);
 
         // When
         let resp = http
@@ -757,11 +728,7 @@ mod tests {
             ))))
             .unwrap();
         });
-        let http = http(
-            skill_executor.api(),
-            dummy_skill_provider_api(),
-            DummyCsi,
-        );
+        let http = http(skill_executor.api(), dummy_skill_provider_api(), DummyCsi);
 
         // When executing a skill in the namespace
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
@@ -801,11 +768,7 @@ mod tests {
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
 
         // When executing a skill
-        let http = http(
-            skill_executer_api,
-            dummy_skill_provider_api(),
-            DummyCsi,
-        );
+        let http = http(skill_executer_api, dummy_skill_provider_api(), DummyCsi);
         let args = ExecuteSkillArgs {
             skill: "my_namespace/my_skill".to_owned(),
             input: json!("Homer"),

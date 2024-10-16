@@ -317,16 +317,16 @@ pub mod tests {
         inference::{tests::AssertConcurrentClient, CompletionRequest, Inference},
         skill_store::{SkillProviderMsg, SkillStore},
         skills::Skill,
-        tokenizers::TokenizersMsg,
     };
 
     #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
+        let mut csi = StubCsi::empty();
+        csi.set_chunking(|_| Ok(vec!["my_chunk".to_owned()]));
 
-        let mut invocation_ctx =
-            SkillInvocationCtx::new(send, DummyCsi, "dummy token".to_owned(), None);
+        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), None);
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -338,24 +338,16 @@ pub mod tests {
         let chunks = invocation_ctx.chunk(request).await;
 
         // Then a single chunk is returned
-        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks, vec!["my_chunk".to_owned()]);
     }
 
     #[tokio::test]
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
         let (send, recv) = oneshot::channel();
-        let (tokenizers, mut recv_tokenizer) = mpsc::channel(1);
-        tokio::spawn(async move {
-            let TokenizersMsg::TokenizerByModel { send, .. } = recv_tokenizer.recv().await.unwrap();
-            send.send(Err(anyhow!("Failed to load tokenizer")))
-        });
-        let csi_apis = CsiDrivers {
-            tokenizers,
-            ..dummy_csi_drivers()
-        };
-        let mut invocation_ctx =
-            SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned(), None);
+        let mut csi = StubCsi::empty();
+        csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
+        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), None);
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();

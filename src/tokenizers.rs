@@ -1,8 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
-use async_trait::async_trait;
 use aleph_alpha_client::Client;
 use anyhow::Context as _;
+use async_trait::async_trait;
 use tokenizers::Tokenizer;
 use tokio::{
     sync::{mpsc, oneshot},
@@ -136,13 +136,16 @@ impl TokenizersActor {
 
 #[cfg(test)]
 pub mod tests {
-    use std::sync::Arc;
     use anyhow::anyhow;
     use async_trait::async_trait;
+    use std::sync::Arc;
 
-    use super::{TokenizerApi, Tokenizer};
+    use super::{Tokenizer, TokenizerApi};
 
-    use crate::{tests::{api_token, inference_address}, tokenizers::Tokenizers};
+    use crate::{
+        tests::{api_token, inference_address},
+        tokenizers::Tokenizers,
+    };
 
     /// A real world hugging face tokenizer for testing
     pub fn pharia_1_llm_7b_control_tokenizer() -> Tokenizer {
@@ -163,7 +166,10 @@ pub mod tests {
             if model_name == "Pharia-1-LLM-7B-control" {
                 Ok(Arc::new(pharia_1_llm_7b_control_tokenizer()))
             } else {
-                Err(anyhow!("model '{}' not supported by FakeTokenizers", model_name))
+                Err(anyhow!(
+                    "model '{}' not supported by FakeTokenizers",
+                    model_name
+                ))
             }
         }
     }
