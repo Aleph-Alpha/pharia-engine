@@ -311,7 +311,7 @@ pub mod tests {
 
     use crate::{
         csi::{
-            tests::{dummy_csi_apis, DummyCsi, StubCsi},
+            tests::{dummy_csi_drivers, DummyCsi, StubCsi},
             CsiDrivers,
         },
         inference::{tests::AssertConcurrentClient, CompletionRequest, Inference},
@@ -327,7 +327,7 @@ pub mod tests {
         let tokenizers = FakeTokenizers::new();
         let csi_apis = CsiDrivers {
             tokenizers: tokenizers.api(),
-            ..dummy_csi_apis()
+            ..dummy_csi_drivers()
         };
         let mut invocation_ctx =
             SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned(), None);
@@ -360,7 +360,7 @@ pub mod tests {
         });
         let csi_apis = CsiDrivers {
             tokenizers,
-            ..dummy_csi_apis()
+            ..dummy_csi_drivers()
         };
         let mut invocation_ctx =
             SkillInvocationCtx::new(send, csi_apis, "dummy token".to_owned(), None);
@@ -464,7 +464,7 @@ pub mod tests {
         let inference = Inference::with_client(client);
         let csi_apis = CsiDrivers {
             inference: inference.api(),
-            ..dummy_csi_apis()
+            ..dummy_csi_drivers()
         };
         let store = SkillStoreGreetStub::new(engine.clone());
         let executor = SkillExecutor::new(engine, csi_apis, store.api());

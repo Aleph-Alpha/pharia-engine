@@ -130,14 +130,37 @@ pub mod tests {
     use tokio::sync::mpsc;
 
     use crate::{
-        inference::{
+        csi::chunking::ChunkParams, inference::{
             tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
-        },
-        tests::api_token,
-        tokenizers::TokenizersApi,
+        }, tests::api_token, tokenizers::{tests::FakeTokenizers, TokenizersApi}
     };
 
     use super::{ChunkRequest, Csi, CsiDrivers};
+
+    #[tokio::test]
+    async fn chunk() {
+        // Given a skill invocation context with a stub tokenizer provider
+        let tokenizers = FakeTokenizers::new();
+        let csi_apis = CsiDrivers {
+            tokenizers: tokenizers.api(),
+            ..dummy_csi_drivers()
+        };
+
+        // When chunking a short text
+        let model = "Pharia-1-LLM-7B-control".to_owned();
+        let max_tokens = 10;
+        let request = ChunkRequest {
+            text: "Greet".to_owned(),
+            params: ChunkParams { model, max_tokens },
+        };
+        let chunks = csi_apis.chunk("dummy_token".to_owned(), request).await.unwrap();
+
+        drop(csi_apis);
+        tokenizers.shutdown().await;
+
+        // Then a single chunk is returned
+        assert_eq!(chunks.len(), 1);
+    }
 
     #[tokio::test]
     async fn complete_all_completion_requests_in_respective_order() {
@@ -145,7 +168,7 @@ pub mod tests {
         let inference_stub = InferenceStub::new(|r| Ok(Completion::from_text(r.prompt)));
         let csi_apis = CsiDrivers {
             inference: inference_stub.api(),
-            ..dummy_csi_apis()
+            ..dummy_csi_drivers()
         };
 
         // When requesting multiple completions
@@ -183,7 +206,7 @@ pub mod tests {
         assert!(completions.get(1).unwrap().text.contains("2nd"));
     }
 
-    pub fn dummy_csi_apis() -> CsiDrivers {
+    pub fn dummy_csi_drivers() -> CsiDrivers {
         let (send, _recv) = mpsc::channel(1);
         let inference = InferenceApi::new(send);
 
