@@ -317,7 +317,7 @@ pub mod tests {
         inference::{tests::AssertConcurrentClient, CompletionRequest, Inference},
         skill_store::{SkillProviderMsg, SkillStore},
         skills::Skill,
-        tokenizers::{tests::FakeTokenizers, TokenizersApi, TokenizersMsg},
+        tokenizers::{tests::FakeTokenizers, TokenizersMsg},
     };
 
     #[tokio::test]
@@ -352,8 +352,7 @@ pub mod tests {
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
         let (send, recv) = oneshot::channel();
-        let (send_tokenizer, mut recv_tokenizer) = mpsc::channel(1);
-        let tokenizers = TokenizersApi::new(send_tokenizer);
+        let (tokenizers, mut recv_tokenizer) = mpsc::channel(1);
         tokio::spawn(async move {
             let TokenizersMsg::TokenizerByModel { send, .. } = recv_tokenizer.recv().await.unwrap();
             send.send(Err(anyhow!("Failed to load tokenizer")))

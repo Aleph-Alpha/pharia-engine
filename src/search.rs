@@ -1,5 +1,5 @@
 mod actor;
 mod client;
 
-pub use actor::{Search, SearchApi, SearchMessage};
+pub use actor::{Search, SearchMessage};
 

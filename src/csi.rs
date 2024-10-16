@@ -8,7 +8,7 @@ use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
     search::SearchMessage,
-    tokenizers::TokenizersApi,
+    tokenizers::{TokenizerApi as _, TokenizersMsg},
 };
 
 pub use self::chunking::ChunkRequest;
@@ -24,7 +24,7 @@ pub struct CsiDrivers {
     pub inference: InferenceApi,
     #[expect(dead_code, reason = "Unused so far")]
     pub search: mpsc::Sender<SearchMessage>,
-    pub tokenizers: TokenizersApi,
+    pub tokenizers: mpsc::Sender<TokenizersMsg>,
 }
 
 /// Cognitive System Interface (CSI) as consumed internally by Pharia Kernel, before the CSI is
@@ -132,7 +132,7 @@ pub mod tests {
     use crate::{
         csi::chunking::ChunkParams, inference::{
             tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
-        }, tests::api_token, tokenizers::{tests::FakeTokenizers, TokenizersApi}
+        }, tests::api_token, tokenizers::tests::FakeTokenizers
     };
 
     use super::{ChunkRequest, Csi, CsiDrivers};
@@ -213,7 +213,7 @@ pub mod tests {
         let (search, _recv) = mpsc::channel(1);
 
         let (send, _recv) = mpsc::channel(1);
-        let tokenizers = TokenizersApi::new(send);
+        let tokenizers = send;
 
         CsiDrivers {
             inference,

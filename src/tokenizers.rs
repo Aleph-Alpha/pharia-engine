@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
 use aleph_alpha_client::Client;
 use anyhow::Context as _;
 use tokenizers::Tokenizer;
@@ -8,17 +9,18 @@ use tokio::{
     task::JoinHandle,
 };
 
-#[derive(Clone)]
-pub struct TokenizersApi {
-    sender: mpsc::Sender<TokenizersMsg>,
+#[async_trait]
+pub trait TokenizerApi {
+    async fn tokenizer_by_model(
+        &self,
+        api_token: String,
+        model_name: String,
+    ) -> Result<Arc<Tokenizer>, anyhow::Error>;
 }
 
-impl TokenizersApi {
-    pub fn new(sender: mpsc::Sender<TokenizersMsg>) -> Self {
-        TokenizersApi { sender }
-    }
-
-    pub async fn tokenizer_by_model(
+#[async_trait]
+impl TokenizerApi for mpsc::Sender<TokenizersMsg> {
+    async fn tokenizer_by_model(
         &self,
         api_token: String,
         model_name: String,
@@ -29,7 +31,7 @@ impl TokenizersApi {
             model_name,
             send,
         };
-        self.sender.send(msg).await.unwrap();
+        self.send(msg).await.unwrap();
         recv.await.unwrap()
     }
 }
@@ -51,8 +53,8 @@ impl Tokenizers {
         Ok(Tokenizers { sender, handle })
     }
 
-    pub fn api(&self) -> TokenizersApi {
-        TokenizersApi::new(self.sender.clone())
+    pub fn api(&self) -> mpsc::Sender<TokenizersMsg> {
+        self.sender.clone()
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -136,13 +138,13 @@ impl TokenizersActor {
 pub mod tests {
     use std::sync::Arc;
 
-    use super::{TokenizersApi, TokenizersMsg};
+    use super::TokenizersMsg;
     use tokenizers::Tokenizer;
     use tokio::{sync::mpsc, task::JoinHandle};
 
     use crate::{
         tests::{api_token, inference_address},
-        tokenizers::Tokenizers,
+        tokenizers::{TokenizerApi as _, Tokenizers},
     };
 
     /// A real world hugging face tokenizer for testing
@@ -179,8 +181,8 @@ pub mod tests {
             Self { send, handle }
         }
 
-        pub fn api(&self) -> TokenizersApi {
-            TokenizersApi::new(self.send.clone())
+        pub fn api(&self) -> mpsc::Sender<TokenizersMsg> {
+            self.send.clone()
         }
 
         pub async fn shutdown(self) {
