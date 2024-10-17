@@ -293,13 +293,13 @@ pub mod tests {
     type CompleteFn =
         dyn Fn(CompletionRequest) -> Result<Completion, anyhow::Error> + Send + Sync + 'static;
 
-    type Chunkfn =
+    type ChunkFn =
         dyn Fn(ChunkRequest) -> Result<Vec<String>, anyhow::Error> + Send + Sync + 'static;
 
     #[derive(Clone)]
     pub struct StubCsi {
         pub completion: Arc<Box<CompleteFn>>,
-        pub chunking: Arc<Box<Chunkfn>>,
+        pub chunking: Arc<Box<ChunkFn>>,
     }
 
     impl StubCsi {
