@@ -52,7 +52,7 @@ pub mod tests {
         inference::{Completion, CompletionRequest},
         language_selection::{select_language, Language, SelectLanguageRequest},
         namespace_watcher::OperatorConfig,
-        search::{SearchRequest, SearchResult},
+        search::{DocumentPath, SearchRequest, SearchResult},
         skill_store::SkillStore,
     };
 
@@ -246,8 +246,17 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             select_language(request)
         }
 
-        async fn search(&mut self, _request: SearchRequest) -> Vec<SearchResult> {
-            unimplemented!()
+        async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult> {
+            let document_path = DocumentPath {
+                namespace: "aleph-alpha".to_owned(),
+                collection: "test-collection".to_owned(),
+                name: "small".to_owned(),
+            };
+            vec![SearchResult {
+                document_path,
+                content: request.query,
+                score: 1.0,
+            }]
         }
     }
 

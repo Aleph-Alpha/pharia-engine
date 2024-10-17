@@ -34,6 +34,14 @@ pub fn given_greet_skill_v0_2() {
     *WASM_BUILD;
 }
 
+/// Creates `search_skill.wasm` in `skills` directory, based on `crates/search-skill`
+pub fn given_search_skill() {
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("search-skill");
+    });
+    *WASM_BUILD;
+}
+
 /// Creates `greet-py.wasm` in `skills` directory, based on `greet-py`
 pub fn given_greet_py() {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {

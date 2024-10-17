@@ -565,7 +565,7 @@ mod tests {
 
     use test_skills::{
         given_greet_py, given_greet_py_v0_2, given_greet_skill, given_greet_skill_v0_1,
-        given_greet_skill_v0_2,
+        given_greet_skill_v0_2, given_search_skill,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -655,6 +655,24 @@ mod tests {
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_unstable() {
+        // Given a skill loaded by our engine
+        given_search_skill();
+        let wasm = fs::read("skills/search_skill.wasm").unwrap();
+        let engine = Engine::new().unwrap();
+        let skill = Skill::new(&engine, wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let content = "42";
+        let input = json!(content);
+        let result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string array
+        assert_eq!(result, json!([content]));
     }
 
     #[tokio::test]
