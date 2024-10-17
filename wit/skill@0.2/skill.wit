@@ -1,4 +1,4 @@
-package pharia:skill@0.2.4;
+package pharia:skill@0.2.5;
 
 @since(version = 0.1.0)
 world skill {
