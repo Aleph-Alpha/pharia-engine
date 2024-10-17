@@ -4,7 +4,7 @@ use axum::http;
 use dotenvy::dotenv;
 use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, OperatorConfig};
 use reqwest::{header, Body};
-use serde_json::{json, Value};
+use serde_json::json;
 use test_skills::given_greet_skill;
 use tokio::sync::oneshot;
 
