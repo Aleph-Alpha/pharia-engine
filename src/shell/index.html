@@ -1,3 +1,104 @@
-<h1>Welcome to Pharia Kernel 👋</h1>
-
-<p>Sorry, we do not have a UI to show you, but you can  read our <a href="/docs/">documentation</a> or look at our <a href="/api-docs">Open API specification</a>.</p>
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>Pharia Kernel</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                background: #0f0f12;
+                padding: 20px;
+            }
+            h1 {
+                color: #f2f2f8;
+                font-size: 30px;
+                font-weight: 700;
+                line-height: 35.22px;
+                text-align: center;
+            }
+            p {
+                color: #b9b9ce;
+                font-size: 16px;
+                font-weight: 500;
+                line-height: 24px;
+                padding: 12px;
+            }
+            ul {
+                display: flex;
+                flex-wrap: wrap;
+                place-content: center;
+                gap: 16px;
+                padding: 0;
+                list-style-type: none;
+            }
+            a {
+                padding: 12px;
+                border-radius: 4px;
+                border: 1px solid #33333c;
+                background: #dcf706;
+                color: #0f0f12;
+                font-size: 14px;
+                font-weight: 600;
+                line-height: 16.42px;
+            }
+            a:hover {
+                background: #bcd902;
+            }
+            .wave {
+                animation-name: wave-animation;
+                animation-duration: 2s;
+                animation-iteration-count: 3;
+                transform-origin: 70% 70%;
+                display: inline-block;
+            }
+            @keyframes wave-animation {
+                0% {
+                    transform: rotate(0deg);
+                }
+                15% {
+                    transform: rotate(15deg);
+                }
+                30% {
+                    transform: rotate(-9deg);
+                }
+                40% {
+                    transform: rotate(15deg);
+                }
+                50% {
+                    transform: rotate(-5deg);
+                }
+                60% {
+                    transform: rotate(12deg);
+                }
+                70% {
+                    transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(0deg);
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Welcome to Pharia Kernel <span class="wave">👋</span></h1>
+        <p>
+            You might be wondering what the Kernel is. At this point, on some
+            level of detail, we are still in the process of figuring it out
+            ourselves. So far, what we know is that it allows you to deploy and
+            execute user-defined code (we call it Skills). These Skills can
+            interact with the world using the Cognitive System Interface (CSI),
+            which is an interface with functionality biased towards the domain
+            of generative AI. The CSI is also the only way these skills can
+            interact with the world. While this may seem restrictive, it
+            facilitates a frictionless deployment experience and ensures
+            security during execution.
+        </p>
+        <ul>
+            <li>
+                <a href="/docs/">Documentation</a>
+            </li>
+            <li>
+                <a href="/api-docs">Open API Specification</a>
+            </li>
+        </ul>
+    </body>
+</html>
