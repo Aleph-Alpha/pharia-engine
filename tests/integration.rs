@@ -4,7 +4,7 @@ use axum::http;
 use dotenvy::dotenv;
 use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, OperatorConfig};
 use reqwest::{header, Body};
-use serde_json::json;
+use serde_json::{json, Value};
 use test_skills::given_greet_skill;
 use tokio::sync::oneshot;
 
@@ -127,6 +127,46 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
     let completion = serde_json::from_slice::<Completion>(&body).unwrap();
     assert!(completion.text.contains("Homer"));
     assert!(matches!(completion.finish_reason, FinishReason::Stop));
+
+    kernel.shutdown().await;
+}
+
+#[cfg_attr(not(feature = "test_document_index"), ignore)]
+#[tokio::test]
+async fn search_via_remote_csi() {
+    let kernel = TestKernel::with_skills(&[]).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(
+            json!({
+                "version": "0.2",
+                "function": "search",
+                "index_path": {
+                    "namespace": "aleph-alpha",
+                    "collection": "test-collection",
+                    "index": "small",
+                },
+                "query":"What is a blockchain?",
+                "max_results":10,
+                "min_score":0.7,
+            })
+            .to_string(),
+        ))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let body = resp.text().await.unwrap();
+    assert!(body.to_lowercase().contains("blockchain"));
 
     kernel.shutdown().await;
 }

@@ -104,7 +104,8 @@ wat = "1.219.1"
 
 [features]
 test_inference = []
-default = ["test_inference"]
+test_document_index = []
+default = ["test_inference", "test_document_index"]
 
 [lints]
 workspace = true

@@ -44,7 +44,7 @@ impl SearchRequest {
 }
 
 /// Which documents you want to search in, and which type of index should be used
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IndexPath {
     /// The namespace the collection belongs to
     pub namespace: String,
@@ -80,7 +80,7 @@ pub enum Cursor {
 }
 
 /// The name of a given document
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DocumentPath {
     /// The namespace the collection belongs to
     pub namespace: String,

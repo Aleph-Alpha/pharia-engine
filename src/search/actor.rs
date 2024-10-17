@@ -2,6 +2,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -58,7 +59,7 @@ pub trait SearchApi: Clone + Send + Sync + 'static {
     ) -> anyhow::Result<Vec<SearchResult>>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SearchResult {
     pub document_path: DocumentPath,
     pub content: String,
@@ -87,10 +88,10 @@ impl SearchApi for mpsc::Sender<SearchMessage> {
 }
 
 /// Search a Document Index collection
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SearchRequest {
     /// Where you want to search in
-    pub index: IndexPath,
+    pub index_path: IndexPath,
     /// What you want to search for
     pub query: String,
     /// The maximum number of results to return. Defaults to 1
@@ -201,7 +202,7 @@ impl SearchMessage {
         api_token: &str,
     ) -> anyhow::Result<Vec<DocumentIndexSearchResult>> {
         let SearchRequest {
-            index,
+            index_path: index,
             query,
             max_results,
             min_score,
@@ -269,7 +270,7 @@ mod tests {
     impl SearchRequest {
         pub fn new(index: IndexPath, query: impl Into<String>) -> Self {
             Self {
-                index,
+                index_path: index,
                 query: query.into(),
                 max_results: 1,
                 min_score: None,

@@ -413,13 +413,13 @@ mod v0_2 {
                 collection,
                 index,
             } = index_path;
-            let index = search::IndexPath {
+            let index_path = search::IndexPath {
                 namespace,
                 collection,
                 index,
             };
             let request = SearchRequest {
-                index,
+                index_path,
                 query,
                 max_results,
                 min_score,

@@ -130,7 +130,7 @@ impl Csi for CsiDrivers {
         auth: String,
         request: SearchRequest,
     ) -> Result<Vec<SearchResult>, anyhow::Error> {
-        let index_path = &request.index;
+        let index_path = &request.index_path;
         trace!(
             "search: namespace={} collection={} max_results={} min_score={}",
             index_path.namespace,
@@ -408,14 +408,6 @@ pub mod tests {
         pub async fn shutdown(self) {
             drop(self.send);
             self.handle.await.unwrap();
-        }
-
-        async fn search(
-            &self,
-            _auth: String,
-            _request: SearchRequest,
-        ) -> Result<Vec<SearchResult>, anyhow::Error> {
-            bail!("Test error")
         }
     }
 }

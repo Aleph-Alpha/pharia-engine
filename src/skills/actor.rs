@@ -302,9 +302,9 @@ where
         let span = span!(
             Level::DEBUG,
             "search",
-            namespace = request.index.namespace,
-            collection = request.index.collection,
-            index = request.index.index
+            namespace = request.index_path.namespace,
+            collection = request.index_path.collection,
+            index = request.index_path.index
         );
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());

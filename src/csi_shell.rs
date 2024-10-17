@@ -10,6 +10,7 @@ use crate::{
     csi::{ChunkRequest, Csi},
     inference::{self, CompletionRequest},
     language_selection::SelectLanguageRequest,
+    search::SearchRequest,
 };
 
 pub async fn http_csi_handle<C>(
@@ -45,6 +46,10 @@ where
                 )
                 .await
                 .map(|v| json!(v)),
+            V0_2CsiRequest::Search(search_request) => drivers
+                .search(bearer.token().to_owned(), search_request)
+                .await
+                .map(|v| json!(v)),
         },
     };
     match result {
@@ -74,6 +79,7 @@ pub enum V0_2CsiRequest {
     Chunk(ChunkRequest),
     SelectLanguage(SelectLanguageRequest),
     CompleteAll(CompleteAllRequest),
+    Search(SearchRequest),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
