@@ -1,5 +1,5 @@
 // Allow because it is part of the bindgen generated code
-#![allow(unsafe_op_in_unsafe_fn, unsafe_attr_outside_unsafe)]
+#![expect(unsafe_op_in_unsafe_fn, unsafe_attr_outside_unsafe)]
 use pharia::skill::csi::complete_text;
 
 wit_bindgen::generate!({ path: "../../wit/skill@unversioned", world: "skill" });
