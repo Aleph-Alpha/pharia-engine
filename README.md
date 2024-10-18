@@ -12,7 +12,7 @@ There are some prerequisites you need to install once
 
 ```shell
 # We need the Wasm target to be able to compile the skills
-rustup target add wasm32-wasip1
+rustup target add wasm32-wasip2
 # We need wasm-tools to strip skill binaries
 cargo install wasm-tools
 ```
@@ -87,7 +87,7 @@ For local development you can run the site generator locally, either via docker 
 
 ### Run via podman
 
-***Note:*** *the following steps assume that you are in the workspace's root directory.*
+**_Note:_** _the following steps assume that you are in the workspace's root directory._
 
 As a prerequisite you have to build the container image once:
 
@@ -117,7 +117,7 @@ mdbook serve doc
 
 ### Run via mdBook tool chain
 
-***Note:*** *the following steps assume that you have [Rust](https://www.rust-lang.org/tools/install) installed and that you are in the workspace's root directory.*
+**_Note:_** _the following steps assume that you have [Rust](https://www.rust-lang.org/tools/install) installed and that you are in the workspace's root directory._
 
 Install mdbook:
 

@@ -50,7 +50,7 @@ cargo_test:
     - apt-get update
     - apt-get -y install python3-venv
     - cargo install wit-bindgen-cli
-    - rustup target add wasm32-wasip1
+    - rustup target add wasm32-wasip2
     - cargo install wasm-tools
     - cargo test --workspace --all-features
 

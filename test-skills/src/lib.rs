@@ -5,10 +5,8 @@ use std::{
     sync::{LazyLock, OnceLock},
 };
 use tempfile::{tempdir, TempDir};
-use wasi_preview1_component_adapter_provider::WASI_SNAPSHOT_PREVIEW1_REACTOR_ADAPTER;
-use wit_component::ComponentEncoder;
 
-const WASI_TARGET: &str = "wasm32-wasip1";
+const WASI_TARGET: &str = "wasm32-wasip2";
 
 /// Creates `greet_skill.wasm` in `skills` directory, based on `crates/greet-skill`
 pub fn given_greet_skill() {
@@ -73,11 +71,7 @@ fn given_rust_skill(package_name: &str) {
 /// In a nutshell this executes the following commands
 ///
 /// ```shell
-/// cargo build -p greet-skill-v0_2 --target wasm32-wasip1 --release
-/// wasm-tools component new \
-///     ./target/wasm32-wasip1/release/greet_skill_v0_2.wasm \
-///     -o ./skills/greet_skill_v0_2.wasm \
-///     --adapt ./wasi_snapshot_preview1.reactor-25.0.0.wasm
+/// cargo build -p greet-skill-v0_2 --target wasm32-wasip2 --release
 /// wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
 /// ```
 fn build_rust_skill(package_name: &str) {
@@ -85,7 +79,7 @@ fn build_rust_skill(package_name: &str) {
 
     // Build the release artefact for web assembly target
     //
-    // cargo build -p greet-skill-v0_2 --target wasm32-wasip1 --release
+    // cargo build -p greet-skill-v0_2 --target wasm32-wasip2 --release
     let output = Command::new("cargo")
         .args([
             "build",
@@ -99,23 +93,11 @@ fn build_rust_skill(package_name: &str) {
         .unwrap();
     error_on_status("Building web assembly failed.", output).unwrap();
 
-    // Until Rust supports wasi 0.2 natively, we have to adapt wasi 0.1 calls to 0.2
-    let wasm_p1_bytes =
-        std::fs::read(format!("./target/{WASI_TARGET}/release/{snake_case}.wasm")).unwrap();
-
-    let wasm_p2_bytes = ComponentEncoder::default()
-        .module(&wasm_p1_bytes)
-        .unwrap()
-        .adapter(
-            "wasi_snapshot_preview1",
-            WASI_SNAPSHOT_PREVIEW1_REACTOR_ADAPTER,
-        )
-        .unwrap()
-        .validate(true)
-        .encode()
-        .unwrap();
-
-    std::fs::write(format!("./skills/{snake_case}.wasm"), wasm_p2_bytes).unwrap();
+    std::fs::copy(
+        format!("./target/{WASI_TARGET}/release/{snake_case}.wasm"),
+        format!("./skills/{snake_case}.wasm"),
+    )
+    .unwrap();
 
     // wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
     let output = Command::new("wasm-tools")

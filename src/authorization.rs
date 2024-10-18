@@ -13,7 +13,7 @@ impl Authorization {
         Authorization { send, handle }
     }
 
-    pub fn api(&self) -> impl AuthorizationApi {
+    pub fn api(&self) -> impl AuthorizationApi + use<> {
         self.send.clone()
     }
 

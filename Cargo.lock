@@ -3814,7 +3814,6 @@ dependencies = [
  "anyhow",
  "change-case",
  "tempfile",
- "wasi-preview1-component-adapter-provider",
  "wit-component 0.219.1",
 ]
 
@@ -4436,12 +4435,6 @@ name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
-
-[[package]]
-name = "wasi-preview1-component-adapter-provider"
-version = "25.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d573ba2346e809ae5ab771aa96331b8a967c6653c893e7e95ca77a99025c3e11"
 
 [[package]]
 name = "wasm-bindgen"
