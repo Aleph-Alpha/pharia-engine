@@ -8,7 +8,7 @@ use crate::{
     inference::{Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
     search::{SearchApi, SearchMessage, SearchRequest, SearchResult},
-    tokenizers::{TokenizerApi as _, TokenizersMsg},
+    tokenizers::TokenizerApi,
 };
 
 pub use self::chunking::ChunkRequest;
@@ -19,11 +19,11 @@ pub mod chunking;
 ///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
-pub struct CsiDrivers {
+pub struct CsiDrivers<T> {
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
     pub search: mpsc::Sender<SearchMessage>,
-    pub tokenizers: mpsc::Sender<TokenizersMsg>,
+    pub tokenizers: T,
 }
 
 /// Cognitive System Interface (CSI) as consumed internally by Pharia Kernel, before the CSI is
@@ -67,7 +67,7 @@ pub trait Csi {
 }
 
 #[async_trait]
-impl Csi for CsiDrivers {
+impl<T> Csi for CsiDrivers<T> where T: TokenizerApi + Send + Sync {
     async fn complete_text(
         &self,
         auth: String,
@@ -167,9 +167,9 @@ pub mod tests {
     #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
-        let tokenizers = FakeTokenizersActor::new();
+        let tokenizers = FakeTokenizers;
         let csi_apis = CsiDrivers {
-            tokenizers: tokenizers.api(),
+            tokenizers,
             ..dummy_csi_drivers()
         };
 
@@ -184,9 +184,6 @@ pub mod tests {
             .chunk("dummy_token".to_owned(), request)
             .await
             .unwrap();
-
-        drop(csi_apis);
-        tokenizers.shutdown().await;
 
         // Then a single chunk is returned
         assert_eq!(chunks.len(), 1);
@@ -236,14 +233,12 @@ pub mod tests {
         assert!(completions.get(1).unwrap().text.contains("2nd"));
     }
 
-    fn dummy_csi_drivers() -> CsiDrivers {
+    fn dummy_csi_drivers() -> CsiDrivers<FakeTokenizers> {
         let (send, _recv) = mpsc::channel(1);
         let inference = InferenceApi::new(send);
 
         let (search, _recv) = mpsc::channel(1);
-
-        let (send, _recv) = mpsc::channel(1);
-        let tokenizers = send;
+        let tokenizers = FakeTokenizers;
 
         CsiDrivers {
             inference,
@@ -368,43 +363,6 @@ pub mod tests {
             _request: SearchRequest,
         ) -> Result<Vec<SearchResult>, anyhow::Error> {
             unimplemented!()
-        }
-    }
-
-    struct FakeTokenizersActor {
-        send: mpsc::Sender<TokenizersMsg>,
-        handle: JoinHandle<()>,
-    }
-
-    impl FakeTokenizersActor {
-        pub fn new() -> FakeTokenizersActor {
-            let (send, mut recv) = mpsc::channel(1);
-            let handle = tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    match msg {
-                        TokenizersMsg::TokenizerByModel {
-                            api_token: _,
-                            model_name,
-                            send,
-                        } => {
-                            let tokenizer = FakeTokenizers
-                                .tokenizer_by_model("dummy_token".to_string(), model_name)
-                                .await;
-                            send.send(tokenizer).unwrap();
-                        }
-                    }
-                }
-            });
-            Self { send, handle }
-        }
-
-        pub fn api(&self) -> mpsc::Sender<TokenizersMsg> {
-            self.send.clone()
-        }
-
-        pub async fn shutdown(self) {
-            drop(self.send);
-            self.handle.await.unwrap();
         }
     }
 }
