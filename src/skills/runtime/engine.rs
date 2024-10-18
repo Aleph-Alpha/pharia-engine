@@ -304,7 +304,7 @@ mod v0_2 {
 
     use super::LinkedCtx;
 
-    bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true, features: ["search"]  });
+    bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true });
 
     #[async_trait::async_trait]
     impl Host for LinkedCtx {
@@ -658,7 +658,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn can_load_and_run_unstable() {
+    async fn can_load_and_run_search_skill() {
         // Given a skill loaded by our engine
         given_search_skill();
         let wasm = fs::read("skills/search_skill.wasm").unwrap();

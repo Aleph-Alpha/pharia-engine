@@ -6,7 +6,7 @@ use exports::pharia::skill::skill_handler::{Error, Guest};
 use pharia::skill::csi::{search, IndexPath};
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill", features: ["search"] });
+wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill" });
 
 struct Skill;
 
