@@ -80,20 +80,17 @@ lingua = { version = "1.6.2", default-features = false, features = [
 ] }
 opentelemetry = "0.26.0"
 opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
-opentelemetry-stdout = { version = "0.26.0", features = ["trace"] }
 tracing-opentelemetry = "0.27.0"
 opentelemetry-otlp = "0.26.0"
 opentelemetry-semantic-conventions = { version = "0.26.0", features = [
     "semconv_experimental",
 ] }
-itertools = "0.13.0"
 humantime = "2.1.0"
 
 [dev-dependencies]
 test-skills = { path = "./test-skills" }
 fake = "2.10.0"
 http-body-util = "0.1.2"
-libc = "0.2.159"
 mime = "0.3.17"
 rand = "0.8.5"
 tempfile = "3.13.0"

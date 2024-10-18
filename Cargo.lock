@@ -2672,23 +2672,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db945c1eaea8ac6a9677185357480d215bb6999faa9f691d0c4d4d641eab7a09"
 
 [[package]]
-name = "opentelemetry-stdout"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a5c185afbc26decc6f10d728971847e3f96532d2b3fb7db2569c1bce154509b"
-dependencies = [
- "async-trait",
- "chrono",
- "futures-util",
- "opentelemetry",
- "opentelemetry_sdk",
- "ordered-float",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "opentelemetry_sdk"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2707,15 +2690,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
-]
-
-[[package]]
-name = "ordered-float"
-version = "4.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44d501f1a72f71d3c063a6bbc8f7271fa73aa09fe5d6283b6571e2ed176a2537"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]
@@ -2750,8 +2724,6 @@ dependencies = [
  "futures",
  "http-body-util",
  "humantime",
- "itertools 0.13.0",
- "libc",
  "lingua",
  "mime",
  "oci-client",
@@ -2759,7 +2731,6 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
- "opentelemetry-stdout",
  "opentelemetry_sdk",
  "rand",
  "reqwest",
@@ -3814,7 +3785,6 @@ dependencies = [
  "anyhow",
  "change-case",
  "tempfile",
- "wit-component 0.219.1",
 ]
 
 [[package]]
