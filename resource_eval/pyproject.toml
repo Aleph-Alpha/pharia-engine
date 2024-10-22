@@ -1,0 +1,16 @@
+[project]
+name = "resource_eval"
+version = "0.1.0"
+description = "Trace resource consumption of Pharia Kernel"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pharia-kernel-sdk-py>=0.2.0",
+    "psutil>=6.1.0",
+    "python-dotenv>=1.0.1",
+    "ruff>=0.7.0",
+]
+
+[[tool.uv.index]]
+name = "jfrog"
+url = "https://alephalpha.jfrog.io/artifactory/api/pypi/python/simple"

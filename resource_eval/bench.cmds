@@ -1,0 +1,32 @@
+# simple language to script benchmarks
+# a hashtag is a comment, obviously
+
+# add_py and access a single skill, based on sample.wasm
+add_py
+
+# adds and accesses multiple skills, here another 4 adding up to 5 all together
+# to differentiate between arguments to the call and the repetition we prefix the number
+4 add_py
+
+# we see, that we have 5 skills
+skills
+
+# access a specific skill, that is rather difficult, you have to guess the name 
+# which has a number appended, and know the parameters
+# Here we execute sample1 with Alice to greet and use 100 KByte of memory for 20 ms
+execute_skill sample_py1 Alice 100 20
+
+# execute all existing skills as shown by skills
+execute_all Bob 20 10
+
+# do 50 requests, 10 each as we have 5 skills
+10 execute_all Cecilia 0 0
+
+# we still have 5 skills
+skills
+# all of which are cached
+cached_skills
+
+
+# stop happens automatically at the end of the script and is logged
+# there is no command for that

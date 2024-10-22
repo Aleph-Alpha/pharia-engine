@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+
+# Virtual environments
+.venv
+
+# Development environments
+.vscode
+
+# logs
+*.log
+
+# wasm, kernel
+*.wasm
+wasi_deps
+skills/
+
+# personal info
+.env
