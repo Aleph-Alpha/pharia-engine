@@ -80,15 +80,20 @@ def get_mem(proc):
         return 0, 0
 
 
+def diff_str_dt(start, end):
+    "computes difference in milliseconds from two log timestamps"
+    sdt, edt = str2dt(start), str2dt(end)
+    delta = edt - sdt
+    # in milliseconds
+    return int(delta / datetime.timedelta(milliseconds=1))
+
+
 def observe_diff(start: dict, end: dict):
     "what are the values and differences in a dictionary of logged values"
     dic = dict()
     for key in start.keys():
         if key == TIMESTAMP:
-            sdt, edt = str2dt(start[key]), str2dt(end[key])
-            delta = edt - sdt
-            # in milliseconds
-            dic[TOOK] = int(delta / datetime.timedelta(milliseconds=1))
+            dic[TOOK] = diff_str_dt(start[key], end[key])
         elif key not in end:
             continue
         elif type(start[key]) in (int, float):

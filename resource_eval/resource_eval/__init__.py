@@ -3,11 +3,12 @@ import argparse
 from dotenv import load_dotenv
 
 from .commands import execute_cmds_file
-from .log_util import logger, run_logger
-from .run_pk import PhariaKernel, get_machine
+from .log_util import dt2str, logger, run_logger
+from .run_pk import PhariaKernel, diff_str_dt, get_machine
 
 
 def do_run(cmds_file, mem):
+    start = dt2str()
     logger.info("start of run")
     machine = get_machine()
     logger.info(f"run: {str(machine)}")
@@ -21,7 +22,8 @@ def do_run(cmds_file, mem):
     execute_cmds_file(pk, cmds_file)
     logger.info("shutting down Pharia Kernel")
     pk.quit()
-    logger.info("end of run")
+    end = dt2str()
+    logger.info(f"end of run, took {diff_str_dt(start, end)} ms total")
 
 
 def do_eval(log_files):
