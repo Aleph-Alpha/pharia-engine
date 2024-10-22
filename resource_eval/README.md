@@ -37,38 +37,59 @@ pharia-skill build sample_py
 
 which should provide you with a file `sample_py.wasm`.
 For the evaluation of the resource consumption we copy from this file.
+The compiled skill does nothing else but greet a Person and optionally may consume some memory or waste some time.
 
 ## Concept
 
-We do a series of skill deployments, accesses etc. which can be described by
-a simple command language. Each command starts in a line with a valid command.
+We do a series of skill deployments, accesses and other Pharia Kernel operations,
+which can be described by a simple command language.
+Each command starts in a line with a valid command.
 All subsequent arguments delimited by whitespace are arguments to this command.
 Commands are:
 
-* `add_py`: adds a python skill, makes a copy of `sample.wasm` and numbers the skills
-  incrementally, the first skill added is `sample1.wasm`.
-* `list_skills': lists all the skills
-* `execute skill sample1 Alice 100 20`: executes a skill with the name `sample1` and
-  greets `Alice`, while doing so 100 KBytes memory and 20 ms all time are wasted.
+* `add_py`: Adds a python skill, makes a copy of `sample_py.wasm` and numbers the skills
+  incrementally, the first skill added is `sample_py1.wasm`.
+* `skills`: Lists all the skills.
+* `execute_skill sample_py1 Alice 100 20`: Executes a skill with the name `sample_py1` and
+  greets `Alice`, while doing so 100 KBytes memory and 20 ms of wall time are wasted.
   The 20 is optional and defaults to 0, the 100 is optional and defaults to 0.
-* `execute_all Alice 0 0`: executes all skills that are listed with the given Parameters
+* `execute_all Alice 0 0`: Executes all skills that are listed with the given parameters.
 
-As a special you may put a number `n` before a command, which repeats command execution
-`n` times.
+You may put a number `n` before a command, which repeats command execution `n` times.
 
 TODO: parallel repetition, parallel blocks
 
-We capture the output of a run in file `241022_162524.558_run.log`, which means that the
-run was captured 2024 on October the 22nd at 16:25:24 and 558 ms. The ending `_run.log` 
-indicated that all information for evaluation is stored there, each line is a Json string.
-These files can be stored and checked in to compare evaluations over time.
-The other log file ends with `_pk.log` and captures the Pharia Kernel output. If all 
-works well it can be safely removed.
+We capture the output of a run of the Pharia Kernel operations in file `241022_162524.558_run.log`,
+which means that the run was captured 2024 on October the 22nd at 16:25:24 and 558 ms.
+The ending `_run.log` indicates that all information for evaluation is stored there, each line is a Json string.
+These `_run.log` files can be stored and checked in to compare evaluations over time.
+In the beginning of a `_run.log` file, there are always three lines.
+First information about the machine the bench runs on, second about the binary, third about the cmds file.
+Then for each Pharia Kernel operation there is a line with the `cmd` it executed, how long it `took` in ms,
+and the resident memory size (`rss`) after the command and by how much it changed compared to before the
+command (`rss_diff`).
+There is similar information about the virtual memory size (`vms`, `vms_diff`).
+Note that `rss` may go down during a run if memory is swapped out. Unfortunately, there is no platform
+independent (i.e. Linux, Mac, and Windows), way to accommodate for this.
+The last line observes the command `stop`, which happens automatically and may take a long time on a Mac.
+
+The other log file ends with `_pk.log` and captures the Pharia Kernel output.
+This file is only used for error tracing and can safely be removed as it is unnecessary for evaluation.
 
 ## Running
 
-To run the evaluation with the commands file `bench.cmds` do:
+To run the evaluation with the commands file `bench.cmds` execute:
 
 ```shell
-./main.py run bench.cms
+./main.py run -m bench.cmds
 ```
+
+Alternatively, you can run the module
+
+```shell
+python3 -m 
+```
+
+## Evaluation
+
+Todo: Compare runs, graphics
