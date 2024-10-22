@@ -4,11 +4,14 @@ from dotenv import load_dotenv
 
 from .commands import execute_cmds_file
 from .log_util import logger, run_logger
-from .run_pk import PhariaKernel
+from .run_pk import PhariaKernel, get_machine
 
 
 def do_run(cmds_file, mem):
     logger.info("start of run")
+    machine = get_machine()
+    logger.info(f"run: {str(machine)}")
+    run_logger.info(machine)
     pk = PhariaKernel(mem)
     pk.start()
     logger.info("Pharia Kernel started")

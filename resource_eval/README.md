@@ -87,7 +87,7 @@ To run the evaluation with the commands file `bench.cmds` execute:
 Alternatively, you can run the module
 
 ```shell
-python3 -m 
+python3 -m resource_eval run -n bench.cmds
 ```
 
 ## Evaluation

@@ -11,6 +11,7 @@ import subprocess
 import threading
 import time
 
+import cpuinfo
 import dotenv
 import psutil
 
@@ -47,6 +48,22 @@ ANSI_ESCAPE_8BIT = re.compile(
 def de_escape(line: str):
     "removes the ansi escape commands from a string"
     return ANSI_ESCAPE_8BIT.sub(b"", line).decode()
+
+
+def get_machine():
+    "gets machine information"
+    cpu = cpuinfo.get_cpu_info()
+    memory = psutil.virtual_memory()
+    # in GB
+    memory_total = round(memory.total / (1024**3))
+    memory_available = round(memory.available / (1024**3))
+    return {
+        "arch": cpu["arch"],
+        "brand": cpu["brand_raw"],
+        "cores": cpu["count"],
+        "memory_total": memory_total,
+        "memory_available": memory_available,
+    }
 
 
 def get_mem(proc):

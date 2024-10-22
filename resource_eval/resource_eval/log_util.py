@@ -49,7 +49,7 @@ def _setup_console_logger(name):
 
 
 def dt2str(timestamp: datetime.datetime = None) -> str:
-    "converts a datetime instance to a parseable string without whitespace"
+    "converts a datetime instance to a string that can be parsed, without whitespace"
     if timestamp is None:
         timestamp = datetime.datetime.now()
     ms = f"{timestamp.microsecond // 1_000:03d}"
