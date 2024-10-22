@@ -292,6 +292,7 @@ mod v0_2 {
     use pharia::skill::csi::{
         ChunkParams, Completion, CompletionParams, CompletionRequest, DocumentPath, FinishReason,
         Host, IndexPath, Language, SearchResult,
+        Message, ChatParams, ChatResponse, Role,
     };
     use wasmtime::component::bindgen;
 
@@ -331,6 +332,17 @@ mod v0_2 {
             };
             let request = inference::CompletionRequest::new(prompt, model).with_params(params);
             self.skill_ctx.complete_text(request).await.into()
+        }
+
+        async fn chat(&mut self, model: String, messages: Vec<Message>, params: ChatParams) -> ChatResponse {
+            let ChatParams { max_tokens, temperature, top_k, top_p } = params;
+            ChatResponse {
+                message: Message {
+                    role: Role::User,
+                    content: "dummy-content".to_owned(),
+                },
+                finish_reason: FinishReason::Stop,
+            }
         }
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
@@ -564,8 +576,7 @@ mod tests {
     use std::fs;
 
     use test_skills::{
-        given_greet_py, given_greet_py_v0_2, given_greet_skill, given_greet_skill_v0_1,
-        given_greet_skill_v0_2, given_search_skill,
+        given_chat_skill, given_greet_py, given_greet_py_v0_2, given_greet_skill, given_greet_skill_v0_1, given_greet_skill_v0_2, given_search_skill
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -673,6 +684,25 @@ mod tests {
 
         // Then it returns a json string array
         assert_eq!(result, json!([content]));
+    }
+
+
+    #[tokio::test]
+    async fn can_load_and_run_chat_skill() {
+        // Given a skill loaded by our engine
+        given_chat_skill();
+        let wasm = fs::read("skills/chat_skill.wasm").unwrap();
+        let engine = Engine::new().unwrap();
+        let skill = Skill::new(&engine, wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let content = "Hello, how are you?";
+        let input = json!(content);
+        let result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string array
+        assert_eq!(result["content"], "dummy-content");
     }
 
     #[tokio::test]

@@ -688,6 +688,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chat-skill"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
