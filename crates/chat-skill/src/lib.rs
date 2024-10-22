@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest};
-use pharia::skill::csi::{chat, Message, ChatParams, Role};
+use pharia::skill::csi::{chat, ChatParams, Message, Role};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill" });
@@ -37,8 +37,8 @@ impl Guest for Skill {
             },
         });
 
-        let output = serde_json::to_vec(&json)
-            .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
+        let output =
+            serde_json::to_vec(&json).map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
         Ok(output)
     }
 }

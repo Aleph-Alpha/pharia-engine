@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tracing::trace;
 
 use crate::{
-    inference::{Completion, CompletionRequest, InferenceApi},
+    inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
     search::{SearchApi, SearchMessage, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
@@ -43,6 +43,9 @@ pub trait Csi {
         requests: Vec<CompletionRequest>,
     ) -> Result<Vec<Completion>, anyhow::Error>;
 
+    async fn chat(&self, auth: String, request: ChatRequest)
+        -> Result<ChatResponse, anyhow::Error>;
+
     async fn chunk(
         &self,
         auth: String,
@@ -67,7 +70,10 @@ pub trait Csi {
 }
 
 #[async_trait]
-impl<T> Csi for CsiDrivers<T> where T: TokenizerApi + Send + Sync {
+impl<T> Csi for CsiDrivers<T>
+where
+    T: TokenizerApi + Send + Sync,
+{
     async fn complete_text(
         &self,
         auth: String,
@@ -97,6 +103,14 @@ impl<T> Csi for CsiDrivers<T> where T: TokenizerApi + Send + Sync {
                 .collect::<Vec<_>>(),
         )
         .await
+    }
+
+    async fn chat(
+        &self,
+        auth: String,
+        request: ChatRequest,
+    ) -> Result<ChatResponse, anyhow::Error> {
+        self.inference.chat(request, auth).await
     }
 
     async fn chunk(
@@ -150,16 +164,17 @@ pub mod tests {
 
     use anyhow::bail;
     use async_trait::async_trait;
-    use tokio::{sync::mpsc, task::JoinHandle};
+    use tokio::sync::mpsc;
 
     use crate::{
         csi::chunking::ChunkParams,
         inference::{
-            tests::InferenceStub, Completion, CompletionParams, CompletionRequest, InferenceApi,
+            tests::InferenceStub, ChatRequest, ChatResponse, Completion, CompletionParams,
+            CompletionRequest, InferenceApi,
         },
         search::{SearchRequest, SearchResult},
         tests::api_token,
-        tokenizers::{tests::FakeTokenizers, TokenizerApi as _, TokenizersMsg},
+        tokenizers::tests::FakeTokenizers,
     };
 
     use super::{ChunkRequest, Csi, CsiDrivers};
@@ -283,6 +298,14 @@ pub mod tests {
         ) -> Result<Vec<SearchResult>, anyhow::Error> {
             panic!("DummyCsi search called")
         }
+
+        async fn chat(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> Result<ChatResponse, anyhow::Error> {
+            panic!("DummyCsi chat called")
+        }
     }
 
     type CompleteFn =
@@ -362,6 +385,14 @@ pub mod tests {
             _auth: String,
             _request: SearchRequest,
         ) -> Result<Vec<SearchResult>, anyhow::Error> {
+            unimplemented!()
+        }
+
+        async fn chat(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> Result<ChatResponse, anyhow::Error> {
             unimplemented!()
         }
     }

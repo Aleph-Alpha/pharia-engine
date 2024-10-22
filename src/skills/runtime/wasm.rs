@@ -49,7 +49,7 @@ pub mod tests {
 
     use crate::{
         csi::ChunkRequest,
-        inference::{Completion, CompletionRequest},
+        inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
         language_selection::{select_language, Language, SelectLanguageRequest},
         namespace_watcher::OperatorConfig,
         search::{DocumentPath, SearchRequest, SearchResult},
@@ -204,6 +204,10 @@ pub mod tests {
         async fn search(&mut self, _request: SearchRequest) -> Vec<SearchResult> {
             unimplemented!()
         }
+
+        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+            unimplemented!()
+        }
     }
 
     /// Asserts a specific prompt and model and returns a greeting message
@@ -258,6 +262,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 score: 1.0,
             }]
         }
+
+        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+            unimplemented!()
+        }
     }
 
     #[derive(Default, Clone)]
@@ -292,6 +300,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         }
 
         async fn search(&mut self, _request: SearchRequest) -> Vec<SearchResult> {
+            unimplemented!()
+        }
+
+        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
             unimplemented!()
         }
     }

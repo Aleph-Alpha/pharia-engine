@@ -75,6 +75,25 @@ impl InferenceApi {
         recv.await
             .expect("sender must be alive when awaiting for answers")
     }
+
+    pub async fn chat(
+        &self,
+        request: ChatRequest,
+        api_token: String,
+    ) -> Result<ChatResponse, anyhow::Error> {
+        let (send, recv) = oneshot::channel();
+        let msg = InferenceMessage::Chat {
+            request,
+            send,
+            api_token,
+        };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await
+            .expect("sender must be alive when awaiting for answers")
+    }
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
@@ -91,6 +110,34 @@ pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
     pub params: CompletionParams,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub struct ChatParams {
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f64>,
+    pub top_k: Option<u32>,
+    pub top_p: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Message {
+    pub role: Role,
+    pub content: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum Role {
+    User,
+    Assistant,
+    System,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub struct ChatRequest {
+    pub model: String,
+    pub messages: Vec<Message>,
+    pub params: ChatParams,
 }
 
 impl CompletionRequest {
@@ -132,6 +179,12 @@ impl FromStr for FinishReason {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Completion {
     pub text: String,
+    pub finish_reason: FinishReason,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatResponse {
+    pub message: Message,
     pub finish_reason: FinishReason,
 }
 
@@ -184,6 +237,11 @@ pub enum InferenceMessage {
         send: oneshot::Sender<anyhow::Result<Completion>>,
         api_token: String,
     },
+    Chat {
+        request: ChatRequest,
+        send: oneshot::Sender<anyhow::Result<ChatResponse>>,
+        api_token: String,
+    },
 }
 
 impl InferenceMessage {
@@ -208,6 +266,14 @@ impl InferenceMessage {
                     };
                     remaining_retries -= 1;
                 };
+                drop(send.send(result));
+            }
+            Self::Chat {
+                request,
+                send,
+                api_token,
+            } => {
+                let result = client.chat(&request, api_token).await;
                 drop(send.send(result));
             }
         }
@@ -253,6 +319,9 @@ pub mod tests {
                     match msg {
                         InferenceMessage::CompleteText { request, send, .. } => {
                             send.send(result(request)).unwrap();
+                        }
+                        InferenceMessage::Chat { .. } => {
+                            unimplemented!()
                         }
                     }
                 }
@@ -301,6 +370,13 @@ pub mod tests {
             } else {
                 Ok(Completion::from_text("Completion succeeded"))
             }
+        }
+        async fn chat(
+            &self,
+            _request: &ChatRequest,
+            _api_token: String,
+        ) -> anyhow::Result<ChatResponse> {
+            unimplemented!()
         }
     }
 
@@ -361,6 +437,14 @@ pub mod tests {
                 sleep(Duration::from_millis(1)).await;
             }
             Ok(Completion::from_text(&request.prompt))
+        }
+
+        async fn chat(
+            &self,
+            _request: &ChatRequest,
+            _api_token: String,
+        ) -> anyhow::Result<ChatResponse> {
+            unimplemented!()
         }
     }
 

@@ -4,7 +4,7 @@ use aleph_alpha_client::{
     Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskCompletion,
 };
 
-use super::{Completion, CompletionParams, CompletionRequest};
+use super::{ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest};
 
 pub trait InferenceClient: Send + Sync + 'static {
     fn complete_text(
@@ -12,9 +12,22 @@ pub trait InferenceClient: Send + Sync + 'static {
         request: &CompletionRequest,
         api_token: String,
     ) -> impl Future<Output = anyhow::Result<Completion>> + Send;
+    fn chat(
+        &self,
+        request: &ChatRequest,
+        api_token: String,
+    ) -> impl Future<Output = anyhow::Result<ChatResponse>> + Send;
 }
 
 impl InferenceClient for Client {
+    async fn chat(
+        &self,
+        _request: &ChatRequest,
+        _api_token: String,
+    ) -> anyhow::Result<ChatResponse> {
+        unimplemented!()
+    }
+
     async fn complete_text(
         &self,
         request: &CompletionRequest,

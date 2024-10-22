@@ -2,7 +2,8 @@ mod actor;
 mod client;
 
 pub use actor::{
-    Completion, CompletionParams, CompletionRequest, FinishReason, Inference, InferenceApi,
+    ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
+    FinishReason, Inference, InferenceApi, Message, Role,
 };
 
 #[cfg(test)]

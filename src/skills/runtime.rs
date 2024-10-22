@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use crate::{
     csi::ChunkRequest,
-    inference::{Completion, CompletionRequest},
+    inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     search::{SearchRequest, SearchResult},
 };
@@ -26,4 +26,5 @@ pub trait CsiForSkills {
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
     async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language>;
     async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult>;
+    async fn chat(&mut self, request: ChatRequest) -> ChatResponse;
 }

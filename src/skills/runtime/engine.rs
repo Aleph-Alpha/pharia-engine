@@ -290,9 +290,8 @@ impl WasiView for LinkedCtx {
 
 mod v0_2 {
     use pharia::skill::csi::{
-        ChunkParams, Completion, CompletionParams, CompletionRequest, DocumentPath, FinishReason,
-        Host, IndexPath, Language, SearchResult,
-        Message, ChatParams, ChatResponse, Role,
+        ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
+        DocumentPath, FinishReason, Host, IndexPath, Language, Message, Role, SearchResult,
     };
     use wasmtime::component::bindgen;
 
@@ -334,15 +333,18 @@ mod v0_2 {
             self.skill_ctx.complete_text(request).await.into()
         }
 
-        async fn chat(&mut self, model: String, messages: Vec<Message>, params: ChatParams) -> ChatResponse {
-            let ChatParams { max_tokens, temperature, top_k, top_p } = params;
-            ChatResponse {
-                message: Message {
-                    role: Role::User,
-                    content: "dummy-content".to_owned(),
-                },
-                finish_reason: FinishReason::Stop,
-            }
+        async fn chat(
+            &mut self,
+            model: String,
+            messages: Vec<Message>,
+            params: ChatParams,
+        ) -> ChatResponse {
+            let request = inference::ChatRequest {
+                model,
+                messages: messages.into_iter().map(Into::into).collect(),
+                params: params.into(),
+            };
+            self.skill_ctx.chat(request).await.into()
         }
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
@@ -473,6 +475,64 @@ mod v0_2 {
         }
     }
 
+    impl From<Message> for inference::Message {
+        fn from(message: Message) -> Self {
+            Self {
+                role: message.role.into(),
+                content: message.content,
+            }
+        }
+    }
+
+    impl From<ChatParams> for inference::ChatParams {
+        fn from(params: ChatParams) -> Self {
+            Self {
+                max_tokens: params.max_tokens,
+                temperature: params.temperature,
+                top_k: params.top_k,
+                top_p: params.top_p,
+            }
+        }
+    }
+
+    impl From<Role> for inference::Role {
+        fn from(role: Role) -> Self {
+            match role {
+                Role::User => inference::Role::User,
+                Role::Assistant => inference::Role::Assistant,
+                Role::System => inference::Role::System,
+            }
+        }
+    }
+
+    impl From<inference::Role> for Role {
+        fn from(role: inference::Role) -> Self {
+            match role {
+                inference::Role::User => Self::User,
+                inference::Role::Assistant => Self::Assistant,
+                inference::Role::System => Self::System,
+            }
+        }
+    }
+
+    impl From<inference::Message> for Message {
+        fn from(message: inference::Message) -> Self {
+            Self {
+                role: message.role.into(),
+                content: message.content,
+            }
+        }
+    }
+
+    impl From<inference::ChatResponse> for ChatResponse {
+        fn from(response: inference::ChatResponse) -> Self {
+            Self {
+                message: response.message.into(),
+                finish_reason: response.finish_reason.into(),
+            }
+        }
+    }
+
     impl From<inference::FinishReason> for FinishReason {
         fn from(finish_reason: inference::FinishReason) -> Self {
             match finish_reason {
@@ -576,7 +636,8 @@ mod tests {
     use std::fs;
 
     use test_skills::{
-        given_chat_skill, given_greet_py, given_greet_py_v0_2, given_greet_skill, given_greet_skill_v0_1, given_greet_skill_v0_2, given_search_skill
+        given_chat_skill, given_greet_py, given_greet_py_v0_2, given_greet_skill,
+        given_greet_skill_v0_1, given_greet_skill_v0_2, given_search_skill,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -685,7 +746,6 @@ mod tests {
         // Then it returns a json string array
         assert_eq!(result, json!([content]));
     }
-
 
     #[tokio::test]
     async fn can_load_and_run_chat_skill() {

@@ -23,7 +23,7 @@ use super::{
 
 use crate::{
     csi::{chunking::ChunkParams, ChunkRequest, Csi},
-    inference::{Completion, CompletionRequest},
+    inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     search::{SearchRequest, SearchResult},
     skill_store::SkillStoreApi,
@@ -264,6 +264,17 @@ where
         }
     }
 
+    async fn chat(&mut self, request: ChatRequest) -> ChatResponse {
+        let span = span!(Level::DEBUG, "chat", model = request.model);
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
+        match self.csi_apis.chat(self.api_token.clone(), request).await {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
         let ChunkParams { model, max_tokens } = &request.params;
         let span = span!(
@@ -329,7 +340,9 @@ pub mod tests {
 
     use crate::{
         csi::tests::{DummyCsi, StubCsi},
-        inference::{tests::AssertConcurrentClient, CompletionRequest, Inference},
+        inference::{
+            tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
+        },
         skill_store::{SkillProviderMsg, SkillStore},
         skills::Skill,
     };
@@ -519,6 +532,14 @@ pub mod tests {
             _auth: String,
             _request: SearchRequest,
         ) -> Result<Vec<SearchResult>, anyhow::Error> {
+            bail!("Test error")
+        }
+
+        async fn chat(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> Result<ChatResponse, anyhow::Error> {
             bail!("Test error")
         }
     }
