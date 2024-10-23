@@ -1,10 +1,11 @@
 import argparse
+import os
 
 from dotenv import load_dotenv
 
 from .commands import execute_cmds_file
 from .log_util import dt2str, logger, run_logger
-from .run_pk import PhariaKernel, diff_str_dt, get_machine
+from .run_pk import PHARIA_KERNEL_BIN, PhariaKernel, diff_str_dt, get_machine
 
 
 def do_run(cmds_file, mem):
@@ -58,6 +59,12 @@ def main():
         help="log memory consumption on the console regularly",
     )
     run_parser.add_argument(
+        "--kernel",
+        "-k",
+        default=None,  # check environment variable
+        help="path to the binary to be used",
+    )
+    run_parser.add_argument(
         "cmds_file",
         nargs="?",
         default="bench.cmds",
@@ -73,6 +80,8 @@ def main():
     )
     args = parser.parse_args()
     if args.command == "run":
+        if args.kernel:
+            os.environ[PHARIA_KERNEL_BIN] = args.kernel
         do_run(args.cmds_file, args.mem)
     elif args.command == "eval":
         do_eval(args.log_files)
