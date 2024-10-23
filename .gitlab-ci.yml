@@ -46,6 +46,7 @@ cargo_test:
   variables:
     SKILL_REGISTRY_USER: $CI_REGISTRY_USER
     SKILL_REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
+    AA_INFERENCE_ADDRESS: https://api.aleph-alpha.com
   script:
     - apt-get update
     - apt-get -y install python3-venv
