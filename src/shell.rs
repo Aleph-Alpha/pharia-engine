@@ -294,7 +294,7 @@ async fn cached_skills(
 #[utoipa::path(
     delete,
     operation_id = "drop_cached_skill",
-    path = "/cached_skills",
+    path = "/cached_skills/{namespace}%2F{name}",
     tag = "skills",
     responses(
         (status = 200, body=String, example = json!("Skill removed from cache.")),
