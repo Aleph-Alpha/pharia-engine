@@ -201,12 +201,35 @@ def add_one_skill_py(log=True):
 
 add_one_skill_py.cnt = 0
 
+
+def drop_cached_skill(skill_name=None, log=True):
+    "drops a given cached skill or the alphabetically first one"
+    if skill_name is None:
+        to_select = cached_skills()
+        if not to_select:
+            logger.error("drop_cached_skill: no skills cached")
+            return
+        skill_name = to_select[0]  # first one
+    url, headers = _ensure_request_config()
+    # Todo: fix the %2F in Pharia Kernel
+    full_url = f"{url}/cached_skills/dev%2F{skill_name}"
+    try:
+        response = requests.delete(full_url, headers=headers)
+        js_response = response.json()
+        if log:
+            logger.info(f"cmd, cached_skills: {js_response}")
+        return response.status_code == 200
+    except Exception as err:
+        logger.error(str(err))
+
+
 COMMANDS = {
     "add_py": add_one_skill_py,
     "execute_all": execute_all,
     "execute_skill": execute_skill,
     "skills": skills,
     "cached_skills": cached_skills,
+    "drop_cached_skill": drop_cached_skill,
 }
 
 

@@ -1,0 +1,26 @@
+5 add_py
+
+# should work
+drop_cached_skill sample_py3
+
+# get rid of 1
+drop_cached_skill 
+
+# nope
+drop_cached_skill does_not_exist
+
+# remove the rest
+3 drop_cached_skill
+
+# slow
+execute_skill sample_py3 A
+# fast
+execute_skill sample_py3 B
+
+# should find the one
+drop_cached_skill
+
+# slow
+execute_skill sample_py3 C
+# fast
+execute_skill sample_py3 D
