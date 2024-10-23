@@ -1,0 +1,26 @@
+# add 10 skills, a little quicker
+p_add_py 10
+
+# warm up
+execute_all JohnDoe 0 0
+
+
+## 3 seconds each, no memory consumption, but 3 seconds
+# 100 ... 900
+p_execute_all JohnDoe 0 3000 10
+p_execute_all JohnDoe 0 3000 20
+# it dies at 300 (Oct/24)
+p_execute_all JohnDoe 0 3000 30
+p_execute_all JohnDoe 0 3000 40
+p_execute_all JohnDoe 0 3000 50
+p_execute_all JohnDoe 0 3000 50
+p_execute_all JohnDoe 0 3000 60
+p_execute_all JohnDoe 0 3000 70
+p_execute_all JohnDoe 0 3000 80
+p_execute_all JohnDoe 0 3000 90
+
+# get rid of all skills
+10 drop_cached_skill
+10 delete_skill
+
+# stop has picked up the removed skills? looks like it

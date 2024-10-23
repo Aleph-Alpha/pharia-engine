@@ -1,0 +1,162 @@
+{"arch": "ARM_8", "brand": "Apple M3 Pro", "cores": "12", "memory_total": "36", "memory_available": "15"}
+{"bin": "/Users/peter.barth/dev/pharia-kernel/target/release/pharia-kernel", "hash": "9290db81ab9e6c038ca3d0f1ad825aded8003317", "modified": "241023_154039.810"}
+{"filename": "cmds/saturate.cmds", "hash": "44f1fec0a35e9cfb02ea49acce8ea6ae357103bc", "modified": "241023_161603.611"}
+{"took": "23381", "rss_diff": "1934400", "rss": "1946224", "vms_diff": "2783056", "vms": "413608256", "cmd": "p_add_py 10"}
+{"took": "23", "rss_diff": "0", "rss": "1946224", "vms_diff": "0", "vms": "413608256", "cmd": "execute_all JohnDoe 0 0"}
+{"took": "3150", "rss_diff": "24528", "rss": "1970752", "vms_diff": "0", "vms": "413608256", "cmd": "p_execute_all JohnDoe 0 3000 10"}
+{"took": "3338", "rss_diff": "125056", "rss": "2095808", "vms_diff": "131072", "vms": "413739328", "cmd": "p_execute_all JohnDoe 0 3000 20"}
+===crash, transcript from the console
+(resource_eval) peter.barth@LNHP7GK1G4 resource_eval % ./main.py run -m cmds/saturate.cmds 
+241023_161626.654 start of run
+241023_161626.700 run: {'arch': 'ARM_8', 'brand': 'Apple M3 Pro', 'cores': 12, 'memory_total': 36, 'memory_available': 15}
+241023_161626.713 Pharia Kernel started
+241023_161626.713 resource: {"rss": 176, "vms": 410085296}
+241023_161626.713 run: {'bin': '/Users/peter.barth/dev/pharia-kernel/target/release/pharia-kernel', 'hash': '9290db81ab9e6c038ca3d0f1ad825aded8003317', 'modified': '241023_154039.810'}
+241023_161626.713 executing benchmark commands file cmds/saturate.cmds
+241023_161626.713 run: {'filename': 'cmds/saturate.cmds', 'hash': '44f1fec0a35e9cfb02ea49acce8ea6ae357103bc', 'modified': '241023_161603.611'}
+241023_161626.825 cmd, p_add_skill_py: adding 10 python skills, last is sample_py10
+241023_161626.944    p_add_skill_py: copied all 10 skills
+241023_161627.219 resource: {"rss": 11856, "vms": 410825200}
+241023_161627.724 resource: {"rss": 12736, "vms": 410862064}
+241023_161628.479    p_add_skill_py: discovered all 10 skills
+241023_161628.479 cmd, skill_request: skill=dev/sample_py1, input={'topic': 'Alice_0', 'memory': 0, 'wait_time': 0}
+241023_161628.732 resource: {"rss": 348768, "vms": 412485904}
+241023_161629.234 resource: {"rss": 756608, "vms": 412859968}
+241023_161629.739 resource: {"rss": 858288, "vms": 412933424}
+241023_161630.663 cmd, skill_request: skill=dev/sample_py2, input={'topic': 'Alice_1', 'memory': 0, 'wait_time': 0}
+241023_161630.750 resource: {"rss": 957648, "vms": 413004960}
+241023_161631.256 resource: {"rss": 1091520, "vms": 413004960}
+241023_161631.759 resource: {"rss": 1129776, "vms": 412988864}
+241023_161632.265 resource: {"rss": 1129760, "vms": 412988304}
+241023_161632.770 resource: {"rss": 1089072, "vms": 412949936}
+241023_161632.852 cmd, skill_request: skill=dev/sample_py3, input={'topic': 'Alice_2', 'memory': 0, 'wait_time': 0}
+241023_161633.275 resource: {"rss": 1202480, "vms": 412949392}
+241023_161633.779 resource: {"rss": 1258368, "vms": 413061904}
+241023_161635.005 cmd, skill_request: skill=dev/sample_py4, input={'topic': 'Alice_3', 'memory': 0, 'wait_time': 0}
+241023_161635.294 resource: {"rss": 1271696, "vms": 412973008}
+241023_161635.800 resource: {"rss": 1356096, "vms": 413142256}
+241023_161636.305 resource: {"rss": 1376656, "vms": 413144304}
+241023_161637.207 cmd, skill_request: skill=dev/sample_py5, input={'topic': 'Alice_4', 'memory': 0, 'wait_time': 0}
+241023_161637.315 resource: {"rss": 1393728, "vms": 413116976}
+241023_161637.817 resource: {"rss": 1437872, "vms": 413167536}
+241023_161638.324 resource: {"rss": 1459840, "vms": 413246560}
+241023_161639.445 cmd, skill_request: skill=dev/sample_py6, input={'topic': 'Alice_5', 'memory': 0, 'wait_time': 0}
+241023_161639.839 resource: {"rss": 1496704, "vms": 413299424}
+241023_161640.341 resource: {"rss": 1532448, "vms": 413299424}
+241023_161640.846 resource: {"rss": 1532496, "vms": 413299424}
+241023_161641.627 cmd, skill_request: skill=dev/sample_py7, input={'topic': 'Alice_6', 'memory': 0, 'wait_time': 0}
+241023_161641.856 resource: {"rss": 1606976, "vms": 413372576}
+241023_161642.358 resource: {"rss": 1651808, "vms": 413427984}
+241023_161642.863 resource: {"rss": 1662176, "vms": 413429008}
+241023_161643.670 cmd, skill_request: skill=dev/sample_py8, input={'topic': 'Alice_7', 'memory': 0, 'wait_time': 0}
+241023_161643.873 resource: {"rss": 1711680, "vms": 413475264}
+241023_161644.377 resource: {"rss": 1729344, "vms": 413475264}
+241023_161644.880 resource: {"rss": 1721296, "vms": 413459168}
+241023_161645.784 cmd, skill_request: skill=dev/sample_py9, input={'topic': 'Alice_8', 'memory': 0, 'wait_time': 0}
+241023_161645.891 resource: {"rss": 1768464, "vms": 413476656}
+241023_161646.396 resource: {"rss": 1807104, "vms": 413510464}
+241023_161646.901 resource: {"rss": 1834624, "vms": 413580240}
+241023_161647.911 resource: {"rss": 1800816, "vms": 413546432}
+241023_161648.043 cmd, skill_request: skill=dev/sample_py10, input={'topic': 'Alice_9', 'memory': 0, 'wait_time': 0}
+241023_161648.417 resource: {"rss": 1919760, "vms": 413654416}
+241023_161648.922 resource: {"rss": 1927552, "vms": 413637664}
+241023_161649.429 resource: {"rss": 1928064, "vms": 413637664}
+241023_161650.206    p_add_skill_py: accessed all 10 skills
+241023_161650.207 run: {'took': 23381, 'rss_diff': 1934400, 'rss': 1946224, 'vms_diff': 2783056, 'vms': 413608256, 'cmd': 'p_add_py 10'}
+241023_161650.208 cmd, execute_all: 10 skills with JohnDoe memory=0 wait_time=0
+241023_161650.230 run: {'took': 23, 'rss_diff': 0, 'rss': 1946224, 'vms_diff': 0, 'vms': 413608256, 'cmd': 'execute_all JohnDoe 0 0'}
+241023_161650.231 cmd, p_execute_all: 10 skills with JohnDoe memory=0 wait_time=3000 times=10 -> 100 threads
+241023_161650.439 resource: {"rss": 3941936, "vms": 1252726656}
+241023_161653.380 run: {'took': 3150, 'rss_diff': 24528, 'rss': 1970752, 'vms_diff': 0, 'vms': 413608256, 'cmd': 'p_execute_all JohnDoe 0 3000 10'}
+241023_161653.382 cmd, p_execute_all: 10 skills with JohnDoe memory=0 wait_time=3000 times=20 -> 200 threads
+241023_161653.471 resource: {"rss": 2961952, "vms": 841558640}
+241023_161653.976 resource: {"rss": 6038208, "vms": 2091976128}
+241023_161656.502 resource: {"rss": 4638656, "vms": 1496202064}
+241023_161656.719 run: {'took': 3338, 'rss_diff': 125056, 'rss': 2095808, 'vms_diff': 131072, 'vms': 413739328, 'cmd': 'p_execute_all JohnDoe 0 3000 20'}
+241023_161656.721 cmd, p_execute_all: 10 skills with JohnDoe memory=0 wait_time=3000 times=30 -> 300 threads
+241023_161656.807 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c2b40>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.807 ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+241023_161656.808 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3470>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.808 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3f80>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.809 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e8890>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.809 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e9310>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.809 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3680>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.809 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e9cd0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.809 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c2ba0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.810 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c2720>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.810 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e9f70>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.811 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7eae70>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.811 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7eb2f0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.811 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3830>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.812 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e81a0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.812 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e9580>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.812 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7eb3e0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.812 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7eb8f0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.813 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3c80>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.813 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c2960>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.813 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e96d0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.813 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7ea030>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.814 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7ebcb0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.814 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3fe0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.814 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c1e80>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.814 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3680>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.815 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e9fd0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.815 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7eb530>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.815 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e8bc0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.816 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c28a0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.816 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3f80>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.816 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c3e60>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.817 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e8710>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.817 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7ebe90>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.817 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7ea6c0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.818 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e8710>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.818 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e9a30>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.818 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e8170>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.818 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c20c0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.818 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c2360>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.819 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10e008b60>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.819 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7c2a50>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.820 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7eb770>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.820 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e97c0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.820 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e93d0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.821 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7eb290>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.821 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10e008c50>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.821 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e9eb0>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.821 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7eaa20>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161656.821 HTTPConnectionPool(host='127.0.0.1', port=8081): Max retries exceeded with url: /execute_skill (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10c7e8140>: Failed to establish a new connection: [Errno 24] Too many open files'))
+241023_161657.003 resource: {"rss": 5648064, "vms": 1924152448}
+241023_161657.509 resource: {"rss": 6966112, "vms": 2477970592}
+241023_161657.808 ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+241023_161658.011 resource: {"rss": 6966128, "vms": 2477970592}
+241023_161658.810 ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+241023_161700.031 resource: {"rss": 3082864, "vms": 824907856}
+241023_161700.536 resource: {"rss": 2116928, "vms": 413737120}
+^CTraceback (most recent call last):
+  File "/Users/peter.barth/dev/pharia-kernel/resource_eval/./main.py", line 5, in <module>
+    resource_eval.cli.main()
+  File "/Users/peter.barth/dev/pharia-kernel/resource_eval/resource_eval/cli.py", line 76, in main
+    do_run(args.cmds_file, args.mem)
+  File "/Users/peter.barth/dev/pharia-kernel/resource_eval/resource_eval/cli.py", line 22, in do_run
+    execute_cmds_file(pk, cmds_file)
+  File "/Users/peter.barth/dev/pharia-kernel/resource_eval/resource_eval/commands.py", line 362, in execute_cmds_file
+    execute_command(pk, command)
+  File "/Users/peter.barth/dev/pharia-kernel/resource_eval/resource_eval/commands.py", line 85, in execute_command
+    COMMANDS[cmd_key](*_to_num(args[1:]), **{"log": log})
+  File "/Users/peter.barth/dev/pharia-kernel/resource_eval/resource_eval/commands.py", line 215, in p_execute_all
+    thread.join()
+  File "/opt/homebrew/Cellar/python@3.12/3.12.7_1/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py", line 1149, in join
+    self._wait_for_tstate_lock()
+  File "/opt/homebrew/Cellar/python@3.12/3.12.7_1/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py", line 1169, in _wait_for_tstate_lock
+    if lock.acquire(block, timeout):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+241023_161703.061 resource: {"rss": 2042752, "vms": 413662944}
+241023_161707.607 resource: {"rss": 1967552, "vms": 413587744}
+241023_161710.744 500 Server Error: Internal Server Error for url: http://127.0.0.1:8081/execute_skill
+241023_161710.744 500 Server Error: Internal Server Error for url: http://127.0.0.1:8081/execute_skill
+241023_161711.139 resource: {"rss": 1893376, "vms": 413513568}
+^CException ignored in: <module 'threading' from '/opt/homebrew/Cellar/python@3.12/3.12.7_1/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py'>
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.12/3.12.7_1/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py", line 1624, in _shutdown
+    lock.acquire()
+KeyboardInterrupt: 

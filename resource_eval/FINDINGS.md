@@ -26,7 +26,8 @@ For reference the enclosed log files.
 The biggest problem, which is reproducible and happens always, is stopping Pharia Kernel
 at the end of a run. For `bench.cmds` both machines used about 1.5 GB of resident memory.
 Stopping that instance (sending SIGTERM, which is what happens if you press Ctrl-C) took
-more than 6 seconds on the Mac but only about 120 ms on the x86_64 machine.
+more than 6 seconds on the Mac but only about 120 ms on the x86_64 machine. On a Mac, it
+helps to delete the skills from cache and remove them before shutting down.
 An assumption is, that the behavior depends on the operating system, not the instruction set architecture.
 As customers will most likely use Linux machines and in addition, customers will most likely
 deploy on x86_64 machines, so it should be fine.
@@ -64,4 +65,35 @@ Todo: rust skills
 
 ## Findings Execution Performance
 
-Todo: parallel execution
+For execution performance, we try to execute skills in parallel. In the following example log
+
+```text
+241023_155316.286_run.log 
+```
+
+we focus on execution time when accessing 10 different skills several times. The baseline is sequential
+access without additional resource consumption. Accessing 10 skills takes 23 ms, doing that 15 times takes 320 ms.
+We can also do all this accesses 150 accesses in parallel, which takes 227 ms. No difference and none expected.
+More interesting is an individual skill invocation, which uses 1 MByte of memory and takes 100ms to complete.
+It is no surprise, that sequentially accessing 10 skills 15 times takes around 16.9 seconds. What is nice, that
+doing this 150 access in parallel takes only 353 ms and we measure an increase in resident memory consumption of
+about 11 MB. Ideal scaling would mean 100 ms, no scaling at all would mean at least 15 seconds. 353 ms appears
+to be very acceptable.
+
+In the cmds file
+
+```text
+saturate.cmds
+```
+
+we increase the parallel load steadily. For that, we use 10 skills but do not use additional memory during a
+request, but 3 seconds execution time.
+Thus, we ensure that most requests run in parallel and have not finished yet.
+Pharia Kernel (Oct/24) can handle 200 requests but ceases to answer to requests while trying to answer 300 requests.
+This experiment was also executed on a Mac.
+
+```text
+logs/241023_161626.638_run.log_failed 
+```
+
+It is likely, that tuning dedicated machines and the Web-Server configuration can provide for a more parallel requests.
