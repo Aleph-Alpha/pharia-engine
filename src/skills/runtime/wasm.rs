@@ -49,11 +49,11 @@ pub mod tests {
 
     use crate::{
         csi::ChunkRequest,
-        inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
+        inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, Message, Role},
         language_selection::{select_language, Language, SelectLanguageRequest},
         namespace_watcher::OperatorConfig,
         search::{DocumentPath, SearchRequest, SearchResult},
-        skill_store::SkillStore,
+        skill_store::SkillStore, FinishReason,
     };
 
     use super::*;
@@ -264,7 +264,13 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         }
 
         async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
-            unimplemented!()
+            ChatResponse {
+                message: Message {
+                    role: Role::Assistant,
+                    content: "dummy-content".to_owned(),
+                },
+                finish_reason: FinishReason::Stop,
+            }
         }
     }
 
