@@ -11,6 +11,7 @@ Each line is a json string representing resource consumption information, time a
 import datetime
 import hashlib
 import os
+import os.path
 import shutil
 import time
 
@@ -211,7 +212,6 @@ def drop_cached_skill(skill_name=None, log=True):
             return
         skill_name = to_select[0]  # first one
     url, headers = _ensure_request_config()
-    # Todo: fix the %2F in Pharia Kernel
     full_url = f"{url}/cached_skills/dev%2F{skill_name}"
     try:
         response = requests.delete(full_url, headers=headers)
@@ -223,6 +223,27 @@ def drop_cached_skill(skill_name=None, log=True):
         logger.error(str(err))
 
 
+def delete_skill(skill_name=None, log=True):
+    "deletes a given skill by just removing it from the skills folder, if none is given the alphabetically first deployed one"
+    if skill_name is None:
+        # Note, that there can be a race regarding the available skills and the view of the
+        # Pharia Kernel to the world. Do not run this in parallel.
+        for skill_name in skills():
+            skill_path = f"skills/{skill_name}.wasm"
+            if os.path.isfile(skill_path):
+                # found one still in the directory, git it a try
+                break
+        else:
+            logger.error("delete_skill: no skill available")
+            return
+    else:
+        skill_path = f"skills/{skill_name}.wasm"
+    try:
+        os.remove(skill_path)
+    except FileNotFoundError:
+        logger.error(f"delete_skill: {skill_path} not found")
+
+
 COMMANDS = {
     "add_py": add_one_skill_py,
     "execute_all": execute_all,
@@ -230,6 +251,7 @@ COMMANDS = {
     "skills": skills,
     "cached_skills": cached_skills,
     "drop_cached_skill": drop_cached_skill,
+    "delete_skill": delete_skill,
 }
 
 
