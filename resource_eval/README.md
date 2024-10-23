@@ -90,8 +90,13 @@ To run the evaluation with the commands file `bench.cmds` execute:
 Alternatively, you can run the module
 
 ```shell
-python3 -m resource_eval run -n bench.cmds
+python3 -m resource_eval run -m bench.cmds
 ```
+
+Two log files are automatically created for each run, one with `..._pk.log` and one with `...run.log`.
+In addition progress is shown on screen.
+With `-m` intermittent resource consumption messages are activated, which is helpful for long running
+commands with many changes in resource consumption.
 
 ## Evaluation
 
