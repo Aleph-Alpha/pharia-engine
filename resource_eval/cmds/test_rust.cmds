@@ -1,0 +1,11 @@
+# add a total of 100 rust skills
+add_rs
+execute_skill sample_rs1 GraydonHoare 0 0 
+4 add_rs
+45 add_rs 
+p_add_rs 50
+
+# do 1000 requests
+p_execute_all GraydonHoare 0 0 10
+
+# check whether deletion is quicker

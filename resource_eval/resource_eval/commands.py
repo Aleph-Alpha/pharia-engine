@@ -15,7 +15,6 @@ import os.path
 import shutil
 import threading
 import time
-from itertools import repeat, starmap
 
 import requests
 
@@ -26,6 +25,9 @@ from .run_pk import PhariaKernel, observe_diff
 SKILL_NAME_PY = "sample_py"
 SKILL_FNAME_PY = SKILL_NAME_PY + ".wasm"
 assert os.path.isfile(SKILL_FNAME_PY)
+SKILL_NAME_RS = "sample_rs"
+SKILL_FNAME_RS = SKILL_NAME_RS + ".wasm"
+assert os.path.isfile(SKILL_FNAME_RS)
 
 # these are the key constants used
 AA_API_TOKEN = "AA_API_TOKEN"
@@ -274,6 +276,65 @@ def p_add_skill_py(how_many=1, log=True):
         logger.info(f"   p_add_skill_py: accessed all {how_many} skills")
 
 
+def add_one_skill_rs(log=True):
+    "adds an instance of the example rust skill and executes it"
+    add_one_skill_rs.cnt += 1
+    skill_name = f"{SKILL_NAME_RS}{add_one_skill_rs.cnt}"
+    logger.info(f"cmd, add_one_skill_rs: adding rust skill {skill_name}")
+    shutil.copy(SKILL_FNAME_RS, f"skills/{skill_name}.wasm")
+    tries, sleep_time = 10, 0.1
+    for _ in range(tries):
+        time.sleep(sleep_time)  # wait for the kernel to pick it up
+        if skill_name in skills(False):
+            break
+        sleep_time *= 2
+    result = execute_skill(skill_name, "Graydon")
+    logger.info(f"  add_one_skill_rs: accessing {skill_name} returned {result}")
+
+
+add_one_skill_rs.cnt = 0
+
+
+def p_add_skill_rs(how_many=1, log=True):
+    """adds how_many instances of the example rust skill and executes all of them
+    This should have a much better performance than `how_many add_skill_rs` as all copying
+    is done first and then all skills are executed.
+    """
+    if how_many < 1:
+        return
+    skill_names = []
+    for _ in range(how_many):
+        add_one_skill_rs.cnt += 1
+        skill_name = f"{SKILL_NAME_RS}{add_one_skill_rs.cnt}"
+        skill_names.append(skill_name)
+    logger.info(
+        f"cmd, p_add_skill_rs: adding {how_many} rust skills, last is {skill_name}"
+    )
+    for skill_name in skill_names:
+        shutil.copy(SKILL_FNAME_RS, f"skills/{skill_name}.wasm")
+    if log:
+        logger.info(f"   p_add_skill_rs: copied all {how_many} skills")
+    tries, sleep_time = 17, 0.1
+    to_discover = set(skill_names)
+    for _ in range(tries):
+        time.sleep(sleep_time)  # wait for the kernel to pick it up
+        to_discover -= set(skills(False))
+        if not to_discover:
+            break
+        sleep_time *= 2
+    if to_discover:
+        log.error("p_add_skill_rs: still not discovered all?")
+        return
+    if log:
+        logger.info(f"   p_add_skill_rs: discovered all {how_many} skills")
+    for i, skill_name in enumerate(skill_names):
+        result = execute_skill(skill_name, f"Graydon{i}")
+        if result is None:
+            logger.error("   p_add_skill_rs: access of {skill_name} failed")
+    if log:
+        logger.info(f"   p_add_skill_rs: accessed all {how_many} skills")
+
+
 def drop_cached_skill(skill_name=None, log=True):
     "drops a given cached skill or the alphabetically first one"
     if skill_name is None:
@@ -318,6 +379,8 @@ def delete_skill(skill_name=None, log=True):
 COMMANDS = {
     "add_py": add_one_skill_py,
     "p_add_py": p_add_skill_py,
+    "add_rs": add_one_skill_rs,
+    "p_add_rs": p_add_skill_rs,
     "execute_all": execute_all,
     "p_execute_all": p_execute_all,
     "execute_skill": execute_skill,
