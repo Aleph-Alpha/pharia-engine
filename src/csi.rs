@@ -169,15 +169,34 @@ pub mod tests {
     use crate::{
         csi::chunking::ChunkParams,
         inference::{
-            tests::InferenceStub, ChatRequest, ChatResponse, Completion, CompletionParams,
-            CompletionRequest, InferenceApi,
+            tests::InferenceStub, ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, InferenceApi, Message, Role
         },
         search::{SearchRequest, SearchResult},
         tests::api_token,
-        tokenizers::tests::FakeTokenizers,
+        tokenizers::tests::FakeTokenizers, FinishReason,
     };
 
     use super::{ChunkRequest, Csi, CsiDrivers};
+
+    #[tokio::test]
+    async fn chat() {
+        // Given a chat request
+        let chat_request = ChatRequest {
+            model: "dummy_model".to_owned(),
+            messages: vec![Message {
+                role: Role::User,
+                content: "Hello".to_owned(),
+            }],
+            params: ChatParams::default(),
+        };
+
+        // When chatting with the StubCsi
+        let csi = StubCsi::empty();
+        let result = csi.chat("dummy-token".to_owned(), chat_request).await.unwrap();
+
+        // Then the response is the same as the request
+        assert_eq!(result.message.content, "Hello");
+    }
 
     #[tokio::test]
     async fn chunk() {
@@ -391,9 +410,12 @@ pub mod tests {
         async fn chat(
             &self,
             _auth: String,
-            _request: ChatRequest,
+            request: ChatRequest,
         ) -> Result<ChatResponse, anyhow::Error> {
-            unimplemented!()
+            Ok(ChatResponse {
+                message: request.messages.first().unwrap().clone(),
+                finish_reason: FinishReason::Stop,
+            }) 
         }
     }
 }
