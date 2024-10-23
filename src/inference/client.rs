@@ -5,9 +5,7 @@ use aleph_alpha_client::{
 };
 use tracing::{error, warn};
 
-use super::{
-    ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Message, Role,
-};
+use super::{ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Message};
 
 pub trait InferenceClient: Send + Sync + 'static {
     fn complete_text(
@@ -87,39 +85,21 @@ impl TryFrom<CompletionOutput> for Completion {
     }
 }
 
-impl From<aleph_alpha_client::Role> for Role {
-    fn from(role: aleph_alpha_client::Role) -> Self {
-        match role {
-            aleph_alpha_client::Role::System => Role::System,
-            aleph_alpha_client::Role::User => Role::User,
-            aleph_alpha_client::Role::Assistant => Role::Assistant,
-        }
-    }
-}
+impl TryFrom<aleph_alpha_client::Message<'_>> for Message {
+    type Error = anyhow::Error;
 
-impl From<&Role> for aleph_alpha_client::Role {
-    fn from(role: &Role) -> Self {
-        match role {
-            Role::System => aleph_alpha_client::Role::System,
-            Role::User => aleph_alpha_client::Role::User,
-            Role::Assistant => aleph_alpha_client::Role::Assistant,
-        }
-    }
-}
-
-impl From<aleph_alpha_client::Message<'_>> for Message {
-    fn from(message: aleph_alpha_client::Message<'_>) -> Self {
-        Message {
-            role: message.role.into(),
+    fn try_from(message: aleph_alpha_client::Message<'_>) -> anyhow::Result<Self> {
+        Ok(Message {
+            role: message.role.parse()?,
             content: message.content.into(),
-        }
+        })
     }
 }
 
 impl<'a> From<&'a Message> for aleph_alpha_client::Message<'a> {
     fn from(message: &'a Message) -> Self {
         aleph_alpha_client::Message {
-            role: (&message.role).into(),
+            role: message.role.to_string().into(),
             content: (&message.content).into(),
         }
     }
@@ -130,7 +110,7 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
 
     fn try_from(chat_output: aleph_alpha_client::ChatOutput) -> anyhow::Result<Self> {
         Ok(ChatResponse {
-            message: Message::from(chat_output.message),
+            message: Message::try_from(chat_output.message)?,
             finish_reason: chat_output.finish_reason.parse()?,
         })
     }
@@ -175,7 +155,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        inference::ChatParams,
+        inference::{ChatParams, Role},
         tests::{api_token, inference_address},
     };
 

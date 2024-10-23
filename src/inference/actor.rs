@@ -1,8 +1,9 @@
-use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
-
 use aleph_alpha_client::Client;
+use anyhow::anyhow;
+use core::fmt;
 use futures::{stream::FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -129,6 +130,28 @@ pub enum Role {
     User,
     Assistant,
     System,
+}
+impl FromStr for Role {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "user" => Ok(Role::User),
+            "assistant" => Ok(Role::Assistant),
+            "system" => Ok(Role::System),
+            _ => Err(anyhow!("Unsupported role: '{s}'.")),
+        }
+    }
+}
+impl fmt::Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::User => "user",
+            Self::Assistant => "assistant",
+            Self::System => "system",
+        };
+        write!(f, "{s}")
+    }
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]

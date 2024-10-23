@@ -31,7 +31,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-aleph-alpha-client = "0.12.3"
+aleph-alpha-client = "0.13.1"
 anyhow = "1.0.91"
 async-trait = "0.1.83"
 axum = { version = "0.7.7", features = ["macros"] }
