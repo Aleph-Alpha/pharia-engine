@@ -39,6 +39,19 @@ which should provide you with a file `sample_py.wasm`.
 For the evaluation of the resource consumption we copy from this file.
 The compiled skill does nothing else but greet a Person and optionally may consume some memory or waste some time.
 
+For the Rust skill you enter the respective directory and build it for the wasm platform.
+Note, that we cannot use the SDK as we live in the Pharia Kernel repo and it is impossible to not use a `Cargo.toml`
+in the parent folders.
+
+```shell
+cd sample_rs
+cargo build --target wasm32-wasip2 --release
+cd ..
+cp ../target/wasm32-wasip2/release/sample_rs.wasm .
+```
+
+Finally, we need to copy the generated file `sample_rs` from the parent target folder to the current folder.
+
 ## Concept
 
 We do a series of skill deployments, accesses and other Pharia Kernel operations,

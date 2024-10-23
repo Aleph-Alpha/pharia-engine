@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*", "pharia-skill", "test-skills"]
+members = ["crates/*", "pharia-skill", "resource_eval/sample_rs", "test-skills"]
 
 [workspace.lints.rust]
 future-incompatible = "warn"
