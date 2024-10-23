@@ -139,7 +139,7 @@ def execute_skill(skill: str, input_val: str, memory=0, wait_time=0, log=True):
         # ignore
 
 
-def skills(log=True):
+def skills(log=True, log_error=True):
     "list all accessible skills removing dev prefix"
     url, headers = _ensure_request_config()
     full_url = f"{url}/skills"
@@ -152,7 +152,8 @@ def skills(log=True):
             logger.info(f"cmd, skills: {js_list}")
         return js_list
     except Exception as err:
-        logger.error(str(err))
+        if log_error:
+            logger.error(str(err))
 
 
 def cached_skills(log=True):
@@ -232,6 +233,12 @@ def execute_cmds_file(pk: PhariaKernel, cmds_file: str):
     }
     run_logger.info(cmd_config)
     logger.info(f"run: {str(cmd_config)}")
+    # ensure the kernel is up, max 17 tries
+    for _ in range(17):
+        if skills(log=False, log_error=False) is not None:
+            # got it, axum is up
+            break
+        time.sleep(0.1)
     # execute the cmd script line by line, logging is done for each command
     for command in commands:
         execute_command(pk, command)

@@ -29,13 +29,13 @@ HASH = "hash"
 MODIFIED = "modified"
 
 # constants
-WAIT_BETWEEN_MEMORY_CHECKS = 0.5
+WAIT_BETWEEN_RESOURCE_CHECKS = 0.5
 SHUTDOWN_TIMEOUT = 2.5
 
-# where to look for the Pharia Kernel binary
+# where to look for the Pharia Kernel binary, prefer local release build
 PK_LOCATIONS = [
-    "../target/debug/pharia-kernel",
     "../target/release/pharia-kernel",
+    "../target/debug/pharia-kernel",
     "pharia-kernel",
 ]
 
@@ -189,7 +189,7 @@ class PhariaKernel:
                 if self.mem_trace:
                     logger.info(f"resource: {json.dumps(dic)}")
             last = dic
-            self.end_pk.wait(WAIT_BETWEEN_MEMORY_CHECKS)
+            self.end_pk.wait(WAIT_BETWEEN_RESOURCE_CHECKS)
 
     def start(self):
         "run a pharia kernel in a separate process, capture the output, observe memory consumption"
