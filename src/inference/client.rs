@@ -104,7 +104,7 @@ impl From<aleph_alpha_client::Role> for Role {
     }
 }
 
-impl<'a> From<&Role> for aleph_alpha_client::Role {
+impl From<&Role> for aleph_alpha_client::Role {
     fn from(role: &Role) -> Self {
         match role {
             Role::System => aleph_alpha_client::Role::System,
@@ -149,7 +149,7 @@ impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
             messages: request
                 .messages
                 .iter()
-                .map(|m| aleph_alpha_client::Message::from(m))
+                .map(aleph_alpha_client::Message::from)
                 .collect(),
             maximum_tokens: request.params.max_tokens,
             temperature: request.params.temperature,
@@ -195,6 +195,6 @@ mod tests {
             .unwrap();
 
         // Then a chat response is returned
-        assert!(chat_response.message.content.len() > 0);
+        assert!(!chat_response.message.content.is_empty());
     }
 }
