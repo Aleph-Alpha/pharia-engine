@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 use crate::{
     csi::{ChunkRequest, Csi},
-    inference::{self, CompletionRequest},
+    inference::{self, ChatRequest, CompletionRequest},
     language_selection::SelectLanguageRequest,
     search::SearchRequest,
 };
@@ -50,6 +50,10 @@ where
                 .search(bearer.token().to_owned(), search_request)
                 .await
                 .map(|v| json!(v)),
+            V0_2CsiRequest::Chat(chat_request) => drivers
+                .chat(bearer.token().to_owned(), chat_request)
+                .await
+                .map(|v| json!(v)),
         },
     };
     match result {
@@ -80,6 +84,7 @@ pub enum V0_2CsiRequest {
     SelectLanguage(SelectLanguageRequest),
     CompleteAll(CompleteAllRequest),
     Search(SearchRequest),
+    Chat(ChatRequest),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
