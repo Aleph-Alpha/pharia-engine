@@ -1,0 +1,35 @@
+# add 10 skills, a little quicker
+p_add_py 10
+
+# warm up
+execute_all JohnDoe 0 0
+
+
+## just some skills
+# 150 sequential skill executions
+15 execute_all JohnDoe 0 0
+
+# 50 parallel skill executions no resources no wait
+p_execute_all MaxHeadroom 0 0 5
+# 100 parallel skill executions no resources no wait, again
+p_execute_all MaxHeadroom 0 0 10
+# 150 parallel skill executions no resources no wait, again
+p_execute_all MaxHeadroom 0 0 15
+
+
+## now with some resource usage, 1MB and 100ms each
+# 150 sequential skill executions with resources
+15 execute_all JohnDoe 1000 100
+
+# 50 parallel skill executions no resources no wait
+p_execute_all MaxHeadroom 1000 100 5
+# 100 parallel skill executions no resources no wait, again
+p_execute_all MaxHeadroom 1000 100 10
+# 150 parallel skill executions no resources no wait, again
+p_execute_all MaxHeadroom 1000 100 15
+
+# get rid of all skills
+10 drop_cached_skill
+10 delete_skill
+
+# stop has picked up the removed skills? looks like it

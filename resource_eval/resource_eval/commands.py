@@ -13,7 +13,9 @@ import hashlib
 import os
 import os.path
 import shutil
+import threading
 import time
+from itertools import repeat, starmap
 
 import requests
 
@@ -172,7 +174,7 @@ def cached_skills(log=True):
 
 
 def execute_all(input_val: str | None = None, memory=0, wait_time=0, log=True):
-    "access all existing skills, without requesting additional time or memory"
+    "access all existing skills, may request additional time or memory"
     skill_names = skills(False)
     if input_val is None:
         input_val = "John Doe"
@@ -182,6 +184,35 @@ def execute_all(input_val: str | None = None, memory=0, wait_time=0, log=True):
         )
     for skill_name in skill_names:
         execute_skill(skill_name, input_val, memory, wait_time, log=False)
+
+
+def p_execute_all(
+    input_val: str | None = None, memory=0, wait_time=0, times=1, log=True
+):  #
+    "access all existing skills in parallel, may request additional time and memory, may run each skill several times"
+    skill_names = skills(False)
+    if input_val is None:
+        input_val = "Victor A. Vyssotsky"
+    threads = [
+        threading.Thread(
+            target=lambda: execute_skill(
+                skill_name, input_val, memory, wait_time, log=False
+            ),
+        )
+        for skill_name in skill_names
+        for _ in range(times)
+    ]
+    if len(threads) > 1000:
+        logger.error("cmd, p_execute_all: really? more than 1000 threads? Nope")
+        return
+    if log:
+        logger.info(
+            f"cmd, p_execute_all: {len(skill_names)} skills with {input_val} memory={memory} wait_time={wait_time} times={times} -> {len(threads)} threads"
+        )
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
 
 
 def add_one_skill_py(log=True):
@@ -201,6 +232,46 @@ def add_one_skill_py(log=True):
 
 
 add_one_skill_py.cnt = 0
+
+
+def p_add_skill_py(how_many=1, log=True):
+    """adds how_many instances of the example python skill and executes all of them
+    This should have a much better performance than `how_many add_skill_py` as all copying
+    is done first and then all skills are executed.
+    """
+    if how_many < 1:
+        return
+    skill_names = []
+    for _ in range(how_many):
+        add_one_skill_py.cnt += 1
+        skill_name = f"{SKILL_NAME_PY}{add_one_skill_py.cnt}"
+        skill_names.append(skill_name)
+    logger.info(
+        f"cmd, p_add_skill_py: adding {how_many} python skills, last is {skill_name}"
+    )
+    for skill_name in skill_names:
+        shutil.copy(SKILL_FNAME_PY, f"skills/{skill_name}.wasm")
+    if log:
+        logger.info(f"   p_add_skill_py: copied all {how_many} skills")
+    tries, sleep_time = 17, 0.1
+    to_discover = set(skill_names)
+    for _ in range(tries):
+        time.sleep(sleep_time)  # wait for the kernel to pick it up
+        to_discover -= set(skills(False))
+        if not to_discover:
+            break
+        sleep_time *= 2
+    if to_discover:
+        log.error("p_add_skill_py: still not discovered all?")
+        return
+    if log:
+        logger.info(f"   p_add_skill_py: discovered all {how_many} skills")
+    for i, skill_name in enumerate(skill_names):
+        result = execute_skill(skill_name, f"Alice_{i}")
+        if result is None:
+            logger.error("   p_add_skill_py: access of {skill_name} failed")
+    if log:
+        logger.info(f"   p_add_skill_py: accessed all {how_many} skills")
 
 
 def drop_cached_skill(skill_name=None, log=True):
@@ -246,7 +317,9 @@ def delete_skill(skill_name=None, log=True):
 
 COMMANDS = {
     "add_py": add_one_skill_py,
+    "p_add_py": p_add_skill_py,
     "execute_all": execute_all,
+    "p_execute_all": p_execute_all,
     "execute_skill": execute_skill,
     "skills": skills,
     "cached_skills": cached_skills,

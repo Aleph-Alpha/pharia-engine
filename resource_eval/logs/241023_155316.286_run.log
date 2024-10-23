@@ -1,0 +1,16 @@
+{"arch": "ARM_8", "brand": "Apple M3 Pro", "cores": "12", "memory_total": "36", "memory_available": "13"}
+{"bin": "/Users/peter.barth/dev/pharia-kernel/target/release/pharia-kernel", "hash": "9290db81ab9e6c038ca3d0f1ad825aded8003317", "modified": "241023_154039.810"}
+{"filename": "cmds/test_p_execute_all.cmds", "hash": "c43cb5d37cabddd93e11c576235223e0bd695992", "modified": "241023_155313.982"}
+{"took": "23737", "rss_diff": "1946880", "rss": "1958592", "vms_diff": "2783952", "vms": "413608128", "cmd": "p_add_py 10"}
+{"took": "23", "rss_diff": "0", "rss": "1958592", "vms_diff": "0", "vms": "413608128", "cmd": "execute_all JohnDoe 0 0"}
+{"took": "320", "rss_diff": "0", "rss": "1958592", "vms_diff": "0", "vms": "413608128", "cmd": "15 execute_all JohnDoe 0 0"}
+{"took": "79", "rss_diff": "128", "rss": "1958720", "vms_diff": "0", "vms": "413608128", "cmd": "p_execute_all MaxHeadroom 0 0 5"}
+{"took": "152", "rss_diff": "0", "rss": "1958720", "vms_diff": "0", "vms": "413608128", "cmd": "p_execute_all MaxHeadroom 0 0 10"}
+{"took": "227", "rss_diff": "80", "rss": "1958800", "vms_diff": "0", "vms": "413608128", "cmd": "p_execute_all MaxHeadroom 0 0 15"}
+{"took": "16901", "rss_diff": "48", "rss": "1958848", "vms_diff": "-2208", "vms": "413605920", "cmd": "15 execute_all JohnDoe 1000 100"}
+{"took": "210", "rss_diff": "0", "rss": "1958848", "vms_diff": "0", "vms": "413605920", "cmd": "p_execute_all MaxHeadroom 1000 100 5"}
+{"took": "276", "rss_diff": "0", "rss": "1958848", "vms_diff": "0", "vms": "413605920", "cmd": "p_execute_all MaxHeadroom 1000 100 10"}
+{"took": "353", "rss_diff": "11760", "rss": "1970608", "vms_diff": "0", "vms": "413605920", "cmd": "p_execute_all MaxHeadroom 1000 100 15"}
+{"took": "27796", "rss_diff": "-744800", "rss": "1225808", "vms_diff": "-744832", "vms": "412861088", "cmd": "10 drop_cached_skill"}
+{"took": "12", "rss_diff": "0", "rss": "1225808", "vms_diff": "0", "vms": "412861088", "cmd": "10 delete_skill"}
+{"took": "19", "rss_diff": "-1225808", "rss": "0", "vms_diff": "-412861088", "vms": "0", "cmd": "stop"}
