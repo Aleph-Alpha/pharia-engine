@@ -169,7 +169,7 @@ mod tests {
     #[tokio::test]
     async fn test_chat_message_conversion() {
         drop(dotenvy::dotenv());
-        
+
         // Given an inference client
         let api_token = env::var("AA_API_TOKEN").unwrap();
         let host = env::var("AA_INFERENCE_ADDRESS").unwrap();
@@ -181,7 +181,6 @@ mod tests {
             params: ChatParams {
                 max_tokens: None,
                 temperature: None,
-                top_k: None,
                 top_p: None,
             },
             messages: vec![Message {
@@ -191,7 +190,9 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token).await.unwrap();
+        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token)
+            .await
+            .unwrap();
 
         // Then a chat response is returned
         assert!(chat_response.message.content.len() > 0);

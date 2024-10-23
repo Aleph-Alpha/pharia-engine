@@ -88,8 +88,6 @@ interface csi {
         max-tokens: option<u32>,
         /// The randomness with which the next token is selected.
         temperature: option<f64>,
-        /// The number of possible next tokens the model will choose from.
-        top-k: option<u32>,
         /// The probability total of next tokens the model will choose from.
         top-p: option<f64>,
     }

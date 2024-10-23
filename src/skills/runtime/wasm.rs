@@ -53,7 +53,8 @@ pub mod tests {
         language_selection::{select_language, Language, SelectLanguageRequest},
         namespace_watcher::OperatorConfig,
         search::{DocumentPath, SearchRequest, SearchResult},
-        skill_store::SkillStore, FinishReason,
+        skill_store::SkillStore,
+        FinishReason,
     };
 
     use super::*;

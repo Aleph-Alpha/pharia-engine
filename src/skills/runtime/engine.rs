@@ -489,7 +489,6 @@ mod v0_2 {
             Self {
                 max_tokens: params.max_tokens,
                 temperature: params.temperature,
-                top_k: params.top_k,
                 top_p: params.top_p,
             }
         }

@@ -116,7 +116,6 @@ pub struct CompletionRequest {
 pub struct ChatParams {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
-    pub top_k: Option<u32>,
     pub top_p: Option<f64>,
 }
 

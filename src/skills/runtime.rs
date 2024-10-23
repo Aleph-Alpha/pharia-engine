@@ -15,7 +15,7 @@ pub use self::{
     wasm::WasmRuntime,
 };
 
-/// Cognitive System Interface (CSI) as consumed by Skill developers. In particular some accidential
+/// Cognitive System Interface (CSI) as consumed by Skill developers. In particular some accidental
 /// complexity has been stripped away, by implementations due to removing accidental errors from the
 /// interface. It also assumes all authentication and authorization is handled behind the scenes.
 /// This is the CSI as passed to user defined code in WASM.
