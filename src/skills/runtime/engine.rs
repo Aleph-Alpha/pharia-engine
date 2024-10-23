@@ -1,12 +1,17 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
 
 use anyhow::anyhow;
 use semver::Version;
 use serde_json::{json, Value};
 use strum::{EnumIter, IntoEnumIterator};
+use tracing::info;
 use wasmtime::{
     component::{Component, InstancePre, Linker as WasmtimeLinker},
-    Config, Engine as WasmtimeEngine, OptLevel, Store, UpdateDeadline,
+    Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType, OptLevel,
+    Store, UpdateDeadline,
 };
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
@@ -28,14 +33,17 @@ impl Engine {
     const MAX_EXECUTION_TIME: Duration = Duration::from_secs(60 * 10);
 
     pub fn new() -> anyhow::Result<Self> {
-        let engine = WasmtimeEngine::new(
-            Config::new()
-                .async_support(true)
-                .cranelift_opt_level(OptLevel::SpeedAndSize)
-                // Allows for cooperative timeslicing in async mode
-                .epoch_interruption(true)
-                .wasm_component_model(true),
-        )?;
+        let mut config = Config::new();
+        config
+            .async_support(true)
+            .cranelift_opt_level(OptLevel::SpeedAndSize)
+            // Allows for cooperative timeslicing in async mode
+            .epoch_interruption(true)
+            .wasm_component_model(true);
+        if use_pooling_allocator_by_default() {
+            config.allocation_strategy(InstanceAllocationStrategy::pooling());
+        }
+        let engine = WasmtimeEngine::new(&config)?;
 
         // We only need a weak reference to pass to the loop.
         let engine_ref = engine.weak();
@@ -628,6 +636,50 @@ mod unversioned {
             self.skill_ctx.complete_text(request).await.text
         }
     }
+}
+
+/// The pooling allocator is tailor made for our use case, so
+/// try to use it when we can. The main cost of the pooling allocator, however,
+/// is the virtual memory required to run it. Not all systems support the same
+/// amount of virtual memory, for example some aarch64 and riscv64 configuration
+/// only support 39 bits of virtual address space.
+///
+/// The pooling allocator, by default, will request 1000 linear memories each
+/// sized at 6G per linear memory. This is 6T of virtual memory which ends up
+/// being about 42 bits of the address space. This exceeds the 39 bit limit of
+/// some systems, so there the pooling allocator will fail by default.
+///
+/// This function attempts to dynamically determine the hint for the pooling
+/// allocator. This returns `true` if the pooling allocator should be used
+/// by default, or `false` otherwise.
+///
+/// The method for testing this is to allocate a 0-sized 64-bit linear memory
+/// with a maximum size that's N bits large where we force all memories to be
+/// static. This should attempt to acquire N bits of the virtual address space.
+/// If successful that should mean that the pooling allocator is OK to use, but
+/// if it fails then the pooling allocator is not used and the normal mmap-based
+/// implementation is used instead.
+///
+/// Based on [`wasmtime serve`](https://github.com/bytecodealliance/wasmtime/blob/c42f925f3ab966e8446a807ea3cb59e3251aea5c/src/commands/serve.rs#L641) and [[`spin`](https://github.com/fermyon/spin/blob/2a9bf7c57eda9aa42152f016373d3105170b164b/crates/core/src/lib.rs#L157) implementations
+fn use_pooling_allocator_by_default() -> bool {
+    const BITS_TO_TEST: u32 = 42;
+    static USE_POOLING: LazyLock<bool> = LazyLock::new(|| {
+        let mut config = Config::new();
+        config.wasm_memory64(true);
+        config.static_memory_maximum_size(1 << BITS_TO_TEST);
+        let Ok(engine) = WasmtimeEngine::new(&config) else {
+            info!("unable to create an engine to test the pooling allocator, disabling pooling allocation");
+            return false;
+        };
+        let mut store = Store::new(&engine, ());
+        // NB: the maximum size is in wasm pages to take out the 16-bits of wasm
+        // page size here from the maximum size.
+        let ty = MemoryType::new64(0, Some(1 << (BITS_TO_TEST - 16)));
+        Memory::new(&mut store, ty).inspect_err(|_| {
+            info!("Pooling allocation not supported on this system. Falling back to mmap-based implementation.");
+        }).is_ok()
+    });
+    *USE_POOLING
 }
 
 #[cfg(test)]
