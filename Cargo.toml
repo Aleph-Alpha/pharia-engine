@@ -32,7 +32,7 @@ edition = "2021"
 
 [dependencies]
 aleph-alpha-client = "0.12.3"
-anyhow = "1.0.89"
+anyhow = "1.0.91"
 async-trait = "0.1.83"
 axum = { version = "0.7.7", features = ["macros"] }
 axum-extra = { version = "0.9.4", features = ["typed-header"] }
@@ -42,12 +42,11 @@ oci-client = "0.13.0"
 oci-wasm = "0.1.0"
 reqwest = "0.12.8"
 semver = "1.0.23"
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.129"
+serde = { version = "1.0.213", features = ["derive"] }
+serde_json = "1.0.132"
 toml = "0.8.19"
 strum = { version = "0.26.3", features = ["derive"] }
-# Pinned because of opentelemetry crates
-tokio = { version = "1.40.0", features = [
+tokio = { version = "1.41.0", features = [
     "macros",
     "rt-multi-thread",
     "signal",
@@ -62,13 +61,13 @@ tower-http = { version = "0.6.1", features = [
 ] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-utoipa = { version = "5.1.1", features = ["axum_extras"] }
+utoipa = { version = "5.1.2", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.2.0", features = ["axum"] }
-wasmtime = "25.0.2"
-wasmtime-wasi = "25.0.2"
+wasmtime = "26.0.0"
+wasmtime-wasi = "26.0.0"
 wit-parser = "0.219.1"
 url = "2.5.2"
-thiserror = "1.0.64"
+thiserror = "1.0.65"
 tokenizers = { version = "0.20.1", default-features = false, features = [
     "onig",
     "esaxx_fast",
