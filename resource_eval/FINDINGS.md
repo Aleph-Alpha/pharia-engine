@@ -51,12 +51,16 @@ Executing all 256 skill again 10 times for the second time took only 15 seconds 
 Some memory rearrangement seems to take place, but nothing out of the ordinary.
 Executing all 256 skill yet again 10 times for the third time, but this time each one consuming 1MB of memory took 17 seconds
 and yet again no significant memory increase. I may be assumed, that on sequential access resources are freed quickly.
+Furthermore, shutting down an instance hosting 256 skills and consuming 22 GB of resident memory took only 1.2 seconds.
 
 All together, 256 skills loaded and executed used about 22 GB main memory, which is less than 100 MB per skill.
-Even for resource intensive skills (more libraries, etc.), we may assume that 150-200 MB per skill is sufficient.
-As a conservative sizing recommendation a 64 GB dedicated x86_64 server instance should be able to host up to 1,000 
+Even for more resource intensive skills (more libraries, etc.), we may assume that 150-200 MB per skill is sufficient.
+This is also based on the assumption, that skill execution itself is not very memory intensive, as the actual
+services such as document index and inference are hosted elsewhere.
+As a conservative sizing recommendation a 64 GB dedicated x86_64 server instance should be able to host up to 500
 Python skills.
 
+Todo: rust skills
 
 ## Findings Execution Performance
 
