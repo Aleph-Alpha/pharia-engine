@@ -63,27 +63,31 @@ def str2dt(s: str) -> datetime.datetime:
     return dt
 
 
-# for console logging  of the driving application
+# for console logging of the driving application
 logger = _setup_console_logger("main")
 
-# the log file for a run, all lines are json; app specific timestamp in all entries
-# that one is used for evaluation
+# the log file for a run, all lines are json; app specific timestamp in all
+# lines where Pharia Kernel operations are executed. To be used for evaluation.
 run_logger = _setup_json_logger("run", "run.log")
 
-# in case someone is interested, we also just pass through the entries from Pharia Kernel
+# Pass through of the log lines from Pharia Kernel and regular resource updates, for tracing
 pk_logger = _setup_file_logger("pk", "pk.log")
 
 
 def _test_log():
     import time
 
-    logger.info("hallo")
+    logger.info("hello")
+    dic = {"timestamp": dt2str(), "msg": "hello", "a": 17, "b": 42}
+    run_logger.info(dic)
+    pk_logger.info(dic)
     time.sleep(0.1)
-    logger.info("und so")
-
-    run_logger.info({"timestamp": dt2str(), "msg": "hallo", "a": 17})
+    dic["timestamp"] = dt2str()
+    run_logger.info(dic)
+    pk_logger.info(dic)
+    logger.info("hello again")
     time.sleep(0.1)
-    run_logger.info({"timestamp": dt2str(), "msg": "hallo"})
+    logger.info("end")
 
 
 if __name__ == "__main__":
