@@ -251,20 +251,7 @@ impl InferenceMessage {
                 send,
                 api_token,
             } => {
-                let mut remaining_retries = 5;
-                let result = loop {
-                    match client.complete_text(&request, api_token.clone()).await {
-                        Ok(value) => break Ok(value),
-                        Err(e) if remaining_retries <= 0 => {
-                            error!("Error completing text: {e}");
-                            break Err(e);
-                        }
-                        Err(e) => {
-                            warn!("Retrying completion: {e}");
-                        }
-                    };
-                    remaining_retries -= 1;
-                };
+                let result = retry(|| client.complete_text(&request, api_token.clone())).await;
                 drop(send.send(result));
             }
             Self::Chat {
@@ -272,8 +259,29 @@ impl InferenceMessage {
                 send,
                 api_token,
             } => {
-                let result = client.chat(&request, api_token).await;
+                let result = retry(|| client.chat(&request, api_token.clone())).await;
                 drop(send.send(result));
+            }
+        }
+    }
+}
+
+async fn retry<T, F, Fut>(mut f: F) -> anyhow::Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = anyhow::Result<T>>,
+{
+    let mut remaining_retries = 5;
+    loop {
+        match f().await {
+            Ok(value) => return Ok(value),
+            Err(e) if remaining_retries <= 0 => {
+                error!("Error after all retries: {e}");
+                return Err(e);
+            }
+            Err(e) => {
+                warn!("Retrying operation: {e}");
+                remaining_retries -= 1;
             }
         }
     }
@@ -377,6 +385,64 @@ pub mod tests {
         ) -> anyhow::Result<ChatResponse> {
             unimplemented!()
         }
+    }
+
+    #[tokio::test]
+    async fn future_which_returns_okay_on_first_try() {
+        // Given a future that always returns okay
+        let mut counter = 0;
+        let ref_counter = &mut counter;
+        let future = || {
+            *ref_counter += 1;
+            std::future::ready(Ok(()))
+        };
+
+        // When retrying the future
+        let result = retry(future).await;
+
+        // Then the future is invoked only once
+        assert!(result.is_ok());
+        assert_eq!(counter, 1);
+    }
+
+    #[tokio::test]
+    async fn future_which_returns_okay_on_third_try() {
+        // Given a future that always returns okay
+        let mut counter = 0;
+        let ref_counter = &mut counter;
+        let future = || {
+            if *ref_counter == 2 {
+                std::future::ready(Ok(()))
+            } else {
+                *ref_counter += 1;
+                std::future::ready(Err(anyhow!("Error")))
+            }
+        };
+
+        // When retrying the future
+        let result = retry(future).await;
+
+        // Then the future is invoked three times and returns okay
+        assert!(result.is_ok());
+        assert_eq!(counter, 2);
+    }
+
+    #[tokio::test]
+    async fn future_which_always_returns_error() {
+        // Given a future that always returns error
+        let mut counter = 0;
+        let ref_counter = &mut counter;
+        let future = || {
+            *ref_counter += 1;
+            std::future::ready(Err::<(), _>(anyhow!("Error")))
+        };
+
+        // When retrying the future
+        let result = retry(future).await;
+
+        // Then the future is invoked six times and returns an error
+        assert!(result.is_err());
+        assert_eq!(counter, 6);
     }
 
     #[tokio::test]
