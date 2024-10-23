@@ -42,8 +42,9 @@ The compiled skill does nothing else but greet a Person and optionally may consu
 ## Concept
 
 We do a series of skill deployments, accesses and other Pharia Kernel operations,
-which can be described by a simple command language.
-Each command starts in a line with a valid command.
+which can be described by a simple command language stored in files with a `.cmds` ending.
+Each line starting with a character is tried to be interpreted as a command.
+The first word should be a valid command.
 All subsequent arguments delimited by whitespace are arguments to this command.
 Commands are:
 
@@ -51,7 +52,7 @@ Commands are:
   incrementally, the first skill added is `sample_py1.wasm`.
 * `skills`: Lists all the skills.
 * `execute_skill sample_py1 Alice 100 20`: Executes a skill with the name `sample_py1` and
-  greets `Alice`, while doing so 100 KBytes memory and 20 ms of wall time are wasted.
+  greets `Alice`, while doing so 100 KBytes of memory and 20 ms of wall time are wasted.
   The 20 is optional and defaults to 0, the 100 is optional and defaults to 0.
 * `execute_all Alice 0 0`: Executes all skills that are listed with the given parameters.
 
@@ -59,22 +60,24 @@ You may put a number `n` before a command, which repeats command execution `n` t
 
 TODO: parallel repetition, parallel blocks
 
-We capture the output of a run of the Pharia Kernel operations in file `241022_162524.558_run.log`,
+We capture the output of a run of the Pharia Kernel operations in a file such as `241022_162524.558_run.log`,
 which means that the run was captured 2024 on October the 22nd at 16:25:24 and 558 ms.
 The ending `_run.log` indicates that all information for evaluation is stored there, each line is a Json string.
 These `_run.log` files can be stored and checked in to compare evaluations over time.
 In the beginning of a `_run.log` file, there are always three lines.
 First information about the machine the bench runs on, second about the binary, third about the cmds file.
-Then for each Pharia Kernel operation there is a line with the `cmd` it executed, how long it `took` in ms,
-and the resident memory size (`rss`) after the command and by how much it changed compared to before the
-command (`rss_diff`).
+Then for each Pharia Kernel operation there is a line with the `cmd` it executed, how long it `took` in ms.
+In addition there is the resident set size (`rss`), which is the amount of memory in KB currently in RAM for the
+running process, after the command and by how much it changed compared to before the command (`rss_diff`).
 There is similar information about the virtual memory size (`vms`, `vms_diff`).
 Note that `rss` may go down during a run if memory is swapped out. Unfortunately, there is no platform
-independent (i.e. Linux, Mac, and Windows), way to accommodate for this.
+independent (i.e. Linux, Mac, and Windows), way to log this accurately.
 The last line observes the command `stop`, which happens automatically and may take a long time on a Mac.
 
-The other log file ends with `_pk.log` and captures the Pharia Kernel output.
-This file is only used for error tracing and can safely be removed as it is unnecessary for evaluation.
+The other log file ends with `_pk.log` and captures the Pharia Kernel log output as well as intermittent
+resource consumption messages.
+This log file is only used for error tracing and can safely be removed after a successful run as it is
+not used for evaluation.
 
 ## Running
 
