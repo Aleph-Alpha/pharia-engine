@@ -60,7 +60,7 @@ impl Kernel {
             NamespaceDescriptionLoaders::new(app_config.operator_config.clone())
                 .context("Unable to read the configuration for namespaces")?,
         );
-        let engine = Arc::new(Engine::new().context("engine creation failed")?);
+        let engine = Arc::new(Engine::new(false).context("engine creation failed")?);
 
         // Boot up the drivers which power the CSI. Right now we only have inference.
         let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();

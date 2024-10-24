@@ -32,7 +32,7 @@ impl Engine {
     /// Currently set to 10 minutes as an upper bound.
     const MAX_EXECUTION_TIME: Duration = Duration::from_secs(60 * 10);
 
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(use_pooling_allocator: bool) -> anyhow::Result<Self> {
         let mut config = Config::new();
         config
             .async_support(true)
@@ -40,9 +40,13 @@ impl Engine {
             // Allows for cooperative timeslicing in async mode
             .epoch_interruption(true)
             .wasm_component_model(true);
-        if use_pooling_allocator_by_default() {
+
+        if use_pooling_allocator && pooling_allocator_is_supported() {
+            // For more information on Pooling Allocation, as well as all of possible configuration,
+            // read the wasmtime docs: https://docs.rs/wasmtime/latest/wasmtime/struct.PoolingAllocationConfig.html
             config.allocation_strategy(InstanceAllocationStrategy::pooling());
         }
+
         let engine = WasmtimeEngine::new(&config)?;
 
         // We only need a weak reference to pass to the loop.
@@ -661,7 +665,7 @@ mod unversioned {
 /// implementation is used instead.
 ///
 /// Based on [`wasmtime serve`](https://github.com/bytecodealliance/wasmtime/blob/c42f925f3ab966e8446a807ea3cb59e3251aea5c/src/commands/serve.rs#L641) and [[`spin`](https://github.com/fermyon/spin/blob/2a9bf7c57eda9aa42152f016373d3105170b164b/crates/core/src/lib.rs#L157) implementations
-fn use_pooling_allocator_by_default() -> bool {
+fn pooling_allocator_is_supported() -> bool {
     const BITS_TO_TEST: u32 = 42;
     static USE_POOLING: LazyLock<bool> = LazyLock::new(|| {
         let mut config = Config::new();
@@ -751,7 +755,7 @@ mod tests {
         // Given a skill loaded by our engine
         given_greet_skill_v0_1();
         let wasm = fs::read("skills/greet_skill_v0_1.wasm").unwrap();
-        let engine = Engine::new().unwrap();
+        let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -768,7 +772,7 @@ mod tests {
         // Given a skill loaded by our engine
         given_greet_skill_v0_2();
         let wasm = fs::read("skills/greet_skill_v0_2.wasm").unwrap();
-        let engine = Engine::new().unwrap();
+        let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -785,7 +789,7 @@ mod tests {
         // Given a skill loaded by our engine
         given_search_skill();
         let wasm = fs::read("skills/search_skill.wasm").unwrap();
-        let engine = Engine::new().unwrap();
+        let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -803,7 +807,7 @@ mod tests {
         // Given a skill loaded by our engine
         given_chat_skill();
         let wasm = fs::read("skills/chat_skill.wasm").unwrap();
-        let engine = Engine::new().unwrap();
+        let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -821,7 +825,7 @@ mod tests {
         // Given a skill loaded by our engine
         given_greet_py();
         let wasm = fs::read("skills/greet-py.wasm").unwrap();
-        let engine = Engine::new().unwrap();
+        let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -838,7 +842,7 @@ mod tests {
         // Given a skill loaded by our engine
         given_greet_py_v0_2();
         let wasm = fs::read("skills/greet-py-v0_2.wasm").unwrap();
-        let engine = Engine::new().unwrap();
+        let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 

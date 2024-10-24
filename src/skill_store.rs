@@ -361,7 +361,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_component_is_in_config() {
         let skill_path = SkillPath::dummy();
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
         let result = provider.fetch(&skill_path).await;
@@ -372,7 +372,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
         let result = provider
@@ -385,7 +385,7 @@ pub mod tests {
     #[tokio::test]
     async fn namespace_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
         let result = provider
@@ -400,7 +400,7 @@ pub mod tests {
         // Given one cached skill
         given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
         provider.fetch(&skill_path).await.unwrap();
 
@@ -415,7 +415,7 @@ pub mod tests {
     async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
 
@@ -431,7 +431,7 @@ pub mod tests {
         given_greet_skill();
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(engine, &local_namespace());
         skill_provider
             .api()
@@ -461,7 +461,7 @@ pub mod tests {
     #[tokio::test]
     async fn should_list_skills_that_have_been_added() {
         // Given an empty provider
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(engine, &local_namespace());
         let api = skill_provider.api();
 
@@ -485,7 +485,7 @@ pub mod tests {
         // Given one cached "greet_skill"
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(engine, &local_namespace());
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
@@ -505,7 +505,7 @@ pub mod tests {
     async fn invalidation_of_an_uncached_skill() {
         // Given one "greet_skill" which is not in cache
         let greet_skill = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(engine, &local_namespace());
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;

@@ -66,7 +66,7 @@ pub mod tests {
     async fn greet_skill_component() {
         given_greet_skill();
         let skill_path = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(
             engine.clone(),
             &OperatorConfig::local(&["greet_skill"]).namespaces,
@@ -84,7 +84,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider =
             SkillStore::new(engine.clone(), &OperatorConfig::local(&[]).namespaces);
         let runtime = WasmRuntime::new(engine, skill_provider.api());
@@ -104,7 +104,7 @@ pub mod tests {
         given_greet_skill();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(
             engine.clone(),
             &OperatorConfig::local(&["greet_skill"]).namespaces,
@@ -128,7 +128,7 @@ pub mod tests {
         given_greet_py();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::new("local", "greet-py");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(
             engine.clone(),
             &OperatorConfig::local(&["greet-py"]).namespaces,
@@ -152,7 +152,7 @@ pub mod tests {
         given_greet_skill();
         let skill_ctx = Box::new(CsiCounter::new());
         let skill_path = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(
             engine.clone(),
             &OperatorConfig::local(&["greet_skill"]).namespaces,

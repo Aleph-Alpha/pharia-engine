@@ -397,7 +397,7 @@ pub mod tests {
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
         let namespaces = HashMap::new();
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let skill_provider = SkillStore::new(engine.clone(), &namespaces);
         let csi_apis = DummyCsi;
         let executer = SkillExecutor::new(engine, csi_apis, skill_provider.api());
@@ -423,7 +423,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_executor_forwards_csi_errors() {
         // Given csi which emits errors for completion request
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreGreetStub::new(engine.clone());
         let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
 
@@ -448,7 +448,7 @@ pub mod tests {
     async fn greeting_skill() {
         // Given
         let csi = StubCsi::with_completion_from_text("Hello");
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreGreetStub::new(engine.clone());
 
         // When
@@ -471,7 +471,7 @@ pub mod tests {
     #[tokio::test(start_paused = true)]
     async fn concurrent_skill_execution() {
         // Given
-        let engine = Arc::new(Engine::new().unwrap());
+        let engine = Arc::new(Engine::new(false).unwrap());
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
         let csi = StubCsi::with_completion_from_text("Hello, Homer!");
