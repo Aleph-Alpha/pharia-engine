@@ -4,7 +4,8 @@ import os
 from dotenv import load_dotenv
 
 from .commands import execute_cmds_file
-from .log_util import dt2str, logger, run_logger
+from .eval_log import do_eval
+from .log_util import dt2str, init_run_loggers, logger, run_logger
 from .run_pk import PHARIA_KERNEL_BIN, PhariaKernel, diff_str_dt, get_machine
 
 
@@ -25,10 +26,6 @@ def do_run(cmds_file, mem):
     pk.quit()
     end = dt2str()
     logger.info(f"end of run, took {diff_str_dt(start, end)} ms total")
-
-
-def do_eval(log_files):
-    print("log_files:", log_files)
 
 
 def main():
@@ -80,6 +77,7 @@ def main():
     )
     args = parser.parse_args()
     if args.command == "run":
+        init_run_loggers()
         if args.kernel:
             os.environ[PHARIA_KERNEL_BIN] = args.kernel
         do_run(args.cmds_file, args.mem)

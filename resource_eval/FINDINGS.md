@@ -23,14 +23,52 @@ For reference the enclosed log files.
 241022_204217.737_run.log      x86_64 5750G
 ```
 
+You find a simple textual comparison of the above log files enclosed.
+
+```text
+Evaluating: cmds=bench.cmds hash=3c6d21c18c26d4130b6f57d617d2131cedd58d1d comparing 2 log files
+a  fname=logs/241022_204217.730_run.log date=2024-10-22 20:42:17.730000   brand=Apple M3 Pro
+   arch=ARM_8  cores=cores=12 mem_total(GB)=36 mem_available(GB)=13
+   binary=/Users/peter.barth/dev/pharia-kernel/target/debug/pharia-kernel hash=753c4e8aaf004e75367a3cb0de8c22db44d135aa
+b  fname=logs/241022_204217.737_run.log date=2024-10-22 20:42:17.737000   brand=AMD Ryzen 7 PRO 5750G with Radeon Graphics
+   arch=X86_64 cores=cores=16 mem_total(GB)=15 mem_available(GB)=11
+   binary=/home/peter/dev/pharia-kernel/target/debug/pharia-kernel hash=8f652eac0741839d18d96d2f7a9cff291fdc4e7c
+==============================================================================================
+cmd                                       id         took(ms)  vs a(%)   rss diff(KB)  vs a(%)
+----------------------------------------------------------------------------------------------
+add_py                                    a             3,171                 834,992         
+                                          b             3,062       97        885,748      106
+4 add_py                                  a            16,086                 611,616         
+                                          b            16,145      100        598,600       98
+skills                                    a                 2                       0         
+                                          b                 1       50              0      100
+execute_skill sample_py1 Alice 100 20     a             2,892                  90,544         
+                                          b                26        1            524        1
+execute_all Bob 20 10                     a                76                      96         
+                                          b                85      112            224      233
+10 execute_all Cecilia 0 0                a               140                       0         
+                                          b               196      140            432      inf
+skills                                    a                 1                       0         
+                                          b                 1      100              0      100
+cached_skills                             a                 0                       0         
+                                          b                 1      inf              0      100
+stop                                      a             6,067              -1,537,472         
+                                          b               114        2     -1,488,328       97
+----------------------------------------------------------------------------------------------
+Total time (ms)                           a            28,435         
+                                          b            19,631       69
+Maximum rss memory (KB)                   a                                 1,537,472         
+                                          b                                 1,488,328       97
+```
+
 The biggest problem, which is reproducible and happens always, is stopping Pharia Kernel
 at the end of a run. For `bench.cmds` both machines used about 1.5 GB of resident memory.
 Stopping that instance (sending SIGTERM, which is what happens if you press Ctrl-C) took
-more than 6 seconds on the Mac but only about 120 ms on the x86_64 machine. On a Mac, it
+more than 6 seconds on the Mac but less than 120 ms on the x86_64 machine. On a Mac, it
 helps to delete the skills from cache and remove them before shutting down.
 An assumption is, that the behavior depends on the operating system, not the instruction set architecture.
 As customers will most likely use Linux machines and in addition, customers will most likely
-deploy on x86_64 machines, so it should be fine.
+deploy on x86_64 machines, it should be fine.
 
 We run Pharia Kernel also on an older x86_64 machine on a KVM instance running `Debian 12` providing
 16 cores and 128 GB of memory. No other load was running on that instance, we may safely assume,
@@ -38,6 +76,31 @@ that no memory paging took place.
 
 ```text
 241022_211735.835_run.log      x86_64 EPYC 7301
+```
+
+```text
+Evaluating: cmds=stress.cmds hash=fe671f5712f7fca8f7e5ac64be07a72186df2be6
+a  fname=logs/241022_211735.835_run.log date=2024-10-22 21:17:35.835000   brand=AMD EPYC 7301 16-Core Processor
+   arch=X86_64 cores=cores=16 mem_total(GB)=126 mem_available(GB)=124
+   binary=/home/peter/pharia-kernel/target/debug/pharia-kernel hash=b6c7be763e517ee2df15ed3f7b40b7d5d3da5e4c
+==============================================================================================
+cmd                                       id         took(ms)  vs a(%)   rss diff(KB)  vs a(%)
+----------------------------------------------------------------------------------------------
+128 add_py                                a           822,576              11,455,548         
+skills                                    a                 3                       0         
+execute_skill sample_py1 Alice 100 20     a                38                       4         
+10 execute_all Bob 0 0                    a            18,319                 157,096         
+10 execute_all Cecilia 0 0                a             6,400                      56         
+10 execute_all Dominic 1000 0             a             7,759                      44         
+128 add_py                                a           818,621               9,929,496         
+10 execute_all Bob 0 0                    a            50,908                 586,344         
+10 execute_all Cecilia 0 0                a            15,117                      76         
+10 execute_all Dominic 1000 0             a            17,275                      24         
+cached_skills                             a                 3                       0         
+stop                                      a             1,220             -22,131,504         
+----------------------------------------------------------------------------------------------
+Total time (ms)                           a         1,758,239         
+Maximum rss memory (KB)                   a                                22,131,504         
 ```
 
 Adding the first 128 Python skills took 822 seconds and consumed 11.4 GB of resident memory.

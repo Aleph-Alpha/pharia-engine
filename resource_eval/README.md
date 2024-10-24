@@ -61,17 +61,22 @@ The first word should be a valid command.
 All subsequent arguments delimited by whitespace are arguments to this command.
 Commands are:
 
-* `add_py`: Adds a python skill, makes a copy of `sample_py.wasm` and numbers the skills
+* `add_py`: Adds a Python skill, makes a copy of `sample_py.wasm` and numbers the skills
   incrementally, the first skill added is `sample_py1.wasm`.
+* `p_add_py 20`: Adds 20 Python skills by copying 20 times in a go and afterwards accessing each of them.
+* `add_rs`: Adds a Rust skill, makes a copy of `sample_rs.wasm` and numbers the skills
+* `p_add_rs 20`: Adds 20 Rust skills by copying 20 times in a go and afterwards accessing each of them.
 * `skills`: Lists all the skills.
 * `execute_skill sample_py1 Alice 100 20`: Executes a skill with the name `sample_py1` and
-  greets `Alice`, while doing so 100 KBytes of memory and 20 ms of wall time are wasted.
-  The 20 is optional and defaults to 0, the 100 is optional and defaults to 0.
+  greets `Alice`, while doing so 100 KB of memory and 20 ms of wall time are wasted.
+  The 20 is optional and defaults to 0, the 100 is optional and defaults to 0.  
 * `execute_all Alice 0 0`: Executes all skills that are listed with the given parameters.
+* `p_execute_all Max 20 30 40`: Execute all skills in parallel (1000 requests max). If 10 skills are
+  deployed this would mean execute each of 40 times (400 skill executions in parallel), where 20 KB
+  of memory and 30 ms of wall time are consumed during each invocation.
 
 You may put a number `n` before a command, which repeats command execution `n` times.
-
-TODO: parallel repetition, parallel blocks
+It is sensible to only do this for commands not starting with `p_`.
 
 We capture the output of a run of the Pharia Kernel operations in a file such as `241022_162524.558_run.log`,
 which means that the run was captured 2024 on October the 22nd at 16:25:24 and 558 ms.
@@ -106,10 +111,10 @@ Alternatively, you can run the module
 python3 -m resource_eval run -m bench.cmds
 ```
 
-Two log files are automatically created for each run, one with `..._pk.log` and one with `...run.log`.
+Two log files are automatically created for each run, one with `..._pk.log` and one with `..._run.log`.
 In addition progress is shown on screen.
 With `-m` intermittent resource consumption messages are activated, which is helpful for long running
-commands with many changes in resource consumption.
+commands with have changes in resource consumption.
 
 ## Evaluation
 

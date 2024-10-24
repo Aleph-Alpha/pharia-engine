@@ -63,21 +63,42 @@ def str2dt(s: str) -> datetime.datetime:
     return dt
 
 
-# for console logging of the driving application
+# for console logging of the driving application, we always need that
 logger = _setup_console_logger("main")
+
+
+class NoneLogger:
+    def __init__(self):
+        self.logger = None
+
+    def info(self, *args, **kwargs):
+        if self.logger:
+            self.logger.info(*args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        if self.logger:
+            self.logger.error(*args, **kwargs)
+
 
 # the log file for a run, all lines are json; app specific timestamp in all
 # lines where Pharia Kernel operations are executed. To be used for evaluation.
-run_logger = _setup_json_logger("run", "run.log")
+# Only needed when running
+run_logger = NoneLogger()
 
 # Pass through of the log lines from Pharia Kernel and regular resource updates, for tracing
-pk_logger = _setup_file_logger("pk", "pk.log")
+pk_logger = NoneLogger()
+
+
+def init_run_loggers():
+    run_logger.logger = _setup_json_logger("run", "run.log")
+    pk_logger.logger = _setup_file_logger("pk", "pk.log")
 
 
 def _test_log():
     import time
 
     logger.info("hello")
+    init_run_loggers()
     dic = {"timestamp": dt2str(), "msg": "hello", "a": 17, "b": 42}
     run_logger.info(dic)
     pk_logger.info(dic)
