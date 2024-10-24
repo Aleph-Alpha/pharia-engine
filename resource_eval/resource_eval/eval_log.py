@@ -108,10 +108,19 @@ HEADER = FMT.format(
     r_per="vs a(%)",
 )
 
+SINGLE_FMT = "{cmd:40}  {id:2}   {took:>14}   {rss_diff:>12}"
+SINGLE_HEADER = SINGLE_FMT.format(
+    cmd="cmd",
+    id="id",
+    took="took(ms)",
+    rss_diff="rss diff(KB)",
+)
+
 
 def do_report(logs: list[Logfile]):
     "textual for now"
-    comp = f" comparing {len(logs)} log files" if len(logs) > 1 else ""
+    SINGLE = len(logs) == 1
+    comp = f" comparing {len(logs)} log files" if not SINGLE else ""
     print(
         f"Evaluating: cmds={logs[0].cmd_info[FILENAME]} hash={logs[0].cmd_info[HASH]}{comp}"
     )
@@ -135,9 +144,9 @@ def do_report(logs: list[Logfile]):
             f"   arch={arch:6} cores=cores={cores} mem_total(GB)={mem_total} mem_available(GB)={mem_available}"
         )
         print(f"   binary={log.bin_info[BIN]} hash={log.bin_info[HASH]}")
-    print("=" * len(HEADER))
-    print(HEADER)
-    print("-" * len(HEADER))
+    print("=" * (len(HEADER) if not SINGLE else len(SINGLE_HEADER)))
+    print(HEADER if not SINGLE else SINGLE_HEADER)
+    print("-" * (len(HEADER) if not SINGLE else len(SINGLE_HEADER)))
     cum_took = {id: 0 for id in ids}
     rss_max = {id: 0 for id in ids}
     for all_per_entry in zip(*logs):
@@ -153,24 +162,36 @@ def do_report(logs: list[Logfile]):
             )
             cum_took[id] += took
             rss_max[id] = max(rss_max[id], rss)
-            print(
-                FMT.format(
-                    cmd=entry[CMD] if first else "",
-                    id=id,
-                    took=delim_thousands(took),
-                    t_per=get_per_diff(took, first_took) if not first else "",
-                    rss_diff=delim_thousands(rss_diff),
-                    r_per=get_per_diff(rss_diff, first_rss_diff) if not first else "",
+            if SINGLE:
+                print(
+                    SINGLE_FMT.format(
+                        cmd=entry[CMD] if first else "",
+                        id=id,
+                        took=delim_thousands(took),
+                        rss_diff=delim_thousands(rss_diff),
+                    )
                 )
-            )
+            else:
+                print(
+                    FMT.format(
+                        cmd=entry[CMD] if first else "",
+                        id=id,
+                        took=delim_thousands(took),
+                        t_per=get_per_diff(took, first_took) if not first else "",
+                        rss_diff=delim_thousands(rss_diff),
+                        r_per=get_per_diff(rss_diff, first_rss_diff)
+                        if not first
+                        else "",
+                    )
+                )
             first = False
         # print(all_per_entry)
-    print("-" * len(HEADER))
+    print("-" * (len(HEADER) if not SINGLE else len(SINGLE_HEADER)))
     for id in ids:
         what = "Total time (ms)" if id == "a" else ""
         t_per = get_per_diff(cum_took[id], cum_took["a"]) if id != "a" else ""
         print(f"{what:40}  {id:2}   {delim_thousands(cum_took[id]):>14} {t_per:>8}")
-    space = " " * 24
+    space = " " * (24 if not SINGLE else 15)
     for id in ids:
         what = "Maximum rss memory (KB)" if id == "a" else ""
         t_per = get_per_diff(rss_max[id], rss_max["a"]) if id != "a" else ""

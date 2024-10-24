@@ -104,20 +104,22 @@ Maximum rss memory (KB)                   a                                22,13
 ```
 
 Adding the first 128 Python skills took 822 seconds and consumed 11.4 GB of resident memory.
-Access the first skill after loading another 127 skills was basically instant and consumed no additional memory.
-Accessing 10 times all 128 skills sequentially took 18 seconds and consumed 157 MB additional resident memory,
+Access the first skill after loading another 127 skills was basically instant (38 ms) and consumed
+almost no additional memory (4 KB).
+Accessing 10 times all 128 skills sequentially took 18.3 seconds and consumed 157 MB additional resident memory,
 which appears to be fine with only 15 ms per skill invocation (without hitting external services such as inference,
 we measure just the overhead). This provides excellent quick startup time when accessing a loaded skill.
 Adding the next 128 Python skills took again about 818 seconds and consumed another 10 GB of resident memory.
 Basically, linear scaling as one wants it.
-Executing all 256 skills 10 times took 50 seconds and added some 500MB of main memory consumption.
-Executing all 256 skill again 10 times for the second time took only 15 seconds and no significant memory increase.
+Executing all 256 skills 10 times took 50 seconds and added some 586 MB of main memory consumption.
+Executing all 256 skill again 10 times (all is hot) took only 15 seconds and no significant memory increase.
 Some memory rearrangement seems to take place, but nothing out of the ordinary.
-Executing all 256 skill yet again 10 times for the third time, but this time each one consuming 1MB of memory took 17 seconds
-and yet again no significant memory increase. I may be assumed, that on sequential access resources are freed quickly.
+Executing all 256 skill yet again 10 times for the third time, but this time each one consumes 1 MB of memory took 17 seconds
+and yet again no significant memory increase. This is at it should be as skill invocation is one shot, there is no state.
+Thus, it may be assumed, that on sequential access resources are freed quickly.
 Furthermore, shutting down an instance hosting 256 skills and consuming 22 GB of resident memory took only 1.2 seconds.
 
-All together, 256 skills loaded and executed used about 22 GB main memory, which is less than 100 MB per skill.
+All together, loading and running 256 skills used about 22 GB main memory, which is less than 100 MB per skill.
 Even for more resource intensive skills (more libraries, etc.), we may assume that 150-200 MB per skill is sufficient.
 This is also based on the assumption, that skill execution itself is not very memory intensive, as the actual
 services such as document index and inference are hosted elsewhere.
@@ -134,13 +136,39 @@ For execution performance, we try to execute skills in parallel. In the followin
 241023_155316.286_run.log 
 ```
 
-we focus on execution time when accessing 10 different skills several times. The baseline is sequential
+```text
+Evaluating: cmds=cmds/test_p_execute_all.cmds hash=c43cb5d37cabddd93e11c576235223e0bd695992
+a  fname=logs/241023_155316.286_run.log date=2024-10-23 15:53:16.286000   brand=Apple M3 Pro
+   arch=ARM_8  cores=cores=12 mem_total(GB)=36 mem_available(GB)=13
+   binary=/Users/peter.barth/dev/pharia-kernel/target/release/pharia-kernel hash=9290db81ab9e6c038ca3d0f1ad825aded8003317
+============================================================================
+cmd                                       id         took(ms)   rss diff(KB)
+----------------------------------------------------------------------------
+p_add_py 10                               a            23,737      1,946,880
+execute_all JohnDoe 0 0                   a                23              0
+15 execute_all JohnDoe 0 0                a               320              0
+p_execute_all MaxHeadroom 0 0 5           a                79            128
+p_execute_all MaxHeadroom 0 0 10          a               152              0
+p_execute_all MaxHeadroom 0 0 15          a               227             80
+15 execute_all JohnDoe 1000 100           a            16,901             48
+p_execute_all MaxHeadroom 1000 100 5      a               210              0
+p_execute_all MaxHeadroom 1000 100 10     a               276              0
+p_execute_all MaxHeadroom 1000 100 15     a               353         11,760
+10 drop_cached_skill                      a            27,796       -744,800
+10 delete_skill                           a                12              0
+stop                                      a                19     -1,225,808
+----------------------------------------------------------------------------
+Total time (ms)                           a            70,105         
+Maximum rss memory (KB)                   a                        1,970,608    
+```
+
+We focus on execution time when accessing 10 different skills several times. The baseline is sequential
 access without additional resource consumption. Accessing 10 skills takes 23 ms, doing that 15 times takes 320 ms.
-We can also do all this accesses 150 accesses in parallel, which takes 227 ms. No difference and none expected.
-More interesting is an individual skill invocation, which uses 1 MByte of memory and takes 100ms to complete.
+We can also do all 150 accesses in parallel, which takes 227 ms. Not a huge difference and none expected.
+More interesting is an individual skill invocation, which uses 1 MB of memory and takes 100 ms to complete.
 It is no surprise, that sequentially accessing 10 skills 15 times takes around 16.9 seconds. What is nice, that
-doing this 150 access in parallel takes only 353 ms and we measure an increase in resident memory consumption of
-about 11 MB. Ideal scaling would mean 100 ms, no scaling at all would mean at least 15 seconds. 353 ms appears
+doing this 150 accesses in parallel takes only 353 ms and we measure an increase in resident memory consumption of
+only 11.7 MB. Ideal scaling would mean 100 ms, no scaling at all would mean at least 15 seconds. 353 ms appears
 to be very acceptable.
 
 In the cmds file
