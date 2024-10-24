@@ -139,11 +139,13 @@ def do_report(logs: list[Logfile]):
         cores = log.machine_info[MCH_CORES]
         mem_total = log.machine_info[MCH_MEMORY_TOTAL]
         mem_available = log.machine_info[MCH_MEMORY_AVAILABLE]
-        print(f"{id:2} fname={log.fname} date={str(when):28} brand={brand}")
+        print(f"{id:2} fname={log.fname} date={str(when):28}")
+        print(f"   brand={brand}")
         print(
             f"   arch={arch:6} cores=cores={cores} mem_total(GB)={mem_total} mem_available(GB)={mem_available}"
         )
-        print(f"   binary={log.bin_info[BIN]} hash={log.bin_info[HASH]}")
+        print(f"   binary={log.bin_info[BIN]}")
+        print(f"   hash of binary={log.bin_info[HASH]}")
     print("=" * (len(HEADER) if not SINGLE else len(SINGLE_HEADER)))
     print(HEADER if not SINGLE else SINGLE_HEADER)
     print("-" * (len(HEADER) if not SINGLE else len(SINGLE_HEADER)))
