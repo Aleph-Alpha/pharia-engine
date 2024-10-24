@@ -126,6 +126,7 @@ impl TestKernel {
             namespace_update_interval: Duration::from_secs(10),
             log_level: "info".to_owned(),
             open_telemetry_endpoint: None,
+            use_pooling_allocator: false,
         };
         Self::new(app_config).await
     }

@@ -15,6 +15,7 @@ pub struct AppConfig {
     pub namespace_update_interval: Duration,
     pub log_level: String,
     pub open_telemetry_endpoint: Option<String>,
+    pub use_pooling_allocator: bool,
 }
 
 impl AppConfig {
@@ -71,6 +72,11 @@ impl AppConfig {
             },
         };
 
+        let use_pooling_allocator = env::var("USE_POOLING_ALLOCATOR")
+            .as_deref()
+            .unwrap_or("false")
+            .parse()?;
+
         Ok(AppConfig {
             tcp_addr: addr.parse().unwrap(),
             inference_addr,
@@ -79,6 +85,7 @@ impl AppConfig {
             namespace_update_interval: namespace_update_interval.into(),
             log_level,
             open_telemetry_endpoint,
+            use_pooling_allocator,
         })
     }
 }
