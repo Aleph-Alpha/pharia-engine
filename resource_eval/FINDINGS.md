@@ -126,7 +126,9 @@ services such as document index and inference are hosted elsewhere.
 As a conservative sizing recommendation a 64 GB dedicated x86_64 server instance should be able to host up to 500
 Python skills.
 
-Todo: rust skills
+A Rust skill is also available to test against. However, the memory footprint is much smaller, the cpu execution
+requirements are way lower.
+Thus we focus for memory testing only on Python skills.
 
 ## Findings Execution Performance
 
@@ -181,10 +183,55 @@ we increase the parallel load steadily. For that, we use 10 skills but do not us
 request, but 3 seconds execution time.
 Thus, we ensure that most requests run in parallel and have not finished yet.
 Pharia Kernel (Oct/24) can handle 200 requests but ceases to answer to requests while trying to answer 300 requests.
-This experiment was also executed on a Mac.
+This experiment was executed on a Mac.
 
 ```text
 logs/241023_161626.638_run.log_failed 
 ```
 
-It is likely, that tuning dedicated machines and the Web-Server configuration can provide for a more parallel requests.
+When executing the experiment on a small x86_64 KVM server, there are no issues up to 900 requests in parallel.
+
+```text
+241024_160204.009_run.log
+```
+
+```text
+Evaluating: cmds=cmds/saturate.cmds hash=3adee1afcc53ea464359a82e89ee18235204e802
+a  fname=logs/241024_160204.009_run.log date=2024-10-24 16:02:04.009000   brand=AMD EPYC 7301 16-Core Processor
+   arch=X86_64 cores=cores=16 mem_total(GB)=126 mem_available(GB)=124
+   binary=/home/peter/dev/pharia-kernel/target/release/pharia-kernel hash=df750779249a3a19cadff4bdf716abb45ce8fb2d
+============================================================================
+cmd                                       id         took(ms)   rss diff(KB)
+----------------------------------------------------------------------------
+p_add_rs 10                               a             1,986         67,080
+execute_all JohnDoe 0 0                   a                16             48
+p_execute_all JohnDoe 42 9000 10          a             9,159          5,480
+p_execute_all JohnDoe 42 9000 20          a             9,300          8,620
+p_execute_all JohnDoe 42 9000 30          a             9,426          8,568
+p_execute_all JohnDoe 42 9000 40          a             9,618          6,872
+p_execute_all JohnDoe 42 9000 50          a             9,746          7,248
+p_execute_all JohnDoe 42 9000 60          a             9,857         10,416
+p_execute_all JohnDoe 42 9000 70          a            10,057          9,176
+p_execute_all JohnDoe 42 9000 80          a            10,201          6,800
+p_execute_all JohnDoe 42 9000 90          a            10,342          9,248
+10 drop_cached_skill                      a                32         -7,888
+10 delete_skill                           a                16              0
+stop                                      a                32       -151,516
+----------------------------------------------------------------------------
+Total time (ms)                           a            89,788         
+Maximum rss memory (KB)                   a                          159,404  
+```
+
+We use 10 Rust skills which are all exceuted in parallel 10, 20, ... 90 times each
+(we explicitely allocate 42 KB per invocation).
+Thus, we have 100, 200, ... 900 parallel executions, which are in parallel as
+each executing takes 9 seconds. As no complete run takes 19 seocnds (10.3 seconds
+is maximum) all request run in parallel. As expected, memory consumption of a
+Rust skill is moderate. Without runtime overhead the skill code alone is a mere
+67 MB. We add about 5 to 10 MB per additional 100 parallel requests for the runtime.
+When running 900 rust skills in memory we stay below 160 MB for the entire Pharia Kernel.
+
+It is likely, that Phaira Kernel can cope with much more requests in parallel. However,
+to reliably test that, we would need a set of dedicated machines that fire a concentrated
+and orchestrated series of requests to the Pharia Kernel. 
+
