@@ -27,12 +27,16 @@ You find a simple textual comparison of the above log files enclosed.
 
 ```text
 Evaluating: cmds=bench.cmds hash=3c6d21c18c26d4130b6f57d617d2131cedd58d1d comparing 2 log files
-a  fname=logs/241022_204217.730_run.log date=2024-10-22 20:42:17.730000   brand=Apple M3 Pro
+a  fname=logs/241022_204217.730_run.log date=2024-10-22 20:42:17.730000   
+   brand=Apple M3 Pro
    arch=ARM_8  cores=cores=12 mem_total(GB)=36 mem_available(GB)=13
-   binary=/Users/peter.barth/dev/pharia-kernel/target/debug/pharia-kernel hash=753c4e8aaf004e75367a3cb0de8c22db44d135aa
-b  fname=logs/241022_204217.737_run.log date=2024-10-22 20:42:17.737000   brand=AMD Ryzen 7 PRO 5750G with Radeon Graphics
+   binary=/Users/peter.barth/dev/pharia-kernel/target/debug/pharia-kernel 
+   hash of binary=753c4e8aaf004e75367a3cb0de8c22db44d135aa
+b  fname=logs/241022_204217.737_run.log date=2024-10-22 20:42:17.737000   
+   brand=AMD Ryzen 7 PRO 5750G with Radeon Graphics
    arch=X86_64 cores=cores=16 mem_total(GB)=15 mem_available(GB)=11
-   binary=/home/peter/dev/pharia-kernel/target/debug/pharia-kernel hash=8f652eac0741839d18d96d2f7a9cff291fdc4e7c
+   binary=/home/peter/dev/pharia-kernel/target/debug/pharia-kernel 
+   hash of binary=8f652eac0741839d18d96d2f7a9cff291fdc4e7c
 ==============================================================================================
 cmd                                       id         took(ms)  vs a(%)   rss diff(KB)  vs a(%)
 ----------------------------------------------------------------------------------------------
@@ -80,9 +84,11 @@ that no memory paging took place.
 
 ```text
 Evaluating: cmds=stress.cmds hash=fe671f5712f7fca8f7e5ac64be07a72186df2be6
-a  fname=logs/241022_211735.835_run.log date=2024-10-22 21:17:35.835000   brand=AMD EPYC 7301 16-Core Processor
+a  fname=logs/241022_211735.835_run.log date=2024-10-22 21:17:35.835000   
+   brand=AMD EPYC 7301 16-Core Processor
    arch=X86_64 cores=cores=16 mem_total(GB)=126 mem_available(GB)=124
-   binary=/home/peter/pharia-kernel/target/debug/pharia-kernel hash=b6c7be763e517ee2df15ed3f7b40b7d5d3da5e4c
+   binary=/home/peter/pharia-kernel/target/debug/pharia-kernel 
+   hash of binary=b6c7be763e517ee2df15ed3f7b40b7d5d3da5e4c
 ==============================================================================================
 cmd                                       id         took(ms)  vs a(%)   rss diff(KB)  vs a(%)
 ----------------------------------------------------------------------------------------------
@@ -140,9 +146,11 @@ For execution performance, we try to execute skills in parallel. In the followin
 
 ```text
 Evaluating: cmds=cmds/test_p_execute_all.cmds hash=c43cb5d37cabddd93e11c576235223e0bd695992
-a  fname=logs/241023_155316.286_run.log date=2024-10-23 15:53:16.286000   brand=Apple M3 Pro
+a  fname=logs/241023_155316.286_run.log date=2024-10-23 15:53:16.286000   
+   brand=Apple M3 Pro
    arch=ARM_8  cores=cores=12 mem_total(GB)=36 mem_available(GB)=13
-   binary=/Users/peter.barth/dev/pharia-kernel/target/release/pharia-kernel hash=9290db81ab9e6c038ca3d0f1ad825aded8003317
+   binary=/Users/peter.barth/dev/pharia-kernel/target/release/pharia-kernel 
+   hash of binary=9290db81ab9e6c038ca3d0f1ad825aded8003317
 ============================================================================
 cmd                                       id         took(ms)   rss diff(KB)
 ----------------------------------------------------------------------------
@@ -197,9 +205,11 @@ When executing the experiment on a small x86_64 KVM server, there are no issues 
 
 ```text
 Evaluating: cmds=cmds/saturate.cmds hash=3adee1afcc53ea464359a82e89ee18235204e802
-a  fname=logs/241024_160204.009_run.log date=2024-10-24 16:02:04.009000   brand=AMD EPYC 7301 16-Core Processor
+a  fname=logs/241024_160204.009_run.log date=2024-10-24 16:02:04.009000   
+   brand=AMD EPYC 7301 16-Core Processor
    arch=X86_64 cores=cores=16 mem_total(GB)=126 mem_available(GB)=124
-   binary=/home/peter/dev/pharia-kernel/target/release/pharia-kernel hash=df750779249a3a19cadff4bdf716abb45ce8fb2d
+   binary=/home/peter/dev/pharia-kernel/target/release/pharia-kernel 
+   hash of binary=df750779249a3a19cadff4bdf716abb45ce8fb2d
 ============================================================================
 cmd                                       id         took(ms)   rss diff(KB)
 ----------------------------------------------------------------------------
