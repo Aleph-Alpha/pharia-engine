@@ -1,25 +1,25 @@
-# Evaluating Memory Consumption and Request Scaling in Pharia Kernel
+# Evaluating Memory Consumption and Throughput in Pharia Kernel
 
-For resource intensive skills in written in Python a reasonably sized server (64 GB main memory)
+For resource intensive skills written in Python a reasonably sized server (64 GB main memory)
 on a typical OS/architecture combination (Linux/x86_64) running Pharia Kernel should be able to
 host up to 500 skills loaded at the same time.
 Most skills are not CPU bound but wait for external resources to become available. Pharia Kernel
-should be able to handle 1,000 parallel requests (over a variety of these 500 skills).
+should be able to handle up to 1,000 parallel requests (over a variety of these 500 skills).
 
 ## Findings Memory Consumption
 
-An almost empty Python Skill, but at least with a native `pydantic` dependency consumes as
+An almost empty Python skill, but at least with a native `pydantic` dependency consumes as
 compiled Wasm file around 50 MB. Successively adding such skills to Pharia Kernel increases
 memory consumption first by about 800 MB, second by about 300 MB and each following copy
-by about 150 MB.
+by about 100 MB.
 
-The file `bench.cmds` adds first one, then another 4 skills to Pharia Kernel.
+The file `bench.cmds` adds first one, then another four skills to Pharia Kernel.
 Each skill is instantly accessed to ensure resource consumption. Executing a skill
 is very fast as soon as the skill is ready. On the Mac there seems to be some very
 aggressive swap out (?) of memory happening, as from time to time resource consumption
 and wall time changes a lot. For example, the first time executing the skill `sample_py1``
-after adding another 4 has on the Mac already caused some 2.8 seconds wall time to get
-some 90 MB of memory in or our, which is not the case on the x86_64 machine where it took
+after adding another four, takes on the Mac about 2.8 seconds wall time to get
+about 90 MB of memory in or out. This is not the case on a x86_64 machine, where it took
 less than 30 ms and only 0.5 MB resident memory change. The run to run variance on the Mac
 is massive, it may also show the same behavior as on the x86_64 machine running Linux.
 For reference the enclosed log files.
@@ -142,16 +142,16 @@ A Rust skill is also available to test against. However, the memory footprint is
 requirements are way lower.
 Thus we focus for memory testing only on Python skills.
 
-## Findings Execution Performance
+## Findings Throughput
 
-For execution performance, we try to execute skills in parallel. In the following example log
+For evaluating throughput, we try to execute skills in parallel. In the following example log
 
 ```text
 241023_155316.286_run.log 
 ```
 
 ```text
-Evaluating: cmds=cmds/test_p_execute_all.cmds hash=c43cb5d37cabddd93e11c576235223e0bd695992
+Evaluating: cmds=cmds/p_execute_all.cmds hash=c43cb5d37cabddd93e11c576235223e0bd695992
 a  file_name=logs/241023_155316.286_run.log date=2024-10-23 15:53:16.286000   
    brand=Apple M3 Pro
    arch=ARM_8  cores=cores=12 mem_total(GB)=36 mem_available(GB)=13
@@ -182,8 +182,8 @@ We focus on execution time when accessing 10 different skills several times. The
 access without additional resource consumption. Accessing 10 skills takes 23 ms, doing that 15 times takes 320 ms.
 We can also do all 150 accesses in parallel, which takes 227 ms. Not a huge difference and none expected.
 More interesting is an individual skill invocation, which uses 1 MB of memory and takes 100 ms to complete.
-It is no surprise, that sequentially accessing 10 skills 15 times takes around 16.9 seconds. What is nice, that
-doing this 150 accesses in parallel takes only 353 ms and we measure an increase in resident memory consumption of
+It is no surprise, that sequentially accessing 10 skills 15 times takes around 16.9 seconds. It is nice, that
+running 150 accesses in parallel takes only 353 ms and we measure an increase in resident memory consumption of
 only 11.7 MB. Ideal scaling would mean 100 ms, no scaling at all would mean at least 15 seconds. 353 ms appears
 to be very acceptable.
 
@@ -193,11 +193,11 @@ In the cmds file
 saturate.cmds
 ```
 
-we increase the parallel load steadily. For that, we use 10 skills but do not use additional memory during a
-request, but 3 seconds execution time.
+we increase the parallel load steadily. For that, we use 10 skills but only use some KB additional memory during a
+request, but 9 seconds execution time.
 Thus, we ensure that most requests run in parallel and have not finished yet.
-Pharia Kernel (Oct/24) can handle 200 requests but ceases to answer to requests while trying to answer 300 requests.
-This experiment was executed on a Mac.
+Pharia Kernel (Oct/24) can handle 200 requests on a Mac. On the Mac it stops answering to requests while trying
+to answer 300 requests in parallel. The Mac is not suited for throughput experiments.
 
 ```text
 logs/241023_161626.638_run.log_failed 
@@ -241,11 +241,12 @@ Maximum rss memory (KB)                   a                          159,404
 We use 10 Rust skills which are all executed in parallel 10, 20, ... 90 times each
 (we explicitly allocate 42 KB per invocation).
 Thus, we have 100, 200, ... 900 parallel executions, which are in parallel as
-each executing takes 9 seconds. As no complete run takes 19 seconds (10.3 seconds
+each execution takes 9 seconds. As no complete run takes 18 seconds (10.3 seconds
 is maximum) all request run in parallel. As expected, memory consumption of a
 Rust skill is moderate. Without runtime overhead the skill code alone is a mere
-67 MB. We add about 5 to 10 MB per additional 100 parallel requests for the runtime.
-When running 900 rust skills in memory we stay below 160 MB for the entire Pharia Kernel.
+67 MB, which is less than 7 MB per skill. We add about 5 to 10 MB per additional
+100 parallel requests to the runtime. When running 900 Rust skills in memory,
+we stay below 160 MB for the entire Pharia Kernel.
 
 It is likely, that Pharia Kernel can cope with much more requests in parallel. However,
 to reliably test that, we would need a set of dedicated machines that fire a concentrated
