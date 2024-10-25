@@ -90,29 +90,29 @@ that no memory paging took place.
 
 ```text
 Evaluating: cmds=stress.cmds hash=fe671f5712f7fca8f7e5ac64be07a72186df2be6
-a  file_name=logs/241022_211735.835_run.log date=2024-10-22 21:17:35.835000   
+a  file_name=logs/241022_211735.835_run.log date=2024-10-22 21:17:35.835000  
    brand=AMD EPYC 7301 16-Core Processor
    arch=X86_64 cores=cores=16 mem_total(GB)=126 mem_available(GB)=124
-   binary=/home/peter/pharia-kernel/target/debug/pharia-kernel 
+   binary=/home/peter/pharia-kernel/target/debug/pharia-kernel
    hash of binary=b6c7be763e517ee2df15ed3f7b40b7d5d3da5e4c
-==============================================================================================
-cmd                                       id         took(ms)  vs a(%)   rss diff(KB)  vs a(%)
-----------------------------------------------------------------------------------------------
-128 add_py                                a           822,576              11,455,548         
-skills                                    a                 3                       0         
-execute_skill sample_py1 Alice 100 20     a                38                       4         
-10 execute_all Bob 0 0                    a            18,319                 157,096         
-10 execute_all Cecilia 0 0                a             6,400                      56         
-10 execute_all Dominic 1000 0             a             7,759                      44         
-128 add_py                                a           818,621               9,929,496         
-10 execute_all Bob 0 0                    a            50,908                 586,344         
-10 execute_all Cecilia 0 0                a            15,117                      76         
-10 execute_all Dominic 1000 0             a            17,275                      24         
-cached_skills                             a                 3                       0         
-stop                                      a             1,220             -22,131,504         
-----------------------------------------------------------------------------------------------
+============================================================================
+cmd                                       id         took(ms)   rss diff(KB)
+----------------------------------------------------------------------------
+128 add_py                                a           822,576     11,455,548
+skills                                    a                 3              0
+execute_skill sample_py1 Alice 100 20     a                38              4
+10 execute_all Bob 0 0                    a            18,319        157,096
+10 execute_all Cecilia 0 0                a             6,400             56
+10 execute_all Dominic 1000 0             a             7,759             44
+128 add_py                                a           818,621      9,929,496
+10 execute_all Bob 0 0                    a            50,908        586,344
+10 execute_all Cecilia 0 0                a            15,117             76
+10 execute_all Dominic 1000 0             a            17,275             24
+cached_skills                             a                 3              0
+stop                                      a             1,220    -22,131,504
+----------------------------------------------------------------------------
 Total time (ms)                           a         1,758,239         
-Maximum rss memory (KB)                   a                                22,131,504         
+Maximum rss memory (KB)                   a                       22,131,504    
 ```
 
 Adding the first 128 Python skills took 822 seconds and consumed 11.4 GB of resident memory.
