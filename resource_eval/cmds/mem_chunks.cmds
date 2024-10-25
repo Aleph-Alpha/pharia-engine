@@ -1,0 +1,22 @@
+p_add_py 10
+
+# twice single chunk warmup
+execute_all Alice 300 0
+execute_all Alice 300 0
+
+# this will most likely do two chunks
+execute_all Bob 500 0
+execute_all Bob 500 0
+
+# this will be weird and do about 210 memory allocations per invocation
+p_execute_all Cecilia 42000 0 1
+p_execute_all Cecilia 42000 0 10
+# don't try on a mac
+# p_execute_all Cecilia 42000 0 90
+
+# go for the throat
+p_execute_all Damian 666666 0 10
+p_execute_all Damian 666666 0 20
+# don't try on mac
+# p_execute_all Damian 666666 0 90
+

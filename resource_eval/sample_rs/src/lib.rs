@@ -5,7 +5,11 @@ use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest};
 use serde::Deserialize;
 use serde_json::json;
-use std::{alloc::Layout, thread::sleep, time::Duration};
+use std::{
+    alloc::{Layout, LayoutError},
+    thread::sleep,
+    time::Duration,
+};
 
 #[derive(Debug, Deserialize)]
 struct SampleRequest {
@@ -16,18 +20,50 @@ struct SampleRequest {
     wait_time: u32,
 }
 
+// consumes small memory chunks if memory is larger than 300 KB, chunk size is between 100 and 300 KB
+fn consume_memory(mut mem_size: usize) -> Result<Vec<Layout>, LayoutError> {
+    let mut chunks = vec![];
+    if mem_size < 300 {
+        let memory = Layout::array::<u8>(mem_size)?;
+        chunks.push(memory);
+        return Ok(chunks);
+    }
+    while mem_size > 300 {
+        let chunk_size = (rand::random::<usize>() % 201) + 100;
+        let chunk = Layout::array::<u8>(chunk_size)?;
+        chunks.push(chunk);
+        mem_size -= chunk_size;
+    }
+    if mem_size > 0 {
+        let chunk = Layout::array::<u8>(mem_size)?;
+        chunks.push(chunk);
+    }
+    Ok(chunks)
+}
+
 // that is the actual skill, but cannot use directly as cannot use client in sub folder :-(
 fn consume(input: SampleRequest) -> String {
     let mut mem_size: usize = input.memory as usize;
     if mem_size == 0 {
         mem_size = 1;
     }
-    let memory = Layout::array::<u8>(mem_size);
+    let memory = consume_memory(mem_size);
+    let memory = match memory {
+        Ok(val) => val,
+        Err(err) => return format!("execution failed while allocating memory with {}", err),
+    };
+    let mut wait_msg = "".to_owned();
     if input.wait_time > 0 {
         sleep(Duration::from_millis(input.wait_time as u64));
+        wait_msg = format!(" time={:06} ms", input.wait_time);
     }
-    drop(memory);
-    format!("Hello {}", input.topic)
+    let mem_msg = format!("  memory={:06} KB in {} chunks", mem_size, memory.len());
+    for chunk in memory.into_iter() {
+        // well, i want to explicitly drop it
+        #[allow(dropping_copy_types)]
+        drop(chunk)
+    }
+    format!("Hello {}  {} {}", input.topic, mem_msg, wait_msg)
 }
 
 // We cannot use the SDK in Pharia Kernel repo, there is no way to exclude subfolders from Cargo magic?

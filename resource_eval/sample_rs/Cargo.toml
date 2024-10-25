@@ -9,6 +9,7 @@ anyhow = "1.0.89"
 serde_json = "1.0.128"
 serde = { version = "1", features = ["derive"] }
 wit-bindgen = "0.34.0"
+rand = "0.8.5"
 
 [lib]
 crate-type = ["cdylib"]
