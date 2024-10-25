@@ -3,6 +3,7 @@ use std::future::Future;
 use aleph_alpha_client::{
     Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat, TaskCompletion,
 };
+use tracing::{error, warn};
 
 use super::{
     ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Message, Role,
@@ -24,16 +25,12 @@ pub trait InferenceClient: Send + Sync + 'static {
 impl InferenceClient for Client {
     async fn chat(&self, request: &ChatRequest, api_token: String) -> anyhow::Result<ChatResponse> {
         let task = request.into();
-        let chat_output = self
-            .chat(
-                &task,
-                &request.model,
-                &How {
-                    api_token: Some(api_token),
-                    ..Default::default()
-                },
-            )
-            .await?;
+        let how = How {
+            api_token: Some(api_token),
+            ..Default::default()
+        };
+        let fetch_chat_output = || self.chat(&task, &request.model, &how);
+        let chat_output = retry(fetch_chat_output).await?;
         chat_output.try_into()
     }
 
@@ -68,17 +65,13 @@ impl InferenceClient for Client {
                 start_with_one_of: &[],
             },
         };
+        let how = How {
+            api_token: Some(api_token),
+            ..Default::default()
+        };
+        let fetch_completion_output = || self.completion(&task, model, &how);
 
-        let completion_output = self
-            .completion(
-                &task,
-                model,
-                &How {
-                    api_token: Some(api_token),
-                    ..Default::default()
-                },
-            )
-            .await?;
+        let completion_output = retry(fetch_completion_output).await?;
         completion_output.try_into()
     }
 }
@@ -158,21 +151,99 @@ impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
     }
 }
 
+async fn retry<T, F, Fut>(mut f: F) -> anyhow::Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, aleph_alpha_client::Error>>,
+{
+    let mut remaining_retries = 5;
+    loop {
+        match f().await {
+            Ok(value) => return Ok(value),
+            Err(e) if remaining_retries <= 0 => {
+                error!("Error after all retries: {e}");
+                return Err(e.into());
+            }
+            Err(e) => {
+                warn!("Retrying operation: {e}");
+                remaining_retries -= 1;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::env;
-
-    use crate::inference::ChatParams;
+    use crate::{
+        inference::ChatParams,
+        tests::{api_token, inference_address},
+    };
 
     use super::*;
 
     #[tokio::test]
-    async fn test_chat_message_conversion() {
-        drop(dotenvy::dotenv());
+    async fn future_which_returns_okay_on_first_try() {
+        // Given a future that always returns okay
+        let mut counter = 0;
+        let ref_counter = &mut counter;
+        let future = || {
+            *ref_counter += 1;
+            std::future::ready(Ok(()))
+        };
 
+        // When retrying the future
+        let result = retry(future).await;
+
+        // Then the future is invoked only once
+        assert!(result.is_ok());
+        assert_eq!(counter, 1);
+    }
+
+    #[tokio::test]
+    async fn future_which_returns_okay_on_third_try() {
+        // Given a future that always returns okay
+        let mut counter = 0;
+        let ref_counter = &mut counter;
+        let future = || {
+            if *ref_counter == 2 {
+                std::future::ready(Ok(()))
+            } else {
+                *ref_counter += 1;
+                std::future::ready(Err(aleph_alpha_client::Error::Unavailable))
+            }
+        };
+
+        // When retrying the future
+        let result = retry(future).await;
+
+        // Then the future is invoked three times and returns okay
+        assert!(result.is_ok());
+        assert_eq!(counter, 2);
+    }
+
+    #[tokio::test]
+    async fn future_which_always_returns_error() {
+        // Given a future that always returns error
+        let mut counter = 0;
+        let ref_counter = &mut counter;
+        let future = || {
+            *ref_counter += 1;
+            std::future::ready(Err::<(), _>(aleph_alpha_client::Error::Unavailable))
+        };
+
+        // When retrying the future
+        let result = retry(future).await;
+
+        // Then the future is invoked six times and returns an error
+        assert!(result.is_err());
+        assert_eq!(counter, 6);
+    }
+
+    #[tokio::test]
+    async fn test_chat_message_conversion() {
         // Given an inference client
-        let api_token = env::var("AA_API_TOKEN").unwrap();
-        let host = env::var("AA_INFERENCE_ADDRESS").unwrap();
+        let api_token = api_token().to_owned();
+        let host = inference_address().to_owned();
         let client = Client::new(host, None).unwrap();
 
         // and a chat request
