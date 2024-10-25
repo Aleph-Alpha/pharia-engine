@@ -73,7 +73,7 @@ Maximum rss memory (KB)                   a                                 1,53
 
 The biggest problem, which is reproducible and happens always, is stopping Pharia Kernel
 at the end of a run. For `bench.cmds` both machines used about 1.5 GB of resident memory.
-Stopping that instance (sending SIGTERM, which is what happens if you press Ctrl-C) took
+Stopping that instance (sending SIGTERM, similar to Ctrl-C which actually sends SIGINT) took
 more than 6 seconds on the Mac but less than 120 ms on the x86_64 machine. On a Mac, it
 helps to delete the skills from cache and remove them before shutting down.
 An assumption is, that the behavior depends on the operating system, not the instruction set architecture.
