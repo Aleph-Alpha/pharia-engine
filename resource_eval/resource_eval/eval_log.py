@@ -31,13 +31,13 @@ class Logfile:
 
     def __init__(
         self,
-        fname: str,
+        file_name: str,
         machine_info: JSON,
         bin_info: JSON,
         cmd_info: JSON,
         entries: list[JSON],
     ):
-        self.fname = fname
+        self.file_name = file_name
         self.machine_info = machine_info
         self.bin_info = bin_info
         self.cmd_info = cmd_info
@@ -129,8 +129,8 @@ def do_report(logs: list[Logfile]):
     len_ending = len(ending)
     for id, log in zip(ids, logs):
         # assume correct filename formatting
-        if log.fname.endswith(ending):
-            when_str = os.path.split(log.fname)[1][:-len_ending]
+        if log.file_name.endswith(ending):
+            when_str = os.path.split(log.file_name)[1][:-len_ending]
             when = str2dt(when_str)
         else:
             when = "unknown"
@@ -139,7 +139,7 @@ def do_report(logs: list[Logfile]):
         cores = log.machine_info[MCH_CORES]
         mem_total = log.machine_info[MCH_MEMORY_TOTAL]
         mem_available = log.machine_info[MCH_MEMORY_AVAILABLE]
-        print(f"{id:2} fname={log.fname} date={str(when):28}")
+        print(f"{id:2} file_name={log.file_name} date={str(when):28}")
         print(f"   brand={brand}")
         print(
             f"   arch={arch:6} cores=cores={cores} mem_total(GB)={mem_total} mem_available(GB)={mem_available}"

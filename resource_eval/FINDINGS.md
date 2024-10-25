@@ -1,4 +1,10 @@
-# Evaluating Pharia Kernel
+# Evaluating Memory Consumption and Request Scaling in Pharia Kernel
+
+For resource intensive skills in written in Python a reasonably sized server (64 GB main memory)
+on a typical OS/architecture combination (Linux/x86_64) running Pharia Kernel should be able to
+host up to 500 skills loaded at the same time.
+Most skills are not CPU bound but wait for external resources to become available. Pharia Kernel
+should be able to handle 1,000 parallel requests (over a variety of these 500 skills).
 
 ## Findings Memory Consumption
 
@@ -27,12 +33,12 @@ You find a simple textual comparison of the above log files enclosed.
 
 ```text
 Evaluating: cmds=bench.cmds hash=3c6d21c18c26d4130b6f57d617d2131cedd58d1d comparing 2 log files
-a  fname=logs/241022_204217.730_run.log date=2024-10-22 20:42:17.730000   
+a  file_name=logs/241022_204217.730_run.log date=2024-10-22 20:42:17.730000   
    brand=Apple M3 Pro
    arch=ARM_8  cores=cores=12 mem_total(GB)=36 mem_available(GB)=13
    binary=/Users/peter.barth/dev/pharia-kernel/target/debug/pharia-kernel 
    hash of binary=753c4e8aaf004e75367a3cb0de8c22db44d135aa
-b  fname=logs/241022_204217.737_run.log date=2024-10-22 20:42:17.737000   
+b  file_name=logs/241022_204217.737_run.log date=2024-10-22 20:42:17.737000   
    brand=AMD Ryzen 7 PRO 5750G with Radeon Graphics
    arch=X86_64 cores=cores=16 mem_total(GB)=15 mem_available(GB)=11
    binary=/home/peter/dev/pharia-kernel/target/debug/pharia-kernel 
@@ -84,7 +90,7 @@ that no memory paging took place.
 
 ```text
 Evaluating: cmds=stress.cmds hash=fe671f5712f7fca8f7e5ac64be07a72186df2be6
-a  fname=logs/241022_211735.835_run.log date=2024-10-22 21:17:35.835000   
+a  file_name=logs/241022_211735.835_run.log date=2024-10-22 21:17:35.835000   
    brand=AMD EPYC 7301 16-Core Processor
    arch=X86_64 cores=cores=16 mem_total(GB)=126 mem_available(GB)=124
    binary=/home/peter/pharia-kernel/target/debug/pharia-kernel 
@@ -146,7 +152,7 @@ For execution performance, we try to execute skills in parallel. In the followin
 
 ```text
 Evaluating: cmds=cmds/test_p_execute_all.cmds hash=c43cb5d37cabddd93e11c576235223e0bd695992
-a  fname=logs/241023_155316.286_run.log date=2024-10-23 15:53:16.286000   
+a  file_name=logs/241023_155316.286_run.log date=2024-10-23 15:53:16.286000   
    brand=Apple M3 Pro
    arch=ARM_8  cores=cores=12 mem_total(GB)=36 mem_available(GB)=13
    binary=/Users/peter.barth/dev/pharia-kernel/target/release/pharia-kernel 
@@ -205,7 +211,7 @@ When executing the experiment on a small x86_64 KVM server, there are no issues 
 
 ```text
 Evaluating: cmds=cmds/saturate.cmds hash=3adee1afcc53ea464359a82e89ee18235204e802
-a  fname=logs/241024_160204.009_run.log date=2024-10-24 16:02:04.009000   
+a  file_name=logs/241024_160204.009_run.log date=2024-10-24 16:02:04.009000   
    brand=AMD EPYC 7301 16-Core Processor
    arch=X86_64 cores=cores=16 mem_total(GB)=126 mem_available(GB)=124
    binary=/home/peter/dev/pharia-kernel/target/release/pharia-kernel 
@@ -232,16 +238,15 @@ Total time (ms)                           a            89,788
 Maximum rss memory (KB)                   a                          159,404  
 ```
 
-We use 10 Rust skills which are all exceuted in parallel 10, 20, ... 90 times each
-(we explicitely allocate 42 KB per invocation).
+We use 10 Rust skills which are all executed in parallel 10, 20, ... 90 times each
+(we explicitly allocate 42 KB per invocation).
 Thus, we have 100, 200, ... 900 parallel executions, which are in parallel as
-each executing takes 9 seconds. As no complete run takes 19 seocnds (10.3 seconds
+each executing takes 9 seconds. As no complete run takes 19 seconds (10.3 seconds
 is maximum) all request run in parallel. As expected, memory consumption of a
 Rust skill is moderate. Without runtime overhead the skill code alone is a mere
 67 MB. We add about 5 to 10 MB per additional 100 parallel requests for the runtime.
 When running 900 rust skills in memory we stay below 160 MB for the entire Pharia Kernel.
 
-It is likely, that Phaira Kernel can cope with much more requests in parallel. However,
+It is likely, that Pharia Kernel can cope with much more requests in parallel. However,
 to reliably test that, we would need a set of dedicated machines that fire a concentrated
-and orchestrated series of requests to the Pharia Kernel. 
-
+and orchestrated series of requests to the Pharia Kernel.
