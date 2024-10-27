@@ -1,0 +1,16 @@
+{"arch": "X86_64", "brand": "AMD EPYC 7301 16-Core Processor", "cores": "16", "memory_total": "126", "memory_available": "124"}
+{"bin": "/home/peter/dev/pharia-kernel/target/release/pharia-kernel", "hash": "c8a24d0b62c2e97bff6e483671c6c9d699d8ec31", "modified": "241025_183954.300"}
+{"filename": "cmds/mem_chunks_2.cmds", "hash": "b15aad654f80726c6b991d0293a7f058de07372e", "modified": "241025_202945.953"}
+{"took": "49495", "rss_diff": "1842988", "rss": "1862668", "vms_diff": "1991932", "vms": "3178752", "cmd": "p_add_py 10"}
+{"took": "44", "rss_diff": "1140", "rss": "1863808", "vms_diff": "260", "vms": "3179012", "cmd": "execute_all Alice 300 0"}
+{"took": "288154", "rss_diff": "42824", "rss": "1906632", "vms_diff": "248", "vms": "3179260", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "285640", "rss_diff": "14248", "rss": "1920880", "vms_diff": "260", "vms": "3179520", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "289745", "rss_diff": "10660", "rss": "1931540", "vms_diff": "0", "vms": "3179520", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "286560", "rss_diff": "6776", "rss": "1938316", "vms_diff": "260", "vms": "3179780", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "291780", "rss_diff": "12024", "rss": "1950340", "vms_diff": "520", "vms": "3180300", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "290305", "rss_diff": "17944", "rss": "1968284", "vms_diff": "0", "vms": "3180300", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "290890", "rss_diff": "3948", "rss": "1972232", "vms_diff": "0", "vms": "3180300", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "287924", "rss_diff": "2680", "rss": "1974912", "vms_diff": "0", "vms": "3180300", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "288679", "rss_diff": "6080", "rss": "1980992", "vms_diff": "0", "vms": "3180300", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "292785", "rss_diff": "3168", "rss": "1984160", "vms_diff": "0", "vms": "3180300", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "164", "rss_diff": "-1984160", "rss": "0", "vms_diff": "-3180300", "vms": "0", "cmd": "stop"}

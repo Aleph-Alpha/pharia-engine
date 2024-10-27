@@ -1,0 +1,16 @@
+{"arch": "X86_64", "brand": "AMD EPYC 7301 16-Core Processor", "cores": "16", "memory_total": "126", "memory_available": "124"}
+{"bin": "/home/peter/dev/pharia-kernel/target/release/pharia-kernel-POOLING", "hash": "c8a24d0b62c2e97bff6e483671c6c9d699d8ec31", "modified": "241025_183954.300"}
+{"filename": "cmds/mem_chunks_2.cmds", "hash": "b15aad654f80726c6b991d0293a7f058de07372e", "modified": "241025_202945.953"}
+{"took": "46763", "rss_diff": "1924640", "rss": "1945044", "vms_diff": "2091976", "vms": "6299044124", "cmd": "p_add_py 10"}
+{"took": "40", "rss_diff": "1028", "rss": "1946072", "vms_diff": "260", "vms": "6299044384", "cmd": "execute_all Alice 300 0"}
+{"took": "292189", "rss_diff": "47428", "rss": "1993500", "vms_diff": "2296", "vms": "6299046680", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "288394", "rss_diff": "16944", "rss": "2010444", "vms_diff": "0", "vms": "6299046680", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "287569", "rss_diff": "7820", "rss": "2018264", "vms_diff": "0", "vms": "6299046680", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "292845", "rss_diff": "9660", "rss": "2027924", "vms_diff": "2048", "vms": "6299048728", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "289966", "rss_diff": "1144", "rss": "2029068", "vms_diff": "0", "vms": "6299048728", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "298499", "rss_diff": "1188", "rss": "2030256", "vms_diff": "0", "vms": "6299048728", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "292053", "rss_diff": "1944", "rss": "2032200", "vms_diff": "0", "vms": "6299048728", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "289868", "rss_diff": "236", "rss": "2032436", "vms_diff": "0", "vms": "6299048728", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "291718", "rss_diff": "-128", "rss": "2032308", "vms_diff": "0", "vms": "6299048728", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "288347", "rss_diff": "1144", "rss": "2033452", "vms_diff": "0", "vms": "6299048728", "cmd": "p_execute_all Damian 666666 0 90"}
+{"took": "216", "rss_diff": "-2033452", "rss": "0", "vms_diff": "-6299048728", "vms": "0", "cmd": "stop"}
