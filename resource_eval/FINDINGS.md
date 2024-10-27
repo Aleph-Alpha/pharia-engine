@@ -267,12 +267,12 @@ It is likely, that Pharia Kernel can cope with much more requests in parallel. H
 to reliably test that, we would need a set of dedicated machines that fire a concentrated
 and orchestrated series of requests to the Pharia Kernel.
 
-# Findings Pooling allocator
+## Findings Pooling allocator
 
 There is the option to use an pooling allocator for the `wasmtime` that runs the skills.
 This should improve memory management. We test it by running 900 Python skills in parallel
 with no wait time but using 666 MB of heap space per invocation.
-In order to accomodate for run to run variations, we run each test 10 times.
+In order to accommodate for run to run variations, we run each test 10 times.
 
 First, we allocate a single chunk of memory.
 Indeed, we see on average a 6 percent reduction in runtime with the pooling allocator enabled.
