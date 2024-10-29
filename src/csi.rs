@@ -169,11 +169,13 @@ pub mod tests {
     use crate::{
         csi::chunking::ChunkParams,
         inference::{
-            tests::InferenceStub, ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, InferenceApi, Message, Role
+            tests::InferenceStub, ChatParams, ChatRequest, ChatResponse, Completion,
+            CompletionParams, CompletionRequest, InferenceApi, Message, Role,
         },
         search::{SearchRequest, SearchResult},
         tests::api_token,
-        tokenizers::tests::FakeTokenizers, FinishReason,
+        tokenizers::tests::FakeTokenizers,
+        FinishReason,
     };
 
     use super::{ChunkRequest, Csi, CsiDrivers};
@@ -192,7 +194,10 @@ pub mod tests {
 
         // When chatting with the StubCsi
         let csi = StubCsi::empty();
-        let result = csi.chat("dummy-token".to_owned(), chat_request).await.unwrap();
+        let result = csi
+            .chat("dummy-token".to_owned(), chat_request)
+            .await
+            .unwrap();
 
         // Then the response is the same as the request
         assert_eq!(result.message.content, "Hello");
@@ -415,7 +420,7 @@ pub mod tests {
             Ok(ChatResponse {
                 message: request.messages.first().unwrap().clone(),
                 finish_reason: FinishReason::Stop,
-            }) 
+            })
         }
     }
 }
