@@ -202,7 +202,7 @@ impl Venv {
         create_virtual_enviroment(&venv_path)?;
         run_in_venv(
             &venv_path,
-            &["python3", "-m", "pip", "install", "componentize-py==0.14.0"],
+            &["python3", "-m", "pip", "install", "componentize-py"],
         )?;
 
         Ok(Venv { directory })
