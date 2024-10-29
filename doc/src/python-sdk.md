@@ -12,7 +12,7 @@ source .venv/bin/activate
 pip install --extra-index-url https://alephalpha.jfrog.io/artifactory/api/pypi/python/simple pharia-kernel-sdk-py
 ```
 
-## Developing Skills in Python
+## Developing Skills
 
 The `pharia_skill` package provides a decorator to support skill development.
 The decorator inserts the Cognitive System Interface (CSI), which always need to be specified as the first argument.
