@@ -11,5 +11,5 @@ or create a [ticket](https://aleph-alpha.atlassian.net/jira/CreateIssue.jspa?pid
 
 ## How to contribute
 
-You can easily contribute by creating a pull request to the [Pharia-Kernel](https://gitlab.aleph-alpha.de/engineering/pharia-kernel) repository.
-The [Pharia-Kernel Readme](https://gitlab.aleph-alpha.de/engineering/pharia-kernel) contains information on how to generate the site locally.
+You can easily contribute by creating a pull request to the [Pharia-Kernel](github.com/Aleph-Alpha/pharia-kernel) repository.
+The [Pharia-Kernel Readme](github.com/Aleph-Alpha/pharia-kernel/blob/main/README.md) contains information on how to generate the site locally.
