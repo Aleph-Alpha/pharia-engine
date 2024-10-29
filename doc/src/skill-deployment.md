@@ -30,7 +30,7 @@ podman run -v ./haiku.wasm:/haiku.wasm pharia-skill publish -R registry.gitlab.a
 
 With our GitLab registry, any user name will work, as long as you use a access token. You can generate a token on your profile page. It is necessary to include write privilege.
 
-Everyone is welcomed to explore in the shared `playgound` namespace, a skill registry is provided at <https://gitlab.aleph-alpha.de/engineering/pharia-kernel-playground>.
+Everyone is welcomed to explore in the shared `playground` namespace, a skill registry is provided at <https://gitlab.aleph-alpha.de/engineering/pharia-kernel-playground>.
 
 ## Configuring namespace
 
