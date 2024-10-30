@@ -129,7 +129,7 @@ impl SkillStoreState {
             let skill_bytes = registry
                 .load_skill(&skill_path.name, tag.as_deref().unwrap_or("latest"))
                 .await?;
-            let SkillImage { bytes } = skill_bytes
+            let SkillImage { bytes, digest } = skill_bytes
                 .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
             let engine = self.engine.clone();
             let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))

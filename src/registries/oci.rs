@@ -6,7 +6,7 @@ use oci_client::{
     Client, Reference,
 };
 use oci_wasm::WasmClient;
-use tracing::error;
+use tracing::{error, warn};
 
 use super::{DynFuture, SkillImage};
 
@@ -35,7 +35,13 @@ impl SkillRegistry for OciRegistry {
             match result {
                 Ok(image) => {
                     let binary = image.layers.into_iter().next().unwrap().data;
-                    Ok(Some(SkillImage::new(binary)))
+                    let digest = if let Some(digest) = image.digest {
+                        digest
+                    } else {
+                        warn!("Missing digest for {name} {tag}. Using tag instead.");
+                        tag.into()
+                    };
+                    Ok(Some(SkillImage::new(binary, digest)))
                 }
                 // We want to distinguish between a skill that is not there and runtime errors
                 Err(e) => {
@@ -158,6 +164,8 @@ mod tests {
 
         // then skill can be loaded
         assert!(component.is_ok());
+        // Make sure the digest is loaded properly
+        assert_ne!(tag, skill.digest);
     }
 
     #[tokio::test]

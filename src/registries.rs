@@ -14,11 +14,16 @@ type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 pub struct SkillImage {
     /// Can be either the binary or WAT text format of a Wasm component
     pub bytes: Vec<u8>,
+    /// Digest associated with these bytes
+    pub digest: String,
 }
 
 impl SkillImage {
-    pub fn new(component: Vec<u8>) -> Self {
-        Self { bytes: component }
+    pub fn new(bytes: Vec<u8>, digest: impl Into<String>) -> Self {
+        Self {
+            bytes,
+            digest: digest.into(),
+        }
     }
 }
 
@@ -81,10 +86,10 @@ pub mod tests {
         fn load_skill<'a>(
             &'a self,
             name: &'a str,
-            _tag: &'a str,
+            tag: &'a str,
         ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
             if let Some(bytes) = self.get(name) {
-                Box::pin(async move { Ok(Some(SkillImage::new(bytes.clone()))) })
+                Box::pin(async move { Ok(Some(SkillImage::new(bytes.clone(), tag))) })
             } else {
                 Box::pin(async { Ok(None) })
             }
