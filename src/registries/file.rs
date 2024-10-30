@@ -1,6 +1,6 @@
 use super::{DynFuture, SkillImage, SkillRegistry};
 
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, time::SystemTime};
 
 pub struct FileRegistry {
     skill_dir: PathBuf,
@@ -24,8 +24,14 @@ impl SkillRegistry for FileRegistry {
             let mut skill_path = self.skill_dir.join(name);
             skill_path.set_extension("wasm");
             let maybe_binary = if skill_path.exists() {
-                let binary = fs::read(skill_path)?;
-                Some(SkillImage::new(binary))
+                let binary = fs::read(&skill_path)?;
+                let digest = skill_path
+                    .metadata()?
+                    .modified()?
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_millis()
+                    .to_string();
+                Some(SkillImage::new(binary, digest))
             } else {
                 None
             };
