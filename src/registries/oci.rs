@@ -8,7 +8,7 @@ use oci_client::{
 use oci_wasm::WasmClient;
 use tracing::error;
 
-use super::DynFuture;
+use super::{DynFuture, SkillImage};
 
 pub struct OciRegistry {
     client: WasmClient,
@@ -23,7 +23,7 @@ impl SkillRegistry for OciRegistry {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
         let repository = format!("{}/{name}", self.repository);
         let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
         let auth = RegistryAuth::Basic(self.username.clone(), self.password.clone());
@@ -35,7 +35,7 @@ impl SkillRegistry for OciRegistry {
             match result {
                 Ok(image) => {
                     let binary = image.layers.into_iter().next().unwrap().data;
-                    Ok(Some(binary))
+                    Ok(Some(SkillImage::new(binary)))
                 }
                 // We want to distinguish between a skill that is not there and runtime errors
                 Err(e) => {
@@ -149,12 +149,12 @@ mod tests {
         // when pulled from registry
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
-        let bytes = registry
+        let skill = registry
             .load_skill("greet_skill", tag)
             .await
             .expect("must return okay")
             .expect("component binaries must be found");
-        let component = Component::new(&engine, bytes);
+        let component = Component::new(&engine, skill.bytes);
 
         // then skill can be loaded
         assert!(component.is_ok());

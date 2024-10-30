@@ -1,4 +1,4 @@
-use super::{DynFuture, SkillRegistry};
+use super::{DynFuture, SkillImage, SkillRegistry};
 
 use std::{fs, path::PathBuf};
 
@@ -19,13 +19,13 @@ impl SkillRegistry for FileRegistry {
         &'a self,
         name: &'a str,
         _tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
         let fut = async move {
             let mut skill_path = self.skill_dir.join(name);
             skill_path.set_extension("wasm");
             let maybe_binary = if skill_path.exists() {
                 let binary = fs::read(skill_path)?;
-                Some(binary)
+                Some(SkillImage::new(binary))
             } else {
                 None
             };
