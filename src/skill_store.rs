@@ -16,12 +16,18 @@ use crate::{
 /// A wrapper around the Skill to also keep track of which
 /// digest was loaded last and when it was last checked.
 struct CachedSkill {
+    /// Compiled and pre initialized skill
     skill: Arc<Skill>,
+    /// Digest of the skill when it was last loaded from the registry
+    digest: String,
 }
 
 impl CachedSkill {
-    fn new(skill: Arc<Skill>) -> Self {
-        Self { skill }
+    fn new(skill: Arc<Skill>, digest: impl Into<String>) -> Self {
+        Self {
+            skill,
+            digest: digest.into(),
+        }
     }
 }
 
@@ -138,7 +144,7 @@ impl SkillStoreState {
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
             let skill = Arc::new(skill);
             self.cached_skills
-                .insert(skill_path.clone(), CachedSkill::new(skill.clone()));
+                .insert(skill_path.clone(), CachedSkill::new(skill.clone(), digest));
             skill
         };
 
