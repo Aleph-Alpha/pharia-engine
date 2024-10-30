@@ -13,9 +13,21 @@ use crate::{
     skills::{Engine, Skill, SkillPath},
 };
 
+/// A wrapper around the Skill to also keep track of which
+/// digest was loaded last and when it was last checked.
+struct CachedSkill {
+    skill: Arc<Skill>,
+}
+
+impl CachedSkill {
+    fn new(skill: Arc<Skill>) -> Self {
+        Self { skill }
+    }
+}
+
 struct SkillStoreState {
     known_skills: HashMap<SkillPath, Option<String>>,
-    cached_skills: HashMap<SkillPath, Arc<Skill>>,
+    cached_skills: HashMap<SkillPath, CachedSkill>,
     // key: Namespace, value: Registry
     skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
     // key: Namespace, value: Error
@@ -103,7 +115,7 @@ impl SkillStoreState {
         }
 
         let skill = if let Some(skill) = self.cached_skills.get(skill_path) {
-            skill.clone()
+            skill.skill.clone()
         } else {
             let Some(tag) = self.known_skills.get(skill_path) else {
                 return Ok(None);
@@ -125,7 +137,8 @@ impl SkillStoreState {
                 .expect("Spawend linking thread must run to completion without being poisened.")
                 .with_context(|| format!("Failed to initialize {skill_path}."))?;
             let skill = Arc::new(skill);
-            self.cached_skills.insert(skill_path.clone(), skill.clone());
+            self.cached_skills
+                .insert(skill_path.clone(), CachedSkill::new(skill.clone()));
             skill
         };
 
