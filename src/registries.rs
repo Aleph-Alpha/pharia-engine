@@ -9,13 +9,25 @@ pub use oci::OciRegistry;
 
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+/// Contains the bytes necessary to instantiate a Skill, as well as the
+/// digest at the time of the pull associated with these bytes.
+pub struct SkillImage {
+    /// Can be either the binary or WAT text format of a Wasm component
+    pub bytes: Vec<u8>,
+}
+
+impl SkillImage {
+    pub fn new(component: Vec<u8>) -> Self {
+        Self { bytes: component }
+    }
+}
+
 pub trait SkillRegistry {
-    /// can return either the binary or WAT text format of a Wasm component
     fn load_skill<'a>(
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>>;
+    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>>;
 }
 
 impl SkillRegistry for Box<dyn SkillRegistry + Send> {
@@ -23,7 +35,7 @@ impl SkillRegistry for Box<dyn SkillRegistry + Send> {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
         self.as_ref().load_skill(name, tag)
     }
 }
@@ -33,7 +45,7 @@ impl<R: SkillRegistry> SkillRegistry for Vec<R> {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
         // Collect all the futures into an ordered stream that will run the futures concurrently,
         // but will return the results in the order they were added.
         let mut futures = self
@@ -63,16 +75,16 @@ pub mod tests {
 
     use crate::registries::FileRegistry;
 
-    use super::{DynFuture, SkillRegistry};
+    use super::{DynFuture, SkillImage, SkillRegistry};
 
     impl SkillRegistry for HashMap<String, Vec<u8>> {
         fn load_skill<'a>(
             &'a self,
             name: &'a str,
             _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
             if let Some(bytes) = self.get(name) {
-                Box::pin(async move { Ok(Some(bytes.clone())) })
+                Box::pin(async move { Ok(Some(SkillImage::new(bytes.clone()))) })
             } else {
                 Box::pin(async { Ok(None) })
             }
@@ -86,7 +98,7 @@ pub mod tests {
             &'a self,
             _name: &'a str,
             _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<Vec<u8>>>> {
+        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
             Box::pin(async move { Err(anyhow!("out-of-cheese-error")) })
         }
     }
@@ -129,10 +141,10 @@ pub mod tests {
 
         // when
         let result = registries.load_skill("dummy skill name", "dummy tag").await;
-        let bytes = result.unwrap().unwrap();
+        let skill = result.unwrap().unwrap();
 
         // then
-        assert_eq!(bytes, b"(component)");
+        assert_eq!(skill.bytes, b"(component)");
     }
 
     #[tokio::test]
@@ -148,10 +160,10 @@ pub mod tests {
 
         // when
         let result = registries.load_skill("dummy skill name", "dummy tag").await;
-        let bytes = result.unwrap().unwrap();
+        let skill = result.unwrap().unwrap();
 
         // then
-        assert_eq!(bytes, b"(component)");
+        assert_eq!(skill.bytes, b"(component)");
     }
 
     #[tokio::test]

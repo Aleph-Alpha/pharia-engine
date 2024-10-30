@@ -9,7 +9,7 @@ use tracing::info;
 
 use crate::{
     namespace_watcher::{NamespaceConfig, Registry},
-    registries::{FileRegistry, OciRegistry, SkillRegistry},
+    registries::{FileRegistry, OciRegistry, SkillImage, SkillRegistry},
     skills::{Engine, Skill, SkillPath},
 };
 
@@ -126,11 +126,11 @@ impl SkillStoreState {
                 .get(&skill_path.namespace)
                 .expect("If skill exists, so must the namespace it resides in.");
 
-            let bytes = registry
+            let skill_bytes = registry
                 .load_skill(&skill_path.name, tag.as_deref().unwrap_or("latest"))
                 .await?;
-            let bytes =
-                bytes.ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
+            let SkillImage { bytes } = skill_bytes
+                .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
             let engine = self.engine.clone();
             let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
                 .await
