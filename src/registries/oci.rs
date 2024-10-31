@@ -18,20 +18,32 @@ pub struct OciRegistry {
     password: String,
 }
 
+impl OciRegistry {
+    fn auth(&self) -> RegistryAuth {
+        RegistryAuth::Basic(self.username.clone(), self.password.clone())
+    }
+
+    fn reference(&self, name: &str, tag: String) -> Reference {
+        Reference::with_tag(
+            self.registry.clone(),
+            format!("{}/{name}", self.repository),
+            tag,
+        )
+    }
+}
+
 impl SkillRegistry for OciRegistry {
     fn load_skill<'a>(
         &'a self,
         name: &'a str,
         tag: &'a str,
     ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
-        let repository = format!("{}/{name}", self.repository);
-        let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
-        let auth = RegistryAuth::Basic(self.username.clone(), self.password.clone());
+        let image = self.reference(name, tag.to_owned());
 
         Box::pin(async move {
             // We want to match on the specific type of result.
             // If it is not found, return None, if it is a connection error, return an error
-            let result = self.client.pull(&image, &auth).await;
+            let result = self.client.pull(&image, &self.auth()).await;
             match result {
                 Ok(image) => {
                     let binary = image.layers.into_iter().next().unwrap().data;
@@ -45,7 +57,7 @@ impl SkillRegistry for OciRegistry {
                 }
                 // We want to distinguish between a skill that is not there and runtime errors
                 Err(e) => {
-                    if is_skill_not_found(&e) {
+                    if anyhow_is_skill_not_found(&e) {
                         Ok(None)
                     } else {
                         error!("Error retrieving skill from registry: {e}");
@@ -61,7 +73,24 @@ impl SkillRegistry for OciRegistry {
         name: &'a str,
         tag: &'a str,
     ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
-        todo!()
+        Box::pin(async move {
+            let result = self
+                .client
+                .fetch_manifest_digest(&self.reference(name, tag.to_owned()), &self.auth())
+                .await;
+            match result {
+                Ok(digest) => Ok(Some(digest)),
+                // We want to distinguish between a skill that is not there and runtime errors
+                Err(e) => {
+                    if is_skill_not_found(&e) {
+                        Ok(None)
+                    } else {
+                        error!("Error retrieving skill from registry: {e}");
+                        Err(e.into())
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -80,18 +109,22 @@ impl OciRegistry {
     }
 }
 
-fn is_skill_not_found(error: &anyhow::Error) -> bool {
+fn anyhow_is_skill_not_found(error: &anyhow::Error) -> bool {
     let Some(error) = error.downcast_ref::<OciDistributionError>() else {
         return false;
     };
 
-    if let OciDistributionError::RegistryError { envelope, .. } = error {
-        envelope
+    is_skill_not_found(error)
+}
+
+fn is_skill_not_found(error: &OciDistributionError) -> bool {
+    match error {
+        OciDistributionError::RegistryError { envelope, .. } => envelope
             .errors
             .iter()
-            .any(|e| e.code == OciErrorCode::ManifestUnknown)
-    } else {
-        false
+            .any(|e| e.code == OciErrorCode::ManifestUnknown),
+        OciDistributionError::ImageManifestNotFoundError(_) => true,
+        _ => false,
     }
 }
 
@@ -169,11 +202,16 @@ mod tests {
             .expect("must return okay")
             .expect("component binaries must be found");
         let component = Component::new(&engine, skill.bytes);
+        let digest = registry
+            .fetch_digest("greet_skill", tag)
+            .await
+            .unwrap()
+            .unwrap();
 
         // then skill can be loaded
         assert!(component.is_ok());
         // Make sure the digest is loaded properly
-        assert_ne!(tag, skill.digest);
+        assert_eq!(digest, skill.digest);
     }
 
     #[tokio::test]
@@ -190,6 +228,22 @@ mod tests {
 
         // then skill can not be found
         assert!(bytes.is_none());
+    }
+
+    #[tokio::test]
+    async fn digest_not_found() {
+        // given a OCI registry is available
+        drop(dotenv());
+        let registry = OciRegistry::from_env().unwrap();
+
+        // when loading a skill that does not exist
+        let digest = registry
+            .fetch_digest("not-existing-skill", "not-existing-tag")
+            .await
+            .unwrap();
+
+        // then skill can not be found
+        assert!(digest.is_none());
     }
 
     #[tokio::test]
