@@ -50,3 +50,52 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt -- --check
       - run: cargo clippy --workspace --all-features --all-targets
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [tests, lints]
+    if: github.ref == 'refs/heads/main'
+    concurrency: deploy
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARTIFACTORY_URL: https://alephalpha.jfrog.io
+      ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate image ID
+        id: generate-image-id
+        run: echo "IMAGE_ID=$(date +%F)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: Build image
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: pharia-kernel
+          tags: latest ${{ env.IMAGE_ID }}
+          containerfiles: |
+            ./Containerfile
+      - name: Log in to JFrog Artifactory
+        uses: ./.github/actions/jfrog
+      - name: Push to JFrog Artifactory
+        id: push
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ${{ env.ARTIFACTORY_REPOSITORY }}
+      - name: Print image URL
+        run: echo "Image pushed to ${{ steps.push.outputs.registry-paths }}"
+      - name: Get user name and email
+        run: |
+          echo "TRIGGER_USER_NAME=$(git log -n 1 --pretty=format:%aN)" >> $GITHUB_ENV
+          echo "TRIGGER_USER_EMAIL=$(git log -n 1 --pretty=format:%aE)" >> $GITHUB_ENV
+      - name: Update image tag
+        uses: digital-blueprint/gitlab-pipeline-trigger-action@v1
+        with:
+          host: "gitlab.aleph-alpha.de"
+          trigger_token: ${{ secrets.DEPLOY_TRIGGER_TOKEN }}
+          access_token: ${{ secrets.DEPLOY_ACCESS_TOKEN }}
+          id: "931"
+          ref: "main"
+          variables: '{"TRIGGER_USER_EMAIL":"${{ env.TRIGGER_USER_EMAIL }}","TRIGGER_USER_NAME":"${{ env.TRIGGER_USER_NAME }}","TRIGGER_IMAGE_TAG":"${{ env.IMAGE_ID }}","TRIGGER_IMAGE_TAG_TARGET":".image.tag","UPDATE_DIRECTORY":"applications","UPDATE_PROJECT":"pharia-kernel"}'
