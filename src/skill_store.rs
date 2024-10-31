@@ -2,6 +2,7 @@ use std::{collections::HashMap, env, sync::Arc};
 
 use anyhow::{anyhow, Context};
 use tokio::{
+    select,
     sync::{mpsc, oneshot},
     task::{spawn_blocking, JoinHandle},
 };
@@ -330,8 +331,14 @@ impl SkillProviderActor {
     }
 
     pub async fn run(&mut self) {
-        while let Some(msg) = self.receiver.recv().await {
-            self.act(msg).await;
+        loop {
+            select! {
+                msg = self.receiver.recv() => match msg {
+                    Some(msg) => self.act(msg).await,
+                    // Senders are gone, break out of the loop for shutdown.
+                    None => break
+                }
+            }
         }
     }
 
