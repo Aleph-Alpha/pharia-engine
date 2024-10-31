@@ -54,7 +54,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [tests, lints]
-    if: github.ref == 'refs/heads/main'
     concurrency: deploy
     permissions:
       contents: read
@@ -82,22 +81,27 @@ jobs:
           oci: true
           containerfiles: |
             ./Containerfile
-      - name: Log in to JFrog Artifactory
+      - if: github.ref == 'refs/heads/main'
+        name: Log in to JFrog Artifactory
         uses: ./.github/actions/jfrog
-      - name: Push to JFrog Artifactory
+      - if: github.ref == 'refs/heads/main'
+        name: Push to JFrog Artifactory
         id: push
         uses: redhat-actions/push-to-registry@v2
         with:
           image: ${{ steps.build-image.outputs.image }}
           tags: ${{ steps.build-image.outputs.tags }}
           registry: ${{ env.ARTIFACTORY_REPOSITORY }}
-      - name: Print image URL
+      - if: github.ref == 'refs/heads/main'
+        name: Print image URL
         run: echo "Image pushed to ${{ steps.push.outputs.registry-paths }}"
-      - name: Get user name and email
+      - if: github.ref == 'refs/heads/main'
+        name: Get user name and email
         run: |
           echo "TRIGGER_USER_NAME=$(git log -n 1 --pretty=format:%aN)" >> $GITHUB_ENV
           echo "TRIGGER_USER_EMAIL=$(git log -n 1 --pretty=format:%aE)" >> $GITHUB_ENV
-      - name: Update image tag
+      - if: github.ref == 'refs/heads/main'
+        name: Update image tag
         uses: digital-blueprint/gitlab-pipeline-trigger-action@v1
         with:
           host: "gitlab.aleph-alpha.de"
