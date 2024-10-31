@@ -1,10 +1,11 @@
-use std::{collections::HashMap, env, sync::Arc};
+use std::{collections::HashMap, env, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Context};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
     task::{spawn_blocking, JoinHandle},
+    time::sleep,
 };
 use tracing::info;
 
@@ -182,9 +183,13 @@ pub struct SkillStore {
 }
 
 impl SkillStore {
-    pub fn new(engine: Arc<Engine>, namespaces: &HashMap<String, NamespaceConfig>) -> Self {
+    pub fn new(
+        engine: Arc<Engine>,
+        namespaces: &HashMap<String, NamespaceConfig>,
+        digest_update_interval: Duration,
+    ) -> Self {
         let (sender, recv) = mpsc::channel(1);
-        let mut actor = SkillProviderActor::new(engine, recv, namespaces);
+        let mut actor = SkillProviderActor::new(engine, recv, namespaces, digest_update_interval);
         let handle = tokio::spawn(async move {
             actor.run().await;
         });
@@ -316,6 +321,7 @@ pub enum SkillProviderMsg {
 struct SkillProviderActor {
     receiver: mpsc::Receiver<SkillProviderMsg>,
     provider: SkillStoreState,
+    digest_update_interval: Duration,
 }
 
 impl SkillProviderActor {
@@ -323,10 +329,12 @@ impl SkillProviderActor {
         engine: Arc<Engine>,
         receiver: mpsc::Receiver<SkillProviderMsg>,
         namespaces: &HashMap<String, NamespaceConfig>,
+        digest_update_interval: Duration,
     ) -> Self {
         SkillProviderActor {
             receiver,
             provider: SkillStoreState::new(engine, namespaces),
+            digest_update_interval,
         }
     }
 
@@ -337,7 +345,11 @@ impl SkillProviderActor {
                     Some(msg) => self.act(msg).await,
                     // Senders are gone, break out of the loop for shutdown.
                     None => break
-                }
+                },
+                () = async {
+                    self.provider.validate_cached_digests().await;
+                    sleep(self.digest_update_interval).await;
+                } => {}
             }
         }
     }
@@ -486,7 +498,7 @@ pub mod tests {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine, &local_namespace());
+        let skill_provider = SkillStore::new(engine, &local_namespace(), Duration::from_secs(10));
         skill_provider
             .api()
             .upsert(SkillPath::new("local", "greet_skill"), None)
@@ -516,7 +528,7 @@ pub mod tests {
     async fn should_list_skills_that_have_been_added() {
         // Given an empty provider
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine, &local_namespace());
+        let skill_provider = SkillStore::new(engine, &local_namespace(), Duration::from_secs(10));
         let api = skill_provider.api();
 
         // When adding a skill
@@ -540,7 +552,7 @@ pub mod tests {
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine, &local_namespace());
+        let skill_provider = SkillStore::new(engine, &local_namespace(), Duration::from_secs(10));
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
         api.fetch(greet_skill.clone()).await.unwrap();
@@ -560,7 +572,7 @@ pub mod tests {
         // Given one "greet_skill" which is not in cache
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine, &local_namespace());
+        let skill_provider = SkillStore::new(engine, &local_namespace(), Duration::from_secs(10));
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
 
@@ -646,14 +658,13 @@ pub mod tests {
         Ok(())
     }
 
-    #[ignore]
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn should_invalidate_cached_skill_whose_digest_has_changed() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
         let (namespace_config, temp_dir) = tmp_namespace_with_skill()?;
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-        let skill_provider = SkillStore::new(engine, &namespace_config);
+        let skill_provider = SkillStore::new(engine, &namespace_config, Duration::from_secs(1));
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
         api.fetch(greet_skill.clone()).await?;
@@ -667,6 +678,7 @@ pub mod tests {
         fs::copy("./skills/chat_skill.wasm", &wasm_file)?;
         let new_time = fs::metadata(&wasm_file)?.modified()?;
         assert_ne!(prev_time, new_time);
+        sleep(Duration::from_secs(2)).await;
 
         // Then greet skill is no longer listed in the cache, but of course still available in the
         // list of all skills

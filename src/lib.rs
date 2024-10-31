@@ -73,7 +73,11 @@ impl Kernel {
             search: search.api(),
             tokenizers: tokenizers.api(),
         };
-        let skill_store = SkillStore::new(engine.clone(), &app_config.operator_config.namespaces);
+        let skill_store = SkillStore::new(
+            engine.clone(),
+            &app_config.operator_config.namespaces,
+            app_config.namespace_update_interval,
+        );
 
         // Boot up runtime we need to execute Skills
         let skill_executor = SkillExecutor::new(engine, csi_drivers.clone(), skill_store.api());
