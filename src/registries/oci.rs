@@ -55,6 +55,14 @@ impl SkillRegistry for OciRegistry {
             }
         })
     }
+
+    fn fetch_digest<'a>(
+        &'a self,
+        name: &'a str,
+        tag: &'a str,
+    ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
+        todo!()
+    }
 }
 
 impl OciRegistry {
