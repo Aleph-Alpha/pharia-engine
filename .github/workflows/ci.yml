@@ -85,7 +85,7 @@ jobs:
             ./Containerfile
 
       - name: Container test
-        run: sh -x ./tests/test-container.sh pharia-kernel:$IMAGE_ID
+        run: bash -x ./tests/test-container.sh pharia-kernel:$IMAGE_ID
       - name: Integration test
         run: |
           (podman run -p 8081:8081 -v ./operator-config.toml:/app/operator-config.toml \
@@ -94,7 +94,7 @@ jobs:
             -e GITLAB_CONFIG_ACCESS_TOKEN=dummy \
             -e AA_API_TOKEN=dummy \
             pharia-kernel:$IMAGE_ID | cat) &
-          sh -x ./tests/test-image.sh 8081 127.0.0.1
+          bash -x ./tests/test-image.sh 8081 127.0.0.1
       - if: github.ref == 'refs/heads/main'
         name: Log in to JFrog Artifactory
         uses: ./.github/actions/jfrog
