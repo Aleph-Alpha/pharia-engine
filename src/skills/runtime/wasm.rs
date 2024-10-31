@@ -45,7 +45,10 @@ impl WasmRuntime {
 
 #[cfg(test)]
 pub mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     use crate::{
         csi::ChunkRequest,
@@ -70,6 +73,7 @@ pub mod tests {
         let skill_provider = SkillStore::new(
             engine.clone(),
             &OperatorConfig::local(&["greet_skill"]).namespaces,
+            Duration::from_secs(10),
         );
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
@@ -85,8 +89,11 @@ pub mod tests {
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider =
-            SkillStore::new(engine.clone(), &OperatorConfig::local(&[]).namespaces);
+        let skill_provider = SkillStore::new(
+            engine.clone(),
+            &OperatorConfig::local(&[]).namespaces,
+            Duration::from_secs(10),
+        );
         let runtime = WasmRuntime::new(engine, skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
@@ -108,6 +115,7 @@ pub mod tests {
         let skill_provider = SkillStore::new(
             engine.clone(),
             &OperatorConfig::local(&["greet_skill"]).namespaces,
+            Duration::from_secs(10),
         );
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
@@ -132,6 +140,7 @@ pub mod tests {
         let skill_provider = SkillStore::new(
             engine.clone(),
             &OperatorConfig::local(&["greet-py"]).namespaces,
+            Duration::from_secs(10),
         );
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
@@ -156,6 +165,7 @@ pub mod tests {
         let skill_provider = SkillStore::new(
             engine.clone(),
             &OperatorConfig::local(&["greet_skill"]).namespaces,
+            Duration::from_secs(10),
         );
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());

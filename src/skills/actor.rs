@@ -329,7 +329,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::{collections::HashMap, fs};
+    use std::{collections::HashMap, fs, time::Duration};
 
     use super::*;
 
@@ -398,7 +398,7 @@ pub mod tests {
         // Given a skill executer with no skills
         let namespaces = HashMap::new();
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine.clone(), &namespaces);
+        let skill_provider = SkillStore::new(engine.clone(), &namespaces, Duration::from_secs(10));
         let csi_apis = DummyCsi;
         let executer = SkillExecutor::new(engine, csi_apis, skill_provider.api());
         let api = executer.api();
