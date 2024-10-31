@@ -150,6 +150,29 @@ impl SkillStoreState {
 
         Ok(Some(skill))
     }
+
+    // Checks the digests in the cache. If the digest behind the tag has changed, remove the cache entries.
+    pub async fn validate_cached_digests(&mut self) {
+        let mut to_remove = vec![];
+        for (skill_path, cached_skill) in &self.cached_skills {
+            let Some(registry) = self.skill_registries.get(&skill_path.namespace) else {
+                continue;
+            };
+            let Some(tag) = self.known_skills.get(skill_path) else {
+                continue;
+            };
+            let Ok(Some(digest)) = registry
+                .fetch_digest(&skill_path.name, tag.as_deref().unwrap_or("latest"))
+                .await
+            else {
+                continue;
+            };
+            if digest != cached_skill.digest {
+                to_remove.push(skill_path.clone());
+            }
+        }
+        self.cached_skills.retain(|k, _| !to_remove.contains(k));
+    }
 }
 
 pub struct SkillStore {
@@ -347,7 +370,12 @@ impl SkillProviderActor {
 #[cfg(test)]
 pub mod tests {
 
-    use test_skills::given_greet_skill;
+    use std::fs;
+
+    use tempfile::TempDir;
+    use test_skills::{given_chat_skill, given_greet_skill};
+
+    use crate::namespace_watcher::tests::SkillDescription;
 
     use super::*;
 
@@ -536,6 +564,9 @@ pub mod tests {
         // indicates that greet skill never had been in the cache to begin with
         assert!(!skill_had_been_in_cache);
         assert_eq!(api.list().await, vec![greet_skill]);
+        // Cleanup
+        drop(api);
+        skill_provider.wait_for_shutdown().await;
     }
 
     /// Namespace named local backed by a file registry with "skills" directory
@@ -548,5 +579,121 @@ pub mod tests {
             },
         };
         std::iter::once(("local".to_owned(), namespace_cfg)).collect()
+    }
+
+    #[tokio::test]
+    async fn invalidate_cache_skills_after_digest_change() -> anyhow::Result<()> {
+        // Given one cached "greet_skill"
+        let (namespace_config, temp_dir) = tmp_namespace_with_skill()?;
+        let greet_skill = SkillPath::new("local", "greet_skill");
+        let engine = Arc::new(Engine::new(false)?);
+        let mut skill_provider = SkillStoreState::new(engine, &namespace_config);
+        skill_provider.upsert_skill(&greet_skill, None);
+        skill_provider.fetch(&greet_skill).await?;
+        assert_eq!(
+            skill_provider.list_cached_skills().collect::<Vec<_>>(),
+            vec![&greet_skill]
+        );
+
+        // When we update "greet_skill"s contents and we clear out expired skills
+        let wasm_file = temp_dir.path().join("greet_skill.wasm");
+        let prev_time = fs::metadata(&wasm_file)?.modified()?;
+        // Another skill so we can copy it over
+        given_chat_skill();
+        fs::copy("./skills/chat_skill.wasm", &wasm_file)?;
+        let new_time = fs::metadata(&wasm_file)?.modified()?;
+        assert_ne!(prev_time, new_time);
+
+        skill_provider.validate_cached_digests().await;
+
+        // Then greet skill is no longer listed in the cache, but of course still available in the
+        // list of all skills
+        assert_eq!(skill_provider.list_cached_skills().count(), 0);
+        assert_eq!(
+            skill_provider.skills().collect::<Vec<_>>(),
+            vec![&greet_skill]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn doesnt_invalidate_unchanged_digests() -> anyhow::Result<()> {
+        // Given one cached "greet_skill"
+        given_greet_skill();
+        let greet_skill = SkillPath::new("local", "greet_skill");
+        let engine = Arc::new(Engine::new(false)?);
+        let mut skill_provider = SkillStoreState::new(engine, &local_namespace());
+        skill_provider.upsert_skill(&greet_skill, None);
+        skill_provider.fetch(&greet_skill).await?;
+
+        // When we check it with no changes
+        skill_provider.validate_cached_digests().await;
+
+        // Then nothing changes
+        assert_eq!(
+            skill_provider.list_cached_skills().collect::<Vec<_>>(),
+            skill_provider.skills().collect::<Vec<_>>(),
+        );
+
+        Ok(())
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn should_invalidate_cached_skill_whose_digest_has_changed() -> anyhow::Result<()> {
+        // Given one cached "greet_skill"
+        let (namespace_config, temp_dir) = tmp_namespace_with_skill()?;
+        let greet_skill = SkillPath::new("local", "greet_skill");
+        let engine = Arc::new(Engine::new(false)?);
+        let skill_provider = SkillStore::new(engine, &namespace_config);
+        let api = skill_provider.api();
+        api.upsert(greet_skill.clone(), None).await;
+        api.fetch(greet_skill.clone()).await?;
+        assert_eq!(api.list_cached().await, vec![greet_skill.clone()]);
+
+        // When we update "greet_skill"s contents
+        let wasm_file = temp_dir.path().join("greet_skill.wasm");
+        let prev_time = fs::metadata(&wasm_file)?.modified()?;
+        // Another skill so we can copy it over
+        given_chat_skill();
+        fs::copy("./skills/chat_skill.wasm", &wasm_file)?;
+        let new_time = fs::metadata(&wasm_file)?.modified()?;
+        assert_ne!(prev_time, new_time);
+
+        // Then greet skill is no longer listed in the cache, but of course still available in the
+        // list of all skills
+        assert!(api.list_cached().await.is_empty());
+        assert_eq!(api.list().await, vec![greet_skill]);
+
+        // Cleanup
+        drop(api);
+        skill_provider.wait_for_shutdown().await;
+
+        Ok(())
+    }
+
+    /// Creates a file registry in a tempdir with one greet skill
+    fn tmp_namespace_with_skill() -> anyhow::Result<(HashMap<String, NamespaceConfig>, TempDir)> {
+        given_greet_skill();
+        let dir = tempfile::tempdir()?;
+        fs::copy(
+            "./skills/greet_skill.wasm",
+            dir.path().join("greet_skill.wasm"),
+        )?;
+
+        let namespace_cfg = NamespaceConfig::InPlace {
+            skills: vec![SkillDescription {
+                name: "greet_skill".to_owned(),
+                tag: None,
+            }],
+            registry: Registry::File {
+                path: dir.path().to_string_lossy().into(),
+            },
+        };
+        Ok((
+            std::iter::once(("local".to_owned(), namespace_cfg)).collect(),
+            dir,
+        ))
     }
 }

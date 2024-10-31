@@ -39,4 +39,26 @@ impl SkillRegistry for FileRegistry {
         };
         Box::pin(fut)
     }
+
+    fn fetch_digest<'a>(
+        &'a self,
+        name: &'a str,
+        _tag: &'a str,
+    ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
+        Box::pin(async move {
+            let mut skill_path = self.skill_dir.join(name);
+            skill_path.set_extension("wasm");
+            if skill_path.exists() {
+                let digest = skill_path
+                    .metadata()?
+                    .modified()?
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_millis()
+                    .to_string();
+                Ok(Some(digest))
+            } else {
+                Ok(None)
+            }
+        })
+    }
 }
