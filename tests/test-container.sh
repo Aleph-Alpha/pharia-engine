@@ -24,7 +24,7 @@ function time_shutdown () {
 
         SECONDS=0
         START_TIME=$SECONDS
-        podman stop -f name=$INTERNAL_NAME
+        podman stop -t 10 $INTERNAL_NAME
         ELAPSED_TIME=$SECONDS
         podman rm $INTERNAL_NAME
 
