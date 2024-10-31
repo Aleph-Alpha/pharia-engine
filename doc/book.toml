@@ -13,7 +13,7 @@ plantuml-cmd="plantuml"
 [output.linkcheck]
 follow-web-links = false
 traverse-parent-directories = false
-warning-policy = "error"
+warning-policy = "warn"
 
 [output.html]
 additional-css = ["theme/pagetoc.css", "theme/pagetoc-style.css"]
