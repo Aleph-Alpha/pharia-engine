@@ -67,6 +67,12 @@ jobs:
       - name: Generate image ID
         id: generate-image-id
         run: echo "IMAGE_ID=$(date +%F)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: Log in to GitLab to access shared images
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: registry.gitlab.aleph-alpha.de
+          username: ${{ secrets.GITLAB_USER }}
+          password: ${{ secrets.GITLAB_TOKEN }}
       - name: Build image
         id: build-image
         uses: redhat-actions/buildah-build@v2
