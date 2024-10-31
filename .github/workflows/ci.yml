@@ -79,6 +79,7 @@ jobs:
         with:
           image: pharia-kernel
           tags: latest ${{ env.IMAGE_ID }}
+          oci: true
           containerfiles: |
             ./Containerfile
       - name: Log in to JFrog Artifactory
