@@ -37,7 +37,7 @@ struct SkillStoreState {
     known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
     // key: Namespace, value: Registry
-    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
+    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
     // key: Namespace, value: Error
     invalid_namespaces: HashMap<String, anyhow::Error>,
     engine: Arc<Engine>,
@@ -58,7 +58,7 @@ impl SkillStoreState {
         }
     }
 
-    fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send> {
+    fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send + Sync> {
         match namespace_config.registry() {
             Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
             Registry::Oci {
@@ -153,26 +153,33 @@ impl SkillStoreState {
         Ok(Some(skill))
     }
 
-    // Checks the digests in the cache. If the digest behind the tag has changed, remove the cache entries.
+    /// Returns the cached skill paths whose digests have changed
+    async fn invalid_cached_digests(&self) -> impl Iterator<Item = SkillPath> {
+        let invalid = futures::future::join_all(self.cached_skills.iter().map(
+            |(skill_path, cached_skill)| async move {
+                let registry = self.skill_registries.get(&skill_path.namespace)?;
+                let tag = self.known_skills.get(skill_path)?;
+                let Ok(Some(digest)) = registry
+                    .fetch_digest(&skill_path.name, tag.as_deref().unwrap_or("latest"))
+                    .await
+                else {
+                    return None;
+                };
+                if digest == cached_skill.digest {
+                    None
+                } else {
+                    Some(skill_path.clone())
+                }
+            },
+        ))
+        .await;
+
+        invalid.into_iter().flatten()
+    }
+
+    /// Checks the digests in the cache. If the digest behind the tag has changed, remove the cache entries.
     pub async fn validate_cached_digests(&mut self) {
-        let mut to_remove = vec![];
-        for (skill_path, cached_skill) in &self.cached_skills {
-            let Some(registry) = self.skill_registries.get(&skill_path.namespace) else {
-                continue;
-            };
-            let Some(tag) = self.known_skills.get(skill_path) else {
-                continue;
-            };
-            let Ok(Some(digest)) = registry
-                .fetch_digest(&skill_path.name, tag.as_deref().unwrap_or("latest"))
-                .await
-            else {
-                continue;
-            };
-            if digest != cached_skill.digest {
-                to_remove.push(skill_path.clone());
-            }
-        }
+        let to_remove = self.invalid_cached_digests().await.collect::<Vec<_>>();
         self.cached_skills.retain(|k, _| !to_remove.contains(k));
     }
 }
