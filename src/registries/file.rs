@@ -1,6 +1,10 @@
 use super::{DynFuture, SkillImage, SkillRegistry};
 
-use std::{fs, path::PathBuf, time::SystemTime};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 pub struct FileRegistry {
     skill_dir: PathBuf,
@@ -12,6 +16,22 @@ impl FileRegistry {
             skill_dir: skill_dir.into(),
         }
     }
+
+    fn skill_path(&self, name: &str) -> PathBuf {
+        let mut skill_path = self.skill_dir.join(name);
+        skill_path.set_extension("wasm");
+        skill_path
+    }
+
+    fn skill_digest(skill_path: &Path) -> anyhow::Result<String> {
+        let digest = skill_path
+            .metadata()?
+            .modified()?
+            .duration_since(SystemTime::UNIX_EPOCH)?
+            .as_millis()
+            .to_string();
+        Ok(digest)
+    }
 }
 
 impl SkillRegistry for FileRegistry {
@@ -21,21 +41,14 @@ impl SkillRegistry for FileRegistry {
         _tag: &'a str,
     ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
         let fut = async move {
-            let mut skill_path = self.skill_dir.join(name);
-            skill_path.set_extension("wasm");
-            let maybe_binary = if skill_path.exists() {
+            let skill_path = self.skill_path(name);
+            if skill_path.exists() {
                 let binary = fs::read(&skill_path)?;
-                let digest = skill_path
-                    .metadata()?
-                    .modified()?
-                    .duration_since(SystemTime::UNIX_EPOCH)?
-                    .as_millis()
-                    .to_string();
-                Some(SkillImage::new(binary, digest))
+                let digest = Self::skill_digest(&skill_path)?;
+                Ok(Some(SkillImage::new(binary, digest)))
             } else {
-                None
-            };
-            Ok(maybe_binary)
+                Ok(None)
+            }
         };
         Box::pin(fut)
     }
@@ -46,16 +59,9 @@ impl SkillRegistry for FileRegistry {
         _tag: &'a str,
     ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
         Box::pin(async move {
-            let mut skill_path = self.skill_dir.join(name);
-            skill_path.set_extension("wasm");
+            let skill_path = self.skill_path(name);
             if skill_path.exists() {
-                let digest = skill_path
-                    .metadata()?
-                    .modified()?
-                    .duration_since(SystemTime::UNIX_EPOCH)?
-                    .as_millis()
-                    .to_string();
-                Ok(Some(digest))
+                Ok(Some(Self::skill_digest(&skill_path)?))
             } else {
                 Ok(None)
             }
