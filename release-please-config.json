@@ -1,0 +1,13 @@
+{
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "exclude-paths": ["helm-charts"]
+    },
+    "helm-charts/pharia-kernel": {
+      "release-type": "helm"
+    }
+  }
+}
