@@ -2,7 +2,12 @@
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "commit-search-depth": 1000,
-  "plugins": ["cargo-workspace"],
+  "plugins": [
+    {
+      "type": "cargo-workspace",
+      "updateAllPackages": true
+    }
+  ],
   "packages": {
     ".": {
       "release-type": "rust",
