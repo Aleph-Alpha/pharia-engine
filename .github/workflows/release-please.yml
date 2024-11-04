@@ -13,6 +13,7 @@ permissions:
 env:
   ARTIFACTORY_URL: https://alephalpha.jfrog.io
   ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
+  CARGO_REGISTRY_INDEX: sparse+https://alephalpha.jfrog.io/artifactory/api/cargo/pharia-kernel-crates/index/
 
 jobs:
   release-please:
@@ -22,5 +23,18 @@ jobs:
         uses: googleapis/release-please-action@v4
 
       - if: ${{ steps.release.outputs.release_created }}
+        name: Checkout repository
+        uses: actions/checkout@v4
+
+      - if: ${{ steps.release.outputs.release_created }}
+        name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - if: ${{ steps.release.outputs.release_created }}
         name: Log in to JFrog Artifactory
         uses: ./.github/actions/jfrog
+
+      - if: ${{ steps.release.outputs.release_created }}
+        name: Publish to JFrog crates registry
+        run: cargo publish -p pharia-kernel --index "$CARGO_REGISTRY_INDEX" --token "Bearer $JFROG_ACCESS_TOKEN"
+
