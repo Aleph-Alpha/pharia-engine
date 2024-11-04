@@ -40,7 +40,7 @@ struct SkillStoreState {
     known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
     // key: Namespace, value: Registry
-    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
     // key: Namespace, value: Error
     invalid_namespaces: HashMap<String, anyhow::Error>,
     engine: Arc<Engine>,
@@ -61,7 +61,7 @@ impl SkillStoreState {
         }
     }
 
-    fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send + Sync> {
+    fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send> {
         match namespace_config.registry() {
             Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
             Registry::Oci {
