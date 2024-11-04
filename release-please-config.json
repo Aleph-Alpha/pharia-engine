@@ -1,6 +1,7 @@
 {
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
+  "commit-search-depth": 1000,
   "packages": {
     ".": {
       "release-type": "rust",
