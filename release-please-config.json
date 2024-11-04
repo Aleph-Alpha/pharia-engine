@@ -4,17 +4,6 @@
   "commit-search-depth": 1000,
   "plugins": ["cargo-workspace"],
   "packages": {
-    ".": {
-      "release-type": "rust",
-      "exclude-paths": ["helm-charts"],
-      "extra-files": [
-        {
-          "type": "yaml",
-          "path": "helm-charts/pharia-kernel/Chart.yaml",
-          "jsonpath": "$.appVersion"
-        }
-      ]
-    },
     "helm-charts/pharia-kernel": {
       "release-type": "helm"
     }
