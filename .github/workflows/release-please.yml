@@ -1,0 +1,26 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+env:
+  ARTIFACTORY_URL: https://alephalpha.jfrog.io
+  ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+
+      - if: ${{ steps.release.outputs.release_created }}
+        name: Log in to JFrog Artifactory
+        uses: ./.github/actions/jfrog
