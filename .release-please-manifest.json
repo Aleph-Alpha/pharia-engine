@@ -1,1 +1,1 @@
-{ "helm-charts/pharia-kernel": "0.1.17" }
+{ "helm-charts/pharia-kernel": "0.1.17", ".": "0.1.0" }
