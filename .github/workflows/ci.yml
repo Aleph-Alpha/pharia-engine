@@ -62,8 +62,9 @@ jobs:
       id-token: write
     env:
       ARTIFACTORY_URL: https://alephalpha.jfrog.io
+      ARTIFACTORY_HOST: alephalpha.jfrog.io
       ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
-      ARTIFACTORY_HELM_URL: oci://alephalpha.jfrog.io/pharia-kernel-helm
+      ARTIFACTORY_HELM_REPOSITORY: pharia-kernel-helm
     steps:
       - uses: actions/checkout@v4
       - name: Generate image ID
@@ -142,10 +143,12 @@ jobs:
 
       - if: github.ref_type == 'tag'
         name: Push Helm charts
-        uses: huggingface/helm-publish-action@latest
+        uses: appany/helm-oci-chart-releaser@v0.3.0
         with:
-          workingDirectory: helm-charts
-          repository: ${{ env.ARTIFACTORY_HELM_URL }}
-          username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
-          password: ${{ env.JFROG_ACCESS_TOKEN }}
-          beforeHook: cd pharia-kernel && helm dependencies update
+          name: pharia-kernel
+          repository: ${{ env.ARTIFACTORY_HELM_REPOSITORY }}
+          tag: ${{ env.IMAGE_ID }}
+          path: helm-charts/pharia-kernel
+          registry: ${{ env.ARTIFACTORY_HOST }}
+          registry_username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
+          registry_password: ${{ env.JFROG_ACCESS_TOKEN }}
