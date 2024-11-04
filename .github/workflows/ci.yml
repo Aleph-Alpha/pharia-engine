@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*' 
   pull_request:
     branches:
       - main
@@ -51,21 +53,28 @@ jobs:
       - run: cargo fmt -- --check
       - run: cargo clippy --workspace --all-features --all-targets
 
-  test-and-deploy-if-on-main:
+  test-and-deploy-if-main-or-tag:
     runs-on: ubuntu-latest
     needs: [tests, lints]
-    concurrency: test-and-deploy-if-on-main
+    concurrency: test-and-deploy-if-main-or-tag
     permissions:
       contents: read
       id-token: write
     env:
       ARTIFACTORY_URL: https://alephalpha.jfrog.io
       ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
+      ARTIFACTORY_HELM_URL: https://alephalpha.jfrog.io/pharia-kernel-helm
     steps:
       - uses: actions/checkout@v4
       - name: Generate image ID
         id: generate-image-id
-        run: echo "IMAGE_ID=$(date +%F)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "IMAGE_ID=$(echo ${{ github.ref_name }} | cut -dv -f2)" >> $GITHUB_ENV
+          else
+            echo "IMAGE_ID=$(date +%F)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          fi
+        shell: bash
 
       - name: Log in to GitLab to access shared images
         uses: redhat-actions/podman-login@v1
@@ -86,6 +95,7 @@ jobs:
 
       - name: Container test
         run: bash -x ./tests/test-container.sh pharia-kernel:$IMAGE_ID
+
       - name: Integration test
         run: |
           (podman run -p 8081:8081 -v ./operator-config.toml:/app/operator-config.toml \
@@ -95,11 +105,12 @@ jobs:
             -e AA_API_TOKEN=dummy \
             pharia-kernel:$IMAGE_ID | cat) &
           bash -x ./tests/test-image.sh 8081 127.0.0.1
-      - if: github.ref == 'refs/heads/main'
+
+      - if: github.event_name != 'pull_request'
         name: Log in to JFrog Artifactory
         uses: ./.github/actions/jfrog
 
-      - if: github.ref == 'refs/heads/main'
+      - if: github.event_name != 'pull_request'
         name: Push to JFrog Artifactory
         id: push
         uses: redhat-actions/push-to-registry@v2
@@ -107,16 +118,18 @@ jobs:
           image: ${{ steps.build-image.outputs.image }}
           tags: ${{ steps.build-image.outputs.tags }}
           registry: ${{ env.ARTIFACTORY_REPOSITORY }}
-      - if: github.ref == 'refs/heads/main'
+
+      - if: github.event_name != 'pull_request'
         name: Print image URL
         run: echo "Image pushed to ${{ steps.push.outputs.registry-paths }}"
-      - if: github.ref == 'refs/heads/main'
+
+      - if: github.event_name != 'pull_request'
         name: Get user name and email
         run: |
           echo "TRIGGER_USER_NAME=$(git log -n 1 --pretty=format:%aN)" >> $GITHUB_ENV
           echo "TRIGGER_USER_EMAIL=$(git log -n 1 --pretty=format:%aE)" >> $GITHUB_ENV
 
-      - if: github.ref == 'refs/heads/main'
+      - if: github.event_name != 'pull_request'
         name: Update image tag
         uses: digital-blueprint/gitlab-pipeline-trigger-action@v1
         with:
@@ -126,3 +139,13 @@ jobs:
           id: "931"
           ref: "main"
           variables: '{"TRIGGER_USER_EMAIL":"${{ env.TRIGGER_USER_EMAIL }}","TRIGGER_USER_NAME":"${{ env.TRIGGER_USER_NAME }}","TRIGGER_IMAGE_TAG":"${{ env.IMAGE_ID }}","TRIGGER_IMAGE_TAG_TARGET":".image.tag","UPDATE_DIRECTORY":"applications","UPDATE_PROJECT":"pharia-kernel"}'
+
+      - if: github.ref_type == 'tag'
+        name: Push Helm charts
+        uses: huggingface/helm-publish-action@latest
+        with:
+          workingDirectory: helm-charts
+          repository: ${{ env.ARTIFACTORY_HELM_URL }}
+          username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
+          password: ${{ env.JFROG_ACCESS_TOKEN }}
+          beforeHook: cd pharia-kernel && helm dependencies update
