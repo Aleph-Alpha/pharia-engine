@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pharia-kernel.fullname" . }}
+  labels:
+    {{- include "pharia-kernel.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pharia-kernel.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/operator-config.yaml") . | sha256sum }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "pharia-kernel.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if or .Values.imagePullSecrets .Values.global.imagePullSecretName }}
+      imagePullSecrets:
+        {{- if .Values.global.imagePullSecretName }}
+        - name: {{ .Values.global.imagePullSecretName }}
+        {{- end }}
+        {{- with .Values.imagePullSecrets }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      serviceAccountName: {{ include "pharia-kernel.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "pharia-kernel.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: {{ .Values.ports.name }}
+              containerPort: {{ .Values.ports.containerPort }}
+              protocol: {{ .Values.ports.protocol }}
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            failureThreshold: 2
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- toYaml .Values.volumeMounts | nindent 12 }}
+          command: []
+          args: []
+          env:
+            - name: LOG_LEVEL
+              value: "error,pharia_kernel={{ .Values.logLevel }}"
+            - name: SKILL_REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretRef }}
+                  key: {{ .Values.skillRegistryUserRef }}
+            - name: SKILL_REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretRef }}
+                  key: {{ .Values.skillRegistryPasswordRef }}
+            {{- if .Values.inferenceAddress }}
+            - name: AA_INFERENCE_ADDRESS
+              value: {{ .Values.inferenceAddress | quote }}
+            {{- else if .Values.global.phariaAIConfigMap }}
+            - name: AA_INFERENCE_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.global.phariaAIConfigMap }}
+                  key: API_SCHEDULER_URL
+            {{- end }}
+            {{- if .Values.documentIndexAddress }}
+            - name: DOCUMENT_INDEX_ADDRESS
+              value: {{ .Values.documentIndexAddress | quote }}
+            {{- else if .Values.global.phariaAIConfigMap }}
+            - name: DOCUMENT_INDEX_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.global.phariaAIConfigMap }}
+                  key: DOCUMENT_INDEX_URL
+            {{- end }}
+            {{- if .Values.openTelemetryEndpoint }}
+            - name: OPEN_TELEMETRY_ENDPOINT
+              value: {{ .Values.openTelemetryEndpoint | quote }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        {{- toYaml .Values.volumes | nindent 8 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}

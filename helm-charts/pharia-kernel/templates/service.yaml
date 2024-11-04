@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pharia-kernel.fullname" . }}
+  labels:
+    {{- include "pharia-kernel.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: {{ .Values.service.name }}
+  selector:
+    {{- include "pharia-kernel.selectorLabels" . | nindent 4 }}
