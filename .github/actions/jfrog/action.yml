@@ -1,5 +1,5 @@
 name: JFrog
-description: Log in to JFrog. (Requires the write permission for `id-token` and the variables $ARTIFACTORY_URL and $ARTIFACTORY_REPOSITORY)
+description: Get JFrog Artifactory login credentials. (Requires the write permission for `id-token` and the variable $ARTIFACTORY_URL)
 
 runs:
   using: "composite"
@@ -30,9 +30,3 @@ runs:
         if [[ -z "$JFROG_ACCESS_TOKEN_SUBJECT" ]]; then exit 1; fi
         echo "JFROG_ACCESS_TOKEN_SUBJECT=$JFROG_ACCESS_TOKEN_SUBJECT" >> $GITHUB_ENV
       shell: bash
-    - name: Log in
-      uses: redhat-actions/podman-login@v1
-      with:
-        registry: ${{ env.ARTIFACTORY_REPOSITORY }}
-        username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
-        password: ${{ env.JFROG_ACCESS_TOKEN }}
