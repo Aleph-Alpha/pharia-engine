@@ -5,7 +5,7 @@ use tokio::{
     select,
     sync::{mpsc, oneshot},
     task::{spawn_blocking, JoinHandle},
-    time::sleep,
+    time::{sleep_until, Instant},
 };
 use tracing::info;
 
@@ -354,8 +354,9 @@ impl SkillProviderActor {
                     None => break
                 },
                 () = async {
+                    let start = Instant::now();
                     self.provider.validate_cached_digests().await;
-                    sleep(self.digest_update_interval).await;
+                    sleep_until(start + self.digest_update_interval).await;
                 } => {}
             }
         }
@@ -400,6 +401,7 @@ pub mod tests {
 
     use tempfile::TempDir;
     use test_skills::{given_chat_skill, given_greet_skill};
+    use tokio::time::sleep;
 
     use crate::namespace_watcher::tests::SkillDescription;
 
