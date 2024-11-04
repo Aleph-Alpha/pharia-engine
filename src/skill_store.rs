@@ -7,7 +7,7 @@ use tokio::{
     task::{spawn_blocking, JoinHandle},
     time::{sleep_until, Instant},
 };
-use tracing::info;
+use tracing::{error, info, warn};
 
 use crate::{
     namespace_watcher::{NamespaceConfig, Registry},
@@ -22,6 +22,8 @@ struct CachedSkill {
     skill: Arc<Skill>,
     /// Digest of the skill when it was last loaded from the registry
     digest: String,
+    /// When we last checked the digest
+    digest_validated: Instant,
 }
 
 impl CachedSkill {
@@ -29,6 +31,7 @@ impl CachedSkill {
         Self {
             skill,
             digest: digest.into(),
+            digest_validated: Instant::now(),
         }
     }
 }
@@ -153,34 +156,51 @@ impl SkillStoreState {
         Ok(Some(skill))
     }
 
-    /// Returns the cached skill paths whose digests have changed
-    async fn invalid_cached_digests(&self) -> impl Iterator<Item = SkillPath> {
-        let invalid = futures::future::join_all(self.cached_skills.iter().map(
-            |(skill_path, cached_skill)| async move {
-                let registry = self.skill_registries.get(&skill_path.namespace)?;
-                let tag = self.known_skills.get(skill_path)?;
-                let Ok(Some(digest)) = registry
-                    .fetch_digest(&skill_path.name, tag.as_deref().unwrap_or("latest"))
-                    .await
-                else {
-                    return None;
-                };
-                if digest == cached_skill.digest {
-                    None
-                } else {
-                    Some(skill_path.clone())
-                }
-            },
-        ))
-        .await;
-
-        invalid.into_iter().flatten()
-    }
-
     /// Checks the digests in the cache. If the digest behind the tag has changed, remove the cache entries.
-    pub async fn validate_cached_digests(&mut self) {
-        let to_remove = self.invalid_cached_digests().await.collect::<Vec<_>>();
-        self.cached_skills.retain(|k, _| !to_remove.contains(k));
+    async fn validate_cached_digests(&mut self, update_interval: Duration) {
+        for skill_path in self.cached_skills.keys().cloned().collect::<Vec<_>>() {
+            let CachedSkill {
+                digest,
+                digest_validated,
+                ..
+            } = self.cached_skills.get(&skill_path).unwrap();
+            // Skip if we've checked it recently enough
+            if Instant::now().duration_since(*digest_validated) < update_interval {
+                continue;
+            }
+
+            let registry = self
+                .skill_registries
+                .get(&skill_path.namespace)
+                .expect("Missing registry for skill.");
+
+            let tag = self
+                .known_skills
+                .get(&skill_path)
+                .expect("Missing configuration for skill");
+
+            let result = registry
+                .fetch_digest(&skill_path.name, tag.as_deref().unwrap_or("latest"))
+                .await;
+
+            match result {
+                Ok(Some(new_digest)) if &new_digest != digest => {
+                    self.cached_skills.remove(&skill_path);
+                }
+                other_case => {
+                    // Logging for strange cases
+                    match other_case {
+                        Ok(None) => warn!("Missing digest for skill {skill_path}"),
+                        Err(e) => error!("Error fetching digest for skill {skill_path}: {e}"),
+                        _ => {}
+                    }
+                    // Always update the digest_validated time
+                    self.cached_skills
+                        .entry(skill_path)
+                        .and_modify(|c| c.digest_validated = Instant::now());
+                }
+            }
+        }
     }
 }
 
@@ -354,8 +374,9 @@ impl SkillProviderActor {
                     None => break
                 },
                 () = async {
+                    // Make sure we don't check again until at least the interval has expired to avoid a busy loop
                     let start = Instant::now();
-                    self.provider.validate_cached_digests().await;
+                    self.provider.validate_cached_digests(self.digest_update_interval).await;
                     sleep_until(start + self.digest_update_interval).await;
                 } => {}
             }
@@ -632,7 +653,7 @@ pub mod tests {
         let new_time = fs::metadata(&wasm_file)?.modified()?;
         assert_ne!(prev_time, new_time);
 
-        skill_provider.validate_cached_digests().await;
+        skill_provider.validate_cached_digests(Duration::ZERO).await;
 
         // Then greet skill is no longer listed in the cache, but of course still available in the
         // list of all skills
@@ -656,7 +677,7 @@ pub mod tests {
         skill_provider.fetch(&greet_skill).await?;
 
         // When we check it with no changes
-        skill_provider.validate_cached_digests().await;
+        skill_provider.validate_cached_digests(Duration::ZERO).await;
 
         // Then nothing changes
         assert_eq!(
