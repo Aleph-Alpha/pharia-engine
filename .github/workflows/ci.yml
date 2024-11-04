@@ -63,7 +63,7 @@ jobs:
     env:
       ARTIFACTORY_URL: https://alephalpha.jfrog.io
       ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
-      ARTIFACTORY_HELM_URL: https://alephalpha.jfrog.io/pharia-kernel-helm
+      ARTIFACTORY_HELM_URL: oci://alephalpha.jfrog.io/pharia-kernel-helm
     steps:
       - uses: actions/checkout@v4
       - name: Generate image ID
