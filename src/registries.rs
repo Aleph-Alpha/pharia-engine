@@ -13,7 +13,8 @@ type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 pub struct SkillImage {
     /// Can be either the binary or WAT text format of a Wasm component
     pub bytes: Vec<u8>,
-    /// Digest associated with these bytes
+    /// Digest associated with these bytes from the registry. We can use
+    /// this to do a cheaper comparison if the backing bytes have changed.
     pub digest: String,
 }
 
