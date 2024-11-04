@@ -6,7 +6,13 @@
   "packages": {
     ".": {
       "release-type": "rust",
-      "exclude-paths": ["helm-charts"],
+      "exclude-paths": [
+        "helm-charts",
+        "crates",
+        "pharia-skill",
+        "resource_eval",
+        "test-skills"
+      ],
       "extra-files": [
         {
           "type": "yaml",
