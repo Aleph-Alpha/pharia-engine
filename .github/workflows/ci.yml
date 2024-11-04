@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*' 
+      - "v*"
   pull_request:
     branches:
       - main
@@ -108,8 +108,16 @@ jobs:
           bash -x ./tests/test-image.sh 8081 127.0.0.1
 
       - if: github.event_name != 'pull_request'
-        name: Log in to JFrog Artifactory
+        name: Get JFrog Artifactory login credentials
         uses: ./.github/actions/jfrog
+
+      - if: github.event_name != 'pull_request'
+        name: Log in to JFrog Artifactory
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.ARTIFACTORY_REPOSITORY }}
+          username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
+          password: ${{ env.JFROG_ACCESS_TOKEN }}
 
       - if: github.event_name != 'pull_request'
         name: Push to JFrog Artifactory
