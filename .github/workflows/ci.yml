@@ -56,7 +56,7 @@ jobs:
   test-and-deploy-if-main-or-tag:
     runs-on: ubuntu-latest
     needs: [tests, lints]
-    concurrency: test-and-deploy-if-main-or-tag
+    concurrency: test-and-deploy-if-main-or-tag-${{ github.ref }}
     permissions:
       contents: read
       id-token: write
