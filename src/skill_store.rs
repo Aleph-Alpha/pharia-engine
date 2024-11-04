@@ -1,13 +1,14 @@
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Context};
+use futures::future::pending;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
     task::{spawn_blocking, JoinHandle},
     time::{sleep_until, Instant},
 };
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::{
     namespace_watcher::{NamespaceConfig, Registry},
@@ -156,49 +157,54 @@ impl SkillStoreState {
         Ok(Some(skill))
     }
 
-    /// Checks the digests in the cache. If the digest behind the tag has changed, remove the cache entries.
-    async fn validate_cached_digests(&mut self, update_interval: Duration) {
-        for skill_path in self.cached_skills.keys().cloned().collect::<Vec<_>>() {
-            let CachedSkill {
-                digest,
-                digest_validated,
-                ..
-            } = self.cached_skills.get(&skill_path).unwrap();
-            // Skip if we've checked it recently enough
-            if Instant::now().duration_since(*digest_validated) < update_interval {
-                continue;
+    /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
+    /// If there are no cached skills, it will return `None`.
+    fn oldest_digest(&self) -> Option<(SkillPath, Instant)> {
+        self.cached_skills
+            .iter()
+            .min_by_key(|(_, c)| c.digest_validated)
+            .map(|(skill_path, cached_skill)| (skill_path.clone(), cached_skill.digest_validated))
+    }
+
+    /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
+    /// If the digest behind the tag has changed, remove the cache entry. Otherwise, upate the validation time.
+    async fn validate_digest(&mut self, skill_path: SkillPath) -> anyhow::Result<()> {
+        let registry = self
+            .skill_registries
+            .get(&skill_path.namespace)
+            .ok_or_else(|| anyhow!("Missing registry for skill {skill_path}"))?;
+        let tag = self
+            .known_skills
+            .get(&skill_path)
+            .ok_or_else(|| anyhow!("Missing configuration for skill {skill_path}"))?;
+        let CachedSkill { digest, .. } = self
+            .cached_skills
+            .get(&skill_path)
+            .ok_or_else(|| anyhow!("Missing cached skill for {skill_path}"))?;
+
+        match registry
+            .fetch_digest(&skill_path.name, tag.as_deref().unwrap_or("latest"))
+            .await
+        {
+            // There is a new digest behind the tag, delete the cache entry
+            Ok(Some(new_digest)) if &new_digest != digest => {
+                self.cached_skills.remove(&skill_path);
+                Ok(())
             }
+            other_case => {
+                let result = match other_case {
+                    // Errors fetching the digest
+                    Ok(None) => Err(anyhow!("Missing digest for skill {skill_path}")),
+                    Err(e) => Err(e),
+                    // Digest has not changed
+                    _ => Ok(()),
+                };
+                // Always update the digest_validated time so we don't loop over errors constantly.
+                self.cached_skills
+                    .entry(skill_path)
+                    .and_modify(|c| c.digest_validated = Instant::now());
 
-            let registry = self
-                .skill_registries
-                .get(&skill_path.namespace)
-                .expect("Missing registry for skill.");
-
-            let tag = self
-                .known_skills
-                .get(&skill_path)
-                .expect("Missing configuration for skill");
-
-            let result = registry
-                .fetch_digest(&skill_path.name, tag.as_deref().unwrap_or("latest"))
-                .await;
-
-            match result {
-                Ok(Some(new_digest)) if &new_digest != digest => {
-                    self.cached_skills.remove(&skill_path);
-                }
-                other_case => {
-                    // Logging for strange cases
-                    match other_case {
-                        Ok(None) => warn!("Missing digest for skill {skill_path}"),
-                        Err(e) => error!("Error fetching digest for skill {skill_path}: {e}"),
-                        _ => {}
-                    }
-                    // Always update the digest_validated time
-                    self.cached_skills
-                        .entry(skill_path)
-                        .and_modify(|c| c.digest_validated = Instant::now());
-                }
+                result
             }
         }
     }
@@ -374,10 +380,17 @@ impl SkillProviderActor {
                     None => break
                 },
                 () = async {
-                    // Make sure we don't check again until at least the interval has expired to avoid a busy loop
-                    let start = Instant::now();
-                    self.provider.validate_cached_digests(self.digest_update_interval).await;
-                    sleep_until(start + self.digest_update_interval).await;
+                    // Find the next skill we should refresh
+                    if let Some((skill_path, last_checked)) = self.provider.oldest_digest() {
+                        // Wait until is it time to refresh
+                        sleep_until(last_checked + self.digest_update_interval).await;
+                        if let Err(e) = self.provider.validate_digest(skill_path).await {
+                            error!("Error refreshing digest: {e}");
+                        }
+                    } else {
+                        // We have no cache, wait for the next message.
+                        pending::<()>().await;
+                    }
                 } => {}
             }
         }
@@ -653,7 +666,7 @@ pub mod tests {
         let new_time = fs::metadata(&wasm_file)?.modified()?;
         assert_ne!(prev_time, new_time);
 
-        skill_provider.validate_cached_digests(Duration::ZERO).await;
+        skill_provider.validate_digest(greet_skill.clone()).await?;
 
         // Then greet skill is no longer listed in the cache, but of course still available in the
         // list of all skills
@@ -677,7 +690,7 @@ pub mod tests {
         skill_provider.fetch(&greet_skill).await?;
 
         // When we check it with no changes
-        skill_provider.validate_cached_digests(Duration::ZERO).await;
+        skill_provider.validate_digest(greet_skill).await?;
 
         // Then nothing changes
         assert_eq!(
