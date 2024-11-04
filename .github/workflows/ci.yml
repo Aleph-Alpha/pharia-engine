@@ -142,12 +142,16 @@ jobs:
           variables: '{"TRIGGER_USER_EMAIL":"${{ env.TRIGGER_USER_EMAIL }}","TRIGGER_USER_NAME":"${{ env.TRIGGER_USER_NAME }}","TRIGGER_IMAGE_TAG":"${{ env.IMAGE_ID }}","TRIGGER_IMAGE_TAG_TARGET":".image.tag","UPDATE_DIRECTORY":"applications","UPDATE_PROJECT":"pharia-kernel"}'
 
       - if: github.ref_type == 'tag'
+        name: Extract Helm chart version
+        run: echo "CHART_VERSION=$(yq .version < helm-charts/pharia-kernel/Chart.yaml)" >> $GITHUB_ENV
+
+      - if: github.ref_type == 'tag'
         name: Push Helm charts
         uses: appany/helm-oci-chart-releaser@v0.3.0
         with:
           name: pharia-kernel
           repository: ${{ env.ARTIFACTORY_HELM_REPOSITORY }}
-          tag: ${{ env.IMAGE_ID }}
+          tag: ${{ env.CHART_VERSION }}
           path: helm-charts/pharia-kernel
           registry: ${{ env.ARTIFACTORY_HOST }}
           registry_username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
