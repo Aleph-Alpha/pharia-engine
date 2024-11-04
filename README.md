@@ -156,6 +156,6 @@ The current prototype is deployed at <https://pharia-kernel.aleph-alpha.stackit.
 
 The status page for uptime robot is found at: <https://stats.uptimerobot.com/gjXpoIPMnv>
 
-The secrets for the deployment can be added to the vault: <https://vault.management-prod01.stackit.run/ui/vault/secrets/c-aa01/list/projects/pharia-kernel/>
+The secrets for the deployment can be added to the [Vault](https://vault.management-prod01.stackit.run/ui/vault/secrets/c-aa01/list/projects/pharia-kernel/)
 
 [deployment]: ./tam/deployment.drawio.svg
