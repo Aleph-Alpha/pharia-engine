@@ -29,7 +29,7 @@ module-name-repetitions = "allow"
 name = "pharia-kernel"
 version = "0.1.0"
 edition = "2021"
-exclude = ["helm-charts"]
+exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
 aleph-alpha-client = "0.13.1"
