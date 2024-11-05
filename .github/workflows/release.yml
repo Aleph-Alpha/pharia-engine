@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+env:
+  ARTIFACTORY_URL: https://alephalpha.jfrog.io
+
+jobs:
+  release-plz-release:
+    name: Release-plz release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Get JFrog Artifactory login credentials
+        uses: ./.github/actions/jfrog
+
+      - name: Run release-plz
+        uses: MarcoIeni/release-plz-action@v0.5
+        with:
+          command: release
+          registry: jfrog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRIES_JFROG_TOKEN: "Bearer ${{ env.JFROG_ACCESS_TOKEN }}"
+
+  release-plz-pr:
+    name: Release-plz PR
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Get JFrog Artifactory login credentials
+        uses: ./.github/actions/jfrog
+
+      - name: Run release-plz
+        id: release-plz
+        uses: MarcoIeni/release-plz-action@v0.5
+        with:
+          command: release-pr
+          registry: jfrog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRIES_JFROG_TOKEN: "Bearer ${{ env.JFROG_ACCESS_TOKEN }}"
+
+      - name: Update Helm chart
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+
+          pr_number=${{ fromJSON(steps.release-plz.outputs.pr).number }}
+          if [[ -n "$pr_number" ]]; then
+            gh pr checkout $pr_number
+            PATH_TO_CHART="helm-charts/pharia-kernel/Chart.yaml"
+            CHART_VERSION=$(yq ".version" < $PATH_TO_CHART)
+            NEW_CHART_VERSION=$(echo "$CHART_VERSION" | awk -F '.' '{print $1"."$2"."($3+1)}')
+            NEW_APP_VERSION=$(echo cargo pkgid | cut -d "#" -f2)
+            yq -i "(.version = \"$NEW_CHART_VERSION\") | (.appVersion = \"$NEW_APP_VERSION\")" $PATH_TO_CHART
+            git add .
+            git commit -m "chore: update Helm chart version"
+            git push
+          fi
