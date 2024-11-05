@@ -78,11 +78,14 @@ jobs:
           if [[ -n "$pr_number" ]]; then
             gh pr checkout $pr_number
             PATH_TO_CHART="helm-charts/pharia-kernel/Chart.yaml"
-            CHART_VERSION=$(yq ".version" < $PATH_TO_CHART)
-            NEW_CHART_VERSION=$(echo "$CHART_VERSION" | awk -F '.' '{print $1"."$2"."($3+1)}')
+            APP_VERSION=$(yq ".appVersion" < $PATH_TO_CHART)
             NEW_APP_VERSION=$(echo $(cargo pkgid) | cut -d "#" -f2)
-            yq -i "(.version = \"$NEW_CHART_VERSION\") | (.appVersion = \"$NEW_APP_VERSION\")" $PATH_TO_CHART
-            git add .
-            git commit -m "chore: update Helm chart version"
-            git push
+            if [[ "$APP_VERSION" != "$NEW_APP_VERSION" ]]; then
+              CHART_VERSION=$(yq ".version" < $PATH_TO_CHART)
+              NEW_CHART_VERSION=$(echo "$CHART_VERSION" | awk -F '.' '{print $1"."$2"."($3+1)}')
+              yq -i "(.version = \"$NEW_CHART_VERSION\") | (.appVersion = \"$NEW_APP_VERSION\")" $PATH_TO_CHART
+              git add .
+              git commit -m "chore: update Helm chart version"
+              git push
+            fi
           fi
