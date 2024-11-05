@@ -1,7 +1,6 @@
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Context};
-use futures::future::pending;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -384,19 +383,21 @@ impl SkillProviderActor {
                     // Senders are gone, break out of the loop for shutdown.
                     None => break
                 },
+                // While we are waiting on messages, refresh the digests behind the tags. If a new message
+                // comes in while we are mid-request, it will get cancelled, but since we want to prioritize
+                // processing messages, doing some duplicate requests is ok.
+                //
+                // The if experessions makes sure we only poll if there are cached skills so that `select`
+                // will only wait on messages until we have a cache.
                 () = async {
                     // Find the next skill we should refresh
-                    if let Some((skill_path, last_checked)) = self.provider.oldest_digest() {
-                        // Wait until is it time to refresh
-                        sleep_until(last_checked + self.digest_update_interval).await;
-                        if let Err(e) = self.provider.validate_digest(skill_path).await {
-                            error!("Error refreshing digest: {e}");
-                        }
-                    } else {
-                        // We have no cache, wait for the next message.
-                        pending::<()>().await;
+                     let (skill_path, last_checked) = self.provider.oldest_digest().expect("No cached skills.");
+                    // Wait until is it time to refresh
+                    sleep_until(last_checked + self.digest_update_interval).await;
+                    if let Err(e) = self.provider.validate_digest(skill_path).await {
+                        error!("Error refreshing digest: {e}");
                     }
-                } => {}
+                }, if self.provider.list_cached_skills().next().is_some() => {}
             }
         }
     }
