@@ -212,6 +212,23 @@ impl SkillStoreState {
             }
         }
     }
+
+    /// Finds the next cached skill we should refresh to see if the backing digest has changed,
+    /// in which case it will remove it from the cache or update the timestamp for when it needs to
+    /// be checked again.
+    ///
+    /// It will check only after the update interval has passed since it was last checked.
+    ///
+    /// This will return immediately if there are no skills to check.
+    async fn refresh_oldest_digest(&mut self, update_interval: Duration) -> anyhow::Result<()> {
+        // Find the next skill we should refresh
+        let Some((skill_path, last_checked)) = self.oldest_digest() else {
+            return Ok(());
+        };
+        // Wait until is it time to refresh
+        sleep_until(last_checked + update_interval).await;
+        self.validate_digest(skill_path).await
+    }
 }
 
 pub struct SkillStore {
@@ -389,15 +406,11 @@ impl SkillProviderActor {
                 //
                 // The if experessions makes sure we only poll if there are cached skills so that `select`
                 // will only wait on messages until we have a cache.
-                () = async {
-                    // Find the next skill we should refresh
-                     let (skill_path, last_checked) = self.provider.oldest_digest().expect("No cached skills.");
-                    // Wait until is it time to refresh
-                    sleep_until(last_checked + self.digest_update_interval).await;
-                    if let Err(e) = self.provider.validate_digest(skill_path).await {
+                result = self.provider.refresh_oldest_digest(self.digest_update_interval), if self.provider.list_cached_skills().next().is_some() => {
+                    if let Err(e) = result {
                         error!("Error refreshing digest: {e}");
                     }
-                }, if self.provider.list_cached_skills().next().is_some() => {}
+                },
             }
         }
     }
