@@ -50,8 +50,10 @@ impl SkillRegistry for OciRegistry {
                     let digest = if let Some(digest) = image.digest {
                         digest
                     } else {
-                        warn!("Missing digest for {name} {tag}. Using tag instead.");
-                        tag.into()
+                        warn!("Registry doesn't return digests. Fetching manually.");
+                        self.fetch_digest(name, tag)
+                            .await?
+                            .expect("Digest should exist for this skill")
                     };
                     Ok(Some(SkillImage::new(binary, digest)))
                 }
