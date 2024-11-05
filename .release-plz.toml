@@ -1,7 +1,7 @@
 [workspace]
 release = false
 release_always = false
-release_commits = '^(?!chore\(pharia-kernel\): release).*$'
+release_commits = "^(feat:|fix:|docs:|perf:|test:|build:|ci:|revert:)"
 
 [[package]]
 name = "pharia-kernel"
