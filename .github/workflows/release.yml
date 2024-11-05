@@ -85,7 +85,7 @@ jobs:
               NEW_CHART_VERSION=$(echo "$CHART_VERSION" | awk -F '.' '{print $1"."$2"."($3+1)}')
               yq -i "(.version = \"$NEW_CHART_VERSION\") | (.appVersion = \"$NEW_APP_VERSION\")" $PATH_TO_CHART
               git add .
-              git commit -m "chore: update Helm chart version"
+              git commit -m "chore(pharia-kernel): release Helm chart $NEW_CHART_VERSION"
               git push
             fi
           fi
