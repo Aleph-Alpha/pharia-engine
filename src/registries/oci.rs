@@ -1,4 +1,4 @@
-use crate::registries::SkillRegistry;
+use anyhow::anyhow;
 use oci_client::{
     client::ClientConfig,
     errors::{OciDistributionError, OciErrorCode},
@@ -9,6 +9,7 @@ use oci_wasm::WasmClient;
 use tracing::{error, warn};
 
 use super::{DynFuture, SkillImage};
+use crate::registries::SkillRegistry;
 
 pub struct OciRegistry {
     client: WasmClient,
@@ -51,9 +52,12 @@ impl SkillRegistry for OciRegistry {
                         digest
                     } else {
                         warn!("Registry doesn't return digests. Fetching manually.");
-                        self.fetch_digest(name, tag)
-                            .await?
-                            .expect("Digest should exist for this skill")
+                        self.fetch_digest(name, tag).await?.ok_or_else(|| {
+                            anyhow!(
+                                "Digest should exist for skill {name}:{tag} in registry {}",
+                                self.registry
+                            )
+                        })?
                     };
                     Ok(Some(SkillImage::new(binary, digest)))
                 }
