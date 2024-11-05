@@ -129,7 +129,7 @@ impl SkillStoreState {
         let skill = if let Some(skill) = self.cached_skills.get(skill_path) {
             skill.skill.clone()
         } else {
-            let Some(tag) = self.known_skills.get(skill_path) else {
+            let Some(tag) = self.tag_for_skill(skill_path) else {
                 return Ok(None);
             };
 
@@ -138,9 +138,7 @@ impl SkillStoreState {
                 .get(&skill_path.namespace)
                 .expect("If skill exists, so must the namespace it resides in.");
 
-            let skill_bytes = registry
-                .load_skill(&skill_path.name, tag.as_deref().unwrap_or("latest"))
-                .await?;
+            let skill_bytes = registry.load_skill(&skill_path.name, tag).await?;
             let SkillImage { bytes, digest } = skill_bytes
                 .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
             let engine = self.engine.clone();
@@ -157,6 +155,18 @@ impl SkillStoreState {
         Ok(Some(skill))
     }
 
+    /// Return to corresponding registry for a given skill path
+    fn registry_for_skill(&self, skill_path: &SkillPath) -> Option<&(impl SkillRegistry + use<>)> {
+        self.skill_registries.get(&skill_path.namespace)
+    }
+
+    /// Return the registered tag for a given skill
+    fn tag_for_skill(&self, skill_path: &SkillPath) -> Option<&str> {
+        self.known_skills
+            .get(skill_path)
+            .map(|o| o.as_deref().unwrap_or("latest"))
+    }
+
     /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
     /// If there are no cached skills, it will return `None`.
     fn oldest_digest(&self) -> Option<(SkillPath, Instant)> {
@@ -169,23 +179,18 @@ impl SkillStoreState {
     /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
     /// If the digest behind the tag has changed, remove the cache entry. Otherwise, upate the validation time.
     async fn validate_digest(&mut self, skill_path: SkillPath) -> anyhow::Result<()> {
-        let registry = self
-            .skill_registries
-            .get(&skill_path.namespace)
-            .ok_or_else(|| anyhow!("Missing registry for skill {skill_path}"))?;
-        let tag = self
-            .known_skills
-            .get(&skill_path)
-            .ok_or_else(|| anyhow!("Missing configuration for skill {skill_path}"))?;
         let CachedSkill { digest, .. } = self
             .cached_skills
             .get(&skill_path)
             .ok_or_else(|| anyhow!("Missing cached skill for {skill_path}"))?;
+        let registry = self
+            .registry_for_skill(&skill_path)
+            .expect("Missing registry for skill");
+        let tag = self
+            .tag_for_skill(&skill_path)
+            .expect("Missing tag for skill");
 
-        match registry
-            .fetch_digest(&skill_path.name, tag.as_deref().unwrap_or("latest"))
-            .await
-        {
+        match registry.fetch_digest(&skill_path.name, tag).await {
             // There is a new digest behind the tag, delete the cache entry
             Ok(Some(new_digest)) if &new_digest != digest => {
                 self.cached_skills.remove(&skill_path);
