@@ -85,6 +85,6 @@ jobs:
               NEW_CHART_VERSION=$(echo "$CHART_VERSION" | awk -F '.' '{print $1"."$2"."($3+1)}')
               yq -i "(.version = \"$NEW_CHART_VERSION\") | (.appVersion = \"$NEW_APP_VERSION\")" $PATH_TO_CHART
               git commit -a --amend --no-edit
-              git push
+              git push -f
             fi
           fi
