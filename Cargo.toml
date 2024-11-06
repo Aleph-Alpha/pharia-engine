@@ -33,7 +33,7 @@ exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
 aleph-alpha-client = "0.13.2"
-anyhow = "1.0.92"
+anyhow = "1.0.93"
 async-trait = "0.1.83"
 axum = { version = "0.7.7", features = ["macros"] }
 axum-extra = { version = "0.9.4", features = ["typed-header"] }
@@ -65,11 +65,11 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 utoipa = { version = "5.2.0", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.2.0", features = ["axum"] }
 wasmtime = "26.0.1"
-wasmtime-wasi = "26.0.0"
+wasmtime-wasi = "26.0.1"
 wit-parser = "0.219.1"
 url = "2.5.3"
 thiserror = "1.0.68"
-tokenizers = { version = "0.20.2", default-features = false, features = [
+tokenizers = { version = "0.20.3", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
