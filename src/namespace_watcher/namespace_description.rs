@@ -1,7 +1,6 @@
 use std::{
     fs::{self, DirEntry},
     path::PathBuf,
-    time::SystemTime,
 };
 
 use anyhow::{anyhow, Context};
@@ -35,15 +34,7 @@ impl SkillDescription {
             .to_str()
             .ok_or_else(|| anyhow!("Invalid UTF-8 name for skill."))?
             .to_owned();
-        let tag = Some(
-            value
-                .metadata()?
-                .modified()?
-                .duration_since(SystemTime::UNIX_EPOCH)?
-                .as_millis()
-                .to_string(),
-        );
-        Ok(Self { name, tag })
+        Ok(Self { name, tag: None })
     }
 }
 
