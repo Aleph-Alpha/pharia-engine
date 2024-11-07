@@ -50,32 +50,10 @@ The `testing` module provides two implementations of CSI for testing:
 
 ## Building Skills
 
-When building the skills, the wheels that include native dependencies need to be provided additionally for Wasm. For example, the skill SDK has a dependency on `pydantic` v2.5.2.
-
-### Download Pydantic WASI wheels
-
-Supported Pydantic versions:
-
-```toml
-pydantic-core = "2.14.5"
-pydantic = "2.5.2"
-```
-
-Download and unpack WASI wheels (without installation):
+In order to run the skill in the Pharia Kernel, the skill needs to be compiled to a Wasm component. You can do this by running
 
 ```shell
-mkdir wasi_deps
-cd wasi_deps
-curl -OL https://github.com/dicej/wasi-wheels/releases/download/latest/pydantic_core-wasi.tar.gz
-tar xf pydantic_core-wasi.tar.gz
-cd ..
+pharia-skill build haiku
 ```
 
-### Compiling Skill to Wasm
-
-You now create the file `haiku.wasm`, ready to be uploaded.
-
-```shell
-pip install componentize-py
-componentize-py -w skill componentize haiku -o ./haiku.wasm -p . -p wasi_deps
-```
+You have now created the file `haiku.wasm`, ready to be uploaded.
