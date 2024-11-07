@@ -15,17 +15,17 @@ Skills are not containers. Yet, we still publish them into container repositorie
 * How to create a ticket: <https://aleph-alpha.atlassian.net/wiki/spaces/EN/pages/847937592/Aleph+Alpha+Service+Desk+-+How+To>
 
 ```shell
-podman login alephalpha.jfrog.io/pharia-kernel-images -u $JFROG_USER -p $JFROG_PASSWORD
-podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-skill:latest
-podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-skill:latest pharia-skill
+curl -L https://alephalpha.jfrog.io/artifactory/pharia-kernel-files/pharia-skill-cli/0.1.16/aarch64-apple-darwin -H "Authorization: Bearer $JFROG_TOKEN" -o pharia-skill-cli
+chmod +x pharia-skill-cli
 ```
 
-Only `podman` is tested, but `docker` should be a dropin replacement.
+On Linux, use `x86_64-unknown-linux-gnu` instead of `aarch64-apple-darwin`.
+On Windows, use `x86_64-pc-windows-msvc` and `chmod` is not necessary.
 
 With the tooling available, we can now upload the Skill.
 
 ```shell
-podman run -v ./haiku.wasm:/haiku.wasm pharia-skill publish -R registry.gitlab.aleph-alpha.de -r engineering/pharia-skills/skills -u DUMMY_USER_NAME -p $GITLAB_TOKEN ./haiku.wasm
+pharia-skill-cli publish -R registry.gitlab.aleph-alpha.de -r engineering/pharia-skills/skills -u DUMMY_USER_NAME -p $GITLAB_TOKEN ./haiku.wasm
 ```
 
 With our GitLab registry, any user name will work, as long as you use a access token. You can generate a token on your profile page. It is necessary to include write privilege.
