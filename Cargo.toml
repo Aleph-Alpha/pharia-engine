@@ -68,7 +68,7 @@ wasmtime = "26.0.1"
 wasmtime-wasi = "26.0.1"
 wit-parser = "0.219.1"
 url = "2.5.3"
-thiserror = "1.0.68"
+thiserror = "2.0.0"
 tokenizers = { version = "0.20.3", default-features = false, features = [
     "onig",
     "esaxx_fast",
