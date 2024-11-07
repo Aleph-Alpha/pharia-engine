@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.1.0...v0.1.1)
+
+### Builds
+
+- *(deps)* Bump thiserror from 1.0.68 to 2.0.0 - ([5644b23](https://github.com/Aleph-Alpha/pharia-kernel/commit/5644b234da0a343940cbd4242e2c729e4bd2a509))
+- *(deps)* Bump appany/helm-oci-chart-releaser from 0.3.0 to 0.4.2 - ([683c028](https://github.com/Aleph-Alpha/pharia-kernel/commit/683c028a897eb0521bc22a7b3c738e3ce5879295))
+- *(deps)* Bump the minor group across 1 directory with 14 updates - ([957ebaf](https://github.com/Aleph-Alpha/pharia-kernel/commit/957ebaf24b944d9a79ebbb08939d008bf9e1278d))
+- *(deps)* Bump wasmtime from 26.0.0 to 26.0.1 in the cargo group - ([d82ff04](https://github.com/Aleph-Alpha/pharia-kernel/commit/d82ff04ffcf43db5657b6465e4efbba7e868d706))
+
+
 ## [0.1.0]
 
 ### Features
