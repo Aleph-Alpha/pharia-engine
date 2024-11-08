@@ -48,15 +48,6 @@ ports:
 #   registry: "registry.gitlab.aleph-alpha.de"
 #   repository: "engineering/pharia-kernel-playground/skills"
 namespaces: {}
-# -- The name of a secret containing the credentials for Pharia Kernel to access skill registries.
-# The secret must contain the fields referenced by `skillRegistryUserRef` and `skillRegistryPasswordRef`
-secretRef: pharia-kernel-secrets
-# -- The key to get user name for accessing skill registries.
-# See 'pharia-kernel.secretRef' for more information
-skillRegistryUserRef: skillRegistryUser
-# -- The key to get password for accessing skill registries.
-# See 'pharia-kernel.secretRef' for more information
-skillRegistryPasswordRef: skillRegistryPassword
 logLevel: trace
 inferenceAddress: ""
 documentIndexAddress: ""

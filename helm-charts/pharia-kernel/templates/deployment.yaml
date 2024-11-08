@@ -67,16 +67,6 @@ spec:
           env:
             - name: LOG_LEVEL
               value: "error,pharia_kernel={{ .Values.logLevel }}"
-            - name: SKILL_REGISTRY_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secretRef }}
-                  key: {{ .Values.skillRegistryUserRef }}
-            - name: SKILL_REGISTRY_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secretRef }}
-                  key: {{ .Values.skillRegistryPasswordRef }}
             {{- if .Values.inferenceAddress }}
             - name: AA_INFERENCE_ADDRESS
               value: {{ .Values.inferenceAddress | quote }}
