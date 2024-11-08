@@ -34,6 +34,10 @@ impl OperatorConfig {
         Ok(toml::from_str(config)?)
     }
 
+    /// Create an operator config which checks the local `skills` directory for
+    /// a list of skills that are provided in the `skills` argument.
+    /// Compared to the `NamespaceConfig::TeamOwned` variant, this removes one
+    /// level of indirection (namespace config), allowing for easier testing.
     #[must_use]
     pub fn local(skills: &[&str]) -> Self {
         OperatorConfig {
