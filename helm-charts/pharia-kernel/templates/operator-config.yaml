@@ -16,6 +16,8 @@ data:
     type = "oci"
     registry = {{ $v.registry | quote }}
     repository = {{ $v.repository | quote }}
+    user_env_var = {{ $v.user_env_var | quote }}
+    password_env_var = {{ $v.password_env_var | quote }}
     {{ end }}
     {{- else }}
     [namespaces]
