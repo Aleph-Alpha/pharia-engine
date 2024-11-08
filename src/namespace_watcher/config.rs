@@ -85,18 +85,18 @@ pub enum Registry {
 pub enum NamespaceConfig {
     /// Namespaces are our way to enable teams to deploy skills in self service via Git Ops. This
     /// implies that the skills in team owned namespaces are configured by a team rather than the
-    /// operaters of Pharia Kernel, which in turn means we only refer the teams documentation here.
+    /// operators of Pharia Kernel, which in turn means we only refer the teams documentation here.
     TeamOwned {
         config_url: String,
         config_access_token_env_var: Option<String>,
         registry: Registry,
     },
-    /// For development it is convinient to just watch a local repository for changing skills
+    /// For development it is convenient to just watch a local repository for changing skills
     /// without the need for reconfiguration.
     Watch { directory: PathBuf },
-    /// Rather than referencing a configuration there skills are listed, this variant just lists
+    /// Rather than referencing a configuration where skills are listed, this variant just lists
     /// them in place in the application config. As such these skills are owned by the operators.
-    /// This behavior is especially useful to make sure certain skills are found in integartion
+    /// This behavior is especially useful to make sure certain skills are found in integration
     /// tests.
     InPlace {
         skills: Vec<SkillDescription>,
