@@ -61,6 +61,7 @@ impl SkillStoreState {
         }
     }
 
+    /// Build a registry implementation from a registry description
     fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send> {
         match namespace_config.registry() {
             Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
