@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Context};
 use tokio::{
@@ -67,19 +67,13 @@ impl SkillStoreState {
             Registry::Oci {
                 repository,
                 registry,
-            } => {
-                drop(dotenvy::dotenv());
-                let username = env::var("SKILL_REGISTRY_USER")
-                    .expect("SKILL_REGISTRY_USER must be set if OCI registry is used.");
-                let password = env::var("SKILL_REGISTRY_PASSWORD")
-                    .expect("SKILL_REGISTRY_PASSWORD must be set if OCI registry is used.");
-                Box::new(OciRegistry::new(
-                    repository.clone(),
-                    registry.clone(),
-                    username,
-                    password,
-                ))
-            }
+                auth,
+            } => Box::new(OciRegistry::new(
+                repository.clone(),
+                registry.clone(),
+                auth.user(),
+                auth.password(),
+            )),
         }
     }
 
