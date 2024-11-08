@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.1.1...v0.2.0)
+
+### Features
+
+- [**breaking**] Load skill registry auth per namespace from env - ([91aa292](https://github.com/Aleph-Alpha/pharia-kernel/commit/91aa2920bddf43faad339fbabcbd46611bbdce44))
+
+### Documentation
+
+- Specify purpose of associated registry method - ([d884c04](https://github.com/Aleph-Alpha/pharia-kernel/commit/d884c04d5c52300ef5b3e5bdfeefdf911f6fe07e))
+- Specify purpose of OperatorConfig::local - ([25847ea](https://github.com/Aleph-Alpha/pharia-kernel/commit/25847ea5eccc9676333d17d00d4bfbeecbdd8b4b))
+- Fix typos - ([3abf7f1](https://github.com/Aleph-Alpha/pharia-kernel/commit/3abf7f17684570107ce034582bd6e53b3cb2c11e))
+- Specify env vars for registry access - ([adefba8](https://github.com/Aleph-Alpha/pharia-kernel/commit/adefba8d2ddc890ad53d5f9afcb94345c658e46f))
+- Update usages on Pharia Skill CLI - ([32afa3e](https://github.com/Aleph-Alpha/pharia-kernel/commit/32afa3eeb94bb527694803fbbe5c2fb3538c668f))
+
+### Builds
+
+- *(deps)* Bump the minor group with 4 updates - ([5b5175c](https://github.com/Aleph-Alpha/pharia-kernel/commit/5b5175cbb994e896d986b0c328478edebe0ee6b3))
+
+
 ## [0.1.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.1.0...v0.1.1)
 
 ### Builds
