@@ -1,7 +1,7 @@
 [workspace]
 release = false
 release_always = false
-release_commits = "^(feat:|fix:|docs:|perf:|test:|build:|ci:|revert:)"
+release_commits = "^(feat|fix|docs|perf|build|ci|revert)"
 
 [[package]]
 name = "pharia-kernel"
