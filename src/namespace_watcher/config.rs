@@ -72,6 +72,29 @@ impl OperatorConfig {
         Self { namespaces }
     }
 }
+
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct RegistryAuth {
+    user_env_var: String,
+    password_env_var: String,
+}
+
+impl RegistryAuth {
+    pub fn user(&self) -> String {
+        env::var(self.user_env_var.as_str()).expect(&format!(
+            "{} must be set if OCI registry is used.",
+            self.user_env_var.as_str()
+        ))
+    }
+
+    pub fn password(&self) -> String {
+        env::var(self.password_env_var.as_str()).expect(&format!(
+            "{} must be set if OCI registry is used.",
+            self.password_env_var.as_str()
+        ))
+    }
+}
+
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Registry {
@@ -81,6 +104,8 @@ pub enum Registry {
     Oci {
         registry: String,
         repository: String,
+        #[serde(flatten)]
+        auth: RegistryAuth,
     },
 }
 
@@ -169,7 +194,10 @@ impl NamespaceConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::namespace_watcher::{config::Registry, NamespaceConfig};
+    use crate::namespace_watcher::{
+        config::{Registry, RegistryAuth},
+        NamespaceConfig,
+    };
 
     use super::OperatorConfig;
 
@@ -215,10 +243,23 @@ mod tests {
             type = "oci"
             registry = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
+            user_env_var = "SKILL_REGISTRY_USER"
+            password_env_var = "SKILL_REGISTRY_PASSWORD"
             "#,
         )
         .unwrap();
-        assert!(config.namespaces.contains_key("pharia-kernel-team"));
+        let pharia_kernel_team = config.namespaces.get("pharia-kernel-team").unwrap();
+        assert_eq!(
+            pharia_kernel_team.registry(),
+            Registry::Oci {
+                registry: "registry.gitlab.aleph-alpha.de".to_owned(),
+                repository: "engineering/pharia-skills/skills".to_owned(),
+                auth: RegistryAuth {
+                    user_env_var: "SKILL_REGISTRY_USER".to_owned(),
+                    password_env_var: "SKILL_REGISTRY_PASSWORD".to_owned(),
+                },
+            }
+        );
     }
 
     #[test]
@@ -253,7 +294,7 @@ mod tests {
     }
 
     #[test]
-    fn deserializes_new_config() {
+    fn deserializes_multiple_namespaces() {
         let config = toml::from_str::<OperatorConfig>(
             r#"
             [namespaces.pharia-kernel-team]
@@ -264,6 +305,8 @@ mod tests {
             type = "oci"
             registry = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
+            user_env_var = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
+            password_env_var = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
 
             [namespaces.pharia-kernel-team-local]
             config_url = "https://dummy_url"
@@ -286,6 +329,10 @@ mod tests {
                         registry: Registry::Oci {
                             registry: "registry.gitlab.aleph-alpha.de".to_owned(),
                             repository: "engineering/pharia-skills/skills".to_owned(),
+                            auth: RegistryAuth {
+                                user_env_var: "PHARIA_KERNEL_TEAM_REGISTRY_USER".to_owned(),
+                                password_env_var: "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD".to_owned(),
+                            },
                         },
                     },
                 ),
