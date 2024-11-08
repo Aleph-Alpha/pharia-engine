@@ -46,19 +46,25 @@ With the local configuration above, Pharia Kernel will serve any skill deployed 
 config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
 # Pharia kernel will use the contents of this environment variable to access (authorize) the above URL
 config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+
 # Registry to load skills from
-registry = { type = "oci", registry = "registry.gitlab.aleph-alpha.de", repository = "engineering/pharia-skills/skills" }
+[namespaces.my-team.registry]
+type = "oci"
+registry = "registry.gitlab.aleph-alpha.de"
+repository = "engineering/pharia-skills/skills"
+user_env_var = "MY_TEAM_REGISTRY_USER"
+password_env_var = "MY_TEAM_REGISTRY_PASSWORD"
 ```
 
 With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace "my-team".
 
 ### Authentication against OCI Registries
 
-Currently Pharia Kernel uses the same credentials to authenticate against all OCI registries. To set these credentials use these environment variables:
+You can provide each namespace in Pharia Kernel with credentials to authenticate against the specified OCI registry. Set the environment variables that are expected from the operator config:
 
 ```shell
-SKILL_REGISTRY_USER=Joe.Plumber
-SKILL_REGISTRY_PASSWORD=****
+MY_TEAM_REGISTRY_USER=Joe.Plumber
+MY_TEAM_REGISTRY_PASSWORD=****
 ```
 
 ## Update interval
