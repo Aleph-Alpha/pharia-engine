@@ -33,7 +33,10 @@ A namespace is also associated with a registry to load the skills from. These sk
 ```toml
 [namespaces.local]
 config_url = "file://namespace.toml"
-registry = { type = "file", path = "skills" }
+
+[namespaces.local.registry]
+type = "file"
+path = "skills"
 ```
 
 With the local configuration above, Pharia Kernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace "local". This is mostly intended for local development of skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommended to use a remote namespace.

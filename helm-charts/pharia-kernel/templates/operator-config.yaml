@@ -11,7 +11,11 @@ data:
     {{- if $v.config_access_token_env_var }}
     config_access_token_env_var = {{ $v.config_access_token_env_var | quote }}
     {{- end }}
-    registry = { type = "oci", registry = {{ $v.registry | quote }}, repository = {{ $v.repository | quote }} }
+
+    [namespaces.{{ $k }}.registry]
+    type = "oci"
+    registry = {{ $v.registry | quote }}
+    repository = {{ $v.repository | quote }}
     {{ end }}
     {{- else }}
     [namespaces]
