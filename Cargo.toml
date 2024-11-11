@@ -68,7 +68,7 @@ wasmtime = "26.0.1"
 wasmtime-wasi = "26.0.1"
 wit-parser = "0.219.1"
 url = "2.5.3"
-thiserror = "2.0.0"
+thiserror = "2.0.3"
 tokenizers = { version = "0.20.3", default-features = false, features = [
     "onig",
     "esaxx_fast",
@@ -93,7 +93,7 @@ fake = "3.0.1"
 http-body-util = "0.1.2"
 mime = "0.3.17"
 rand = "0.8.5"
-tempfile = "3.13.0"
+tempfile = "3.14.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.41.1", features = ["test-util"] }
 tokio-test = "0.4.4"
