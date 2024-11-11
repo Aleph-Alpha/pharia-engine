@@ -186,4 +186,23 @@ pub mod tests {
         assert_eq!(tc.skills[0].tag.as_ref().unwrap(), "v1.0.0-rc");
         assert!(tc.skills[1].tag.is_none());
     }
+
+    #[test]
+    fn load_skill_list_config_toml_alternate_syntax() {
+        let tc: NamespaceDescription = toml::from_str(
+            r#"
+            [[skills]]
+            name = "Goofy"
+            tag = "v1.0.0-rc"
+            [[skills]]
+            name = "Pluto"
+            [[skills]]
+            name = "Gamma"
+            "#,
+        )
+        .unwrap();
+        assert_eq!(tc.skills.len(), 3);
+        assert_eq!(tc.skills[0].tag.as_ref().unwrap(), "v1.0.0-rc");
+        assert!(tc.skills[1].tag.is_none());
+    }
 }
