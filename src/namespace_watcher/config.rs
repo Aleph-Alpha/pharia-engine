@@ -81,17 +81,21 @@ pub struct RegistryAuth {
 
 impl RegistryAuth {
     pub fn user(&self) -> String {
-        env::var(self.user_env_var.as_str()).expect(&format!(
-            "{} must be set if OCI registry is used.",
-            self.user_env_var.as_str()
-        ))
+        env::var(self.user_env_var.as_str()).unwrap_or_else(|_| {
+            panic!(
+                "{} must be set if OCI registry is used.",
+                self.user_env_var.as_str()
+            )
+        })
     }
 
     pub fn password(&self) -> String {
-        env::var(self.password_env_var.as_str()).expect(&format!(
-            "{} must be set if OCI registry is used.",
-            self.password_env_var.as_str()
-        ))
+        env::var(self.password_env_var.as_str()).unwrap_or_else(|_| {
+            panic!(
+                "{} must be set if OCI registry is used.",
+                self.password_env_var.as_str()
+            )
+        })
     }
 }
 
