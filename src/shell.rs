@@ -18,6 +18,7 @@ use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
+    cors::CorsLayer,
     decompression::DecompressionLayer,
     sensitive_headers::SetSensitiveRequestHeadersLayer,
     services::{ServeDir, ServeFile},
@@ -132,7 +133,8 @@ where
                 )
                 // Compress responses
                 .layer(CompressionLayer::new())
-                .layer(DecompressionLayer::new()),
+                .layer(DecompressionLayer::new())
+                .layer(CorsLayer::very_permissive()),
         )
 }
 
