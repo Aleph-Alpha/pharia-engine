@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.2.1...v0.2.2)
+
+### Features
+
+- Allow cors requests for frontend apps - ([907061d](https://github.com/Aleph-Alpha/pharia-kernel/commit/907061df37ce90a94a86c6b7ab6857ea82e45897))
+
+### Builds
+
+- *(deps)* Bump the minor group with 10 updates - ([99fb63c](https://github.com/Aleph-Alpha/pharia-kernel/commit/99fb63cb07f57909c3c9caf0300e6853bb9e3c4c))
+- *(deps)* Bump the minor group with 6 updates - ([59527d1](https://github.com/Aleph-Alpha/pharia-kernel/commit/59527d172baa1bfe98c9dd3e8491e164d18a8ac7))
+
+
 ## [0.2.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.1.1...v0.2.0)
 
 ### Features
