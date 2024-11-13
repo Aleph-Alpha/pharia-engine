@@ -10,7 +10,7 @@ updates:
     schedule:
       interval: "daily"
     allow:
-      - dependency-type: "direct"
+      - dependency-type: "all"
     ignore:
       # These are tied to tracing-opentelemetry updating, so we always have to wait to upgrade
       - dependency-name: "opentelemetry"
@@ -29,20 +29,6 @@ updates:
           - "wasmtime*"
         update-types:
           - "major"
-
-  # Lockfile maintainance
-  - package-ecosystem: "cargo"
-    directory: "/"
-    schedule:
-      interval: "daily"
-    allow:
-      - dependency-type: "indirect"
-    groups:
-      minor:
-        update-types:
-          - "major"
-          - "minor"
-          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
