@@ -14,11 +14,11 @@ updates:
     ignore:
       # These are tied to tracing-opentelemetry updating, so we always have to wait to upgrade
       - dependency-name: "opentelemetry"
-        versions: [">=0.27.0"]
+        versions: [">=0.28.0"]
       - dependency-name: "opentelemetry_sdk"
-        versions: [">=0.27.0"]
+        versions: [">=0.28.0"]
       - dependency-name: "opentelemetry-*"
-        versions: [">=0.27.0"]
+        versions: [">=0.28.0"]
     groups:
       minor:
         update-types:
