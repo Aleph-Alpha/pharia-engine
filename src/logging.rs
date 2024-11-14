@@ -1,10 +1,10 @@
 use std::{env, str::FromStr};
 
 use opentelemetry::{global, trace::TracerProvider, KeyValue};
-use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::{
     runtime,
-    trace::{BatchConfig, RandomIdGenerator, Sampler, Tracer},
+    trace::{RandomIdGenerator, Sampler, Tracer},
     Resource,
 };
 use opentelemetry_semantic_conventions::{
@@ -28,7 +28,7 @@ pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<()> {
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer());
     if let Some(endpoint) = &app_config.open_telemetry_endpoint {
-        let otel_tracer = init_otel_tracer(endpoint);
+        let otel_tracer = init_otel_tracer(endpoint)?;
         registry.with(OpenTelemetryLayer::new(otel_tracer)).init();
     } else {
         registry.init();
@@ -36,10 +36,9 @@ pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn init_otel_tracer(endpoint: &str) -> Tracer {
-    let provider = opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_trace_config(
+fn init_otel_tracer(endpoint: &str) -> anyhow::Result<Tracer> {
+    let provider = opentelemetry_sdk::trace::TracerProvider::builder()
+        .with_config(
             opentelemetry_sdk::trace::Config::default()
                 // Customize sampling strategy
                 .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
@@ -49,17 +48,17 @@ fn init_otel_tracer(endpoint: &str) -> Tracer {
                 .with_id_generator(RandomIdGenerator::default())
                 .with_resource(resource()),
         )
-        .with_batch_config(BatchConfig::default())
-        .with_exporter(
-            opentelemetry_otlp::new_exporter()
-                .tonic()
-                .with_endpoint(endpoint),
+        .with_batch_exporter(
+            SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint)
+                .build()?,
+            runtime::Tokio,
         )
-        .install_batch(runtime::Tokio)
-        .unwrap();
+        .build();
 
     global::set_tracer_provider(provider.clone());
-    provider.tracer("tracing-otel-subscriber")
+    Ok(provider.tracer("tracing-otel-subscriber"))
 }
 
 // Create a Resource that captures information about the entity for which telemetry is recorded.
