@@ -81,7 +81,7 @@ lingua = { version = "1.6.2", default-features = false, features = [
 ] }
 opentelemetry = "0.26.0"
 opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
-tracing-opentelemetry = "0.27.0"
+tracing-opentelemetry = "0.28.0"
 opentelemetry-otlp = "0.26.0"
 opentelemetry-semantic-conventions = { version = "0.26.0", features = [
     "semconv_experimental",
