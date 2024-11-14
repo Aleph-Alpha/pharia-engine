@@ -2499,7 +2499,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
- "wit-component",
+ "wit-component 0.219.1",
  "wit-parser 0.219.1",
 ]
 
@@ -2588,9 +2588,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "570074cc999d1a58184080966e5bd3bf3a9a4af650c3b05047c2621e7405cd17"
+checksum = "0f3cebff57f7dbd1255b44d8bddc2cebeb0ea677dbaa2e25a3070a91b318f660"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -2602,9 +2602,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-otlp"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29e1f9c8b032d4f635c730c0efcf731d5e2530ea13fa8bef7939ddc8420696bd"
+checksum = "91cf61a1868dacc576bf2b2a1c3e9ab150af7272909e80085c3173384fe11f76"
 dependencies = [
  "async-trait",
  "futures-core",
@@ -2616,13 +2616,14 @@ dependencies = [
  "thiserror 1.0.68",
  "tokio",
  "tonic",
+ "tracing",
 ]
 
 [[package]]
 name = "opentelemetry-proto"
-version = "0.26.1"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9d3968ce3aefdcca5c27e3c4ea4391b37547726a70893aab52d3de95d5f8b34"
+checksum = "a6e05acbfada5ec79023c85368af14abd0b307c015e9064d249b2a950ef459a6"
 dependencies = [
  "opentelemetry",
  "opentelemetry_sdk",
@@ -2632,15 +2633,15 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-semantic-conventions"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db945c1eaea8ac6a9677185357480d215bb6999faa9f691d0c4d4d641eab7a09"
+checksum = "bc1b6902ff63b32ef6c489e8048c5e253e2e4a803ea3ea7e783914536eb15c52"
 
 [[package]]
 name = "opentelemetry_sdk"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2c627d9f4c9cdc1f21a29ee4bfbd6028fcb8bcf2a857b43f3abdf72c9c862f3"
+checksum = "27b742c1cae4693792cc564e58d75a2a0ba29421a34a85b50da92efa89ecb2bc"
 dependencies = [
  "async-trait",
  "futures-channel",
@@ -2655,6 +2656,7 @@ dependencies = [
  "thiserror 1.0.68",
  "tokio",
  "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -4123,9 +4125,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-opentelemetry"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc58af5d3f6c5811462cabb3289aec0093f7338e367e5a33d28c0433b3c7360b"
+checksum = "97a971f6058498b5c0f1affa23e7ea202057a7301dbff68e968b2d578bcbd053"
 dependencies = [
  "js-sys",
  "once_cell",
@@ -4457,6 +4459,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm-metadata"
+version = "0.220.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f3e5f5920c5abfc45573c89b07b38efdaae1515ef86f83dad12d60e50ecd62b"
+dependencies = [
+ "anyhow",
+ "indexmap 2.6.0",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "spdx",
+ "wasm-encoder 0.220.0",
+ "wasmparser 0.220.0",
+]
+
+[[package]]
 name = "wasm-streams"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4502,7 +4520,9 @@ version = "0.220.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e246c2772ce3ebc83f89a2d4487ac5794cad6c309b2071818a88c7db7c36d87b"
 dependencies = [
+ "ahash",
  "bitflags 2.6.0",
+ "hashbrown 0.14.5",
  "indexmap 2.6.0",
  "semver",
 ]
@@ -5082,9 +5102,9 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen"
-version = "0.34.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e11ad55616555605a60a8b2d1d89e006c2076f46c465c892cc2c153b20d4b30"
+checksum = "c966692b6d8c4bb3c1aee3313e0930f44457a5763cfffb666f814506124e4691"
 dependencies = [
  "wit-bindgen-rt",
  "wit-bindgen-rust-macro",
@@ -5092,45 +5112,45 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-core"
-version = "0.34.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "163cee59d3d5ceec0b256735f3ab0dccac434afb0ec38c406276de9c5a11e906"
+checksum = "19857cff2a480fece56ea43f9199322ee5014688a3539ebf8d29ae62d75a3a1f"
 dependencies = [
  "anyhow",
  "heck 0.5.0",
- "wit-parser 0.219.1",
+ "wit-parser 0.220.0",
 ]
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.34.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "744845cde309b8fa32408d6fb67456449278c66ea4dcd96de29797b302721f02"
+checksum = "605d5562e971a823cf5a550a9d69cb7144e9b4969a810043127175517a4e1865"
 dependencies = [
  "bitflags 2.6.0",
 ]
 
 [[package]]
 name = "wit-bindgen-rust"
-version = "0.34.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6919521fc7807f927a739181db93100ca7ed03c29509b84d5f96b27b2e49a9a"
+checksum = "6d894e599c161d71acb6a78e8ec8a609a09c2bb227de50829f5afbd03b844a69"
 dependencies = [
  "anyhow",
  "heck 0.5.0",
  "indexmap 2.6.0",
  "prettyplease",
  "syn",
- "wasm-metadata",
+ "wasm-metadata 0.220.0",
  "wit-bindgen-core",
- "wit-component",
+ "wit-component 0.220.0",
 ]
 
 [[package]]
 name = "wit-bindgen-rust-macro"
-version = "0.34.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c967731fc5d50244d7241ecfc9302a8929db508eea3c601fbc5371b196ba38a5"
+checksum = "a723cf943bba3bf34f437eb101e5a78180971e25dfb0085d80dbe4e73afb2854"
 dependencies = [
  "anyhow",
  "prettyplease",
@@ -5155,9 +5175,28 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "wasm-encoder 0.219.1",
- "wasm-metadata",
+ "wasm-metadata 0.219.1",
  "wasmparser 0.219.1",
  "wit-parser 0.219.1",
+]
+
+[[package]]
+name = "wit-component"
+version = "0.220.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73ccedf54cc65f287da268d64d2bf4f7530d2cfb2296ffbe3ad5f65567e4cf53"
+dependencies = [
+ "anyhow",
+ "bitflags 2.6.0",
+ "indexmap 2.6.0",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "wasm-encoder 0.220.0",
+ "wasm-metadata 0.220.0",
+ "wasmparser 0.220.0",
+ "wit-parser 0.220.0",
 ]
 
 [[package]]
