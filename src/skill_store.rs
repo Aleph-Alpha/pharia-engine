@@ -238,7 +238,7 @@ impl SkillStore {
         digest_update_interval: Duration,
     ) -> Self {
         let (sender, recv) = mpsc::channel(1);
-        let mut actor = SkillProviderActor::new(engine, recv, namespaces, digest_update_interval);
+        let mut actor = SkillStoreActor::new(engine, recv, namespaces, digest_update_interval);
         let handle = tokio::spawn(async move {
             actor.run().await;
         });
@@ -367,20 +367,20 @@ pub enum SkillProviderMsg {
     },
 }
 
-struct SkillProviderActor {
+struct SkillStoreActor {
     receiver: mpsc::Receiver<SkillProviderMsg>,
     provider: SkillStoreState,
     digest_update_interval: Duration,
 }
 
-impl SkillProviderActor {
+impl SkillStoreActor {
     pub fn new(
         engine: Arc<Engine>,
         receiver: mpsc::Receiver<SkillProviderMsg>,
         namespaces: &HashMap<String, NamespaceConfig>,
         digest_update_interval: Duration,
     ) -> Self {
-        SkillProviderActor {
+        SkillStoreActor {
             receiver,
             provider: SkillStoreState::new(engine, namespaces),
             digest_update_interval,
