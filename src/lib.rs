@@ -196,6 +196,7 @@ mod tests {
     async fn shutdown() {
         let config = AppConfig {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
+            metrics_addr: "127.0.0.1:0".parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             document_index_addr: "https://document-index.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::empty(),
