@@ -143,13 +143,13 @@ where
 
 #[derive(IntoStaticStr, strum::Display)]
 #[strum(serialize_all = "snake_case")]
-pub enum MetricNames {
+pub enum ShellMetrics {
     HttpRequestsTotal,
     HttpRequestsDurationSeconds,
 }
 
-impl From<MetricNames> for metrics::KeyName {
-    fn from(value: MetricNames) -> Self {
+impl From<ShellMetrics> for metrics::KeyName {
+    fn from(value: ShellMetrics) -> Self {
         Self::from_const_str(value.into())
     }
 }
@@ -172,8 +172,8 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 
     let labels = [("method", method), ("path", path), ("status", status)];
 
-    metrics::counter!(MetricNames::HttpRequestsTotal, &labels).increment(1);
-    metrics::histogram!(MetricNames::HttpRequestsDurationSeconds, &labels).record(latency);
+    metrics::counter!(ShellMetrics::HttpRequestsTotal, &labels).increment(1);
+    metrics::histogram!(ShellMetrics::HttpRequestsDurationSeconds, &labels).record(latency);
     response
 }
 
