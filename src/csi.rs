@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chunking::ChunkParams;
 use futures::future::try_join_all;
+use strum::IntoStaticStr;
 use tokio::sync::mpsc;
 use tracing::trace;
 
@@ -69,6 +70,18 @@ pub trait Csi {
     ) -> Result<Vec<SearchResult>, anyhow::Error>;
 }
 
+#[derive(IntoStaticStr, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum CsiMetrics {
+    CsiRequestsTotal,
+}
+
+impl From<CsiMetrics> for metrics::KeyName {
+    fn from(value: CsiMetrics) -> Self {
+        Self::from_const_str(value.into())
+    }
+}
+
 #[async_trait]
 impl<T> Csi for CsiDrivers<T>
 where
@@ -79,6 +92,8 @@ where
         auth: String,
         request: CompletionRequest,
     ) -> Result<Completion, anyhow::Error> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "complete")]).increment(1);
+
         trace!(
             "complete_text: request.model={} request.params.max_tokens={}",
             request.model,
@@ -87,6 +102,7 @@ where
                 .max_tokens
                 .map_or_else(|| "None".to_owned(), |val| val.to_string()),
         );
+
         self.inference.complete_text(request, auth).await
     }
 
@@ -110,6 +126,17 @@ where
         auth: String,
         request: ChatRequest,
     ) -> Result<ChatResponse, anyhow::Error> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")]).increment(1);
+
+        trace!(
+            "chat: request.model={} request.params.max_tokens={}",
+            request.model,
+            request
+                .params
+                .max_tokens
+                .map_or_else(|| "None".to_owned(), |val| val.to_string()),
+        );
+
         self.inference.chat(request, auth).await
     }
 
@@ -118,6 +145,8 @@ where
         auth: String,
         request: ChunkRequest,
     ) -> Result<Vec<String>, anyhow::Error> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chunk")]).increment(1);
+
         let ChunkRequest {
             text,
             params: ChunkParams { model, max_tokens },
@@ -144,7 +173,10 @@ where
         auth: String,
         request: SearchRequest,
     ) -> Result<Vec<SearchResult>, anyhow::Error> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "search")]).increment(1);
+
         let index_path = &request.index_path;
+
         trace!(
             "search: namespace={} collection={} max_results={} min_score={}",
             index_path.namespace,
