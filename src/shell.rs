@@ -1,10 +1,11 @@
-use std::{future::Future, iter::once, net::SocketAddr};
+use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
 
 use anyhow::Context;
 use axum::{
-    extract::{MatchedPath, Path, State},
-    http::{header::AUTHORIZATION, Request, StatusCode},
-    response::Html,
+    extract::{MatchedPath, Path, Request, State},
+    http::{header::AUTHORIZATION, StatusCode},
+    middleware::{self, Next},
+    response::{Html, IntoResponse},
     routing::{delete, get, post},
     Json, Router,
 };
@@ -107,6 +108,7 @@ where
         .route("/openapi.json", get(serve_docs))
         .route("/healthcheck", get(|| async { "ok" }))
         .route("/", get(index))
+        .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
             ServiceBuilder::new()
                 // Mark the `Authorization` request header as sensitive so it doesn't show in logs
@@ -136,6 +138,29 @@ where
                 .layer(DecompressionLayer::new())
                 .layer(CorsLayer::very_permissive()),
         )
+}
+
+/// Tracks which routes get called and latency for each request
+async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
+    let start = Instant::now();
+    let path = if let Some(matched_path) = req.extensions().get::<MatchedPath>() {
+        matched_path.as_str().to_owned()
+    } else {
+        req.uri().path().to_owned()
+    };
+    let method = req.method().to_string();
+
+    // Run request
+    let response = next.run(req).await;
+
+    let latency = start.elapsed().as_secs_f64();
+    let status = response.status().as_u16().to_string();
+
+    let labels = [("method", method), ("path", path), ("status", status)];
+
+    metrics::counter!("http_requests_total", &labels).increment(1);
+    metrics::histogram!("http_requests_duration_seconds", &labels).record(latency);
+    response
 }
 
 #[derive(OpenApi)]
