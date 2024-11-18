@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
 
-use crate::shell::MetricNames;
+use crate::shell::ShellMetrics;
 
 /// Initializes a recorder for metrics macros and exposes a Prometheus exporter
 /// and exposes it over port 9000 (by default). Any GET request at the port
@@ -19,7 +19,7 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
 
     PrometheusBuilder::new()
         .set_buckets_for_metric(
-            Matcher::Full(MetricNames::HttpRequestsDurationSeconds.to_string()),
+            Matcher::Full(ShellMetrics::HttpRequestsDurationSeconds.to_string()),
             EXPONENTIAL_SECONDS,
         )?
         .with_http_listener(addr)
