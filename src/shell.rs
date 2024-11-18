@@ -141,9 +141,9 @@ where
         )
 }
 
-#[derive(IntoStaticStr)]
+#[derive(IntoStaticStr, strum::Display)]
 #[strum(serialize_all = "snake_case")]
-enum MetricNames {
+pub enum MetricNames {
     HttpRequestsTotal,
     HttpRequestsDurationSeconds,
 }

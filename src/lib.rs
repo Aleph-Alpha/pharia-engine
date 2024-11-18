@@ -5,6 +5,7 @@ mod csi_shell;
 mod inference;
 mod language_selection;
 mod logging;
+mod metrics;
 mod namespace_watcher;
 mod registries;
 mod search;
@@ -31,6 +32,7 @@ use self::{inference::Inference, skills::SkillExecutor};
 pub use config::AppConfig;
 pub use inference::{Completion, FinishReason};
 pub use logging::initialize_tracing;
+pub use metrics::initialize_metrics;
 pub use namespace_watcher::OperatorConfig;
 
 pub struct Kernel {
