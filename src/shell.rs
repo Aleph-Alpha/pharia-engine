@@ -15,6 +15,7 @@ use axum_extra::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use strum::IntoStaticStr;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -140,6 +141,19 @@ where
         )
 }
 
+#[derive(IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+enum MetricNames {
+    HttpRequestsTotal,
+    HttpRequestsDurationSeconds,
+}
+
+impl From<MetricNames> for metrics::KeyName {
+    fn from(value: MetricNames) -> Self {
+        Self::from_const_str(value.into())
+    }
+}
+
 /// Tracks which routes get called and latency for each request
 async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
     let start = Instant::now();
@@ -158,8 +172,8 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 
     let labels = [("method", method), ("path", path), ("status", status)];
 
-    metrics::counter!("http_requests_total", &labels).increment(1);
-    metrics::histogram!("http_requests_duration_seconds", &labels).record(latency);
+    metrics::counter!(MetricNames::HttpRequestsTotal, &labels).increment(1);
+    metrics::histogram!(MetricNames::HttpRequestsDurationSeconds, &labels).record(latency);
     response
 }
 
