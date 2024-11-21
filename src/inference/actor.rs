@@ -282,7 +282,7 @@ impl InferenceMessage {
                 api_token,
             } => {
                 let result = client.chat(&request, api_token.clone()).await;
-                drop(send.send(result));
+                drop(send.send(result.map_err(Into::into)));
             }
         }
     }
@@ -298,7 +298,7 @@ pub mod tests {
     use anyhow::anyhow;
     use tokio::{sync::mpsc, task::JoinHandle, time::sleep, try_join};
 
-    use crate::inference::client::InferenceClient;
+    use crate::inference::client::{InferenceClient, InferenceClientError};
 
     use super::*;
 
@@ -383,7 +383,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
-        ) -> anyhow::Result<ChatResponse> {
+        ) -> Result<ChatResponse, InferenceClientError> {
             unimplemented!()
         }
     }
@@ -451,7 +451,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
-        ) -> anyhow::Result<ChatResponse> {
+        ) -> Result<ChatResponse, InferenceClientError> {
             unimplemented!()
         }
     }
