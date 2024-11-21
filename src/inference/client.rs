@@ -5,6 +5,8 @@ use aleph_alpha_client::{
 };
 use tracing::{error, warn};
 
+use thiserror::Error;
+
 use super::{ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Message};
 
 pub trait InferenceClient: Send + Sync + 'static {
@@ -17,19 +19,28 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &ChatRequest,
         api_token: String,
-    ) -> impl Future<Output = anyhow::Result<ChatResponse>> + Send;
+    ) -> impl Future<Output = Result<ChatResponse, InferenceClientError>> + Send;
 }
 
 impl InferenceClient for Client {
-    async fn chat(&self, request: &ChatRequest, api_token: String) -> anyhow::Result<ChatResponse> {
+    async fn chat(
+        &self,
+        request: &ChatRequest,
+        api_token: String,
+    ) -> Result<ChatResponse, InferenceClientError> {
         let task = request.into();
         let how = How {
             api_token: Some(api_token),
             ..Default::default()
         };
         let fetch_chat_output = || self.chat(&task, &request.model, &how);
-        let chat_output = retry(fetch_chat_output).await?;
-        chat_output.try_into()
+        let chat_result = retry(fetch_chat_output).await;
+        match chat_result {
+            Ok(chat_output) => chat_output
+                .try_into()
+                .map_err(|e| InferenceClientError::Other(e)),
+            Err(e) => Err(InferenceClientError::Other(e.into())), // will be specific later
+        }
     }
 
     async fn complete_text(
@@ -131,7 +142,7 @@ impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
     }
 }
 
-async fn retry<T, F, Fut>(mut f: F) -> anyhow::Result<T>
+async fn retry<T, F, Fut>(mut f: F) -> Result<T, aleph_alpha_client::Error>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, aleph_alpha_client::Error>>,
@@ -142,7 +153,7 @@ where
             Ok(value) => return Ok(value),
             Err(e) if remaining_retries <= 0 => {
                 error!("Error after all retries: {e}");
-                return Err(e.into());
+                return Err(e);
             }
             Err(e) => {
                 warn!("Retrying operation: {e}");
@@ -150,6 +161,12 @@ where
             }
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum InferenceClientError {
+    #[error(transparent)]
+    Other(#[from] anyhow::Error), // default is an anyhow error
 }
 
 #[cfg(test)]
@@ -247,5 +264,30 @@ mod tests {
 
         // Then a chat response is returned
         assert!(!chat_response.message.content.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_bad_token_gives_inference_client_error() {
+        // Given an inference client and a bad token
+        let bad_api_token = "bad_api_token".to_owned();
+        let host = inference_address().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // and a chat request return an error
+        let chat_request = ChatRequest {
+            model: "llama-3.1-8b-instruct".to_owned(),
+            params: ChatParams::default(),
+            messages: vec![Message {
+                role: Role::User,
+                content: "Hello, world!".to_owned(),
+            }],
+        };
+
+        // When chatting with inference client
+        let chat_result =
+            <Client as InferenceClient>::chat(&client, &chat_request, bad_api_token).await;
+
+        // Then an InferenceClientError is returned
+        assert!(chat_result.is_err());
     }
 }
