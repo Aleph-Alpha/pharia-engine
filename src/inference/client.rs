@@ -36,10 +36,8 @@ impl InferenceClient for Client {
         let fetch_chat_output = || self.chat(&task, &request.model, &how);
         let chat_result = retry(fetch_chat_output).await;
         match chat_result {
-            Ok(chat_output) => chat_output
-                .try_into()
-                .map_err(|e| InferenceClientError::Other(e)),
-            Err(e) => Err(InferenceClientError::Other(e.into())), // will be specific later
+            Ok(chat_output) => chat_output.try_into().map_err(InferenceClientError::Other),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -165,8 +163,21 @@ where
 
 #[derive(Error, Debug)]
 pub enum InferenceClientError {
+    #[error("Unauthorized")]
+    Unauthorized,
     #[error(transparent)]
     Other(#[from] anyhow::Error), // default is an anyhow error
+}
+
+impl From<aleph_alpha_client::Error> for InferenceClientError {
+    fn from(err: aleph_alpha_client::Error) -> Self {
+        match err {
+            aleph_alpha_client::Error::Http { status: 401, .. } => {
+                InferenceClientError::Unauthorized
+            }
+            _ => InferenceClientError::Other(err.into()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -287,7 +298,11 @@ mod tests {
         let chat_result =
             <Client as InferenceClient>::chat(&client, &chat_request, bad_api_token).await;
 
-        // Then an InferenceClientError is returned
+        // Then an InferenceClientError Unauthorized is returned
         assert!(chat_result.is_err());
+        assert!(matches!(
+            chat_result.unwrap_err(),
+            InferenceClientError::Unauthorized
+        ));
     }
 }
