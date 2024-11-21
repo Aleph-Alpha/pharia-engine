@@ -14,7 +14,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &CompletionRequest,
         api_token: String,
-    ) -> impl Future<Output = anyhow::Result<Completion>> + Send;
+    ) -> impl Future<Output = Result<Completion, InferenceClientError>> + Send;
     fn chat(
         &self,
         request: &ChatRequest,
@@ -45,7 +45,7 @@ impl InferenceClient for Client {
         &self,
         request: &CompletionRequest,
         api_token: String,
-    ) -> anyhow::Result<Completion> {
+    ) -> Result<Completion, InferenceClientError> {
         let CompletionRequest {
             model,
             prompt,
@@ -78,8 +78,13 @@ impl InferenceClient for Client {
         };
         let fetch_completion_output = || self.completion(&task, model, &how);
 
-        let completion_output = retry(fetch_completion_output).await?;
-        completion_output.try_into()
+        let completion_result = retry(fetch_completion_output).await;
+        match completion_result {
+            Ok(completion_output) => completion_output
+                .try_into()
+                .map_err(InferenceClientError::Other),
+            Err(e) => Err(e.into()),
+        }
     }
 }
 

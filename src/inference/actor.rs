@@ -274,7 +274,7 @@ impl InferenceMessage {
                 api_token,
             } => {
                 let result = client.complete_text(&request, api_token.clone()).await;
-                drop(send.send(result));
+                drop(send.send(result.map_err(Into::into)));
             }
             Self::Chat {
                 request,
@@ -365,7 +365,7 @@ pub mod tests {
             &self,
             _params: &super::CompletionRequest,
             _api_token: String,
-        ) -> anyhow::Result<Completion> {
+        ) -> Result<Completion, InferenceClientError> {
             let remaining = self
                 .remaining_failures
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |f| {
@@ -374,7 +374,7 @@ pub mod tests {
                 .unwrap();
 
             if remaining == 0 {
-                Err(anyhow!("Inference error"))
+                Err(InferenceClientError::Other(anyhow!("Inference error")))
             } else {
                 Ok(Completion::from_text("Completion succeeded"))
             }
@@ -434,7 +434,7 @@ pub mod tests {
             &self,
             request: &CompletionRequest,
             _api_token: String,
-        ) -> anyhow::Result<Completion> {
+        ) -> Result<Completion, InferenceClientError> {
             self.expected_concurrent_requests
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |e| {
                     Some(e.saturating_sub(1))
