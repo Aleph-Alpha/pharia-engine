@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chunking::ChunkParams;
 use futures::future::try_join_all;
 use strum::IntoStaticStr;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tracing::trace;
 
 use crate::{
@@ -60,7 +60,13 @@ pub trait Csi {
         request: SelectLanguageRequest,
     ) -> anyhow::Result<Option<Language>> {
         // default implementation can be provided here because language selection is stateless
-        Ok(tokio::task::spawn_blocking(move || select_language(request)).await?)
+        let (send, recv) = oneshot::channel();
+        rayon::spawn(|| {
+            let _ = send.send(select_language(request));
+        });
+        Ok(recv
+            .await
+            .expect("Sender should be alive while waiting for answers."))
     }
 
     async fn search(
@@ -155,9 +161,11 @@ where
 
         let tokenizer = self.tokenizers.tokenizer_by_model(auth, model).await?;
         // Push into the blocking thread pool because this can be expensive for long documents
-        let chunks =
-            tokio::task::spawn_blocking(move || chunking::chunking(&text, &tokenizer, max_tokens))
-                .await?;
+        let (send, recv) = oneshot::channel();
+        rayon::spawn(move || drop(send.send(chunking::chunking(&text, &tokenizer, max_tokens))));
+        let chunks = recv
+            .await
+            .expect("Sender should be alive while waiting for answers.");
 
         trace!(
             "chunk: text_len={} max_tokens={} -> chunks.len()={}",

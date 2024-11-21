@@ -2765,6 +2765,7 @@ dependencies = [
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk",
  "rand",
+ "rayon",
  "reqwest",
  "semver",
  "serde",

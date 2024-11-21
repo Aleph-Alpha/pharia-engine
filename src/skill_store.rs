@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
-    task::{spawn_blocking, JoinHandle},
+    task::JoinHandle,
     time::{sleep_until, Instant},
 };
 use tracing::{error, info};
@@ -133,9 +133,11 @@ impl SkillStoreState {
         let SkillImage { bytes, digest } = skill_bytes
             .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
         let engine = self.engine.clone();
-        let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
+        let (send, recv) = oneshot::channel();
+        rayon::spawn(move || drop(send.send(Skill::new(engine.as_ref(), bytes))));
+        let skill = recv
             .await
-            .expect("Spawned linking thread must run to completion without being poisoned.")
+            .expect("Sender should be alive while waiting for answers.")
             .with_context(|| format!("Failed to initialize {skill_path}."))?;
         Ok((skill, digest))
     }
