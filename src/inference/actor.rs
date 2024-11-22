@@ -1,3 +1,4 @@
+use super::client::InferenceClient;
 use aleph_alpha_client::Client;
 use anyhow::anyhow;
 use core::fmt;
@@ -9,8 +10,6 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-
-use super::client::InferenceClient;
 
 /// Handle to the inference actor. Spin this up in order to use the inference API.
 pub struct Inference {
