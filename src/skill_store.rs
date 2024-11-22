@@ -408,7 +408,7 @@ impl SkillStoreActor {
         loop {
             select! {
                 msg = self.receiver.recv() => match msg {
-                    Some(msg) => self.act(msg).await,
+                    Some(msg) => self.act(msg),
                     // Senders are gone, break out of the loop for shutdown.
                     None => break
                 },
@@ -434,7 +434,7 @@ impl SkillStoreActor {
         }
     }
 
-    pub async fn act(&mut self, msg: SkillProviderMsg) {
+    pub fn act(&mut self, msg: SkillProviderMsg) {
         match msg {
             SkillProviderMsg::Fetch { skill_path, send } => {
                 if let Some(skill) = self.provider.cached_skill(&skill_path) {
@@ -554,7 +554,8 @@ pub mod tests {
         let registry = Arc::new(Box::new(registry) as Box<dyn SkillRegistry + Send + Sync>);
 
         // When fetching the skill
-        let result = SkillStoreState::fetch(registry, engine, skill_path, "latest".to_owned()).await;
+        let result =
+            SkillStoreState::fetch(registry, engine, skill_path, "latest".to_owned()).await;
 
         // Then no error occurs
         assert!(result.is_ok());
