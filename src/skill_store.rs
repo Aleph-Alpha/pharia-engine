@@ -457,12 +457,19 @@ impl SkillStoreActor {
                         // Create a future that answers the original fetch request via the channel
                         // and also returns the skill so that it can be inserted into the cache.
                         let fut = async move {
-                            let (skill, digest) =
-                                SkillStoreState::fetch(registry, engine, skill_path.clone(), tag)
-                                    .await?;
-                            let skill = Arc::new(skill);
-                            drop(send.send(Ok(Some(skill.clone()))));
-                            Ok((skill, skill_path, digest))
+                            match SkillStoreState::fetch(registry, engine, skill_path.clone(), tag)
+                                .await
+                            {
+                                Ok((skill, digest)) => {
+                                    let skill = Arc::new(skill);
+                                    drop(send.send(Ok(Some(skill.clone()))));
+                                    Ok((skill, skill_path, digest))
+                                }
+                                Err(e) => {
+                                    drop(send.send(Err(e)));
+                                    Err(anyhow!("Failed to fetch skill {skill_path}"))
+                                }
+                            }
                         };
 
                         // Schedule the future to run in the background
@@ -514,7 +521,7 @@ pub mod tests {
     use tokio::time::sleep;
 
     use crate::namespace_watcher::tests::SkillDescription;
-    use crate::registries::tests::NeverResolvingRegistry;
+    use crate::registries::tests::{NeverResolvingRegistry, SaboteurRegistry};
 
     use super::*;
 
@@ -587,6 +594,23 @@ pub mod tests {
         assert_eq!(result.unwrap().len(), 1);
 
         drop(handle);
+    }
+
+    #[tokio::test]
+    async fn skill_store_can_handle_fetch_errors() {
+        // Given a skill store with a registry that always fails
+        let registry = Box::new(SaboteurRegistry) as Box<dyn SkillRegistry + Send + Sync>;
+        let skill_path = SkillPath::new("local", "greet_skill");
+        let registries = std::iter::once(("local".to_owned(), registry)).collect();
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let skill_store = SkillStore::new(engine, registries, Duration::from_secs(10)).api();
+
+        // When fetching a skill which is in the known skills
+        skill_store.upsert(skill_path.clone(), None).await;
+        let result = skill_store.fetch(skill_path).await;
+
+        // Then an error is returned
+        assert!(result.is_err());
     }
 
     #[tokio::test]
