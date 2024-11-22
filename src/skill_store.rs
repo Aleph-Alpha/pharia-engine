@@ -362,13 +362,15 @@ pub enum SkillProviderMsg {
     },
 }
 
+// A computation that fetches a skill from a registry and builds it.
+type SkillFetchFuture =
+    Pin<Box<dyn Future<Output = anyhow::Result<(Arc<Skill>, SkillPath, String)>> + Send>>;
+
 struct SkillStoreActor {
     receiver: mpsc::Receiver<SkillProviderMsg>,
     provider: SkillStoreState,
     digest_update_interval: Duration,
-    running_requests: FuturesUnordered<
-        Pin<Box<dyn Future<Output = anyhow::Result<(Arc<Skill>, SkillPath, String)>> + Send>>,
-    >,
+    running_requests: FuturesUnordered<SkillFetchFuture>,
 }
 
 impl From<&NamespaceConfig> for Box<dyn SkillRegistry + Send + Sync> {
