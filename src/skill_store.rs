@@ -139,7 +139,7 @@ impl SkillStoreState {
     fn registry_for_skill(
         &self,
         skill_path: &SkillPath,
-    ) -> Option<&Arc<(impl SkillRegistry + use<>)>> {
+    ) -> Option<&Arc<Box<dyn SkillRegistry + Send + Sync>>> {
         self.skill_registries.get(&skill_path.namespace)
     }
 
@@ -449,10 +449,9 @@ impl SkillStoreActor {
                         let engine = self.provider.engine.clone();
                         let registry = self
                             .provider
-                            .skill_registries
-                            .get(&skill_path.namespace)
-                            .expect("If skill exists, so must the namespace it resides in.")
-                            .clone();
+                            .registry_for_skill(&skill_path)
+                            .cloned()
+                            .expect("If skill exists, so must the registry it resides in.");
                         let tag = tag.to_owned();
 
                         // Create a future that answers the original fetch request via the channel
