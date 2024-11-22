@@ -1,10 +1,14 @@
-use std::{future::Future, pin::Pin};
-
+use anyhow::Context;
+use std::{future::Future, pin::Pin, sync::Arc};
 mod file;
 mod oci;
 
+use anyhow::anyhow;
 pub use file::FileRegistry;
 pub use oci::OciRegistry;
+use tokio::task::spawn_blocking;
+
+use crate::skills::{Engine, Skill, SkillPath};
 
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
@@ -25,6 +29,22 @@ impl SkillImage {
             digest: digest.into(),
         }
     }
+}
+
+pub async fn load_and_build(
+    skill_registry: Arc<Box<dyn SkillRegistry + Send + Sync>>,
+    engine: Arc<Engine>,
+    skill_path: SkillPath,
+    tag: String,
+) -> anyhow::Result<(Skill, String)> {
+    let skill_bytes = skill_registry.load_skill(&skill_path.name, &tag).await?;
+    let SkillImage { bytes, digest } =
+        skill_bytes.ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
+    let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
+        .await
+        .expect("Spawned linking thread must run to completion without being poisoned.")
+        .with_context(|| format!("Failed to initialize {skill_path}."))?;
+    Ok((skill, digest))
 }
 
 pub trait SkillRegistry {
