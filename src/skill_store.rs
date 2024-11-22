@@ -47,34 +47,16 @@ struct SkillStoreState {
 }
 
 impl SkillStoreState {
-    pub fn new(engine: Arc<Engine>, namespaces: &HashMap<String, NamespaceConfig>) -> Self {
-        let skill_registries = namespaces
-            .iter()
-            .map(|(k, v)| (k.to_owned(), Self::registry(v)))
-            .collect::<HashMap<_, _>>();
+    pub fn new(
+        engine: Arc<Engine>,
+        skill_registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+    ) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
             skill_registries,
             invalid_namespaces: HashMap::new(),
             engine,
-        }
-    }
-
-    /// Build a registry implementation from a registry description
-    fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send + Sync> {
-        match namespace_config.registry() {
-            Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
-            Registry::Oci {
-                repository,
-                registry,
-                auth,
-            } => Box::new(OciRegistry::new(
-                repository.clone(),
-                registry.clone(),
-                auth.user(),
-                auth.password(),
-            )),
         }
     }
 
@@ -394,6 +376,24 @@ struct SkillStoreActor {
     digest_update_interval: Duration,
 }
 
+impl From<&NamespaceConfig> for Box<dyn SkillRegistry + Send + Sync> {
+    fn from(val: &NamespaceConfig) -> Self {
+        match val.registry() {
+            Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
+            Registry::Oci {
+                repository,
+                registry,
+                auth,
+            } => Box::new(OciRegistry::new(
+                repository.clone(),
+                registry.clone(),
+                auth.user(),
+                auth.password(),
+            )),
+        }
+    }
+}
+
 impl SkillStoreActor {
     pub fn new(
         engine: Arc<Engine>,
@@ -401,9 +401,13 @@ impl SkillStoreActor {
         namespaces: &HashMap<String, NamespaceConfig>,
         digest_update_interval: Duration,
     ) -> Self {
+        let skill_registries = namespaces
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
+            .collect::<HashMap<_, _>>();
         SkillStoreActor {
             receiver,
-            provider: SkillStoreState::new(engine, namespaces),
+            provider: SkillStoreState::new(engine, skill_registries),
             digest_update_interval,
         }
     }
@@ -492,10 +496,11 @@ pub mod tests {
                 config_access_token_env_var: None,
                 registry,
             };
-            let mut namespaces = HashMap::new();
-            namespaces.insert(skill_path.namespace.clone(), ns_cfg);
 
-            let mut provider = SkillStoreState::new(engine, &namespaces);
+            let mut registries = HashMap::new();
+            registries.insert(skill_path.namespace.clone(), (&ns_cfg).into());
+
+            let mut provider = SkillStoreState::new(engine, registries);
             provider.upsert_skill(skill_path, None);
             provider
         }
@@ -676,9 +681,13 @@ pub mod tests {
     async fn invalidate_cache_skills_after_digest_change() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
         let (namespace_config, temp_dir) = tmp_namespace_with_skill()?;
+        let registries = namespace_config
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
+            .collect();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-        let mut skill_provider = SkillStoreState::new(engine, &namespace_config);
+        let mut skill_provider = SkillStoreState::new(engine, registries);
         skill_provider.upsert_skill(&greet_skill, None);
         skill_provider.fetch(&greet_skill).await?;
         assert_eq!(
@@ -714,7 +723,11 @@ pub mod tests {
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-        let mut skill_provider = SkillStoreState::new(engine, &local_namespace());
+        let registries = local_namespace()
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
+            .collect();
+        let mut skill_provider = SkillStoreState::new(engine, registries);
         skill_provider.upsert_skill(&greet_skill, None);
         skill_provider.fetch(&greet_skill).await?;
 
