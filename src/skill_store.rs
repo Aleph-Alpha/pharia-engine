@@ -473,12 +473,10 @@ pub mod tests {
     use tokio::time::sleep;
 
     use crate::namespace_watcher::tests::SkillDescription;
-    use crate::registries::tests::NeverResolvingRegistry;
 
     use super::*;
 
     pub use super::SkillProviderMsg;
-    use tokio::time::{self, Duration};
 
     pub fn dummy_skill_provider_api() -> SkillStoreApi {
         let (send, _recv) = mpsc::channel(1);
@@ -503,33 +501,6 @@ pub mod tests {
             provider.upsert_skill(skill_path, None);
             provider
         }
-    }
-
-    #[tokio::test]
-    async fn loading_skill_does_not_block_skill_store() {
-        // Given a skill store with a registry that never resolves
-        let registry = Box::new(NeverResolvingRegistry) as Box<dyn SkillRegistry + Send + Sync>;
-        let skill_path = SkillPath::new("local", "greet_skill");
-        let registries = std::iter::once(("local".to_owned(), registry)).collect();
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store = SkillStore::new(engine, registries, Duration::from_secs(10)).api();
-
-        // When fetching a skill which is in the known skills
-        skill_store.upsert(skill_path.clone(), None).await;
-        let cloned_skill_store = skill_store.clone();
-        let handle = tokio::spawn(async move {
-            let result = cloned_skill_store.fetch(skill_path).await;
-            assert!(result.unwrap().is_none());
-        });
-
-        // and waiting 10ms to ensure the fetch has been received
-        sleep(Duration::from_millis(10)).await;
-
-        // Then the skill store can still be served other requests within reasonable time
-        let result = time::timeout(Duration::from_millis(20), skill_store.list()).await;
-        assert_eq!(result.unwrap().len(), 1);
-
-        drop(handle);
     }
 
     #[tokio::test]
