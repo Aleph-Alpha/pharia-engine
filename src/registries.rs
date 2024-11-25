@@ -63,7 +63,6 @@ impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
 pub mod tests {
     use std::collections::HashMap;
 
-    use anyhow::anyhow;
     use tempfile::tempdir;
 
     use super::{DynFuture, SkillImage, SkillRegistry};
@@ -87,26 +86,6 @@ pub mod tests {
             _tag: &'a str,
         ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
             Box::pin(pending::<Result<Option<String>, anyhow::Error>>())
-        }
-    }
-
-    pub struct SaboteurRegistry;
-
-    impl SkillRegistry for SaboteurRegistry {
-        fn load_skill<'a>(
-            &'a self,
-            _name: &'a str,
-            _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
-            Box::pin(async { Err(anyhow!("SaboteurRegistry always fails.")) })
-        }
-
-        fn fetch_digest<'a>(
-            &'a self,
-            _name: &'a str,
-            _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
-            Box::pin(async { Err(anyhow!("SaboteurRegistry always fails.")) })
         }
     }
 
