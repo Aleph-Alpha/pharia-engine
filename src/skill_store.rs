@@ -1,7 +1,6 @@
-use anyhow::{anyhow, Context};
-use futures::stream::FuturesUnordered;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use std::{future::Future, pin::Pin};
+
+use anyhow::{anyhow, Context};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -376,7 +375,6 @@ struct SkillStoreActor {
     receiver: mpsc::Receiver<SkillProviderMsg>,
     provider: SkillStoreState,
     digest_update_interval: Duration,
-    running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
 impl From<&NamespaceConfig> for Box<dyn SkillRegistry + Send + Sync> {
@@ -408,7 +406,6 @@ impl SkillStoreActor {
             receiver,
             provider: SkillStoreState::new(engine, skill_registries),
             digest_update_interval,
-            running_requests: FuturesUnordered::new(),
         }
     }
 
@@ -424,7 +421,7 @@ impl SkillStoreActor {
                 // comes in while we are mid-request, it will get cancelled, but since we want to prioritize
                 // processing messages, doing some duplicate requests is ok.
                 //
-                // The if expressions makes sure we only poll if there are cached skills so that `select`
+                // The if experessions makes sure we only poll if there are cached skills so that `select`
                 // will only wait on messages until we have a cache.
                 result = self.provider.refresh_oldest_digest(self.digest_update_interval), if self.provider.list_cached_skills().next().is_some() => {
                     if let Err(e) = result {
