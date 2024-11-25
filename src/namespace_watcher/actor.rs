@@ -64,9 +64,9 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
     }
 }
 
-/// Watches for changes in namespaces configuration. In particular which skills should currently be
+/// Watches for changes in namespaces configuration. In particuler which skills should currently be
 /// served. These changes are communicated back to the skill provider, so it would serve the version
-/// the skill operator intends to serve from then on. This enables Skill Operators to roll out
+/// the skill operator intends to serve from then on. This enables Skill Operatores to roll out
 /// skills at runtime in self service.
 pub struct NamespaceWatcher {
     ready: tokio::sync::watch::Receiver<bool>,
