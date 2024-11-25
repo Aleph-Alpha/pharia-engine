@@ -230,7 +230,7 @@ async fn serve_docs() -> Json<openapi::OpenApi> {
 #[derive(Deserialize, Serialize, ToSchema)]
 struct ExecuteSkillArgs {
     /// The qualified name of the skill to invoke. The qualified name consists of a namespace and
-    /// a skill name (e.g. "acme/summarize").
+    /// a skillname (e.g. "acme/summarize").
     /// If the namespace is omitted, the default 'pharia-kernel-team' namespace is used.
     ///
     skill: String,

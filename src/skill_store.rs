@@ -138,7 +138,7 @@ impl SkillStoreState {
         let engine = self.engine.clone();
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
-            .expect("Spawned linking thread must run to completion without being poisoned.")
+            .expect("Spawend linking thread must run to completion without being poisened.")
             .with_context(|| format!("Failed to initialize {skill_path}."))?;
         Ok((skill, digest))
     }
@@ -175,7 +175,7 @@ impl SkillStoreState {
     }
 
     /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
-    /// If the digest behind the tag has changed, remove the cache entry. Otherwise, update the validation time.
+    /// If the digest behind the tag has changed, remove the cache entry. Otherwise, upate the validation time.
     async fn validate_digest(&mut self, skill_path: SkillPath) -> anyhow::Result<()> {
         let CachedSkill { digest, .. } = self
             .cached_skills
@@ -298,7 +298,7 @@ impl SkillStoreApi {
             .expect("all api handlers must be shutdown before actors");
     }
 
-    /// Fetch an executable skill
+    /// Fetch an exeutable skill
     pub async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, anyhow::Error> {
         let (send, recv) = oneshot::channel();
         let msg = SkillProviderMsg::Fetch { skill_path, send };
@@ -624,7 +624,7 @@ pub mod tests {
             .fetch(SkillPath::new("local", "greet_skill"))
             .await
             .unwrap();
-        // and listing all cached skills
+        // and listing all chached skills
         let cached_skills = skill_provider.api().list_cached().await;
 
         // Then only "greet_skill" will appear in that list, but not "greet-py"
