@@ -343,6 +343,7 @@ pub mod tests {
         inference::{
             tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },
+        skill_loader::SkillLoader,
         skill_store::{SkillProviderMsg, SkillStore},
         skills::Skill,
     };
@@ -398,7 +399,9 @@ pub mod tests {
         // Given a skill executer with no skills
         let namespaces = HashMap::new();
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine.clone(), namespaces, Duration::from_secs(10));
+        let skill_loader = SkillLoader::new(engine.clone(), namespaces).api();
+
+        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         let csi_apis = DummyCsi;
         let executer = SkillExecutor::new(engine, csi_apis, skill_provider.api());
         let api = executer.api();

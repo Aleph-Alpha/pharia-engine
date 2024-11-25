@@ -58,6 +58,7 @@ pub mod tests {
         namespace_watcher::OperatorConfig,
         registries::SkillRegistry,
         search::{DocumentPath, SearchRequest, SearchResult},
+        skill_loader::SkillLoader,
         skill_store::SkillStore,
         FinishReason,
     };
@@ -83,8 +84,8 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_registries = local_registries_with_skills(&["greet_skill"]);
-        let skill_provider =
-            SkillStore::new(engine.clone(), skill_registries, Duration::from_secs(10));
+        let skill_loader = SkillLoader::new(engine.clone(), skill_registries).api();
+        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
@@ -100,8 +101,8 @@ pub mod tests {
     async fn errors_for_non_existing_skill() {
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_registries = local_registries_with_skills(&[]);
-        let skill_provider =
-            SkillStore::new(engine.clone(), skill_registries, Duration::from_secs(10));
+        let skill_loader = SkillLoader::new(engine.clone(), skill_registries).api();
+        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         let runtime = WasmRuntime::new(engine, skill_provider.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
@@ -121,8 +122,8 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_registries = local_registries_with_skills(&["greet_skill"]);
-        let skill_provider =
-            SkillStore::new(engine.clone(), skill_registries, Duration::from_secs(10));
+        let skill_loader = SkillLoader::new(engine.clone(), skill_registries).api();
+        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
 
@@ -144,8 +145,8 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet-py");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_registries = local_registries_with_skills(&["greet-py"]);
-        let skill_provider =
-            SkillStore::new(engine.clone(), skill_registries, Duration::from_secs(10));
+        let skill_loader = SkillLoader::new(engine.clone(), skill_registries).api();
+        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
 
@@ -167,8 +168,8 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_registries = local_registries_with_skills(&["greet_skill"]);
-        let skill_provider =
-            SkillStore::new(engine.clone(), skill_registries, Duration::from_secs(10));
+        let skill_loader = SkillLoader::new(engine.clone(), skill_registries).api();
+        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_provider.api().upsert(skill_path.clone(), None).await;
         let runtime = WasmRuntime::new(engine, skill_provider.api());
         for i in 1..10 {
