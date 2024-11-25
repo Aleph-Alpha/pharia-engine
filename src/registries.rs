@@ -6,6 +6,8 @@ mod oci;
 pub use file::FileRegistry;
 pub use oci::OciRegistry;
 
+use crate::namespace_watcher::{NamespaceConfig, Registry};
+
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Contains the bytes necessary to instantiate a Skill, as well as the
@@ -23,6 +25,24 @@ impl SkillImage {
         Self {
             bytes,
             digest: digest.into(),
+        }
+    }
+}
+
+impl From<&NamespaceConfig> for Box<dyn SkillRegistry + Send + Sync> {
+    fn from(val: &NamespaceConfig) -> Self {
+        match val.registry() {
+            Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
+            Registry::Oci {
+                repository,
+                registry,
+                auth,
+            } => Box::new(OciRegistry::new(
+                repository.clone(),
+                registry.clone(),
+                auth.user(),
+                auth.password(),
+            )),
         }
     }
 }

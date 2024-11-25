@@ -10,8 +10,7 @@ use tokio::{
 use tracing::{error, info};
 
 use crate::{
-    namespace_watcher::{NamespaceConfig, Registry},
-    registries::{FileRegistry, OciRegistry, SkillImage, SkillRegistry},
+    registries::{SkillImage, SkillRegistry},
     skills::{Engine, Skill, SkillPath},
 };
 
@@ -377,24 +376,6 @@ struct SkillStoreActor {
     digest_update_interval: Duration,
 }
 
-impl From<&NamespaceConfig> for Box<dyn SkillRegistry + Send + Sync> {
-    fn from(val: &NamespaceConfig) -> Self {
-        match val.registry() {
-            Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
-            Registry::Oci {
-                repository,
-                registry,
-                auth,
-            } => Box::new(OciRegistry::new(
-                repository.clone(),
-                registry.clone(),
-                auth.user(),
-                auth.password(),
-            )),
-        }
-    }
-}
-
 impl SkillStoreActor {
     pub fn new(
         engine: Arc<Engine>,
@@ -475,6 +456,7 @@ pub mod tests {
     use crate::namespace_watcher::tests::SkillDescription;
 
     use super::*;
+    use crate::namespace_watcher::{NamespaceConfig, Registry};
 
     pub use super::SkillProviderMsg;
 
