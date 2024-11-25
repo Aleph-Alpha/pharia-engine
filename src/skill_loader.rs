@@ -178,7 +178,9 @@ pub mod tests {
     use super::*;
 
     impl SkillLoader {
-        pub fn with_namespace_and_skill(engine: Arc<Engine>, skill_path: &SkillPath) -> Self {
+        /// Skill loader loading skills from a local
+        /// `skills` directory
+        pub fn with_file_registry(engine: Arc<Engine>, namespace: String) -> Self {
             let registry = Registry::File {
                 path: "skills".to_owned(),
             };
@@ -189,8 +191,13 @@ pub mod tests {
             };
 
             let mut registries = HashMap::new();
-            registries.insert(skill_path.namespace.clone(), (&ns_cfg).into());
+            registries.insert(namespace, (&ns_cfg).into());
             SkillLoader::new(engine, registries)
+        }
+
+        /// Skill loader with a registry called `local` loading skills from a local `skills` directory
+        pub fn with_file_registry_named_local(engine: Arc<Engine>) -> Self {
+            SkillLoader::with_file_registry(engine, "local".to_owned())
         }
     }
 }
