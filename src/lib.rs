@@ -24,6 +24,7 @@ use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use search::Search;
 use shell::Shell;
+use skill_loader::SkillLoader;
 use skill_store::SkillStore;
 use skills::Engine;
 use tokenizers::Tokenizers;
@@ -40,6 +41,7 @@ pub struct Kernel {
     inference: Inference,
     tokenizers: Tokenizers,
     search: Search,
+    skill_loader: SkillLoader,
     skill_store: SkillStore,
     skill_executor: SkillExecutor,
     namespace_watcher: NamespaceWatcher,
@@ -83,11 +85,8 @@ impl Kernel {
             .iter()
             .map(|(k, v)| (k.to_owned(), v.into()))
             .collect();
-        let skill_store = SkillStore::new(
-            engine.clone(),
-            skill_registries,
-            app_config.namespace_update_interval,
-        );
+        let skill_loader = SkillLoader::new(engine.clone(), skill_registries);
+        let skill_store = SkillStore::new(skill_loader.api(), app_config.namespace_update_interval);
 
         // Boot up runtime we need to execute Skills
         let skill_executor = SkillExecutor::new(engine, csi_drivers.clone(), skill_store.api());
@@ -121,6 +120,7 @@ impl Kernel {
                 namespace_watcher.wait_for_shutdown().await;
                 skill_executor.wait_for_shutdown().await;
                 skill_store.wait_for_shutdown().await;
+                skill_loader.wait_for_shutdown().await;
                 tokenizers.wait_for_shutdown().await;
                 inference.wait_for_shutdown().await;
                 search.wait_for_shutdown().await;
@@ -133,6 +133,7 @@ impl Kernel {
             inference,
             tokenizers,
             search,
+            skill_loader,
             skill_store,
             skill_executor,
             namespace_watcher,
@@ -151,6 +152,7 @@ impl Kernel {
         self.namespace_watcher.wait_for_shutdown().await;
         self.skill_executor.wait_for_shutdown().await;
         self.skill_store.wait_for_shutdown().await;
+        self.skill_loader.wait_for_shutdown().await;
         self.tokenizers.wait_for_shutdown().await;
         self.inference.wait_for_shutdown().await;
         self.search.wait_for_shutdown().await;
