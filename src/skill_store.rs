@@ -1,16 +1,17 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
-    task::{spawn_blocking, JoinHandle},
+    task::JoinHandle,
     time::{sleep_until, Instant},
 };
 use tracing::{error, info};
 
 use crate::{
-    registries::{SkillImage, SkillRegistry},
+    registries::SkillRegistry,
+    skill_loader::SkillLoader,
     skills::{Engine, Skill, SkillPath},
 };
 
@@ -38,11 +39,9 @@ impl CachedSkill {
 struct SkillStoreState {
     known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
-    // key: Namespace, value: Registry
-    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
     // key: Namespace, value: Error
     invalid_namespaces: HashMap<String, anyhow::Error>,
-    engine: Arc<Engine>,
+    skill_loader: SkillLoader,
 }
 
 impl SkillStoreState {
@@ -53,9 +52,8 @@ impl SkillStoreState {
         SkillStoreState {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
-            skill_registries,
             invalid_namespaces: HashMap::new(),
-            engine,
+            skill_loader: SkillLoader::new(engine, skill_registries),
         }
     }
 
@@ -102,7 +100,7 @@ impl SkillStoreState {
             return Ok(Some(skill));
         }
         if let Some(tag) = self.tag(skill_path)? {
-            let (skill, digest) = self.load_and_build(skill_path, tag).await?;
+            let (skill, digest) = self.skill_loader.fetch(skill_path, tag).await?;
             let skill = Arc::new(skill);
             self.insert(skill_path.clone(), skill.clone(), digest);
             Ok(Some(skill))
@@ -118,37 +116,10 @@ impl SkillStoreState {
             .map(|skill| skill.skill.clone())
     }
 
-    /// Load a skill from the registry and build it to a `Skill`
-    pub async fn load_and_build(
-        &self,
-        skill_path: &SkillPath,
-        tag: &str,
-    ) -> anyhow::Result<(Skill, String)> {
-        let registry = self
-            .skill_registries
-            .get(&skill_path.namespace)
-            .expect("If skill exists, so must the namespace it resides in.");
-
-        let skill_bytes = registry.load_skill(&skill_path.name, tag).await?;
-        let SkillImage { bytes, digest } = skill_bytes
-            .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
-        let engine = self.engine.clone();
-        let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
-            .await
-            .expect("Spawned linking thread must run to completion without being poisoned.")
-            .with_context(|| format!("Failed to initialize {skill_path}."))?;
-        Ok((skill, digest))
-    }
-
     /// Insert a skill into the cache.
     pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<Skill>, digest: String) {
         self.cached_skills
             .insert(skill_path, CachedSkill::new(skill.clone(), digest));
-    }
-
-    /// Return to corresponding registry for a given skill path
-    fn registry_for_skill(&self, skill_path: &SkillPath) -> Option<&(impl SkillRegistry + use<>)> {
-        self.skill_registries.get(&skill_path.namespace)
     }
 
     /// Return the registered tag for a given skill
@@ -178,15 +149,13 @@ impl SkillStoreState {
             .cached_skills
             .get(&skill_path)
             .ok_or_else(|| anyhow!("Missing cached skill for {skill_path}"))?;
-        let registry = self
-            .registry_for_skill(&skill_path)
-            .expect("Missing registry for skill");
+
         let tag = self
             .tag(&skill_path)
             .expect("Bad namespace configuration for skill")
             .expect("Missing tag for skill");
 
-        match registry.fetch_digest(&skill_path.name, tag).await {
+        match self.skill_loader.fetch_digest(&skill_path, tag).await {
             // There is a new digest behind the tag, delete the cache entry
             Ok(Some(new_digest)) if &new_digest != digest => {
                 self.cached_skills.remove(&skill_path);
