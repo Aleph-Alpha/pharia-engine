@@ -4,7 +4,8 @@ use anyhow::{anyhow, Context};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
 
-use crate::registries::{SkillImage, SkillRegistry};
+use crate::namespace_watcher::Registry;
+use crate::registries::{FileRegistry, OciRegistry, SkillImage, SkillRegistry};
 use crate::skills::{Engine, Skill, SkillPath};
 
 use std::collections::HashMap;
@@ -22,16 +23,55 @@ pub enum SkillLoaderMsg {
     },
 }
 
+/// Which registry is backing which namespace
+pub struct RegistryConfig {
+    registries: HashMap<String, Registry>,
+}
+
+impl RegistryConfig {
+    pub fn new(registries: HashMap<String, Registry>) -> Self {
+        Self { registries }
+    }
+
+    /// Convert the registry config into a map of namespace to actual skill registry implementations
+    pub fn skill_registries(&self) -> HashMap<String, Box<dyn SkillRegistry + Send + Sync>> {
+        self.registries
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
+            .collect()
+    }
+}
+
+impl From<&Registry> for Box<dyn SkillRegistry + Send + Sync> {
+    fn from(val: &Registry) -> Self {
+        match val {
+            Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
+            Registry::Oci {
+                repository,
+                registry,
+                auth,
+            } => Box::new(OciRegistry::new(
+                repository.clone(),
+                registry.clone(),
+                auth.user(),
+                auth.password(),
+            )),
+        }
+    }
+}
+
 pub struct SkillLoader {
     sender: mpsc::Sender<SkillLoaderMsg>,
     handle: JoinHandle<()>,
 }
 
 impl SkillLoader {
-    pub fn new(
-        engine: Arc<Engine>,
-        registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
-    ) -> Self {
+    pub fn new(engine: Arc<Engine>, registry_config: RegistryConfig) -> Self {
+        let registries = registry_config
+            .registries
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
+            .collect();
         let (sender, recv) = mpsc::channel(1);
         let mut actor = SkillLoaderActor::new(recv, engine, registries);
         let handle = tokio::spawn(async move {
@@ -173,31 +213,37 @@ impl SkillLoaderActor {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::namespace_watcher::{NamespaceConfig, Registry};
+    use crate::namespace_watcher::Registry;
 
     use super::*;
 
-    impl SkillLoader {
-        /// Skill loader loading skills from a local
-        /// `skills` directory
-        pub fn with_file_registry(engine: Arc<Engine>, namespace: String) -> Self {
+    impl RegistryConfig {
+        pub fn with_file_registry_named_skills(namespace: String) -> Self {
             let registry = Registry::File {
                 path: "skills".to_owned(),
             };
-            let ns_cfg = NamespaceConfig::TeamOwned {
-                config_url: "file://namespace.toml".to_owned(),
-                config_access_token_env_var: None,
-                registry,
-            };
-
             let mut registries = HashMap::new();
-            registries.insert(namespace, (&ns_cfg).into());
-            SkillLoader::new(engine, registries)
+            registries.insert(namespace, registry);
+            Self::new(registries)
         }
 
-        /// Skill loader with a registry called `local` loading skills from a local `skills` directory
-        pub fn with_file_registry_named_local(engine: Arc<Engine>) -> Self {
-            SkillLoader::with_file_registry(engine, "local".to_owned())
+        pub fn with_file_registry(namespace: String, path: String) -> Self {
+            let registry = Registry::File { path };
+            let mut registries = HashMap::new();
+            registries.insert(namespace, registry);
+            Self::new(registries)
+        }
+
+        pub fn empty() -> Self {
+            Self::new(HashMap::new())
+        }
+    }
+
+    impl SkillLoader {
+        /// Skill loader loading skills from a local `skills` directory
+        pub fn with_file_registry(engine: Arc<Engine>, namespace: String) -> Self {
+            let registry_config = RegistryConfig::with_file_registry_named_skills(namespace);
+            SkillLoader::new(engine, registry_config)
         }
     }
 }

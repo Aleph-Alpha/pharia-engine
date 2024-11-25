@@ -264,7 +264,7 @@ pub mod tests {
     use tokio::sync::{mpsc, Mutex};
     use tokio::time::timeout;
 
-    use crate::namespace_watcher::NamespaceConfig;
+    use crate::namespace_watcher::tests::NamespaceConfig;
     use crate::skill_store::tests::SkillProviderMsg;
     use crate::skills::SkillPath;
 
