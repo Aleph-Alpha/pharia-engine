@@ -1,20 +1,19 @@
-use crate::registries::SkillImage;
 use anyhow::{anyhow, Context};
 use futures::stream::FuturesUnordered;
+use crate::registries::load_and_build;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use std::{future::Future, pin::Pin};
-use tokio::task::spawn_blocking;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
-    task::JoinHandle,
+    task::{spawn_blocking, JoinHandle},
     time::{sleep_until, Instant},
 };
 use tracing::{error, info};
 
 use crate::{
     namespace_watcher::{NamespaceConfig, Registry},
-    registries::{FileRegistry, OciRegistry, SkillRegistry},
+    registries::{FileRegistry, OciRegistry, SkillImage, SkillRegistry},
     skills::{Engine, Skill, SkillPath},
 };
 use futures::StreamExt;
@@ -58,10 +57,7 @@ impl SkillStoreState {
         SkillStoreState {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
-            skill_registries: skill_registries
-                .into_iter()
-                .map(|(k, v)| (k, Arc::new(v)))
-                .collect(),
+            skill_registries: skill_registries.into_iter().map(|(k, v)| (k, Arc::new(v))).collect(),
             invalid_namespaces: HashMap::new(),
             engine,
         }
@@ -103,23 +99,20 @@ impl SkillStoreState {
         self.invalid_namespaces.remove(namespace);
     }
 
-    /// Fetch a skill for which the tag has already been validated from a registry
-    /// and build it. This function can be moved to a separate thread to not block
-    /// the main thread of the `SkillStoreActor`.
-    pub async fn fetch(
-        skill_registry: Arc<Box<dyn SkillRegistry + Send + Sync>>,
-        engine: Arc<Engine>,
-        skill_path: SkillPath,
-        tag: String,
-    ) -> anyhow::Result<(Skill, String)> {
-        let skill_bytes = skill_registry.load_skill(&skill_path.name, &tag).await?;
-        let SkillImage { bytes, digest } = skill_bytes
-            .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
-        let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
-            .await
-            .expect("Spawned linking thread must run to completion without being poisoned.")
-            .with_context(|| format!("Failed to initialize {skill_path}."))?;
-        Ok((skill, digest))
+    /// Fetch a skill. If the skill is present in the cache, return it. Otherwise, fetch it from the
+    /// registry and cache it.
+    pub async fn fetch(&mut self, skill_path: &SkillPath) -> anyhow::Result<Option<Arc<Skill>>> {
+        if let Some(skill) = self.cached_skill(skill_path) {
+            return Ok(Some(skill));
+        }
+        if let Some(tag) = self.tag(skill_path)? {
+            let (skill, digest) = self.load_and_build(skill_path, tag).await?;
+            let skill = Arc::new(skill);
+            self.insert(skill_path.clone(), skill.clone(), digest);
+            Ok(Some(skill))
+        } else {
+            Ok(None)
+        }
     }
 
     /// `Some` if the skill is present in the cache, `None` if not
@@ -129,6 +122,28 @@ impl SkillStoreState {
             .map(|skill| skill.skill.clone())
     }
 
+    /// Load a skill from the registry and build it to a `Skill`
+    pub async fn load_and_build(
+        &self,
+        skill_path: &SkillPath,
+        tag: &str,
+    ) -> anyhow::Result<(Skill, String)> {
+        let registry = self
+            .skill_registries
+            .get(&skill_path.namespace)
+            .expect("If skill exists, so must the namespace it resides in.");
+
+        let skill_bytes = registry.load_skill(&skill_path.name, tag).await?;
+        let SkillImage { bytes, digest } = skill_bytes
+            .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
+        let engine = self.engine.clone();
+        let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
+            .await
+            .expect("Spawned linking thread must run to completion without being poisoned.")
+            .with_context(|| format!("Failed to initialize {skill_path}."))?;
+        Ok((skill, digest))
+    }
+
     /// Insert a skill into the cache.
     pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<Skill>, digest: String) {
         self.cached_skills
@@ -136,10 +151,7 @@ impl SkillStoreState {
     }
 
     /// Return to corresponding registry for a given skill path
-    fn registry_for_skill(
-        &self,
-        skill_path: &SkillPath,
-    ) -> Option<&Arc<(impl SkillRegistry + use<>)>> {
+    fn registry_for_skill(&self, skill_path: &SkillPath) -> Option<&Arc<(impl SkillRegistry + use<>)>> {
         self.skill_registries.get(&skill_path.namespace)
     }
 
@@ -412,7 +424,7 @@ impl SkillStoreActor {
                     // Senders are gone, break out of the loop for shutdown.
                     None => break
                 },
-                // Run all scheduled fetch requests in parallel. Will
+                // FuturesUnordered will let them run in parallel. It will
                 // yield once one of them is completed.
                 result = self.running_requests.select_next_some(), if !self.running_requests.is_empty()  => {
                     if let Ok((skill, skill_path, digest)) = result {
@@ -445,29 +457,22 @@ impl SkillStoreActor {
                     // Skill is configured, fetch it in the background
                     Ok(Some(tag)) => {
                         let engine = self.provider.engine.clone();
-                        let registry = self
-                            .provider
-                            .skill_registries
-                            .get(&skill_path.namespace)
-                            .expect("If skill exists, so must the namespace it resides in.")
-                            .clone();
-                        let tag = tag.to_owned();
+                        let registry = self.provider.skill_registries
+                        .get(&skill_path.namespace)
+                        .expect("If skill exists, so must the namespace it resides in.");
 
-                        // Create a future that answers the original fetch request via the channel
-                        // and also returns the skill so that it can be inserted into the cache.
+                        //  can I clone this simply?
+                        let registry = registry.clone();
+                        let tag = tag.to_owned();
                         let fut = async move {
-                            let (skill, digest) =
-                                SkillStoreState::fetch(registry, engine, skill_path.clone(), tag)
-                                    .await?;
+                            let (skill, digest) = load_and_build(registry, engine, skill_path.clone(), tag).await?;
                             let skill = Arc::new(skill);
                             drop(send.send(Ok(Some(skill.clone()))));
                             Ok((skill, skill_path, digest))
                         };
-
-                        // Schedule the future to run in the background
                         self.running_requests.push(Box::pin(fut));
-                    }
-                    // Skill is not configured, return early
+                    },
+                    // Skill is not configured return early
                     Ok(None) => {
                         drop(send.send(Ok(None)));
                     }
@@ -506,7 +511,7 @@ impl SkillStoreActor {
 #[cfg(test)]
 pub mod tests {
 
-    use std::{fs, path::PathBuf};
+    use std::fs;
 
     use tempfile::TempDir;
     use test_skills::{given_chat_skill, given_greet_skill};
@@ -546,21 +551,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn skill_store_can_fetch_skill() {
-        // Given a skill store with a registry that can load a skill
-        let skill_path = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let registry = FileRegistry::with_dir(PathBuf::from("./skills"));
-        let registry = Arc::new(Box::new(registry) as Box<dyn SkillRegistry + Send + Sync>);
-
-        // When fetching the skill
-        let result = SkillStoreState::fetch(registry, engine, skill_path, "latest".to_owned()).await;
-
-        // Then no error occurs
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
     async fn loading_skill_does_not_block_skill_store() {
         // Given a skill store with a registry that never resolves
         let registry = Box::new(NeverResolvingRegistry) as Box<dyn SkillRegistry + Send + Sync>;
@@ -588,48 +578,14 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn skill_store_can_load_skill() {
-        // Given a skill store with a registry that can load a skill
-        let skill_path = SkillPath::new("local", "greet_skill");
+    async fn skill_component_is_in_config() {
+        let skill_path = SkillPath::dummy();
         let engine = Arc::new(Engine::new(false).unwrap());
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
-        let skill_store =
-            SkillStore::new(engine, local_registries(), Duration::from_secs(10)).api();
-        skill_store.upsert(skill_path.clone(), None).await;
+        let result = provider.fetch(&skill_path).await;
 
-        // When fetching the skill
-        skill_store
-            .fetch(skill_path.clone())
-            .await
-            .unwrap()
-            .unwrap();
-
-        // Then the skill is cached
-        let cached_skills = skill_store.list_cached().await;
-        assert_eq!(cached_skills.len(), 1);
-        assert_eq!(cached_skills.first().unwrap(), &skill_path);
-    }
-
-    #[tokio::test]
-    async fn cached_skill_removed() {
-        // Given one cached skill
-        // Given a skill store with a registry that can load a skill
-        let skill_path = SkillPath::new("local", "greet_skill");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store =
-            SkillStore::new(engine, local_registries(), Duration::from_secs(10)).api();
-        skill_store.upsert(skill_path.clone(), None).await;
-        skill_store
-            .fetch(skill_path.clone())
-            .await
-            .unwrap()
-            .unwrap();
-
-        // When we remove the skill
-        skill_store.remove(skill_path.clone()).await;
-
-        // Then the skill is no longer cached
-        assert!(skill_store.list_cached().await.is_empty());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -651,6 +607,22 @@ pub mod tests {
         let result = provider.tag(&SkillPath::new("non_existing_namespace", &skill_path.name));
 
         assert!(matches!(result, Ok(None)));
+    }
+
+    #[tokio::test]
+    async fn cached_skill_removed() {
+        // Given one cached skill
+        given_greet_skill();
+        let skill_path = SkillPath::new("local", "greet_skill");
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
+        provider.fetch(&skill_path).await.unwrap().unwrap();
+
+        // When we remove the skill
+        provider.remove_skill(&skill_path);
+
+        // Then the skill is no longer cached
+        assert!(provider.list_cached_skills().next().is_none());
     }
 
     #[test]
@@ -777,28 +749,15 @@ pub mod tests {
         std::iter::once(("local".to_owned(), registry)).collect()
     }
 
-    async fn skill(engine: Arc<Engine>) -> (Skill, String) {
-        let skill_dir = PathBuf::from("./skills");
-        let registry = FileRegistry::with_dir(skill_dir);
-        let skill_path = SkillPath::new("local", "greet_skill");
-        let registry = Arc::new(Box::new(registry) as Box<dyn SkillRegistry + Send + Sync>);
-        SkillStoreState::fetch(registry, engine, skill_path, "latest".to_owned())
-            .await
-            .unwrap()
-    }
-
     #[tokio::test]
     async fn invalidate_cache_skills_after_digest_change() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
         let (registries, temp_dir) = tmp_registries_with_skill()?;
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-
-        let mut skill_provider = SkillStoreState::new(engine.clone(), registries);
+        let mut skill_provider = SkillStoreState::new(engine, registries);
         skill_provider.upsert_skill(&greet_skill, None);
-
-        let (skill, digest) = skill(engine.clone()).await;
-        skill_provider.insert(greet_skill.clone(), Arc::new(skill), digest);
+        skill_provider.fetch(&greet_skill).await?;
         assert_eq!(
             skill_provider.list_cached_skills().collect::<Vec<_>>(),
             vec![&greet_skill]
@@ -832,10 +791,9 @@ pub mod tests {
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-        let mut skill_provider = SkillStoreState::new(engine.clone(), local_registries());
+        let mut skill_provider = SkillStoreState::new(engine, local_registries());
         skill_provider.upsert_skill(&greet_skill, None);
-        let (skill, digest) = skill(engine.clone()).await;
-        skill_provider.insert(greet_skill.clone(), Arc::new(skill), digest);
+        skill_provider.fetch(&greet_skill).await?;
 
         // When we check it with no changes
         skill_provider.validate_digest(greet_skill).await?;
