@@ -237,12 +237,11 @@ pub struct SkillStore {
 impl SkillStore {
     pub fn new(
         engine: Arc<Engine>,
-        skill_registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+        namespaces: &HashMap<String, NamespaceConfig>,
         digest_update_interval: Duration,
     ) -> Self {
         let (sender, recv) = mpsc::channel(1);
-        let mut actor =
-            SkillStoreActor::new(engine, recv, skill_registries, digest_update_interval);
+        let mut actor = SkillStoreActor::new(engine, recv, namespaces, digest_update_interval);
         let handle = tokio::spawn(async move {
             actor.run().await;
         });
@@ -399,9 +398,13 @@ impl SkillStoreActor {
     pub fn new(
         engine: Arc<Engine>,
         receiver: mpsc::Receiver<SkillProviderMsg>,
-        skill_registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+        namespaces: &HashMap<String, NamespaceConfig>,
         digest_update_interval: Duration,
     ) -> Self {
+        let skill_registries = namespaces
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
+            .collect::<HashMap<_, _>>();
         SkillStoreActor {
             receiver,
             provider: SkillStoreState::new(engine, skill_registries),
@@ -572,7 +575,7 @@ pub mod tests {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine, local_registries(), Duration::from_secs(10));
+        let skill_provider = SkillStore::new(engine, &local_namespace(), Duration::from_secs(10));
         skill_provider
             .api()
             .upsert(SkillPath::new("local", "greet_skill"), None)
@@ -602,7 +605,7 @@ pub mod tests {
     async fn should_list_skills_that_have_been_added() {
         // Given an empty provider
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine, local_registries(), Duration::from_secs(10));
+        let skill_provider = SkillStore::new(engine, &local_namespace(), Duration::from_secs(10));
         let api = skill_provider.api();
 
         // When adding a skill
@@ -626,7 +629,7 @@ pub mod tests {
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine, local_registries(), Duration::from_secs(10));
+        let skill_provider = SkillStore::new(engine, &local_namespace(), Duration::from_secs(10));
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
         api.fetch(greet_skill.clone()).await.unwrap();
@@ -646,7 +649,7 @@ pub mod tests {
         // Given one "greet_skill" which is not in cache
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_provider = SkillStore::new(engine, local_registries(), Duration::from_secs(10));
+        let skill_provider = SkillStore::new(engine, &local_namespace(), Duration::from_secs(10));
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
 
@@ -663,7 +666,7 @@ pub mod tests {
     }
 
     /// Namespace named local backed by a file registry with "skills" directory
-    fn local_registries() -> HashMap<String, Box<dyn SkillRegistry + Send + Sync>> {
+    fn local_namespace() -> HashMap<String, NamespaceConfig> {
         let namespace_cfg = NamespaceConfig::TeamOwned {
             config_url: "file://namespace.toml".to_owned(),
             config_access_token_env_var: None,
@@ -671,14 +674,17 @@ pub mod tests {
                 path: "./skills".to_owned(),
             },
         };
-        let registry = (&namespace_cfg).into();
-        std::iter::once(("local".to_owned(), registry)).collect()
+        std::iter::once(("local".to_owned(), namespace_cfg)).collect()
     }
 
     #[tokio::test]
     async fn invalidate_cache_skills_after_digest_change() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
-        let (registries, temp_dir) = tmp_registries_with_skill()?;
+        let (namespace_config, temp_dir) = tmp_namespace_with_skill()?;
+        let registries = namespace_config
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
+            .collect();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
         let mut skill_provider = SkillStoreState::new(engine, registries);
@@ -717,7 +723,11 @@ pub mod tests {
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-        let mut skill_provider = SkillStoreState::new(engine, local_registries());
+        let registries = local_namespace()
+            .iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
+            .collect();
+        let mut skill_provider = SkillStoreState::new(engine, registries);
         skill_provider.upsert_skill(&greet_skill, None);
         skill_provider.fetch(&greet_skill).await?;
 
@@ -736,10 +746,10 @@ pub mod tests {
     #[tokio::test(start_paused = true)]
     async fn should_invalidate_cached_skill_whose_digest_has_changed() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
-        let (registries, temp_dir) = tmp_registries_with_skill()?;
+        let (namespace_config, temp_dir) = tmp_namespace_with_skill()?;
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-        let skill_provider = SkillStore::new(engine, registries, Duration::from_secs(1));
+        let skill_provider = SkillStore::new(engine, &namespace_config, Duration::from_secs(1));
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
         api.fetch(greet_skill.clone()).await?;
@@ -768,10 +778,7 @@ pub mod tests {
     }
 
     /// Creates a file registry in a tempdir with one greet skill
-    fn tmp_registries_with_skill() -> anyhow::Result<(
-        HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
-        TempDir,
-    )> {
+    fn tmp_namespace_with_skill() -> anyhow::Result<(HashMap<String, NamespaceConfig>, TempDir)> {
         given_greet_skill();
         let dir = tempfile::tempdir()?;
         fs::copy(
@@ -789,7 +796,7 @@ pub mod tests {
             },
         };
         Ok((
-            std::iter::once(("local".to_owned(), (&namespace_cfg).into())).collect(),
+            std::iter::once(("local".to_owned(), namespace_cfg)).collect(),
             dir,
         ))
     }
