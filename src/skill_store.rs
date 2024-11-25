@@ -15,7 +15,6 @@ use crate::{
     registries::{FileRegistry, OciRegistry, SkillImage, SkillRegistry},
     skills::{Engine, Skill, SkillPath},
 };
-use futures::StreamExt;
 
 /// A wrapper around the Skill to also keep track of which
 /// digest was loaded last and when it was last checked.
@@ -421,9 +420,6 @@ impl SkillStoreActor {
                     // Senders are gone, break out of the loop for shutdown.
                     None => break
                 },
-                // FuturesUnordered will let them run in parallel. It will
-                // yield once one of them is completed.
-                () = self.running_requests.select_next_some(), if !self.running_requests.is_empty()  => {}
                 // While we are waiting on messages, refresh the digests behind the tags. If a new message
                 // comes in while we are mid-request, it will get cancelled, but since we want to prioritize
                 // processing messages, doing some duplicate requests is ok.
