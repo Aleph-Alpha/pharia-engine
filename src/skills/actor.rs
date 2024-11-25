@@ -329,7 +329,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::{collections::HashMap, fs, time::Duration};
+    use std::{fs, time::Duration};
 
     use super::*;
 
@@ -343,7 +343,7 @@ pub mod tests {
         inference::{
             tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },
-        skill_loader::SkillLoader,
+        skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillProviderMsg, SkillStore},
         skills::Skill,
     };
@@ -397,9 +397,9 @@ pub mod tests {
     #[tokio::test]
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
-        let namespaces = HashMap::new();
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader = SkillLoader::new(engine.clone(), namespaces).api();
+        let registry_config = RegistryConfig::empty();
+        let skill_loader = SkillLoader::new(engine.clone(), registry_config).api();
 
         let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         let csi_apis = DummyCsi;

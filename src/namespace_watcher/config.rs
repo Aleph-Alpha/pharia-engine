@@ -8,6 +8,8 @@ use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use url::Url;
 
+use crate::skill_loader::RegistryConfig;
+
 use super::{
     namespace_description::{
         FileLoader, HttpLoader, NamespaceDescription, SkillDescription, WatchLoader,
@@ -58,6 +60,17 @@ impl OperatorConfig {
             )]
             .into(),
         }
+    }
+
+    /// Which namespaces is backed by which registry
+    #[must_use]
+    pub fn registry_config(&self) -> RegistryConfig {
+        RegistryConfig::new(
+            self.namespaces
+                .iter()
+                .map(|(k, v)| (k.to_owned(), v.registry()))
+                .collect(),
+        )
     }
 
     #[must_use]
@@ -198,10 +211,9 @@ impl NamespaceConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::namespace_watcher::{
-        config::{Registry, RegistryAuth},
-        NamespaceConfig,
-    };
+    use crate::namespace_watcher::config::{Registry, RegistryAuth};
+
+    use crate::namespace_watcher::tests::NamespaceConfig;
 
     use super::OperatorConfig;
 
