@@ -66,29 +66,9 @@ pub mod tests {
 
     use tempfile::tempdir;
 
-    use super::{DynFuture, SkillImage, SkillRegistry};
     use crate::registries::FileRegistry;
-    use futures::future::pending;
 
-    pub struct NeverResolvingRegistry;
-
-    impl SkillRegistry for NeverResolvingRegistry {
-        fn load_skill<'a>(
-            &'a self,
-            _name: &'a str,
-            _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
-            Box::pin(pending::<Result<Option<SkillImage>, anyhow::Error>>())
-        }
-
-        fn fetch_digest<'a>(
-            &'a self,
-            _name: &'a str,
-            _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
-            Box::pin(pending::<Result<Option<String>, anyhow::Error>>())
-        }
-    }
+    use super::{DynFuture, SkillImage, SkillRegistry};
 
     impl SkillRegistry for HashMap<String, Vec<u8>> {
         fn load_skill<'a>(
