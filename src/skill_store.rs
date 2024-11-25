@@ -639,7 +639,7 @@ pub mod tests {
     #[tokio::test]
     async fn cached_skill_removed() {
         // Given one cached skill
-        given_greet_skill();
+        // Given a skill store with a registry that can load a skill
         let skill_path = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
