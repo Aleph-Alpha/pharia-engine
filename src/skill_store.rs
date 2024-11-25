@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context};
 use futures::stream::FuturesUnordered;
-use crate::registries::load_and_build;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use std::{future::Future, pin::Pin};
 use tokio::{
@@ -43,7 +42,7 @@ struct SkillStoreState {
     known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
     // key: Namespace, value: Registry
-    skill_registries: HashMap<String, Arc<Box<dyn SkillRegistry + Send + Sync>>>,
+    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
     // key: Namespace, value: Error
     invalid_namespaces: HashMap<String, anyhow::Error>,
     engine: Arc<Engine>,
@@ -57,7 +56,7 @@ impl SkillStoreState {
         SkillStoreState {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
-            skill_registries: skill_registries.into_iter().map(|(k, v)| (k, Arc::new(v))).collect(),
+            skill_registries,
             invalid_namespaces: HashMap::new(),
             engine,
         }
@@ -151,7 +150,7 @@ impl SkillStoreState {
     }
 
     /// Return to corresponding registry for a given skill path
-    fn registry_for_skill(&self, skill_path: &SkillPath) -> Option<&Arc<(impl SkillRegistry + use<>)>> {
+    fn registry_for_skill(&self, skill_path: &SkillPath) -> Option<&(impl SkillRegistry + use<>)> {
         self.skill_registries.get(&skill_path.namespace)
     }
 
@@ -378,9 +377,7 @@ struct SkillStoreActor {
     receiver: mpsc::Receiver<SkillProviderMsg>,
     provider: SkillStoreState,
     digest_update_interval: Duration,
-    running_requests: FuturesUnordered<
-        Pin<Box<dyn Future<Output = anyhow::Result<(Arc<Skill>, SkillPath, String)>> + Send>>,
-    >,
+    running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
 impl From<&NamespaceConfig> for Box<dyn SkillRegistry + Send + Sync> {
@@ -426,11 +423,7 @@ impl SkillStoreActor {
                 },
                 // FuturesUnordered will let them run in parallel. It will
                 // yield once one of them is completed.
-                result = self.running_requests.select_next_some(), if !self.running_requests.is_empty()  => {
-                    if let Ok((skill, skill_path, digest)) = result {
-                        self.provider.insert(skill_path, skill, digest);
-                    }
-                },
+                () = self.running_requests.select_next_some(), if !self.running_requests.is_empty()  => {}
                 // While we are waiting on messages, refresh the digests behind the tags. If a new message
                 // comes in while we are mid-request, it will get cancelled, but since we want to prioritize
                 // processing messages, doing some duplicate requests is ok.
@@ -449,38 +442,7 @@ impl SkillStoreActor {
     pub async fn act(&mut self, msg: SkillProviderMsg) {
         match msg {
             SkillProviderMsg::Fetch { skill_path, send } => {
-                if let Some(skill) = self.provider.cached_skill(&skill_path) {
-                    drop(send.send(Ok(Some(skill))));
-                    return;
-                }
-                match self.provider.tag(&skill_path) {
-                    // Skill is configured, fetch it in the background
-                    Ok(Some(tag)) => {
-                        let engine = self.provider.engine.clone();
-                        let registry = self.provider.skill_registries
-                        .get(&skill_path.namespace)
-                        .expect("If skill exists, so must the namespace it resides in.");
-
-                        //  can I clone this simply?
-                        let registry = registry.clone();
-                        let tag = tag.to_owned();
-                        let fut = async move {
-                            let (skill, digest) = load_and_build(registry, engine, skill_path.clone(), tag).await?;
-                            let skill = Arc::new(skill);
-                            drop(send.send(Ok(Some(skill.clone()))));
-                            Ok((skill, skill_path, digest))
-                        };
-                        self.running_requests.push(Box::pin(fut));
-                    },
-                    // Skill is not configured return early
-                    Ok(None) => {
-                        drop(send.send(Ok(None)));
-                    }
-                    // Namespace is erroneous, return error
-                    Err(e) => {
-                        drop(send.send(Err(e)));
-                    }
-                }
+                drop(send.send(self.provider.fetch(&skill_path).await));
             }
             SkillProviderMsg::List { send } => {
                 drop(send.send(self.provider.skills().cloned().collect()));
