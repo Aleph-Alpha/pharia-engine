@@ -42,7 +42,7 @@ pub trait SkillRegistry {
     ) -> DynFuture<'a, anyhow::Result<Option<String>>>;
 }
 
-impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
+impl SkillRegistry for Box<dyn SkillRegistry + Send> {
     fn load_skill<'a>(
         &'a self,
         name: &'a str,

@@ -40,7 +40,7 @@ struct SkillStoreState {
     known_skills: HashMap<SkillPath, Option<String>>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
     // key: Namespace, value: Registry
-    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+    skill_registries: HashMap<String, Box<dyn SkillRegistry + Send>>,
     // key: Namespace, value: Error
     invalid_namespaces: HashMap<String, anyhow::Error>,
     engine: Arc<Engine>,
@@ -62,7 +62,7 @@ impl SkillStoreState {
     }
 
     /// Build a registry implementation from a registry description
-    fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send + Sync> {
+    fn registry(namespace_config: &NamespaceConfig) -> Box<dyn SkillRegistry + Send> {
         match namespace_config.registry() {
             Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
             Registry::Oci {
@@ -114,55 +114,39 @@ impl SkillStoreState {
         self.invalid_namespaces.remove(namespace);
     }
 
-    /// Fetch a skill. If the skill is present in the cache, return it. Otherwise, fetch it from the
-    /// registry and cache it.
+    /// `Some` if the skill can be successfully loaded, `None` if the skill can not be found
     pub async fn fetch(&mut self, skill_path: &SkillPath) -> anyhow::Result<Option<Arc<Skill>>> {
-        if let Some(skill) = self.cached_skill(skill_path) {
-            return Ok(Some(skill));
+        if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
+            return Err(anyhow!("Invalid namespace: {error}"));
         }
-        if let Some(tag) = self.tag(skill_path)? {
-            let (skill, digest) = self.load_and_build(skill_path, tag).await?;
-            let skill = Arc::new(skill);
-            self.insert(skill_path.clone(), skill.clone(), digest);
-            Ok(Some(skill))
+
+        let skill = if let Some(skill) = self.cached_skills.get(skill_path) {
+            skill.skill.clone()
         } else {
-            Ok(None)
-        }
-    }
+            let Some(tag) = self.tag_for_skill(skill_path) else {
+                return Ok(None);
+            };
 
-    /// `Some` if the skill is present in the cache, `None` if not
-    pub fn cached_skill(&self, skill_path: &SkillPath) -> Option<Arc<Skill>> {
-        self.cached_skills
-            .get(skill_path)
-            .map(|skill| skill.skill.clone())
-    }
+            let registry = self
+                .skill_registries
+                .get(&skill_path.namespace)
+                .expect("If skill exists, so must the namespace it resides in.");
 
-    /// Load a skill from the registry and build it to a `Skill`
-    pub async fn load_and_build(
-        &self,
-        skill_path: &SkillPath,
-        tag: &str,
-    ) -> anyhow::Result<(Skill, String)> {
-        let registry = self
-            .skill_registries
-            .get(&skill_path.namespace)
-            .expect("If skill exists, so must the namespace it resides in.");
+            let skill_bytes = registry.load_skill(&skill_path.name, tag).await?;
+            let SkillImage { bytes, digest } = skill_bytes
+                .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
+            let engine = self.engine.clone();
+            let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
+                .await
+                .expect("Spawend linking thread must run to completion without being poisened.")
+                .with_context(|| format!("Failed to initialize {skill_path}."))?;
+            let skill = Arc::new(skill);
+            self.cached_skills
+                .insert(skill_path.clone(), CachedSkill::new(skill.clone(), digest));
+            skill
+        };
 
-        let skill_bytes = registry.load_skill(&skill_path.name, tag).await?;
-        let SkillImage { bytes, digest } = skill_bytes
-            .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
-        let engine = self.engine.clone();
-        let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
-            .await
-            .expect("Spawend linking thread must run to completion without being poisened.")
-            .with_context(|| format!("Failed to initialize {skill_path}."))?;
-        Ok((skill, digest))
-    }
-
-    /// Insert a skill into the cache.
-    pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<Skill>, digest: String) {
-        self.cached_skills
-            .insert(skill_path, CachedSkill::new(skill.clone(), digest));
+        Ok(Some(skill))
     }
 
     /// Return to corresponding registry for a given skill path
@@ -171,14 +155,10 @@ impl SkillStoreState {
     }
 
     /// Return the registered tag for a given skill
-    fn tag(&self, skill_path: &SkillPath) -> anyhow::Result<Option<&str>> {
-        if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
-            return Err(anyhow!("Invalid namespace: {error}"));
-        }
-        Ok(self
-            .known_skills
+    fn tag_for_skill(&self, skill_path: &SkillPath) -> Option<&str> {
+        self.known_skills
             .get(skill_path)
-            .map(|o| o.as_deref().unwrap_or("latest")))
+            .map(|o| o.as_deref().unwrap_or("latest"))
     }
 
     /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
@@ -201,8 +181,7 @@ impl SkillStoreState {
             .registry_for_skill(&skill_path)
             .expect("Missing registry for skill");
         let tag = self
-            .tag(&skill_path)
-            .expect("Bad namespace configuration for skill")
+            .tag_for_skill(&skill_path)
             .expect("Missing tag for skill");
 
         match registry.fetch_digest(&skill_path.name, tag).await {
@@ -434,7 +413,8 @@ impl SkillStoreActor {
     pub async fn act(&mut self, msg: SkillProviderMsg) {
         match msg {
             SkillProviderMsg::Fetch { skill_path, send } => {
-                drop(send.send(self.provider.fetch(&skill_path).await));
+                let result = self.provider.fetch(&skill_path).await;
+                drop(send.send(result));
             }
             SkillProviderMsg::List { send } => {
                 drop(send.send(self.provider.skills().cloned().collect()));
@@ -512,23 +492,28 @@ pub mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn skill_component_not_in_config() {
+    #[tokio::test]
+    async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
         let engine = Arc::new(Engine::new(false).unwrap());
-        let provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
-        let result = provider.tag(&SkillPath::new(&skill_path.namespace, "non_existing_skill"));
+        let result = provider
+            .fetch(&SkillPath::new(&skill_path.namespace, "non_existing_skill"))
+            .await;
+
         assert!(matches!(result, Ok(None)));
     }
 
-    #[test]
-    fn namespace_not_in_config() {
+    #[tokio::test]
+    async fn namespace_not_in_config() {
         let skill_path = SkillPath::dummy();
         let engine = Arc::new(Engine::new(false).unwrap());
-        let provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
-        let result = provider.tag(&SkillPath::new("non_existing_namespace", &skill_path.name));
+        let result = provider
+            .fetch(&SkillPath::new("non_existing_namespace", &skill_path.name))
+            .await;
 
         assert!(matches!(result, Ok(None)));
     }
@@ -540,7 +525,7 @@ pub mod tests {
         let skill_path = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
-        provider.fetch(&skill_path).await.unwrap().unwrap();
+        provider.fetch(&skill_path).await.unwrap();
 
         // When we remove the skill
         provider.remove_skill(&skill_path);
@@ -549,16 +534,16 @@ pub mod tests {
         assert!(provider.list_cached_skills().next().is_none());
     }
 
-    #[test]
-    fn should_error_if_fetching_skill_from_invalid_namespace() {
+    #[tokio::test]
+    async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
 
-        // when fetching the tag
-        let result = provider.tag(&skill_path);
+        // when fetching the skill
+        let result = provider.fetch(&skill_path).await;
 
         // then it returns an error
         assert!(result.is_err());
