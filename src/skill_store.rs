@@ -436,7 +436,8 @@ pub mod tests {
 
     impl SkillStoreState {
         fn with_namespace_and_skill(engine: Arc<Engine>, skill_path: &SkillPath) -> Self {
-            let skill_loader = SkillLoader::with_namespace_and_skill(engine, skill_path).api();
+            let skill_loader =
+                SkillLoader::with_file_registry(engine, skill_path.namespace.clone()).api();
 
             let mut provider = SkillStoreState::new(skill_loader);
             provider.upsert_skill(skill_path, None);
@@ -513,8 +514,7 @@ pub mod tests {
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new(false).unwrap());
-        let registries = local_registries();
-        let skill_loader = SkillLoader::new(engine, registries).api();
+        let skill_loader = SkillLoader::with_file_registry_named_local(engine).api();
         let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_provider
             .api()
@@ -545,8 +545,7 @@ pub mod tests {
     async fn should_list_skills_that_have_been_added() {
         // Given an empty provider
         let engine = Arc::new(Engine::new(false).unwrap());
-        let registries = local_registries();
-        let skill_loader = SkillLoader::new(engine, registries).api();
+        let skill_loader = SkillLoader::with_file_registry_named_local(engine).api();
         let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         let api = skill_provider.api();
 
@@ -571,8 +570,7 @@ pub mod tests {
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let registries = local_registries();
-        let skill_loader = SkillLoader::new(engine, registries).api();
+        let skill_loader = SkillLoader::with_file_registry_named_local(engine).api();
         let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
@@ -593,8 +591,7 @@ pub mod tests {
         // Given one "greet_skill" which is not in cache
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let registries = local_registries();
-        let skill_loader = SkillLoader::new(engine, registries).api();
+        let skill_loader = SkillLoader::with_file_registry_named_local(engine).api();
         let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
         let api = skill_provider.api();
         api.upsert(greet_skill.clone(), None).await;
@@ -609,19 +606,6 @@ pub mod tests {
         // Cleanup
         drop(api);
         skill_provider.wait_for_shutdown().await;
-    }
-
-    /// Namespace named local backed by a file registry with "skills" directory
-    fn local_registries() -> HashMap<String, Box<dyn SkillRegistry + Send + Sync>> {
-        let namespace_cfg = NamespaceConfig::TeamOwned {
-            config_url: "file://namespace.toml".to_owned(),
-            config_access_token_env_var: None,
-            registry: Registry::File {
-                path: "./skills".to_owned(),
-            },
-        };
-        let registry = (&namespace_cfg).into();
-        std::iter::once(("local".to_owned(), registry)).collect()
     }
 
     #[tokio::test]
@@ -668,7 +652,7 @@ pub mod tests {
         given_greet_skill();
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-        let skill_loader = SkillLoader::new(engine, local_registries()).api();
+        let skill_loader = SkillLoader::with_file_registry_named_local(engine).api();
         let mut skill_provider = SkillStoreState::new(skill_loader);
 
         skill_provider.upsert_skill(&greet_skill, None);
