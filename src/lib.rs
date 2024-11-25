@@ -75,16 +75,9 @@ impl Kernel {
             search: search.api(),
             tokenizers: tokenizers.api(),
         };
-
-        let skill_registries = app_config
-            .operator_config
-            .namespaces
-            .iter()
-            .map(|(k, v)| (k.to_owned(), v.into()))
-            .collect();
         let skill_store = SkillStore::new(
             engine.clone(),
-            skill_registries,
+            &app_config.operator_config.namespaces,
             app_config.namespace_update_interval,
         );
 
