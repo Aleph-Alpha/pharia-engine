@@ -99,6 +99,7 @@ impl Kernel {
 
         let shell = match Shell::new(
             app_config.tcp_addr,
+            authorization.api(),
             skill_executor.api(),
             skill_store.api(),
             csi_drivers,

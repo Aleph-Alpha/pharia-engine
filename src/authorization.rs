@@ -23,8 +23,8 @@ impl Authorization {
         Authorization { send, handle }
     }
 
-    pub fn api(&self) -> impl AuthorizationApi + use<> {
-        self.send.clone()
+    pub fn api(&self) -> AuthorizationApi {
+        AuthorizationApi::new(self.send.clone())
     }
 
     /// Authorization is going to shutdown, as soon as the last instance of [`AuthorizationApi`] is
@@ -35,11 +35,18 @@ impl Authorization {
     }
 }
 
-pub trait AuthorizationApi {}
+#[derive(Clone)]
+pub struct AuthorizationApi {
+    sender: mpsc::Sender<AuthorizationMsg>,
+}
 
-impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {}
+impl AuthorizationApi {
+    pub fn new(sender: mpsc::Sender<AuthorizationMsg>) -> Self {
+        Self { sender }
+    }
+}
 
-enum AuthorizationMsg {}
+pub enum AuthorizationMsg {}
 
 pub async fn authorization_middleware(
     _bearer: Option<TypedHeader<headers::Authorization<Bearer>>>,
@@ -48,4 +55,15 @@ pub async fn authorization_middleware(
 ) -> Result<Response, ErrorResponse> {
     let response = next.run(request).await;
     Ok(response)
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::*;
+
+    pub fn dummy_authorization_api() -> AuthorizationApi {
+        let (send, _recv) = mpsc::channel(1);
+        AuthorizationApi::new(send)
+    }
 }
