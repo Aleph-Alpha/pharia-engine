@@ -1,4 +1,4 @@
-use std::{future::Future, iter::once, net::SocketAddr, sync::Arc, time::Instant};
+use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
 
 use anyhow::Context;
 use axum::{
@@ -55,7 +55,7 @@ impl Shell {
         addr: impl Into<SocketAddr>,
         skill_executor_api: SkillExecutorApi,
         skill_provider_api: SkillStoreApi,
-        csi_drivers: impl Csi + Send + Sync + 'static,
+        csi_drivers: impl Csi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, anyhow::Error> {
         let addr = addr.into();
@@ -66,12 +66,12 @@ impl Shell {
             .context(format!("Could not bind a tcp listener to '{addr}'"))?;
         info!("Listening on: {addr}");
 
-        let handle = tokio::spawn(async move {
-            let app_state = AppState::new(
-                skill_provider_api.clone(),
-                skill_executor_api.clone(),
-                csi_drivers,
-            );
+        let app_state = AppState::new(
+            skill_provider_api.clone(),
+            skill_executor_api.clone(),
+            csi_drivers,
+        );
+        let handle = tokio::spawn(async {
             let res = axum::serve(listener, http(app_state))
                 .with_graceful_shutdown(shutdown_signal)
                 .await;
@@ -87,58 +87,61 @@ impl Shell {
     }
 }
 
-#[derive(Clone)]
-pub struct CsiDriverImpl(pub Arc<dyn Csi + Sync + Send>);
-
 /// State shared between routes
 #[derive(Clone)]
-pub struct AppState {
+pub struct AppState<C>
+where
+    C: Clone,
+{
     skill_provider_api: SkillStoreApi,
     skill_executor_api: SkillExecutorApi,
-    csi_drivers: CsiDriverImpl,
+    pub csi_drivers: C,
 }
 
-impl AppState {
-    pub fn new<C>(
+impl<C> AppState<C>
+where
+    C: Csi + Clone + Sync + Send + 'static,
+{
+    pub fn new(
         skill_provider_api: SkillStoreApi,
         skill_executor_api: SkillExecutorApi,
         csi_drivers: C,
-    ) -> Self
-    where
-        C: Csi + Sync + Send + 'static,
-    {
+    ) -> Self {
         Self {
             skill_provider_api,
             skill_executor_api,
-            csi_drivers: CsiDriverImpl(Arc::new(csi_drivers)),
+            csi_drivers,
         }
     }
 }
 
-impl FromRef<AppState> for SkillStoreApi {
-    fn from_ref(app_state: &AppState) -> SkillStoreApi {
+impl<C> FromRef<AppState<C>> for SkillStoreApi
+where
+    C: Clone,
+{
+    fn from_ref(app_state: &AppState<C>) -> SkillStoreApi {
         app_state.skill_provider_api.clone()
     }
 }
 
-impl FromRef<AppState> for SkillExecutorApi {
-    fn from_ref(app_state: &AppState) -> SkillExecutorApi {
+impl<C> FromRef<AppState<C>> for SkillExecutorApi
+where
+    C: Clone,
+{
+    fn from_ref(app_state: &AppState<C>) -> SkillExecutorApi {
         app_state.skill_executor_api.clone()
     }
 }
 
-impl FromRef<AppState> for CsiDriverImpl {
-    fn from_ref(app_state: &AppState) -> CsiDriverImpl {
-        app_state.csi_drivers.clone()
-    }
-}
-
-pub fn http(app_state: AppState) -> Router {
+pub fn http<C>(app_state: AppState<C>) -> Router
+where
+    C: Csi + Clone + Sync + Send + 'static,
+{
     let serve_dir =
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
 
     Router::new()
-        .route("/csi", post(http_csi_handle))
+        .route("/csi", post(http_csi_handle::<C>))
         .route_layer(middleware::from_fn(authorization_middleware))
         .route("/cached_skills", get(cached_skills))
         .route("/cached_skills/:name", delete(drop_cached_skill))
