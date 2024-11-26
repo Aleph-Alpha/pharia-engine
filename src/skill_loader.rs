@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
 
 use crate::namespace_watcher::Registry;
-use crate::registries::{FileRegistry, OciRegistry, SkillImage, SkillRegistry};
+use crate::registries::{Digest, FileRegistry, OciRegistry, SkillImage, SkillRegistry};
 use crate::skills::{Engine, Skill, SkillPath};
 
 use std::collections::HashMap;
@@ -14,12 +14,12 @@ pub enum SkillLoaderMsg {
     Fetch {
         skill_path: SkillPath,
         tag: String,
-        send: oneshot::Sender<anyhow::Result<(Skill, String)>>,
+        send: oneshot::Sender<anyhow::Result<(Skill, Digest)>>,
     },
     FetchDigest {
         skill_path: SkillPath,
         tag: String,
-        send: oneshot::Sender<anyhow::Result<Option<String>>>,
+        send: oneshot::Sender<anyhow::Result<Option<Digest>>>,
     },
 }
 
@@ -101,7 +101,7 @@ impl SkillLoaderApi {
         &self,
         skill_path: SkillPath,
         tag: String,
-    ) -> Result<(Skill, String), anyhow::Error> {
+    ) -> Result<(Skill, Digest), anyhow::Error> {
         let (send, recv) = oneshot::channel();
         self.sender
             .send(SkillLoaderMsg::Fetch {
@@ -118,7 +118,7 @@ impl SkillLoaderApi {
         &self,
         skill_path: SkillPath,
         tag: String,
-    ) -> Result<Option<String>, anyhow::Error> {
+    ) -> Result<Option<Digest>, anyhow::Error> {
         let (send, recv) = oneshot::channel();
         self.sender
             .send(SkillLoaderMsg::FetchDigest {
@@ -180,7 +180,7 @@ impl SkillLoaderActor {
     }
 
     /// Load a skill from the registry and build it to a `Skill`
-    async fn fetch(&self, skill_path: &SkillPath, tag: &str) -> anyhow::Result<(Skill, String)> {
+    async fn fetch(&self, skill_path: &SkillPath, tag: &str) -> anyhow::Result<(Skill, Digest)> {
         let registry = self
             .registries
             .get(&skill_path.namespace)
@@ -202,7 +202,7 @@ impl SkillLoaderActor {
         &self,
         skill_path: &SkillPath,
         tag: &str,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<Digest>> {
         let registry = self
             .registries
             .get(&skill_path.namespace)

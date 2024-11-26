@@ -10,6 +10,7 @@ use tokio::{
 use tracing::{error, info};
 
 use crate::{
+    registries::Digest,
     skill_loader::SkillLoaderApi,
     skills::{Skill, SkillPath},
 };
@@ -20,16 +21,16 @@ struct CachedSkill {
     /// Compiled and pre initialized skill
     skill: Arc<Skill>,
     /// Digest of the skill when it was last loaded from the registry
-    digest: String,
+    digest: Digest,
     /// When we last checked the digest
     digest_validated: Instant,
 }
 
 impl CachedSkill {
-    fn new(skill: Arc<Skill>, digest: impl Into<String>) -> Self {
+    fn new(skill: Arc<Skill>, digest: Digest) -> Self {
         Self {
             skill,
-            digest: digest.into(),
+            digest,
             digest_validated: Instant::now(),
         }
     }
@@ -116,7 +117,7 @@ impl SkillStoreState {
     }
 
     /// Insert a skill into the cache.
-    pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<Skill>, digest: String) {
+    pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<Skill>, digest: Digest) {
         self.cached_skills
             .insert(skill_path, CachedSkill::new(skill.clone(), digest));
     }

@@ -1,4 +1,4 @@
-use super::{DynFuture, SkillImage, SkillRegistry};
+use super::{Digest, DynFuture, SkillImage, SkillRegistry};
 
 use std::{
     fs,
@@ -23,14 +23,14 @@ impl FileRegistry {
         skill_path
     }
 
-    fn skill_digest(skill_path: &Path) -> anyhow::Result<String> {
+    fn skill_digest(skill_path: &Path) -> anyhow::Result<Digest> {
         let digest = skill_path
             .metadata()?
             .modified()?
             .duration_since(SystemTime::UNIX_EPOCH)?
             .as_millis()
             .to_string();
-        Ok(digest)
+        Ok(Digest(digest))
     }
 }
 
@@ -57,7 +57,7 @@ impl SkillRegistry for FileRegistry {
         &'a self,
         name: &'a str,
         _tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
+    ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
         Box::pin(async move {
             let skill_path = self.skill_path(name);
             if skill_path.exists() {
