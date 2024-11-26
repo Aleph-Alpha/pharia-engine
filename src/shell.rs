@@ -2,7 +2,7 @@ use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
 
 use anyhow::Context;
 use axum::{
-    extract::{MatchedPath, Path, Request, State},
+    extract::{FromRef, MatchedPath, Path, Request, State},
     http::{header::AUTHORIZATION, StatusCode},
     middleware::{self, Next},
     response::{Html, IntoResponse},
@@ -65,10 +65,18 @@ impl Shell {
             .await
             .context(format!("Could not bind a tcp listener to '{addr}'"))?;
         info!("Listening on: {addr}");
+        let app_state = AppState {
+            skill_provider_api: skill_provider_api.clone(),
+        };
         let handle = tokio::spawn(async {
             let res = axum::serve(
                 listener,
-                http(skill_executor_api, skill_provider_api, csi_drivers),
+                http(
+                    app_state,
+                    skill_executor_api,
+                    skill_provider_api,
+                    csi_drivers,
+                ),
             )
             .with_graceful_shutdown(shutdown_signal)
             .await;
@@ -84,7 +92,20 @@ impl Shell {
     }
 }
 
+/// State shared between routes
+#[derive(Clone)]
+pub struct AppState {
+    skill_provider_api: SkillStoreApi,
+}
+
+impl FromRef<AppState> for SkillStoreApi {
+    fn from_ref(app_state: &AppState) -> SkillStoreApi {
+        app_state.skill_provider_api.clone()
+    }
+}
+
 pub fn http<C>(
+    app_state: AppState,
     skill_executor_api: SkillExecutorApi,
     skill_provider_api: SkillStoreApi,
     csi_drivers: C,
@@ -111,6 +132,7 @@ where
         .route("/openapi.json", get(serve_docs))
         .route("/healthcheck", get(|| async { "ok" }))
         .route("/", get(index))
+        .with_state(app_state)
         .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
             ServiceBuilder::new()
@@ -430,7 +452,11 @@ mod tests {
         let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
 
         let skill_executor = StubSkillExecuter::new(|_| {});
-        let http = http(skill_executor.api(), dummy_skill_provider_api(), csi);
+        let skill_provider = dummy_skill_provider_api();
+        let app_state = AppState {
+            skill_provider_api: skill_provider.clone(),
+        };
+        let http = http(app_state, skill_executor.api(), skill_provider, csi);
 
         let resp = http
             .oneshot(
@@ -466,7 +492,11 @@ mod tests {
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
-        let http = http(skill_executor_api, dummy_skill_provider_api(), DummyCsi);
+        let skill_provider = dummy_skill_provider_api();
+        let app_state = AppState {
+            skill_provider_api: skill_provider.clone(),
+        };
+        let http = http(app_state, skill_executor_api, skill_provider, DummyCsi);
 
         let args = ExecuteSkillArgs {
             skill: "local/greet_skill".to_owned(),
@@ -494,9 +524,13 @@ mod tests {
     async fn api_token_missing() {
         // Given
         let skill_executor = StubSkillExecuter::new(|_| {});
+        let skill_provider = dummy_skill_provider_api();
+        let app_state = AppState {
+            skill_provider_api: skill_provider.clone(),
+        };
 
         // When
-        let http = http(skill_executor.api(), dummy_skill_provider_api(), DummyCsi);
+        let http = http(app_state, skill_executor.api(), skill_provider, DummyCsi);
         let args = ExecuteSkillArgs {
             skill: "greet".to_owned(),
             input: json!("Homer"),
@@ -537,8 +571,15 @@ mod tests {
                 panic!("unexpected message in test")
             }
         });
-
-        let http = http(dummy_skill_executer.api(), skill_provider_api, DummyCsi);
+        let app_state = AppState {
+            skill_provider_api: skill_provider_api.clone(),
+        };
+        let http = http(
+            app_state,
+            dummy_skill_executer.api(),
+            skill_provider_api,
+            DummyCsi,
+        );
 
         let resp = http
             .oneshot(
@@ -575,7 +616,15 @@ mod tests {
                 send.send(true).unwrap();
             }
         });
-        let http = http(dummy_skill_executer.api(), skill_provider_api, DummyCsi);
+        let app_state = AppState {
+            skill_provider_api: skill_provider_api.clone(),
+        };
+        let http = http(
+            app_state,
+            dummy_skill_executer.api(),
+            skill_provider_api,
+            DummyCsi,
+        );
 
         // When the skill is deleted
         let resp = http
@@ -623,7 +672,15 @@ mod tests {
                 send.send(false).unwrap();
             }
         });
-        let http = http(dummy_skill_executer.api(), skill_provider_api, DummyCsi);
+        let app_state = AppState {
+            skill_provider_api: skill_provider_api.clone(),
+        };
+        let http = http(
+            app_state,
+            dummy_skill_executer.api(),
+            skill_provider_api,
+            DummyCsi,
+        );
 
         // When the skill is deleted
         let resp = http
@@ -654,7 +711,11 @@ mod tests {
         // drop the receiver, we expect the shell to never try to execute a skill
         let (send, _) = mpsc::channel(1);
         let skill_executor_api = SkillExecutorApi::new(send);
-        let http = http(skill_executor_api, dummy_skill_provider_api(), DummyCsi);
+        let skill_provider = dummy_skill_provider_api();
+        let app_state = AppState {
+            skill_provider_api: skill_provider.clone(),
+        };
+        let http = http(app_state, skill_executor_api, skill_provider, DummyCsi);
 
         // When executing a skill with a blank name
         let api_token = api_token();
@@ -685,10 +746,14 @@ mod tests {
     async fn healthcheck() {
         let (send, _recv) = mpsc::channel(1);
         let dummy_skill_executer_api = SkillExecutorApi::new(send);
-
+        let skill_provider = dummy_skill_provider_api();
+        let app_state = AppState {
+            skill_provider_api: skill_provider.clone(),
+        };
         let http = http(
+            app_state,
             dummy_skill_executer_api,
-            dummy_skill_provider_api(),
+            skill_provider,
             DummyCsi,
         );
         let resp = http
@@ -708,10 +773,14 @@ mod tests {
     async fn skill_wit_route_should_return_current_wit_world() {
         let (send, _recv) = mpsc::channel(1);
         let dummy_skill_executer_api = SkillExecutorApi::new(send);
-
+        let skill_provider = dummy_skill_provider_api();
+        let app_state = AppState {
+            skill_provider_api: skill_provider.clone(),
+        };
         let http = http(
+            app_state,
             dummy_skill_executer_api,
-            dummy_skill_provider_api(),
+            skill_provider,
             DummyCsi,
         );
         let resp = http
@@ -746,7 +815,15 @@ mod tests {
                 panic!("Unexpected message in test")
             }
         });
-        let http = http(dummy_skill_executer.api(), skill_provider_api, DummyCsi);
+        let app_state = AppState {
+            skill_provider_api: skill_provider_api.clone(),
+        };
+        let http = http(
+            app_state,
+            dummy_skill_executer.api(),
+            skill_provider_api,
+            DummyCsi,
+        );
 
         // When
         let resp = http
@@ -776,7 +853,11 @@ mod tests {
             ))))
             .unwrap();
         });
-        let http = http(skill_executor.api(), dummy_skill_provider_api(), DummyCsi);
+        let skill_provider = dummy_skill_provider_api();
+        let app_state = AppState {
+            skill_provider_api: skill_provider.clone(),
+        };
+        let http = http(app_state, skill_executor.api(), skill_provider, DummyCsi);
 
         // When executing a skill in the namespace
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
@@ -814,9 +895,13 @@ mod tests {
         });
         let skill_executer_api = skill_executer_dummy.api();
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
+        let skill_provider = dummy_skill_provider_api();
+        let app_state = AppState {
+            skill_provider_api: skill_provider.clone(),
+        };
 
         // When executing a skill
-        let http = http(skill_executer_api, dummy_skill_provider_api(), DummyCsi);
+        let http = http(app_state, skill_executer_api, skill_provider, DummyCsi);
         let args = ExecuteSkillArgs {
             skill: "my_namespace/my_skill".to_owned(),
             input: json!("Homer"),
