@@ -466,6 +466,50 @@ mod tests {
     use tokio::{sync::mpsc, task::JoinHandle};
     use tower::util::ServiceExt;
 
+    impl AppState<DummyCsi> {
+        pub fn dummy() -> Self {
+            let skill_executor = StubSkillExecuter::new(|_| {});
+            Self::new(
+                dummy_authorization_api(),
+                dummy_skill_provider_api(),
+                skill_executor.api(),
+                DummyCsi,
+            )
+        }
+    }
+
+    impl<C> AppState<C>
+    where
+        C: Csi + Clone + Sync + Send + 'static,
+    {
+        pub fn with_authorization_api(mut self, authorization_api: AuthorizationApi) -> Self {
+            self.authorization_api = authorization_api;
+            self
+        }
+
+        pub fn with_skill_provider_api(mut self, skill_provider_api: SkillStoreApi) -> Self {
+            self.skill_provider_api = skill_provider_api;
+            self
+        }
+
+        pub fn with_skill_executor_api(mut self, skill_executor_api: SkillExecutorApi) -> Self {
+            self.skill_executor_api = skill_executor_api;
+            self
+        }
+
+        pub fn with_csi_drivers<D>(self, csi_drivers: D) -> AppState<D>
+        where
+            D: Csi + Clone + Sync + Send + 'static,
+        {
+            AppState::new(
+                self.authorization_api,
+                self.skill_provider_api,
+                self.skill_executor_api,
+                csi_drivers,
+            )
+        }
+    }
+
     #[tokio::test]
     async fn http_csi_handle_returns_completion() {
         // Given a versioned csi request
@@ -488,16 +532,7 @@ mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
         let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
-
-        let authorization_api = dummy_authorization_api();
-        let skill_provider_api = dummy_skill_provider_api();
-        let skill_executor = StubSkillExecuter::new(|_| {});
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api,
-            skill_executor.api(),
-            csi,
-        );
+        let app_state = AppState::dummy().with_csi_drivers(csi);
         let http = http(app_state);
 
         let resp = http
@@ -529,20 +564,13 @@ mod tests {
             send.send(Ok(json!("dummy completion"))).unwrap();
         });
         let skill_executor_api = skill_executer_mock.api();
+        let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
+        let http = http(app_state);
 
         // When
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
-        let authorization_api = dummy_authorization_api();
-        let skill_provider_api = dummy_skill_provider_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api,
-            skill_executor_api.clone(),
-            DummyCsi,
-        );
-        let http = http(app_state);
 
         let args = ExecuteSkillArgs {
             skill: "local/greet_skill".to_owned(),
@@ -569,15 +597,8 @@ mod tests {
     #[tokio::test]
     async fn api_token_missing() {
         // Given
-        let authorization_api = dummy_authorization_api();
-        let skill_provider_api = dummy_skill_provider_api();
-        let skill_executor = StubSkillExecuter::new(|_| {});
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api,
-            skill_executor.api(),
-            DummyCsi,
-        );
+        let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
+        let app_state = AppState::dummy().with_skill_executor_api(saboteur_skill_executer.api());
 
         // When
         let http = http(app_state);
@@ -608,8 +629,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_cached_skills_for_user() {
-        let authorization_api = dummy_authorization_api();
-        let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
+        let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
         let skill_provider_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
@@ -622,12 +642,9 @@ mod tests {
                 panic!("unexpected message in test")
             }
         });
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api.clone(),
-            dummy_skill_executer.api(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy()
+            .with_skill_provider_api(skill_provider_api.clone())
+            .with_skill_executor_api(saboteur_skill_executer.api());
         let http = http(app_state);
 
         let resp = http
@@ -649,7 +666,7 @@ mod tests {
     #[tokio::test]
     async fn drop_cached_skill() {
         // Given a provider which answers invalidate cache with `true`
-        let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
+        let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.
         let skill_path = Arc::new(Mutex::new(None));
@@ -665,13 +682,9 @@ mod tests {
                 send.send(true).unwrap();
             }
         });
-        let authorization_api = dummy_authorization_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api.clone(),
-            dummy_skill_executer.api(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy()
+            .with_skill_provider_api(skill_provider_api.clone())
+            .with_skill_executor_api(saboteur_skill_executer.api());
         let http = http(app_state);
 
         // When the skill is deleted
@@ -704,7 +717,7 @@ mod tests {
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.
         // Given a runtime with one installed skill
-        let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
+        let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.
         let skill_path = Arc::new(Mutex::new(None));
@@ -720,13 +733,9 @@ mod tests {
                 send.send(false).unwrap();
             }
         });
-        let authorization_api = dummy_authorization_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api.clone(),
-            dummy_skill_executer.api(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy()
+            .with_skill_provider_api(skill_provider_api.clone())
+            .with_skill_executor_api(saboteur_skill_executer.api());
         let http = http(app_state);
 
         // When the skill is deleted
@@ -758,14 +767,7 @@ mod tests {
         // drop the receiver, we expect the shell to never try to execute a skill
         let (send, _) = mpsc::channel(1);
         let skill_executor_api = SkillExecutorApi::new(send);
-        let authorization_api = dummy_authorization_api();
-        let skill_provider_api = dummy_skill_provider_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api,
-            skill_executor_api.clone(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
         let http = http(app_state);
 
         // When executing a skill with a blank name
@@ -795,16 +797,7 @@ mod tests {
 
     #[tokio::test]
     async fn healthcheck() {
-        let (send, _recv) = mpsc::channel(1);
-        let dummy_skill_executer_api = SkillExecutorApi::new(send);
-        let authorization_api = dummy_authorization_api();
-        let skill_provider_api = dummy_skill_provider_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api,
-            dummy_skill_executer_api.clone(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy();
         let http = http(app_state);
         let resp = http
             .oneshot(
@@ -821,16 +814,7 @@ mod tests {
 
     #[tokio::test]
     async fn skill_wit_route_should_return_current_wit_world() {
-        let (send, _recv) = mpsc::channel(1);
-        let dummy_skill_executer_api = SkillExecutorApi::new(send);
-        let authorization_api = dummy_authorization_api();
-        let skill_provider_api = dummy_skill_provider_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api,
-            dummy_skill_executer_api.clone(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy();
         let http = http(app_state);
         let resp = http
             .oneshot(
@@ -850,7 +834,7 @@ mod tests {
     #[tokio::test]
     async fn list_skills() {
         // Given we can provide two skills "ns_one/one" and "ns_two/two"
-        let dummy_skill_executer = StubSkillExecuter::new(|_| panic!());
+        let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
         let skill_provider_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
@@ -864,13 +848,9 @@ mod tests {
                 panic!("Unexpected message in test")
             }
         });
-        let authorization_api = dummy_authorization_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api.clone(),
-            dummy_skill_executer.api(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy()
+            .with_skill_provider_api(skill_provider_api)
+            .with_skill_executor_api(saboteur_skill_executer.api());
         let http = http(app_state);
 
         // When
@@ -901,14 +881,7 @@ mod tests {
             ))))
             .unwrap();
         });
-        let skill_provider_api = dummy_skill_provider_api();
-        let authorization_api = dummy_authorization_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api,
-            skill_executor.api(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy().with_skill_executor_api(skill_executor.api());
         let http = http(app_state);
 
         // When executing a skill in the namespace
@@ -946,14 +919,7 @@ mod tests {
                 .unwrap();
         });
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
-        let skill_provider_api = dummy_skill_provider_api();
-        let authorization_api = dummy_authorization_api();
-        let app_state = AppState::new(
-            authorization_api,
-            skill_provider_api.clone(),
-            skill_executer_dummy.api(),
-            DummyCsi,
-        );
+        let app_state = AppState::dummy().with_skill_executor_api(skill_executer_dummy.api());
 
         // When executing a skill
         let http = http(app_state);
