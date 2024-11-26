@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
+use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
 
 use crate::namespace_watcher::Registry;
 use crate::registries::{Digest, FileRegistry, OciRegistry, SkillImage, SkillRegistry};
 use crate::skills::{Engine, Skill, SkillPath};
-
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use std::collections::HashMap;
+use std::{future::Future, pin::Pin};
 
 pub enum SkillLoaderMsg {
     Fetch {
@@ -80,8 +83,8 @@ impl SkillLoader {
         registries: HashMap<String, Arc<dyn SkillRegistry + Send + Sync>>,
     ) -> Self {
         let (sender, recv) = mpsc::channel(1);
-        let mut actor = SkillLoaderActor::new(recv, engine, registries);
         let handle = tokio::spawn(async move {
+            let mut actor = SkillLoaderActor::new(recv, engine, registries);
             actor.run().await;
         });
         SkillLoader { sender, handle }
@@ -139,11 +142,15 @@ impl SkillLoaderApi {
     }
 }
 
+/// A future that fetches a skill and its digest and sends them to the message sender.
+type SkillRequest = Pin<Box<dyn Future<Output = ()> + Send>>;
+
 /// Owns access to the registries and provides ready-to-use skills and skill digests.
 pub struct SkillLoaderActor {
     receiver: mpsc::Receiver<SkillLoaderMsg>,
     engine: Arc<Engine>,
     registries: HashMap<String, Arc<dyn SkillRegistry + Send + Sync>>,
+    running_requests: FuturesUnordered<SkillRequest>,
 }
 
 impl SkillLoaderActor {
@@ -156,12 +163,22 @@ impl SkillLoaderActor {
             receiver,
             engine,
             registries,
+            running_requests: FuturesUnordered::new(),
         }
     }
 
     pub async fn run(&mut self) {
-        while let Some(msg) = self.receiver.recv().await {
-            self.act(msg).await;
+        loop {
+            select! {
+                msg = self.receiver.recv() => match msg {
+                Some(msg) => self.act(msg),
+                // Senders are gone, break out of the loop for shutdown.
+                None => break
+            },
+            // FuturesUnordered will let them run in parallel. It will
+            // yield once one of them is completed.
+                () = self.running_requests.select_next_some(), if !self.running_requests.is_empty()  => {}
+            }
         }
     }
 
@@ -189,7 +206,10 @@ impl SkillLoaderActor {
         Ok((skill, digest))
     }
 
-    async fn act(&self, msg: SkillLoaderMsg) {
+    /// For each new message, create a future that resolves the message and
+    /// push it into the running requests. This allows concurrent execution
+    /// of multiple requests.
+    fn act(&self, msg: SkillLoaderMsg) {
         match msg {
             SkillLoaderMsg::Fetch {
                 skill_path,
@@ -197,8 +217,12 @@ impl SkillLoaderActor {
                 send,
             } => {
                 let registry = self.registry(&skill_path.namespace);
-                let result = Self::fetch(registry, self.engine.clone(), &skill_path, &tag).await;
-                drop(send.send(result));
+                let engine = self.engine.clone();
+                let fut = async move {
+                    let result = Self::fetch(registry, engine, &skill_path, &tag).await;
+                    drop(send.send(result));
+                };
+                self.running_requests.push(Box::pin(fut));
             }
             SkillLoaderMsg::FetchDigest {
                 skill_path,
@@ -206,8 +230,11 @@ impl SkillLoaderActor {
                 send,
             } => {
                 let registry = self.registry(&skill_path.namespace);
-                let result = registry.fetch_digest(&skill_path.name, &tag).await;
-                drop(send.send(result));
+                let fut = async move {
+                    let result = registry.fetch_digest(&skill_path.name, &tag).await;
+                    drop(send.send(result));
+                };
+                self.running_requests.push(Box::pin(fut));
             }
         }
     }
