@@ -80,7 +80,7 @@ impl Kernel {
         };
 
         let registry_config = app_config.operator_config.registry_config();
-        let skill_loader = SkillLoader::new(engine.clone(), registry_config);
+        let skill_loader = SkillLoader::from_config(engine.clone(), registry_config);
         let skill_store = SkillStore::new(skill_loader.api(), app_config.namespace_update_interval);
 
         // Boot up runtime we need to execute Skills

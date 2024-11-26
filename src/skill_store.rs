@@ -611,7 +611,7 @@ pub mod tests {
         // Given one cached "greet_skill"
         let (registry_config, temp_dir) = tmp_registries_with_skill()?;
         let engine = Arc::new(Engine::new(false)?);
-        let skill_loader = SkillLoader::new(engine, registry_config).api();
+        let skill_loader = SkillLoader::from_config(engine, registry_config).api();
         let mut skill_store_state = SkillStoreState::new(skill_loader);
 
         let greet_skill = SkillPath::new("local", "greet_skill");
@@ -676,7 +676,7 @@ pub mod tests {
         let (registry_config, temp_dir) = tmp_registries_with_skill()?;
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
-        let skill_loader = SkillLoader::new(engine, registry_config).api();
+        let skill_loader = SkillLoader::from_config(engine, registry_config).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(1));
         let api = skill_store.api();
         api.upsert(greet_skill.clone(), None).await;

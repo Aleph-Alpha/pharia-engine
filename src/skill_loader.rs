@@ -66,12 +66,19 @@ pub struct SkillLoader {
 }
 
 impl SkillLoader {
-    pub fn new(engine: Arc<Engine>, registry_config: RegistryConfig) -> Self {
+    pub fn from_config(engine: Arc<Engine>, registry_config: RegistryConfig) -> Self {
         let registries = registry_config
             .registries
             .iter()
             .map(|(k, v)| (k.to_owned(), v.into()))
             .collect();
+        Self::new(engine, registries)
+    }
+
+    pub fn new(
+        engine: Arc<Engine>,
+        registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+    ) -> Self {
         let (sender, recv) = mpsc::channel(1);
         let mut actor = SkillLoaderActor::new(recv, engine, registries);
         let handle = tokio::spawn(async move {
@@ -243,7 +250,7 @@ pub mod tests {
         /// Skill loader loading skills from a local `skills` directory
         pub fn with_file_registry(engine: Arc<Engine>, namespace: String) -> Self {
             let registry_config = RegistryConfig::with_file_registry_named_skills(namespace);
-            SkillLoader::new(engine, registry_config)
+            SkillLoader::from_config(engine, registry_config)
         }
     }
 }
