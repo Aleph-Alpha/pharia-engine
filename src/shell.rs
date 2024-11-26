@@ -141,19 +141,21 @@ where
         ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
 
     Router::new()
+        // Authenticated routes
         .route("/csi", post(http_csi_handle::<C>))
-        .route_layer(middleware::from_fn(authorization_middleware))
-        .route("/cached_skills", get(cached_skills))
-        .route("/cached_skills/:name", delete(drop_cached_skill))
         .route("/skills", get(skills))
         .route("/execute_skill", post(execute_skill))
+        .route("/cached_skills", get(cached_skills))
+        .route("/cached_skills/:name", delete(drop_cached_skill))
+        .with_state(app_state)
+        .route_layer(middleware::from_fn(authorization_middleware))
+        // Unauthenticated routes
         .route("/skill.wit", get(skill_wit()))
         .nest_service("/docs", serve_dir.clone())
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
         .route("/openapi.json", get(serve_docs))
         .route("/healthcheck", get(|| async { "ok" }))
         .route("/", get(index))
-        .with_state(app_state)
         .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
             ServiceBuilder::new()
