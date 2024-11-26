@@ -161,8 +161,11 @@ where
         .route("/execute_skill", post(execute_skill))
         .route("/cached_skills", get(cached_skills))
         .route("/cached_skills/:name", delete(drop_cached_skill))
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            authorization_middleware,
+        ))
         .with_state(app_state)
-        .route_layer(middleware::from_fn(authorization_middleware))
         // Unauthenticated routes
         .route("/skill.wit", get(skill_wit()))
         .nest_service("/docs", serve_dir.clone())
@@ -445,7 +448,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        authorization::tests::dummy_authorization_api,
+        authorization::{self, tests::StubAuthorization},
         csi::tests::{DummyCsi, StubCsi},
         csi_shell::{V0_2CsiRequest, VersionedCsiRequest},
         inference::{self, Completion, CompletionParams, CompletionRequest},
@@ -468,9 +471,16 @@ mod tests {
 
     impl AppState<DummyCsi> {
         pub fn dummy() -> Self {
+            let dummy_authorization = StubAuthorization::new(|msg| {
+                match msg {
+                    authorization::AuthorizationMsg::Auth { api_token: _, send } => {
+                        drop(send.send(Ok(true)));
+                    }
+                };
+            });
             let skill_executor = StubSkillExecuter::new(|_| {});
             Self::new(
-                dummy_authorization_api(),
+                dummy_authorization.api(),
                 dummy_skill_provider_api(),
                 skill_executor.api(),
                 DummyCsi,
@@ -595,7 +605,54 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn api_token_missing() {
+    async fn api_token_missing_permission() {
+        // Given
+        let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
+        let stub_authorization = StubAuthorization::new(|msg| {
+            match msg {
+                authorization::AuthorizationMsg::Auth { api_token: _, send } => {
+                    drop(send.send(Ok(false)));
+                }
+            };
+        });
+        let app_state = AppState::dummy()
+            .with_skill_executor_api(saboteur_skill_executer.api())
+            .with_authorization_api(stub_authorization.api());
+
+        // When we want to access an endpoint that requires authentication
+        let api_token = api_token();
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let http = http(app_state);
+        let args = ExecuteSkillArgs {
+            skill: "greet".to_owned(),
+            input: json!("Homer"),
+        };
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/execute_skill")
+                    .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            String::from_utf8(body.to_vec()).unwrap(),
+            "Bearer token invalid".to_owned()
+        );
+    }
+
+    #[tokio::test]
+    async fn api_token_missing_in_execute_skill() {
         // Given
         let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         let app_state = AppState::dummy().with_skill_executor_api(saboteur_skill_executer.api());
@@ -623,12 +680,13 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(
             String::from_utf8(body.to_vec()).unwrap(),
-            "Header of type `authorization` was missing".to_owned()
+            "Bearer token expected".to_owned()
         );
     }
 
     #[tokio::test]
     async fn list_cached_skills_for_user() {
+        // Given
         let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
         let skill_provider_api = SkillStoreApi::new(send);
@@ -647,16 +705,24 @@ mod tests {
             .with_skill_executor_api(saboteur_skill_executer.api());
         let http = http(app_state);
 
+        // When
+        let api_token = api_token();
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::GET)
                     .uri("/cached_skills")
+                    .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
             .await
             .unwrap();
+
+        // Then
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
@@ -688,11 +754,16 @@ mod tests {
         let http = http(app_state);
 
         // When the skill is deleted
+        let api_token = api_token();
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
                     .uri("/cached_skills/haiku_skill".to_owned())
+                    .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -739,11 +810,16 @@ mod tests {
         let http = http(app_state);
 
         // When the skill is deleted
+        let api_token = api_token();
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
                     .uri("/cached_skills/haiku_skill".to_owned())
+                    .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -854,10 +930,15 @@ mod tests {
         let http = http(app_state);
 
         // When
+        let api_token = api_token();
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
         let resp = http
             .oneshot(
                 Request::builder()
                     .uri("/skills")
+                    .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
