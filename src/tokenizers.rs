@@ -154,6 +154,7 @@ pub mod tests {
     }
 
     /// A skill executer double, loaded up with predefined answers.
+    #[derive(Clone)]
     pub struct FakeTokenizers;
 
     #[async_trait]

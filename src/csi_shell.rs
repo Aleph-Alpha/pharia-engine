@@ -7,20 +7,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    csi::{ChunkRequest, Csi},
+    csi::ChunkRequest,
     inference::{self, ChatRequest, CompletionRequest},
     language_selection::SelectLanguageRequest,
     search::SearchRequest,
+    shell::CsiDriverImpl,
 };
 
-pub async fn http_csi_handle<C>(
-    State(drivers): State<C>,
+pub async fn http_csi_handle(
+    State(drivers): State<CsiDriverImpl>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<VersionedCsiRequest>,
-) -> (StatusCode, Json<Value>)
-where
-    C: Csi + Clone + Sync,
-{
+) -> (StatusCode, Json<Value>) {
+    let drivers = drivers.0.as_ref();
     let result = match args {
         VersionedCsiRequest::V0_2(request) => match request {
             V0_2CsiRequest::Complete(completion_request) => drivers
