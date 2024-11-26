@@ -91,9 +91,7 @@ impl SkillLoader {
     }
 
     pub fn api(&self) -> SkillLoaderApi {
-        SkillLoaderApi {
-            sender: self.sender.clone(),
-        }
+        SkillLoaderApi::new(self.sender.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -102,8 +100,16 @@ impl SkillLoader {
         self.handle.await.unwrap();
     }
 }
+
+#[derive(Clone)]
 pub struct SkillLoaderApi {
     sender: mpsc::Sender<SkillLoaderMsg>,
+}
+
+impl SkillLoaderApi {
+    pub fn new(sender: mpsc::Sender<SkillLoaderMsg>) -> Self {
+        Self { sender }
+    }
 }
 
 impl SkillLoaderApi {
@@ -190,8 +196,8 @@ impl SkillLoaderActor {
     }
 
     /// Load a skill from the registry and build it to a `Skill`
-    async fn fetch(
-        registry: Arc<dyn SkillRegistry + Send + Sync>,
+    async fn fetch<'a>(
+        registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
         skill_path: &SkillPath,
         tag: &str,
@@ -219,7 +225,7 @@ impl SkillLoaderActor {
                 let registry = self.registry(&skill_path.namespace);
                 let engine = self.engine.clone();
                 let fut = async move {
-                    let result = Self::fetch(registry, engine, &skill_path, &tag).await;
+                    let result = Self::fetch(registry.as_ref(), engine, &skill_path, &tag).await;
                     drop(send.send(result));
                 };
                 self.running_requests.push(Box::pin(fut));
