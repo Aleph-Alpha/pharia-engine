@@ -165,38 +165,22 @@ impl SkillLoaderActor {
         }
     }
 
-    async fn act(&self, msg: SkillLoaderMsg) {
-        match msg {
-            SkillLoaderMsg::Fetch {
-                skill_path,
-                tag,
-                send,
-            } => {
-                let result = self.fetch(&skill_path, &tag).await;
-                drop(send.send(result));
-            }
-            SkillLoaderMsg::FetchDigest {
-                skill_path,
-                tag,
-                send,
-            } => {
-                let result = self.fetch_digest(&skill_path, &tag).await;
-                drop(send.send(result));
-            }
-        }
+    pub fn registry(&self, namespace: &str) -> &(dyn SkillRegistry + Send + Sync) {
+        self.registries
+            .get(namespace)
+            .expect("If skill exists, so must the namespace it resides in.")
     }
 
     /// Load a skill from the registry and build it to a `Skill`
-    async fn fetch(&self, skill_path: &SkillPath, tag: &str) -> anyhow::Result<(Skill, Digest)> {
-        let registry = self
-            .registries
-            .get(&skill_path.namespace)
-            .expect("If skill exists, so must the namespace it resides in.");
-
+    async fn fetch(
+        registry: &(dyn SkillRegistry + Send + Sync),
+        engine: Arc<Engine>,
+        skill_path: &SkillPath,
+        tag: &str,
+    ) -> anyhow::Result<(Skill, Digest)> {
         let skill_bytes = registry.load_skill(&skill_path.name, tag).await?;
         let SkillImage { bytes, digest } = skill_bytes
             .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
-        let engine = self.engine.clone();
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")
@@ -204,17 +188,27 @@ impl SkillLoaderActor {
         Ok((skill, digest))
     }
 
-    /// Fetch the digest for a skill from the registry
-    pub async fn fetch_digest(
-        &self,
-        skill_path: &SkillPath,
-        tag: &str,
-    ) -> anyhow::Result<Option<Digest>> {
-        let registry = self
-            .registries
-            .get(&skill_path.namespace)
-            .expect("If skill exists, so must the namespace it resides in.");
-        registry.fetch_digest(&skill_path.name, tag).await
+    async fn act(&self, msg: SkillLoaderMsg) {
+        match msg {
+            SkillLoaderMsg::Fetch {
+                skill_path,
+                tag,
+                send,
+            } => {
+                let registry = self.registry(&skill_path.namespace);
+                let result = Self::fetch(registry, self.engine.clone(), &skill_path, &tag).await;
+                drop(send.send(result));
+            }
+            SkillLoaderMsg::FetchDigest {
+                skill_path,
+                tag,
+                send,
+            } => {
+                let registry = self.registry(&skill_path.namespace);
+                let result = registry.fetch_digest(&skill_path.name, &tag).await;
+                drop(send.send(result));
+            }
+        }
     }
 }
 
