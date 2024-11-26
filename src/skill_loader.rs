@@ -220,7 +220,13 @@ impl SkillLoaderActor {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::namespace_watcher::Registry;
+    use tokio::time::{sleep, timeout, Duration};
+
+    use crate::{
+        namespace_watcher::Registry,
+        registries::tests::{NeverResolvingRegistry, ReadyRegistry},
+        skills::Engine,
+    };
 
     use super::*;
 
@@ -252,5 +258,43 @@ pub mod tests {
             let registry_config = RegistryConfig::with_file_registry_named_skills(namespace);
             SkillLoader::from_config(engine, registry_config)
         }
+    }
+
+    #[tokio::test]
+    async fn test_skill_loader_fetches_multiple_skills_concurrently() {
+        // Given a skill loader with two registries, one that never resolves and one that always does
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let never_resolving =
+            Box::new(NeverResolvingRegistry) as Box<dyn SkillRegistry + Send + Sync>;
+        let ready_registry = Box::new(ReadyRegistry) as Box<dyn SkillRegistry + Send + Sync>;
+        let mut registries = HashMap::new();
+        registries.insert("never-resolving".to_owned(), never_resolving);
+        registries.insert("ready".to_owned(), ready_registry);
+        let skill_loader = SkillLoader::new(engine, registries);
+        let never_resolving_skill_path = SkillPath::new("never-resolving", "dummy");
+        let ready_skill_path = SkillPath::new("ready", "dummy");
+
+        // When we fetch the never resolving skill
+        let api = skill_loader.api();
+        let handle = tokio::spawn(async move {
+            drop(
+                api.fetch(never_resolving_skill_path, "dummy".to_owned())
+                    .await,
+            );
+        });
+
+        // And waiting 10ms to ensure the message has been received
+        sleep(Duration::from_millis(10)).await;
+
+        // Then the other skill can still be fetched
+        let result = timeout(
+            Duration::from_millis(5),
+            skill_loader
+                .api()
+                .fetch(ready_skill_path, "dummy".to_owned()),
+        )
+        .await;
+        assert!(result.is_ok());
+        drop(handle);
     }
 }
