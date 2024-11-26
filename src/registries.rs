@@ -65,6 +65,7 @@ impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
 pub mod tests {
     use std::collections::HashMap;
 
+    use futures::future::{pending, ready};
     use tempfile::tempdir;
 
     use crate::registries::FileRegistry;
@@ -92,6 +93,44 @@ pub mod tests {
             tag: &'a str,
         ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
             Box::pin(async { Ok(Some(Digest(tag.to_owned()))) })
+        }
+    }
+
+    pub struct NeverResolvingRegistry;
+
+    impl SkillRegistry for NeverResolvingRegistry {
+        fn load_skill<'a>(
+            &'a self,
+            _name: &'a str,
+            _tag: &'a str,
+        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
+            Box::pin(pending::<Result<Option<SkillImage>, anyhow::Error>>())
+        }
+        fn fetch_digest<'a>(
+            &'a self,
+            _name: &'a str,
+            _tag: &'a str,
+        ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
+            Box::pin(pending::<Result<Option<Digest>, anyhow::Error>>())
+        }
+    }
+
+    pub struct ReadyRegistry;
+
+    impl SkillRegistry for ReadyRegistry {
+        fn load_skill<'a>(
+            &'a self,
+            _name: &'a str,
+            _tag: &'a str,
+        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
+            Box::pin(ready(Ok(None)))
+        }
+        fn fetch_digest<'a>(
+            &'a self,
+            _name: &'a str,
+            _tag: &'a str,
+        ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
+            Box::pin(ready(Ok(None)))
         }
     }
 
