@@ -34,7 +34,7 @@ impl RegistryConfig {
     }
 
     /// Convert the registry config into a map of namespace to actual skill registry implementations
-    pub fn skill_registries(&self) -> HashMap<String, Box<dyn SkillRegistry + Send + Sync>> {
+    pub fn skill_registries(&self) -> HashMap<String, Arc<dyn SkillRegistry + Send + Sync>> {
         self.registries
             .iter()
             .map(|(k, v)| (k.to_owned(), v.into()))
@@ -42,15 +42,15 @@ impl RegistryConfig {
     }
 }
 
-impl From<&Registry> for Box<dyn SkillRegistry + Send + Sync> {
+impl From<&Registry> for Arc<dyn SkillRegistry + Send + Sync> {
     fn from(val: &Registry) -> Self {
         match val {
-            Registry::File { path } => Box::new(FileRegistry::with_dir(path)),
+            Registry::File { path } => Arc::new(FileRegistry::with_dir(path)),
             Registry::Oci {
                 repository,
                 registry,
                 auth,
-            } => Box::new(OciRegistry::new(
+            } => Arc::new(OciRegistry::new(
                 repository.clone(),
                 registry.clone(),
                 auth.user(),
@@ -77,7 +77,7 @@ impl SkillLoader {
 
     pub fn new(
         engine: Arc<Engine>,
-        registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+        registries: HashMap<String, Arc<dyn SkillRegistry + Send + Sync>>,
     ) -> Self {
         let (sender, recv) = mpsc::channel(1);
         let mut actor = SkillLoaderActor::new(recv, engine, registries);
@@ -143,14 +143,14 @@ impl SkillLoaderApi {
 pub struct SkillLoaderActor {
     receiver: mpsc::Receiver<SkillLoaderMsg>,
     engine: Arc<Engine>,
-    registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+    registries: HashMap<String, Arc<dyn SkillRegistry + Send + Sync>>,
 }
 
 impl SkillLoaderActor {
     pub fn new(
         receiver: mpsc::Receiver<SkillLoaderMsg>,
         engine: Arc<Engine>,
-        registries: HashMap<String, Box<dyn SkillRegistry + Send + Sync>>,
+        registries: HashMap<String, Arc<dyn SkillRegistry + Send + Sync>>,
     ) -> Self {
         Self {
             receiver,
@@ -165,15 +165,16 @@ impl SkillLoaderActor {
         }
     }
 
-    pub fn registry(&self, namespace: &str) -> &(dyn SkillRegistry + Send + Sync) {
+    pub fn registry(&self, namespace: &str) -> Arc<dyn SkillRegistry + Send + Sync> {
         self.registries
             .get(namespace)
             .expect("If skill exists, so must the namespace it resides in.")
+            .clone()
     }
 
     /// Load a skill from the registry and build it to a `Skill`
     async fn fetch(
-        registry: &(dyn SkillRegistry + Send + Sync),
+        registry: Arc<dyn SkillRegistry + Send + Sync>,
         engine: Arc<Engine>,
         skill_path: &SkillPath,
         tag: &str,
@@ -259,8 +260,8 @@ pub mod tests {
         // Given a skill loader with two registries, one that never resolves and one that always does
         let engine = Arc::new(Engine::new(false).unwrap());
         let never_resolving =
-            Box::new(NeverResolvingRegistry) as Box<dyn SkillRegistry + Send + Sync>;
-        let ready_registry = Box::new(ReadyRegistry) as Box<dyn SkillRegistry + Send + Sync>;
+            Arc::new(NeverResolvingRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
+        let ready_registry = Arc::new(ReadyRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
         let mut registries = HashMap::new();
         registries.insert("never-resolving".to_owned(), never_resolving);
         registries.insert("ready".to_owned(), ready_registry);
