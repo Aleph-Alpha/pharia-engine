@@ -37,6 +37,7 @@ use utoipa::{
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
+    authorization::authorization_middleware,
     csi::Csi,
     csi_shell::http_csi_handle,
     skill_store::SkillStoreApi,
@@ -97,13 +98,14 @@ where
     Router::new()
         .route("/csi", post(http_csi_handle::<C>))
         .with_state(csi_drivers)
+        .route_layer(middleware::from_fn(authorization_middleware))
         .route("/cached_skills", get(cached_skills))
         .route("/cached_skills/:name", delete(drop_cached_skill))
         .route("/skills", get(skills))
         .with_state(skill_provider_api)
-        .route("/skill.wit", get(skill_wit()))
         .route("/execute_skill", post(execute_skill))
         .with_state(skill_executor_api)
+        .route("/skill.wit", get(skill_wit()))
         .nest_service("/docs", serve_dir.clone())
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
         .route("/openapi.json", get(serve_docs))
