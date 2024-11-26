@@ -8,6 +8,10 @@ pub use oci::OciRegistry;
 
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+/// Used to check if a skill image has changed
+#[derive(Debug, Eq, PartialEq)]
+pub struct Digest(String);
+
 /// Contains the bytes necessary to instantiate a Skill, as well as the
 /// digest at the time of the pull associated with these bytes.
 pub struct SkillImage {
@@ -15,15 +19,12 @@ pub struct SkillImage {
     pub bytes: Vec<u8>,
     /// Digest associated with these bytes from the registry. We can use
     /// this to do a cheaper comparison if the backing bytes have changed.
-    pub digest: String,
+    pub digest: Digest,
 }
 
 impl SkillImage {
-    pub fn new(bytes: Vec<u8>, digest: impl Into<String>) -> Self {
-        Self {
-            bytes,
-            digest: digest.into(),
-        }
+    pub fn new(bytes: Vec<u8>, digest: Digest) -> Self {
+        Self { bytes, digest }
     }
 }
 
@@ -39,7 +40,7 @@ pub trait SkillRegistry {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<String>>>;
+    ) -> DynFuture<'a, anyhow::Result<Option<Digest>>>;
 }
 
 impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
@@ -55,7 +56,7 @@ impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
+    ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
         self.as_ref().fetch_digest(name, tag)
     }
 }
@@ -68,7 +69,7 @@ pub mod tests {
 
     use crate::registries::FileRegistry;
 
-    use super::{DynFuture, SkillImage, SkillRegistry};
+    use super::{Digest, DynFuture, SkillImage, SkillRegistry};
 
     impl SkillRegistry for HashMap<String, Vec<u8>> {
         fn load_skill<'a>(
@@ -77,7 +78,9 @@ pub mod tests {
             tag: &'a str,
         ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
             if let Some(bytes) = self.get(name) {
-                Box::pin(async move { Ok(Some(SkillImage::new(bytes.clone(), tag))) })
+                Box::pin(
+                    async move { Ok(Some(SkillImage::new(bytes.clone(), Digest(tag.to_owned())))) },
+                )
             } else {
                 Box::pin(async { Ok(None) })
             }
@@ -87,8 +90,8 @@ pub mod tests {
             &'a self,
             _name: &'a str,
             tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<String>>> {
-            Box::pin(async { Ok(Some(tag.to_owned())) })
+        ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
+            Box::pin(async { Ok(Some(Digest(tag.to_owned()))) })
         }
     }
 
