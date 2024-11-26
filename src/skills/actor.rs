@@ -399,7 +399,7 @@ pub mod tests {
         // Given a skill executer with no skills
         let engine = Arc::new(Engine::new(false).unwrap());
         let registry_config = RegistryConfig::empty();
-        let skill_loader = SkillLoader::new(engine.clone(), registry_config).api();
+        let skill_loader = SkillLoader::from_config(engine.clone(), registry_config).api();
 
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let csi_apis = DummyCsi;
