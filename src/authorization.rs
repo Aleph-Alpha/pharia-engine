@@ -1,4 +1,14 @@
 #![expect(dead_code)]
+use axum::{
+    body::Body,
+    http::Request,
+    middleware::Next,
+    response::{ErrorResponse, Response},
+};
+use axum_extra::{
+    headers::{self, authorization::Bearer},
+    TypedHeader,
+};
 use tokio::{sync::mpsc, task::JoinHandle};
 
 pub struct Authorization {
@@ -30,3 +40,12 @@ pub trait AuthorizationApi {}
 impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {}
 
 enum AuthorizationMsg {}
+
+pub async fn authorization_middleware(
+    _bearer: Option<TypedHeader<headers::Authorization<Bearer>>>,
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, ErrorResponse> {
+    let response = next.run(request).await;
+    Ok(response)
+}
