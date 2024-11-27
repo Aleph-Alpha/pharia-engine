@@ -20,9 +20,14 @@ pub struct Authorization {
 }
 
 impl Authorization {
-    pub fn new(authorization_url: String) -> Authorization {
+    pub fn new(authorization_url: String) -> Self {
+        let client = HttpAuthorizationClient::new(authorization_url);
+        Self::with_client(client)
+    }
+
+    pub fn with_client(client: impl AuthorizationClient) -> Self {
         let (send, recv) = mpsc::channel(1);
-        let mut actor = AuthorizationActor::new(recv, authorization_url);
+        let mut actor = AuthorizationActor::new(client, recv);
         let handle = tokio::spawn(async move { actor.run().await });
         Authorization { send, handle }
     }
@@ -39,18 +44,18 @@ impl Authorization {
     }
 }
 
-struct AuthorizationActor {
+struct AuthorizationActor<C: AuthorizationClient> {
     recv: mpsc::Receiver<AuthorizationMsg>,
     running_authorizations: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
-    client: Arc<AuthorizationClient>,
+    client: Arc<C>,
 }
 
-impl AuthorizationActor {
-    fn new(recv: mpsc::Receiver<AuthorizationMsg>, authorization_url: String) -> Self {
+impl<C: AuthorizationClient> AuthorizationActor<C> {
+    fn new(client: C, recv: mpsc::Receiver<AuthorizationMsg>) -> Self {
         Self {
             recv,
             running_authorizations: FuturesUnordered::new(),
-            client: Arc::new(AuthorizationClient::new(authorization_url)),
+            client: Arc::new(client),
         }
     }
     async fn run(&mut self) {
@@ -66,8 +71,10 @@ impl AuthorizationActor {
     }
     fn act(&mut self, msg: AuthorizationMsg) {
         let client = self.client.clone();
-        self.running_authorizations
-            .push(Box::pin(async move { msg.act(client.as_ref()).await }));
+        let fut = async move {
+            msg.act(client.as_ref()).await;
+        };
+        self.running_authorizations.push(Box::pin(fut));
     }
 }
 
@@ -101,13 +108,13 @@ pub enum AuthorizationMsg {
 }
 
 impl AuthorizationMsg {
-    async fn act(self, client: &AuthorizationClient) {
+    async fn act(self, client: &impl AuthorizationClient) {
         match self {
             AuthorizationMsg::Auth { api_token, send } => {
                 let result = client.token_valid(api_token).await;
                 drop(send.send(result));
             }
-        }
+        };
     }
 }
 
@@ -144,19 +151,25 @@ pub async fn authorization_middleware(
     Ok(response)
 }
 
-struct AuthorizationClient {
+pub trait AuthorizationClient: Send + Sync + 'static {
+    fn token_valid(&self, api_token: String) -> impl Future<Output = anyhow::Result<bool>> + Send;
+}
+
+struct HttpAuthorizationClient {
     url: String,
     client: reqwest::Client,
 }
 
-impl AuthorizationClient {
+impl HttpAuthorizationClient {
     pub fn new(url: String) -> Self {
         Self {
             url,
             client: reqwest::Client::new(),
         }
     }
+}
 
+impl AuthorizationClient for HttpAuthorizationClient {
     async fn token_valid(&self, api_token: String) -> anyhow::Result<bool> {
         let url = format!("{}/check_privileges", self.url);
         let body: Vec<String> = vec![];
@@ -178,6 +191,10 @@ impl AuthorizationClient {
 
 #[cfg(test)]
 pub mod tests {
+
+    use std::time::Duration;
+
+    use tokio::time::timeout;
 
     use super::*;
     use crate::tests::{api_token, inference_address};
@@ -213,7 +230,7 @@ pub mod tests {
     async fn true_for_valid_permissions() {
         // Given a client that is configured against the inference api
         let url = inference_address();
-        let client = AuthorizationClient::new(url.to_owned());
+        let client = HttpAuthorizationClient::new(url.to_owned());
 
         // When the client is used to check a valid api token
         let result = client.token_valid(api_token().to_owned()).await;
@@ -226,12 +243,40 @@ pub mod tests {
     async fn false_for_invalid_token() {
         // Given a client that is configured against the inference api
         let url = inference_address();
-        let client = AuthorizationClient::new(url.to_owned());
+        let client = HttpAuthorizationClient::new(url.to_owned());
 
         // When the client is used to check an invalid api token
         let result = client.token_valid("invalid".to_owned()).await;
 
         // Then the result is false
         assert!(!result.unwrap());
+    }
+
+    struct StubAuthorizationClient;
+
+    impl AuthorizationClient for StubAuthorizationClient {
+        fn token_valid(
+            &self,
+            _api_token: String,
+        ) -> impl Future<Output = anyhow::Result<bool>> + Send {
+            async move { Ok(true) }
+        }
+    }
+
+    #[tokio::test]
+    async fn auth_api_answers_messages() {
+        // Given a stub authorization client
+        let client = StubAuthorizationClient;
+        let api = Authorization::with_client(client).api();
+
+        // When checking permissions for a token
+        let result = timeout(
+            Duration::from_millis(10),
+            api.check_permission("valid".to_owned()),
+        )
+        .await;
+
+        // Then the message get's answered within 10ms
+        assert!(result.unwrap().unwrap());
     }
 }
