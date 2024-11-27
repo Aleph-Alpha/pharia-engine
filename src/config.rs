@@ -13,6 +13,8 @@ pub struct AppConfig {
     pub inference_addr: String,
     /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
     pub document_index_addr: String,
+    /// This base URL is used to authorize an AA_API_TOKEN for use by the kernel
+    pub authorization_addr: String,
     pub operator_config: OperatorConfig,
     pub namespace_update_interval: Duration,
     pub log_level: String,
@@ -41,13 +43,20 @@ impl AppConfig {
         let document_index_addr = env::var("DOCUMENT_INDEX_ADDRESS")
             .unwrap_or_else(|_| "https://document-index.aleph-alpha.com".to_owned());
 
+        let authorization_addr = env::var("AUTHORIZATION_ADDRESS")
+            .unwrap_or_else(|_| "https://api.aleph-alpha.com".to_owned());
+
         let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "error".to_owned());
 
         let open_telemetry_endpoint = env::var("OPEN_TELEMETRY_ENDPOINT").ok();
 
         assert!(
             !inference_addr.is_empty(),
-            "The inference address must be provided."
+            "The inference address must be available."
+        );
+        assert!(
+            !authorization_addr.is_empty(),
+            "The authorization address must be available."
         );
 
         let namespace_update_interval: humantime::Duration = env::var("NAMESPACE_UPDATE_INTERVAL")
@@ -86,6 +95,7 @@ impl AppConfig {
             metrics_addr: metrics_addr.parse().unwrap(),
             inference_addr,
             document_index_addr,
+            authorization_addr,
             operator_config,
             namespace_update_interval: namespace_update_interval.into(),
             log_level,

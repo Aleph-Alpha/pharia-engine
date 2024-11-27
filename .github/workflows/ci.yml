@@ -41,6 +41,7 @@ jobs:
       SKILL_REGISTRY_PASSWORD: ${{ secrets.SKILL_REGISTRY_PASSWORD }}
       AA_API_TOKEN: ${{ secrets.AA_API_TOKEN }}
       AA_INFERENCE_ADDRESS: https://api.aleph-alpha.com
+      AUTHORIZATION_ADDRESS: https://api.aleph-alpha.com
 
   lints:
     runs-on: ubuntu-latest
