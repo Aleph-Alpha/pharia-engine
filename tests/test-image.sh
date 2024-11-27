@@ -11,7 +11,7 @@ fi
 
 for i in {1..5}
 do
-    BODY=$(curl -s http://$HOST:$PORT/healthcheck)
+    BODY=$(curl -s http://$HOST:$PORT/health)
     if [ "$BODY" = "ok" ]; then
         break
     else

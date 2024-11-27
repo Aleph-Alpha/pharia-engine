@@ -49,14 +49,14 @@ spec:
               protocol: {{ .Values.service.metricsProtocol }}
           livenessProbe:
             httpGet:
-              path: /healthcheck
+              path: /health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 15
             failureThreshold: 2
           readinessProbe:
             httpGet:
-              path: /healthcheck
+              path: /health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5
