@@ -450,7 +450,7 @@ mod tests {
         csi::tests::{DummyCsi, StubCsi},
         csi_shell::{V0_2CsiRequest, VersionedCsiRequest},
         inference::{self, Completion, CompletionParams, CompletionRequest},
-        skill_store::tests::{dummy_skill_store_api, SkillProviderMsg},
+        skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
         skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
         tests::api_token,
     };
@@ -689,7 +689,7 @@ mod tests {
         let (send, mut recv) = mpsc::channel(1);
         let skill_store_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
-            if let SkillProviderMsg::ListCached { send } = recv.recv().await.unwrap() {
+            if let SkillStoreMessage::ListCached { send } = recv.recv().await.unwrap() {
                 send.send(vec![
                     SkillPath::new("ns", "first"),
                     SkillPath::new("ns", "second"),
@@ -738,7 +738,7 @@ mod tests {
         let (send, mut recv) = mpsc::channel(1);
         let skill_store_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
-            if let SkillProviderMsg::InvalidateCache { skill_path, send } =
+            if let SkillStoreMessage::InvalidateCache { skill_path, send } =
                 recv.recv().await.unwrap()
             {
                 skill_path_clone.lock().unwrap().replace(skill_path);
@@ -794,7 +794,7 @@ mod tests {
         let (send, mut recv) = mpsc::channel(1);
         let skill_store_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
-            if let SkillProviderMsg::InvalidateCache { skill_path, send } =
+            if let SkillStoreMessage::InvalidateCache { skill_path, send } =
                 recv.recv().await.unwrap()
             {
                 skill_path_clone.lock().unwrap().replace(skill_path);
@@ -919,7 +919,7 @@ mod tests {
         let (send, mut recv) = mpsc::channel(1);
         let skill_store_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
-            if let SkillProviderMsg::List { send } = recv.recv().await.unwrap() {
+            if let SkillStoreMessage::List { send } = recv.recv().await.unwrap() {
                 send.send(vec![
                     SkillPath::new("ns_one", "one"),
                     SkillPath::new("ns_two", "two"),

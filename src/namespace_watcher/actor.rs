@@ -265,7 +265,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::namespace_watcher::tests::NamespaceConfig;
-    use crate::skill_store::tests::SkillProviderMsg;
+    use crate::skill_store::tests::SkillStoreMessage;
     use crate::skills::SkillPath;
 
     use super::*;
@@ -390,7 +390,7 @@ pub mod tests {
     #[tokio::test]
     async fn load_config_during_first_pass() {
         // Given a config that take forever to load
-        let (sender, _) = mpsc::channel::<SkillProviderMsg>(1);
+        let (sender, _) = mpsc::channel::<SkillStoreMessage>(1);
         let skill_store_api = SkillStoreApi::new(sender);
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
@@ -463,7 +463,7 @@ pub mod tests {
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
-        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(1);
+        let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(1);
         let skill_store_api = SkillStoreApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
         let mut observer =
@@ -475,7 +475,7 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillProviderMsg::Upsert {
+            SkillStoreMessage::Upsert {
                 skill_path,
                 tag: None
             }
@@ -541,7 +541,7 @@ pub mod tests {
             vec![SkillDescription::with_name(dummy_skill)],
         )]);
 
-        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
+        let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(2);
         let skill_store_api = SkillStoreApi::new(sender);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
 
@@ -555,7 +555,7 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillProviderMsg::SetNamespaceError {
+            SkillStoreMessage::SetNamespaceError {
                 namespace, ..
             }
             if namespace == dummy_namespace
@@ -565,7 +565,7 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillProviderMsg::Remove {
+            SkillStoreMessage::Remove {
                 skill_path
             }
             if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
@@ -585,7 +585,7 @@ pub mod tests {
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
-        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(1);
+        let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(1);
         let skill_store_api = SkillStoreApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
         let observer = NamespaceWatcher::with_config(skill_store_api, stub_config, update_interval);
@@ -607,7 +607,7 @@ pub mod tests {
     #[tokio::test]
     async fn remove_invalid_namespace_if_namespace_become_valid() {
         // given an invalid namespace
-        let (sender, mut receiver) = mpsc::channel::<SkillProviderMsg>(2);
+        let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(2);
         let skill_store_api = SkillStoreApi::new(sender);
         let update_interval_ms = 1;
         let update_interval = Duration::from_millis(update_interval_ms);
@@ -642,7 +642,7 @@ pub mod tests {
 
         assert!(matches!(
              msg,
-            SkillProviderMsg::SetNamespaceError {
+            SkillStoreMessage::SetNamespaceError {
                 namespace, error: None
             }
             if namespace == dummy_namespace
@@ -658,7 +658,7 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillProviderMsg::Upsert {
+            SkillStoreMessage::Upsert {
                 skill_path,
                 tag: None
             }
