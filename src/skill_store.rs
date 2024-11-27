@@ -1,8 +1,10 @@
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    borrow::ToOwned, collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration,
+};
 
 use crate::{
     registries::Digest,
-    skill_loader::SkillLoaderApi,
+    skill_loader::{ConfiguredSkill, SkillLoaderApi},
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
@@ -111,14 +113,11 @@ impl SkillStoreState {
     }
 
     /// Return the registered tag for a given skill
-    fn tag(&self, skill_path: &SkillPath) -> anyhow::Result<Option<&str>> {
+    fn tag(&self, skill_path: &SkillPath) -> anyhow::Result<Option<Option<&str>>> {
         if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
             return Err(anyhow!("Invalid namespace: {error}"));
         }
-        Ok(self
-            .known_skills
-            .get(skill_path)
-            .map(|o| o.as_deref().unwrap_or("latest")))
+        Ok(self.known_skills.get(skill_path).map(|o| o.as_deref()))
     }
 
     /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
@@ -143,11 +142,8 @@ impl SkillStoreState {
             .expect("Bad namespace configuration for skill")
             .expect("Missing tag for skill");
 
-        match self
-            .skill_loader
-            .fetch_digest(skill_path.clone(), tag.to_owned())
-            .await
-        {
+        let skill = ConfiguredSkill::new(skill_path.clone(), tag.map(ToOwned::to_owned));
+        match self.skill_loader.fetch_digest(skill).await {
             // There is a new digest behind the tag, delete the cache entry
             Ok(Some(new_digest)) if &new_digest != digest => {
                 self.cached_skills.remove(&skill_path);
@@ -450,12 +446,11 @@ impl SkillStoreActor {
                 match self.provider.tag(&skill_path) {
                     Ok(Some(tag)) => {
                         let skill_loader = self.provider.skill_loader.clone();
+                        let skill =
+                            ConfiguredSkill::new(skill_path.clone(), tag.map(ToOwned::to_owned));
                         let cloned_skill_path = skill_path.clone();
-                        let cloned_tag = tag.to_owned();
                         let fut = async move {
-                            let result = skill_loader
-                                .fetch(cloned_skill_path.clone(), cloned_tag)
-                                .await;
+                            let result = skill_loader.fetch(skill).await;
                             (cloned_skill_path, result)
                         };
                         self.skill_requests.push(skill_path, Box::pin(fut), send);
@@ -725,13 +720,10 @@ pub mod tests {
         // Given one cached skill
         given_greet_skill_v0_2();
         let skill_path = SkillPath::new("local", "greet_skill_v0_2");
+        let configured_skill = ConfiguredSkill::without_tag(skill_path.clone());
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
-        let (skill, digest) = provider
-            .skill_loader
-            .fetch(skill_path.clone(), "latest".to_owned())
-            .await
-            .unwrap();
+        let (skill, digest) = provider.skill_loader.fetch(configured_skill).await.unwrap();
         provider.insert(skill_path.clone(), Arc::new(skill), digest);
 
         // When we remove the skill
@@ -868,10 +860,11 @@ pub mod tests {
         let mut skill_store_state = SkillStoreState::new(skill_loader);
 
         let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
+        let configured_skill = ConfiguredSkill::without_tag(greet_skill.clone());
         skill_store_state.upsert_skill(&greet_skill, None);
         let (skill, digest) = skill_store_state
             .skill_loader
-            .fetch(greet_skill.clone(), "latest".to_owned())
+            .fetch(configured_skill)
             .await?;
         skill_store_state.insert(greet_skill.clone(), Arc::new(skill), digest);
         assert_eq!(
@@ -908,6 +901,7 @@ pub mod tests {
         // Given one cached "greet_skill"
         given_greet_skill_v0_2();
         let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
+        let configured_skill = ConfiguredSkill::without_tag(greet_skill.clone());
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
         let mut skill_store_state = SkillStoreState::new(skill_loader);
@@ -915,7 +909,7 @@ pub mod tests {
         skill_store_state.upsert_skill(&greet_skill, None);
         let (skill, digest) = skill_store_state
             .skill_loader
-            .fetch(greet_skill.clone(), "latest".to_owned())
+            .fetch(configured_skill)
             .await?;
         skill_store_state.insert(greet_skill.clone(), Arc::new(skill), digest);
 
