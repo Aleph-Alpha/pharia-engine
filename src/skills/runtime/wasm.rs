@@ -12,14 +12,14 @@ pub struct WasmRuntime {
     /// Used to execute skills. We will share the engine with multiple running skills, and skill
     /// provider to convert bytes into executable skills.
     engine: Arc<Engine>,
-    skill_provider_api: SkillStoreApi,
+    skill_store_api: SkillStoreApi,
 }
 
 impl WasmRuntime {
-    pub fn new(engine: Arc<Engine>, skill_provider_api: SkillStoreApi) -> Self {
+    pub fn new(engine: Arc<Engine>, skill_store_api: SkillStoreApi) -> Self {
         Self {
             engine,
-            skill_provider_api,
+            skill_store_api,
         }
     }
 
@@ -30,7 +30,7 @@ impl WasmRuntime {
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> Result<Value, ExecuteSkillError> {
         let skill = self
-            .skill_provider_api
+            .skill_store_api
             .fetch(skill_path.to_owned())
             .await
             .map_err(ExecuteSkillError::Other)?;
@@ -73,14 +73,14 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
 
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_provider.api().upsert(skill_path.clone(), None).await;
-        let runtime = WasmRuntime::new(engine, skill_provider.api());
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        skill_store.api().upsert(skill_path.clone(), None).await;
+        let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
 
         drop(runtime);
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
 
         assert_eq!(resp.unwrap(), "Hello");
     }
@@ -90,15 +90,15 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader =
             SkillLoader::with_file_registry(engine.clone(), "local".to_owned()).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        let runtime = WasmRuntime::new(engine, skill_provider.api());
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
             .run(&SkillPath::dummy(), json!("name"), skill_ctx)
             .await;
 
         drop(runtime);
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
 
         assert!(resp.is_err());
     }
@@ -111,9 +111,9 @@ pub mod tests {
         let skill_path = SkillPath::new(&namespace, "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_provider.api().upsert(skill_path.clone(), None).await;
-        let runtime = WasmRuntime::new(engine, skill_provider.api());
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        skill_store.api().upsert(skill_path.clone(), None).await;
+        let runtime = WasmRuntime::new(engine, skill_store.api());
 
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -121,7 +121,7 @@ pub mod tests {
             .unwrap();
 
         drop(runtime);
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
 
         assert_eq!(actual, "Hello Homer");
     }
@@ -134,9 +134,9 @@ pub mod tests {
         let skill_path = SkillPath::new(&namespace, "greet-py");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_provider.api().upsert(skill_path.clone(), None).await;
-        let runtime = WasmRuntime::new(engine, skill_provider.api());
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        skill_store.api().upsert(skill_path.clone(), None).await;
+        let runtime = WasmRuntime::new(engine, skill_store.api());
 
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -144,7 +144,7 @@ pub mod tests {
             .unwrap();
 
         drop(runtime);
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
 
         assert_eq!(actual, "Hello Homer");
     }
@@ -157,9 +157,9 @@ pub mod tests {
         let skill_path = SkillPath::new(&namespace, "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_provider.api().upsert(skill_path.clone(), None).await;
-        let runtime = WasmRuntime::new(engine, skill_provider.api());
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        skill_store.api().upsert(skill_path.clone(), None).await;
+        let runtime = WasmRuntime::new(engine, skill_store.api());
         for i in 1..10 {
             let resp = runtime
                 .run(&skill_path, json!("Homer"), skill_ctx.clone())
@@ -169,7 +169,7 @@ pub mod tests {
         }
 
         drop(runtime);
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
     }
 
     /// A test double for a [`Csi`] implementation which always completes with the provided function.
