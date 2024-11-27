@@ -13,7 +13,7 @@ pub struct AppConfig {
     pub inference_addr: String,
     /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
     pub document_index_addr: String,
-    /// This base URL is used to authorize an AA_API_TOKEN for use by the kernel
+    /// This base URL is used to authorize an `AA_API_TOKEN` for use by the kernel
     pub authorization_addr: String,
     pub operator_config: OperatorConfig,
     pub namespace_update_interval: Duration,
