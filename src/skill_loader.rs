@@ -13,15 +13,38 @@ use futures::StreamExt;
 use std::collections::HashMap;
 use std::{future::Future, pin::Pin};
 
+// A skill that has been configured and may be fetched and executed.
+#[derive(Debug, Clone)]
+pub struct ConfiguredSkill {
+    skill_path: SkillPath,
+    tag: Option<String>,
+}
+
+impl ConfiguredSkill {
+    pub fn new(skill_path: SkillPath, tag: Option<String>) -> Self {
+        Self { skill_path, tag }
+    }
+
+    pub fn namespace(&self) -> &str {
+        &self.skill_path.namespace
+    }
+
+    pub fn name(&self) -> &str {
+        &self.skill_path.name
+    }
+
+    pub fn tag_or_default(&self) -> &str {
+        self.tag.as_deref().unwrap_or("latest")
+    }
+}
+
 pub enum SkillLoaderMsg {
     Fetch {
-        skill_path: SkillPath,
-        tag: String,
+        skill: ConfiguredSkill,
         send: oneshot::Sender<anyhow::Result<(Skill, Digest)>>,
     },
     FetchDigest {
-        skill_path: SkillPath,
-        tag: String,
+        skill: ConfiguredSkill,
         send: oneshot::Sender<anyhow::Result<Option<Digest>>>,
     },
 }
@@ -113,18 +136,10 @@ impl SkillLoaderApi {
 }
 
 impl SkillLoaderApi {
-    pub async fn fetch(
-        &self,
-        skill_path: SkillPath,
-        tag: String,
-    ) -> Result<(Skill, Digest), anyhow::Error> {
+    pub async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), anyhow::Error> {
         let (send, recv) = oneshot::channel();
         self.sender
-            .send(SkillLoaderMsg::Fetch {
-                skill_path,
-                tag,
-                send,
-            })
+            .send(SkillLoaderMsg::Fetch { skill, send })
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
@@ -132,16 +147,11 @@ impl SkillLoaderApi {
 
     pub async fn fetch_digest(
         &self,
-        skill_path: SkillPath,
-        tag: String,
+        skill: ConfiguredSkill,
     ) -> Result<Option<Digest>, anyhow::Error> {
         let (send, recv) = oneshot::channel();
         self.sender
-            .send(SkillLoaderMsg::FetchDigest {
-                skill_path,
-                tag,
-                send,
-            })
+            .send(SkillLoaderMsg::FetchDigest { skill, send })
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
@@ -199,16 +209,17 @@ impl SkillLoaderActor {
     async fn fetch<'a>(
         registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
-        skill_path: &SkillPath,
-        tag: &str,
+        skill: &ConfiguredSkill,
     ) -> anyhow::Result<(Skill, Digest)> {
-        let skill_bytes = registry.load_skill(&skill_path.name, tag).await?;
-        let SkillImage { bytes, digest } = skill_bytes
-            .ok_or_else(|| anyhow!("Skill {skill_path} configured but not loadable."))?;
+        let skill_bytes = registry
+            .load_skill(skill.name(), skill.tag_or_default())
+            .await?;
+        let SkillImage { bytes, digest } =
+            skill_bytes.ok_or_else(|| anyhow!("Skill {skill:?} configured but not loadable."))?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")
-            .with_context(|| format!("Failed to initialize {skill_path}."))?;
+            .with_context(|| format!("Failed to initialize {skill:?}."))?;
         Ok((skill, digest))
     }
 
@@ -217,27 +228,21 @@ impl SkillLoaderActor {
     /// of multiple requests.
     fn act(&self, msg: SkillLoaderMsg) {
         match msg {
-            SkillLoaderMsg::Fetch {
-                skill_path,
-                tag,
-                send,
-            } => {
-                let registry = self.registry(&skill_path.namespace);
+            SkillLoaderMsg::Fetch { skill, send } => {
+                let registry = self.registry(skill.namespace());
                 let engine = self.engine.clone();
                 let fut = async move {
-                    let result = Self::fetch(registry.as_ref(), engine, &skill_path, &tag).await;
+                    let result = Self::fetch(registry.as_ref(), engine, &skill).await;
                     drop(send.send(result));
                 };
                 self.running_requests.push(Box::pin(fut));
             }
-            SkillLoaderMsg::FetchDigest {
-                skill_path,
-                tag,
-                send,
-            } => {
-                let registry = self.registry(&skill_path.namespace);
+            SkillLoaderMsg::FetchDigest { skill, send } => {
+                let registry = self.registry(skill.namespace());
                 let fut = async move {
-                    let result = registry.fetch_digest(&skill_path.name, &tag).await;
+                    let result = registry
+                        .fetch_digest(skill.name(), skill.tag_or_default())
+                        .await;
                     drop(send.send(result));
                 };
                 self.running_requests.push(Box::pin(fut));
@@ -255,6 +260,12 @@ pub mod tests {
         registries::tests::{NeverResolvingRegistry, ReadyRegistry},
         skills::Engine,
     };
+
+    impl ConfiguredSkill {
+        pub fn without_tag(skill_path: SkillPath) -> Self {
+            Self::new(skill_path, None)
+        }
+    }
 
     use super::*;
 
@@ -304,24 +315,17 @@ pub mod tests {
 
         // When we fetch the never resolving skill
         let api = skill_loader.api();
+        let skill = ConfiguredSkill::new(never_resolving_skill_path, Some("dummy".to_owned()));
         let handle = tokio::spawn(async move {
-            drop(
-                api.fetch(never_resolving_skill_path, "dummy".to_owned())
-                    .await,
-            );
+            drop(api.fetch(skill).await);
         });
 
         // And waiting 10ms to ensure the message has been received
         sleep(Duration::from_millis(10)).await;
 
         // Then the other skill can still be fetched
-        let result = timeout(
-            Duration::from_millis(5),
-            skill_loader
-                .api()
-                .fetch(ready_skill_path, "dummy".to_owned()),
-        )
-        .await;
+        let skill = ConfiguredSkill::new(ready_skill_path, Some("dummy".to_owned()));
+        let result = timeout(Duration::from_millis(5), skill_loader.api().fetch(skill)).await;
         assert!(result.is_ok());
         drop(handle);
     }
