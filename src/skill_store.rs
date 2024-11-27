@@ -8,6 +8,7 @@ use crate::{
 use anyhow::anyhow;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use itertools::Itertools;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -71,8 +72,13 @@ impl SkillStoreState {
         self.invalidate(skill);
     }
 
+    /// All configured skills, sorted by namespace and name
     pub fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-        self.known_skills.keys()
+        self.known_skills.keys().sorted_by(|a, b| {
+            a.namespace
+                .cmp(&b.namespace)
+                .then_with(|| a.name.cmp(&b.name))
+        })
     }
 
     pub fn list_cached_skills(&self) -> impl Iterator<Item = &SkillPath> + '_ {
@@ -643,6 +649,33 @@ pub mod tests {
         assert!(timeout(Duration::from_millis(10), second_request)
             .await
             .is_ok());
+    }
+
+    #[tokio::test]
+    async fn skills_are_sorted() {
+        // Given a provider with two skills
+        let (sender, _recv) = mpsc::channel(1);
+        let skill_loader = SkillLoaderApi::new(sender);
+
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10)).api();
+        skill_store.upsert(SkillPath::new("a", "a"), None).await;
+        skill_store.upsert(SkillPath::new("a", "b"), None).await;
+        skill_store.upsert(SkillPath::new("b", "a"), None).await;
+        skill_store.upsert(SkillPath::new("b", "b"), None).await;
+
+        // When skills are listed
+        let skills = skill_store.list().await;
+
+        // Then the skills are sorted
+        assert_eq!(
+            skills,
+            vec![
+                SkillPath::new("a", "a"),
+                SkillPath::new("a", "b"),
+                SkillPath::new("b", "a"),
+                SkillPath::new("b", "b"),
+            ]
+        );
     }
 
     #[tokio::test]
