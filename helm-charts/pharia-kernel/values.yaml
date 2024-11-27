@@ -44,6 +44,8 @@ service:
   metricsTargetPort: 9000
   metricsTargetPortName: metrics
   metricsProtocol: TCP
+serviceMonitor:
+  enabled: false
 # -- Active namespaces for Pharia Kernel. e.g.:
 # playground:
 #   config_url: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
