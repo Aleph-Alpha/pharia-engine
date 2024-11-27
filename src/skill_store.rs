@@ -202,7 +202,7 @@ impl SkillStoreState {
 }
 
 pub struct SkillStore {
-    sender: mpsc::Sender<SkillProviderMsg>,
+    sender: mpsc::Sender<SkillStoreMessage>,
     handle: JoinHandle<()>,
 }
 
@@ -229,16 +229,16 @@ impl SkillStore {
 
 #[derive(Clone)]
 pub struct SkillStoreApi {
-    sender: mpsc::Sender<SkillProviderMsg>,
+    sender: mpsc::Sender<SkillStoreMessage>,
 }
 
 impl SkillStoreApi {
-    pub fn new(sender: mpsc::Sender<SkillProviderMsg>) -> Self {
+    pub fn new(sender: mpsc::Sender<SkillStoreMessage>) -> Self {
         SkillStoreApi { sender }
     }
 
     pub async fn remove(&self, skill_path: SkillPath) {
-        let msg = SkillProviderMsg::Remove { skill_path };
+        let msg = SkillStoreMessage::Remove { skill_path };
         self.sender
             .send(msg)
             .await
@@ -246,7 +246,7 @@ impl SkillStoreApi {
     }
 
     pub async fn upsert(&self, skill_path: SkillPath, tag: Option<String>) {
-        let msg = SkillProviderMsg::Upsert { skill_path, tag };
+        let msg = SkillStoreMessage::Upsert { skill_path, tag };
         self.sender
             .send(msg)
             .await
@@ -256,7 +256,7 @@ impl SkillStoreApi {
     /// Report a namespace as erroneous (e.g. in case its configuration is messed up). Set `None`
     /// to communicate that a namespace is no longer erroneous.
     pub async fn set_namespace_error(&self, namespace: String, error: Option<anyhow::Error>) {
-        let msg = SkillProviderMsg::SetNamespaceError { namespace, error };
+        let msg = SkillStoreMessage::SetNamespaceError { namespace, error };
         self.sender
             .send(msg)
             .await
@@ -266,7 +266,7 @@ impl SkillStoreApi {
     /// Fetch an executable skill
     pub async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, anyhow::Error> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillProviderMsg::Fetch { skill_path, send };
+        let msg = SkillStoreMessage::Fetch { skill_path, send };
         self.sender
             .send(msg)
             .await
@@ -278,7 +278,7 @@ impl SkillStoreApi {
     /// component from an OCI
     pub async fn list_cached(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillProviderMsg::ListCached { send };
+        let msg = SkillStoreMessage::ListCached { send };
         self.sender
             .send(msg)
             .await
@@ -289,7 +289,7 @@ impl SkillStoreApi {
     /// List all skills from all namespaces
     pub async fn list(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillProviderMsg::List { send };
+        let msg = SkillStoreMessage::List { send };
         self.sender
             .send(msg)
             .await
@@ -301,7 +301,7 @@ impl SkillStoreApi {
     /// in the cache before, `false` otherwise .
     pub async fn invalidate_cache(&self, skill_path: SkillPath) -> bool {
         let (send, recv) = oneshot::channel();
-        let msg = SkillProviderMsg::InvalidateCache { skill_path, send };
+        let msg = SkillStoreMessage::InvalidateCache { skill_path, send };
         self.sender
             .send(msg)
             .await
@@ -310,7 +310,7 @@ impl SkillStoreApi {
     }
 }
 
-pub enum SkillProviderMsg {
+pub enum SkillStoreMessage {
     Fetch {
         skill_path: SkillPath,
         send: oneshot::Sender<Result<Option<Arc<Skill>>, anyhow::Error>>,
@@ -339,14 +339,14 @@ pub enum SkillProviderMsg {
 }
 
 struct SkillStoreActor {
-    receiver: mpsc::Receiver<SkillProviderMsg>,
+    receiver: mpsc::Receiver<SkillStoreMessage>,
     provider: SkillStoreState,
     digest_update_interval: Duration,
 }
 
 impl SkillStoreActor {
     pub fn new(
-        receiver: mpsc::Receiver<SkillProviderMsg>,
+        receiver: mpsc::Receiver<SkillStoreMessage>,
         skill_loader: SkillLoaderApi,
         digest_update_interval: Duration,
     ) -> Self {
@@ -380,31 +380,31 @@ impl SkillStoreActor {
         }
     }
 
-    pub async fn act(&mut self, msg: SkillProviderMsg) {
+    pub async fn act(&mut self, msg: SkillStoreMessage) {
         match msg {
-            SkillProviderMsg::Fetch { skill_path, send } => {
+            SkillStoreMessage::Fetch { skill_path, send } => {
                 drop(send.send(self.provider.fetch(&skill_path).await));
             }
-            SkillProviderMsg::List { send } => {
+            SkillStoreMessage::List { send } => {
                 drop(send.send(self.provider.skills().cloned().collect()));
             }
-            SkillProviderMsg::Remove { skill_path } => {
+            SkillStoreMessage::Remove { skill_path } => {
                 self.provider.remove_skill(&skill_path);
             }
-            SkillProviderMsg::Upsert { skill_path, tag } => {
+            SkillStoreMessage::Upsert { skill_path, tag } => {
                 self.provider.upsert_skill(&skill_path, tag);
             }
-            SkillProviderMsg::SetNamespaceError { namespace, error } => {
+            SkillStoreMessage::SetNamespaceError { namespace, error } => {
                 if let Some(error) = error {
                     self.provider.add_invalid_namespace(namespace, error);
                 } else {
                     self.provider.remove_invalid_namespace(&namespace);
                 }
             }
-            SkillProviderMsg::ListCached { send } => {
+            SkillStoreMessage::ListCached { send } => {
                 drop(send.send(self.provider.list_cached_skills().cloned().collect()));
             }
-            SkillProviderMsg::InvalidateCache { skill_path, send } => {
+            SkillStoreMessage::InvalidateCache { skill_path, send } => {
                 let _ = send.send(self.provider.invalidate(&skill_path));
             }
         }
@@ -425,7 +425,7 @@ pub mod tests {
 
     use super::*;
 
-    pub use super::SkillProviderMsg;
+    pub use super::SkillStoreMessage;
 
     pub fn dummy_skill_store_api() -> SkillStoreApi {
         let (send, _recv) = mpsc::channel(1);

@@ -344,7 +344,7 @@ pub mod tests {
             tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },
         skill_loader::{RegistryConfig, SkillLoader},
-        skill_store::{SkillProviderMsg, SkillStore},
+        skill_store::{SkillStore, SkillStoreMessage},
         skills::Skill,
     };
 
@@ -549,7 +549,7 @@ pub mod tests {
 
     /// Only serves test/greet skill
     pub struct SkillStoreGreetStub {
-        send: mpsc::Sender<SkillProviderMsg>,
+        send: mpsc::Sender<SkillStoreMessage>,
         join_handle: JoinHandle<()>,
     }
 
@@ -560,11 +560,11 @@ pub mod tests {
             let skill = Skill::new(&engine, greet_bytes.clone()).unwrap();
             let skill = Arc::new(skill);
 
-            let (send, mut recv) = mpsc::channel::<SkillProviderMsg>(1);
+            let (send, mut recv) = mpsc::channel::<SkillStoreMessage>(1);
             let join_handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
                     match msg {
-                        SkillProviderMsg::Fetch { skill_path, send } => {
+                        SkillStoreMessage::Fetch { skill_path, send } => {
                             let skill = if skill_path == SkillPath::new("test", "greet") {
                                 Some(skill.clone())
                             } else {
