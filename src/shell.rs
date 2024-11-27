@@ -873,7 +873,14 @@ mod tests {
 
     #[tokio::test]
     async fn healthcheck() {
-        let app_state = AppState::dummy();
+        let saboteur_authorization = StubAuthorization::new(|msg| {
+            match msg {
+                authorization::AuthorizationMsg::Auth { api_token: _, send } => {
+                    drop(send.send(Ok(false)));
+                }
+            };
+        });
+        let app_state = AppState::dummy().with_authorization_api(saboteur_authorization.api());
         let http = http(app_state);
         let resp = http
             .oneshot(
@@ -950,6 +957,44 @@ mod tests {
         let actual = String::from_utf8(body.to_vec()).unwrap();
         let expected = "[\"ns_one/one\",\"ns_two/two\"]";
         assert_eq!(actual, expected);
+    }
+
+    #[tokio::test]
+    async fn cannot_list_skills_without_permissions() {
+        // Given we have a saboteur authorization
+        let saboteur_authorization = StubAuthorization::new(|msg| {
+            match msg {
+                authorization::AuthorizationMsg::Auth { api_token: _, send } => {
+                    drop(send.send(Ok(false)));
+                }
+            };
+        });
+        let app_state = AppState::dummy().with_authorization_api(saboteur_authorization.api());
+        let http = http(app_state);
+
+        // When
+        let api_token = api_token();
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .uri("/skills")
+                    .header(header::AUTHORIZATION, auth_value)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            String::from_utf8(body.to_vec()).unwrap(),
+            "Bearer token invalid".to_owned()
+        );
     }
 
     #[tokio::test]
