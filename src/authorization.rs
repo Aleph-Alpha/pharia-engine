@@ -202,27 +202,21 @@ pub mod tests {
     /// An authorization double, loaded up with predefined answers.
     pub struct StubAuthorization {
         send: mpsc::Sender<AuthorizationMsg>,
-        handle: JoinHandle<()>,
     }
 
     impl StubAuthorization {
         pub fn new(mut handle: impl FnMut(AuthorizationMsg) + Send + 'static) -> Self {
             let (send, mut recv) = mpsc::channel(1);
-            let handle = tokio::spawn(async move {
+            tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
                     handle(msg);
                 }
             });
-            Self { send, handle }
+            Self { send }
         }
 
         pub fn api(&self) -> AuthorizationApi {
             AuthorizationApi::new(self.send.clone())
-        }
-
-        pub async fn shutdown(self) {
-            drop(self.send);
-            self.handle.await.unwrap();
         }
     }
 
