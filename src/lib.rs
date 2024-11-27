@@ -95,7 +95,7 @@ impl Kernel {
         // Wait for first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        let authorization = Authorization::new();
+        let authorization = Authorization::new(app_config.inference_addr);
 
         let shell = match Shell::new(
             app_config.tcp_addr,

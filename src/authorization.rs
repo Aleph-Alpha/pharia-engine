@@ -1,5 +1,4 @@
-#![expect(dead_code)]
-use std::{future::Future, pin::Pin};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use axum::{
     body::Body,
@@ -21,9 +20,9 @@ pub struct Authorization {
 }
 
 impl Authorization {
-    pub fn new() -> Authorization {
+    pub fn new(authorization_url: String) -> Authorization {
         let (send, recv) = mpsc::channel(1);
-        let mut actor = AuthorizationActor::new(recv);
+        let mut actor = AuthorizationActor::new(recv, authorization_url);
         let handle = tokio::spawn(async move { actor.run().await });
         Authorization { send, handle }
     }
@@ -43,13 +42,15 @@ impl Authorization {
 struct AuthorizationActor {
     recv: mpsc::Receiver<AuthorizationMsg>,
     running_authorizations: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    client: Arc<AuthorizationClient>,
 }
 
 impl AuthorizationActor {
-    fn new(recv: mpsc::Receiver<AuthorizationMsg>) -> Self {
+    fn new(recv: mpsc::Receiver<AuthorizationMsg>, authorization_url: String) -> Self {
         Self {
             recv,
             running_authorizations: FuturesUnordered::new(),
+            client: Arc::new(AuthorizationClient::new(authorization_url)),
         }
     }
     async fn run(&mut self) {
@@ -64,8 +65,9 @@ impl AuthorizationActor {
         }
     }
     fn act(&mut self, msg: AuthorizationMsg) {
+        let client = self.client.clone();
         self.running_authorizations
-            .push(Box::pin(async move { msg.act() }));
+            .push(Box::pin(async move { msg.act(client.as_ref()).await }));
     }
 }
 
@@ -99,9 +101,12 @@ pub enum AuthorizationMsg {
 }
 
 impl AuthorizationMsg {
-    fn act(self) {
+    async fn act(self, client: &AuthorizationClient) {
         match self {
-            AuthorizationMsg::Auth { api_token: _, send } => drop(send.send(Ok(true))),
+            AuthorizationMsg::Auth { api_token, send } => {
+                let result = client.token_valid(api_token).await;
+                drop(send.send(result));
+            }
         }
     }
 }
