@@ -4,8 +4,7 @@ use std::{future::Future, pin::Pin};
 use axum::{
     body::Body,
     extract::State,
-    http::Request,
-    http::StatusCode,
+    http::{HeaderMap, Request, StatusCode},
     middleware::Next,
     response::{ErrorResponse, Response},
 };
@@ -140,10 +139,43 @@ pub async fn authorization_middleware(
     Ok(response)
 }
 
+struct AuthorizationClient {
+    url: String,
+    client: reqwest::Client,
+}
+
+impl AuthorizationClient {
+    pub fn new(url: String) -> Self {
+        Self {
+            url,
+            client: reqwest::Client::new(),
+        }
+    }
+
+    async fn token_valid(&self, api_token: String) -> anyhow::Result<bool> {
+        let url = format!("{}/check_privileges", self.url);
+        let body: Vec<String> = vec![];
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Authorization",
+            format!("Bearer {api_token}").parse().unwrap(),
+        );
+        let response = self
+            .client
+            .post(url)
+            .json(&body)
+            .headers(headers)
+            .send()
+            .await?;
+        Ok(response.status().is_success())
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
 
     use super::*;
+    use crate::tests::{api_token, inference_address};
 
     /// An authorization double, loaded up with predefined answers.
     pub struct StubAuthorization {
@@ -170,5 +202,31 @@ pub mod tests {
             drop(self.send);
             self.handle.await.unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn true_for_valid_permissions() {
+        // Given a client that is configured against the inference api
+        let url = inference_address();
+        let client = AuthorizationClient::new(url.to_owned());
+
+        // When the client is used to check a valid api token
+        let result = client.token_valid(api_token().to_owned()).await;
+
+        // Then the result is true
+        assert!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn false_for_invalid_token() {
+        // Given a client that is configured against the inference api
+        let url = inference_address();
+        let client = AuthorizationClient::new(url.to_owned());
+
+        // When the client is used to check an invalid api token
+        let result = client.token_valid("invalid".to_owned()).await;
+
+        // Then the result is false
+        assert!(!result.unwrap());
     }
 }
