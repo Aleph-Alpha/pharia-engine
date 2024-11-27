@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.2.3...v0.3.0)
+
+### Features
+
+- Add authorization_addr endpoint to configure where to check authorization requests from kernel - ([76b9c44](https://github.com/Aleph-Alpha/pharia-kernel/commit/76b9c4458e4b0752df8c7e3267360bf52c09474d))
+- Implement authorization middleware with actor model - ([0991fe6](https://github.com/Aleph-Alpha/pharia-kernel/commit/0991fe63083f5e5811c1b7960abd5db0dfe78f2a))
+- Require token on CSI and skill routes - ([3718963](https://github.com/Aleph-Alpha/pharia-kernel/commit/37189636bb0df405ebd06110a0d7a11a37f8a59f))
+- Skill loading happens in background - ([b0b533a](https://github.com/Aleph-Alpha/pharia-kernel/commit/b0b533a8a414b0d7986e29b96dbf369ce7c3e32e))
+- Expose metrics for total CSI function calls - ([2b1fd3b](https://github.com/Aleph-Alpha/pharia-kernel/commit/2b1fd3b1f0c21b4c348bebbb6a1060bd6a9428c7))
+- Allow metrics addr to be configurable - ([3fce17c](https://github.com/Aleph-Alpha/pharia-kernel/commit/3fce17c30d5dca0f0f68e32e90267a82d7f17840))
+- Expose metrics endpoint at port 9000 - ([e42c931](https://github.com/Aleph-Alpha/pharia-kernel/commit/e42c931e36ca591ae6d42514f63579d6d6b67cb2))
+- Emit library-level metrics from shell - ([c36e7c6](https://github.com/Aleph-Alpha/pharia-kernel/commit/c36e7c6f538916725abe5a1612ffb2bcb42e14b4))
+
+### Fixes
+
+- Always send response in message channel - ([b5b0fb0](https://github.com/Aleph-Alpha/pharia-kernel/commit/b5b0fb0418ba0ef842168353b6c25702997c6990))
+
+### Documentation
+
+- Fix multiple typos - ([33a5b56](https://github.com/Aleph-Alpha/pharia-kernel/commit/33a5b563c6b956e00ffbb91bdac65356f311bea2))
+
+### Builds
+
+- *(deps)* Bump the minor group with 15 updates - ([9508430](https://github.com/Aleph-Alpha/pharia-kernel/commit/95084308131bd1d806d2b73351e45f7e1764a029))
+- *(deps)* Bump the wasmtime group with 15 updates - ([a0a878a](https://github.com/Aleph-Alpha/pharia-kernel/commit/a0a878a619c5e9168647dbca76d9a21bbb922e24))
+- *(deps)* Bump rustls from 0.23.17 to 0.23.18 in the cargo group - ([5175d3f](https://github.com/Aleph-Alpha/pharia-kernel/commit/5175d3fee79f2cda7448379c4ab226117990340d))
+
+
 ## [0.2.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.2.2...v0.2.3)
 
 ### Builds
