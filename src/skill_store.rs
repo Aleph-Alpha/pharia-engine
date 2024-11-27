@@ -427,7 +427,7 @@ pub mod tests {
 
     pub use super::SkillProviderMsg;
 
-    pub fn dummy_skill_provider_api() -> SkillStoreApi {
+    pub fn dummy_skill_store_api() -> SkillStoreApi {
         let (send, _recv) = mpsc::channel(1);
         SkillStoreApi::new(send)
     }
@@ -513,30 +513,30 @@ pub mod tests {
         // and "greet-py"
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_provider
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        skill_store
             .api()
             .upsert(SkillPath::new("local", "greet_skill"), None)
             .await;
-        skill_provider
+        skill_store
             .api()
             .upsert(SkillPath::new("local", "greet-py"), None)
             .await;
 
         // When fetching "greet_skill" but not "greet-py"
-        skill_provider
+        skill_store
             .api()
             .fetch(SkillPath::new("local", "greet_skill"))
             .await
             .unwrap();
         // and listing all cached skills
-        let cached_skills = skill_provider.api().list_cached().await;
+        let cached_skills = skill_store.api().list_cached().await;
 
         // Then only "greet_skill" will appear in that list, but not "greet-py"
         assert_eq!(cached_skills, vec![SkillPath::new("local", "greet_skill")]);
 
         // Cleanup
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
     }
 
     #[tokio::test]
@@ -544,8 +544,8 @@ pub mod tests {
         // Given an empty provider
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        let api = skill_provider.api();
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let api = skill_store.api();
 
         // When adding a skill
         api.upsert(SkillPath::new("local", "one"), None).await;
@@ -559,7 +559,7 @@ pub mod tests {
 
         // Cleanup
         drop(api);
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
     }
 
     #[tokio::test]
@@ -569,8 +569,8 @@ pub mod tests {
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        let api = skill_provider.api();
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let api = skill_store.api();
         api.upsert(greet_skill.clone(), None).await;
         api.fetch(greet_skill.clone()).await.unwrap();
 
@@ -590,8 +590,8 @@ pub mod tests {
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
-        let api = skill_provider.api();
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let api = skill_store.api();
         api.upsert(greet_skill.clone(), None).await;
 
         // When we invalidate "greet_skill"
@@ -603,7 +603,7 @@ pub mod tests {
         assert_eq!(api.list().await, vec![greet_skill]);
         // Cleanup
         drop(api);
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
     }
 
     #[tokio::test]
@@ -612,13 +612,13 @@ pub mod tests {
         let (registry_config, temp_dir) = tmp_registries_with_skill()?;
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::new(engine, registry_config).api();
-        let mut skill_provider = SkillStoreState::new(skill_loader);
+        let mut skill_store_state = SkillStoreState::new(skill_loader);
 
         let greet_skill = SkillPath::new("local", "greet_skill");
-        skill_provider.upsert_skill(&greet_skill, None);
-        skill_provider.fetch(&greet_skill).await?;
+        skill_store_state.upsert_skill(&greet_skill, None);
+        skill_store_state.fetch(&greet_skill).await?;
         assert_eq!(
-            skill_provider.list_cached_skills().collect::<Vec<_>>(),
+            skill_store_state.list_cached_skills().collect::<Vec<_>>(),
             vec![&greet_skill]
         );
 
@@ -631,13 +631,15 @@ pub mod tests {
         let new_time = fs::metadata(&wasm_file)?.modified()?;
         assert_ne!(prev_time, new_time);
 
-        skill_provider.validate_digest(greet_skill.clone()).await?;
+        skill_store_state
+            .validate_digest(greet_skill.clone())
+            .await?;
 
         // Then greet skill is no longer listed in the cache, but of course still available in the
         // list of all skills
-        assert_eq!(skill_provider.list_cached_skills().count(), 0);
+        assert_eq!(skill_store_state.list_cached_skills().count(), 0);
         assert_eq!(
-            skill_provider.skills().collect::<Vec<_>>(),
+            skill_store_state.skills().collect::<Vec<_>>(),
             vec![&greet_skill]
         );
 
@@ -651,18 +653,18 @@ pub mod tests {
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
-        let mut skill_provider = SkillStoreState::new(skill_loader);
+        let mut skill_store_state = SkillStoreState::new(skill_loader);
 
-        skill_provider.upsert_skill(&greet_skill, None);
-        skill_provider.fetch(&greet_skill).await?;
+        skill_store_state.upsert_skill(&greet_skill, None);
+        skill_store_state.fetch(&greet_skill).await?;
 
         // When we check it with no changes
-        skill_provider.validate_digest(greet_skill).await?;
+        skill_store_state.validate_digest(greet_skill).await?;
 
         // Then nothing changes
         assert_eq!(
-            skill_provider.list_cached_skills().collect::<Vec<_>>(),
-            skill_provider.skills().collect::<Vec<_>>(),
+            skill_store_state.list_cached_skills().collect::<Vec<_>>(),
+            skill_store_state.skills().collect::<Vec<_>>(),
         );
 
         Ok(())
@@ -675,8 +677,8 @@ pub mod tests {
         let greet_skill = SkillPath::new("local", "greet_skill");
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::new(engine, registry_config).api();
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(1));
-        let api = skill_provider.api();
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(1));
+        let api = skill_store.api();
         api.upsert(greet_skill.clone(), None).await;
         api.fetch(greet_skill.clone()).await?;
         assert_eq!(api.list_cached().await, vec![greet_skill.clone()]);
@@ -698,7 +700,7 @@ pub mod tests {
 
         // Cleanup
         drop(api);
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
 
         Ok(())
     }

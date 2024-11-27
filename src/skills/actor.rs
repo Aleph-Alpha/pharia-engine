@@ -37,11 +37,11 @@ pub struct SkillExecutor {
 
 impl SkillExecutor {
     /// Create a new skill executer with the default web assembly runtime
-    pub fn new<C>(engine: Arc<Engine>, csi_apis: C, skill_provider: SkillStoreApi) -> Self
+    pub fn new<C>(engine: Arc<Engine>, csi_apis: C, skill_store_api: SkillStoreApi) -> Self
     where
         C: Csi + Clone + Send + Sync + 'static,
     {
-        let runtime = WasmRuntime::new(engine, skill_provider);
+        let runtime = WasmRuntime::new(engine, skill_store_api);
         let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
         let handle = tokio::spawn(async {
             SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
@@ -401,9 +401,9 @@ pub mod tests {
         let registry_config = RegistryConfig::empty();
         let skill_loader = SkillLoader::new(engine.clone(), registry_config).api();
 
-        let skill_provider = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let csi_apis = DummyCsi;
-        let executer = SkillExecutor::new(engine, csi_apis, skill_provider.api());
+        let executer = SkillExecutor::new(engine, csi_apis, skill_store.api());
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace
@@ -417,7 +417,7 @@ pub mod tests {
 
         drop(api);
         executer.wait_for_shutdown().await;
-        skill_provider.wait_for_shutdown().await;
+        skill_store.wait_for_shutdown().await;
 
         // Then result indicates that the skill is missing
         assert!(matches!(result, Err(ExecuteSkillError::SkillDoesNotExist)));
