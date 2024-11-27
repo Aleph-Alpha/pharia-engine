@@ -49,6 +49,7 @@ ports:
 #   repository: "engineering/pharia-kernel-playground/skills"
 namespaces: {}
 logLevel: trace
+authorizationAddress: ""
 inferenceAddress: ""
 documentIndexAddress: ""
 openTelemetryEndpoint: ""

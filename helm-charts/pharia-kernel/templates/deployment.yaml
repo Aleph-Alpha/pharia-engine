@@ -67,6 +67,16 @@ spec:
           env:
             - name: LOG_LEVEL
               value: "error,pharia_kernel={{ .Values.logLevel }}"
+            {{- if .Values.authorizationAddress }}
+            - name: AUTHORIZATION_ADDRESS
+              value: {{ .Values.authorizationAddress | quote }}
+            {{- else if .Values.global.phariaAIConfigMap }}
+            - name: AUTHORIZATION_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.global.phariaAIConfigMap }}
+                  key: PHARIA_IAM_URL
+            {{- end }}
             {{- if .Values.inferenceAddress }}
             - name: AA_INFERENCE_ADDRESS
               value: {{ .Values.inferenceAddress | quote }}
