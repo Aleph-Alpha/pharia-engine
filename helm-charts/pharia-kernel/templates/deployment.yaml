@@ -41,9 +41,12 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - name: {{ .Values.ports.name }}
-              containerPort: {{ .Values.ports.containerPort }}
-              protocol: {{ .Values.ports.protocol }}
+            - name: {{ .Values.service.targetPortName }}
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: {{ .Values.service.protocol }}
+            - name: {{ .Values.service.metricsTargetPortName }}
+              containerPort: {{ .Values.service.metricsTargetPort }}
+              protocol: {{ .Values.service.metricsProtocol }}
           livenessProbe:
             httpGet:
               path: /healthcheck

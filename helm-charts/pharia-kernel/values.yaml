@@ -35,12 +35,15 @@ securityContext:
 service:
   type: ClusterIP
   port: 80
-  targetPort: http
-  name: http
-ports:
-  name: http
-  containerPort: 8081
+  portName: http
+  targetPort: 8081
+  targetPortName: http
   protocol: TCP
+  metricsPort: 9000
+  metricsPortName: metrics
+  metricsTargetPort: 9000
+  metricsTargetPortName: metrics
+  metricsProtocol: TCP
 # -- Active namespaces for Pharia Kernel. e.g.:
 # playground:
 #   config_url: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"

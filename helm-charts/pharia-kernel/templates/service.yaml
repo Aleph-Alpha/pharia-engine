@@ -8,8 +8,12 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.targetPort }}
-      protocol: TCP
-      name: {{ .Values.service.name }}
+      targetPort: {{ .Values.service.targetPortName }}
+      protocol: {{ .Values.service.protocol }}
+      name: {{ .Values.service.portName }}
+    - port: {{ .Values.service.metricsPort }}
+      targetPort: {{ .Values.service.metricsTargetPortName }}
+      protocol: {{ .Values.service.metricsProtocol }}
+      name: {{ .Values.service.metricsPortName }}
   selector:
     {{- include "pharia-kernel.selectorLabels" . | nindent 4 }}
