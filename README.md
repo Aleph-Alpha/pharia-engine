@@ -57,7 +57,7 @@ podman build . --tag pharia-kernel --platform linux/arm64
 health check:
 
 ```shell
-curl -v GET 127.0.0.1:8081/healthcheck
+curl -v GET 127.0.0.1:8081/health
 ```
 
 list skills:

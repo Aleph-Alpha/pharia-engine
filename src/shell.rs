@@ -171,7 +171,9 @@ where
         .nest_service("/docs", serve_dir.clone())
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
         .route("/openapi.json", get(serve_docs))
+        // maintaining `healthcheck` route for backward compatibility
         .route("/healthcheck", get(|| async { "ok" }))
+        .route("/health", get(|| async { "ok" }))
         .route("/", get(index))
         .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
@@ -871,6 +873,23 @@ mod tests {
 
     #[tokio::test]
     async fn healthcheck() {
+        let app_state = AppState::dummy();
+        let http = http(app_state);
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .uri("/healthcheck")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"ok");
+    }
+
+    #[tokio::test]
+    async fn health() {
         let saboteur_authorization = StubAuthorization::new(|msg| {
             match msg {
                 authorization::AuthorizationMsg::Auth { api_token: _, send } => {
@@ -883,7 +902,7 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .uri("/healthcheck")
+                    .uri("/health")
                     .body(Body::empty())
                     .unwrap(),
             )
