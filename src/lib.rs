@@ -95,7 +95,7 @@ impl Kernel {
         // Wait for first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        let authorization = Authorization::new(app_config.inference_addr);
+        let authorization = Authorization::new(app_config.authorization_addr);
 
         let shell = match Shell::new(
             app_config.tcp_addr,
@@ -205,6 +205,7 @@ mod tests {
             metrics_addr: "127.0.0.1:0".parse().unwrap(),
             inference_addr: "https://api.aleph-alpha.com".to_owned(),
             document_index_addr: "https://document-index.aleph-alpha.com".to_owned(),
+            authorization_addr: "https://api.aleph-alpha.com".to_owned(),
             operator_config: OperatorConfig::empty(),
             namespace_update_interval: Duration::from_secs(10),
             log_level: "info".to_owned(),
