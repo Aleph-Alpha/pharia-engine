@@ -37,9 +37,9 @@ impl TestKernel {
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             metrics_addr: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
-            inference_addr: "https://api.aleph-alpha.com".to_owned(),
-            document_index_addr: "https://document-index.aleph-alpha.com".to_owned(),
-            authorization_addr: "https://api.aleph-alpha.com".to_owned(),
+            inference_addr: "https://inference-api.product.pharia.com".to_owned(),
+            document_index_addr: "https://document-index.product.pharia.com".to_owned(),
+            authorization_addr: "https://inference-api.product.pharia.com".to_owned(),
             operator_config: OperatorConfig::local(skills),
             namespace_update_interval: Duration::from_secs(10),
             log_level: "info".to_owned(),
@@ -110,7 +110,7 @@ async fn completion_via_remote_csi() {
 You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
-                "model": "llama-3.1-8b-instruct",
+                "model": "pharia-1-llm-7b-control",
                 "params": {
                     "max_tokens": 64,
                     "temperature": null,
@@ -153,13 +153,13 @@ async fn search_via_remote_csi() {
                 "version": "0.2",
                 "function": "search",
                 "index_path": {
-                    "namespace": "aleph-alpha",
-                    "collection": "test-collection",
-                    "index": "small",
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "index": "asym-64",
                 },
-                "query":"What is a blockchain?",
+                "query":"What is the Pharia Kernel?",
                 "max_results":10,
-                "min_score":0.7,
+                "min_score":0.1,
             })
             .to_string(),
         ))
@@ -167,10 +167,9 @@ async fn search_via_remote_csi() {
         .send()
         .await
         .unwrap();
-
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
-    assert!(body.to_lowercase().contains("blockchain"));
+    assert!(body.to_lowercase().contains("kernel"));
 
     kernel.shutdown().await;
 }

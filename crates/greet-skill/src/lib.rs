@@ -18,7 +18,7 @@ You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         );
-        complete_text(&prompt, "llama-3.1-8b-instruct")
+        complete_text(&prompt, "pharia-1-llm-7b-control")
     }
 }
 

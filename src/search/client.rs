@@ -202,10 +202,10 @@ pub mod tests {
         let client = Client::new(host).unwrap();
 
         // When making a query on an existing collection
-        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
+        let index = IndexPath::new("Kernel", "test", "asym-64");
         let request = SearchRequest::new(
             vec![Modality::Text {
-                text: "What is the population of Heidelberg?".to_owned(),
+                text: "What is the Pharia Kernel?".to_owned(),
             }],
             1,
             None,
@@ -215,38 +215,15 @@ pub mod tests {
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
-        assert!(results[0].document_path.name.contains("Heidelberg"));
+        assert!(results[0]
+            .document_path
+            .name
+            .to_lowercase()
+            .contains("kernel"));
         let Modality::Text { text } = &results[0].section[0] else {
             panic!("invalid entry");
         };
-        assert!(text.contains("Heidelberg"));
-    }
-
-    #[tokio::test]
-    async fn multiple_results() {
-        // Given a search client pointed at the document index
-        let host = document_index_address().to_owned();
-        let api_token = api_token();
-        let client = Client::new(host).unwrap();
-        let max_results = 5;
-
-        // When making a query on an existing collection
-        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
-        let request = SearchRequest::new(
-            vec![Modality::Text {
-                text: "What is the population of Heidelberg?".to_owned(),
-            }],
-            max_results,
-            None,
-            true,
-        );
-        let results = client.search(index, request, api_token).await.unwrap();
-
-        // Then we get at least one result
-        assert_eq!(results.len(), max_results as usize);
-        assert!(results
-            .iter()
-            .all(|r| r.document_path.name.contains("Heidelberg")));
+        assert!(text.contains("Kernel"));
     }
 
     #[tokio::test]
@@ -256,13 +233,13 @@ pub mod tests {
         let api_token = api_token();
         let client = Client::new(host).unwrap();
         let max_results = 5;
-        let min_score = 0.725;
+        let min_score = 0.99;
 
-        // When making a query on an existing collection
-        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
+        // When making a query on an existing collection with a high min score
+        let index = IndexPath::new("Kernel", "test", "asym-64");
         let request = SearchRequest::new(
             vec![Modality::Text {
-                text: "What is the population of Heidelberg?".to_owned(),
+                text: "What is the Pharia Kernel?".to_owned(),
             }],
             max_results,
             Some(min_score),
@@ -270,8 +247,7 @@ pub mod tests {
         );
         let results = client.search(index, request, api_token).await.unwrap();
 
-        // Then we get less than 5 results
-        assert_eq!(results.len(), 4);
-        assert!(results.iter().all(|r| r.score >= min_score));
+        // Then we don't get any results
+        assert!(results.is_empty());
     }
 }

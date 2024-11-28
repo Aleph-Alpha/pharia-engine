@@ -227,7 +227,7 @@ You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>";
 
-            let expected_model = "llama-3.1-8b-instruct";
+            let expected_model = "pharia-1-llm-7b-control";
 
             // Print actual parameters in case of failure
             eprintln!("{request:?}");

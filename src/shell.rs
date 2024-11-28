@@ -525,7 +525,7 @@ mod tests {
         // Given a versioned csi request
         let prompt = "Say hello to Homer";
         let completion_request = CompletionRequest {
-            model: "llama-3.1-8b-instruct".to_owned(),
+            model: "pharia-1-llm-7b-control".to_owned(),
             prompt: prompt.to_owned(),
             params: CompletionParams {
                 max_tokens: Some(128),

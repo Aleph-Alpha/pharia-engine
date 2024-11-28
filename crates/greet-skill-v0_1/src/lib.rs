@@ -24,7 +24,7 @@ You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         );
-        let result = complete("llama-3.1-8b-instruct", &prompt, None);
+        let result = complete("pharia-1-llm-7b-control", &prompt, None);
         let output = serde_json::to_vec(&json!(result.text))
             .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
         Ok(output)

@@ -107,7 +107,7 @@ mod tests {
             "version": "0.2",
             "function": "complete",
             "prompt": "Hello",
-            "model": "llama-3.1-8b-instruct",
+            "model": "pharia-1-llm-7b-control",
             "params": {
                 "max_tokens": 128,
                 "temperature": null,

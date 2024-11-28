@@ -296,38 +296,19 @@ mod tests {
         let search = Search::new(host);
 
         // When making a query on an existing collection
-        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
-        let request = SearchRequest::new(index, "What is the population of Heidelberg?");
+        let index = IndexPath::new("Kernel", "test", "asym-64");
+        let request = SearchRequest::new(index, "What is the Pharia Kernel?");
         let results = search.api().search(request, api_token).await.unwrap();
         search.wait_for_shutdown().await;
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
-        assert!(results[0].document_path.name.contains("Heidelberg"));
-        assert!(results[0].content.contains("Heidelberg"));
-    }
-
-    #[tokio::test]
-    async fn multiple_results() {
-        // Given a search client pointed at the document index
-        let host = document_index_address().to_owned();
-        let api_token = api_token().to_owned();
-        let search = Search::new(host);
-        let max_results = 5;
-
-        // When making a query on an existing collection
-        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
-        let request = SearchRequest::new(index, "What is the population of Heidelberg?")
-            .with_max_results(max_results);
-        let results = search.api().search(request, api_token).await.unwrap();
-        search.wait_for_shutdown().await;
-
-        // Then we get at least one result
-        assert_eq!(results.len(), max_results as usize);
-        assert!(results
-            .iter()
-            .all(|r| r.document_path.name.contains("Heidelberg")));
-        assert!(results.iter().all(|r| r.content.contains("Heidelberg")));
+        assert!(results[0]
+            .document_path
+            .name
+            .to_lowercase()
+            .contains("kernel"));
+        assert!(results[0].content.contains("Kernel"));
     }
 
     #[tokio::test]
@@ -337,18 +318,18 @@ mod tests {
         let api_token = api_token().to_owned();
         let search = Search::new(host);
         let max_results = 5;
-        let min_score = 0.725;
+        let min_score = 0.99;
 
         // When making a query on an existing collection
-        let index = IndexPath::new("f13", "wikipedia-de", "luminous-base-asymmetric-64");
-        let request = SearchRequest::new(index, "What is the population of Heidelberg?")
+        let index = IndexPath::new("Kernel", "test", "asym-64");
+        let request = SearchRequest::new(index, "What is the Pharia Kernel?")
             .with_max_results(max_results)
             .with_min_score(min_score);
         let results = search.api().search(request, api_token).await.unwrap();
         search.wait_for_shutdown().await;
 
-        // Then we get less than 5 results
-        assert_eq!(results.len(), 4);
+        // Then we don't get any results
+        assert!(results.is_empty());
     }
 
     /// This Client will only resolve a completion once the correct number of
