@@ -52,7 +52,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt -- --check
-      - run: cargo clippy --workspace --all-features --all-targets
+      - run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
   test-and-deploy-if-main-or-tag:
     runs-on: ubuntu-latest
