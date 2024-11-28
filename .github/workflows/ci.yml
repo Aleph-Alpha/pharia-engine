@@ -40,8 +40,8 @@ jobs:
       SKILL_REGISTRY_USER: ${{ github.actor }}
       SKILL_REGISTRY_PASSWORD: ${{ secrets.SKILL_REGISTRY_PASSWORD }}
       AA_API_TOKEN: ${{ secrets.AA_API_TOKEN }}
-      AA_INFERENCE_ADDRESS: https://api.aleph-alpha.com
-      AUTHORIZATION_ADDRESS: https://api.aleph-alpha.com
+      AA_INFERENCE_ADDRESS: https://inference-api.product.pharia.com
+      AUTHORIZATION_ADDRESS: https://inference-api.product.pharia.com
 
   lints:
     runs-on: ubuntu-latest

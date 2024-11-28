@@ -261,7 +261,7 @@ mod tests {
 
         // and a chat request
         let chat_request = ChatRequest {
-            model: "llama-3.1-8b-instruct".to_owned(),
+            model: "pharia-1-llm-7b-control".to_owned(),
             params: ChatParams {
                 max_tokens: None,
                 temperature: None,
@@ -291,7 +291,7 @@ mod tests {
 
         // and a chat request return an error
         let chat_request = ChatRequest {
-            model: "llama-3.1-8b-instruct".to_owned(),
+            model: "pharia-1-llm-7b-control".to_owned(),
             params: ChatParams::default(),
             messages: vec![Message {
                 role: Role::User,

@@ -178,7 +178,7 @@ pub mod tests {
     #[tokio::test]
     async fn fetch_pharia_1_llm_7b_control_tokenizer() {
         // Given a model name and the actual inference API
-        let model_name = "Pharia-1-LLM-7B-control";
+        let model_name = "pharia-1-llm-7b-control";
         let base_url = inference_address();
         let api_token = api_token().to_owned();
 

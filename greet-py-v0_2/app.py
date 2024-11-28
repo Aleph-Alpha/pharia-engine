@@ -16,5 +16,5 @@ You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Provide a nice greeting for the person named: {input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
         params = csi.CompletionParams(10, None, None, None, [])
-        completion = csi.complete("llama-3.1-8b-instruct", prompt, params)
+        completion = csi.complete("pharia-1-llm-7b-control", prompt, params)
         return json.dumps(completion.text).encode()
