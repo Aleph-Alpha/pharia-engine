@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.3.1...v0.3.2)
+
+### Features
+
+- Sort skills by namespace and name - ([371ad48](https://github.com/Aleph-Alpha/pharia-kernel/commit/371ad48e7943619bc91ad0abecbd020dc953056c))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 19 updates - ([ded5b89](https://github.com/Aleph-Alpha/pharia-kernel/commit/ded5b895209c595d9bade684ca422977f89e9163))
+
+
 ## [0.3.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.3.0...v0.3.1)
 
 ### Features
