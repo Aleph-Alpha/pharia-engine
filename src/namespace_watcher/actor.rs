@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
 
-use crate::{skill_store::SkillStoreApi, skills::SkillPath};
+use crate::{skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::SkillPath};
 
 use super::{
     namespace_description::{NamespaceDescriptionError, SkillDescription},
@@ -239,9 +239,9 @@ impl NamespaceWatcherActor {
         let incoming = self.skills.get(namespace).unwrap();
         let diff = Self::compute_diff(&existing, incoming);
         for skill in diff.added_or_changed {
-            self.skill_store_api
-                .upsert(SkillPath::new(namespace, &skill.name), skill.tag)
-                .await;
+            let tag = skill.tag.as_deref().unwrap_or("latest");
+            let skill = ConfiguredSkill::new(skill.name, namespace, tag);
+            self.skill_store_api.upsert(skill).await;
         }
 
         for skill_name in diff.removed {
@@ -476,10 +476,9 @@ pub mod tests {
         assert!(matches!(
             msg,
             SkillStoreMessage::Upsert {
-                skill_path,
-                tag: None
+                skill,
             }
-            if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
+            if skill == ConfiguredSkill::new(dummy_skill, dummy_namespace, "latest")
         ));
 
         observer.wait_for_shutdown().await;
@@ -659,10 +658,9 @@ pub mod tests {
         assert!(matches!(
             msg,
             SkillStoreMessage::Upsert {
-                skill_path,
-                tag: None
+                skill,
             }
-            if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
+            if skill == ConfiguredSkill::new(dummy_skill, dummy_namespace, "latest")
         ));
     }
 }
