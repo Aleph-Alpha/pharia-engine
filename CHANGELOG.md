@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.3.0...v0.3.1)
+
+### Features
+
+- Migrate health endpoint - ([9c23321](https://github.com/Aleph-Alpha/pharia-kernel/commit/9c23321f252697f65f8ac3f37553a9f30f188e03))
+- Skill request cache ensures skill store only has one pending request per skill - ([2fe288f](https://github.com/Aleph-Alpha/pharia-kernel/commit/2fe288f0b59e90b657a044b4d243cef894ca47c9))
+
+
 ## [0.3.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.2.3...v0.3.0)
 
 ### Features
