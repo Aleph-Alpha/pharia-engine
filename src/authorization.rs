@@ -249,11 +249,8 @@ pub mod tests {
     struct StubAuthorizationClient;
 
     impl AuthorizationClient for StubAuthorizationClient {
-        fn token_valid(
-            &self,
-            _api_token: String,
-        ) -> impl Future<Output = anyhow::Result<bool>> + Send {
-            async move { Ok(true) }
+        async fn token_valid(&self, _api_token: String) -> anyhow::Result<bool> {
+            Ok(true)
         }
     }
 

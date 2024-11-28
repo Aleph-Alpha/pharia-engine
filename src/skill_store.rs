@@ -639,7 +639,7 @@ pub mod tests {
             SkillLoaderMsg::Fetch { send, .. } => {
                 drop(send.send(Err(anyhow!("First request response"))));
             }
-            _ => unreachable!(),
+            SkillLoaderMsg::FetchDigest { .. } => unreachable!(),
         }
 
         // Then both requests have answered with the error response

@@ -37,17 +37,13 @@ pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<()> {
 }
 
 fn init_otel_tracer(endpoint: &str) -> anyhow::Result<Tracer> {
-    let provider = opentelemetry_sdk::trace::TracerProvider::builder()
-        .with_config(
-            opentelemetry_sdk::trace::Config::default()
-                // Customize sampling strategy
-                .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
-                    1.0,
-                ))))
-                // If export trace to AWS X-Ray, you can use XrayIdGenerator
-                .with_id_generator(RandomIdGenerator::default())
-                .with_resource(resource()),
-        )
+    let provider = opentelemetry_sdk::trace::TracerProvider::builder() // Customize sampling strategy
+        .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
+            1.0,
+        ))))
+        // If export trace to AWS X-Ray, you can use XrayIdGenerator
+        .with_id_generator(RandomIdGenerator::default())
+        .with_resource(resource())
         .with_batch_exporter(
             SpanExporter::builder()
                 .with_tonic()
