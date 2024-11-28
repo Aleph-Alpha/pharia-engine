@@ -607,7 +607,7 @@ pub mod tests {
         assert!(cache.recipients.is_empty());
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn skill_store_issues_only_one_request_for_a_skill() {
         // Given a skill store with a configured skill
         let (send, mut recv) = mpsc::channel(2);
