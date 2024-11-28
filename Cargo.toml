@@ -32,7 +32,7 @@ edition = "2021"
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-aleph-alpha-client = "0.13.2"
+aleph-alpha-client = "0.14.0"
 anyhow = "1.0.93"
 async-trait = "0.1.83"
 axum = { version = "0.7.9", features = ["macros"] }
@@ -61,33 +61,33 @@ tower-http = { version = "0.6.2", features = [
     "sensitive-headers",
     "trace",
 ] }
-tracing = "0.1.40"
+tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 utoipa = { version = "5.2.0", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.2.0", features = ["axum"] }
 wasmtime = "27.0.0"
 wasmtime-wasi = "27.0.0"
-wit-parser = "0.220.0"
+wit-parser = "0.221.0"
 url = "2.5.4"
 thiserror = "2.0.3"
-tokenizers = { version = "0.20.3", default-features = false, features = [
+tokenizers = { version = "0.21.0", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.18.1", features = ["tokenizers"] }
+text-splitter = { version = "0.19.0", features = ["tokenizers"] }
 lingua = { version = "1.6.2", default-features = false, features = [
     "english",
     "german",
 ] }
-opentelemetry = "0.27.0"
-opentelemetry_sdk = { version = "0.27.0", features = ["rt-tokio"] }
+opentelemetry = "0.27.1"
+opentelemetry_sdk = { version = "0.27.1", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.28.0"
 opentelemetry-otlp = "0.27.0"
 opentelemetry-semantic-conventions = { version = "0.27.0", features = [
     "semconv_experimental",
 ] }
 humantime = "2.1.0"
-metrics = "0.24.0"
+metrics = "0.24.1"
 metrics-exporter-prometheus = { version = "0.16.0", default-features = false, features = ["http-listener"] }
 itertools = "0.13.0"
 
@@ -101,7 +101,7 @@ tempfile = "3.14.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.41.1", features = ["test-util"] }
 tokio-test = "0.4.4"
-wat = "1.220.0"
+wat = "1.221.0"
 
 [features]
 test_inference = []
