@@ -429,8 +429,8 @@ impl SkillStoreActor {
                         error!("Error refreshing digest: {e}");
                     }
                 },
-            // FuturesUnordered will let them run in parallel. It will
-                // yield once one of them is completed.
+                // FuturesUnordered will let them run in parallel.
+                // It will yield once one of them is completed.
                 result = self.skill_requests.select_next_some(), if !self.skill_requests.is_empty()  => {
                     if let Ok((skill_path, (skill, digest))) = result {
                         self.provider.insert(skill_path, skill, digest);

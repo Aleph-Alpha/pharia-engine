@@ -176,14 +176,14 @@ impl SkillLoaderActor {
     pub async fn run(&mut self) {
         loop {
             select! {
-                msg = self.receiver.recv() => match msg {
-                Some(msg) => self.act(msg),
-                // Senders are gone, break out of the loop for shutdown.
-                None => break
-            },
-            // FuturesUnordered will let them run in parallel. It will
-            // yield once one of them is completed.
-                () = self.running_requests.select_next_some(), if !self.running_requests.is_empty()  => {}
+                    msg = self.receiver.recv() => match msg {
+                    Some(msg) => self.act(msg),
+                    // Senders are gone, break out of the loop for shutdown.
+                        None => break,
+                    },
+                    // FuturesUnordered will let them run in parallel.
+                    // It will yield once one of them is completed.
+                    () = self.running_requests.select_next_some(), if !self.running_requests.is_empty() => {}
             }
         }
     }
