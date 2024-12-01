@@ -54,12 +54,12 @@ impl SkillConfiguration {
     fn upsert_skill(&mut self, skill: ConfiguredSkill) -> bool {
         info!("New or changed skill: {skill}");
         let skill_path = SkillPath::new(&skill.namespace, &skill.name);
-        self
-            .known_skills
+        self.known_skills
             .insert(skill_path.clone(), skill.tag)
             .is_some()
     }
     fn remove_skill(&mut self, skill_path: &SkillPath) -> bool {
+        info!("Removed skill: {skill_path}");
         self.known_skills.remove(skill_path).is_some()
     }
     /// All configured skills, sorted by namespace and name
@@ -87,10 +87,7 @@ impl SkillConfiguration {
 
 struct SkillStoreState {
     configuration: SkillConfiguration,
-    known_skills: HashMap<SkillPath, String>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
-    // key: Namespace, value: Error
-    invalid_namespaces: HashMap<String, anyhow::Error>,
     skill_loader: SkillLoaderApi,
 }
 
@@ -98,38 +95,26 @@ impl SkillStoreState {
     pub fn new(skill_loader: SkillLoaderApi) -> Self {
         SkillStoreState {
             configuration: SkillConfiguration::new(),
-            known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
-            invalid_namespaces: HashMap::new(),
             skill_loader,
         }
     }
 
     pub fn upsert_skill(&mut self, skill: ConfiguredSkill) {
-        info!("New or changed skill: {skill}");
         let skill_path = SkillPath::new(&skill.namespace, &skill.name);
-        if self
-            .known_skills
-            .insert(skill_path.clone(), skill.tag)
-            .is_some()
-        {
+        if self.configuration.upsert_skill(skill) {
             self.invalidate(&skill_path);
         }
     }
 
     pub fn remove_skill(&mut self, skill: &SkillPath) {
-        info!("Removed skill: {skill}");
-        self.known_skills.remove(skill);
+        self.configuration.remove_skill(skill);
         self.invalidate(skill);
     }
 
     /// All configured skills, sorted by namespace and name
     pub fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-        self.known_skills.keys().sorted_by(|a, b| {
-            a.namespace
-                .cmp(&b.namespace)
-                .then_with(|| a.name.cmp(&b.name))
-        })
+        self.configuration.skills()
     }
 
     pub fn list_cached_skills(&self) -> impl Iterator<Item = &SkillPath> + '_ {
@@ -141,11 +126,11 @@ impl SkillStoreState {
     }
 
     pub fn add_invalid_namespace(&mut self, namespace: String, e: anyhow::Error) {
-        self.invalid_namespaces.insert(namespace, e);
+        self.configuration.add_invalid_namespace(namespace, e);
     }
 
     pub fn remove_invalid_namespace(&mut self, namespace: &str) {
-        self.invalid_namespaces.remove(namespace);
+        self.configuration.remove_invalid_namespace(namespace);
     }
 
     /// `Some` if the skill is present in the cache, `None` if not
@@ -163,10 +148,7 @@ impl SkillStoreState {
 
     /// Return the registered tag for a given skill
     fn tag(&self, skill_path: &SkillPath) -> anyhow::Result<Option<&str>> {
-        if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
-            return Err(anyhow!("Invalid namespace: {error}"));
-        }
-        Ok(self.known_skills.get(skill_path).map(String::as_str))
+        self.configuration.tag(skill_path)
     }
 
     /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
@@ -187,6 +169,7 @@ impl SkillStoreState {
             .ok_or_else(|| anyhow!("Missing cached skill for {skill_path}"))?;
 
         let tag = self
+            .configuration
             .tag(&skill_path)
             .expect("Bad namespace configuration for skill")
             .expect("Missing tag for skill");
