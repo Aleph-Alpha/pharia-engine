@@ -53,11 +53,6 @@ impl SkillStoreState {
         }
     }
 
-    /// All configured skills, sorted by namespace and name
-    pub async fn skills(&self) -> Vec<SkillPath> {
-        self.configuration.skills().await
-    }
-
     pub fn list_cached_skills(&self) -> impl Iterator<Item = &SkillPath> + '_ {
         self.cached_skills.keys()
     }
@@ -223,17 +218,6 @@ impl SkillStoreApi {
         recv.await.unwrap()
     }
 
-    /// List all skills from all namespaces
-    pub async fn list(&self) -> Vec<SkillPath> {
-        let (send, recv) = oneshot::channel();
-        let msg = SkillStoreMessage::List { send };
-        self.sender
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
-        recv.await.unwrap()
-    }
-
     /// Drops a skill from the cache in case it has been cached before. `true` if the skill has been
     /// in the cache before, `false` otherwise .
     pub async fn invalidate_cache(&self, skill_path: SkillPath) -> bool {
@@ -251,9 +235,6 @@ pub enum SkillStoreMessage {
     Fetch {
         skill_path: SkillPath,
         send: oneshot::Sender<Result<Option<Arc<Skill>>, anyhow::Error>>,
-    },
-    List {
-        send: oneshot::Sender<Vec<SkillPath>>,
     },
     ListCached {
         send: oneshot::Sender<Vec<SkillPath>>,
@@ -408,9 +389,6 @@ impl SkillStoreActor {
                         drop(send.send(Err(e)));
                     }
                 }
-            }
-            SkillStoreMessage::List { send } => {
-                drop(send.send(self.provider.skills().await));
             }
             SkillStoreMessage::Remove { skill_path } => {
                 self.provider.invalidate(&skill_path);
@@ -590,36 +568,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn skills_are_sorted() {
-        // Given a provider with two skills
-        let (sender, _recv) = mpsc::channel(1);
-        let skill_loader = SkillLoaderApi::new(sender);
-        let skills = vec![
-            ConfiguredSkill::new("a", "a", "latest"),
-            ConfiguredSkill::new("a", "b", "latest"),
-            ConfiguredSkill::new("b", "a", "latest"),
-            ConfiguredSkill::new("b", "b", "latest"),
-        ];
-        let configuration = SkillConfiguration::with_skills(skills).await.api();
-        let skill_store =
-            SkillStore::new(skill_loader, configuration, Duration::from_secs(10)).api();
-
-        // When skills are listed
-        let skills = skill_store.list().await;
-
-        // Then the skills are sorted
-        assert_eq!(
-            skills,
-            vec![
-                SkillPath::new("a", "a"),
-                SkillPath::new("a", "b"),
-                SkillPath::new("b", "a"),
-                SkillPath::new("b", "b"),
-            ]
-        );
-    }
-
-    #[tokio::test]
     async fn skill_configured_but_not_loadable_error() {
         // Given a skill store with a configured skill that is not loadable
         let skill_path = SkillPath::dummy();
@@ -739,33 +687,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn should_list_skills_that_have_been_added() {
-        // Given an empty provider
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let configuration = SkillConfiguration::new();
-        let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
-        let skill_store =
-            SkillStore::new(skill_loader, configuration.api(), Duration::from_secs(10));
-        let api = configuration.api();
-
-        // When adding two skills
-        let skill = ConfiguredSkill::from_path(&SkillPath::new("local", "one"));
-        api.upsert(skill).await;
-        let skill = ConfiguredSkill::from_path(&SkillPath::new("local", "two"));
-        api.upsert(skill).await;
-        let skills = skill_store.api().list().await;
-
-        // Then the skills are listed by the skill executor api
-        assert_eq!(skills.len(), 2);
-        assert!(skills.contains(&SkillPath::new("local", "one")));
-        assert!(skills.contains(&SkillPath::new("local", "two")));
-
-        // Cleanup
-        drop(api);
-        skill_store.wait_for_shutdown().await;
-    }
-
-    #[tokio::test]
     async fn should_remove_invalidated_skill_from_cache() {
         // Given one cached "greet_skill"
         given_greet_skill_v0_2();
@@ -773,8 +694,9 @@ pub mod tests {
         let configured_skill = ConfiguredSkill::from_path(&greet_skill);
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
-        let configuration = SkillConfiguration::with_skill(configured_skill).await.api();
-        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(10));
+        let configuration = SkillConfiguration::with_skill(configured_skill).await;
+        let skill_store =
+            SkillStore::new(skill_loader, configuration.api(), Duration::from_secs(10));
         let api = skill_store.api();
         api.fetch(greet_skill.clone()).await.unwrap();
 
@@ -785,7 +707,7 @@ pub mod tests {
         // list of all skills
         assert!(skill_had_been_in_cache);
         assert!(api.list_cached().await.is_empty());
-        assert_eq!(api.list().await, vec![greet_skill]);
+        assert_eq!(configuration.api().skills().await, vec![greet_skill]);
     }
 
     #[tokio::test]
@@ -795,10 +717,9 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
         let configured_skills = ConfiguredSkill::new("local", "greet_skill", "latest");
-        let configuration = SkillConfiguration::with_skill(configured_skills)
-            .await
-            .api();
-        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(10));
+        let configuration = SkillConfiguration::with_skill(configured_skills).await;
+        let skill_store =
+            SkillStore::new(skill_loader, configuration.api(), Duration::from_secs(10));
         let api = skill_store.api();
 
         // When we invalidate "greet_skill"
@@ -807,7 +728,8 @@ pub mod tests {
         // Then greet skill is of course still available in the list of all skills. The return value
         // indicates that greet skill never had been in the cache to begin with
         assert!(!skill_had_been_in_cache);
-        assert_eq!(api.list().await, vec![greet_skill]);
+        assert_eq!(configuration.api().skills().await, vec![greet_skill]);
+
         // Cleanup
         drop(api);
         skill_store.wait_for_shutdown().await;
@@ -887,8 +809,9 @@ pub mod tests {
         let configured_skill = ConfiguredSkill::from_path(&greet_skill);
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::from_config(engine, registry_config).api();
-        let configuration = SkillConfiguration::with_skill(configured_skill).await.api();
-        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(1));
+        let configuration = SkillConfiguration::with_skill(configured_skill).await;
+        let skill_store =
+            SkillStore::new(skill_loader, configuration.api(), Duration::from_secs(1));
 
         let api = skill_store.api();
         api.fetch(greet_skill.clone()).await?;
@@ -907,7 +830,7 @@ pub mod tests {
         // Then greet skill is no longer listed in the cache, but of course still available in the
         // list of all skills
         assert!(api.list_cached().await.is_empty());
-        assert_eq!(api.list().await, vec![greet_skill]);
+        assert_eq!(configuration.api().skills().await, vec![greet_skill]);
 
         // Cleanup
         drop(api);

@@ -40,6 +40,7 @@ use crate::{
     authorization::{authorization_middleware, AuthorizationApi},
     csi::Csi,
     csi_shell::http_csi_handle,
+    skill_configuration::SkillConfigurationApi,
     skill_store::SkillStoreApi,
     skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
 };
@@ -55,6 +56,7 @@ impl Shell {
         addr: impl Into<SocketAddr>,
         authorization_api: AuthorizationApi,
         skill_executor_api: SkillExecutorApi,
+        skill_configuration_api: SkillConfigurationApi,
         skill_store_api: SkillStoreApi,
         csi_drivers: impl Csi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
@@ -70,6 +72,7 @@ impl Shell {
         let app_state = AppState::new(
             authorization_api,
             skill_store_api,
+            skill_configuration_api,
             skill_executor_api,
             csi_drivers,
         );
@@ -97,6 +100,7 @@ where
 {
     authorization_api: AuthorizationApi,
     skill_store_api: SkillStoreApi,
+    skill_configuration_api: SkillConfigurationApi,
     skill_executor_api: SkillExecutorApi,
     pub csi_drivers: C,
 }
@@ -108,12 +112,14 @@ where
     pub fn new(
         authorization_api: AuthorizationApi,
         skill_store_api: SkillStoreApi,
+        skill_configuration_api: SkillConfigurationApi,
         skill_executor_api: SkillExecutorApi,
         csi_drivers: C,
     ) -> Self {
         Self {
             authorization_api,
             skill_store_api,
+            skill_configuration_api,
             skill_executor_api,
             csi_drivers,
         }
@@ -144,6 +150,15 @@ where
 {
     fn from_ref(app_state: &AppState<C>) -> SkillExecutorApi {
         app_state.skill_executor_api.clone()
+    }
+}
+
+impl<C> FromRef<AppState<C>> for SkillConfigurationApi
+where
+    C: Clone,
+{
+    fn from_ref(app_state: &AppState<C>) -> SkillConfigurationApi {
+        app_state.skill_configuration_api.clone()
     }
 }
 
@@ -372,8 +387,10 @@ async fn execute_skill(
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
 )]
-async fn skills(State(skill_store_api): State<SkillStoreApi>) -> (StatusCode, Json<Vec<String>>) {
-    let response = skill_store_api.list().await;
+async fn skills(
+    State(skill_configuration_api): State<SkillConfigurationApi>,
+) -> (StatusCode, Json<Vec<String>>) {
+    let response = skill_configuration_api.skills().await;
     let response = response.iter().map(ToString::to_string).collect();
     (StatusCode::OK, Json(response))
 }
@@ -462,6 +479,7 @@ mod tests {
         csi::tests::{DummyCsi, StubCsi},
         csi_shell::{V0_2CsiRequest, VersionedCsiRequest},
         inference::{self, Completion, CompletionParams, CompletionRequest},
+        skill_configuration::{tests::StubSkillConfiguration, SkillConfigurationMsg},
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
         skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
         tests::api_token,
@@ -489,9 +507,18 @@ mod tests {
                 };
             });
             let skill_executor = StubSkillExecuter::new(|_| {});
+            let skill_configuration = StubSkillConfiguration::new(|msg| match msg {
+                SkillConfigurationMsg::List { send } => {
+                    drop(send.send(vec![]));
+                }
+                _ => {
+                    unreachable!()
+                }
+            });
             Self::new(
                 dummy_authorization.api(),
                 dummy_skill_store_api(),
+                skill_configuration.api(),
                 skill_executor.api(),
                 DummyCsi,
             )
@@ -512,6 +539,14 @@ mod tests {
             self
         }
 
+        pub fn with_skill_configuration_api(
+            mut self,
+            skill_configuration_api: SkillConfigurationApi,
+        ) -> Self {
+            self.skill_configuration_api = skill_configuration_api;
+            self
+        }
+
         pub fn with_skill_executor_api(mut self, skill_executor_api: SkillExecutorApi) -> Self {
             self.skill_executor_api = skill_executor_api;
             self
@@ -524,6 +559,7 @@ mod tests {
             AppState::new(
                 self.authorization_api,
                 self.skill_store_api,
+                self.skill_configuration_api,
                 self.skill_executor_api,
                 csi_drivers,
             )
@@ -946,9 +982,9 @@ mod tests {
         // Given we can provide two skills "ns_one/one" and "ns_two/two"
         let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
-        let skill_store_api = SkillStoreApi::new(send);
+        let skill_configuration_api = SkillConfigurationApi::new(send);
         tokio::spawn(async move {
-            if let SkillStoreMessage::List { send } = recv.recv().await.unwrap() {
+            if let SkillConfigurationMsg::List { send } = recv.recv().await.unwrap() {
                 send.send(vec![
                     SkillPath::new("ns_one", "one"),
                     SkillPath::new("ns_two", "two"),
@@ -959,7 +995,7 @@ mod tests {
             }
         });
         let app_state = AppState::dummy()
-            .with_skill_store_api(skill_store_api)
+            .with_skill_configuration_api(skill_configuration_api)
             .with_skill_executor_api(saboteur_skill_executer.api());
         let http = http(app_state);
 

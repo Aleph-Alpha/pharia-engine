@@ -110,6 +110,7 @@ impl Kernel {
             app_config.tcp_addr,
             authorization.api(),
             skill_executor.api(),
+            skill_configuration.api(),
             skill_store.api(),
             csi_drivers,
             shutdown_signal,

@@ -52,6 +52,7 @@ impl SkillConfiguration {
     }
 }
 
+#[derive(Clone)]
 pub struct SkillConfigurationApi {
     sender: mpsc::Sender<SkillConfigurationMsg>,
 }
@@ -224,5 +225,54 @@ pub mod tests {
         pub async fn with_skill(skill: ConfiguredSkill) -> Self {
             Self::with_skills(vec![skill]).await
         }
+    }
+
+    #[tokio::test]
+    async fn skills_are_sorted() {
+        // Given a provider with two skills
+        let skills = vec![
+            ConfiguredSkill::new("a", "a", "latest"),
+            ConfiguredSkill::new("a", "b", "latest"),
+            ConfiguredSkill::new("b", "a", "latest"),
+            ConfiguredSkill::new("b", "b", "latest"),
+        ];
+        let configuration = SkillConfiguration::with_skills(skills).await.api();
+
+        // When skills are listed
+        let skills = configuration.skills().await;
+
+        // Then the skills are sorted
+        assert_eq!(
+            skills,
+            vec![
+                SkillPath::new("a", "a"),
+                SkillPath::new("a", "b"),
+                SkillPath::new("b", "a"),
+                SkillPath::new("b", "b"),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn should_list_skills_that_have_been_added() {
+        // Given an empty provider
+        let configuration = SkillConfiguration::new();
+        let api = configuration.api();
+
+        // When adding two skills
+        let skill = ConfiguredSkill::from_path(&SkillPath::new("local", "one"));
+        api.upsert(skill).await;
+        let skill = ConfiguredSkill::from_path(&SkillPath::new("local", "two"));
+        api.upsert(skill).await;
+        let skills = api.skills().await;
+
+        // Then the skills are listed by the skill executor api
+        assert_eq!(skills.len(), 2);
+        assert!(skills.contains(&SkillPath::new("local", "one")));
+        assert!(skills.contains(&SkillPath::new("local", "two")));
+
+        // Cleanup
+        drop(api);
+        configuration.wait_for_shutdown().await;
     }
 }
