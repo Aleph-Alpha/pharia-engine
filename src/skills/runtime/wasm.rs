@@ -55,6 +55,7 @@ pub mod tests {
         inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, Message, Role},
         language_selection::{select_language, Language, SelectLanguageRequest},
         search::{DocumentPath, SearchRequest, SearchResult},
+        skill_configuration::SkillConfiguration,
         skill_loader::{ConfiguredSkill, SkillLoader},
         skill_store::SkillStore,
         FinishReason,
@@ -73,8 +74,9 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
+        let configuration = SkillConfiguration::new().api();
 
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(10));
         skill_store.api().upsert(skill).await;
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
@@ -91,7 +93,8 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader =
             SkillLoader::with_file_registry(engine.clone(), "local".to_owned()).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let configuration = SkillConfiguration::new().api();
+        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(10));
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
@@ -113,7 +116,8 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let configuration = SkillConfiguration::new().api();
+        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(10));
         skill_store.api().upsert(skill).await;
         let runtime = WasmRuntime::new(engine, skill_store.api());
 
@@ -136,8 +140,9 @@ pub mod tests {
         let skill_path = SkillPath::new(&namespace, "greet-py-v0_2");
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
+        let configuration = SkillConfiguration::new().api();
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(10));
         skill_store.api().upsert(skill).await;
         let runtime = WasmRuntime::new(engine, skill_store.api());
 
@@ -161,7 +166,8 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let configuration = SkillConfiguration::new().api();
+        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(10));
         skill_store.api().upsert(skill).await;
         let runtime = WasmRuntime::new(engine, skill_store.api());
         for i in 1..10 {

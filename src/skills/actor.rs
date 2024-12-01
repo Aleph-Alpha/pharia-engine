@@ -343,6 +343,7 @@ pub mod tests {
         inference::{
             tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },
+        skill_configuration::SkillConfiguration,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, SkillStoreMessage},
         skills::Skill,
@@ -400,8 +401,9 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let registry_config = RegistryConfig::empty();
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config).api();
+        let configuration = SkillConfiguration::new().api();
 
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::new(skill_loader, configuration, Duration::from_secs(10));
         let csi_apis = DummyCsi;
         let executer = SkillExecutor::new(engine, csi_apis, skill_store.api());
         let api = executer.api();

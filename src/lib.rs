@@ -25,6 +25,7 @@ use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use search::Search;
 use shell::Shell;
+use skill_configuration::SkillConfiguration;
 use skill_loader::SkillLoader;
 use skill_store::SkillStore;
 use skills::Engine;
@@ -43,6 +44,7 @@ pub struct Kernel {
     tokenizers: Tokenizers,
     search: Search,
     skill_loader: SkillLoader,
+    skill_configuration: SkillConfiguration,
     skill_store: SkillStore,
     skill_executor: SkillExecutor,
     namespace_watcher: NamespaceWatcher,
@@ -82,7 +84,12 @@ impl Kernel {
 
         let registry_config = app_config.operator_config.registry_config();
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config);
-        let skill_store = SkillStore::new(skill_loader.api(), app_config.namespace_update_interval);
+        let skill_configuration = SkillConfiguration::new();
+        let skill_store = SkillStore::new(
+            skill_loader.api(),
+            skill_configuration.api(),
+            app_config.namespace_update_interval,
+        );
 
         // Boot up runtime we need to execute Skills
         let skill_executor = SkillExecutor::new(engine, csi_drivers.clone(), skill_store.api());
@@ -118,6 +125,7 @@ impl Kernel {
                 skill_executor.wait_for_shutdown().await;
                 skill_store.wait_for_shutdown().await;
                 skill_loader.wait_for_shutdown().await;
+                skill_configuration.wait_for_shutdown().await;
                 tokenizers.wait_for_shutdown().await;
                 inference.wait_for_shutdown().await;
                 search.wait_for_shutdown().await;
@@ -131,6 +139,7 @@ impl Kernel {
             tokenizers,
             search,
             skill_loader,
+            skill_configuration,
             skill_store,
             skill_executor,
             namespace_watcher,
@@ -149,6 +158,7 @@ impl Kernel {
         self.namespace_watcher.wait_for_shutdown().await;
         self.skill_executor.wait_for_shutdown().await;
         self.skill_store.wait_for_shutdown().await;
+        self.skill_configuration.wait_for_shutdown().await;
         self.skill_loader.wait_for_shutdown().await;
         self.tokenizers.wait_for_shutdown().await;
         self.inference.wait_for_shutdown().await;
