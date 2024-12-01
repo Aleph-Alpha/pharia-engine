@@ -69,37 +69,22 @@ impl SkillConfigurationApi {
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
-    pub async fn upsert_skill(&self, skill: ConfiguredSkill) {
+    pub async fn upsert(&self, skill: ConfiguredSkill) {
         let msg = SkillConfigurationMsg::Upsert { skill };
         self.sender
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
     }
-    pub async fn remove_skill(&self, skill_path: &SkillPath) {
-        let msg = SkillConfigurationMsg::Remove {
-            skill_path: skill_path.clone(),
-        };
+    pub async fn remove(&self, skill_path: SkillPath) {
+        let msg = SkillConfigurationMsg::Remove { skill_path };
         self.sender
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
     }
-    pub async fn add_invalid_namespace(&self, namespace: String, error: anyhow::Error) {
-        let msg = SkillConfigurationMsg::SetNamespaceError {
-            namespace,
-            error: Some(error),
-        };
-        self.sender
-            .send(msg)
-            .await
-            .expect("all api handlers must be shutdown before actors");
-    }
-    pub async fn remove_invalid_namespace(&self, namespace: &str) {
-        let msg = SkillConfigurationMsg::SetNamespaceError {
-            namespace: namespace.to_string(),
-            error: None,
-        };
+    pub async fn set_namespace_error(&self, namespace: String, error: Option<anyhow::Error>) {
+        let msg = SkillConfigurationMsg::SetNamespaceError { namespace, error };
         self.sender
             .send(msg)
             .await
@@ -225,6 +210,19 @@ pub mod tests {
                 }
                 _ => unreachable!(),
             })
+        }
+    }
+
+    impl SkillConfiguration {
+        pub async fn with_skills(skills: Vec<ConfiguredSkill>) -> Self {
+            let configuration = Self::new();
+            for skill in skills {
+                configuration.api().upsert(skill).await;
+            }
+            configuration
+        }
+        pub async fn with_skill(skill: ConfiguredSkill) -> Self {
+            Self::with_skills(vec![skill]).await
         }
     }
 }

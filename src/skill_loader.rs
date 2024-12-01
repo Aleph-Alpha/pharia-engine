@@ -16,8 +16,8 @@ use std::{future::Future, pin::Pin};
 // A skill that has been configured and may be fetched and executed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfiguredSkill {
-    pub name: String,
     pub namespace: String,
+    pub name: String,
     pub tag: String,
 }
 
@@ -29,13 +29,13 @@ impl std::fmt::Display for ConfiguredSkill {
 
 impl ConfiguredSkill {
     pub fn new(
-        name: impl Into<String>,
         namespace: impl Into<String>,
+        name: impl Into<String>,
         tag: impl Into<String>,
     ) -> Self {
         Self {
-            name: name.into(),
             namespace: namespace.into(),
+            name: name.into(),
             tag: tag.into(),
         }
     }
@@ -263,7 +263,7 @@ pub mod tests {
 
     impl ConfiguredSkill {
         pub fn from_path(skill_path: &SkillPath) -> Self {
-            Self::new(&skill_path.name, &skill_path.namespace, "latest")
+            Self::new(&skill_path.namespace, &skill_path.name, "latest")
         }
     }
 

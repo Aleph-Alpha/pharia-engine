@@ -5,7 +5,10 @@ use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
 
-use crate::{skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::SkillPath};
+use crate::{
+    skill_configuration::SkillConfigurationApi, skill_loader::ConfiguredSkill,
+    skill_store::SkillStoreApi, skills::SkillPath,
+};
 
 use super::{
     namespace_description::{NamespaceDescriptionError, SkillDescription},
@@ -83,6 +86,7 @@ impl NamespaceWatcher {
 
     pub fn with_config(
         skill_store_api: SkillStoreApi,
+        skill_configuration_api: SkillConfigurationApi,
         config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
     ) -> Self {
@@ -93,6 +97,7 @@ impl NamespaceWatcher {
                 ready_sender,
                 shutdown_receiver,
                 skill_store_api,
+                skill_configuration_api,
                 config,
                 update_interval,
             )
@@ -116,6 +121,7 @@ struct NamespaceWatcherActor {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_store_api: SkillStoreApi,
+    skill_configuration_api: SkillConfigurationApi,
     config: Box<dyn ObservableConfig + Send>,
     update_interval: Duration,
     skills: HashMap<String, Vec<SkillDescription>>,
@@ -154,6 +160,7 @@ impl NamespaceWatcherActor {
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_store_api: SkillStoreApi,
+        skill_configuration_api: SkillConfigurationApi,
         config: Box<dyn ObservableConfig + Send>,
         update_interval: Duration,
     ) -> Self {
@@ -161,6 +168,7 @@ impl NamespaceWatcherActor {
             ready,
             shutdown,
             skill_store_api,
+            skill_configuration_api,
             config,
             update_interval,
             skills: HashMap::new(),
@@ -208,7 +216,7 @@ impl NamespaceWatcherActor {
         let incoming = match self.config.skills(namespace).await {
             Ok(incoming) => {
                 if self.invalid_namespaces.contains(namespace) {
-                    self.skill_store_api
+                    self.skill_configuration_api
                         .set_namespace_error(namespace.to_owned(), None)
                         .await;
                     self.invalid_namespaces.remove(namespace);
@@ -225,7 +233,7 @@ impl NamespaceWatcherActor {
                 error!(
                     "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
-                self.skill_store_api
+                self.skill_configuration_api
                     .set_namespace_error(namespace.to_owned(), Some(e))
                     .await;
                 self.invalid_namespaces.insert(namespace.to_owned());
@@ -240,12 +248,15 @@ impl NamespaceWatcherActor {
         let diff = Self::compute_diff(&existing, incoming);
         for skill in diff.added_or_changed {
             let tag = skill.tag.as_deref().unwrap_or("latest");
-            let skill = ConfiguredSkill::new(skill.name, namespace, tag);
-            self.skill_store_api.upsert(skill).await;
+            let skill = ConfiguredSkill::new(namespace, skill.name, tag);
+            self.skill_configuration_api.upsert(skill).await;
         }
 
         for skill_name in diff.removed {
             self.skill_store_api
+                .remove(SkillPath::new(namespace, &skill_name))
+                .await;
+            self.skill_configuration_api
                 .remove(SkillPath::new(namespace, &skill_name))
                 .await;
         }
@@ -265,6 +276,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::namespace_watcher::tests::NamespaceConfig;
+    use crate::skill_configuration::SkillConfigurationMsg;
     use crate::skill_store::tests::SkillStoreMessage;
     use crate::skills::SkillPath;
 
@@ -392,9 +404,16 @@ pub mod tests {
         // Given a config that take forever to load
         let (sender, _) = mpsc::channel::<SkillStoreMessage>(1);
         let skill_store_api = SkillStoreApi::new(sender);
+        let (sender, _) = mpsc::channel::<SkillConfigurationMsg>(1);
+        let skill_configuration_api = SkillConfigurationApi::new(sender);
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
-        let mut observer = NamespaceWatcher::with_config(skill_store_api, config, update_interval);
+        let mut observer = NamespaceWatcher::with_config(
+            skill_store_api,
+            skill_configuration_api,
+            config,
+            update_interval,
+        );
 
         // When waiting for the first pass
         let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
@@ -463,11 +482,17 @@ pub mod tests {
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
-        let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(1);
+        let (sender, _) = mpsc::channel::<SkillStoreMessage>(1);
         let skill_store_api = SkillStoreApi::new(sender);
+        let (sender, mut receiver) = mpsc::channel::<SkillConfigurationMsg>(1);
+        let skill_configuration_api = SkillConfigurationApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let mut observer =
-            NamespaceWatcher::with_config(skill_store_api, stub_config, update_interval);
+        let mut observer = NamespaceWatcher::with_config(
+            skill_store_api,
+            skill_configuration_api,
+            stub_config,
+            update_interval,
+        );
         observer.wait_for_ready().await;
 
         // Then one new skill message is send for each skill configured
@@ -475,10 +500,10 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillStoreMessage::Upsert {
+            SkillConfigurationMsg::Upsert {
                 skill,
             }
-            if skill == ConfiguredSkill::new(dummy_skill, dummy_namespace, "latest")
+            if skill == ConfiguredSkill::new(dummy_namespace, dummy_skill, "latest")
         ));
 
         observer.wait_for_shutdown().await;
@@ -488,6 +513,7 @@ pub mod tests {
         fn with_skills(
             skills: HashMap<String, Vec<SkillDescription>>,
             skill_store_api: SkillStoreApi,
+            skill_configuration_api: SkillConfigurationApi,
             config: Box<dyn ObservableConfig + Send>,
         ) -> Self {
             let (ready, _) = tokio::sync::watch::channel(false);
@@ -496,6 +522,7 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api,
+                skill_configuration_api,
                 config,
                 update_interval: Duration::from_millis(1),
                 skills,
@@ -531,6 +558,47 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn removed_skill_gets_dropped_from_cache_and_configuration() {
+        // Given an configuration observer actor with a configured skill
+        let dummy_namespace = "dummy_namespace";
+        let dummy_skill = "dummy_skill";
+        let namespaces = HashMap::from([(
+            dummy_namespace.to_owned(),
+            vec![SkillDescription::with_name(dummy_skill)],
+        )]);
+
+        let (sender, mut store_receiver) = mpsc::channel::<SkillStoreMessage>(2);
+        let skill_store_api = SkillStoreApi::new(sender);
+        let (sender, mut receiver) = mpsc::channel::<SkillConfigurationMsg>(1);
+        let skill_configuration_api = SkillConfigurationApi::new(sender);
+
+        // When we report changes from an empty configuration
+        let config = StubConfig::new(HashMap::from([(dummy_namespace.to_owned(), vec![])]));
+        let mut watcher = NamespaceWatcherActor::with_skills(
+            namespaces,
+            skill_store_api,
+            skill_configuration_api,
+            Box::new(config),
+        );
+        watcher.report_changes_in_namespace(dummy_namespace).await;
+
+        // Then the skill is removed from the store cache
+        let msg = store_receiver.try_recv().unwrap();
+
+        assert!(
+            matches!(msg, SkillStoreMessage::Remove{ skill_path } if skill_path == SkillPath::new(dummy_namespace, dummy_skill))
+        );
+
+        // And the skill is removed from the configuration
+        let msg = receiver.try_recv().unwrap();
+
+        assert!(matches!(
+            msg,
+            SkillConfigurationMsg::Remove { skill_path } if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
+        ));
+    }
+
+    #[tokio::test]
     async fn add_invalid_namespace_and_unload_skill_for_invalid_namespace_description() {
         // given an configuration observer actor
         let dummy_namespace = "dummy_namespace";
@@ -540,31 +608,47 @@ pub mod tests {
             vec![SkillDescription::with_name(dummy_skill)],
         )]);
 
-        let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(2);
+        let (sender, mut store_receiver) = mpsc::channel::<SkillStoreMessage>(1);
         let skill_store_api = SkillStoreApi::new(sender);
+        let (sender, mut receiver) = mpsc::channel::<SkillConfigurationMsg>(2);
+        let skill_configuration_api = SkillConfigurationApi::new(sender);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
 
-        let mut coa = NamespaceWatcherActor::with_skills(namespaces, skill_store_api, config);
+        let mut watcher = NamespaceWatcherActor::with_skills(
+            namespaces,
+            skill_store_api,
+            skill_configuration_api,
+            config,
+        );
 
         // when we load an invalid namespace
-        coa.report_changes_in_namespace(dummy_namespace).await;
+        watcher.report_changes_in_namespace(dummy_namespace).await;
 
-        // then mark the namespace as invalid and remove all skills of that namespace
+        // then mark the namespace as invalid
         let msg = receiver.try_recv().unwrap();
 
         assert!(matches!(
             msg,
-            SkillStoreMessage::SetNamespaceError {
+            SkillConfigurationMsg::SetNamespaceError {
                 namespace, ..
             }
             if namespace == dummy_namespace
         ));
 
+        // and drop all skills of that namespace from the store cache
+        let msg = store_receiver.try_recv().unwrap();
+
+        assert!(matches!(
+            msg,
+            SkillStoreMessage::Remove { skill_path } if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
+        ));
+
+        // and remove all skills of that namespace from the configuration
         let msg = receiver.try_recv().unwrap();
 
         assert!(matches!(
             msg,
-            SkillStoreMessage::Remove {
+            SkillConfigurationMsg::Remove {
                 skill_path
             }
             if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
@@ -584,10 +668,17 @@ pub mod tests {
         let stub_config = Box::new(StubConfig::new(namespaces));
 
         // When we boot up the configuration observer
-        let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(1);
+        let (sender, _) = mpsc::channel::<SkillStoreMessage>(1);
         let skill_store_api = SkillStoreApi::new(sender);
+        let (sender, mut receiver) = mpsc::channel::<SkillConfigurationMsg>(1);
+        let skill_configuration_api = SkillConfigurationApi::new(sender);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let observer = NamespaceWatcher::with_config(skill_store_api, stub_config, update_interval);
+        let observer = NamespaceWatcher::with_config(
+            skill_store_api,
+            skill_configuration_api,
+            stub_config,
+            update_interval,
+        );
 
         // Then only one new skill message is send for each skill configured
         receiver.recv().await.unwrap();
@@ -606,8 +697,10 @@ pub mod tests {
     #[tokio::test]
     async fn remove_invalid_namespace_if_namespace_become_valid() {
         // given an invalid namespace
-        let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(2);
+        let (sender, _) = mpsc::channel::<SkillStoreMessage>(2);
         let skill_store_api = SkillStoreApi::new(sender);
+        let (sender, mut receiver) = mpsc::channel::<SkillConfigurationMsg>(1);
+        let skill_configuration_api = SkillConfigurationApi::new(sender);
         let update_interval_ms = 1;
         let update_interval = Duration::from_millis(update_interval_ms);
         let dummy_namespace = "dummy_namespace";
@@ -617,7 +710,12 @@ pub mod tests {
             ]))));
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
-        let mut observer = NamespaceWatcher::with_config(skill_store_api, config, update_interval);
+        let mut observer = NamespaceWatcher::with_config(
+            skill_store_api,
+            skill_configuration_api,
+            config,
+            update_interval,
+        );
         observer.wait_for_ready().await;
         receiver.recv().await.unwrap();
 
@@ -640,8 +738,8 @@ pub mod tests {
         .unwrap();
 
         assert!(matches!(
-             msg,
-            SkillStoreMessage::SetNamespaceError {
+            msg,
+            SkillConfigurationMsg::SetNamespaceError {
                 namespace, error: None
             }
             if namespace == dummy_namespace
@@ -657,10 +755,10 @@ pub mod tests {
 
         assert!(matches!(
             msg,
-            SkillStoreMessage::Upsert {
+            SkillConfigurationMsg::Upsert {
                 skill,
             }
-            if skill == ConfiguredSkill::new(dummy_skill, dummy_namespace, "latest")
+            if skill == ConfiguredSkill::new(dummy_namespace, dummy_skill, "latest")
         ));
     }
 }
