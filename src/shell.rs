@@ -54,11 +54,7 @@ impl Shell {
     /// implies that the listener is bound to the endpoint.
     pub async fn new(
         addr: impl Into<SocketAddr>,
-        authorization_api: AuthorizationApi,
-        skill_executor_api: SkillExecutorApi,
-        skill_configuration_api: SkillConfigurationApi,
-        skill_store_api: SkillStoreApi,
-        csi_drivers: impl Csi + Clone + Send + Sync + 'static,
+        app_state: AppState<impl Csi + Clone + Send + Sync + 'static>,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, anyhow::Error> {
         let addr = addr.into();
@@ -69,13 +65,6 @@ impl Shell {
             .context(format!("Could not bind a tcp listener to '{addr}'"))?;
         info!("Listening on: {addr}");
 
-        let app_state = AppState::new(
-            authorization_api,
-            skill_store_api,
-            skill_configuration_api,
-            skill_executor_api,
-            csi_drivers,
-        );
         let handle = tokio::spawn(async {
             let res = axum::serve(listener, http(app_state))
                 .with_graceful_shutdown(shutdown_signal)

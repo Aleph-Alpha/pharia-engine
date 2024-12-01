@@ -24,7 +24,7 @@ use csi::CsiDrivers;
 use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use search::Search;
-use shell::Shell;
+use shell::{AppState, Shell};
 use skill_configuration::SkillConfiguration;
 use skill_loader::SkillLoader;
 use skill_store::SkillStore;
@@ -106,17 +106,14 @@ impl Kernel {
 
         let authorization = Authorization::new(app_config.authorization_addr);
 
-        let shell = match Shell::new(
-            app_config.tcp_addr,
+        let app_state = AppState::new(
             authorization.api(),
-            skill_executor.api(),
-            skill_configuration.api(),
             skill_store.api(),
+            skill_configuration.api(),
+            skill_executor.api(),
             csi_drivers,
-            shutdown_signal,
-        )
-        .await
-        {
+        );
+        let shell = match Shell::new(app_config.tcp_addr, app_state, shutdown_signal).await {
             Ok(shell) => shell,
             Err(e) => {
                 // In case construction of shell goes wrong (e.g. we can not bind the port) we
