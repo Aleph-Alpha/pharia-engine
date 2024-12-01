@@ -275,4 +275,41 @@ pub mod tests {
         drop(api);
         configuration.wait_for_shutdown().await;
     }
+
+    #[tokio::test]
+    async fn returns_tag_for_configured_skill() {
+        // Given a skill configuration with a skill
+        let configuration =
+            SkillConfiguration::with_skill(ConfiguredSkill::new("local", "one", "latest")).await;
+        let api = configuration.api();
+
+        // When asking for the tag
+        let tag = api.tag(&SkillPath::new("local", "one")).await;
+
+        // Then the tag is returned
+        assert_eq!(tag.unwrap().unwrap().as_str(), "latest");
+    }
+
+    #[tokio::test]
+    async fn returns_error_for_invalid_namespace() {
+        // Given a skill configuration with an invalid namespace
+        let configuration = SkillConfiguration::new().api();
+        let namespace = "invalid".to_string();
+        configuration
+            .set_namespace_error(namespace.clone(), Some(anyhow!("error")))
+            .await;
+
+        // When asking for the tag
+        let tag = configuration.tag(&SkillPath::new(namespace, "one")).await;
+
+        // Then the error is returned
+        assert_eq!(tag.unwrap_err().to_string(), "Invalid namespace: error");
+    }
+
+    #[tokio::test]
+    async fn returns_none_for_unknown_skill() {
+        let configuration = SkillConfiguration::new().api();
+        let tag = configuration.tag(&SkillPath::new("local", "unknown")).await;
+        assert_eq!(tag.unwrap(), None);
+    }
 }
