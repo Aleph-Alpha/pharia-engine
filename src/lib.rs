@@ -10,6 +10,7 @@ mod namespace_watcher;
 mod registries;
 mod search;
 mod shell;
+mod skill_configuration;
 mod skill_loader;
 mod skill_store;
 mod skills;
