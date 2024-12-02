@@ -500,7 +500,7 @@ pub mod tests {
     use std::fs;
 
     use tempfile::TempDir;
-    use test_skills::{given_chat_skill, given_greet_skill};
+    use test_skills::{given_chat_skill, given_greet_skill_v0_2};
     use tokio::time::{sleep, timeout};
 
     use crate::skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg};
@@ -620,7 +620,7 @@ pub mod tests {
         let skill_loader = SkillLoaderApi::new(send);
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10)).api();
 
-        let skill_path = SkillPath::new("local", "greet_skill");
+        let skill_path = SkillPath::new("local", "greet_skill_v0_2");
         skill_store.upsert(skill_path.clone(), None).await;
 
         // And given two pending fetch requests
@@ -723,8 +723,8 @@ pub mod tests {
     #[tokio::test]
     async fn cached_skill_removed() {
         // Given one cached skill
-        given_greet_skill();
-        let skill_path = SkillPath::new("local", "greet_skill");
+        given_greet_skill_v0_2();
+        let skill_path = SkillPath::new("local", "greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
         let (skill, digest) = provider
@@ -744,7 +744,7 @@ pub mod tests {
     #[tokio::test]
     async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
-        let skill_path = SkillPath::new("local", "greet_skill");
+        let skill_path = SkillPath::new("local", "greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
@@ -758,7 +758,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn should_only_cache_skills_that_have_been_fetched() {
-        given_greet_skill();
+        given_greet_skill_v0_2();
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new(false).unwrap());
@@ -766,24 +766,27 @@ pub mod tests {
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_store
             .api()
-            .upsert(SkillPath::new("local", "greet_skill"), None)
+            .upsert(SkillPath::new("local", "greet_skill_v0_2"), None)
             .await;
         skill_store
             .api()
-            .upsert(SkillPath::new("local", "greet-py"), None)
+            .upsert(SkillPath::new("local", "greet-py-v0_2"), None)
             .await;
 
         // When fetching "greet_skill" but not "greet-py"
         skill_store
             .api()
-            .fetch(SkillPath::new("local", "greet_skill"))
+            .fetch(SkillPath::new("local", "greet_skill_v0_2"))
             .await
             .unwrap();
         // and listing all cached skills
         let cached_skills = skill_store.api().list_cached().await;
 
         // Then only "greet_skill" will appear in that list, but not "greet-py"
-        assert_eq!(cached_skills, vec![SkillPath::new("local", "greet_skill")]);
+        assert_eq!(
+            cached_skills,
+            vec![SkillPath::new("local", "greet_skill_v0_2")]
+        );
 
         // Cleanup
         skill_store.wait_for_shutdown().await;
@@ -815,8 +818,8 @@ pub mod tests {
     #[tokio::test]
     async fn should_remove_invalidated_skill_from_cache() {
         // Given one cached "greet_skill"
-        given_greet_skill();
-        let greet_skill = SkillPath::new("local", "greet_skill");
+        given_greet_skill_v0_2();
+        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
@@ -864,7 +867,7 @@ pub mod tests {
         let skill_loader = SkillLoader::from_config(engine, registry_config).api();
         let mut skill_store_state = SkillStoreState::new(skill_loader);
 
-        let greet_skill = SkillPath::new("local", "greet_skill");
+        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
         skill_store_state.upsert_skill(&greet_skill, None);
         let (skill, digest) = skill_store_state
             .skill_loader
@@ -877,7 +880,7 @@ pub mod tests {
         );
 
         // When we update "greet_skill"s contents and we clear out expired skills
-        let wasm_file = temp_dir.path().join("greet_skill.wasm");
+        let wasm_file = temp_dir.path().join("greet_skill_v0_2.wasm");
         let prev_time = fs::metadata(&wasm_file)?.modified()?;
         // Another skill so we can copy it over
         given_chat_skill();
@@ -903,8 +906,8 @@ pub mod tests {
     #[tokio::test]
     async fn doesnt_invalidate_unchanged_digests() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
-        given_greet_skill();
-        let greet_skill = SkillPath::new("local", "greet_skill");
+        given_greet_skill_v0_2();
+        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
         let mut skill_store_state = SkillStoreState::new(skill_loader);
@@ -932,7 +935,7 @@ pub mod tests {
     async fn should_invalidate_cached_skill_whose_digest_has_changed() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
         let (registry_config, temp_dir) = tmp_registries_with_skill()?;
-        let greet_skill = SkillPath::new("local", "greet_skill");
+        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::from_config(engine, registry_config).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(1));
@@ -942,7 +945,7 @@ pub mod tests {
         assert_eq!(api.list_cached().await, vec![greet_skill.clone()]);
 
         // When we update "greet_skill"s contents
-        let wasm_file = temp_dir.path().join("greet_skill.wasm");
+        let wasm_file = temp_dir.path().join("greet_skill_v0_2.wasm");
         let prev_time = fs::metadata(&wasm_file)?.modified()?;
         // Another skill so we can copy it over
         given_chat_skill();
@@ -965,11 +968,11 @@ pub mod tests {
 
     /// Creates a file registry in a tempdir with one greet skill
     fn tmp_registries_with_skill() -> anyhow::Result<(RegistryConfig, TempDir)> {
-        given_greet_skill();
+        given_greet_skill_v0_2();
         let dir = tempfile::tempdir()?;
         fs::copy(
-            "./skills/greet_skill.wasm",
-            dir.path().join("greet_skill.wasm"),
+            "./skills/greet_skill_v0_2.wasm",
+            dir.path().join("greet_skill_v0_2.wasm"),
         )?;
 
         let path = dir.path().to_string_lossy().into();

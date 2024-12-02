@@ -8,22 +8,6 @@ use tempfile::{tempdir, TempDir};
 
 const WASI_TARGET: &str = "wasm32-wasip2";
 
-/// Creates `greet_skill.wasm` in `skills` directory, based on `crates/greet-skill`
-pub fn given_greet_skill() {
-    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
-        given_rust_skill("greet-skill");
-    });
-    *WASM_BUILD;
-}
-
-/// Creates `greet_skill_v0_1.wasm` in `skills` directory, based on `crates/greet-skill-v0_1`
-pub fn given_greet_skill_v0_1() {
-    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
-        given_rust_skill("greet-skill-v0_1");
-    });
-    *WASM_BUILD;
-}
-
 /// Creates `greet_skill_v0_2.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
 pub fn given_greet_skill_v0_2() {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
@@ -44,14 +28,6 @@ pub fn given_search_skill() {
 pub fn given_chat_skill() {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("chat-skill");
-    });
-    *WASM_BUILD;
-}
-
-/// Creates `greet-py.wasm` in `skills` directory, based on `greet-py`
-pub fn given_greet_py() {
-    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
-        given_python_skill("greet-py", "unversioned");
     });
     *WASM_BUILD;
 }
@@ -106,18 +82,6 @@ fn build_rust_skill(package_name: &str) {
         format!("./skills/{snake_case}.wasm"),
     )
     .unwrap();
-
-    // wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
-    let output = Command::new("wasm-tools")
-        .args([
-            "strip",
-            &format!("./skills/{snake_case}.wasm"),
-            "-o",
-            &format!("./skills/{snake_case}.wasm"),
-        ])
-        .output()
-        .unwrap();
-    error_on_status("Stripping web assembly component", output).unwrap();
 }
 
 fn build_python_skill(package_name: &str, wit_version: &str) {
