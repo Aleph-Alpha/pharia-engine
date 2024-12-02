@@ -335,7 +335,7 @@ pub mod tests {
 
     use anyhow::{anyhow, bail};
     use serde_json::json;
-    use test_skills::given_greet_skill;
+    use test_skills::given_greet_skill_v0_2;
     use tokio::try_join;
 
     use crate::{
@@ -555,8 +555,8 @@ pub mod tests {
 
     impl SkillStoreGreetStub {
         pub fn new(engine: Arc<Engine>) -> Self {
-            given_greet_skill();
-            let greet_bytes = fs::read("./skills/greet_skill.wasm").unwrap();
+            given_greet_skill_v0_2();
+            let greet_bytes = fs::read("./skills/greet_skill_v0_2.wasm").unwrap();
             let skill = Skill::new(&engine, greet_bytes.clone()).unwrap();
             let skill = Arc::new(skill);
 

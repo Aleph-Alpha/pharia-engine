@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::anyhow;
 use semver::Version;
-use serde_json::{json, Value};
+use serde_json::Value;
 use strum::{EnumIter, IntoEnumIterator};
 use tracing::info;
 use wasmtime::{
@@ -118,10 +118,6 @@ impl Engine {
 pub enum Skill {
     /// Skills targeting versions 0.2.x of the skill world
     V0_2(v0_2::SkillPre<LinkedCtx>),
-    /// Skills targeting versions 0.1.x of the skill world
-    V0_1(v0_1::SkillPre<LinkedCtx>),
-    /// Skills targeting the pre-semver-released version of skill world
-    Unversioned(unversioned::SkillPre<LinkedCtx>),
 }
 
 impl Skill {
@@ -136,14 +132,6 @@ impl Skill {
                 let skill = v0_2::SkillPre::new(pre)?;
                 Ok(Skill::V0_2(skill))
             }
-            SupportedVersion::V0_1 => {
-                let skill = v0_1::SkillPre::new(pre)?;
-                Ok(Skill::V0_1(skill))
-            }
-            SupportedVersion::Unversioned => {
-                let skill = unversioned::SkillPre::new(pre)?;
-                Ok(Skill::Unversioned(skill))
-            }
         }
     }
 
@@ -154,12 +142,6 @@ impl Skill {
             match version {
                 SupportedVersion::V0_2 => {
                     v0_2::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
-                }
-                SupportedVersion::V0_1 => {
-                    v0_1::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
-                }
-                SupportedVersion::Unversioned => {
-                    unversioned::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
             }
         }
@@ -197,36 +179,6 @@ impl Skill {
                 };
                 Ok(serde_json::from_slice(&result)?)
             }
-            Self::V0_1(skill) => {
-                let input = serde_json::to_vec(&input)?;
-                let bindings = skill.instantiate_async(&mut store).await?;
-                let result = bindings
-                    .pharia_skill_skill_handler()
-                    .call_run(store, &input)
-                    .await?;
-                let result = match result {
-                    Ok(result) => result,
-                    Err(e) => match e {
-                        v0_1::exports::pharia::skill::skill_handler::Error::Internal(e) => {
-                            tracing::error!("Failed to run skill, internal skill error:\n{e}");
-                            return Err(anyhow!("Internal skill error:\n{e}"));
-                        }
-                        v0_1::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
-                            tracing::error!("Failed to run skill, invalid input:\n{e}");
-                            return Err(anyhow!("Invalid input:\n{e}"));
-                        }
-                    },
-                };
-                Ok(serde_json::from_slice(&result)?)
-            }
-            Self::Unversioned(skill) => {
-                let Some(input) = input.as_str() else {
-                    return Err(anyhow!("Invalid input, string expected."));
-                };
-                let bindings = skill.instantiate_async(&mut store).await?;
-                let result = bindings.call_run(store, input).await?;
-                Ok(json!(result))
-            }
         }
     }
 }
@@ -236,10 +188,6 @@ impl Skill {
 enum SupportedVersion {
     /// Versions 0.2.x of the skill world
     V0_2,
-    /// Versions 0.1.x of the skill world
-    V0_1,
-    /// Pre-semver-released version of skill world
-    Unversioned,
 }
 
 impl SupportedVersion {
@@ -248,11 +196,7 @@ impl SupportedVersion {
             Some(Version {
                 major: 0, minor: 2, ..
             }) => Ok(Self::V0_2),
-            Some(Version {
-                major: 0, minor: 1, ..
-            }) => Ok(Self::V0_1),
-            None => Ok(Self::Unversioned),
-            Some(_) => Err(anyhow!("Unsupported Pharia Skill version.")),
+            Some(_) | None => Err(anyhow!("Unsupported Pharia Skill version.")),
         }
     }
 
@@ -555,93 +499,6 @@ mod v0_2 {
     }
 }
 
-mod v0_1 {
-    use pharia::skill::csi::{Completion, CompletionParams, FinishReason, Host};
-    use wasmtime::component::bindgen;
-
-    use crate::inference;
-
-    use super::LinkedCtx;
-
-    bindgen!({ world: "skill", path: "./wit/skill@0.1", async: true });
-
-    #[async_trait::async_trait]
-    impl Host for LinkedCtx {
-        #[must_use]
-        async fn complete(
-            &mut self,
-            model: String,
-            prompt: String,
-            options: Option<CompletionParams>,
-        ) -> Completion {
-            let params = if let Some(CompletionParams {
-                max_tokens,
-                temperature,
-                top_k,
-                top_p,
-            }) = options
-            {
-                inference::CompletionParams {
-                    max_tokens: max_tokens.or(Some(128)),
-                    temperature,
-                    top_k,
-                    top_p,
-                    ..Default::default()
-                }
-            } else {
-                inference::CompletionParams {
-                    max_tokens: Some(128),
-                    ..Default::default()
-                }
-            };
-            let request = inference::CompletionRequest::new(prompt, model).with_params(params);
-            self.skill_ctx.complete_text(request).await.into()
-        }
-    }
-
-    impl From<inference::Completion> for Completion {
-        fn from(completion: inference::Completion) -> Self {
-            Self {
-                text: completion.text,
-                finish_reason: completion.finish_reason.into(),
-            }
-        }
-    }
-
-    impl From<inference::FinishReason> for FinishReason {
-        fn from(finish_reason: inference::FinishReason) -> Self {
-            match finish_reason {
-                inference::FinishReason::Stop => Self::Stop,
-                inference::FinishReason::Length => Self::Length,
-                inference::FinishReason::ContentFilter => Self::ContentFilter,
-            }
-        }
-    }
-}
-
-mod unversioned {
-    use pharia::skill::csi::Host;
-    use wasmtime::component::bindgen;
-
-    use crate::inference::{CompletionParams, CompletionRequest};
-
-    use super::LinkedCtx;
-
-    bindgen!({ world: "skill", path: "./wit/skill@unversioned", async: true });
-
-    #[async_trait::async_trait]
-    impl Host for LinkedCtx {
-        #[must_use]
-        async fn complete_text(&mut self, prompt: String, model: String) -> String {
-            let request = CompletionRequest::new(prompt, model).with_params(CompletionParams {
-                max_tokens: Some(128),
-                ..Default::default()
-            });
-            self.skill_ctx.complete_text(request).await.text
-        }
-    }
-}
-
 /// The pooling allocator is tailor made for our use case, so
 /// try to use it when we can. The main cost of the pooling allocator, however,
 /// is the virtual memory required to run it. Not all systems support the same
@@ -690,9 +547,9 @@ fn pooling_allocator_is_supported() -> bool {
 mod tests {
     use std::fs;
 
+    use serde_json::json;
     use test_skills::{
-        given_chat_skill, given_greet_py, given_greet_py_v0_2, given_greet_skill,
-        given_greet_skill_v0_1, given_greet_skill_v0_2, given_search_skill,
+        given_chat_skill, given_greet_py_v0_2, given_greet_skill_v0_2, given_search_skill,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -707,10 +564,12 @@ mod tests {
 
     #[test]
     fn can_parse_module() {
-        given_greet_skill();
-        let wasm = fs::read("skills/greet_skill.wasm").unwrap();
-        let version = SupportedVersion::extract_pharia_skill_version(wasm).unwrap();
-        assert_eq!(version, None);
+        given_greet_skill_v0_2();
+        let wasm = fs::read("skills/greet_skill_v0_2.wasm").unwrap();
+        let version = SupportedVersion::extract_pharia_skill_version(wasm)
+            .unwrap()
+            .unwrap();
+        assert_eq!(version, Version::new(0, 2, 7));
     }
 
     #[test]
@@ -748,23 +607,6 @@ mod tests {
         // Then English is selected as the language
         assert!(language.is_some());
         assert_eq!(language.unwrap(), Language::Eng);
-    }
-
-    #[tokio::test]
-    async fn can_load_and_run_v0_1_module() {
-        // Given a skill loaded by our engine
-        given_greet_skill_v0_1();
-        let wasm = fs::read("skills/greet_skill_v0_1.wasm").unwrap();
-        let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, wasm).unwrap();
-        let ctx = Box::new(CsiGreetingMock);
-
-        // When invoked with a json string
-        let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
-
-        // Then it returns a json string
-        assert_eq!(result, json!("Hello Homer"));
     }
 
     #[tokio::test]
@@ -818,23 +660,6 @@ mod tests {
 
         // Then it returns a json string array
         assert_eq!(result["content"], "dummy-content");
-    }
-
-    #[tokio::test]
-    async fn can_load_and_run_unversioned_py_module() {
-        // Given a skill loaded by our engine
-        given_greet_py();
-        let wasm = fs::read("skills/greet-py.wasm").unwrap();
-        let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, wasm).unwrap();
-        let ctx = Box::new(CsiGreetingMock);
-
-        // When invoked with a json string
-        let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
-
-        // Then it returns a json string
-        assert_eq!(result, json!("Hello Homer"));
     }
 
     #[tokio::test]

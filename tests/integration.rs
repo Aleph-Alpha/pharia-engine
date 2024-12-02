@@ -5,7 +5,7 @@ use dotenvy::dotenv;
 use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, OperatorConfig};
 use reqwest::{header, Body};
 use serde_json::json;
-use test_skills::given_greet_skill;
+use test_skills::given_greet_skill_v0_2;
 use tokio::sync::oneshot;
 
 struct TestKernel {
@@ -62,8 +62,8 @@ impl TestKernel {
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn execute_skill() {
-    given_greet_skill();
-    let kernel = TestKernel::with_skills(&["greet_skill"]).await;
+    given_greet_skill_v0_2();
+    let kernel = TestKernel::with_skills(&["greet_skill_v0_2"]).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -74,7 +74,7 @@ async fn execute_skill() {
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
         .body(Body::from(
-            json!({ "skill": "local/greet_skill", "input": "Homer"}).to_string(),
+            json!({ "skill": "local/greet_skill_v0_2", "input": "Homer"}).to_string(),
         ))
         .timeout(Duration::from_secs(30))
         .send()

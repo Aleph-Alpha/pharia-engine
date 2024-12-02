@@ -63,13 +63,13 @@ pub mod tests {
     use super::*;
     use async_trait::async_trait;
     use serde_json::json;
-    use test_skills::{given_greet_py, given_greet_skill};
+    use test_skills::{given_greet_py_v0_2, given_greet_skill_v0_2};
 
     #[tokio::test]
     async fn greet_skill_component() {
-        given_greet_skill();
+        given_greet_skill_v0_2();
         let namespace = "local".to_owned();
-        let skill_path = SkillPath::new(&namespace, "greet_skill");
+        let skill_path = SkillPath::new(&namespace, "greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
 
@@ -105,10 +105,10 @@ pub mod tests {
 
     #[tokio::test]
     async fn rust_greeting_skill() {
-        given_greet_skill();
+        given_greet_skill_v0_2();
         let skill_ctx = Box::new(CsiGreetingMock);
         let namespace = "local".to_owned();
-        let skill_path = SkillPath::new(&namespace, "greet_skill");
+        let skill_path = SkillPath::new(&namespace, "greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
@@ -128,10 +128,10 @@ pub mod tests {
 
     #[tokio::test]
     async fn python_greeting_skill() {
-        given_greet_py();
+        given_greet_py_v0_2();
         let skill_ctx = Box::new(CsiGreetingMock);
         let namespace = "local".to_owned();
-        let skill_path = SkillPath::new(&namespace, "greet-py");
+        let skill_path = SkillPath::new(&namespace, "greet-py-v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
@@ -151,10 +151,10 @@ pub mod tests {
 
     #[tokio::test]
     async fn can_call_preinstantiated_multiple_times() {
-        given_greet_skill();
+        given_greet_skill_v0_2();
         let skill_ctx = Box::new(CsiCounter::new());
         let namespace = "local".to_owned();
-        let skill_path = SkillPath::new(&namespace, "greet_skill");
+        let skill_path = SkillPath::new(&namespace, "greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
