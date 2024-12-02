@@ -160,7 +160,7 @@ where
         .route("/skills", get(skills))
         .route("/execute_skill", post(execute_skill))
         .route("/cached_skills", get(cached_skills))
-        .route("/cached_skills/:name", delete(drop_cached_skill))
+        .route("/cached_skills/:namespace/:name", delete(drop_cached_skill))
         .route_layer(middleware::from_fn_with_state(
             app_state.clone(),
             authorization_middleware,
@@ -326,14 +326,22 @@ async fn execute_skill(
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<ExecuteSkillArgs>,
 ) -> (StatusCode, Json<Value>) {
-    if args.skill.trim().is_empty() {
+    let skill_name = args.skill.trim();
+    if skill_name.is_empty() {
         return (
             VALIDATION_ERROR_STATUS_CODE,
             Json(json!("Empty skill names are not allowed.")),
         );
     }
 
-    let skill_path = SkillPath::from_str(&args.skill);
+    let Some((namespace, name)) = skill_name.split_once('/') else {
+        return (
+            VALIDATION_ERROR_STATUS_CODE,
+            Json(json!("Missing namespace for skill.")),
+        );
+    };
+
+    let skill_path = SkillPath::new(namespace, name);
     let result = skill_executor_api
         .execute_skill(skill_path, args.input, bearer.token().to_owned())
         .await;
@@ -399,7 +407,7 @@ async fn cached_skills(
 #[utoipa::path(
     delete,
     operation_id = "drop_cached_skill",
-    path = "/cached_skills/{namespace}%2F{name}",
+    path = "/cached_skills/{namespace}/{name}",
     tag = "skills",
     responses(
         (status = 200, body=String, example = json!("Skill removed from cache.")),
@@ -408,9 +416,9 @@ async fn cached_skills(
 )]
 async fn drop_cached_skill(
     State(skill_store_api): State<SkillStoreApi>,
-    Path(name): Path<String>,
+    Path((namespace, name)): Path<(String, String)>,
 ) -> (StatusCode, Json<String>) {
-    let skill_path = SkillPath::from_str(&name);
+    let skill_path = SkillPath::new(namespace, name);
     let skill_was_cached = skill_store_api.invalidate_cache(skill_path).await;
     let msg = if skill_was_cached {
         "Skill removed from cache".to_string()
@@ -762,7 +770,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri("/cached_skills/haiku_skill".to_owned())
+                    .uri("/cached_skills/pharia-kernel-team/haiku_skill".to_owned())
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
@@ -818,7 +826,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri("/cached_skills/haiku_skill".to_owned())
+                    .uri("/cached_skills/pharia-kernel-team/haiku_skill".to_owned())
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
