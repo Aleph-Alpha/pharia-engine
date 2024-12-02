@@ -62,7 +62,7 @@ tower-http = { version = "0.6.2", features = [
     "trace",
 ] }
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 utoipa = { version = "5.2.0", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.2.0", features = ["axum"] }
 wasmtime = "27.0.0"
