@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.3.2...v0.4.0)
+
+### Features
+
+- [**breaking**] Execute_skill and drop_cached_skill require namespace with skill name - ([d776680](https://github.com/Aleph-Alpha/pharia-kernel/commit/d77668066b88e8c1b0c8235d055fdbbab6f0d7a6))
+- [**breaking**] Remove support for unversioned and 0.1 wit worlds - ([f3b5c82](https://github.com/Aleph-Alpha/pharia-kernel/commit/f3b5c82e0a1132b1cf178898886616f8450f21be))
+
+### Documentation
+
+- Apply seasonal theme - ([d6d6107](https://github.com/Aleph-Alpha/pharia-kernel/commit/d6d61070ec8456e0f64e3b96c8d1bb37cc21e899))
+
+### Builds
+
+- *(deps)* Bump the minor group with 18 updates - ([46e094b](https://github.com/Aleph-Alpha/pharia-kernel/commit/46e094b4ae28117d63d00b922fd69f9325180380))
+
+
 ## [0.3.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.3.1...v0.3.2)
 
 ### Features
