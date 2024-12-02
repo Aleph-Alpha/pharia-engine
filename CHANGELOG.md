@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.0...v0.4.1)
+
+### Features
+
+- Prefix all metric names - ([b0583cb](https://github.com/Aleph-Alpha/pharia-kernel/commit/b0583cbafff84d90ab73736f2ed7fb3bd89ce96b))
+
+
 ## [0.4.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.3.2...v0.4.0)
 
 ### Features
