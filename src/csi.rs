@@ -70,9 +70,10 @@ pub trait Csi {
     ) -> Result<Vec<SearchResult>, anyhow::Error>;
 }
 
-#[derive(IntoStaticStr, strum::Display)]
+#[derive(IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum CsiMetrics {
+    #[strum(to_string = "kernel_csi_requests_total")]
     CsiRequestsTotal,
 }
 
