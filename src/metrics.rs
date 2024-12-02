@@ -19,7 +19,7 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
 
     PrometheusBuilder::new()
         .set_buckets_for_metric(
-            Matcher::Full(ShellMetrics::HttpRequestsDurationSeconds.to_string()),
+            Matcher::Full(<&'static str>::from(ShellMetrics::HttpRequestsDurationSeconds).into()),
             EXPONENTIAL_SECONDS,
         )?
         .with_http_listener(addr)

@@ -207,10 +207,12 @@ where
         )
 }
 
-#[derive(IntoStaticStr, strum::Display)]
+#[derive(IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum ShellMetrics {
+    #[strum(to_string = "kernel_http_requests_total")]
     HttpRequestsTotal,
+    #[strum(to_string = "kernel_http_requests_duration_seconds")]
     HttpRequestsDurationSeconds,
 }
 
