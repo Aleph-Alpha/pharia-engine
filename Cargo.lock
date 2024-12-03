@@ -2767,7 +2767,7 @@ dependencies = [
  "wasmtime",
  "wasmtime-wasi",
  "wat",
- "wit-parser 0.221.0",
+ "wit-parser 0.221.2",
 ]
 
 [[package]]
@@ -4515,12 +4515,12 @@ dependencies = [
 
 [[package]]
 name = "wasm-encoder"
-version = "0.221.0"
+version = "0.221.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de35b6c3ef1f53ac7a31b5e69bc00f1542ea337e7e7162dc34c68b537ff82690"
+checksum = "c17a3bd88f2155da63a1f2fcb8a56377a24f0b6dfed12733bb5f544e86f690c5"
 dependencies = [
  "leb128",
- "wasmparser 0.221.0",
+ "wasmparser 0.221.2",
 ]
 
 [[package]]
@@ -4597,9 +4597,9 @@ dependencies = [
 
 [[package]]
 name = "wasmparser"
-version = "0.221.0"
+version = "0.221.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8659e755615170cfe20da468865c989da78c5da16d8652e69a75acda02406a92"
+checksum = "9845c470a2e10b61dd42c385839cdd6496363ed63b5c9e420b5488b77bd22083"
 dependencies = [
  "bitflags 2.6.0",
  "indexmap 2.6.0",
@@ -4901,24 +4901,24 @@ dependencies = [
 
 [[package]]
 name = "wast"
-version = "221.0.0"
+version = "221.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d8eb1933d493dd07484a255c3f52236123333f5befaa3be36182a50d393ec54"
+checksum = "fcc4470b9de917ba199157d1f0ae104f2ae362be728c43e68c571c7715bd629e"
 dependencies = [
  "bumpalo",
  "leb128",
  "memchr",
  "unicode-width",
- "wasm-encoder 0.221.0",
+ "wasm-encoder 0.221.2",
 ]
 
 [[package]]
 name = "wat"
-version = "1.221.0"
+version = "1.221.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c813fd4e5b2b97242830b56e7b7dc5479bc17aaa8730109be35e61909af83993"
+checksum = "6b1f3c6d82af47286494c6caea1d332037f5cbeeac82bbf5ef59cb8c201c466e"
 dependencies = [
- "wast 221.0.0",
+ "wast 221.0.2",
 ]
 
 [[package]]
@@ -5314,9 +5314,9 @@ dependencies = [
 
 [[package]]
 name = "wit-parser"
-version = "0.221.0"
+version = "0.221.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61f5b0a971faff0855a827ef06b25528263a718907bed4056992382316f1e68e"
+checksum = "fbe1538eea6ea5ddbe5defd0dc82539ad7ba751e1631e9185d24a931f0a5adc8"
 dependencies = [
  "anyhow",
  "id-arena",
@@ -5327,7 +5327,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "unicode-xid",
- "wasmparser 0.221.0",
+ "wasmparser 0.221.2",
 ]
 
 [[package]]
