@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.1...v0.4.2)
+
+### Builds
+
+- *(deps)* Bump the minor group with 2 updates - ([0a83ead](https://github.com/Aleph-Alpha/pharia-kernel/commit/0a83ead829ad89a076dd3b17c6675cba556ecbd1))
+
+
 ## [0.4.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.0...v0.4.1)
 
 ### Features
