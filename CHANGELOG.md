@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.2...v0.4.3)
+
+### Features
+
+- Update default authorization address to Pharia IAM - ([338c2f1](https://github.com/Aleph-Alpha/pharia-kernel/commit/338c2f13faf2ed5a6c5cf83143afa144fca46800))
+- Rename env variable to PHARIA_AI_TOKEN - ([ac649a0](https://github.com/Aleph-Alpha/pharia-kernel/commit/ac649a0fb4626cb82d6dc29eed8f215d8d9bec91))
+
+### Builds
+
+- *(deps)* Bump the minor group with 4 updates - ([968ac0e](https://github.com/Aleph-Alpha/pharia-kernel/commit/968ac0e712c9559cfbc70eeb2df2af9085f6efa1))
+
+
 ## [0.4.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.1...v0.4.2)
 
 ### Builds
