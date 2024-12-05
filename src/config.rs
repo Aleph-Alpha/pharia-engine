@@ -44,7 +44,7 @@ impl AppConfig {
             .unwrap_or_else(|_| "https://document-index.product.pharia.com".to_owned());
 
         let authorization_addr = env::var("AUTHORIZATION_ADDRESS")
-            .unwrap_or_else(|_| "https://inference-api.product.pharia.com".to_owned());
+            .unwrap_or_else(|_| "https://pharia-iam.product.pharia.com".to_owned());
 
         let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "error".to_owned());
 
