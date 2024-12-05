@@ -30,7 +30,7 @@ SKILL_FNAME_RS = SKILL_NAME_RS + ".wasm"
 assert os.path.isfile(SKILL_FNAME_RS)
 
 # these are the key constants used
-AA_API_TOKEN = "AA_API_TOKEN"
+PHARIA_AI_TOKEN = "PHARIA_AI_TOKEN"
 PHARIA_KERNEL_ADDRESS = "PHARIA_KERNEL_ADDRESS"
 PHARIA_KERNEL_URL = "PHARIA_KERNEL_URL"
 HEADERS = "headers"
@@ -105,7 +105,7 @@ REQUEST_CONFIG = dict()
 def _ensure_request_config():
     if not REQUEST_CONFIG:
         # fill cache config
-        token = os.environ.get(AA_API_TOKEN)
+        token = os.environ.get(PHARIA_AI_TOKEN)
         address = os.environ.get(PHARIA_KERNEL_ADDRESS)
         url = PHARIA_KERNEL_ADDRESS
         if not url.startswith("http"):
@@ -118,7 +118,7 @@ def _ensure_request_config():
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
         }
-        REQUEST_CONFIG[AA_API_TOKEN] = token
+        REQUEST_CONFIG[PHARIA_AI_TOKEN] = token
         REQUEST_CONFIG[PHARIA_KERNEL_URL] = url
         REQUEST_CONFIG[HEADERS] = headers
     return REQUEST_CONFIG[PHARIA_KERNEL_URL], REQUEST_CONFIG[HEADERS]

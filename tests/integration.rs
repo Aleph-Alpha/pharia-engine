@@ -179,7 +179,7 @@ fn api_token() -> &'static str {
     static API_TOKEN: OnceLock<String> = OnceLock::new();
     API_TOKEN.get_or_init(|| {
         drop(dotenv());
-        env::var("AA_API_TOKEN").expect("AA_API_TOKEN variable not set")
+        env::var("PHARIA_AI_TOKEN").expect("PHARIA_AI_TOKEN variable not set")
     })
 }
 

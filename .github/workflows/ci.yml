@@ -39,7 +39,7 @@ jobs:
       SKILL_REPOSITORY: aleph-alpha/pharia-kernel
       SKILL_REGISTRY_USER: ${{ github.actor }}
       SKILL_REGISTRY_PASSWORD: ${{ secrets.SKILL_REGISTRY_PASSWORD }}
-      AA_API_TOKEN: ${{ secrets.AA_API_TOKEN }}
+      PHARIA_AI_TOKEN: ${{ secrets.PHARIA_AI_TOKEN }}
       AA_INFERENCE_ADDRESS: https://inference-api.product.pharia.com
       AUTHORIZATION_ADDRESS: https://inference-api.product.pharia.com
 
@@ -104,7 +104,7 @@ jobs:
             -e SKILL_REGISTRY_USER=dummy \
             -e SKILL_REGISTRY_PASSWORD=dummy \
             -e GITLAB_CONFIG_ACCESS_TOKEN=dummy \
-            -e AA_API_TOKEN=dummy \
+            -e PHARIA_AI_TOKEN=dummy \
             pharia-kernel:$IMAGE_ID | cat) &
           bash -x ./tests/test-image.sh 8081 127.0.0.1
 
