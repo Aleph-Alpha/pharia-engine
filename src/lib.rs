@@ -205,7 +205,7 @@ mod tests {
             metrics_addr: "127.0.0.1:0".parse().unwrap(),
             inference_addr: "https://inference-api.product.pharia.com".to_owned(),
             document_index_addr: "https://document-index.product.pharia.com".to_owned(),
-            authorization_addr: "https://inference-api.product.pharia.com".to_owned(),
+            authorization_addr: "https://pharia-iam.product.pharia.com".to_owned(),
             operator_config: OperatorConfig::empty(),
             namespace_update_interval: Duration::from_secs(10),
             log_level: "info".to_owned(),
