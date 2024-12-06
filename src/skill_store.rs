@@ -142,7 +142,7 @@ impl SkillStoreState {
             .expect("Bad namespace configuration for skill")
             .expect("Missing tag for skill");
 
-        let skill = ConfiguredSkill::new(&skill_path.name, &skill_path.namespace, tag);
+        let skill = ConfiguredSkill::new(&skill_path.namespace, &skill_path.name, tag);
         match self.skill_loader.fetch_digest(skill).await {
             // There is a new digest behind the tag, delete the cache entry
             Ok(Some(new_digest)) if &new_digest != digest => {
@@ -446,7 +446,7 @@ impl SkillStoreActor {
                     Ok(Some(tag)) => {
                         let skill_loader = self.provider.skill_loader.clone();
                         let skill =
-                            ConfiguredSkill::new(&skill_path.name, &skill_path.namespace, tag);
+                            ConfiguredSkill::new(&skill_path.namespace, &skill_path.name, tag);
                         let cloned_skill_path = skill_path.clone();
                         let fut = async move {
                             let result = skill_loader.fetch(skill).await;
