@@ -7,34 +7,37 @@ use tokio::task::{spawn_blocking, JoinHandle};
 
 use crate::namespace_watcher::Registry;
 use crate::registries::{Digest, FileRegistry, OciRegistry, SkillImage, SkillRegistry};
-use crate::skills::{Engine, Skill, SkillPath};
+use crate::skills::{Engine, Skill};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::{future::Future, pin::Pin};
 
 // A skill that has been configured and may be fetched and executed.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfiguredSkill {
-    skill_path: SkillPath,
-    tag: Option<String>,
+    pub name: String,
+    pub namespace: String,
+    pub tag: String,
+}
+
+impl std::fmt::Display for ConfiguredSkill {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}/{}", self.namespace, self.name, self.tag)
+    }
 }
 
 impl ConfiguredSkill {
-    pub fn new(skill_path: SkillPath, tag: Option<String>) -> Self {
-        Self { skill_path, tag }
-    }
-
-    pub fn namespace(&self) -> &str {
-        &self.skill_path.namespace
-    }
-
-    pub fn name(&self) -> &str {
-        &self.skill_path.name
-    }
-
-    pub fn tag_or_default(&self) -> &str {
-        self.tag.as_deref().unwrap_or("latest")
+    pub fn new(
+        name: impl Into<String>,
+        namespace: impl Into<String>,
+        tag: impl Into<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            namespace: namespace.into(),
+            tag: tag.into(),
+        }
     }
 }
 
@@ -211,9 +214,7 @@ impl SkillLoaderActor {
         engine: Arc<Engine>,
         skill: &ConfiguredSkill,
     ) -> anyhow::Result<(Skill, Digest)> {
-        let skill_bytes = registry
-            .load_skill(skill.name(), skill.tag_or_default())
-            .await?;
+        let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
             skill_bytes.ok_or_else(|| anyhow!("Skill {skill:?} configured but not loadable."))?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
@@ -229,7 +230,7 @@ impl SkillLoaderActor {
     fn act(&self, msg: SkillLoaderMsg) {
         match msg {
             SkillLoaderMsg::Fetch { skill, send } => {
-                let registry = self.registry(skill.namespace());
+                let registry = self.registry(&skill.namespace);
                 let engine = self.engine.clone();
                 let fut = async move {
                     let result = Self::fetch(registry.as_ref(), engine, &skill).await;
@@ -238,11 +239,9 @@ impl SkillLoaderActor {
                 self.running_requests.push(Box::pin(fut));
             }
             SkillLoaderMsg::FetchDigest { skill, send } => {
-                let registry = self.registry(skill.namespace());
+                let registry = self.registry(&skill.namespace);
                 let fut = async move {
-                    let result = registry
-                        .fetch_digest(skill.name(), skill.tag_or_default())
-                        .await;
+                    let result = registry.fetch_digest(&skill.name, &skill.tag).await;
                     drop(send.send(result));
                 };
                 self.running_requests.push(Box::pin(fut));
@@ -253,6 +252,7 @@ impl SkillLoaderActor {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::skills::SkillPath;
     use tokio::time::{sleep, timeout, Duration};
 
     use crate::{
@@ -262,8 +262,8 @@ pub mod tests {
     };
 
     impl ConfiguredSkill {
-        pub fn without_tag(skill_path: SkillPath) -> Self {
-            Self::new(skill_path, None)
+        pub fn from_path(skill_path: &SkillPath) -> Self {
+            Self::new(&skill_path.name, &skill_path.namespace, "latest")
         }
     }
 
@@ -315,7 +315,7 @@ pub mod tests {
 
         // When we fetch the never resolving skill
         let api = skill_loader.api();
-        let skill = ConfiguredSkill::new(never_resolving_skill_path, Some("dummy".to_owned()));
+        let skill = ConfiguredSkill::from_path(&never_resolving_skill_path);
         let handle = tokio::spawn(async move {
             drop(api.fetch(skill).await);
         });
@@ -324,7 +324,7 @@ pub mod tests {
         sleep(Duration::from_millis(10)).await;
 
         // Then the other skill can still be fetched
-        let skill = ConfiguredSkill::new(ready_skill_path, Some("dummy".to_owned()));
+        let skill = ConfiguredSkill::from_path(&ready_skill_path);
         let result = timeout(Duration::from_millis(5), skill_loader.api().fetch(skill)).await;
         assert!(result.is_ok());
         drop(handle);
