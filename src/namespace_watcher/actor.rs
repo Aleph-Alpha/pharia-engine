@@ -240,7 +240,7 @@ impl NamespaceWatcherActor {
         let diff = Self::compute_diff(&existing, incoming);
         for skill in diff.added_or_changed {
             let tag = skill.tag.as_deref().unwrap_or("latest");
-            let skill = ConfiguredSkill::new(skill.name, namespace, tag);
+            let skill = ConfiguredSkill::new(namespace, skill.name, tag);
             self.skill_store_api.upsert(skill).await;
         }
 
@@ -478,7 +478,7 @@ pub mod tests {
             SkillStoreMessage::Upsert {
                 skill,
             }
-            if skill == ConfiguredSkill::new(dummy_skill, dummy_namespace, "latest")
+            if skill == ConfiguredSkill::new(dummy_namespace, dummy_skill, "latest")
         ));
 
         observer.wait_for_shutdown().await;
@@ -660,7 +660,7 @@ pub mod tests {
             SkillStoreMessage::Upsert {
                 skill,
             }
-            if skill == ConfiguredSkill::new(dummy_skill, dummy_namespace, "latest")
+            if skill == ConfiguredSkill::new(dummy_namespace, dummy_skill, "latest")
         ));
     }
 }

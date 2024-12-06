@@ -16,26 +16,26 @@ use std::{future::Future, pin::Pin};
 // A skill that has been configured and may be fetched and executed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfiguredSkill {
-    pub name: String,
     pub namespace: String,
+    pub name: String,
     pub tag: String,
 }
 
 impl std::fmt::Display for ConfiguredSkill {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}/{}/{}", self.namespace, self.name, self.tag)
+        write!(f, "{}/{}:{}", self.namespace, self.name, self.tag)
     }
 }
 
 impl ConfiguredSkill {
     pub fn new(
-        name: impl Into<String>,
         namespace: impl Into<String>,
+        name: impl Into<String>,
         tag: impl Into<String>,
     ) -> Self {
         Self {
-            name: name.into(),
             namespace: namespace.into(),
+            name: name.into(),
             tag: tag.into(),
         }
     }
@@ -216,11 +216,11 @@ impl SkillLoaderActor {
     ) -> anyhow::Result<(Skill, Digest)> {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
-            skill_bytes.ok_or_else(|| anyhow!("Skill {skill:?} configured but not loadable."))?;
+            skill_bytes.ok_or_else(|| anyhow!("Skill {skill} configured but not loadable."))?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")
-            .with_context(|| format!("Failed to initialize {skill:?}."))?;
+            .with_context(|| format!("Failed to initialize {skill}."))?;
         Ok((skill, digest))
     }
 
@@ -263,7 +263,7 @@ pub mod tests {
 
     impl ConfiguredSkill {
         pub fn from_path(skill_path: &SkillPath) -> Self {
-            Self::new(&skill_path.name, &skill_path.namespace, "latest")
+            Self::new(&skill_path.namespace, &skill_path.name, "latest")
         }
     }
 
