@@ -69,7 +69,7 @@ impl Kernel {
             Engine::new(app_config.use_pooling_allocator).context("engine creation failed")?,
         );
 
-        // Boot up the drivers which power the CSI. Right now we only have inference.
+        // Boot up the drivers which power the CSI.
         let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();
         let inference = Inference::new(app_config.inference_addr.clone());
         let search = Search::new(app_config.document_index_addr.clone());
@@ -83,7 +83,7 @@ impl Kernel {
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config);
         let skill_store = SkillStore::new(skill_loader.api(), app_config.namespace_update_interval);
 
-        // Boot up runtime we need to execute Skills
+        // Boot up the runtime we need to execute Skills
         let skill_executor = SkillExecutor::new(engine, csi_drivers.clone(), skill_store.api());
 
         let mut namespace_watcher = NamespaceWatcher::with_config(
@@ -92,7 +92,7 @@ impl Kernel {
             app_config.namespace_update_interval,
         );
 
-        // Wait for first pass of the configuration so that the configured skills are loaded
+        // Wait for the first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
         let authorization = Authorization::new(app_config.authorization_addr);
@@ -110,7 +110,7 @@ impl Kernel {
             Ok(shell) => shell,
             Err(e) => {
                 // In case construction of shell goes wrong (e.g. we can not bind the port) we
-                // shutdown all the other actors we created so far, so they do not live on in
+                // shut down all the other actors we created so far, so they do not live on in
                 // detached threads.
                 authorization.wait_for_shutdown().await;
                 namespace_watcher.wait_for_shutdown().await;
