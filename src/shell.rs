@@ -249,7 +249,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, skills, cached_skills, execute_skill, drop_cached_skill, skill_wit),
+    paths(serve_docs, skills, cached_skills, run_skill, drop_cached_skill, skill_wit),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs)),
     tags(
@@ -366,14 +366,14 @@ async fn execute_skill(
 /// Run a skill in the kernel from one of the available repositories.
 #[utoipa::path(
     post,
-    operation_id = "run_skill",
+    operation_id = "run skill",
     path = "/v1/skills/{namespace}/{name}/run",
-    request_body = Value,
+    request_body(content_type = "application/json", description = "The expected input for the skill in JSON format.", example = json!({"text": "some text to be summarized", "length": "short"})),
     security(("api_token" = [])),
     tag = "skills",
     responses(
-        (status = 200, description = "The Skill was executed.", body=String, example = json!("Skill output")),
-        (status = 400, description = "The Skill invocation failed.", body=String, example = json!("Skill not found."))
+        (status = 200, description = "The Skill was executed.", body=Value, example = json!({"summary": "The summary of the text."})),
+        (status = 400, description = "The Skill invocation failed.", body=Value, example = json!("Skill not found."))
     ),
 )]
 async fn run_skill(
