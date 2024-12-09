@@ -69,7 +69,11 @@ spec:
           args: []
           env:
             - name: LOG_LEVEL
-              value: "error,pharia_kernel={{ .Values.logLevel }}"
+            {{- if .Values.logLevel }}
+              value: {{ .Values.logLevel }}
+            {{- else }}
+              value: info
+            {{- end}}
             {{- if .Values.authorizationAddress }}
             - name: AUTHORIZATION_ADDRESS
               value: {{ .Values.authorizationAddress | quote }}
