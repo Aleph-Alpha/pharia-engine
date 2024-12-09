@@ -156,10 +156,7 @@ where
 
     Router::new()
         // Authenticated routes
-        .route(
-            "/v1/skills/:namespace/:name/run",
-            post(|| async { (StatusCode::OK, Json(json!("dummy completion"))) }),
-        )
+        .route("/v1/skills/:namespace/:name/run", post(run_skill))
         .route("/csi", post(http_csi_handle::<C>))
         .route("/skills", get(skills))
         .route("/execute_skill", post(execute_skill))
@@ -350,6 +347,44 @@ async fn execute_skill(
     let skill_path = SkillPath::new(namespace, name);
     let result = skill_executor_api
         .execute_skill(skill_path, args.input, bearer.token().to_owned())
+        .await;
+    match result {
+        Ok(response) => (StatusCode::OK, Json(json!(response))),
+        Err(ExecuteSkillError::SkillDoesNotExist) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
+        ),
+        Err(ExecuteSkillError::Other(err)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!(err.to_string())),
+        ),
+    }
+}
+
+/// run_skill
+///
+/// Run a skill in the kernel from one of the available repositories.
+#[utoipa::path(
+    post,
+    operation_id = "run_skill",
+    path = "/v1/skills/{namespace}/{name}/run",
+    request_body = Value,
+    security(("api_token" = [])),
+    tag = "skills",
+    responses(
+        (status = 200, description = "The Skill was executed.", body=String, example = json!("Skill output")),
+        (status = 400, description = "The Skill invocation failed.", body=String, example = json!("Skill not found."))
+    ),
+)]
+async fn run_skill(
+    State(skill_executor_api): State<SkillExecutorApi>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Path((namespace, name)): Path<(String, String)>,
+    Json(input): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    let skill_path = SkillPath::new(namespace, name);
+    let result = skill_executor_api
+        .execute_skill(skill_path, input, bearer.token().to_owned())
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(json!(response))),
@@ -619,7 +654,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn skills_run() {
+    async fn run_skill() {
         // Given
         let skill_executer_mock = StubSkillExecuter::new(move |msg| {
             let SkillExecutorMsg {
