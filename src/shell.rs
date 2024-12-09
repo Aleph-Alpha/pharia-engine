@@ -661,9 +661,14 @@ mod tests {
         // Given
         let skill_executer_mock = StubSkillExecuter::new(move |msg| {
             let SkillExecutorMsg {
-                skill_path, send, ..
+                skill_path,
+                send,
+                api_token,
+                input,
             } = msg;
             assert_eq!(skill_path, SkillPath::new("local", "greet_skill"));
+            assert_eq!(api_token, "dummy auth token");
+            assert_eq!(input, json!("Homer"));
             send.send(Ok(json!("dummy completion"))).unwrap();
         });
         let skill_executor_api = skill_executer_mock.api();
