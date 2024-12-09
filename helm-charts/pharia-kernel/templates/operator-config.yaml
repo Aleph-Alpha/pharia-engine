@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: operator-config
+  name: pharia-kernel-operator-config
 data:
   operator-config.toml: |
     {{- $namespaces := .Values.defaultNamespacesEnabled | ternary (merge .Values.defaultNamespaces .Values.namespaces) .Values.namespaces -}}

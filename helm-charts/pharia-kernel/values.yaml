@@ -90,7 +90,7 @@ resources: {}
 volumes:
   - name: config-volume
     configMap:
-      name: operator-config
+      name: pharia-kernel-operator-config
 volumeMounts:
   - name: config-volume
     mountPath: /app/operator-config.toml
