@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.3...v0.4.4)
+
+### Features
+
+- Run_skill endpoint invokes skill executor api - ([51d79e9](https://github.com/Aleph-Alpha/pharia-kernel/commit/51d79e9724582c58cb6bc52b0ef4eae3e66188d0))
+- Introduce skills run endpoint - ([39b324e](https://github.com/Aleph-Alpha/pharia-kernel/commit/39b324eea5da4ce4956a1606935937ed389af189))
+- Add more metrics buckets for request duration - ([e36d800](https://github.com/Aleph-Alpha/pharia-kernel/commit/e36d80003ab5bad6103134fa32af7c7eef303e66))
+
+### Fixes
+
+- Missing auth tokens in api docs - ([4393cde](https://github.com/Aleph-Alpha/pharia-kernel/commit/4393cde4278bfbba956e9917d00640e20d5a912d))
+
+### Documentation
+
+- Add execute_skill endpoint as deprecated - ([4f70203](https://github.com/Aleph-Alpha/pharia-kernel/commit/4f70203ed68cc0fae0899c1d609d095675c8b9a1))
+- Remove execute skill from docs, update example for run_skill - ([05cf4fb](https://github.com/Aleph-Alpha/pharia-kernel/commit/05cf4fbcfafcf7e494a926e0deb8d62e5bf103ea))
+
+### Builds
+
+- *(deps)* Bump the minor group with 8 updates - ([b01512e](https://github.com/Aleph-Alpha/pharia-kernel/commit/b01512eb101627b5f79e52e8104a89e217ab0002))
+
+
 ## [0.4.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.2...v0.4.3)
 
 ### Features
