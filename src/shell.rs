@@ -146,7 +146,7 @@ where
         app_state.skill_executor_api.clone()
     }
 }
-
+#[allow(deprecated)]
 pub fn http<C>(app_state: AppState<C>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
@@ -249,7 +249,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, skills, cached_skills, run_skill, drop_cached_skill, skill_wit),
+    paths(serve_docs, skills, cached_skills, execute_skill, run_skill, drop_cached_skill, skill_wit),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs)),
     tags(
@@ -324,6 +324,7 @@ struct ExecuteSkillArgs {
         (status = 400, description = "The Skill invocation failed.", body=String, example = json!("Skill not found."))
     ),
 )]
+#[deprecated]
 async fn execute_skill(
     State(skill_executor_api): State<SkillExecutorApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
