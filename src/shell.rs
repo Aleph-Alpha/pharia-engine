@@ -156,6 +156,10 @@ where
 
     Router::new()
         // Authenticated routes
+        .route(
+            "/v1/skills/:namespace/:name/run",
+            post(|| async { (StatusCode::OK, Json(json!("dummy completion"))) }),
+        )
         .route("/csi", post(http_csi_handle::<C>))
         .route("/skills", get(skills))
         .route("/execute_skill", post(execute_skill))
@@ -604,6 +608,43 @@ mod tests {
                     .header(header::AUTHORIZATION, auth_value)
                     .uri("/execute_skill")
                     .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = serde_json::from_slice::<String>(&body).unwrap();
+        assert_eq!(answer, "dummy completion");
+    }
+
+    #[tokio::test]
+    async fn skills_run() {
+        // Given
+        let skill_executer_mock = StubSkillExecuter::new(move |msg| {
+            let SkillExecutorMsg {
+                skill_path, send, ..
+            } = msg;
+            assert_eq!(skill_path, SkillPath::new("local", "greet_skill"));
+            send.send(Ok(json!("dummy completion"))).unwrap();
+        });
+        let skill_executor_api = skill_executer_mock.api();
+        let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
+        let http = http(app_state);
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
             )
             .await
