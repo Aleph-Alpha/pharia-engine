@@ -4,8 +4,9 @@ metadata:
   name: operator-config
 data:
   operator-config.toml: |
-    {{- if .Values.namespaces }}
-    {{- range $k, $v := .Values.namespaces }}
+    {{- $namespaces := .Values.defaultNamespacesEnabled | ternary (merge .Values.defaultNamespaces .Values.namespaces) .Values.namespaces -}}
+    {{- if $namespaces }}
+    {{- range $k, $v := $namespaces }}
     [namespaces.{{ $k }}]
     config_url = {{ $v.config_url | quote }}
     {{- if $v.config_access_token_env_var }}
