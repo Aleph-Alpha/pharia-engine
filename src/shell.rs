@@ -407,6 +407,7 @@ async fn run_skill(
     operation_id = "skills",
     path = "/skills",
     tag = "skills",
+    security(("api_token" = [])),
     responses(
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
@@ -427,6 +428,7 @@ async fn skills(State(skill_store_api): State<SkillStoreApi>) -> (StatusCode, Js
     operation_id = "cached_skills",
     path = "/cached_skills",
     tag = "skills",
+    security(("api_token" = [])),
     responses(
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
@@ -450,6 +452,7 @@ async fn cached_skills(
     operation_id = "drop_cached_skill",
     path = "/cached_skills/{namespace}/{name}",
     tag = "skills",
+    security(("api_token" = [])),
     responses(
         (status = 200, body=String, example = json!("Skill removed from cache.")),
         (status = 200, body=String, example = json!("Skill was not present in cache.")),
