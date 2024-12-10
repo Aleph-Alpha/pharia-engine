@@ -46,7 +46,7 @@ impl AppConfig {
         let authorization_addr = env::var("AUTHORIZATION_ADDRESS")
             .unwrap_or_else(|_| "https://pharia-iam.product.pharia.com".to_owned());
 
-        let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "error".to_owned());
+        let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_owned());
 
         let open_telemetry_endpoint = env::var("OPEN_TELEMETRY_ENDPOINT").ok();
 
