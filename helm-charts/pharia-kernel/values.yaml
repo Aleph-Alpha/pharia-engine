@@ -51,11 +51,11 @@ defaultNamespacesEnabled: false
 defaultNamespaces:
   assistant:
     config_url: https://alephalpha.jfrog.io/artifactory/pharia-kernel-files/namespaces/assistant/namespace.toml
-    config_access_token_env_var: JFROG_NAMESPACE_CONFIG_ACCESS_TOKEN
+    config_access_token_env_var: ALEPH_ALPHA_OCI_NAMESPACE_CONFIG_ACCESS_TOKEN
     registry: alephalpha.jfrog.io
     repository: assistant-skills
-    user_env_var: JFROG_SKILL_REGISTRY_USER
-    password_env_var: JFROG_SKILL_REGISTRY_PASSWORD
+    user_env_var: ALEPH_ALPHA_OCI_SKILL_REGISTRY_USER
+    password_env_var: ALEPH_ALPHA_OCI_SKILL_REGISTRY_PASSWORD
 # -- Active namespaces for Pharia Kernel. e.g.:
 # playground:
 #   config_url: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
