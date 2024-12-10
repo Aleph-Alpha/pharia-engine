@@ -63,7 +63,7 @@ defaultNamespaces:
 #   registry: "registry.gitlab.aleph-alpha.de"
 #   repository: "engineering/pharia-kernel-playground/skills"
 namespaces: {}
-logLevel: trace
+logLevel: info
 authorizationAddress: ""
 inferenceAddress: ""
 documentIndexAddress: ""
