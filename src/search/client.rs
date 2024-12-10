@@ -2,7 +2,7 @@ use std::future::Future;
 
 use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 
 pub trait SearchClient: Send + Sync + 'static {
     fn search(
@@ -11,6 +11,12 @@ pub trait SearchClient: Send + Sync + 'static {
         request: SearchRequest,
         api_token: &str,
     ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
+
+    fn document_metadata(
+        &self,
+        document_path: DocumentPath,
+        api_token: &str,
+    ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
 }
 
 /// Search a Document Index collection
@@ -159,6 +165,38 @@ impl SearchClient for Client {
             .json()
             .await?)
     }
+
+    async fn document_metadata(
+        &self,
+        document_path: DocumentPath,
+        api_token: &str,
+    ) -> anyhow::Result<Option<Value>> {
+        let DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = document_path;
+
+        #[derive(Deserialize)]
+        struct Document {
+            metadata: Option<Value>,
+        }
+
+        let document = self
+            .http
+            .get(format!(
+                "{}/collections/{namespace}/{collection}/docs/{name}",
+                &self.host
+            ))
+            .bearer_auth(api_token)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<Document>()
+            .await?;
+
+        Ok(document.metadata)
+    }
 }
 
 #[cfg(test)]
@@ -178,6 +216,14 @@ pub mod tests {
         ) -> anyhow::Result<Vec<SearchResult>> {
             Ok(vec![])
         }
+
+        async fn document_metadata(
+            &self,
+            _document_path: DocumentPath,
+            _api_token: &str,
+        ) -> anyhow::Result<Option<Value>> {
+            todo!()
+        }
     }
 
     impl IndexPath {
@@ -190,6 +236,20 @@ pub mod tests {
                 namespace: namespace.into(),
                 collection: collection.into(),
                 index: index.into(),
+            }
+        }
+    }
+
+    impl DocumentPath {
+        pub fn new(
+            namespace: impl Into<String>,
+            collection: impl Into<String>,
+            name: impl Into<String>,
+        ) -> Self {
+            Self {
+                namespace: namespace.into(),
+                collection: collection.into(),
+                name: name.into(),
             }
         }
     }
@@ -224,6 +284,29 @@ pub mod tests {
             panic!("invalid entry");
         };
         assert!(text.contains("Kernel"));
+    }
+
+    #[tokio::test]
+    async fn request_metadata() {
+        let host = document_index_address().to_owned();
+        let api_token = api_token();
+        let client = Client::new(host).unwrap();
+
+        let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
+        let maybe_metadata = client
+            .document_metadata(document_path, api_token)
+            .await
+            .unwrap();
+
+        if let Some(metadata) = maybe_metadata {
+            assert!(metadata.is_array());
+            assert_eq!(
+                metadata[0]["url"].as_str().unwrap(),
+                "https://pharia-kernel.product.pharia.com/"
+            );
+        } else {
+            panic!("metadata not found");
+        }
     }
 
     #[tokio::test]

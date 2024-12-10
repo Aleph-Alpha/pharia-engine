@@ -261,6 +261,7 @@ mod tests {
         time::Duration,
     };
 
+    use serde_json::Value;
     use tokio::{time::sleep, try_join};
 
     use crate::tests::{api_token, document_index_address};
@@ -364,6 +365,14 @@ mod tests {
                 sleep(Duration::from_millis(1)).await;
             }
             Ok(vec![])
+        }
+
+        async fn document_metadata(
+            &self,
+            _document_path: DocumentPath,
+            _api_token: &str,
+        ) -> anyhow::Result<Option<Value>> {
+            unimplemented!()
         }
     }
 
