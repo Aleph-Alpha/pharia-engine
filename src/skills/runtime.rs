@@ -28,4 +28,5 @@ pub trait CsiForSkills {
     async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language>;
     async fn chat(&mut self, request: ChatRequest) -> ChatResponse;
     async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult>;
+    async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Value>;
 }

@@ -25,7 +25,7 @@ use crate::{
     csi::{chunking::ChunkParams, ChunkRequest, Csi},
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
-    search::{SearchRequest, SearchResult},
+    search::{DocumentPath, SearchRequest, SearchResult},
     skill_store::SkillStoreApi,
 };
 
@@ -321,6 +321,27 @@ where
             span.set_parent(context.clone());
         }
         match self.csi_apis.search(self.api_token.clone(), request).await {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
+    async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Value> {
+        let span = span!(
+            Level::DEBUG,
+            "document_metadata",
+            namespace = document_path.namespace,
+            collection = document_path.collection,
+            name = document_path.name
+        );
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
+        match self
+            .csi_apis
+            .document_metadata(self.api_token.clone(), document_path)
+            .await
+        {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }

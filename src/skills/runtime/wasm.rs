@@ -207,15 +207,18 @@ pub mod tests {
             select_language(request)
         }
 
+        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+            unimplemented!()
+        }
+
         async fn search(&mut self, _request: SearchRequest) -> Vec<SearchResult> {
             unimplemented!()
         }
 
-        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+        async fn document_metadata(&mut self, _document_path: DocumentPath) -> Option<Value> {
             unimplemented!()
         }
     }
-
     /// Asserts a specific prompt and model and returns a greeting message
     pub struct CsiGreetingMock;
 
@@ -256,6 +259,16 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             select_language(request)
         }
 
+        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+            ChatResponse {
+                message: Message {
+                    role: Role::Assistant,
+                    content: "dummy-content".to_owned(),
+                },
+                finish_reason: FinishReason::Stop,
+            }
+        }
+
         async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult> {
             let document_path = DocumentPath {
                 namespace: "aleph-alpha".to_owned(),
@@ -269,14 +282,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             }]
         }
 
-        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
-            ChatResponse {
-                message: Message {
-                    role: Role::Assistant,
-                    content: "dummy-content".to_owned(),
-                },
-                finish_reason: FinishReason::Stop,
-            }
+        async fn document_metadata(&mut self, _document_path: DocumentPath) -> Option<Value> {
+            Some(json!({ "url": "http://example.de" }))
         }
     }
 
@@ -311,11 +318,15 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             select_language(request)
         }
 
+        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+            unimplemented!()
+        }
+
         async fn search(&mut self, _request: SearchRequest) -> Vec<SearchResult> {
             unimplemented!()
         }
 
-        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+        async fn document_metadata(&mut self, _document_path: DocumentPath) -> Option<Value> {
             unimplemented!()
         }
     }
