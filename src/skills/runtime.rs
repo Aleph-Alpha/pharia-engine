@@ -2,12 +2,13 @@ mod engine;
 mod wasm;
 
 use async_trait::async_trait;
+use serde_json::Value;
 
 use crate::{
     csi::ChunkRequest,
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
-    search::{SearchRequest, SearchResult},
+    search::{DocumentPath, SearchRequest, SearchResult},
 };
 
 pub use self::{
@@ -25,6 +26,6 @@ pub trait CsiForSkills {
     async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
     async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language>;
-    async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult>;
     async fn chat(&mut self, request: ChatRequest) -> ChatResponse;
+    async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult>;
 }
