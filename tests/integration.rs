@@ -4,7 +4,7 @@ use axum::http;
 use dotenvy::dotenv;
 use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, OperatorConfig};
 use reqwest::{header, Body};
-use serde_json::json;
+use serde_json::{json, Value};
 use test_skills::given_greet_skill_v0_2;
 use tokio::sync::oneshot;
 
@@ -170,6 +170,45 @@ async fn search_via_remote_csi() {
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
     assert!(body.to_lowercase().contains("kernel"));
+
+    kernel.shutdown().await;
+}
+
+#[cfg_attr(not(feature = "test_document_index"), ignore)]
+#[tokio::test]
+async fn metadata_via_remote_csi() {
+    let kernel = TestKernel::with_skills(&[]).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(
+            json!({
+                "version": "0.2",
+                "function": "document_metadata",
+                "document_path": {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "kernel-docs",
+                },
+            })
+            .to_string(),
+        ))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let body: Value = resp.json().await.unwrap();
+    assert!(body[0]["url"]
+        .as_str()
+        .unwrap()
+        .starts_with("https://pharia-kernel"));
 
     kernel.shutdown().await;
 }

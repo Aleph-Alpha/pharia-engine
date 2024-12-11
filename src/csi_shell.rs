@@ -10,7 +10,7 @@ use crate::{
     csi::{ChunkRequest, Csi},
     inference::{self, ChatRequest, CompletionRequest},
     language_selection::SelectLanguageRequest,
-    search::SearchRequest,
+    search::{DocumentMetadataRequest, DocumentPath, SearchRequest},
     shell::AppState,
 };
 
@@ -56,6 +56,13 @@ where
                 .chat(bearer.token().to_owned(), chat_request)
                 .await
                 .map(|v| json!(v)),
+            V0_2CsiRequest::DocumentMetadata(document_metadata_request) => drivers
+                .document_metadata(
+                    bearer.token().to_owned(),
+                    document_metadata_request.document_path,
+                )
+                .await
+                .map(|r| json!(r)),
         },
     };
     match result {
@@ -87,6 +94,7 @@ pub enum V0_2CsiRequest {
     CompleteAll(CompleteAllRequest),
     Search(SearchRequest),
     Chat(ChatRequest),
+    DocumentMetadata(DocumentMetadataRequest),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
