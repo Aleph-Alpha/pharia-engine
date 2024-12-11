@@ -10,7 +10,7 @@ use crate::{
     csi::{ChunkRequest, Csi},
     inference::{self, ChatRequest, CompletionRequest},
     language_selection::SelectLanguageRequest,
-    search::{DocumentMetadataRequest, DocumentPath, SearchRequest},
+    search::{DocumentMetadataRequest, SearchRequest},
     shell::AppState,
 };
 
