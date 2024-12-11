@@ -171,17 +171,16 @@ impl SearchClient for Client {
         document_path: DocumentPath,
         api_token: &str,
     ) -> anyhow::Result<Option<Value>> {
-        let DocumentPath {
-            namespace,
-            collection,
-            name,
-        } = document_path;
-
         #[derive(Deserialize)]
         struct Document {
             metadata: Option<Value>,
         }
 
+        let DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = document_path;
         let document = self
             .http
             .get(format!(

@@ -1,5 +1,5 @@
 mod actor;
 mod client;
 
-pub use actor::{Search, SearchApi, SearchMessage, SearchRequest, SearchResult};
+pub use actor::{DocumentIndexMessage, Search, SearchApi, SearchRequest, SearchResult};
 pub use client::{DocumentPath, IndexPath};

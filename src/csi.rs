@@ -8,7 +8,7 @@ use tracing::trace;
 use crate::{
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
-    search::{SearchApi, SearchMessage, SearchRequest, SearchResult},
+    search::{DocumentIndexMessage, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
 };
 
@@ -23,7 +23,7 @@ pub mod chunking;
 pub struct CsiDrivers<T> {
     /// We use the inference Api to complete text
     pub inference: InferenceApi,
-    pub search: mpsc::Sender<SearchMessage>,
+    pub search: mpsc::Sender<DocumentIndexMessage>,
     pub tokenizers: T,
 }
 

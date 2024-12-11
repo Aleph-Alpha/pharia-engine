@@ -3,6 +3,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
+use serde_json::value::Value;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -17,7 +18,7 @@ use super::client::{
 
 /// Handle to the search actor. Spin this up in order to use the Search API
 pub struct Search {
-    send: mpsc::Sender<SearchMessage>,
+    send: mpsc::Sender<DocumentIndexMessage>,
     handle: JoinHandle<()>,
 }
 
@@ -30,13 +31,13 @@ impl Search {
     }
 
     pub fn with_client(client: impl SearchClient) -> Self {
-        let (send, recv) = mpsc::channel::<SearchMessage>(1);
+        let (send, recv) = mpsc::channel::<DocumentIndexMessage>(1);
         let mut actor = SearchActor::new(client, recv);
         let handle = tokio::spawn(async move { actor.run().await });
         Self { send, handle }
     }
 
-    pub fn api(&self) -> mpsc::Sender<SearchMessage> {
+    pub fn api(&self) -> mpsc::Sender<DocumentIndexMessage> {
         self.send.clone()
     }
 
@@ -57,6 +58,11 @@ pub trait SearchApi: Clone + Send + Sync + 'static {
         request: SearchRequest,
         api_token: String,
     ) -> anyhow::Result<Vec<SearchResult>>;
+    async fn document_metadata(
+        &self,
+        document_path: DocumentPath,
+        api_token: String,
+    ) -> anyhow::Result<Option<Value>>;
 }
 
 #[derive(Debug, Serialize)]
@@ -67,15 +73,33 @@ pub struct SearchResult {
 }
 
 #[async_trait]
-impl SearchApi for mpsc::Sender<SearchMessage> {
+impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
     async fn search(
         &self,
         request: SearchRequest,
         api_token: String,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let (send, recv) = oneshot::channel();
-        let msg = SearchMessage {
+        let msg = DocumentIndexMessage::SearchMessage {
             request,
+            send,
+            api_token,
+        };
+        self.send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await
+            .expect("sender must be alive when awaiting for answers")
+    }
+
+    async fn document_metadata(
+        &self,
+        document_path: DocumentPath,
+        api_token: String,
+    ) -> anyhow::Result<Option<Value>> {
+        let (send, recv) = oneshot::channel();
+        let msg = DocumentIndexMessage::MetadataMessage {
+            document_path,
             send,
             api_token,
         };
@@ -123,12 +147,12 @@ pub struct DocumentIndexSearchResult {
 struct SearchActor<C: SearchClient> {
     /// Internal client to interact with the Document Index API
     client: Arc<C>,
-    recv: mpsc::Receiver<SearchMessage>,
+    recv: mpsc::Receiver<DocumentIndexMessage>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
 impl<C: SearchClient> SearchActor<C> {
-    fn new(client: C, recv: mpsc::Receiver<SearchMessage>) -> Self {
+    fn new(client: C, recv: mpsc::Receiver<DocumentIndexMessage>) -> Self {
         Self {
             client: Arc::new(client),
             recv,
@@ -154,7 +178,7 @@ impl<C: SearchClient> SearchActor<C> {
         }
     }
 
-    fn act(&mut self, msg: SearchMessage) {
+    fn act(&mut self, msg: DocumentIndexMessage) {
         let client = self.client.clone();
         self.running_requests.push(Box::pin(async move {
             msg.act(client.as_ref()).await;
@@ -163,37 +187,54 @@ impl<C: SearchClient> SearchActor<C> {
 }
 
 #[derive(Debug)]
-pub struct SearchMessage {
-    pub request: SearchRequest,
-    pub send: oneshot::Sender<anyhow::Result<Vec<SearchResult>>>,
-    pub api_token: String,
+pub enum DocumentIndexMessage {
+    SearchMessage {
+        request: SearchRequest,
+        send: oneshot::Sender<anyhow::Result<Vec<SearchResult>>>,
+        api_token: String,
+    },
+    MetadataMessage {
+        document_path: DocumentPath,
+        send: oneshot::Sender<anyhow::Result<Option<Value>>>,
+        api_token: String,
+    },
 }
 
-impl SearchMessage {
+impl DocumentIndexMessage {
     async fn act(self, client: &impl SearchClient) {
-        let SearchMessage {
-            request,
-            send,
-            api_token,
-        } = self;
-        let results = Self::search(client, request, &api_token).await;
-        let results = results.map(|v| {
-            v.into_iter()
-                .map(
-                    |DocumentIndexSearchResult {
-                         document_path,
-                         section,
-                         score,
-                         ..
-                     }| SearchResult {
-                        document_path,
-                        content: section,
-                        score,
-                    },
-                )
-                .collect()
-        });
-        drop(send.send(results));
+        match self {
+            Self::SearchMessage {
+                request,
+                send,
+                api_token,
+            } => {
+                let results = Self::search(client, request, &api_token).await;
+                let results = results.map(|v| {
+                    v.into_iter()
+                        .map(
+                            |DocumentIndexSearchResult {
+                                 document_path,
+                                 section,
+                                 score,
+                                 ..
+                             }| SearchResult {
+                                document_path,
+                                content: section,
+                                score,
+                            },
+                        )
+                        .collect()
+                });
+                drop(send.send(results));
+            }
+            Self::MetadataMessage {
+                document_path,
+                send,
+                api_token,
+            } => {
+                todo!()
+            }
+        }
     }
 
     async fn search(
