@@ -145,7 +145,7 @@ fn run_in_venv(venv_path: &Path, args: &[&str]) -> Result<Vec<u8>, Error> {
     if !output.status.success() {
         let standard_error = String::from_utf8_lossy(&output.stderr);
         bail!(
-            "Failed to run commond in virtual environment. Args:\n\
+            "Failed to run command in virtual environment. Args:\n\
             {args:?}\n\
             Standard Error:\n\
             {standard_error}",
@@ -171,7 +171,7 @@ impl Venv {
     pub fn new() -> Result<Self, Error> {
         let directory = tempdir().expect("Must be able to create temporary directory");
         let venv_path = directory.path().join("venv");
-        create_virtual_enviroment(&venv_path)?;
+        create_virtual_environment(&venv_path)?;
         run_in_venv(
             &venv_path,
             &["python3", "-m", "pip", "install", "componentize-py"],
@@ -186,7 +186,7 @@ impl Venv {
     }
 }
 
-fn create_virtual_enviroment(venv_path: &Path) -> Result<(), Error> {
+fn create_virtual_environment(venv_path: &Path) -> Result<(), Error> {
     let venv_path = venv_path
         .to_str()
         .expect("Temporary path must be representable in UTF-8");
