@@ -287,16 +287,19 @@ pub mod tests {
 
     #[tokio::test]
     async fn request_metadata() {
+        // Given a search client pointed at the document index
         let host = document_index_address().to_owned();
         let api_token = api_token();
         let client = Client::new(host).unwrap();
 
+        // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
         let maybe_metadata = client
             .document_metadata(document_path, api_token)
             .await
             .unwrap();
 
+        // Then we get the expected metadata
         if let Some(metadata) = maybe_metadata {
             assert!(metadata.is_array());
             assert_eq!(
