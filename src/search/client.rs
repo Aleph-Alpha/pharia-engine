@@ -27,7 +27,7 @@ pub struct SearchRequest {
     /// The maximum number of results to return. Defaults to 1
     max_results: u32,
     /// The minimum score each result should have to be returned.
-    /// By default, all results are returned, up to the `max_results`.
+    /// By default, all results are returned, up to the `max_results`.
     min_score: Option<f64>,
     /// Whether only text chunks should be returned
     text_only: bool,
