@@ -42,12 +42,13 @@ dependencies = [
 
 [[package]]
 name = "aleph-alpha-client"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd1e9b14b6491617124e3a13787069e3f831f1cd3d54f08208271eb33788d45b"
+checksum = "10142faaf117baa35b48f21815e4aa2b536212f473c6635f1597e669cb35c8ad"
 dependencies = [
  "async-stream",
  "base64 0.22.1",
+ "dotenvy",
  "futures-util",
  "image",
  "itertools 0.13.0",
@@ -2925,7 +2926,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "157c5a9d7ea5c2ed2d9fb8f495b64759f7816c7eaea54ba3978f0d63000162e3"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn",
