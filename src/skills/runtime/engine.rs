@@ -90,7 +90,7 @@ impl Engine {
     }
 
     /// Generates a store for a specific invocation.
-    /// This will yield after every tick, as well as halt execution after `Self::MAX_EXUCUTION_TIME`.
+    /// This will yield after every tick, as well as halt execution after `Self::MAX_EXECUTION_TIME`.
     fn store<T>(&self, data: T) -> Store<T> {
         let mut store = Store::new(&self.inner, data);
         // Check after the next tick
