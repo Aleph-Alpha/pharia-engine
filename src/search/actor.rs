@@ -232,7 +232,8 @@ impl DocumentIndexMessage {
                 send,
                 api_token,
             } => {
-                todo!()
+                let results = Self::document_metadata(client, document_path, &api_token).await;
+                drop(send.send(results));
             }
         }
     }
@@ -293,6 +294,14 @@ impl DocumentIndexMessage {
             })
             .collect()
     }
+
+    async fn document_metadata(
+        client: &impl SearchClient,
+        document_path: DocumentPath,
+        api_token: &str,
+    ) -> anyhow::Result<Option<Value>> {
+        client.document_metadata(document_path, api_token).await
+    }
 }
 
 #[cfg(test)]
@@ -351,6 +360,34 @@ mod tests {
             .to_lowercase()
             .contains("kernel"));
         assert!(results[0].content.contains("Kernel"));
+    }
+
+    #[tokio::test]
+    async fn request_metadata() {
+        // Given a search client pointed at the document index
+        let host = document_index_address().to_owned();
+        let api_token = api_token().to_owned();
+        let search = Search::new(host);
+
+        // When requesting metadata of an existing document
+        let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
+        let result = search
+            .api()
+            .document_metadata(document_path, api_token)
+            .await
+            .unwrap();
+        search.wait_for_shutdown().await;
+
+        // Then we get the expected metadata
+        if let Some(metadata) = result {
+            assert!(metadata.is_array());
+            assert_eq!(
+                metadata[0]["url"].as_str().unwrap(),
+                "https://pharia-kernel.product.pharia.com/"
+            );
+        } else {
+            panic!("metadata not found");
+        }
     }
 
     #[tokio::test]
