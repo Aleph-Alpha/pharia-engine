@@ -343,6 +343,7 @@ pub mod tests {
         inference::{
             tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },
+        search::DocumentPath,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, SkillStoreMessage},
         skills::Skill,
@@ -530,6 +531,14 @@ pub mod tests {
             bail!("Test error")
         }
 
+        async fn chat(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> Result<ChatResponse, anyhow::Error> {
+            bail!("Test error")
+        }
+
         async fn search(
             &self,
             _auth: String,
@@ -538,15 +547,14 @@ pub mod tests {
             bail!("Test error")
         }
 
-        async fn chat(
+        async fn document_metadata(
             &self,
             _auth: String,
-            _request: ChatRequest,
-        ) -> Result<ChatResponse, anyhow::Error> {
+            _document_path: DocumentPath,
+        ) -> Result<Option<Value>, anyhow::Error> {
             bail!("Test error")
         }
     }
-
     /// Only serves test/greet skill
     pub struct SkillStoreGreetStub {
         send: mpsc::Sender<SkillStoreMessage>,

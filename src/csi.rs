@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chunking::ChunkParams;
 use futures::future::try_join_all;
+use serde_json::Value;
 use strum::IntoStaticStr;
 use tokio::sync::mpsc;
 use tracing::trace;
@@ -8,7 +9,7 @@ use tracing::trace;
 use crate::{
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
-    search::{DocumentIndexMessage, SearchApi, SearchRequest, SearchResult},
+    search::{DocumentIndexMessage, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
 };
 
@@ -68,6 +69,12 @@ pub trait Csi {
         auth: String,
         request: SearchRequest,
     ) -> Result<Vec<SearchResult>, anyhow::Error>;
+
+    async fn document_metadata(
+        &self,
+        auth: String,
+        document_path: DocumentPath,
+    ) -> Result<Option<Value>, anyhow::Error>;
 }
 
 #[derive(IntoStaticStr)]
@@ -189,6 +196,25 @@ where
         );
         self.search.search(request, auth).await
     }
+
+    async fn document_metadata(
+        &self,
+        auth: String,
+        document_path: DocumentPath,
+    ) -> Result<Option<Value>, anyhow::Error> {
+        metrics::counter!(
+            CsiMetrics::CsiRequestsTotal,
+            &[("function", "document_metadata")]
+        )
+        .increment(1);
+        trace!(
+            "document_metadata: namespace={}, collection={}, name={}",
+            document_path.namespace,
+            document_path.collection,
+            document_path.name,
+        );
+        self.search.document_metadata(document_path, auth).await
+    }
 }
 
 #[cfg(test)]
@@ -197,6 +223,7 @@ pub mod tests {
 
     use anyhow::bail;
     use async_trait::async_trait;
+    use serde_json::Value;
     use tokio::sync::mpsc;
 
     use crate::{
@@ -205,7 +232,7 @@ pub mod tests {
             tests::InferenceStub, ChatParams, ChatRequest, ChatResponse, Completion,
             CompletionParams, CompletionRequest, InferenceApi, Message, Role,
         },
-        search::{SearchRequest, SearchResult},
+        search::{DocumentPath, SearchRequest, SearchResult},
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
         FinishReason,
@@ -348,6 +375,14 @@ pub mod tests {
             panic!("DummyCsi complete_all called");
         }
 
+        async fn chat(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> Result<ChatResponse, anyhow::Error> {
+            panic!("DummyCsi chat called")
+        }
+
         async fn search(
             &self,
             _auth: String,
@@ -356,12 +391,12 @@ pub mod tests {
             panic!("DummyCsi search called")
         }
 
-        async fn chat(
+        async fn document_metadata(
             &self,
             _auth: String,
-            _request: ChatRequest,
-        ) -> Result<ChatResponse, anyhow::Error> {
-            panic!("DummyCsi chat called")
+            _document_path: DocumentPath,
+        ) -> Result<Option<Value>, anyhow::Error> {
+            panic!("DummyCsi metadata_document called")
         }
     }
 
@@ -437,14 +472,6 @@ pub mod tests {
             (*self.chunking)(request)
         }
 
-        async fn search(
-            &self,
-            _auth: String,
-            _request: SearchRequest,
-        ) -> Result<Vec<SearchResult>, anyhow::Error> {
-            unimplemented!()
-        }
-
         async fn chat(
             &self,
             _auth: String,
@@ -454,6 +481,22 @@ pub mod tests {
                 message: request.messages.first().unwrap().clone(),
                 finish_reason: FinishReason::Stop,
             })
+        }
+
+        async fn search(
+            &self,
+            _auth: String,
+            _request: SearchRequest,
+        ) -> Result<Vec<SearchResult>, anyhow::Error> {
+            unimplemented!()
+        }
+
+        async fn document_metadata(
+            &self,
+            _auth: String,
+            _document_path: DocumentPath,
+        ) -> Result<Option<Value>, anyhow::Error> {
+            unimplemented!()
         }
     }
 }
