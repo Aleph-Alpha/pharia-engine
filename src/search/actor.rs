@@ -125,6 +125,13 @@ pub struct SearchRequest {
     pub min_score: Option<f64>,
 }
 
+/// Retrieve the metadata of a document
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DocumentMetadataRequest {
+    /// Which Document
+    pub document_path: DocumentPath,
+}
+
 /// A section of a document that is returned from a search request
 #[derive(Debug)]
 #[expect(dead_code, reason = "Unused so far")]

@@ -86,7 +86,7 @@ pub enum Cursor {
 }
 
 /// The name of a given document
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DocumentPath {
     /// The namespace the collection belongs to
     pub namespace: String,
