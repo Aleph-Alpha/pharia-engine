@@ -24,6 +24,14 @@ pub fn given_search_skill() {
     *WASM_BUILD;
 }
 
+/// Creates `search_skill.wasm` in `skills` directory, based on `crates/search-skill`
+pub fn given_doc_metadata_skill() {
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("doc-metadata-skill");
+    });
+    *WASM_BUILD;
+}
+
 /// Creates `chat_skill.wasm` in `skills` directory, based on `crates/chat-skill`
 pub fn given_chat_skill() {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {

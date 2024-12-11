@@ -420,6 +420,23 @@ mod v0_2 {
                 )
                 .collect()
         }
+
+        async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Vec<u8>> {
+            let DocumentPath {
+                namespace,
+                collection,
+                name,
+            } = document_path;
+            let document_path = search::DocumentPath {
+                namespace,
+                collection,
+                name,
+            };
+            self.skill_ctx
+                .document_metadata(document_path)
+                .await
+                .map(|value| value.to_string().as_bytes().to_vec())
+        }
     }
 
     impl From<inference::Completion> for Completion {
