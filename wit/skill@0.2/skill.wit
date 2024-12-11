@@ -170,7 +170,7 @@ interface csi {
 
     search: func(index-path: index-path, query: string, max-results: u32, min-score: option<f64>) -> list<search-result>;
 
-    /// @unstable(feature=document-metadata)
+    @unstable(feature=document-metadata)
     document-metadata: func(document-path: document-path) -> option<list<u8>>;
      
 }
