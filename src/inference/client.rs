@@ -69,8 +69,9 @@ impl InferenceClient for Client {
                 temperature: *temperature,
                 top_k: *top_k,
                 top_p: *top_p,
-                start_with_one_of: &[],
+                complete_with_one_of: &[],
             },
+            special_tokens: false,
         };
         let how = How {
             api_token: Some(api_token),
