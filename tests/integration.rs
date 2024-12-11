@@ -5,7 +5,7 @@ use dotenvy::dotenv;
 use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, OperatorConfig};
 use reqwest::{header, Body};
 use serde_json::{json, Value};
-use test_skills::given_greet_skill_v0_2;
+use test_skills::{given_greet_skill_v0_2, given_search_skill};
 use tokio::sync::oneshot;
 
 struct TestKernel {
@@ -84,6 +84,39 @@ async fn execute_skill() {
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
     assert!(body.contains("Homer"));
+
+    kernel.shutdown().await;
+}
+
+#[cfg_attr(not(feature = "test_document_index"), ignore)]
+#[tokio::test]
+async fn execute_search_skill() {
+    given_search_skill();
+    let kernel = TestKernel::with_skills(&["search_skill"]).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!("http://127.0.0.1:{}/execute_skill", kernel.port()))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(
+            json!({ "skill": "local/search_skill", "input": "What is the Pharia Kernel?"})
+                .to_string(),
+        ))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+    let status = resp.status();
+    let value: Value = resp.json().await.unwrap();
+    assert_eq!(status, axum::http::StatusCode::OK);
+    assert!(value.is_array());
+    assert!(!value.as_array().unwrap().is_empty());
+    let first_text = value[0].clone().to_string();
+    assert!(first_text.to_ascii_lowercase().contains("kernel"));
 
     kernel.shutdown().await;
 }

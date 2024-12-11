@@ -15,9 +15,9 @@ impl Guest for Skill {
         let query = serde_json::from_slice::<String>(&input)
             .map_err(|e| Error::InvalidInput(anyhow!(e).to_string()))?;
         let index_path = IndexPath {
-            namespace: "aleph-alpha".to_owned(),
-            collection: "test-collection".to_owned(),
-            index: "small".to_owned(),
+            namespace: "Kernel".to_owned(),
+            collection: "test".to_owned(),
+            index: "asym-64".to_owned(),
         };
         let results = search(&index_path, &query, 10, None);
         let results = results
