@@ -121,7 +121,6 @@ async fn execute_search_skill() {
     kernel.shutdown().await;
 }
 
-#[cfg_attr(not(feature = "test_document_index"), ignore)]
 #[tokio::test]
 async fn execute_doc_metadata_skill() {
     given_doc_metadata_skill();
