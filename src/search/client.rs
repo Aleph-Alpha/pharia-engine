@@ -221,7 +221,7 @@ pub mod tests {
             _document_path: DocumentPath,
             _api_token: &str,
         ) -> anyhow::Result<Option<Value>> {
-            todo!()
+            Ok(None)
         }
     }
 
