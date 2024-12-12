@@ -204,7 +204,6 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
     kernel.shutdown().await;
 }
 
-#[cfg_attr(not(feature = "test_document_index"), ignore)]
 #[tokio::test]
 async fn search_via_remote_csi() {
     let kernel = TestKernel::with_skills(&[]).await;
