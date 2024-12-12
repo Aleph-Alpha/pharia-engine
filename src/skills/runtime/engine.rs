@@ -252,6 +252,7 @@ mod v0_2 {
         ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
         DocumentPath, FinishReason, Host, IndexPath, Language, Message, Role, SearchResult,
     };
+    use tracing::warn;
     use wasmtime::component::bindgen;
 
     use crate::{
@@ -435,10 +436,21 @@ mod v0_2 {
                 collection,
                 name,
             };
-            self.skill_ctx
+            let result = self
+                .skill_ctx
                 .document_metadata(document_path)
                 .await
-                .map(|value| serde_json::to_vec(value))
+                .map(|value| serde_json::to_vec(&value));
+            match result {
+                Some(value) => match value {
+                    Ok(value) => Some(value),
+                    Err(_err) => {
+                        warn!("parsing metadata from document index failed");
+                        None
+                    }
+                },
+                None => None,
+            }
         }
     }
 
