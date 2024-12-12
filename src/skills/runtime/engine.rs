@@ -438,7 +438,7 @@ mod v0_2 {
             self.skill_ctx
                 .document_metadata(document_path)
                 .await
-                .map(|value| value.to_string().as_bytes().to_vec())
+                .map(|value| serde_json::to_vec(value))
         }
     }
 
