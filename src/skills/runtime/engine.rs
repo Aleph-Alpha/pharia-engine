@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-pub(crate) use semver::Version;
+use semver::Version;
 use serde_json::Value;
 use strum::{EnumIter, IntoEnumIterator};
 use tracing::info;
