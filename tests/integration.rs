@@ -146,13 +146,8 @@ async fn execute_doc_metadata_skill() {
     assert_eq!(status, axum::http::StatusCode::OK);
     assert!(value.is_array());
     assert!(!value.as_array().unwrap().is_empty());
-    let first_text = value[0]["url"].to_string();
-    // TODO: why are there still "" around the solution? list<u8> is not the right one?
-    let first_text = first_text.strip_prefix("\"").unwrap();
-    let first_text = first_text.strip_suffix("\"").unwrap();
-    assert!(first_text
-        .to_ascii_lowercase()
-        .starts_with("https://pharia-kernel"));
+    let first_text = value[0]["url"].as_str().unwrap();
+    assert!(first_text.starts_with("https://pharia-kernel"));
 
     kernel.shutdown().await;
 }
