@@ -8,7 +8,6 @@ use semver::Version;
 use serde_json::Value;
 use strum::{EnumIter, IntoEnumIterator};
 use tracing::info;
-use v0_2::LinkOptions;
 use wasmtime::{
     component::{Component, InstancePre, Linker as WasmtimeLinker},
     Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType, OptLevel,
@@ -142,9 +141,11 @@ impl Skill {
         for version in SupportedVersion::iter() {
             match version {
                 SupportedVersion::V0_2 => {
-                    let mut options = LinkOptions::default();
-                    options.document_metadata(true);
-                    v0_2::Skill::add_to_linker(linker, &options, |state: &mut LinkedCtx| state)?;
+                    v0_2::Skill::add_to_linker(
+                        linker,
+                        v0_2::LinkOptions::default().document_metadata(true),
+                        |state: &mut LinkedCtx| state,
+                    )?;
                 }
             }
         }
