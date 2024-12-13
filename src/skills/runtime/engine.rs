@@ -71,7 +71,7 @@ impl Engine {
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker)?;
         // Skill world from bindgen
-        Skill::add_to_linker(&mut linker)?;
+        SupportedVersion::add_all_to_linker(&mut linker)?;
 
         Ok(Self {
             inner: engine,
@@ -135,24 +135,6 @@ impl Skill {
         }
     }
 
-    /// Links all currently supported versions of the skill world to the engine
-    fn add_to_linker(linker: &mut WasmtimeLinker<LinkedCtx>) -> anyhow::Result<()> {
-        // Skill world from bindgen
-        for version in SupportedVersion::iter() {
-            match version {
-                SupportedVersion::V0_2 => {
-                    v0_2::Skill::add_to_linker(
-                        linker,
-                        v0_2::LinkOptions::default().document_metadata(true),
-                        |state: &mut LinkedCtx| state,
-                    )?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     pub async fn run(
         &self,
         engine: &Engine,
@@ -195,6 +177,23 @@ enum SupportedVersion {
 }
 
 impl SupportedVersion {
+    /// Links all currently supported versions of the skill world to the engine
+    fn add_all_to_linker(linker: &mut WasmtimeLinker<LinkedCtx>) -> anyhow::Result<()> {
+        for version in Self::iter() {
+            match version {
+                Self::V0_2 => {
+                    v0_2::Skill::add_to_linker(
+                        linker,
+                        v0_2::LinkOptions::default().document_metadata(true),
+                        |state: &mut LinkedCtx| state,
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         match Self::extract_pharia_skill_version(wasm)? {
             Some(Version {
