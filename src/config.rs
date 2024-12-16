@@ -46,7 +46,14 @@ impl AppConfig {
         let authorization_addr = env::var("AUTHORIZATION_ADDRESS")
             .unwrap_or_else(|_| "https://pharia-iam.product.pharia.com".to_owned());
 
-        let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_owned());
+        let log_level = match env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_owned()) {
+            level if ["debug", "trace"].contains(&level.as_str()) => {
+                // Don't allow third-party crates to go below info unless they user passed in a
+                // RUST_LOG formatted string themselves
+                format!("info,pharia_kernel={level}")
+            }
+            level => level,
+        };
 
         let open_telemetry_endpoint = env::var("OPEN_TELEMETRY_ENDPOINT").ok();
 
