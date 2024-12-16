@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.8](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.7...v0.4.8)
+
+### Fixes
+
+- Specify search introduction with `since` in wit world - ([ab827b3](https://github.com/Aleph-Alpha/pharia-kernel/commit/ab827b327eceffdb489f20df67b76a352738f169))
+- Bump wit version because of unstable document-metadata - ([eb8c322](https://github.com/Aleph-Alpha/pharia-kernel/commit/eb8c322b8de63c508ee6610f3a01ec4b157869a9))
+
+
 ## [0.4.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.5...v0.4.6)
 
 ### Features
