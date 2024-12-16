@@ -147,6 +147,7 @@ interface csi {
     complete-all: func(requests: list<completion-request>) -> list<completion>;
 
     /// Which documents you want to search in, and which type of index should be used
+    @since(version = 0.2.6)
     record index-path {
         /// The namespace the collection belongs to
          namespace: string,
@@ -156,21 +157,23 @@ interface csi {
          index: string,
     }
 
+    @since(version = 0.2.6)
     record document-path {
          namespace: string,
          collection: string,
          name: string,
     }
 
+    @since(version = 0.2.6)
     record search-result {
          document-path: document-path,
          content: string,
          score: f64,
     }
 
+    @since(version = 0.2.6)
     search: func(index-path: index-path, query: string, max-results: u32, min-score: option<f64>) -> list<search-result>;
 
     @unstable(feature=document-metadata)
     document-metadata: func(document-path: document-path) -> option<list<u8>>;
-     
 }
