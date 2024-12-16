@@ -591,7 +591,7 @@ mod tests {
         let version = SupportedVersion::extract_pharia_skill_version(wasm)
             .unwrap()
             .unwrap();
-        assert_eq!(version, Version::new(0, 2, 7));
+        assert_eq!(version, Version::new(0, 2, 8));
     }
 
     #[test]
