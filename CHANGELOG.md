@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.5...v0.4.6)
+
+### Features
+
+- Use unversioned for document_metadata - ([dc06e90](https://github.com/Aleph-Alpha/pharia-kernel/commit/dc06e9003dd30fee8e0813bdb26a097fc0f008b6))
+- Document_metadata in the wit world and test via skill - ([c15e91d](https://github.com/Aleph-Alpha/pharia-kernel/commit/c15e91d2e1f166fc9782feb4446bdc195c5b308b))
+- Add document_metadata to csi - ([a0fc362](https://github.com/Aleph-Alpha/pharia-kernel/commit/a0fc36242db383a5d1bf1a3f385c6da47f7bf14c))
+- Introduct document_metadata in CsiForSkills - ([84ca64d](https://github.com/Aleph-Alpha/pharia-kernel/commit/84ca64d8427c8e59aaaead1651d0120136005256))
+- Document_metadata in CSI - ([c61c855](https://github.com/Aleph-Alpha/pharia-kernel/commit/c61c855697401675400cee1069a5d65c3ad5eab0))
+- Search actor can request metadata - ([f531fd2](https://github.com/Aleph-Alpha/pharia-kernel/commit/f531fd285cdb5da9510b86260a22462b2f1f7254))
+- Add document metadata retrieval - ([fccd7be](https://github.com/Aleph-Alpha/pharia-kernel/commit/fccd7be086e45c45fa24291d62b03d1e20b682b8))
+
+### Fixes
+
+- Do not convert to string first, however " still remain - ([aaddc59](https://github.com/Aleph-Alpha/pharia-kernel/commit/aaddc5905dd77542a99c3a879ca9117eab25499d))
+
+### Documentation
+
+- Typo - ([8c2441c](https://github.com/Aleph-Alpha/pharia-kernel/commit/8c2441cf0e7ed84e12f481b9c1a906c0263d436e))
+
+### Builds
+
+- *(deps)* Bump the minor group with 7 updates - ([525469f](https://github.com/Aleph-Alpha/pharia-kernel/commit/525469fc49149bdd20742c7fce36afbd8ba23cc2))
+- *(deps)* Bump the minor group with 3 updates - ([c5327a5](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5327a5c37717d5b1e217d4277a9ee9921b6aad1))
+- *(deps)* Bump the minor group with 5 updates - ([ed232d9](https://github.com/Aleph-Alpha/pharia-kernel/commit/ed232d95353a90bba7cc4bd5b27d840227c1dcd8))
+- *(deps)* Bump aleph-alpha-client in the minor group - ([97c44ac](https://github.com/Aleph-Alpha/pharia-kernel/commit/97c44acab321165d2aed61414fdb63e22098084b))
+
+
 ## [0.4.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.4...v0.4.5)
 
 ### Documentation
