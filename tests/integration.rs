@@ -200,6 +200,34 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
 }
 
 #[tokio::test]
+async fn unsupported_csi_function() {
+    let kernel = TestKernel::with_skills(&[]).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(
+            json!({"version": "0.2", "function": "foo"}).to_string(),
+        ))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+    let body = resp.bytes().await.unwrap();
+    let error = serde_json::from_slice::<String>(&body).unwrap();
+    assert!(error.contains("not supported by this Kernel installation yet"));
+
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
 async fn unsupported_old_csi_version() {
     let kernel = TestKernel::with_skills(&[]).await;
 
