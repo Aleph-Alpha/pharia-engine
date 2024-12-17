@@ -65,6 +65,7 @@ where
                 )
                 .await
                 .map(|r| json!(r)),
+            V0_2CsiRequest::Unknown => return (StatusCode::BAD_REQUEST, Json(json!("The specified CSI function is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")))
         },
         VersionedCsiRequest::Unknown { version } => {
             let error = match version.map(|v| VersionReq::parse(&v)) {
@@ -119,6 +120,8 @@ pub enum V0_2CsiRequest {
     Search(SearchRequest),
     Chat(ChatRequest),
     DocumentMetadata(DocumentMetadataRequest),
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
