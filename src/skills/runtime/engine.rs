@@ -196,12 +196,8 @@ impl SupportedVersion {
     }
 
     fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
-        match Self::extract_pharia_skill_version(wasm)? {
-            Some(Version {
-                major: 0, minor: 2, ..
-            }) => Ok(Self::V0_2),
-            Some(_) | None => Err(anyhow!("Unsupported Pharia Skill version.")),
-        }
+        let version = Self::extract_pharia_skill_version(wasm)?;
+        Self::validate_version(version)
     }
 
     fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> anyhow::Result<Option<Version>> {
