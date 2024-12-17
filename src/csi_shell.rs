@@ -3,6 +3,7 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
+use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -12,6 +13,7 @@ use crate::{
     language_selection::SelectLanguageRequest,
     search::{DocumentMetadataRequest, SearchRequest},
     shell::AppState,
+    skills::SupportedVersion,
 };
 
 pub async fn http_csi_handle<C>(
@@ -64,6 +66,26 @@ where
                 .await
                 .map(|r| json!(r)),
         },
+        VersionedCsiRequest::Unknown { version } => {
+            let error = match version.map(|v| VersionReq::parse(&v)) {
+                Some(Ok(req)) if req.comparators.len() == 1 => {
+                    let max_supported_version = SupportedVersion::latest_supported_version();
+                    let comp = req.comparators.first().unwrap();
+                    if comp.major > max_supported_version.major
+                        || (comp.major == max_supported_version.major
+                            && comp.minor.is_some_and(|m| m > max_supported_version.minor))
+                    {
+                        "The specified CSI version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK."
+                    } else {
+                        "This CSI version is no longer supported by the Kernel. Try upgrading your SDK."
+                    }
+                }
+                Some(Ok(_) | Err(_)) | None => {
+                    "A valid CSI version is required. Try upgrading your SDK."
+                }
+            };
+            return (StatusCode::BAD_REQUEST, Json(json!(error)));
+        }
     };
     match result {
         Ok(result) => (StatusCode::OK, Json(result)),
@@ -83,6 +105,8 @@ where
 pub enum VersionedCsiRequest {
     #[serde(rename = "0.2")]
     V0_2(V0_2CsiRequest),
+    #[serde(untagged)]
+    Unknown { version: Option<String> },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
