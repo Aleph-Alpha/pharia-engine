@@ -74,9 +74,9 @@ where
     }
 }
 
-/// This structs allows us to represent versioned interactions with the CSI.
+/// This represents the versioned interactions with the CSI.
 /// The members of this enum provide the glue code to translate between a function
-/// defined in a versioned wit world and the `CsiForSkills` trait.
+/// defined in a versioned WIT world and the `CsiForSkills` trait.
 /// By introducing this abstraction, we can expose a versioned interface of the CSI over http.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "version")]
