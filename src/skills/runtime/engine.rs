@@ -567,7 +567,7 @@ fn pooling_allocator_is_supported() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{fs, path::Path};
 
     use serde_json::json;
     use test_skills::{
@@ -702,22 +702,31 @@ mod tests {
     }
 
     #[test]
-    fn can_parse_latest_wit_world_version() -> anyhow::Result<()> {
-        let mut resolve = wit_parser::Resolve::new();
-        let package = resolve.push_str(
-            "./wit/skill@0.2/skill.wit",
-            include_str!("../../../wit/skill@0.2/skill.wit"),
-        )?;
-        let p = resolve
-            .packages
-            .get(package)
-            .expect("Package should exist.");
-        let version = p
-            .name
-            .version
-            .as_ref()
-            .expect("Version should be specified.");
-        assert_eq!(version, &Version::new(0, 2, 8));
-        Ok(())
+    fn can_parse_latest_wit_world_version() {
+        fn wit_version(path: impl AsRef<Path>, contents: &str) -> Version {
+            let mut resolve = wit_parser::Resolve::new();
+            let package_id = resolve
+                .push_str(path, contents)
+                .expect("Invalid WIT world file");
+
+            resolve
+                .packages
+                .get(package_id)
+                .expect("Package should exist.")
+                .name
+                .version
+                .as_ref()
+                .expect("Version should be specified.")
+                .clone()
+        }
+
+        static VERSION: LazyLock<Version> = LazyLock::new(|| {
+            wit_version(
+                "./wit/skill@0.2/skill.wit",
+                include_str!("../../../wit/skill@0.2/skill.wit"),
+            )
+        });
+
+        assert_eq!(*VERSION, Version::new(0, 2, 8));
     }
 }
