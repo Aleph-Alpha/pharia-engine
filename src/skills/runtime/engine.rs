@@ -700,4 +700,24 @@ mod tests {
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
     }
+
+    #[test]
+    fn can_parse_latest_wit_world_version() -> anyhow::Result<()> {
+        let mut resolve = wit_parser::Resolve::new();
+        let package = resolve.push_str(
+            "./wit/skill@0.2/skill.wit",
+            include_str!("../../../wit/skill@0.2/skill.wit"),
+        )?;
+        let p = resolve
+            .packages
+            .get(package)
+            .expect("Package should exist.");
+        let version = p
+            .name
+            .version
+            .as_ref()
+            .expect("Version should be specified.");
+        assert_eq!(version, &Version::new(0, 2, 8));
+        Ok(())
+    }
 }
