@@ -172,7 +172,7 @@ impl Skill {
 
 /// Currently supported versions of the skill world
 #[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
-enum SupportedVersion {
+pub enum SupportedVersion {
     /// Versions 0.2.x of the skill world
     V0_2,
 }
@@ -249,7 +249,7 @@ impl SupportedVersion {
     }
 
     /// Latest supported version for all supported versions
-    fn latest_supported_version() -> &'static Version {
+    pub fn latest_supported_version() -> &'static Version {
         Self::iter()
             .map(SupportedVersion::current_supported_version)
             .min()

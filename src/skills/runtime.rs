@@ -12,7 +12,7 @@ use crate::{
 };
 
 pub use self::{
-    engine::{Engine, Skill},
+    engine::{Engine, Skill, SupportedVersion},
     wasm::WasmRuntime,
 };
 
