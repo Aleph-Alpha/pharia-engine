@@ -1,4 +1,5 @@
 use std::{
+    path::Path,
     sync::LazyLock,
     time::{Duration, Instant},
 };
@@ -170,7 +171,7 @@ impl Skill {
 }
 
 /// Currently supported versions of the skill world
-#[derive(Debug, Clone, Copy, EnumIter)]
+#[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 enum SupportedVersion {
     /// Versions 0.2.x of the skill world
     V0_2,
@@ -214,6 +215,73 @@ impl SupportedVersion {
             Ok(package_name.version.clone())
         } else {
             Err(anyhow!("Wasm isn't a component."))
+        }
+    }
+
+    /// Extracts the package version from a given WIT file.
+    /// Path is used for debugging, contents should be the text contents of the WIT file.
+    fn extract_wit_package_version(path: impl AsRef<Path>, contents: &str) -> Version {
+        let mut resolve = wit_parser::Resolve::new();
+        let package_id = resolve
+            .push_str(path, contents)
+            .expect("Invalid WIT world file");
+
+        resolve
+            .packages
+            .get(package_id)
+            .expect("Package should exist.")
+            .name
+            .version
+            .as_ref()
+            .expect("Version should be specified.")
+            .clone()
+    }
+
+    /// Current latest supported version of a given release line
+    fn current_supported_version(self) -> &'static Version {
+        match self {
+            Self::V0_2 => {
+                static VERSION: LazyLock<Version> = LazyLock::new(|| {
+                    SupportedVersion::extract_wit_package_version(
+                        "./wit/skill@0.2/skill.wit",
+                        include_str!("../../../wit/skill@0.2/skill.wit"),
+                    )
+                });
+                &VERSION
+            }
+        }
+    }
+
+    /// Latest supported version for all supported versions
+    fn latest_supported_version() -> &'static Version {
+        Self::iter()
+            .map(SupportedVersion::current_supported_version)
+            .min()
+            .expect("At least one version.")
+    }
+
+    /// Check if a given version is valid
+    fn validate_version(version: Option<Version>) -> anyhow::Result<Self> {
+        const NO_LONGER_SUPPORTED: &str =
+            "This Skill version is no longer supported by the Kernel. Try upgrading your SDK.";
+        const NOT_SUPPORTED_YET: &str =
+            "This Skill version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.";
+
+        let Some(version) = version else {
+            return Err(anyhow::anyhow!(NO_LONGER_SUPPORTED));
+        };
+
+        match version {
+            Version {
+                major: 0, minor: 2, ..
+            } if &version <= Self::V0_2.current_supported_version() => Ok(Self::V0_2),
+            _ => {
+                if &version > Self::latest_supported_version() {
+                    Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
+                } else {
+                    Err(anyhow::anyhow!(NO_LONGER_SUPPORTED))
+                }
+            }
         }
     }
 }
@@ -567,7 +635,7 @@ fn pooling_allocator_is_supported() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path};
+    use std::fs;
 
     use serde_json::json;
     use test_skills::{
@@ -703,30 +771,56 @@ mod tests {
 
     #[test]
     fn can_parse_latest_wit_world_version() {
-        fn wit_version(path: impl AsRef<Path>, contents: &str) -> Version {
-            let mut resolve = wit_parser::Resolve::new();
-            let package_id = resolve
-                .push_str(path, contents)
-                .expect("Invalid WIT world file");
+        assert_eq!(
+            SupportedVersion::V0_2.current_supported_version(),
+            &Version::new(0, 2, 8)
+        );
+    }
 
-            resolve
-                .packages
-                .get(package_id)
-                .expect("Package should exist.")
-                .name
-                .version
-                .as_ref()
-                .expect("Version should be specified.")
-                .clone()
-        }
+    #[test]
+    fn latest_supported_version() {
+        assert_eq!(
+            SupportedVersion::V0_2.current_supported_version(),
+            SupportedVersion::latest_supported_version(),
+        );
+    }
 
-        static VERSION: LazyLock<Version> = LazyLock::new(|| {
-            wit_version(
-                "./wit/skill@0.2/skill.wit",
-                include_str!("../../../wit/skill@0.2/skill.wit"),
-            )
-        });
+    #[test]
+    fn unsupported_unversioned() {
+        let error = SupportedVersion::validate_version(None).unwrap_err();
+        assert!(error.to_string().contains("no longer supported"));
+    }
 
-        assert_eq!(*VERSION, Version::new(0, 2, 8));
+    #[test]
+    fn unsupported_v0_1() {
+        let error = SupportedVersion::validate_version(Some(Version::new(0, 1, 0))).unwrap_err();
+        assert!(error.to_string().contains("no longer supported"));
+    }
+
+    #[test]
+    fn valid_0_2_version() -> anyhow::Result<()> {
+        let version = Some(Version::new(0, 2, 0));
+        let supported_version = SupportedVersion::validate_version(version)?;
+        assert_eq!(supported_version, SupportedVersion::V0_2);
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_0_2_version() {
+        let error =
+            SupportedVersion::validate_version(Some(Version::new(0, 2, u64::MAX))).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("not supported by this Kernel installation yet"));
+    }
+
+    #[test]
+    fn invalid_future_version() {
+        let error =
+            SupportedVersion::validate_version(Some(Version::new(u64::MAX, u64::MAX, u64::MAX)))
+                .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("not supported by this Kernel installation yet"));
     }
 }
