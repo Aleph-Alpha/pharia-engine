@@ -19,8 +19,9 @@ data:
     password_env_var = "ALEPH_ALPHA_OCI_SKILL_REGISTRY_PASSWORD"
     {{- end }}
 
-    {{- if .Values.namespaces }}
-    {{- range $k, $v := .Values.namespaces }}
+    {{- $namespaces := .Values.defaultNamespacesEnabled | ternary (omit .Values.namespaces "assistant") .Values.namespaces -}}
+    {{- if $namespaces }}
+    {{- range $k, $v := $namespaces }}
     [namespaces.{{ $k }}]
     config_url = {{ $v.config_url | quote }}
     {{- if $v.config_access_token_env_var }}
