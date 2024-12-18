@@ -252,7 +252,7 @@ impl SupportedVersion {
     pub fn latest_supported_version() -> &'static Version {
         Self::iter()
             .map(SupportedVersion::current_supported_version)
-            .min()
+            .max()
             .expect("At least one version.")
     }
 
