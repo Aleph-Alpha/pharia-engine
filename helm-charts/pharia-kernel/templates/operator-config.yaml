@@ -4,22 +4,7 @@ metadata:
   name: pharia-kernel-operator-config
 data:
   operator-config.toml: |
-    {{- if or .Values.defaultNamespacesEnabled .Values.namespaces }}
-    {{- if .Values.defaultNamespacesEnabled }}
-    [namespaces.assistant]
-    {{- with index $.Values "pharia-assistant-api" }}
-    config_url = {{ printf "%s.%s.svc.cluster.local/skills/skill-config" .fullnameOverride $.Release.Namespace | quote }}
-    {{- end }}
-
-    [namespaces.assistant.registry]
-    type = "oci"
-    registry = "alephalpha.jfrog.io"
-    repository = "assistant-skills"
-    user_env_var = "ALEPH_ALPHA_OCI_SKILL_REGISTRY_USER"
-    password_env_var = "ALEPH_ALPHA_OCI_SKILL_REGISTRY_PASSWORD"
-    {{- end }}
-
-    {{- $namespaces := .Values.defaultNamespacesEnabled | ternary (omit .Values.namespaces "assistant") .Values.namespaces -}}
+    {{- $namespaces := .Values.defaultNamespacesEnabled | ternary (merge .Values.defaultNamespaces .Values.namespaces) .Values.namespaces -}}
     {{- if $namespaces }}
     {{- range $k, $v := $namespaces }}
     [namespaces.{{ $k }}]
@@ -27,7 +12,6 @@ data:
     {{- if $v.config_access_token_env_var }}
     config_access_token_env_var = {{ $v.config_access_token_env_var | quote }}
     {{- end }}
-
     [namespaces.{{ $k }}.registry]
     type = "oci"
     registry = {{ $v.registry | quote }}
@@ -35,7 +19,6 @@ data:
     user_env_var = {{ $v.user_env_var | quote }}
     password_env_var = {{ $v.password_env_var | quote }}
     {{ end }}
-    {{- end }}
     {{- else }}
     [namespaces]
     {{- end }}
