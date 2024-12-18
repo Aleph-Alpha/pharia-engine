@@ -50,7 +50,7 @@ serviceMonitor:
 defaultNamespacesEnabled: false
 defaultNamespaces:
   assistant:
-    config_url: pharia-assistant-api.pharia-ai.svc.cluster.local/skills/skill-config
+    config_url: "http://pharia-assistant-api.pharia-ai.svc.cluster.local/skills/skill-config"
     registry: alephalpha.jfrog.io
     repository: assistant-skills
     user_env_var: ALEPH_ALPHA_OCI_SKILL_REGISTRY_USER
