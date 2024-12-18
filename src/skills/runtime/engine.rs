@@ -272,6 +272,7 @@ impl SupportedVersion {
                 major: 0, minor: 2, ..
             } if &version <= Self::V0_2.current_supported_version() => Ok(Self::V0_2),
             _ => {
+                // Once we have more than one supported version, we will need to account for 0.2.x being greater than current but less than latest
                 if &version > Self::latest_supported_version() {
                     Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
                 } else {
