@@ -82,6 +82,7 @@ where
                         "This CSI version is no longer supported by the Kernel. Try upgrading your SDK."
                     }
                 }
+                // If the user passes in a random string, the parse will fail and we will end up down here
                 Some(Ok(_) | Err(_)) | None => {
                     "A valid CSI version is required. Try upgrading your SDK."
                 }
