@@ -72,6 +72,7 @@ where
                 Some(Ok(req)) if req.comparators.len() == 1 => {
                     let max_supported_version = SupportedVersion::latest_supported_version();
                     let comp = req.comparators.first().unwrap();
+                    // Only applies to unknown versions. If we parse `1.x.x` as `1` then we are only doing a major version check and minor version only applies `0.x`
                     if comp.major > max_supported_version.major
                         || (comp.major == max_supported_version.major
                             && comp.minor.is_some_and(|m| m > max_supported_version.minor))
