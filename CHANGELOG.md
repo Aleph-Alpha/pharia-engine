@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.12](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.11...v0.4.12)
+
+### Features
+
+- Better error message for unsupported functions - ([bf38195](https://github.com/Aleph-Alpha/pharia-kernel/commit/bf381952c07c111d6f574a55943e7fb9e575bc4b))
+- Better error message for invalid version strings - ([6362133](https://github.com/Aleph-Alpha/pharia-kernel/commit/63621339ff80149bf4ad81b33f911cd81e552a20))
+- Improve error messages for unsupported skill versions - ([d3ca9b0](https://github.com/Aleph-Alpha/pharia-kernel/commit/d3ca9b0c97a1775d566b77c956332679c90e3921))
+
+### Fixes
+
+- Use max to get latest version - ([cec26cb](https://github.com/Aleph-Alpha/pharia-kernel/commit/cec26cb34d78e6612302cdda3736d84159896ab1))
+
+### Documentation
+
+- Clearer error message for unknown function - ([8d3f2d2](https://github.com/Aleph-Alpha/pharia-kernel/commit/8d3f2d2fdd1b3e07273fb9c5ece2717c59cbe102))
+- Add more comments for version parsing logic - ([b439fc3](https://github.com/Aleph-Alpha/pharia-kernel/commit/b439fc33d665fe5addaa37fdc7a98136c2245507))
+- Add comments for version parsing logic - ([f62f453](https://github.com/Aleph-Alpha/pharia-kernel/commit/f62f453b687eb901a8aaca2b48c639bd6307fad0))
+
+
 ## [0.4.10](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.9...v0.4.10)
 
 ### Documentation
