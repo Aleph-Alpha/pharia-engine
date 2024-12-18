@@ -20,7 +20,7 @@ use tracing::{error, info};
 /// A wrapper around the Skill to also keep track of which
 /// digest was loaded last and when it was last checked.
 struct CachedSkill {
-    /// Compiled and pre initialized skill
+    /// Compiled and pre-initialized skill
     skill: Arc<Skill>,
     /// Digest of the skill when it was last loaded from the registry
     digest: Digest,
