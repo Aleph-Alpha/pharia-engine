@@ -65,7 +65,10 @@ where
                 )
                 .await
                 .map(|r| json!(r)),
-            V0_2CsiRequest::Unknown => return (StatusCode::BAD_REQUEST, Json(json!("The specified CSI function is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")))
+            V0_2CsiRequest::Unknown { function } => {
+                let msg = format!("The CSI function {} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.", function.as_deref().unwrap_or("specified"));
+                return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
+            }
         },
         VersionedCsiRequest::Unknown { version } => {
             let error = match version.map(|v| VersionReq::parse(&v)) {
@@ -87,7 +90,7 @@ where
                     "A valid CSI version is required. Try upgrading your SDK."
                 }
             };
-            return (StatusCode::BAD_REQUEST, Json(json!(error)));
+            return (VALIDATION_ERROR_STATUS_CODE, Json(json!(error)));
         }
     };
     match result {
@@ -122,14 +125,21 @@ pub enum V0_2CsiRequest {
     Search(SearchRequest),
     Chat(ChatRequest),
     DocumentMetadata(DocumentMetadataRequest),
-    #[serde(other)]
-    Unknown,
+    #[serde(untagged)]
+    Unknown {
+        function: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CompleteAllRequest {
     pub requests: Vec<CompletionRequest>,
 }
+
+/// We use `BAD_REQUEST` (400) for validation error as it is more commonly used.
+/// `UNPROCESSABLE_ENTITY` (422) is an alternative, but it may surprise users as it is less commonly
+/// known
+const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
 #[cfg(test)]
 mod tests {
