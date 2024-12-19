@@ -88,7 +88,9 @@ impl OperatorConfig {
 
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct RegistryAuth {
+    #[serde(alias = "userenvvar")]
     user_env_var: String,
+    #[serde(alias = "passwordenvvar")]
     password_env_var: String,
 }
 
@@ -214,6 +216,7 @@ mod tests {
     use std::collections::HashMap;
 
     use config::{Config, Environment};
+    use serde::Deserialize;
 
     use crate::namespace_watcher::config::{Registry, RegistryAuth};
 
@@ -259,6 +262,46 @@ mod tests {
             auth: RegistryAuth {
                 user_env_var,
                 password_env_var,
+            },
+        };
+        assert_eq!(config, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn deserialize_nested_struct_from_env() -> anyhow::Result<()> {
+        let registry = "gitlab.aleph-alpha.de".to_owned();
+        let repository = "engineering/pharia-skills/skills".to_owned();
+        let user_env_var = "SKILL_REGISTRY_USER".to_owned();
+        let password_env_var = "SKILL_REGISTRY_PASSWORD".to_owned();
+
+        #[derive(Deserialize, PartialEq, Eq, Debug, Clone)]
+        struct Nested {
+            registry: Registry,
+        }
+
+        let env_vars = HashMap::from([
+            ("REGISTRY_TYPE".to_owned(), "oci".to_owned()),
+            ("REGISTRY_REGISTRY".to_owned(), registry.clone()),
+            ("REGISTRY_REPOSITORY".to_owned(), repository.clone()),
+            ("REGISTRY_USERENVVAR".to_owned(), user_env_var.clone()),
+            ("REGISTRY_PASSWORDENVVAR".to_owned(), password_env_var.clone()),
+        ]);
+
+        let source = Environment::default().separator("_").source(Some(env_vars));
+        let config = Config::builder()
+            .add_source(source)
+            .build()?
+            .try_deserialize::<Nested>()?;
+
+        let expected = Nested {
+            registry: Registry::Oci {
+                registry,
+                repository,
+                auth: RegistryAuth {
+                    user_env_var,
+                    password_env_var,
+                },
             },
         };
         assert_eq!(config, expected);
