@@ -19,6 +19,7 @@ use super::{
 
 #[derive(Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct OperatorConfig {
+    #[serde(default)]
     pub namespaces: HashMap<String, NamespaceConfig>,
 }
 
@@ -307,6 +308,47 @@ mod tests {
             },
         };
         assert_eq!(config, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn deserialize_empty_operator_config() -> anyhow::Result<()> {
+        // Given a hashmap with variables
+        let env_vars = HashMap::from([]);
+
+        // When we build the source from the environment variables
+        let source = Environment::default().separator("_").source(Some(env_vars));
+        let config = Config::builder()
+            .add_source(source)
+            .build()?
+            .try_deserialize::<OperatorConfig>()?;
+
+        assert_eq!(config, OperatorConfig::empty());
+        Ok(())
+    }
+
+    #[test]
+    fn deserialize_operator_config_with_namespaces() -> anyhow::Result<()> {
+        // Given a hashmap with variables
+        let env_vars = HashMap::from([
+            ("NAMESPACES_PLAYGROUND_CONFIGURL".to_owned(), "https://gitlab.aleph-alpha.de/playground".to_owned()),
+            ("NAMESPACES_PLAYGROUND_CONFIGACCESSTOKENENVVAR".to_owned(), "GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
+            ("NAMESPACES_PLAYGROUND_REGISTRY_TYPE".to_owned(), "oci".to_owned()),
+            ("NAMESPACES_PLAYGROUND_REGISTRY_REGISTRY".to_owned(), "registry.gitlab.aleph-alpha.de".to_owned()),
+            ("NAMESPACES_PLAYGROUND_REGISTRY_REPOSITORY".to_owned(), "engineering/pharia-skills/skills".to_owned()),
+            ("NAMESPACES_PLAYGROUND_REGISTRY_USERENVVAR".to_owned(), "SKILL_REGISTRY_USER".to_owned()),
+            ("NAMESPACES_PLAYGROUND_REGISTRY_PASSWORDENVVAR".to_owned(), "SKILL_REGISTRY_PASSWORD".to_owned()),
+        ]);
+
+
+        // When we build the source from the environment variables
+        let source = Environment::default().separator("_").source(Some(env_vars));
+        let config = Config::builder()
+            .add_source(source)
+            .build()?
+            .try_deserialize::<OperatorConfig>()?;
+        
+        assert_eq!(config.namespaces.len(), 1);
         Ok(())
     }
 
