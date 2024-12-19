@@ -136,9 +136,7 @@ pub enum NamespaceConfig {
     /// implies that the skills in team owned namespaces are configured by a team rather than the
     /// operators of Pharia Kernel, which in turn means we only refer the teams documentation here.
     TeamOwned {
-        #[serde(alias = "configurl")]
         config_url: String,
-        #[serde(alias = "configaccesstokenenvvar")]
         config_access_token_env_var: Option<String>,
         registry: Registry,
     },
@@ -280,16 +278,16 @@ mod tests {
         let config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN".to_owned();
 
         let env_vars = HashMap::from([
-            ("REGISTRY_TYPE".to_owned(), "oci".to_owned()),
-            ("REGISTRY_REGISTRY".to_owned(), registry.clone()),
-            ("REGISTRY_REPOSITORY".to_owned(), repository.clone()),
-            ("REGISTRY_USERENVVAR".to_owned(), user_env_var.clone()),
-            ("REGISTRY_PASSWORDENVVAR".to_owned(), password_env_var.clone()),
-            ("CONFIGURL".to_owned(), config_url.clone()),
-            ("CONFIGACCESSTOKENENVVAR".to_owned(), config_access_token_env_var.clone()),
+            ("REGISTRY__TYPE".to_owned(), "oci".to_owned()),
+            ("REGISTRY__REGISTRY".to_owned(), registry.clone()),
+            ("REGISTRY__REPOSITORY".to_owned(), repository.clone()),
+            ("REGISTRY__USER_ENV_VAR".to_owned(), user_env_var.clone()),
+            ("REGISTRY__PASSWORD_ENV_VAR".to_owned(), password_env_var.clone()),
+            ("CONFIG_URL".to_owned(), config_url.clone()),
+            ("CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(), config_access_token_env_var.clone()),
         ]);
 
-        let source = Environment::default().separator("_").source(Some(env_vars));
+        let source = Environment::default().separator("__").source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
@@ -331,23 +329,22 @@ mod tests {
     fn deserialize_operator_config_with_namespaces() -> anyhow::Result<()> {
         // Given a hashmap with variables
         let env_vars = HashMap::from([
-            ("NAMESPACES_PLAYGROUND_CONFIGURL".to_owned(), "https://gitlab.aleph-alpha.de/playground".to_owned()),
-            ("NAMESPACES_PLAYGROUND_CONFIGACCESSTOKENENVVAR".to_owned(), "GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
-            ("NAMESPACES_PLAYGROUND_REGISTRY_TYPE".to_owned(), "oci".to_owned()),
-            ("NAMESPACES_PLAYGROUND_REGISTRY_REGISTRY".to_owned(), "registry.gitlab.aleph-alpha.de".to_owned()),
-            ("NAMESPACES_PLAYGROUND_REGISTRY_REPOSITORY".to_owned(), "engineering/pharia-skills/skills".to_owned()),
-            ("NAMESPACES_PLAYGROUND_REGISTRY_USERENVVAR".to_owned(), "SKILL_REGISTRY_USER".to_owned()),
-            ("NAMESPACES_PLAYGROUND_REGISTRY_PASSWORDENVVAR".to_owned(), "SKILL_REGISTRY_PASSWORD".to_owned()),
+            ("NAMESPACES__PLAY_GROUND__CONFIG_URL".to_owned(), "https://gitlab.aleph-alpha.de/playground".to_owned()),
+            ("NAMESPACES__PLAY_GROUND__CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(), "GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
+            ("NAMESPACES__PLAY_GROUND__REGISTRY__TYPE".to_owned(), "oci".to_owned()),
+            ("NAMESPACES__PLAY_GROUND__REGISTRY__REGISTRY".to_owned(), "registry.gitlab.aleph-alpha.de".to_owned()),
+            ("NAMESPACES__PLAY_GROUND__REGISTRY__REPOSITORY".to_owned(), "engineering/pharia-skills/skills".to_owned()),
+            ("NAMESPACES__PLAY_GROUND__REGISTRY__USER_ENV_VAR".to_owned(), "SKILL_REGISTRY_USER".to_owned()),
+            ("NAMESPACES__PLAY_GROUND__REGISTRY__PASSWORD_ENV_VAR".to_owned(), "SKILL_REGISTRY_PASSWORD".to_owned()),
         ]);
 
 
         // When we build the source from the environment variables
-        let source = Environment::default().separator("_").source(Some(env_vars));
+        let source = Environment::default().separator("__").source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
             .try_deserialize::<OperatorConfig>()?;
-        
         assert_eq!(config.namespaces.len(), 1);
         Ok(())
     }
