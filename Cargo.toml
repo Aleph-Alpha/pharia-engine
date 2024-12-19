@@ -105,6 +105,7 @@ tempfile = "3.14.0"
 tokio = { version = "1.42.0", features = ["test-util"] }
 tokio-test = "0.4.4"
 wat = "1.222.0"
+config = "0.15.0"
 
 [features]
 test_inference = []

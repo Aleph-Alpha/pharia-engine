@@ -211,6 +211,10 @@ impl NamespaceConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use config::{Config, Environment};
+
     use crate::namespace_watcher::config::{Registry, RegistryAuth};
 
     use crate::namespace_watcher::tests::NamespaceConfig;
@@ -224,6 +228,41 @@ mod tests {
         pub fn empty() -> Self {
             Self::from_toml("[namespaces]").unwrap()
         }
+    }
+
+    #[test]
+    fn deserialize_registry_from_env() -> anyhow::Result<()> {
+        // Given some environment variable
+        let registry = "gitlab.aleph-alpha.de".to_owned();
+        let repository = "engineering/pharia-skills/skills".to_owned();
+        let user_env_var = "SKILL_REGISTRY_USER".to_owned();
+        let password_env_var = "SKILL_REGISTRY_PASSWORD".to_owned();
+        let env_vars = HashMap::from([
+            ("TYPE".to_owned(), "oci".to_owned()),
+            ("REGISTRY".to_owned(), registry.clone()),
+            ("REPOSITORY".to_owned(), repository.clone()),
+            ("USER_ENV_VAR".to_owned(), user_env_var.clone()),
+            ("PASSWORD_ENV_VAR".to_owned(), password_env_var.clone()),
+        ]);
+
+        // When we  build the source from the environment variables
+        let source = Environment::default().source(Some(env_vars));
+        let config = Config::builder()
+            .add_source(source)
+            .build()?
+            .try_deserialize::<Registry>()?;
+
+        // Then we can build the config from the source
+        let expected = Registry::Oci {
+            registry,
+            repository,
+            auth: RegistryAuth {
+                user_env_var,
+                password_env_var,
+            },
+        };
+        assert_eq!(config, expected);
+        Ok(())
     }
 
     #[test]
