@@ -67,9 +67,9 @@ utoipa = { version = "5.2.0", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.2.0", features = ["axum"] }
 wasmtime = "27.0.0"
 wasmtime-wasi = "27.0.0"
-wit-parser = "0.221.2"
+wit-parser = "0.222.0"
 url = "2.5.4"
-thiserror = "2.0.7"
+thiserror = "2.0.8"
 tokenizers = { version = "0.21.0", default-features = false, features = [
     "onig",
     "esaxx_fast",
@@ -101,7 +101,7 @@ tempfile = "3.14.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.42.0", features = ["test-util"] }
 tokio-test = "0.4.4"
-wat = "1.221.2"
+wat = "1.222.0"
 
 [features]
 test_inference = []
