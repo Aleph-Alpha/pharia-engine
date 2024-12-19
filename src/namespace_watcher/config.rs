@@ -135,7 +135,9 @@ pub enum NamespaceConfig {
     /// implies that the skills in team owned namespaces are configured by a team rather than the
     /// operators of Pharia Kernel, which in turn means we only refer the teams documentation here.
     TeamOwned {
+        #[serde(alias = "configurl")]
         config_url: String,
+        #[serde(alias = "configaccesstokenenvvar")]
         config_access_token_env_var: Option<String>,
         registry: Registry,
     },
@@ -216,7 +218,6 @@ mod tests {
     use std::collections::HashMap;
 
     use config::{Config, Environment};
-    use serde::Deserialize;
 
     use crate::namespace_watcher::config::{Registry, RegistryAuth};
 
@@ -269,16 +270,13 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_nested_struct_from_env() -> anyhow::Result<()> {
+    fn deserialize_namespace_config_from_env() -> anyhow::Result<()> {
         let registry = "gitlab.aleph-alpha.de".to_owned();
         let repository = "engineering/pharia-skills/skills".to_owned();
         let user_env_var = "SKILL_REGISTRY_USER".to_owned();
         let password_env_var = "SKILL_REGISTRY_PASSWORD".to_owned();
-
-        #[derive(Deserialize, PartialEq, Eq, Debug, Clone)]
-        struct Nested {
-            registry: Registry,
-        }
+        let config_url = "https://gitlab.aleph-alpha.de/playground".to_owned();
+        let config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN".to_owned();
 
         let env_vars = HashMap::from([
             ("REGISTRY_TYPE".to_owned(), "oci".to_owned()),
@@ -286,15 +284,19 @@ mod tests {
             ("REGISTRY_REPOSITORY".to_owned(), repository.clone()),
             ("REGISTRY_USERENVVAR".to_owned(), user_env_var.clone()),
             ("REGISTRY_PASSWORDENVVAR".to_owned(), password_env_var.clone()),
+            ("CONFIGURL".to_owned(), config_url.clone()),
+            ("CONFIGACCESSTOKENENVVAR".to_owned(), config_access_token_env_var.clone()),
         ]);
 
         let source = Environment::default().separator("_").source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
-            .try_deserialize::<Nested>()?;
+            .try_deserialize::<NamespaceConfig>()?;
 
-        let expected = Nested {
+        let expected = NamespaceConfig::TeamOwned {
+            config_url,
+            config_access_token_env_var: Some(config_access_token_env_var.clone()),
             registry: Registry::Oci {
                 registry,
                 repository,
