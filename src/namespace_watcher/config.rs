@@ -216,7 +216,7 @@ impl NamespaceConfig {
 mod tests {
     use std::collections::HashMap;
 
-    use config::{Config, Environment};
+    use config::{Config, Environment, File, FileFormat};
 
     use crate::namespace_watcher::config::{Registry, RegistryAuth};
 
@@ -231,6 +231,90 @@ mod tests {
         pub fn empty() -> Self {
             Self::from_toml("[namespaces]").unwrap()
         }
+    }
+
+    #[test]
+    fn load_from_two_empty_sources() -> anyhow::Result<()> {
+        // Given a TOML file and environment variables
+        let file_source = File::from_str("", FileFormat::Toml);
+        let env_vars = HashMap::new();
+        let env_source = Environment::default()
+            .separator("__")
+            .source(Some(env_vars));
+
+        // When loading from the sources
+        let config = Config::builder()
+            .add_source(file_source)
+            .add_source(env_source)
+            .build()?
+            .try_deserialize::<OperatorConfig>()?;
+
+        // Then both sources are applied, with the values from environment variables having precedence
+        assert_eq!(config.namespaces.len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn load_from_two_partial_sources() -> anyhow::Result<()> {
+        // Given a TOML file and environment variables
+        let config_url = "https://acme.com/latest/config.toml";
+        let config_access_token_env_var = "ACME_CONFIG_ACCESS_TOKEN";
+        let registry = "registry.acme.com";
+        let repository = "engineering/skills";
+        let user_env_var = "SKILL_REGISTRY_USER";
+        let password_env_var = "SKILL_REGISTRY_PASSWORD";
+        let file_source = File::from_str(
+            &format!(
+                "[namespaces.acme]
+config_url = \"to_be_overwritten\"
+config_access_token_env_var = \"{config_access_token_env_var}\"
+
+[namespaces.acme.registry]
+type = \"oci\"
+registry = \"{registry}\"
+repository = \"{repository}\"
+password_env_var =  \"{password_env_var}\"
+            ",
+            ),
+            FileFormat::Toml,
+        );
+        let env_vars = HashMap::from([
+            (
+                "NAMESPACES__ACME__CONFIG_URL".to_owned(),
+                config_url.to_owned(),
+            ),
+            (
+                "NAMESPACES__ACME__REGISTRY__USER_ENV_VAR".to_owned(),
+                user_env_var.to_owned(),
+            ),
+        ]);
+        let env_source = Environment::default()
+            .separator("__")
+            .source(Some(env_vars));
+
+        // When loading from the sources
+        let config = Config::builder()
+            .add_source(file_source)
+            .add_source(env_source)
+            .build()?
+            .try_deserialize::<OperatorConfig>()?;
+
+        // Then both sources are applied, with the values from environment variables having higher precedence
+        assert_eq!(config.namespaces.len(), 1);
+        let namespace_config = NamespaceConfig::TeamOwned {
+            config_url: config_url.to_owned(),
+            config_access_token_env_var: Some(config_access_token_env_var.to_owned()),
+            registry: Registry::Oci {
+                registry: registry.to_owned(),
+                repository: repository.to_owned(),
+                auth: RegistryAuth {
+                    user_env_var: user_env_var.to_owned(),
+                    password_env_var: password_env_var.to_owned(),
+                },
+            },
+        };
+        assert_eq!(config.namespaces.get("acme").unwrap(), &namespace_config);
+        Ok(())
     }
 
     #[test]
@@ -282,12 +366,20 @@ mod tests {
             ("REGISTRY__REGISTRY".to_owned(), registry.clone()),
             ("REGISTRY__REPOSITORY".to_owned(), repository.clone()),
             ("REGISTRY__USER_ENV_VAR".to_owned(), user_env_var.clone()),
-            ("REGISTRY__PASSWORD_ENV_VAR".to_owned(), password_env_var.clone()),
+            (
+                "REGISTRY__PASSWORD_ENV_VAR".to_owned(),
+                password_env_var.clone(),
+            ),
             ("CONFIG_URL".to_owned(), config_url.clone()),
-            ("CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(), config_access_token_env_var.clone()),
+            (
+                "CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(),
+                config_access_token_env_var.clone(),
+            ),
         ]);
 
-        let source = Environment::default().separator("__").source(Some(env_vars));
+        let source = Environment::default()
+            .separator("__")
+            .source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
@@ -329,18 +421,40 @@ mod tests {
     fn deserialize_operator_config_with_namespaces() -> anyhow::Result<()> {
         // Given a hashmap with variables
         let env_vars = HashMap::from([
-            ("NAMESPACES__PLAY_GROUND__CONFIG_URL".to_owned(), "https://gitlab.aleph-alpha.de/playground".to_owned()),
-            ("NAMESPACES__PLAY_GROUND__CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(), "GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
-            ("NAMESPACES__PLAY_GROUND__REGISTRY__TYPE".to_owned(), "oci".to_owned()),
-            ("NAMESPACES__PLAY_GROUND__REGISTRY__REGISTRY".to_owned(), "registry.gitlab.aleph-alpha.de".to_owned()),
-            ("NAMESPACES__PLAY_GROUND__REGISTRY__REPOSITORY".to_owned(), "engineering/pharia-skills/skills".to_owned()),
-            ("NAMESPACES__PLAY_GROUND__REGISTRY__USER_ENV_VAR".to_owned(), "SKILL_REGISTRY_USER".to_owned()),
-            ("NAMESPACES__PLAY_GROUND__REGISTRY__PASSWORD_ENV_VAR".to_owned(), "SKILL_REGISTRY_PASSWORD".to_owned()),
+            (
+                "NAMESPACES__PLAY_GROUND__CONFIG_URL".to_owned(),
+                "https://gitlab.aleph-alpha.de/playground".to_owned(),
+            ),
+            (
+                "NAMESPACES__PLAY_GROUND__CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(),
+                "GITLAB_CONFIG_ACCESS_TOKEN".to_owned(),
+            ),
+            (
+                "NAMESPACES__PLAY_GROUND__REGISTRY__TYPE".to_owned(),
+                "oci".to_owned(),
+            ),
+            (
+                "NAMESPACES__PLAY_GROUND__REGISTRY__REGISTRY".to_owned(),
+                "registry.gitlab.aleph-alpha.de".to_owned(),
+            ),
+            (
+                "NAMESPACES__PLAY_GROUND__REGISTRY__REPOSITORY".to_owned(),
+                "engineering/pharia-skills/skills".to_owned(),
+            ),
+            (
+                "NAMESPACES__PLAY_GROUND__REGISTRY__USER_ENV_VAR".to_owned(),
+                "SKILL_REGISTRY_USER".to_owned(),
+            ),
+            (
+                "NAMESPACES__PLAY_GROUND__REGISTRY__PASSWORD_ENV_VAR".to_owned(),
+                "SKILL_REGISTRY_PASSWORD".to_owned(),
+            ),
         ]);
 
-
         // When we build the source from the environment variables
-        let source = Environment::default().separator("__").source(Some(env_vars));
+        let source = Environment::default()
+            .separator("__")
+            .source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
