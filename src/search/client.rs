@@ -181,10 +181,15 @@ impl SearchClient for Client {
             collection,
             name,
         } = document_path;
+
+        // Namespaces and collections must match regex ^[a-zA-Z0-9\-\.]+$
+        // therefore, we do not need to url encode them
+        // A document name can contain characters like `/`, which need to be url encoded
+        let encoded_name = urlencoding::encode(&name);
         let document = self
             .http
             .get(format!(
-                "{}/collections/{namespace}/{collection}/docs/{name}",
+                "{}/collections/{namespace}/{collection}/docs/{encoded_name}",
                 &self.host
             ))
             .bearer_auth(api_token)
@@ -293,7 +298,7 @@ pub mod tests {
         let client = Client::new(host).unwrap();
 
         // When requesting metadata of an existing document
-        let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
+        let document_path = DocumentPath::new("Kernel", "test", "kernel/docs");
         let maybe_metadata = client
             .document_metadata(document_path, api_token)
             .await
