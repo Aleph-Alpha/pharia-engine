@@ -151,6 +151,8 @@ impl SearchClient for Client {
             body["filters"] = json!([{ "with": [{ "modality": "text" }]}]);
         }
 
+        // Namespaces, collections and indexes must match regex ^[a-zA-Z0-9\-\.]+$
+        // therefore, we do not need to url encode them
         Ok(self
             .http
             .post(format!(
