@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.14](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.13...v0.4.14)
+
+### Features
+
+- Hide docs and index behind auth middleware - ([d46d130](https://github.com/Aleph-Alpha/pharia-kernel/commit/d46d1300a71a23f34c3d3d70f7e1ddcca151f5b5))
+
+### Fixes
+
+- Url encode documenent name when requesting metadata - ([d1da157](https://github.com/Aleph-Alpha/pharia-kernel/commit/d1da157f49fd9dfee97855f8449dce1c56d738ee))
+
+### Documentation
+
+- Add comment about indexes not needing url encoding - ([5784e9a](https://github.com/Aleph-Alpha/pharia-kernel/commit/5784e9ae7d7e778226434cf180dbbd28a8c099e9))
+
+### Builds
+
+- *(deps)* Bump the minor group with 5 updates - ([57d2588](https://github.com/Aleph-Alpha/pharia-kernel/commit/57d258846d6733ed9e63b1c96748737a910c6b09))
+
+
 ## [0.4.13](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.12...v0.4.13)
 
 ### Documentation
