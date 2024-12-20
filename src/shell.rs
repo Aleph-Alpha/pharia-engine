@@ -162,6 +162,8 @@ where
         .route("/execute_skill", post(execute_skill))
         .route("/cached_skills", get(cached_skills))
         .route("/cached_skills/:namespace/:name", delete(drop_cached_skill))
+        .nest_service("/docs", serve_dir.clone())
+        .route("/", get(index))
         .route_layer(middleware::from_fn_with_state(
             app_state.clone(),
             authorization_middleware,
@@ -169,13 +171,11 @@ where
         .with_state(app_state)
         // Unauthenticated routes
         .route("/skill.wit", get(skill_wit()))
-        .nest_service("/docs", serve_dir.clone())
         .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
         .route("/openapi.json", get(serve_docs))
         // maintaining `healthcheck` route for backward compatibility
         .route("/healthcheck", get(|| async { "ok" }))
         .route("/health", get(|| async { "ok" }))
-        .route("/", get(index))
         .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
             ServiceBuilder::new()

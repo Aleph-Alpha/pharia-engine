@@ -24,7 +24,7 @@ if [ "$BODY" != "ok" ]; then
     exit 1
 fi
 
-RESPONSE_CODE=$(curl -o /dev/null -s -w "%{http_code}\n" http://$HOST:$PORT/docs/index.html)
+RESPONSE_CODE=$(curl -o /dev/null -s -w "%{http_code}\n" http://$HOST:$PORT/skill.wit)
 
 if [ "$RESPONSE_CODE" = "200" ]; then
     exit 0
