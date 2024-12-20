@@ -89,9 +89,7 @@ impl OperatorConfig {
 
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct RegistryAuth {
-    #[serde(alias = "userenvvar")]
     user_env_var: String,
-    #[serde(alias = "passwordenvvar")]
     password_env_var: String,
 }
 
