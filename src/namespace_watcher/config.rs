@@ -1,10 +1,7 @@
-use std::{
-    collections::HashMap,
-    env, fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, env, path::PathBuf};
 
 use anyhow::{anyhow, Context};
+use config::{Config, Environment, File, FileFormat, FileSourceFile};
 use serde::Deserialize;
 use url::Url;
 
@@ -25,16 +22,23 @@ pub struct OperatorConfig {
 
 impl OperatorConfig {
     /// # Errors
-    /// Cannot parse config or cannot read from file.
-    pub fn from_file<P: AsRef<Path>>(p: P) -> anyhow::Result<Self> {
-        let config = fs::read_to_string(p)?;
-        Self::from_toml(&config)
+    /// Cannot parse operator config from the provided file or the environment variables.
+    pub fn new(config_file: &str) -> anyhow::Result<Self> {
+        let file_source = File::with_name(config_file);
+        let env_source = Environment::default().separator("__");
+        Self::with_sources(file_source, env_source)
     }
 
-    /// # Errors
-    /// Cannot parse config.
-    pub fn from_toml(config: &str) -> anyhow::Result<Self> {
-        Ok(toml::from_str(config)?)
+    fn with_sources(
+        file_source: File<FileSourceFile, FileFormat>,
+        env_source: Environment,
+    ) -> anyhow::Result<Self> {
+        let config = Config::builder()
+            .add_source(file_source)
+            .add_source(env_source)
+            .build()?
+            .try_deserialize::<OperatorConfig>()?;
+        Ok(config)
     }
 
     /// Create an operator config which checks the local `skills` directory for
@@ -212,15 +216,12 @@ impl NamespaceConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::fs;
+    use std::io::Write;
 
-    use config::{Config, Environment, File, FileFormat};
+    use tempfile::tempdir;
 
-    use crate::namespace_watcher::config::{Registry, RegistryAuth};
-
-    use crate::namespace_watcher::tests::NamespaceConfig;
-
-    use super::OperatorConfig;
+    use super::*;
 
     impl OperatorConfig {
         /// # Panics
@@ -229,23 +230,28 @@ mod tests {
         pub fn empty() -> Self {
             Self::from_toml("[namespaces]").unwrap()
         }
+
+        /// # Errors
+        /// Cannot parse config.
+        pub fn from_toml(config: &str) -> anyhow::Result<Self> {
+            Ok(toml::from_str(config)?)
+        }
     }
 
     #[test]
     fn load_from_two_empty_sources() -> anyhow::Result<()> {
         // Given a TOML file and environment variables
-        let file_source = File::from_str("", FileFormat::Toml);
+        let dir = tempdir()?;
+        let file_path = dir.path().join("operator-config.toml");
+        fs::File::create_new(&file_path)?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
         let env_vars = HashMap::new();
         let env_source = Environment::default()
             .separator("__")
             .source(Some(env_vars));
 
         // When loading from the sources
-        let config = Config::builder()
-            .add_source(file_source)
-            .add_source(env_source)
-            .build()?
-            .try_deserialize::<OperatorConfig>()?;
+        let config = OperatorConfig::with_sources(file_source, env_source)?;
 
         // Then both sources are applied, with the values from environment variables having precedence
         assert_eq!(config.namespaces.len(), 0);
@@ -255,7 +261,11 @@ mod tests {
     #[test]
     fn load_two_namespaces_from_independent_sources() -> anyhow::Result<()> {
         // Given a TOML file and environment variables
-        let file_source = File::from_str(
+        let dir = tempdir()?;
+        let file_path = dir.path().join("operator-config.toml");
+        let mut file = fs::File::create_new(&file_path)?;
+        writeln!(
+            file,
             r#"[namespaces.a]
 config_url = "a"
 config_access_token_env_var = "a"
@@ -265,9 +275,9 @@ type = "oci"
 registry = "a"
 repository = "a"
 user_env_var =  "a"
-password_env_var =  "a""#,
-            FileFormat::Toml,
-        );
+password_env_var =  "a""#
+        )?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
         let env_vars = HashMap::from([
             ("NAMESPACES__B__CONFIG_URL".to_owned(), "b".to_owned()),
             (
@@ -297,11 +307,7 @@ password_env_var =  "a""#,
             .source(Some(env_vars));
 
         // When loading from the sources
-        let config = Config::builder()
-            .add_source(file_source)
-            .add_source(env_source)
-            .build()?
-            .try_deserialize::<OperatorConfig>()?;
+        let config = OperatorConfig::with_sources(file_source, env_source)?;
 
         // Then both namespaces are loaded
         assert_eq!(config.namespaces.len(), 2);
@@ -319,9 +325,12 @@ password_env_var =  "a""#,
         let repository = "engineering/skills";
         let user_env_var = "SKILL_REGISTRY_USER";
         let password_env_var = "SKILL_REGISTRY_PASSWORD";
-        let file_source = File::from_str(
-            &format!(
-                "[namespaces.acme]
+        let dir = tempdir()?;
+        let file_path = dir.path().join("operator-config.toml");
+        let mut file = fs::File::create_new(&file_path)?;
+        writeln!(
+            file,
+            "[namespaces.acme]
 config_url = \"to_be_overwritten\"
 config_access_token_env_var = \"{config_access_token_env_var}\"
 
@@ -330,10 +339,9 @@ type = \"oci\"
 registry = \"{registry}\"
 repository = \"{repository}\"
 password_env_var =  \"{password_env_var}\"
-            ",
-            ),
-            FileFormat::Toml,
-        );
+        "
+        )?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
         let env_vars = HashMap::from([
             (
                 "NAMESPACES__ACME__CONFIG_URL".to_owned(),
@@ -349,11 +357,7 @@ password_env_var =  \"{password_env_var}\"
             .source(Some(env_vars));
 
         // When loading from the sources
-        let config = Config::builder()
-            .add_source(file_source)
-            .add_source(env_source)
-            .build()?
-            .try_deserialize::<OperatorConfig>()?;
+        let config = OperatorConfig::with_sources(file_source, env_source)?;
 
         // Then both sources are applied, with the values from environment variables having higher precedence
         assert_eq!(config.namespaces.len(), 1);
@@ -598,7 +602,7 @@ password_env_var =  \"{password_env_var}\"
 
     #[test]
     fn reads_from_file() {
-        let config = OperatorConfig::from_file("operator-config.toml").unwrap();
+        let config = OperatorConfig::new("operator-config.toml").unwrap();
         assert!(config.namespaces.contains_key("pharia-kernel-team"));
     }
 

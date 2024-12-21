@@ -93,6 +93,7 @@ metrics-exporter-prometheus = { version = "0.16.0", default-features = false, fe
 ] }
 itertools = "0.14.0"
 urlencoding = "2.1.3"
+config = { version = "0.15.4", features = ["toml"] }
 
 [dev-dependencies]
 test-skills = { path = "./test-skills" }
@@ -105,7 +106,6 @@ tempfile = "3.14.0"
 tokio = { version = "1.42.0", features = ["test-util"] }
 tokio-test = "0.4.4"
 wat = "1.222.0"
-config = { version = "0.15.3", features = ["toml"] }
 
 [features]
 test_inference = []
