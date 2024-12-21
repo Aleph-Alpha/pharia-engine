@@ -253,7 +253,65 @@ mod tests {
     }
 
     #[test]
-    fn load_from_two_partial_sources() -> anyhow::Result<()> {
+    fn load_two_namespaces_from_independent_sources() -> anyhow::Result<()> {
+        // Given a TOML file and environment variables
+        let file_source = File::from_str(
+            r#"[namespaces.a]
+config_url = "a"
+config_access_token_env_var = "a"
+
+[namespaces.a.registry]
+type = "oci"
+registry = "a"
+repository = "a"
+user_env_var =  "a"
+password_env_var =  "a""#,
+            FileFormat::Toml,
+        );
+        let env_vars = HashMap::from([
+            ("NAMESPACES__B__CONFIG_URL".to_owned(), "b".to_owned()),
+            (
+                "NAMESPACES__B__CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(),
+                "b".to_owned(),
+            ),
+            ("NAMESPACES__B__REGISTRY__TYPE".to_owned(), "oci".to_owned()),
+            (
+                "NAMESPACES__B__REGISTRY__REGISTRY".to_owned(),
+                "b".to_owned(),
+            ),
+            (
+                "NAMESPACES__B__REGISTRY__REPOSITORY".to_owned(),
+                "b".to_owned(),
+            ),
+            (
+                "NAMESPACES__B__REGISTRY__USER_ENV_VAR".to_owned(),
+                "b".to_owned(),
+            ),
+            (
+                "NAMESPACES__B__REGISTRY__PASSWORD_ENV_VAR".to_owned(),
+                "b".to_owned(),
+            ),
+        ]);
+        let env_source = Environment::default()
+            .separator("__")
+            .source(Some(env_vars));
+
+        // When loading from the sources
+        let config = Config::builder()
+            .add_source(file_source)
+            .add_source(env_source)
+            .build()?
+            .try_deserialize::<OperatorConfig>()?;
+
+        // Then both namespaces are loaded
+        assert_eq!(config.namespaces.len(), 2);
+        assert!(config.namespaces.contains_key("a"));
+        assert!(config.namespaces.contains_key("b"));
+        Ok(())
+    }
+
+    #[test]
+    fn load_one_namespace_from_two_partial_sources() -> anyhow::Result<()> {
         // Given a TOML file and environment variables
         let config_url = "https://acme.com/latest/config.toml";
         let config_access_token_env_var = "ACME_CONFIG_ACCESS_TOKEN";
