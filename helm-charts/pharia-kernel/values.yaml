@@ -46,21 +46,23 @@ service:
   metricsProtocol: TCP
 serviceMonitor:
   enabled: false
-# -- If the default namespaces are enabled, the provided namespaces with existing keys are ignored
+# -- If the default namespaces are enabled, the provided namespaces with existing keys are overwritten
 defaultNamespacesEnabled: false
-defaultNamespaces:
-  assistant:
-    config_url: "http://pharia-assistant-api.pharia-ai.svc.cluster.local/skills/skill-config"
-    registry: alephalpha.jfrog.io
-    repository: assistant-skills
-    user_env_var: ALEPH_ALPHA_OCI_SKILL_REGISTRY_USER
-    password_env_var: ALEPH_ALPHA_OCI_SKILL_REGISTRY_PASSWORD
 # -- Active namespaces for Pharia Kernel. e.g.:
 # playground:
 #   config_url: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
-#   config_access_token_env_var: "GITLAB_CONFIG_ACCESS_TOKEN"
+#   config_access_token: "GITLAB_CONFIG_ACCESS_TOKEN"
 #   registry: "registry.gitlab.aleph-alpha.de"
 #   repository: "engineering/pharia-kernel-playground/skills"
+#   user: "REGISTRY_USER"
+#   password: "REGISTRY_PASSWORD"
+# Each of the value can alternatively be provided as environment variables, which have higher precedence:
+# NAMESPACES__PLAYGROUND__CONFIG_URL
+# NAMESPACES__PLAYGROUND__CONFIG_ACCESS_TOKEN
+# NAMESPACES__PLAYGROUND__REGISTRY__REGISTRY
+# NAMESPACES__PLAYGROUND__REGISTRY__REPOSITORY
+# NAMESPACES__PLAYGROUND__REGISTRY__USER
+# NAMESPACES__PLAYGROUND__REGISTRY__PASSWORD
 namespaces: {}
 logLevel: info
 openTelemetryEndpoint: ""
