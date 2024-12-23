@@ -104,6 +104,17 @@ spec:
                   name: {{ .Values.global.phariaAIConfigMap }}
                   key: DOCUMENT_INDEX_URL
             {{- end }}
+            {{- if and .Values.defaultNamespacesEnabled .Values.global.phariaAIConfigMap }}
+            - name: NAMESPACES__ASSISTANT__CONFIG_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.global.phariaAIConfigMap }}
+                  key: PHARIA_ASSISTANT_API_SKILL_CONFIG
+            - name: NAMESPACES__ASSISTANT__REGISTRY__REGISTRY
+              value: "alephalpha.jfrog.io"
+            - name: NAMESPACES__ASSISTANT__REGISTRY__REPOSITORY
+              value: "assistant-skills"
+            {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

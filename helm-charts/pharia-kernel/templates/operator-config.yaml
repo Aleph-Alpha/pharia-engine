@@ -4,20 +4,33 @@ metadata:
   name: pharia-kernel-operator-config
 data:
   operator-config.toml: |
-    {{- $namespaces := .Values.defaultNamespacesEnabled | ternary (merge .Values.defaultNamespaces .Values.namespaces) .Values.namespaces -}}
-    {{- if $namespaces }}
-    {{- range $k, $v := $namespaces }}
+    {{- if .Values.namespaces }}
+    {{- range $k, $v := .Values.namespaces }}
+    {{- if or $v.config_url $v.config_access_token }}
     [namespaces.{{ $k }}]
-    config_url = {{ $v.config_url | quote }}
-    {{- if $v.config_access_token_env_var }}
-    config_access_token_env_var = {{ $v.config_access_token_env_var | quote }}
     {{- end }}
+    {{- if $v.config_url }}
+    config_url = {{ $v.config_url | quote }}
+    {{- end }}
+    {{- if $v.config_access_token }}
+    config_access_token = {{ $v.config_access_token | quote }}
+    {{- end }}
+    {{- if or $v.registry $v.repository $v.user $v.password }}
     [namespaces.{{ $k }}.registry]
     type = "oci"
+    {{- end }}
+    {{- if $v.registry }}
     registry = {{ $v.registry | quote }}
+    {{- end }}
+    {{- if $v.repository }}
     repository = {{ $v.repository | quote }}
-    user_env_var = {{ $v.user_env_var | quote }}
-    password_env_var = {{ $v.password_env_var | quote }}
+    {{- end }}
+    {{- if $v.user }}
+    user = {{ $v.user | quote }}
+    {{- end }}
+    {{- if $v.password }}
+    password = {{ $v.password | quote }}
+    {{- end }}
     {{ end }}
     {{- else }}
     [namespaces]
