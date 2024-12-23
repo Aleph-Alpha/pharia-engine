@@ -33,7 +33,7 @@ exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
 aleph-alpha-client = "0.15.0"
-anyhow = "1.0.94"
+anyhow = "1.0.95"
 async-trait = "0.1.83"
 axum = { version = "0.7.9", features = ["macros"] }
 axum-extra = { version = "0.9.6", features = ["typed-header"] }
@@ -44,7 +44,7 @@ oci-wasm = "0.2.0"
 reqwest = "0.12.9"
 semver = "1.0.24"
 serde = { version = "1.0.216", features = ["derive"] }
-serde_json = "1.0.133"
+serde_json = "1.0.134"
 toml = "0.8.19"
 strum = { version = "0.26.3", features = ["derive"] }
 tokio = { version = "1.42.0", features = [
@@ -69,7 +69,7 @@ wasmtime = "27.0.0"
 wasmtime-wasi = "27.0.0"
 wit-parser = "0.222.0"
 url = "2.5.4"
-thiserror = "2.0.8"
+thiserror = "2.0.9"
 tokenizers = { version = "0.21.0", default-features = false, features = [
     "onig",
     "esaxx_fast",
