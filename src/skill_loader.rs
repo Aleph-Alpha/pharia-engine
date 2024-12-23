@@ -78,12 +78,13 @@ impl From<&Registry> for Arc<dyn SkillRegistry + Send + Sync> {
             Registry::Oci {
                 repository,
                 registry,
-                auth,
+                user,
+                password,
             } => Arc::new(OciRegistry::new(
                 repository.clone(),
                 registry.clone(),
-                auth.user(),
-                auth.password(),
+                user.clone(),
+                password.clone(),
             )),
         }
     }

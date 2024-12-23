@@ -46,17 +46,15 @@ With the local configuration above, Pharia Kernel will serve any skill deployed 
 ```toml
 [namespaces.my-team]
 # The URL to the configuration listing the skills of this namespace
+# Pharia kernel will use the contents of the `NAMESPACES__MY_TEAM__CONFIG_ACCESS_TOKEN` environment variable to access (authorize) the config
 config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
-# Pharia kernel will use the contents of this environment variable to access (authorize) the above URL
-config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
 
 # Registry to load skills from
+# Pharia kernel will use the contents of the `NAMESPACES__MY_TEAM__REGISTRY__USER` and `NAMESPACES__MY_TEAM__REGISTRY__PASSWORD` environment variables to access (authorize) the registry
 [namespaces.my-team.registry]
 type = "oci"
 registry = "registry.gitlab.aleph-alpha.de"
 repository = "engineering/pharia-skills/skills"
-user_env_var = "MY_TEAM_REGISTRY_USER"
-password_env_var = "MY_TEAM_REGISTRY_PASSWORD"
 ```
 
 With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace "my-team".

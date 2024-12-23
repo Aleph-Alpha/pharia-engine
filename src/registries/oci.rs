@@ -150,10 +150,10 @@ mod tests {
 
     impl OciRegistry {
         fn from_env() -> Option<Self> {
-            let maybe_repository = env::var("SKILL_REPOSITORY");
-            let maybe_registry = env::var("SKILL_REGISTRY");
-            let maybe_username = env::var("SKILL_REGISTRY_USER");
-            let maybe_password = env::var("SKILL_REGISTRY_PASSWORD");
+            let maybe_repository = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__REPOSITORY");
+            let maybe_registry = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__REGISTRY");
+            let maybe_username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER");
+            let maybe_password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD");
             match (
                 maybe_repository,
                 maybe_registry,
@@ -174,10 +174,10 @@ mod tests {
                 .await
                 .expect("component must be valid");
 
-            let username =
-                env::var("SKILL_REGISTRY_USER").expect("SKILL_REGISTRY_USER variable not set");
-            let password = env::var("SKILL_REGISTRY_PASSWORD")
-                .expect("SKILL_REGISTRY_PASSWORD variable not set");
+            let username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER")
+                .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER variable not set");
+            let password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD")
+                .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD variable not set");
             let auth = RegistryAuth::Basic(username, password);
 
             self.client
