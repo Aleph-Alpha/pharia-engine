@@ -182,6 +182,9 @@ mod tests {
     use std::fs;
     use std::io::Write;
 
+    use heck::ToKebabCase;
+    use serde::Deserializer;
+    use serde_json::json;
     use tempfile::tempdir;
 
     use super::*;
@@ -610,5 +613,35 @@ password =  \"{password}\"
         };
 
         assert_eq!(config, expected);
+    }
+
+    fn keys_to_kebab_case<'de, D>(deserializer: D) -> Result<HashMap<String, String>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let map: HashMap<String, String> = Deserialize::deserialize(deserializer)?;
+        let map = map
+            .into_iter()
+            .map(|(k, v)| (k.to_kebab_case(), v))
+            .collect();
+        Ok(map)
+    }
+
+    #[test]
+    fn custom_deserialization() -> anyhow::Result<()> {
+        // given
+        #[derive(Deserialize)]
+        struct MyStruct {
+            #[serde(deserialize_with = "keys_to_kebab_case")]
+            my_map: HashMap<String, String>,
+        }
+        let json = json!({"my_map": {"my_key":"my_value"}});
+
+        // when
+        let my_struct = serde_json::from_value::<MyStruct>(json)?;
+
+        // then
+        assert!(my_struct.my_map.contains_key("my-key"));
+        Ok(())
     }
 }
