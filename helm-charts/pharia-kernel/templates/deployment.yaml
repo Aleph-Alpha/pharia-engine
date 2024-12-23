@@ -70,6 +70,10 @@ spec:
           env:
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | quote }}
+            {{- if .Values.openTelemetryEndpoint }}
+            - name: OPEN_TELEMETRY_ENDPOINT
+              value: {{ .Values.openTelemetryEndpoint | quote }}
+            {{- end }}
             {{- if .Values.authorizationAddress }}
             - name: AUTHORIZATION_ADDRESS
               value: {{ .Values.authorizationAddress | quote }}
@@ -99,10 +103,6 @@ spec:
                 configMapKeyRef:
                   name: {{ .Values.global.phariaAIConfigMap }}
                   key: DOCUMENT_INDEX_URL
-            {{- end }}
-            {{- if .Values.openTelemetryEndpoint }}
-            - name: OPEN_TELEMETRY_ENDPOINT
-              value: {{ .Values.openTelemetryEndpoint | quote }}
             {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
