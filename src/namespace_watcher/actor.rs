@@ -34,9 +34,9 @@ impl NamespaceDescriptionLoaders {
                 config
                     .loader()
                     .with_context(|| {
-                        format!("Unable to load configuration of namespace: '{namespace}'")
+                        format!("Unable to load configuration of namespace: '{namespace:?}'")
                     })
-                    .map(|loader| (namespace, loader))
+                    .map(|loader| (namespace.into_string(), loader))
             })
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
         Ok(Self { namespaces })
@@ -264,6 +264,7 @@ pub mod tests {
     use tokio::sync::{mpsc, Mutex};
     use tokio::time::timeout;
 
+    use crate::namespace_watcher::config::Namespace;
     use crate::namespace_watcher::tests::NamespaceConfig;
     use crate::skill_store::tests::SkillStoreMessage;
     use crate::skills::SkillPath;
@@ -407,7 +408,7 @@ pub mod tests {
     async fn watch_skills_in_empty_directory() {
         let temp_dir = tempdir().unwrap();
         let namespaces = [(
-            "local".to_owned(),
+            Namespace::new("local"),
             NamespaceConfig::Watch {
                 directory: temp_dir.path().to_owned(),
             },
@@ -430,7 +431,7 @@ pub mod tests {
         fs::File::create(directory.join("skill_1.wasm")).unwrap();
         fs::File::create(directory.join("skill_2.wasm")).unwrap();
         let namespaces = [(
-            "local".to_owned(),
+            Namespace::new("local"),
             NamespaceConfig::Watch {
                 directory: directory.to_owned(),
             },
