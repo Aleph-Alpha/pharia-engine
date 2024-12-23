@@ -63,10 +63,10 @@ defaultNamespaces:
 #   repository: "engineering/pharia-kernel-playground/skills"
 namespaces: {}
 logLevel: info
+openTelemetryEndpoint: ""
 authorizationAddress: ""
 inferenceAddress: ""
 documentIndexAddress: ""
-openTelemetryEndpoint: ""
 
 ingress:
   enabled: true
