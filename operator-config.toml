@@ -7,5 +7,5 @@ config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files
 # Pharia kernel will use the contents of the `NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER` and `NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD` environment variables to access (authorize) the registry
 [namespaces.pharia_kernel_team.registry]
 type = "oci"
-registry = "registry.gitlab.aleph-alpha.de"
+name = "registry.gitlab.aleph-alpha.de"
 repository = "engineering/pharia-skills/skills"

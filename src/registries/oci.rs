@@ -148,8 +148,8 @@ mod tests {
 
     impl OciRegistry {
         fn from_env() -> Option<Self> {
+            let maybe_registry = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__NAME");
             let maybe_repository = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__REPOSITORY");
-            let maybe_registry = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__REGISTRY");
             let maybe_username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER");
             let maybe_password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD");
             match (
