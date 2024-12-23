@@ -1,6 +1,6 @@
-use std::{collections::HashMap, env, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use config::{Config, Environment, File, FileFormat, FileSourceFile};
 use serde::Deserialize;
 use url::Url;
@@ -92,32 +92,6 @@ impl OperatorConfig {
 }
 
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct RegistryAuth {
-    user_env_var: String,
-    password_env_var: String,
-}
-
-impl RegistryAuth {
-    pub fn user(&self) -> String {
-        env::var(self.user_env_var.as_str()).unwrap_or_else(|_| {
-            panic!(
-                "{} must be set if OCI registry is used.",
-                self.user_env_var.as_str()
-            )
-        })
-    }
-
-    pub fn password(&self) -> String {
-        env::var(self.password_env_var.as_str()).unwrap_or_else(|_| {
-            panic!(
-                "{} must be set if OCI registry is used.",
-                self.password_env_var.as_str()
-            )
-        })
-    }
-}
-
-#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Registry {
     File {
@@ -126,8 +100,8 @@ pub enum Registry {
     Oci {
         registry: String,
         repository: String,
-        #[serde(flatten)]
-        auth: RegistryAuth,
+        user: String,
+        password: String,
     },
 }
 
@@ -139,7 +113,7 @@ pub enum NamespaceConfig {
     /// operators of Pharia Kernel, which in turn means we only refer the teams documentation here.
     TeamOwned {
         config_url: String,
-        config_access_token_env_var: Option<String>,
+        config_access_token: Option<String>,
         registry: Registry,
     },
     /// For development it is convenient to just watch a local repository for changing skills
@@ -170,28 +144,16 @@ impl NamespaceConfig {
         match self {
             NamespaceConfig::TeamOwned {
                 config_url,
-                config_access_token_env_var,
+                config_access_token,
                 // Registry does not change dynamically at the moment
                 registry: _,
             } => {
                 let url = Url::parse(config_url)?;
                 match url.scheme() {
-                    "https" | "http" => {
-                        let config_access_token = config_access_token_env_var
-                            .as_ref()
-                            .map(env::var)
-                            .transpose()
-                            .with_context(|| {
-                                format!(
-                                    "Missing environment variable: {}",
-                                    config_access_token_env_var.as_ref().unwrap()
-                                )
-                            })?;
-                        Ok(Box::new(HttpLoader::from_url(
-                            config_url,
-                            config_access_token,
-                        )))
-                    }
+                    "https" | "http" => Ok(Box::new(HttpLoader::from_url(
+                        config_url,
+                        config_access_token.clone(),
+                    ))),
                     "file" => {
                         // remove leading "file://"
                         let file_path = &config_url[7..];
@@ -268,20 +230,20 @@ mod tests {
             file,
             r#"[namespaces.a]
 config_url = "a"
-config_access_token_env_var = "a"
+config_access_token = "a"
 
 [namespaces.a.registry]
 type = "oci"
 registry = "a"
 repository = "a"
-user_env_var =  "a"
-password_env_var =  "a""#
+user =  "a"
+password =  "a""#
         )?;
         let file_source = File::with_name(file_path.to_str().unwrap());
         let env_vars = HashMap::from([
             ("NAMESPACES__B__CONFIG_URL".to_owned(), "b".to_owned()),
             (
-                "NAMESPACES__B__CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(),
+                "NAMESPACES__B__CONFIG_ACCESS_TOKEN".to_owned(),
                 "b".to_owned(),
             ),
             ("NAMESPACES__B__REGISTRY__TYPE".to_owned(), "oci".to_owned()),
@@ -293,12 +255,9 @@ password_env_var =  "a""#
                 "NAMESPACES__B__REGISTRY__REPOSITORY".to_owned(),
                 "b".to_owned(),
             ),
+            ("NAMESPACES__B__REGISTRY__USER".to_owned(), "b".to_owned()),
             (
-                "NAMESPACES__B__REGISTRY__USER_ENV_VAR".to_owned(),
-                "b".to_owned(),
-            ),
-            (
-                "NAMESPACES__B__REGISTRY__PASSWORD_ENV_VAR".to_owned(),
+                "NAMESPACES__B__REGISTRY__PASSWORD".to_owned(),
                 "b".to_owned(),
             ),
         ]);
@@ -320,11 +279,11 @@ password_env_var =  "a""#
     fn load_one_namespace_from_two_partial_sources() -> anyhow::Result<()> {
         // Given a TOML file and environment variables
         let config_url = "https://acme.com/latest/config.toml";
-        let config_access_token_env_var = "ACME_CONFIG_ACCESS_TOKEN";
+        let config_access_token = "ACME_CONFIG_ACCESS_TOKEN";
         let registry = "registry.acme.com";
         let repository = "engineering/skills";
-        let user_env_var = "SKILL_REGISTRY_USER";
-        let password_env_var = "SKILL_REGISTRY_PASSWORD";
+        let user = "DUMMY_USER";
+        let password = "DUMMY_PASSWORD";
         let dir = tempdir()?;
         let file_path = dir.path().join("operator-config.toml");
         let mut file = fs::File::create_new(&file_path)?;
@@ -332,13 +291,13 @@ password_env_var =  "a""#
             file,
             "[namespaces.acme]
 config_url = \"to_be_overwritten\"
-config_access_token_env_var = \"{config_access_token_env_var}\"
+config_access_token = \"{config_access_token}\"
 
 [namespaces.acme.registry]
 type = \"oci\"
 registry = \"{registry}\"
 repository = \"{repository}\"
-password_env_var =  \"{password_env_var}\"
+password =  \"{password}\"
         "
         )?;
         let file_source = File::with_name(file_path.to_str().unwrap());
@@ -348,8 +307,8 @@ password_env_var =  \"{password_env_var}\"
                 config_url.to_owned(),
             ),
             (
-                "NAMESPACES__ACME__REGISTRY__USER_ENV_VAR".to_owned(),
-                user_env_var.to_owned(),
+                "NAMESPACES__ACME__REGISTRY__USER".to_owned(),
+                user.to_owned(),
             ),
         ]);
         let env_source = Environment::default()
@@ -363,14 +322,12 @@ password_env_var =  \"{password_env_var}\"
         assert_eq!(config.namespaces.len(), 1);
         let namespace_config = NamespaceConfig::TeamOwned {
             config_url: config_url.to_owned(),
-            config_access_token_env_var: Some(config_access_token_env_var.to_owned()),
+            config_access_token: Some(config_access_token.to_owned()),
             registry: Registry::Oci {
                 registry: registry.to_owned(),
                 repository: repository.to_owned(),
-                auth: RegistryAuth {
-                    user_env_var: user_env_var.to_owned(),
-                    password_env_var: password_env_var.to_owned(),
-                },
+                user: user.to_owned(),
+                password: password.to_owned(),
             },
         };
         assert_eq!(config.namespaces.get("acme").unwrap(), &namespace_config);
@@ -382,14 +339,14 @@ password_env_var =  \"{password_env_var}\"
         // Given some environment variable
         let registry = "gitlab.aleph-alpha.de".to_owned();
         let repository = "engineering/pharia-skills/skills".to_owned();
-        let user_env_var = "SKILL_REGISTRY_USER".to_owned();
-        let password_env_var = "SKILL_REGISTRY_PASSWORD".to_owned();
+        let user = "DUMMY_USER".to_owned();
+        let password = "DUMMY_PASSWORD".to_owned();
         let env_vars = HashMap::from([
             ("TYPE".to_owned(), "oci".to_owned()),
             ("REGISTRY".to_owned(), registry.clone()),
             ("REPOSITORY".to_owned(), repository.clone()),
-            ("USER_ENV_VAR".to_owned(), user_env_var.clone()),
-            ("PASSWORD_ENV_VAR".to_owned(), password_env_var.clone()),
+            ("USER".to_owned(), user.clone()),
+            ("PASSWORD".to_owned(), password.clone()),
         ]);
 
         // When we  build the source from the environment variables
@@ -403,10 +360,8 @@ password_env_var =  \"{password_env_var}\"
         let expected = Registry::Oci {
             registry,
             repository,
-            auth: RegistryAuth {
-                user_env_var,
-                password_env_var,
-            },
+            user,
+            password,
         };
         assert_eq!(config, expected);
         Ok(())
@@ -416,24 +371,21 @@ password_env_var =  \"{password_env_var}\"
     fn deserialize_namespace_config_from_env() -> anyhow::Result<()> {
         let registry = "gitlab.aleph-alpha.de".to_owned();
         let repository = "engineering/pharia-skills/skills".to_owned();
-        let user_env_var = "SKILL_REGISTRY_USER".to_owned();
-        let password_env_var = "SKILL_REGISTRY_PASSWORD".to_owned();
+        let user = "DUMMY_USER".to_owned();
+        let password = "DUMMY_PASSWORD".to_owned();
         let config_url = "https://gitlab.aleph-alpha.de/playground".to_owned();
-        let config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN".to_owned();
+        let config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN".to_owned();
 
         let env_vars = HashMap::from([
             ("REGISTRY__TYPE".to_owned(), "oci".to_owned()),
             ("REGISTRY__REGISTRY".to_owned(), registry.clone()),
             ("REGISTRY__REPOSITORY".to_owned(), repository.clone()),
-            ("REGISTRY__USER_ENV_VAR".to_owned(), user_env_var.clone()),
-            (
-                "REGISTRY__PASSWORD_ENV_VAR".to_owned(),
-                password_env_var.clone(),
-            ),
+            ("REGISTRY__USER".to_owned(), user.clone()),
+            ("REGISTRY__PASSWORD".to_owned(), password.clone()),
             ("CONFIG_URL".to_owned(), config_url.clone()),
             (
-                "CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(),
-                config_access_token_env_var.clone(),
+                "CONFIG_ACCESS_TOKEN".to_owned(),
+                config_access_token.clone(),
             ),
         ]);
 
@@ -447,14 +399,12 @@ password_env_var =  \"{password_env_var}\"
 
         let expected = NamespaceConfig::TeamOwned {
             config_url,
-            config_access_token_env_var: Some(config_access_token_env_var.clone()),
+            config_access_token: Some(config_access_token.clone()),
             registry: Registry::Oci {
                 registry,
                 repository,
-                auth: RegistryAuth {
-                    user_env_var,
-                    password_env_var,
-                },
+                user,
+                password,
             },
         };
         assert_eq!(config, expected);
@@ -486,7 +436,7 @@ password_env_var =  \"{password_env_var}\"
                 "https://gitlab.aleph-alpha.de/playground".to_owned(),
             ),
             (
-                "NAMESPACES__PLAY_GROUND__CONFIG_ACCESS_TOKEN_ENV_VAR".to_owned(),
+                "NAMESPACES__PLAY_GROUND__CONFIG_ACCESS_TOKEN".to_owned(),
                 "GITLAB_CONFIG_ACCESS_TOKEN".to_owned(),
             ),
             (
@@ -502,11 +452,11 @@ password_env_var =  \"{password_env_var}\"
                 "engineering/pharia-skills/skills".to_owned(),
             ),
             (
-                "NAMESPACES__PLAY_GROUND__REGISTRY__USER_ENV_VAR".to_owned(),
+                "NAMESPACES__PLAY_GROUND__REGISTRY__USER".to_owned(),
                 "SKILL_REGISTRY_USER".to_owned(),
             ),
             (
-                "NAMESPACES__PLAY_GROUND__REGISTRY__PASSWORD_ENV_VAR".to_owned(),
+                "NAMESPACES__PLAY_GROUND__REGISTRY__PASSWORD".to_owned(),
                 "SKILL_REGISTRY_PASSWORD".to_owned(),
             ),
         ]);
@@ -549,28 +499,26 @@ password_env_var =  \"{password_env_var}\"
     fn deserialize_config_with_oci_registry() {
         let config = OperatorConfig::from_toml(
             r#"
-            [namespaces.pharia-kernel-team]
+            [namespaces.pharia_kernel_team]
             config_url = "https://dummy_url"
 
-            [namespaces.pharia-kernel-team.registry]
+            [namespaces.pharia_kernel_team.registry]
             type = "oci"
             registry = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
-            user_env_var = "SKILL_REGISTRY_USER"
-            password_env_var = "SKILL_REGISTRY_PASSWORD"
+            user = "DUMMY_USER"
+            password = "DUMMY_PASSWORD"
             "#,
         )
         .unwrap();
-        let pharia_kernel_team = config.namespaces.get("pharia-kernel-team").unwrap();
+        let pharia_kernel_team = config.namespaces.get("pharia_kernel_team").unwrap();
         assert_eq!(
             pharia_kernel_team.registry(),
             Registry::Oci {
                 registry: "registry.gitlab.aleph-alpha.de".to_owned(),
                 repository: "engineering/pharia-skills/skills".to_owned(),
-                auth: RegistryAuth {
-                    user_env_var: "SKILL_REGISTRY_USER".to_owned(),
-                    password_env_var: "SKILL_REGISTRY_PASSWORD".to_owned(),
-                },
+                user: "DUMMY_USER".to_owned(),
+                password: "DUMMY_PASSWORD".to_owned(),
             }
         );
     }
@@ -579,20 +527,20 @@ password_env_var =  \"{password_env_var}\"
     fn deserialize_config_with_config_access_token() {
         let config = OperatorConfig::from_toml(
             r#"
-            [namespaces.dummy_team]
+            [namespaces.dummy-team]
             config_url = "file://dummy_config_url"
-            config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+            config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
-            [namespaces.dummy_team.registry]
+            [namespaces.dummy-team.registry]
             type = "file"
             path = "dummy_file_path"
             "#,
         )
         .unwrap();
-        let namespace_cfg = config.namespaces.get("dummy_team").unwrap();
+        let namespace_cfg = config.namespaces.get("dummy-team").unwrap();
         let expected = NamespaceConfig::TeamOwned {
             config_url: "file://dummy_config_url".to_owned(),
-            config_access_token_env_var: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
+            config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
             registry: Registry::File {
                 path: "dummy_file_path".to_owned(),
             },
@@ -602,30 +550,31 @@ password_env_var =  \"{password_env_var}\"
 
     #[test]
     fn reads_from_file() {
+        drop(dotenvy::dotenv());
         let config = OperatorConfig::new("operator-config.toml").unwrap();
-        assert!(config.namespaces.contains_key("pharia-kernel-team"));
+        assert!(config.namespaces.contains_key("pharia_kernel_team"));
     }
 
     #[test]
     fn deserializes_multiple_namespaces() {
         let config = toml::from_str::<OperatorConfig>(
             r#"
-            [namespaces.pharia-kernel-team]
+            [namespaces.pharia_kernel_team]
             config_url = "https://dummy_url"
-            config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+            config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
-            [namespaces.pharia-kernel-team.registry]
+            [namespaces.pharia_kernel_team.registry]
             type = "oci"
             registry = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
-            user_env_var = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
-            password_env_var = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
+            user = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
+            password = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
 
-            [namespaces.pharia-kernel-team-local]
+            [namespaces.pharia_kernel_team-local]
             config_url = "https://dummy_url"
-            config_access_token_env_var = "GITLAB_CONFIG_ACCESS_TOKEN"
+            config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
-            [namespaces.pharia-kernel-team-local.registry]
+            [namespaces.pharia_kernel_team-local.registry]
             type = "file"
             path = "/temp/skills"
             "#,
@@ -635,25 +584,23 @@ password_env_var =  \"{password_env_var}\"
         let expected = OperatorConfig {
             namespaces: [
                 (
-                    "pharia-kernel-team".to_owned(),
+                    "pharia_kernel_team".to_owned(),
                     NamespaceConfig::TeamOwned {
                         config_url: "https://dummy_url".to_owned(),
-                        config_access_token_env_var: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
+                        config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
                         registry: Registry::Oci {
                             registry: "registry.gitlab.aleph-alpha.de".to_owned(),
                             repository: "engineering/pharia-skills/skills".to_owned(),
-                            auth: RegistryAuth {
-                                user_env_var: "PHARIA_KERNEL_TEAM_REGISTRY_USER".to_owned(),
-                                password_env_var: "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD".to_owned(),
-                            },
+                            user: "PHARIA_KERNEL_TEAM_REGISTRY_USER".to_owned(),
+                            password: "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD".to_owned(),
                         },
                     },
                 ),
                 (
-                    "pharia-kernel-team-local".to_owned(),
+                    "pharia_kernel_team-local".to_owned(),
                     NamespaceConfig::TeamOwned {
                         config_url: "https://dummy_url".to_owned(),
-                        config_access_token_env_var: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
+                        config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
                         registry: Registry::File {
                             path: "/temp/skills".to_owned(),
                         },
