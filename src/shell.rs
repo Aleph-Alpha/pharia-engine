@@ -306,7 +306,7 @@ async fn serve_docs() -> Json<openapi::OpenApi> {
 struct ExecuteSkillArgs {
     /// The qualified name of the skill to invoke. The qualified name consists of a namespace and
     /// a skill name (e.g. "acme/summarize").
-    /// If the namespace is omitted, the default `pharia_kernel_team` namespace is used.
+    /// If the namespace is omitted, the default `pharia-kernel-team` namespace is used.
     ///
     skill: String,
     /// The expected input for the skill in JSON format. Examples:
@@ -859,7 +859,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri("/cached_skills/pharia_kernel_team/haiku_skill".to_owned())
+                    .uri("/cached_skills/pharia-kernel-team/haiku_skill".to_owned())
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
@@ -871,7 +871,7 @@ mod tests {
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         assert_eq!(
             skill_path.lock().unwrap().take().unwrap(),
-            SkillPath::new("pharia_kernel_team", "haiku_skill")
+            SkillPath::new("pharia-kernel-team", "haiku_skill")
         );
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
@@ -915,7 +915,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri("/cached_skills/pharia_kernel_team/haiku_skill".to_owned())
+                    .uri("/cached_skills/pharia-kernel-team/haiku_skill".to_owned())
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
@@ -927,7 +927,7 @@ mod tests {
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         assert_eq!(
             skill_path.lock().unwrap().take().unwrap(),
-            SkillPath::new("pharia_kernel_team", "haiku_skill")
+            SkillPath::new("pharia-kernel-team", "haiku_skill")
         );
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();

@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::anyhow;
-use config::{Config, Environment, File, FileFormat, FileSourceFile};
-use serde::Deserialize;
+use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
+use heck::ToKebabCase;
+use serde::{Deserialize, Deserializer};
 use url::Url;
 
 use crate::skill_loader::RegistryConfig;
@@ -14,10 +15,33 @@ use super::{
     NamespaceDescriptionLoader,
 };
 
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub struct Namespace(String);
+
+impl Namespace {
+    pub fn new(input: impl Into<String>) -> Self {
+        Self(input.into().to_kebab_case())
+    }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Namespace {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Namespace::new(s))
+    }
+}
+
 #[derive(Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct OperatorConfig {
     #[serde(default)]
-    pub namespaces: HashMap<String, NamespaceConfig>,
+    pub namespaces: HashMap<Namespace, NamespaceConfig>,
 }
 
 impl OperatorConfig {
@@ -25,8 +49,16 @@ impl OperatorConfig {
     /// Cannot parse operator config from the provided file or the environment variables.
     pub fn new(config_file: &str) -> anyhow::Result<Self> {
         let file = File::with_name(config_file);
-        let env = Environment::default().separator("__");
+        let env = Self::environment();
         Self::from_sources(file, env)
+    }
+
+    fn environment() -> Environment {
+        // A namespace can contain the characters `[a-z0-9-]` e.g. `pharia-kernel-team`.
+        // As only SCREAMING_SNAKE_CASE is widely supported for environment variable keys,
+        // we support it by converting each key into kebab-case.
+        // Because we have a nested configuration, we use double underscores as the separators.
+        Environment::with_convert_case(Case::Kebab).separator("__")
     }
 
     fn from_sources(
@@ -49,7 +81,7 @@ impl OperatorConfig {
     pub fn local(skills: &[&str]) -> Self {
         OperatorConfig {
             namespaces: [(
-                "local".to_owned(),
+                Namespace::new("local"),
                 NamespaceConfig::InPlace {
                     skills: skills
                         .iter()
@@ -73,7 +105,7 @@ impl OperatorConfig {
         RegistryConfig::new(
             self.namespaces
                 .iter()
-                .map(|(k, v)| (k.to_owned(), v.registry()))
+                .map(|(k, v)| (k.to_owned().0, v.registry()))
                 .collect(),
         )
     }
@@ -81,7 +113,7 @@ impl OperatorConfig {
     #[must_use]
     pub fn dev() -> Self {
         let namespaces = [(
-            "dev".to_owned(),
+            Namespace::new("dev"),
             NamespaceConfig::Watch {
                 directory: "skills".into(),
             },
@@ -113,7 +145,9 @@ pub enum NamespaceConfig {
     /// implies that the skills in team owned namespaces are configured by a team rather than the
     /// operators of Pharia Kernel, which in turn means we only refer the teams documentation here.
     TeamOwned {
+        #[serde(alias = "config-url")]
         config_url: String,
+        #[serde(alias = "config-access-token")]
         config_access_token: Option<String>,
         registry: Registry,
     },
@@ -182,9 +216,6 @@ mod tests {
     use std::fs;
     use std::io::Write;
 
-    use heck::ToKebabCase;
-    use serde::Deserializer;
-    use serde_json::json;
     use tempfile::tempdir;
 
     use super::*;
@@ -212,9 +243,7 @@ mod tests {
         fs::File::create_new(&file_path)?;
         let file_source = File::with_name(file_path.to_str().unwrap());
         let env_vars = HashMap::new();
-        let env_source = Environment::default()
-            .separator("__")
-            .source(Some(env_vars));
+        let env_source = OperatorConfig::environment().source(Some(env_vars));
 
         // When loading from the sources
         let config = OperatorConfig::from_sources(file_source, env_source)?;
@@ -262,17 +291,17 @@ password =  "a""#
                 "b".to_owned(),
             ),
         ]);
-        let env_source = Environment::default()
-            .separator("__")
-            .source(Some(env_vars));
+        let env_source = OperatorConfig::environment().source(Some(env_vars));
 
         // When loading from the sources
         let config = OperatorConfig::from_sources(file_source, env_source)?;
 
         // Then both namespaces are loaded
         assert_eq!(config.namespaces.len(), 2);
-        assert!(config.namespaces.contains_key("a"));
-        assert!(config.namespaces.contains_key("b"));
+        let namespace_a = Namespace::new("a");
+        assert!(config.namespaces.contains_key(&namespace_a));
+        let namespace_b = Namespace::new("b");
+        assert!(config.namespaces.contains_key(&namespace_b));
         Ok(())
     }
 
@@ -291,7 +320,6 @@ password =  "a""#
         writeln!(
             file,
             "[namespaces.acme]
-config_url = \"to_be_overwritten\"
 config_access_token = \"{config_access_token}\"
 
 [namespaces.acme.registry]
@@ -312,9 +340,7 @@ password =  \"{password}\"
                 user.to_owned(),
             ),
         ]);
-        let env_source = Environment::default()
-            .separator("__")
-            .source(Some(env_vars));
+        let env_source = OperatorConfig::environment().source(Some(env_vars));
 
         // When loading from the sources
         let config = OperatorConfig::from_sources(file_source, env_source)?;
@@ -331,7 +357,11 @@ password =  \"{password}\"
                 password: password.to_owned(),
             },
         };
-        assert_eq!(config.namespaces.get("acme").unwrap(), &namespace_config);
+        let namespace = Namespace::new("acme");
+        assert_eq!(
+            config.namespaces.get(&namespace).unwrap(),
+            &namespace_config
+        );
         Ok(())
     }
 
@@ -351,7 +381,7 @@ password =  \"{password}\"
         ]);
 
         // When we  build the source from the environment variables
-        let source = Environment::default().source(Some(env_vars));
+        let source = OperatorConfig::environment().source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
@@ -390,9 +420,7 @@ password =  \"{password}\"
             ),
         ]);
 
-        let source = Environment::default()
-            .separator("__")
-            .source(Some(env_vars));
+        let source = OperatorConfig::environment().source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
@@ -418,7 +446,7 @@ password =  \"{password}\"
         let env_vars = HashMap::from([]);
 
         // When we build the source from the environment variables
-        let source = Environment::default().separator("_").source(Some(env_vars));
+        let source = OperatorConfig::environment().source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
@@ -463,9 +491,7 @@ password =  \"{password}\"
         ]);
 
         // When we build the source from the environment variables
-        let source = Environment::default()
-            .separator("__")
-            .source(Some(env_vars));
+        let source = OperatorConfig::environment().source(Some(env_vars));
         let config = Config::builder()
             .add_source(source)
             .build()?
@@ -477,7 +503,8 @@ password =  \"{password}\"
     #[test]
     fn deserialize_config_with_file_registry() {
         let config = OperatorConfig::local(&[]);
-        assert!(config.namespaces.contains_key("local"));
+        let namespace = Namespace::new("local");
+        assert!(config.namespaces.contains_key(&namespace));
     }
 
     #[test]
@@ -489,7 +516,8 @@ password =  \"{password}\"
             "#,
         )
         .unwrap();
-        let local_namespace = config.namespaces.get("local").unwrap();
+        let namespace = Namespace::new("local");
+        let local_namespace = config.namespaces.get(&namespace).unwrap();
 
         let registry = local_namespace.registry();
 
@@ -500,10 +528,10 @@ password =  \"{password}\"
     fn deserialize_config_with_oci_registry() {
         let config = OperatorConfig::from_toml(
             r#"
-            [namespaces.pharia_kernel_team]
+            [namespaces.pharia-kernel-team]
             config_url = "https://dummy_url"
 
-            [namespaces.pharia_kernel_team.registry]
+            [namespaces.pharia-kernel-team.registry]
             type = "oci"
             name = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
@@ -512,7 +540,8 @@ password =  \"{password}\"
             "#,
         )
         .unwrap();
-        let pharia_kernel_team = config.namespaces.get("pharia_kernel_team").unwrap();
+        let namespace = Namespace::new("pharia-kernel-team");
+        let pharia_kernel_team = config.namespaces.get(&namespace).unwrap();
         assert_eq!(
             pharia_kernel_team.registry(),
             Registry::Oci {
@@ -538,7 +567,8 @@ password =  \"{password}\"
             "#,
         )
         .unwrap();
-        let namespace_cfg = config.namespaces.get("dummy-team").unwrap();
+        let namespace = Namespace::new("dummy-team");
+        let namespace_cfg = config.namespaces.get(&namespace).unwrap();
         let expected = NamespaceConfig::TeamOwned {
             config_url: "file://dummy_config_url".to_owned(),
             config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
@@ -553,29 +583,30 @@ password =  \"{password}\"
     fn reads_from_file() {
         drop(dotenvy::dotenv());
         let config = OperatorConfig::new("operator-config.toml").unwrap();
-        assert!(config.namespaces.contains_key("pharia_kernel_team"));
+        let namespace = Namespace::new("pharia-kernel-team");
+        assert!(config.namespaces.contains_key(&namespace));
     }
 
     #[test]
     fn deserializes_multiple_namespaces() {
         let config = toml::from_str::<OperatorConfig>(
             r#"
-            [namespaces.pharia_kernel_team]
+            [namespaces.pharia-kernel-team]
             config_url = "https://dummy_url"
             config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
-            [namespaces.pharia_kernel_team.registry]
+            [namespaces.pharia-kernel-team.registry]
             type = "oci"
             name = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
             user = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
             password = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
 
-            [namespaces.pharia_kernel_team-local]
+            [namespaces.pharia-kernel-team-local]
             config_url = "https://dummy_url"
             config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
-            [namespaces.pharia_kernel_team-local.registry]
+            [namespaces.pharia-kernel-team-local.registry]
             type = "file"
             path = "/temp/skills"
             "#,
@@ -585,7 +616,7 @@ password =  \"{password}\"
         let expected = OperatorConfig {
             namespaces: [
                 (
-                    "pharia_kernel_team".to_owned(),
+                    Namespace::new("pharia-kernel-team"),
                     NamespaceConfig::TeamOwned {
                         config_url: "https://dummy_url".to_owned(),
                         config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
@@ -598,7 +629,7 @@ password =  \"{password}\"
                     },
                 ),
                 (
-                    "pharia_kernel_team-local".to_owned(),
+                    Namespace::new("pharia-kernel-team-local"),
                     NamespaceConfig::TeamOwned {
                         config_url: "https://dummy_url".to_owned(),
                         config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
@@ -613,35 +644,5 @@ password =  \"{password}\"
         };
 
         assert_eq!(config, expected);
-    }
-
-    fn keys_to_kebab_case<'de, D>(deserializer: D) -> Result<HashMap<String, String>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let map: HashMap<String, String> = Deserialize::deserialize(deserializer)?;
-        let map = map
-            .into_iter()
-            .map(|(k, v)| (k.to_kebab_case(), v))
-            .collect();
-        Ok(map)
-    }
-
-    #[test]
-    fn custom_deserialization() -> anyhow::Result<()> {
-        // given
-        #[derive(Deserialize)]
-        struct MyStruct {
-            #[serde(deserialize_with = "keys_to_kebab_case")]
-            my_map: HashMap<String, String>,
-        }
-        let json = json!({"my_map": {"my_key":"my_value"}});
-
-        // when
-        let my_struct = serde_json::from_value::<MyStruct>(json)?;
-
-        // then
-        assert!(my_struct.my_map.contains_key("my-key"));
-        Ok(())
     }
 }
