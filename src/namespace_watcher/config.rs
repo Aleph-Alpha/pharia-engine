@@ -24,18 +24,18 @@ impl OperatorConfig {
     /// # Errors
     /// Cannot parse operator config from the provided file or the environment variables.
     pub fn new(config_file: &str) -> anyhow::Result<Self> {
-        let file_source = File::with_name(config_file);
-        let env_source = Environment::default().separator("__");
-        Self::with_sources(file_source, env_source)
+        let file = File::with_name(config_file);
+        let env = Environment::default().separator("__");
+        Self::from_sources(file, env)
     }
 
-    fn with_sources(
-        file_source: File<FileSourceFile, FileFormat>,
-        env_source: Environment,
+    fn from_sources(
+        file: File<FileSourceFile, FileFormat>,
+        env: Environment,
     ) -> anyhow::Result<Self> {
         let config = Config::builder()
-            .add_source(file_source)
-            .add_source(env_source)
+            .add_source(file)
+            .add_source(env)
             .build()?
             .try_deserialize::<OperatorConfig>()?;
         Ok(config)
@@ -213,7 +213,7 @@ mod tests {
             .source(Some(env_vars));
 
         // When loading from the sources
-        let config = OperatorConfig::with_sources(file_source, env_source)?;
+        let config = OperatorConfig::from_sources(file_source, env_source)?;
 
         // Then both sources are applied, with the values from environment variables having precedence
         assert_eq!(config.namespaces.len(), 0);
@@ -266,7 +266,7 @@ password =  "a""#
             .source(Some(env_vars));
 
         // When loading from the sources
-        let config = OperatorConfig::with_sources(file_source, env_source)?;
+        let config = OperatorConfig::from_sources(file_source, env_source)?;
 
         // Then both namespaces are loaded
         assert_eq!(config.namespaces.len(), 2);
@@ -316,7 +316,7 @@ password =  \"{password}\"
             .source(Some(env_vars));
 
         // When loading from the sources
-        let config = OperatorConfig::with_sources(file_source, env_source)?;
+        let config = OperatorConfig::from_sources(file_source, env_source)?;
 
         // Then both sources are applied, with the values from environment variables having higher precedence
         assert_eq!(config.namespaces.len(), 1);
