@@ -20,6 +20,19 @@ pub struct OciRegistry {
 }
 
 impl OciRegistry {
+    pub fn new(repository: String, registry: String, username: String, password: String) -> Self {
+        let client = Client::new(ClientConfig::default());
+        let client = WasmClient::new(client);
+
+        Self {
+            client,
+            registry,
+            repository,
+            username,
+            password,
+        }
+    }
+
     fn auth(&self) -> RegistryAuth {
         RegistryAuth::Basic(self.username.clone(), self.password.clone())
     }
@@ -97,21 +110,6 @@ impl SkillRegistry for OciRegistry {
                 }
             }
         })
-    }
-}
-
-impl OciRegistry {
-    pub fn new(repository: String, registry: String, username: String, password: String) -> Self {
-        let client = Client::new(ClientConfig::default());
-        let client = WasmClient::new(client);
-
-        Self {
-            client,
-            registry,
-            repository,
-            username,
-            password,
-        }
     }
 }
 
