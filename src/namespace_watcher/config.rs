@@ -98,6 +98,7 @@ pub enum Registry {
         path: String,
     },
     Oci {
+        #[serde(rename = "name")]
         registry: String,
         repository: String,
         user: String,
@@ -234,7 +235,7 @@ config_access_token = "a"
 
 [namespaces.a.registry]
 type = "oci"
-registry = "a"
+name = "a"
 repository = "a"
 user =  "a"
 password =  "a""#
@@ -247,10 +248,7 @@ password =  "a""#
                 "b".to_owned(),
             ),
             ("NAMESPACES__B__REGISTRY__TYPE".to_owned(), "oci".to_owned()),
-            (
-                "NAMESPACES__B__REGISTRY__REGISTRY".to_owned(),
-                "b".to_owned(),
-            ),
+            ("NAMESPACES__B__REGISTRY__NAME".to_owned(), "b".to_owned()),
             (
                 "NAMESPACES__B__REGISTRY__REPOSITORY".to_owned(),
                 "b".to_owned(),
@@ -295,7 +293,7 @@ config_access_token = \"{config_access_token}\"
 
 [namespaces.acme.registry]
 type = \"oci\"
-registry = \"{registry}\"
+name = \"{registry}\"
 repository = \"{repository}\"
 password =  \"{password}\"
         "
@@ -343,7 +341,7 @@ password =  \"{password}\"
         let password = "DUMMY_PASSWORD".to_owned();
         let env_vars = HashMap::from([
             ("TYPE".to_owned(), "oci".to_owned()),
-            ("REGISTRY".to_owned(), registry.clone()),
+            ("NAME".to_owned(), registry.clone()),
             ("REPOSITORY".to_owned(), repository.clone()),
             ("USER".to_owned(), user.clone()),
             ("PASSWORD".to_owned(), password.clone()),
@@ -378,7 +376,7 @@ password =  \"{password}\"
 
         let env_vars = HashMap::from([
             ("REGISTRY__TYPE".to_owned(), "oci".to_owned()),
-            ("REGISTRY__REGISTRY".to_owned(), registry.clone()),
+            ("REGISTRY__NAME".to_owned(), registry.clone()),
             ("REGISTRY__REPOSITORY".to_owned(), repository.clone()),
             ("REGISTRY__USER".to_owned(), user.clone()),
             ("REGISTRY__PASSWORD".to_owned(), password.clone()),
@@ -444,7 +442,7 @@ password =  \"{password}\"
                 "oci".to_owned(),
             ),
             (
-                "NAMESPACES__PLAY_GROUND__REGISTRY__REGISTRY".to_owned(),
+                "NAMESPACES__PLAY_GROUND__REGISTRY__NAME".to_owned(),
                 "registry.gitlab.aleph-alpha.de".to_owned(),
             ),
             (
@@ -504,7 +502,7 @@ password =  \"{password}\"
 
             [namespaces.pharia_kernel_team.registry]
             type = "oci"
-            registry = "registry.gitlab.aleph-alpha.de"
+            name = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
             user = "DUMMY_USER"
             password = "DUMMY_PASSWORD"
@@ -565,7 +563,7 @@ password =  \"{password}\"
 
             [namespaces.pharia_kernel_team.registry]
             type = "oci"
-            registry = "registry.gitlab.aleph-alpha.de"
+            name = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
             user = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
             password = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"

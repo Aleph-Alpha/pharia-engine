@@ -20,7 +20,7 @@ data:
     type = "oci"
     {{- end }}
     {{- if $v.registry }}
-    registry = {{ $v.registry | quote }}
+    name = {{ $v.registry | quote }}
     {{- end }}
     {{- if $v.repository }}
     repository = {{ $v.repository | quote }}

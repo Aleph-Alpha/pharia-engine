@@ -110,7 +110,7 @@ spec:
                 configMapKeyRef:
                   name: {{ .Values.global.phariaAIConfigMap }}
                   key: PHARIA_ASSISTANT_API_SKILL_CONFIG
-            - name: NAMESPACES__ASSISTANT__REGISTRY__REGISTRY
+            - name: NAMESPACES__ASSISTANT__REGISTRY__NAME
               value: "alephalpha.jfrog.io"
             - name: NAMESPACES__ASSISTANT__REGISTRY__REPOSITORY
               value: "assistant-skills"
