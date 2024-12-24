@@ -53,11 +53,12 @@ impl OperatorConfig {
         Self::from_sources(file, env)
     }
 
+    /// A namespace can contain the characters `[a-z0-9-]` e.g. `pharia-kernel-team`.
+    ///
+    /// As only `SCREAMING_SNAKE_CASE` is widely supported for environment variable keys,
+    /// we support it by converting each key into `kebab-case`.
+    /// Because we have a nested configuration, we use double underscores as the separators.
     fn environment() -> Environment {
-        // A namespace can contain the characters `[a-z0-9-]` e.g. `pharia-kernel-team`.
-        // As only SCREAMING_SNAKE_CASE is widely supported for environment variable keys,
-        // we support it by converting each key into kebab-case.
-        // Because we have a nested configuration, we use double underscores as the separators.
         Environment::with_convert_case(Case::Kebab).separator("__")
     }
 
