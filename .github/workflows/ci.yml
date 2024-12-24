@@ -35,10 +35,10 @@ jobs:
       - name: Run cargo test
         run: cargo test --workspace --all-features
     env:
-      SKILL_REGISTRY: ghcr.io
-      SKILL_REPOSITORY: aleph-alpha/pharia-kernel
-      SKILL_REGISTRY_USER: ${{ github.actor }}
-      SKILL_REGISTRY_PASSWORD: ${{ secrets.SKILL_REGISTRY_PASSWORD }}
+      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__NAME: ghcr.io
+      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__REPOSITORY: aleph-alpha/pharia-kernel
+      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER: ${{ github.actor }}
+      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD: ${{ secrets.SKILL_REGISTRY_PASSWORD }}
       PHARIA_AI_TOKEN: ${{ secrets.PHARIA_AI_TOKEN }}
       AA_INFERENCE_ADDRESS: https://inference-api.product.pharia.com
       AUTHORIZATION_ADDRESS: https://pharia-iam.product.pharia.com
@@ -101,9 +101,9 @@ jobs:
       - name: Integration test
         run: |
           (podman run -p 8081:8081 -v ./operator-config.toml:/app/operator-config.toml \
-            -e SKILL_REGISTRY_USER=dummy \
-            -e SKILL_REGISTRY_PASSWORD=dummy \
-            -e GITLAB_CONFIG_ACCESS_TOKEN=dummy \
+            -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER=dummy \
+            -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD=dummy \
+            -e NAMESPACES__PHARIA_KERNEL_TEAM__CONFIG_ACCESS_TOKEN=dummy \
             -e PHARIA_AI_TOKEN=dummy \
             pharia-kernel:$IMAGE_ID | cat) &
           bash -x ./tests/test-image.sh 8081 127.0.0.1
