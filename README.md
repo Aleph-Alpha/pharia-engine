@@ -72,10 +72,10 @@ execute skill:
 
 ```shell
 set -a; source .env
-curl -v -X POST 127.0.0.1:8081/execute_skill \
+curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill/run\
 -H "Authorization: Bearer $PHARIA_AI_TOKEN" \
 -H 'Content-Type: application/json' \
--d '{"skill":"pharia-kernel-team/greet_skill", "input":"Homer"}'
+-d '"Homer"'
 ```
 
 ## User manual

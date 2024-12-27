@@ -113,10 +113,10 @@ In order to run Pharia Kernel, you need to provide a namespace configuration:
 4. Execute your skill:
 
     ```shell
-        curl -v -X POST 127.0.0.1:8081/execute_skill \
+        curl -v -X POST 127.0.0.1:8081/v1/skills/dev/my_skill/run \
             -H "Authorization: Bearer $PHARIA_AI_TOKEN" \
             -H 'Content-Type: application/json' \
-            -d '{"skill":"dev/my_skill", "input":"Homer"}'
+            -d '"Homer"'
     ```
 
 5. Iterate

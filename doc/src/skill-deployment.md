@@ -47,4 +47,4 @@ skills = [
 
 With this configuration, Pharia Kernel looks in the associated OCI registry for two skills: the "greet" skill with the tag "latest" and the "haiku" skill with the tag "v1.0.1". If the configuration changes, Pharia Kernel will pick up the changes and reload the skills.
 
-Congratulations! Your Skill is now deployed. You can now use the [HTTP API](https://pharia-kernel.aleph-alpha.stackit.run/api-docs#tag/skills/POST/execute_skill) to call it.
+Congratulations! Your Skill is now deployed. You can now use the [HTTP API](https://pharia-kernel.product.pharia.com/api-docs#tag/skills/POST/v1/skills/{namespace}/{name}/run) to call it.
