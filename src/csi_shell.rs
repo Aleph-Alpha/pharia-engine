@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use crate::{
     csi::{ChunkRequest, Csi},
-    inference::{self, ChatRequest, CompletionRequest},
+    inference::{ChatRequest, CompletionParams, CompletionRequest},
     language_selection::SelectLanguageRequest,
     search::{DocumentMetadataRequest, SearchRequest},
     shell::AppState,
@@ -28,7 +28,7 @@ where
     let result = match args {
         VersionedCsiRequest::V0_2(request) => match request {
             V0_2CsiRequest::Complete(completion_request) => drivers
-                .complete_text(bearer.token().to_owned(), completion_request)
+                .complete_text(bearer.token().to_owned(), completion_request.into())
                 .await
                 .map(|r| json!(r)),
             V0_2CsiRequest::Chunk(chunk_request) => drivers
@@ -45,7 +45,7 @@ where
                     complete_all_request
                         .requests
                         .into_iter()
-                        .map(inference::CompletionRequest::from)
+                        .map(Into::into)
                         .collect(),
                 )
                 .await
@@ -118,7 +118,7 @@ pub enum VersionedCsiRequest {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum V0_2CsiRequest {
-    Complete(CompletionRequest),
+    Complete(V0_2CompletionRequest),
     Chunk(ChunkRequest),
     SelectLanguage(SelectLanguageRequest),
     CompleteAll(CompleteAllRequest),
@@ -133,7 +133,61 @@ pub enum V0_2CsiRequest {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CompleteAllRequest {
-    pub requests: Vec<CompletionRequest>,
+    pub requests: Vec<V0_2CompletionRequest>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct V0_2CompletionRequest {
+    pub prompt: String,
+    pub model: String,
+    pub params: V0_2CompletionParams,
+}
+
+impl From<V0_2CompletionRequest> for CompletionRequest {
+    fn from(
+        V0_2CompletionRequest {
+            prompt,
+            model,
+            params,
+        }: V0_2CompletionRequest,
+    ) -> Self {
+        Self {
+            prompt,
+            model,
+            params: params.into(),
+        }
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct V0_2CompletionParams {
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f64>,
+    pub top_k: Option<u32>,
+    pub top_p: Option<f64>,
+    pub stop: Vec<String>,
+}
+
+impl From<V0_2CompletionParams> for CompletionParams {
+    fn from(
+        V0_2CompletionParams {
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+        }: V0_2CompletionParams,
+    ) -> Self {
+        Self {
+            // the option to include special tokens is only supported since v0.3
+            special_tokens: false,
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+        }
+    }
 }
 
 /// We use `BAD_REQUEST` (400) for validation error as it is more commonly used.

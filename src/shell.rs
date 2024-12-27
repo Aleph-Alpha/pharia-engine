@@ -503,8 +503,10 @@ mod tests {
     use crate::{
         authorization::{self, tests::StubAuthorization},
         csi::tests::{DummyCsi, StubCsi},
-        csi_shell::{V0_2CsiRequest, VersionedCsiRequest},
-        inference::{self, Completion, CompletionParams, CompletionRequest},
+        csi_shell::{
+            V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest, VersionedCsiRequest,
+        },
+        inference::{self, Completion},
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
         skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
         tests::api_token,
@@ -577,10 +579,10 @@ mod tests {
     async fn http_csi_handle_returns_completion() {
         // Given a versioned csi request
         let prompt = "Say hello to Homer";
-        let completion_request = CompletionRequest {
+        let completion_request = V0_2CompletionRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
             prompt: prompt.to_owned(),
-            params: CompletionParams::default(),
+            params: V0_2CompletionParams::default(),
         };
         let request = VersionedCsiRequest::V0_2(V0_2CsiRequest::Complete(completion_request));
 
