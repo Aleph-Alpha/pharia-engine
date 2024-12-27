@@ -383,7 +383,7 @@ impl SkillRequests {
             }
             Err(e) => {
                 for sender in senders {
-                    drop(sender.send(Err(anyhow!(e.to_string()))));
+                    drop(sender.send(Err(anyhow!(format!("{e:?}")))));
                 }
                 Err(e)
             }
