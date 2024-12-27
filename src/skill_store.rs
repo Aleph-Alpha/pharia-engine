@@ -383,7 +383,17 @@ impl SkillRequests {
             }
             Err(e) => {
                 for sender in senders {
-                    drop(sender.send(Err(anyhow!(format!("{e:?}")))));
+                    // We can not copy the error, but also don't want to make any formatting decisions
+                    // at this level. Therefore, we try to clone the original error chain
+                    let root = anyhow!(e.root_cause().to_string());
+
+                    // The error chain starts from the outer most, so we reverse it and skip the root cause
+                    let error = e
+                        .chain()
+                        .rev()
+                        .skip(1)
+                        .fold(root, |error, cause| error.context(cause.to_string()));
+                    drop(sender.send(Err(error)));
                 }
                 Err(e)
             }
