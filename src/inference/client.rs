@@ -51,6 +51,7 @@ impl InferenceClient for Client {
             prompt,
             params:
                 CompletionParams {
+                    special_tokens,
                     max_tokens,
                     temperature,
                     top_k,
@@ -71,7 +72,7 @@ impl InferenceClient for Client {
                 top_p: *top_p,
                 complete_with_one_of: &[],
             },
-            special_tokens: false,
+            special_tokens: *special_tokens,
         };
         let how = How {
             api_token: Some(api_token),
@@ -310,5 +311,33 @@ mod tests {
             chat_result.unwrap_err(),
             InferenceClientError::Unauthorized
         ));
+    }
+
+    #[tokio::test]
+    async fn test_complete_response_with_special_tokens() {
+        // Given an inference client
+        let api_token = api_token().to_owned();
+        let host = inference_address().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // and a completion request
+        let completion_request = CompletionRequest {
+            prompt: "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Environment: ipython<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Write code to check if number is prime, use that to see if the number 7 is prime<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
+            model: "llama-3.1-8b-instruct".to_owned(),
+            params:CompletionParams {special_tokens: true, ..CompletionParams ::default()}
+        };
+
+        // When completing text with inference client
+        let completion_response =
+            <Client as InferenceClient>::complete_text(&client, &completion_request, api_token)
+                .await
+                .unwrap();
+
+        // Then a completion response is returned
+        assert!(completion_response.text.contains("<|python_tag|>"));
     }
 }

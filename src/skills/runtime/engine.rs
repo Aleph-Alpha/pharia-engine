@@ -347,6 +347,7 @@ mod v0_2 {
                 stop,
             } = options;
             let params = inference::CompletionParams {
+                special_tokens: false,
                 max_tokens,
                 temperature,
                 top_k,
@@ -414,6 +415,7 @@ mod v0_2 {
                         prompt: r.prompt,
                         model: r.model,
                         params: inference::CompletionParams {
+                            special_tokens: false,
                             max_tokens,
                             temperature,
                             top_k,
