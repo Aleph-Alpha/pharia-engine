@@ -370,7 +370,7 @@ async fn execute_skill(
         ),
         Err(ExecuteSkillError::Other(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!(err.to_string())),
+            Json(json!(format!("{:?}", err))),
         ),
     }
 }
@@ -408,7 +408,7 @@ async fn run_skill(
         ),
         Err(ExecuteSkillError::Other(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!(err.to_string())),
+            Json(json!(format!("{:?}", err))),
         ),
     }
 }
@@ -623,6 +623,42 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let completion = serde_json::from_slice::<Completion>(&body).unwrap();
         assert_eq!(completion.text, prompt);
+    }
+
+    #[tokio::test]
+    async fn error_context_is_returned() {
+        // Given a mock skill executor which returns a nested error
+        let skill_executer_mock = StubSkillExecuter::new(move |msg| {
+            let SkillExecutorMsg { send, .. } = msg;
+            let error = anyhow::anyhow!("inner error").context("outer error");
+            send.send(Err(ExecuteSkillError::Other(error))).unwrap();
+        });
+        let skill_executor_api = skill_executer_mock.api();
+        let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
+        let http = http(app_state);
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/greet_skill/run")
+                    .body(Body::from(json!("Homer").to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = String::from_utf8(body.to_vec()).unwrap();
+        assert!(answer.contains("outer error"));
+        assert!(answer.contains("inner error"));
     }
 
     #[tokio::test]
