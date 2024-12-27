@@ -580,13 +580,7 @@ mod tests {
         let completion_request = CompletionRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
             prompt: prompt.to_owned(),
-            params: CompletionParams {
-                max_tokens: Some(128),
-                temperature: None,
-                top_k: None,
-                top_p: None,
-                stop: vec![],
-            },
+            params: CompletionParams::default(),
         };
         let request = VersionedCsiRequest::V0_2(V0_2CsiRequest::Complete(completion_request));
 

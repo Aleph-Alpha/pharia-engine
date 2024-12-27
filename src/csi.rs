@@ -301,13 +301,7 @@ pub mod tests {
         let completion_req_1 = CompletionRequest {
             model: "dummy_model".to_owned(),
             prompt: "1st_request".to_owned(),
-            params: CompletionParams {
-                max_tokens: None,
-                temperature: None,
-                top_k: None,
-                top_p: None,
-                stop: vec![],
-            },
+            params: CompletionParams::default(),
         };
 
         let completion_req_2 = CompletionRequest {
