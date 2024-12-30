@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use thiserror::Error;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
@@ -48,6 +48,8 @@ pub enum SkillLoaderError {
     LinkerError(String),
     #[error("Invalid namespace: {0}")]
     InvalidNamespace(String),
+    #[error("Skill configured but not loadable.")]
+    Unloadable,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -228,7 +230,7 @@ impl SkillLoaderActor {
     ) -> Result<(Skill, Digest), SkillLoaderError> {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
-            skill_bytes.ok_or_else(|| anyhow!("Skill {skill} configured but not loadable."))?;
+            skill_bytes.ok_or_else(|| SkillLoaderError::Unloadable)?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")

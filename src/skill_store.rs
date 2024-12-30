@@ -412,6 +412,9 @@ impl SkillRequests {
                         SkillLoaderError::InvalidNamespace(e) => {
                             drop(sender.send(Err(SkillLoaderError::InvalidNamespace(e.clone()))));
                         }
+                        SkillLoaderError::Unloadable => {
+                            drop(sender.send(Err(SkillLoaderError::Unloadable)));
+                        }
                     }
                 }
                 Err(e)
