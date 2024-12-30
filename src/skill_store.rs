@@ -400,6 +400,12 @@ impl SkillRequests {
                                 .fold(root, |error, cause| error.context(cause.to_string()));
                             drop(sender.send(Err(SkillLoaderError::Other(error))));
                         }
+                        SkillLoaderError::NotSupportedYet => {
+                            drop(sender.send(Err(SkillLoaderError::NotSupportedYet)));
+                        }
+                        SkillLoaderError::NoLongerSupported => {
+                            drop(sender.send(Err(SkillLoaderError::NoLongerSupported)));
+                        }
                     }
                 }
                 Err(e)

@@ -262,15 +262,8 @@ impl SupportedVersion {
 
     /// Check if a given version is valid
     fn validate_version(version: Option<Version>) -> Result<Self, SkillLoaderError> {
-        const NO_LONGER_SUPPORTED: &str =
-            "This Skill version is no longer supported by the Kernel. Try upgrading your SDK.";
-        const NOT_SUPPORTED_YET: &str =
-            "This Skill version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.";
-
         let Some(version) = version else {
-            return Err(SkillLoaderError::Other(anyhow::anyhow!(
-                NO_LONGER_SUPPORTED
-            )));
+            return Err(SkillLoaderError::NoLongerSupported);
         };
 
         match version {
@@ -280,11 +273,9 @@ impl SupportedVersion {
             _ => {
                 // Once we have more than one supported version, we will need to account for 0.2.x being greater than current but less than latest
                 if &version > Self::latest_supported_version() {
-                    Err(SkillLoaderError::Other(anyhow::anyhow!(NOT_SUPPORTED_YET)))
+                    Err(SkillLoaderError::NotSupportedYet)
                 } else {
-                    Err(SkillLoaderError::Other(anyhow::anyhow!(
-                        NO_LONGER_SUPPORTED
-                    )))
+                    Err(SkillLoaderError::NoLongerSupported)
                 }
             }
         }
