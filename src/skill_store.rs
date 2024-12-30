@@ -113,9 +113,9 @@ impl SkillStoreState {
     }
 
     /// Return the registered tag for a given skill
-    fn tag(&self, skill_path: &SkillPath) -> anyhow::Result<Option<&str>> {
+    fn tag(&self, skill_path: &SkillPath) -> Result<Option<&str>, SkillLoaderError> {
         if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
-            return Err(anyhow!("Invalid namespace: {error}"));
+            return Err(SkillLoaderError::InvalidNamespace(error.to_string()));
         }
         Ok(self.known_skills.get(skill_path).map(String::as_str))
     }
@@ -409,6 +409,9 @@ impl SkillRequests {
                         SkillLoaderError::LinkerError(e) => {
                             drop(sender.send(Err(SkillLoaderError::LinkerError(e.clone()))));
                         }
+                        SkillLoaderError::InvalidNamespace(e) => {
+                            drop(sender.send(Err(SkillLoaderError::InvalidNamespace(e.clone()))));
+                        }
                     }
                 }
                 Err(e)
@@ -487,7 +490,7 @@ impl SkillStoreActor {
                         drop(send.send(Ok(None)));
                     }
                     Err(e) => {
-                        drop(send.send(Err(SkillLoaderError::Other(e))));
+                        drop(send.send(Err(e)));
                     }
                 }
             }

@@ -46,6 +46,8 @@ pub enum SkillLoaderError {
     NoLongerSupported,
     #[error("Failed to instantiate the skill: {0}")]
     LinkerError(String),
+    #[error("Invalid namespace: {0}")]
+    InvalidNamespace(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
