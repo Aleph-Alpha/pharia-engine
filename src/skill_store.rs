@@ -391,15 +391,6 @@ impl SkillRequests {
                     // We can not copy the error, but also don't want to make any formatting decisions
                     // at this level. Therefore, we try to clone the original error chain
                     match &e {
-                        SkillLoaderError::Other(e) => {
-                            let root = anyhow!(e.root_cause().to_string());
-                            let error = e
-                                .chain()
-                                .rev()
-                                .skip(1)
-                                .fold(root, |error, cause| error.context(cause.to_string()));
-                            drop(sender.send(Err(SkillLoaderError::Other(error))));
-                        }
                         SkillLoaderError::NotSupportedYet => {
                             drop(sender.send(Err(SkillLoaderError::NotSupportedYet)));
                         }

@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Context;
 use thiserror::Error;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
@@ -62,8 +61,6 @@ pub enum SkillLoaderError {
     WasmtimeBindingsError(String),
     #[error("Wasm decode error: {0}")]
     WasmDecodeError(String),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
 }
 
 pub enum SkillLoaderMsg {
@@ -248,8 +245,7 @@ impl SkillLoaderActor {
             skill_bytes.ok_or_else(|| SkillLoaderError::Unloadable)?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
-            .expect("Spawned linking thread must run to completion without being poisoned.")
-            .with_context(|| format!("Failed to initialize {skill}."))?;
+            .expect("Spawned linking thread must run to completion without being poisoned.")?;
         Ok((skill, digest))
     }
 
