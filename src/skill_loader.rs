@@ -50,6 +50,8 @@ pub enum SkillLoaderError {
     InvalidNamespace(String),
     #[error("Skill configured but not loadable.")]
     Unloadable,
+    #[error("{0}")]
+    RegistryError(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -228,7 +230,10 @@ impl SkillLoaderActor {
         engine: Arc<Engine>,
         skill: &ConfiguredSkill,
     ) -> Result<(Skill, Digest), SkillLoaderError> {
-        let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
+        let skill_bytes = registry
+            .load_skill(&skill.name, &skill.tag)
+            .await
+            .map_err(|e| SkillLoaderError::RegistryError(e.to_string()))?;
         let SkillImage { bytes, digest } =
             skill_bytes.ok_or_else(|| SkillLoaderError::Unloadable)?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))

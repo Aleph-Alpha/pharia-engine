@@ -415,6 +415,9 @@ impl SkillRequests {
                         SkillLoaderError::Unloadable => {
                             drop(sender.send(Err(SkillLoaderError::Unloadable)));
                         }
+                        SkillLoaderError::RegistryError(e) => {
+                            drop(sender.send(Err(SkillLoaderError::RegistryError(e.clone()))));
+                        }
                     }
                 }
                 Err(e)
