@@ -33,7 +33,7 @@ impl WasmRuntime {
             .skill_store_api
             .fetch(skill_path.to_owned())
             .await
-            .map_err(ExecuteSkillError::Other)?;
+            .map_err(ExecuteSkillError::SkillLoaderError)?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(ExecuteSkillError::SkillDoesNotExist)?;
         skill

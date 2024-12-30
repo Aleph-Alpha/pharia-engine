@@ -368,6 +368,10 @@ async fn execute_skill(
             StatusCode::BAD_REQUEST,
             Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
         ),
+        Err(ExecuteSkillError::SkillLoaderError(err)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!(format!("{:?}", err))),
+        ),
         Err(ExecuteSkillError::Other(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(format!("{:?}", err))),
@@ -405,6 +409,10 @@ async fn run_skill(
         Err(ExecuteSkillError::SkillDoesNotExist) => (
             StatusCode::BAD_REQUEST,
             Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
+        ),
+        Err(ExecuteSkillError::SkillLoaderError(err)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!(format!("{:?}", err))),
         ),
         Err(ExecuteSkillError::Other(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,

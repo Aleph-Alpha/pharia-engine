@@ -26,6 +26,7 @@ use crate::{
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     search::{DocumentPath, SearchRequest, SearchResult},
+    skill_loader::SkillLoaderError,
     skill_store::SkillStoreApi,
 };
 
@@ -99,6 +100,8 @@ pub enum ExecuteSkillError {
         associated with the namespace."
     )]
     SkillDoesNotExist,
+    #[error(transparent)]
+    SkillLoaderError(SkillLoaderError),
     #[error(transparent)]
     Other(anyhow::Error),
 }

@@ -3,7 +3,7 @@ use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Durat
 use crate::{
     namespace_watcher::Namespace,
     registries::Digest,
-    skill_loader::{ConfiguredSkill, SkillLoaderApi},
+    skill_loader::{ConfiguredSkill, SkillLoaderApi, SkillLoaderError},
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
@@ -248,7 +248,10 @@ impl SkillStoreApi {
     }
 
     /// Fetch an executable skill
-    pub async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, anyhow::Error> {
+    pub async fn fetch(
+        &self,
+        skill_path: SkillPath,
+    ) -> Result<Option<Arc<Skill>>, SkillLoaderError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::Fetch { skill_path, send };
         self.sender
@@ -297,7 +300,7 @@ impl SkillStoreApi {
 pub enum SkillStoreMessage {
     Fetch {
         skill_path: SkillPath,
-        send: oneshot::Sender<Result<Option<Arc<Skill>>, anyhow::Error>>,
+        send: oneshot::Sender<Result<Option<Arc<Skill>>, SkillLoaderError>>,
     },
     List {
         send: oneshot::Sender<Vec<SkillPath>>,
@@ -329,9 +332,9 @@ struct SkillStoreActor {
 }
 
 type SkillRequest =
-    Pin<Box<dyn Future<Output = (SkillPath, Result<(Skill, Digest), anyhow::Error>)> + Send>>;
+    Pin<Box<dyn Future<Output = (SkillPath, Result<(Skill, Digest), SkillLoaderError>)> + Send>>;
 
-type Recipient = oneshot::Sender<Result<Option<Arc<Skill>>, anyhow::Error>>;
+type Recipient = oneshot::Sender<Result<Option<Arc<Skill>>, SkillLoaderError>>;
 struct SkillRequests {
     requests: FuturesUnordered<SkillRequest>,
     recipients: HashMap<SkillPath, Vec<Recipient>>,
@@ -370,7 +373,9 @@ impl SkillRequests {
 
     /// Select the next finished skill request and send the result to the recipients.
     /// Return the skill path and result.
-    pub async fn select_next_some(&mut self) -> anyhow::Result<(SkillPath, (Arc<Skill>, Digest))> {
+    pub async fn select_next_some(
+        &mut self,
+    ) -> Result<(SkillPath, (Arc<Skill>, Digest)), SkillLoaderError> {
         let (skill_path, result) = self.requests.select_next_some().await;
         let senders = self.recipients.remove(&skill_path).unwrap();
         match result {
@@ -385,15 +390,17 @@ impl SkillRequests {
                 for sender in senders {
                     // We can not copy the error, but also don't want to make any formatting decisions
                     // at this level. Therefore, we try to clone the original error chain
-                    let root = anyhow!(e.root_cause().to_string());
-
-                    // The error chain starts from the outer most, so we reverse it and skip the root cause
-                    let error = e
-                        .chain()
-                        .rev()
-                        .skip(1)
-                        .fold(root, |error, cause| error.context(cause.to_string()));
-                    drop(sender.send(Err(error)));
+                    match &e {
+                        SkillLoaderError::Other(e) => {
+                            let root = anyhow!(e.root_cause().to_string());
+                            let error = e
+                                .chain()
+                                .rev()
+                                .skip(1)
+                                .fold(root, |error, cause| error.context(cause.to_string()));
+                            drop(sender.send(Err(SkillLoaderError::Other(error))));
+                        }
+                    }
                 }
                 Err(e)
             }
@@ -471,7 +478,7 @@ impl SkillStoreActor {
                         drop(send.send(Ok(None)));
                     }
                     Err(e) => {
-                        drop(send.send(Err(e)));
+                        drop(send.send(Err(SkillLoaderError::Other(e))));
                     }
                 }
             }
@@ -511,7 +518,7 @@ pub mod tests {
     use tokio::time::{sleep, timeout};
 
     use crate::namespace_watcher::Namespace;
-    use crate::skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg};
+    use crate::skill_loader::{RegistryConfig, SkillLoader, SkillLoaderError, SkillLoaderMsg};
     use crate::skills::{Engine, SkillPath};
 
     use super::*;
@@ -550,12 +557,22 @@ pub mod tests {
         let skill_path_clone = skill_path.clone();
 
         // When pushing two requests for the same skill to the cache
-        let fut = async move { (skill_path_clone, Err(anyhow!("First response"))) };
+        let fut = async move {
+            (
+                skill_path_clone,
+                Err(SkillLoaderError::Other(anyhow!("First response"))),
+            )
+        };
         let (first_send, first_recv) = oneshot::channel();
         cache.push(skill_path.clone(), Box::pin(fut), first_send);
 
         let skill_path_clone = skill_path.clone();
-        let fut = async move { (skill_path_clone, Err(anyhow!("Second response"))) };
+        let fut = async move {
+            (
+                skill_path_clone,
+                Err(SkillLoaderError::Other(anyhow!("Second response"))),
+            )
+        };
         let (second_send, second_recv) = oneshot::channel();
         cache.push(skill_path, Box::pin(fut), second_send);
 
@@ -590,12 +607,22 @@ pub mod tests {
 
         // When pushing two requests for different skills to the cache
         let first_skill_clone = first_skill.clone();
-        let fut = async move { (first_skill_clone, Err(anyhow!("First response"))) };
+        let fut = async move {
+            (
+                first_skill_clone,
+                Err(SkillLoaderError::Other(anyhow!("First response"))),
+            )
+        };
         let (first_send, first_recv) = oneshot::channel();
         cache.push(first_skill, Box::pin(fut), first_send);
 
         let second_skill_clone = second_skill.clone();
-        let fut = async move { (second_skill_clone, Err(anyhow!("Second response"))) };
+        let fut = async move {
+            (
+                second_skill_clone,
+                Err(SkillLoaderError::Other(anyhow!("Second response"))),
+            )
+        };
         let (second_send, second_recv) = oneshot::channel();
         cache.push(second_skill, Box::pin(fut), second_send);
 
@@ -647,7 +674,9 @@ pub mod tests {
         // When answering the first request with an error message
         match recv.recv().await.unwrap() {
             SkillLoaderMsg::Fetch { send, .. } => {
-                drop(send.send(Err(anyhow!("First request response"))));
+                drop(send.send(Err(SkillLoaderError::Other(anyhow!(
+                    "First request response"
+                )))));
             }
             SkillLoaderMsg::FetchDigest { .. } => unreachable!(),
         }

@@ -87,9 +87,11 @@ impl Engine {
     pub fn instantiate_pre(
         &self,
         bytes: impl AsRef<[u8]>,
-    ) -> anyhow::Result<InstancePre<LinkedCtx>> {
+    ) -> Result<InstancePre<LinkedCtx>, SkillLoaderError> {
         let component = Component::new(&self.inner, bytes)?;
-        self.linker.instantiate_pre(&component)
+        self.linker
+            .instantiate_pre(&component)
+            .map_err(SkillLoaderError::Other)
     }
 
     /// Generates a store for a specific invocation.
@@ -126,7 +128,7 @@ pub enum Skill {
 impl Skill {
     /// Extracts the version of the skill WIT world from the provided bytes,
     /// and links it to the appropriate version in the linker.
-    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> Result<Self, SkillLoaderError> {
         let skill_version = SupportedVersion::extract(&bytes)?;
         let pre = engine.instantiate_pre(&bytes)?;
 
@@ -266,7 +268,9 @@ impl SupportedVersion {
             "This Skill version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.";
 
         let Some(version) = version else {
-            return Err(SkillLoaderError::Other(anyhow::anyhow!(NO_LONGER_SUPPORTED)));
+            return Err(SkillLoaderError::Other(anyhow::anyhow!(
+                NO_LONGER_SUPPORTED
+            )));
         };
 
         match version {
@@ -278,7 +282,9 @@ impl SupportedVersion {
                 if &version > Self::latest_supported_version() {
                     Err(SkillLoaderError::Other(anyhow::anyhow!(NOT_SUPPORTED_YET)))
                 } else {
-                    Err(SkillLoaderError::Other(anyhow::anyhow!(NO_LONGER_SUPPORTED)))
+                    Err(SkillLoaderError::Other(anyhow::anyhow!(
+                        NO_LONGER_SUPPORTED
+                    )))
                 }
             }
         }
