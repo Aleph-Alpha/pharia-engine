@@ -52,6 +52,10 @@ pub enum SkillLoaderError {
     Unloadable,
     #[error("{0}")]
     RegistryError(String),
+    #[error("Wasm isn't a component.")]
+    NotComponent,
+    #[error("Wasm component isn't using Pharia Skill.")]
+    NotPhariaSkill,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

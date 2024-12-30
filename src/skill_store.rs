@@ -418,6 +418,12 @@ impl SkillRequests {
                         SkillLoaderError::RegistryError(e) => {
                             drop(sender.send(Err(SkillLoaderError::RegistryError(e.clone()))));
                         }
+                        SkillLoaderError::NotComponent => {
+                            drop(sender.send(Err(SkillLoaderError::NotComponent)));
+                        }
+                        SkillLoaderError::NotPhariaSkill => {
+                            drop(sender.send(Err(SkillLoaderError::NotPhariaSkill)));
+                        }
                     }
                 }
                 Err(e)

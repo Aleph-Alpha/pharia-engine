@@ -204,17 +204,19 @@ impl SupportedVersion {
         Self::validate_version(version)
     }
 
-    fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> anyhow::Result<Option<Version>> {
+    fn extract_pharia_skill_version(
+        wasm: impl AsRef<[u8]>,
+    ) -> Result<Option<Version>, SkillLoaderError> {
         let decoded = decode(wasm.as_ref())?;
         if let DecodedWasm::Component(resolve, ..) = decoded {
             let package_name = &resolve
                 .package_names
                 .keys()
                 .find(|k| (k.namespace == "pharia" && k.name == "skill"))
-                .ok_or_else(|| anyhow!("Wasm component isn't using Pharia Skill."))?;
+                .ok_or_else(|| SkillLoaderError::NotPhariaSkill)?;
             Ok(package_name.version.clone())
         } else {
-            Err(anyhow!("Wasm isn't a component."))
+            Err(SkillLoaderError::NotComponent)
         }
     }
 
