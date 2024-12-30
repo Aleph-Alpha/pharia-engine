@@ -60,6 +60,8 @@ pub enum SkillLoaderError {
     ComponentError(String),
     #[error("Wasmtime bindings error: {0}")]
     WasmtimeBindingsError(String),
+    #[error("Wasm decode error: {0}")]
+    WasmDecodeError(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

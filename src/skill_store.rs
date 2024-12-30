@@ -433,6 +433,9 @@ impl SkillRequests {
                                     .send(Err(SkillLoaderError::WasmtimeBindingsError(e.clone()))),
                             );
                         }
+                        SkillLoaderError::WasmDecodeError(e) => {
+                            drop(sender.send(Err(SkillLoaderError::WasmDecodeError(e.clone()))));
+                        }
                     }
                 }
                 Err(e)

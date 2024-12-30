@@ -209,7 +209,8 @@ impl SupportedVersion {
     fn extract_pharia_skill_version(
         wasm: impl AsRef<[u8]>,
     ) -> Result<Option<Version>, SkillLoaderError> {
-        let decoded = decode(wasm.as_ref())?;
+        let decoded =
+            decode(wasm.as_ref()).map_err(|e| SkillLoaderError::WasmDecodeError(e.to_string()))?;
         if let DecodedWasm::Component(resolve, ..) = decoded {
             let package_name = &resolve
                 .package_names
