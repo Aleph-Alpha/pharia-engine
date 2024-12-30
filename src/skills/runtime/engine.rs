@@ -88,7 +88,8 @@ impl Engine {
         &self,
         bytes: impl AsRef<[u8]>,
     ) -> Result<InstancePre<LinkedCtx>, SkillLoaderError> {
-        let component = Component::new(&self.inner, bytes)?;
+        let component = Component::new(&self.inner, bytes)
+            .map_err(|e| SkillLoaderError::ComponentError(e.to_string()))?;
         self.linker
             .instantiate_pre(&component)
             .map_err(|e| SkillLoaderError::LinkerError(e.to_string()))

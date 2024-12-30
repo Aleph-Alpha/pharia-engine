@@ -424,6 +424,9 @@ impl SkillRequests {
                         SkillLoaderError::NotPhariaSkill => {
                             drop(sender.send(Err(SkillLoaderError::NotPhariaSkill)));
                         }
+                        SkillLoaderError::ComponentError(e) => {
+                            drop(sender.send(Err(SkillLoaderError::ComponentError(e.clone()))));
+                        }
                     }
                 }
                 Err(e)

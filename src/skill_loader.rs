@@ -56,6 +56,8 @@ pub enum SkillLoaderError {
     NotComponent,
     #[error("Wasm component isn't using Pharia Skill.")]
     NotPhariaSkill,
+    #[error("Component error: {0}")]
+    ComponentError(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
