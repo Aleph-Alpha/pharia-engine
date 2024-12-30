@@ -388,46 +388,7 @@ impl SkillRequests {
             }
             Err(e) => {
                 for sender in senders {
-                    // We can not copy the error, but also don't want to make any formatting decisions
-                    // at this level. Therefore, we try to clone the original error chain
-                    match &e {
-                        SkillLoaderError::NotSupportedYet => {
-                            drop(sender.send(Err(SkillLoaderError::NotSupportedYet)));
-                        }
-                        SkillLoaderError::NoLongerSupported => {
-                            drop(sender.send(Err(SkillLoaderError::NoLongerSupported)));
-                        }
-                        SkillLoaderError::LinkerError(e) => {
-                            drop(sender.send(Err(SkillLoaderError::LinkerError(e.clone()))));
-                        }
-                        SkillLoaderError::InvalidNamespace(e) => {
-                            drop(sender.send(Err(SkillLoaderError::InvalidNamespace(e.clone()))));
-                        }
-                        SkillLoaderError::Unloadable => {
-                            drop(sender.send(Err(SkillLoaderError::Unloadable)));
-                        }
-                        SkillLoaderError::RegistryError(e) => {
-                            drop(sender.send(Err(SkillLoaderError::RegistryError(e.clone()))));
-                        }
-                        SkillLoaderError::NotComponent => {
-                            drop(sender.send(Err(SkillLoaderError::NotComponent)));
-                        }
-                        SkillLoaderError::NotPhariaSkill => {
-                            drop(sender.send(Err(SkillLoaderError::NotPhariaSkill)));
-                        }
-                        SkillLoaderError::ComponentError(e) => {
-                            drop(sender.send(Err(SkillLoaderError::ComponentError(e.clone()))));
-                        }
-                        SkillLoaderError::WasmtimeBindingsError(e) => {
-                            drop(
-                                sender
-                                    .send(Err(SkillLoaderError::WasmtimeBindingsError(e.clone()))),
-                            );
-                        }
-                        SkillLoaderError::WasmDecodeError(e) => {
-                            drop(sender.send(Err(SkillLoaderError::WasmDecodeError(e.clone()))));
-                        }
-                    }
+                    drop(sender.send(Err(e.clone())));
                 }
                 Err(e)
             }

@@ -37,7 +37,7 @@ impl ConfiguredSkill {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum SkillLoaderError {
     #[error("This Skill version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
     NotSupportedYet,
