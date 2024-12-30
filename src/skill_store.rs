@@ -572,7 +572,7 @@ pub mod tests {
         let fut = async move {
             (
                 skill_path_clone,
-                Err(SkillLoaderError::Other(anyhow!("First response"))),
+                Err(SkillLoaderError::LinkerError("First error".to_string())),
             )
         };
         let (first_send, first_recv) = oneshot::channel();
@@ -582,7 +582,7 @@ pub mod tests {
         let fut = async move {
             (
                 skill_path_clone,
-                Err(SkillLoaderError::Other(anyhow!("Second response"))),
+                Err(SkillLoaderError::LinkerError("Second error".to_string())),
             )
         };
         let (second_send, second_recv) = oneshot::channel();
@@ -597,13 +597,13 @@ pub mod tests {
             .unwrap()
             .unwrap_err()
             .to_string()
-            .contains("First response"));
+            .contains("First error"));
         assert!(second_recv
             .await
             .unwrap()
             .unwrap_err()
             .to_string()
-            .contains("First response"));
+            .contains("First error"));
 
         // And the cache is empty
         assert!(cache.recipients.is_empty());
@@ -622,7 +622,7 @@ pub mod tests {
         let fut = async move {
             (
                 first_skill_clone,
-                Err(SkillLoaderError::Other(anyhow!("First response"))),
+                Err(SkillLoaderError::LinkerError("First error".to_string())),
             )
         };
         let (first_send, first_recv) = oneshot::channel();
@@ -632,7 +632,7 @@ pub mod tests {
         let fut = async move {
             (
                 second_skill_clone,
-                Err(SkillLoaderError::Other(anyhow!("Second response"))),
+                Err(SkillLoaderError::LinkerError("Second error".to_string())),
             )
         };
         let (second_send, second_recv) = oneshot::channel();
@@ -648,13 +648,13 @@ pub mod tests {
             .unwrap()
             .unwrap_err()
             .to_string()
-            .contains("First response"));
+            .contains("First error"));
         assert!(second_recv
             .await
             .unwrap()
             .unwrap_err()
             .to_string()
-            .contains("Second response"));
+            .contains("Second error"));
 
         // And the cache is empty
         assert!(cache.requests.is_empty());
@@ -686,9 +686,9 @@ pub mod tests {
         // When answering the first request with an error message
         match recv.recv().await.unwrap() {
             SkillLoaderMsg::Fetch { send, .. } => {
-                drop(send.send(Err(SkillLoaderError::Other(anyhow!(
-                    "First request response"
-                )))));
+                drop(send.send(Err(SkillLoaderError::LinkerError(
+                    "First request response".to_string(),
+                ))));
             }
             SkillLoaderMsg::FetchDigest { .. } => unreachable!(),
         }
