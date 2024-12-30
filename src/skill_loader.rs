@@ -241,8 +241,7 @@ impl SkillLoaderActor {
             .load_skill(&skill.name, &skill.tag)
             .await
             .map_err(|e| SkillLoaderError::RegistryError(e.to_string()))?;
-        let SkillImage { bytes, digest } =
-            skill_bytes.ok_or_else(|| SkillLoaderError::Unloadable)?;
+        let SkillImage { bytes, digest } = skill_bytes.ok_or(SkillLoaderError::Unloadable)?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")?;

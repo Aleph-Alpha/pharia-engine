@@ -216,7 +216,7 @@ impl SupportedVersion {
                 .package_names
                 .keys()
                 .find(|k| (k.namespace == "pharia" && k.name == "skill"))
-                .ok_or_else(|| SkillLoaderError::NotPhariaSkill)?;
+                .ok_or(SkillLoaderError::NotPhariaSkill)?;
             Ok(package_name.version.clone())
         } else {
             Err(SkillLoaderError::NotComponent)
