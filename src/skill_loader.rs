@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
+use thiserror::Error;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
@@ -36,6 +37,13 @@ impl ConfiguredSkill {
         }
     }
 }
+
+#[derive(Error, Debug)]
+pub enum SkillLoaderError {
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
 
 pub enum SkillLoaderMsg {
     Fetch {

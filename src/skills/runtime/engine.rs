@@ -17,6 +17,8 @@ use wasmtime::{
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
+use crate::skill_loader::SkillLoaderError;
+
 use super::CsiForSkills;
 
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
@@ -195,7 +197,7 @@ impl SupportedVersion {
         Ok(())
     }
 
-    fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+    fn extract(wasm: impl AsRef<[u8]>) -> Result<Self, SkillLoaderError> {
         let version = Self::extract_pharia_skill_version(wasm)?;
         Self::validate_version(version)
     }
@@ -257,14 +259,14 @@ impl SupportedVersion {
     }
 
     /// Check if a given version is valid
-    fn validate_version(version: Option<Version>) -> anyhow::Result<Self> {
+    fn validate_version(version: Option<Version>) -> Result<Self, SkillLoaderError> {
         const NO_LONGER_SUPPORTED: &str =
             "This Skill version is no longer supported by the Kernel. Try upgrading your SDK.";
         const NOT_SUPPORTED_YET: &str =
             "This Skill version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.";
 
         let Some(version) = version else {
-            return Err(anyhow::anyhow!(NO_LONGER_SUPPORTED));
+            return Err(SkillLoaderError::Other(anyhow::anyhow!(NO_LONGER_SUPPORTED)));
         };
 
         match version {
@@ -274,9 +276,9 @@ impl SupportedVersion {
             _ => {
                 // Once we have more than one supported version, we will need to account for 0.2.x being greater than current but less than latest
                 if &version > Self::latest_supported_version() {
-                    Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
+                    Err(SkillLoaderError::Other(anyhow::anyhow!(NOT_SUPPORTED_YET)))
                 } else {
-                    Err(anyhow::anyhow!(NO_LONGER_SUPPORTED))
+                    Err(SkillLoaderError::Other(anyhow::anyhow!(NO_LONGER_SUPPORTED)))
                 }
             }
         }
