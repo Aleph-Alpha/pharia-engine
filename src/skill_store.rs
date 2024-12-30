@@ -427,6 +427,12 @@ impl SkillRequests {
                         SkillLoaderError::ComponentError(e) => {
                             drop(sender.send(Err(SkillLoaderError::ComponentError(e.clone()))));
                         }
+                        SkillLoaderError::WasmtimeBindingsError(e) => {
+                            drop(
+                                sender
+                                    .send(Err(SkillLoaderError::WasmtimeBindingsError(e.clone()))),
+                            );
+                        }
                     }
                 }
                 Err(e)

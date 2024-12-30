@@ -135,7 +135,8 @@ impl Skill {
 
         match skill_version {
             SupportedVersion::V0_2 => {
-                let skill = v0_2::SkillPre::new(pre)?;
+                let skill = v0_2::SkillPre::new(pre)
+                    .map_err(|e| SkillLoaderError::WasmtimeBindingsError(e.to_string()))?;
                 Ok(Skill::V0_2(skill))
             }
         }

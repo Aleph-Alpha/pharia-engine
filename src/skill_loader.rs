@@ -58,6 +58,8 @@ pub enum SkillLoaderError {
     NotPhariaSkill,
     #[error("Component error: {0}")]
     ComponentError(String),
+    #[error("Wasmtime bindings error: {0}")]
+    WasmtimeBindingsError(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
