@@ -44,6 +44,8 @@ pub enum SkillLoaderError {
     NotSupportedYet,
     #[error("This Skill version is no longer supported by the Kernel. Try upgrading your SDK.")]
     NoLongerSupported,
+    #[error("Failed to instantiate the skill: {0}")]
+    LinkerError(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

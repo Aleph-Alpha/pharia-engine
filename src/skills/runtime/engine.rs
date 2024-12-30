@@ -91,7 +91,7 @@ impl Engine {
         let component = Component::new(&self.inner, bytes)?;
         self.linker
             .instantiate_pre(&component)
-            .map_err(SkillLoaderError::Other)
+            .map_err(|e| SkillLoaderError::LinkerError(e.to_string()))
     }
 
     /// Generates a store for a specific invocation.

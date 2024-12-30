@@ -406,6 +406,9 @@ impl SkillRequests {
                         SkillLoaderError::NoLongerSupported => {
                             drop(sender.send(Err(SkillLoaderError::NoLongerSupported)));
                         }
+                        SkillLoaderError::LinkerError(e) => {
+                            drop(sender.send(Err(SkillLoaderError::LinkerError(e.clone()))));
+                        }
                     }
                 }
                 Err(e)
