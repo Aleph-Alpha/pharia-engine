@@ -616,7 +616,7 @@ fn pooling_allocator_is_supported() -> bool {
     static USE_POOLING: LazyLock<bool> = LazyLock::new(|| {
         let mut config = Config::new();
         config.wasm_memory64(true);
-        config.static_memory_maximum_size(1 << BITS_TO_TEST);
+        config.memory_reservation(1 << BITS_TO_TEST);
         let Ok(engine) = WasmtimeEngine::new(&config) else {
             info!("unable to create an engine to test the pooling allocator, disabling pooling allocation");
             return false;
