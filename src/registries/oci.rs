@@ -20,14 +20,14 @@ pub struct OciRegistry {
 }
 
 impl OciRegistry {
-    pub fn new(repository: String, registry: String, username: String, password: String) -> Self {
+    pub fn new(registry: String, repository: String, username: String, password: String) -> Self {
         let client = Client::new(ClientConfig::default());
         let client = WasmClient::new(client);
 
         Self {
             client,
             registry,
-            repository,
+            repository: repository.trim_matches('/').to_owned(),
             username,
             password,
         }
@@ -37,12 +37,13 @@ impl OciRegistry {
         RegistryAuth::Basic(self.username.clone(), self.password.clone())
     }
 
-    fn reference(&self, name: &str, tag: String) -> Reference {
-        Reference::with_tag(
-            self.registry.clone(),
-            format!("{}/{name}", self.repository),
-            tag,
-        )
+    fn reference(&self, name: &str, tag: impl Into<String>) -> Reference {
+        let repository = if self.repository.is_empty() {
+            name.to_owned()
+        } else {
+            format!("{}/{name}", self.repository)
+        };
+        Reference::with_tag(self.registry.clone(), repository, tag.into())
     }
 }
 
@@ -52,7 +53,7 @@ impl SkillRegistry for OciRegistry {
         name: &'a str,
         tag: &'a str,
     ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
-        let image = self.reference(name, tag.to_owned());
+        let image = self.reference(name, tag);
 
         Box::pin(async move {
             // We want to match on the specific type of result.
@@ -95,7 +96,7 @@ impl SkillRegistry for OciRegistry {
         Box::pin(async move {
             let result = self
                 .client
-                .fetch_manifest_digest(&self.reference(name, tag.to_owned()), &self.auth())
+                .fetch_manifest_digest(&self.reference(name, tag), &self.auth())
                 .await;
             match result {
                 Ok(digest) => Ok(Some(Digest(digest))),
@@ -153,13 +154,13 @@ mod tests {
             let maybe_username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER");
             let maybe_password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD");
             match (
-                maybe_repository,
                 maybe_registry,
+                maybe_repository,
                 maybe_username,
                 maybe_password,
             ) {
-                (Ok(repository), Ok(registry), Ok(username), Ok(password)) => {
-                    Some(OciRegistry::new(repository, registry, username, password))
+                (Ok(registry), Ok(repository), Ok(username), Ok(password)) => {
+                    Some(OciRegistry::new(registry, repository, username, password))
                 }
                 _ => None,
             }
@@ -267,5 +268,32 @@ mod tests {
 
         // then skill can not be found
         assert!(bytes.is_err());
+    }
+
+    #[test]
+    fn oci_registry_sanitizes_base_repository_input() {
+        let registry = OciRegistry::new(
+            "127.0.0.1:6000".to_owned(),
+            "/skills/".to_owned(),
+            "dummy-user".to_owned(),
+            "dummy-password".to_owned(),
+        );
+
+        assert_eq!(registry.repository, "skills");
+    }
+
+    #[test]
+    fn oci_registry_handles_empty_base_repository() {
+        let skill_name = "skill";
+        let registry = OciRegistry::new(
+            "127.0.0.1:6000".to_owned(),
+            String::new(),
+            "dummy-user".to_owned(),
+            "dummy-password".to_owned(),
+        );
+
+        let reference = registry.reference(skill_name, "tag");
+
+        assert_eq!(reference.repository(), skill_name);
     }
 }
