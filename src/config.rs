@@ -1,6 +1,5 @@
 use anyhow::anyhow;
-use config::ConfigError;
-use std::{env, io, net::SocketAddr, time::Duration};
+use std::{env, net::SocketAddr, time::Duration};
 
 use crate::namespace_watcher::OperatorConfig;
 
@@ -72,40 +71,8 @@ impl AppConfig {
             .unwrap_or("10s")
             .parse()?;
 
-        let operator_config = match OperatorConfig::new("operator-config.toml") {
-            Ok(operator_config) => operator_config,
-            Err(config_error) => match config_error.downcast::<ConfigError>() {
-                Ok(ConfigError::Foreign(foreign_error)) => {
-                    match foreign_error.downcast::<io::Error>() {
-                        Ok(io_error) if io_error.kind() == io::ErrorKind::NotFound => {
-                            // println! as the logger is not yet instantiated
-                            println!("Info: The 'operator-config.toml' is not found, fallback to the namespace 'dev' with the path 'skills' as the registry.");
-                            OperatorConfig::dev()
-                        }
-                        Ok(err) => {
-                            return Err(anyhow!(
-                                "The provided operator configuration must be valid: {err}"
-                            ))
-                        }
-                        Err(err) => {
-                            return Err(anyhow!(
-                                "The provided operator configuration must be valid: {err}"
-                            ))
-                        }
-                    }
-                }
-                Ok(err) => {
-                    return Err(anyhow!(
-                        "The provided operator configuration must be valid: {err}"
-                    ))
-                }
-                Err(err) => {
-                    return Err(anyhow!(
-                        "The provided operator configuration must be valid: {err}"
-                    ))
-                }
-            },
-        };
+        let operator_config = OperatorConfig::new("operator-config.toml")
+            .map_err(|err| anyhow!("The provided operator configuration must be valid: {err}"))?;
 
         let use_pooling_allocator = env::var("USE_POOLING_ALLOCATOR")
             .as_deref()

@@ -48,7 +48,7 @@ impl OperatorConfig {
     /// # Errors
     /// Cannot parse operator config from the provided file or the environment variables.
     pub fn new(config_file: &str) -> anyhow::Result<Self> {
-        let file = File::with_name(config_file);
+        let file = File::with_name(config_file).required(false);
         let env = Self::environment();
         Self::from_sources(file, env)
     }
