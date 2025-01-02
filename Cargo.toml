@@ -64,7 +64,7 @@ tower-http = { version = "0.6.2", features = [
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 utoipa = { version = "5.3.0", features = ["axum_extras"] }
-utoipa-scalar = { version = "0.2.0", features = ["axum"] }
+utoipa-scalar = { version = "0.2.0" }
 wasmtime = "28.0.0"
 wasmtime-wasi = "28.0.0"
 wit-parser = "0.222.0"
@@ -88,7 +88,9 @@ opentelemetry-semantic-conventions = { version = "0.27.0", features = [
 ] }
 humantime = "2.1.0"
 metrics = "0.24.1"
-metrics-exporter-prometheus = { version = "0.16.0", default-features = false, features = ["http-listener"] }
+metrics-exporter-prometheus = { version = "0.16.0", default-features = false, features = [
+    "http-listener",
+] }
 itertools = "0.14.0"
 urlencoding = "2.1.3"
 
