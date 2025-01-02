@@ -10,10 +10,10 @@ data:
     [namespaces.{{ $k }}]
     {{- end }}
     {{- if $v.config_url }}
-    config_url = {{ $v.config_url | quote }}
+    config-url = {{ $v.config_url | quote }}
     {{- end }}
     {{- if $v.config_access_token }}
-    config_access_token = {{ $v.config_access_token | quote }}
+    config-access-token = {{ $v.config_access_token | quote }}
     {{- end }}
     {{- if or $v.registry $v.repository $v.user $v.password }}
     [namespaces.{{ $k }}.registry]

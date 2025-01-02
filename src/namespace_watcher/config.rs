@@ -145,10 +145,9 @@ pub enum NamespaceConfig {
     /// Namespaces are our way to enable teams to deploy skills in self service via Git Ops. This
     /// implies that the skills in team owned namespaces are configured by a team rather than the
     /// operators of Pharia Kernel, which in turn means we only refer the teams documentation here.
+    #[serde(rename_all="kebab-case")]
     TeamOwned {
-        #[serde(alias = "config-url")]
         config_url: String,
-        #[serde(alias = "config-access-token")]
         config_access_token: Option<String>,
         registry: Registry,
     },
@@ -263,8 +262,8 @@ mod tests {
         writeln!(
             file,
             r#"[namespaces.a]
-config_url = "a"
-config_access_token = "a"
+config-url = "a"
+config-access-token = "a"
 
 [namespaces.a.registry]
 type = "oci"
@@ -321,7 +320,7 @@ password =  "a""#
         writeln!(
             file,
             "[namespaces.acme]
-config_access_token = \"{config_access_token}\"
+config-access-token = \"{config_access_token}\"
 
 [namespaces.acme.registry]
 type = \"oci\"
@@ -530,7 +529,7 @@ password =  \"{password}\"
         let config = OperatorConfig::from_toml(
             r#"
             [namespaces.pharia-kernel-team]
-            config_url = "https://dummy_url"
+            config-url = "https://dummy_url"
 
             [namespaces.pharia-kernel-team.registry]
             type = "oci"
@@ -559,8 +558,8 @@ password =  \"{password}\"
         let config = OperatorConfig::from_toml(
             r#"
             [namespaces.dummy-team]
-            config_url = "file://dummy_config_url"
-            config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN"
+            config-url = "file://dummy_config_url"
+            config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
             [namespaces.dummy-team.registry]
             type = "file"
@@ -593,8 +592,8 @@ password =  \"{password}\"
         let config = toml::from_str::<OperatorConfig>(
             r#"
             [namespaces.pharia-kernel-team]
-            config_url = "https://dummy_url"
-            config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN"
+            config-url = "https://dummy_url"
+            config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
             [namespaces.pharia-kernel-team.registry]
             type = "oci"
@@ -604,8 +603,8 @@ password =  \"{password}\"
             password = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
 
             [namespaces.pharia-kernel-team-local]
-            config_url = "https://dummy_url"
-            config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN"
+            config-url = "https://dummy_url"
+            config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
             [namespaces.pharia-kernel-team-local.registry]
             type = "file"
