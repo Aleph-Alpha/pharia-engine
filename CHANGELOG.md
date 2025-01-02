@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.14...v0.5.0)
+
+### Features
+
+- Remove fallback to "dev" namespace for operator-config.toml - ([e0933df](https://github.com/Aleph-Alpha/pharia-kernel/commit/e0933dfd308d0543f29c61958966850cf42a9460))
+- Prioritize oci registry over file registry - ([79b37dd](https://github.com/Aleph-Alpha/pharia-kernel/commit/79b37dd71a4767700b853a8f914d5ec7565aa271))
+- [**breaking**] Flatten repository in operator config - ([a46cabc](https://github.com/Aleph-Alpha/pharia-kernel/commit/a46cabc9b6d746e94390bc4714250035bed1e17e))
+- Use untagged enum for registry - ([972a515](https://github.com/Aleph-Alpha/pharia-kernel/commit/972a515745e009555f3e42f4f9b4e31c78ca28b7))
+- [**breaking**] Expect operator config variables in kebab-case - ([d0b5c00](https://github.com/Aleph-Alpha/pharia-kernel/commit/d0b5c00475e1bee0499f59ccad28cf73f4da9514))
+- Handle base repository with leading/trailing slashes or empty content - ([37760fb](https://github.com/Aleph-Alpha/pharia-kernel/commit/37760fb63d34cb45be4500043f427fd89a11f9be))
+- Support kebab-case and snake_case for fields in namespace config - ([671a173](https://github.com/Aleph-Alpha/pharia-kernel/commit/671a173770e6ece3b956e13d4bf92b02a25da3ca))
+- [**breaking**] Rename registry name field as `name` - ([3cf82f9](https://github.com/Aleph-Alpha/pharia-kernel/commit/3cf82f9cc0d429265b338921375c84d24e7d6aac))
+- [**breaking**] Update fields for credentials to take values directly - ([0ab1f29](https://github.com/Aleph-Alpha/pharia-kernel/commit/0ab1f29d4dc92106a65e6c12a769e100592b92d2))
+- Support configuring namespaces via environment variables - ([6319105](https://github.com/Aleph-Alpha/pharia-kernel/commit/631910573df833bf87bc43c5636601961d3dce0d))
+
+### Documentation
+
+- Update to new namespace config definition - ([7c746d7](https://github.com/Aleph-Alpha/pharia-kernel/commit/7c746d7b3488ca23794f1898f69ceccdfa73b416))
+- Remove outdated comment - ([06017b4](https://github.com/Aleph-Alpha/pharia-kernel/commit/06017b482c25b5bf110a938cd0844f3d2f258401))
+- Environment config source - ([7a154e6](https://github.com/Aleph-Alpha/pharia-kernel/commit/7a154e6bc4a9844ac9a00fce27d452bda20233db))
+
+### Builds
+
+- *(deps)* Bump the minor group with 6 updates - ([213aa5a](https://github.com/Aleph-Alpha/pharia-kernel/commit/213aa5a874c403cb798bacb8841478b406124803))
+- *(deps)* Bump the minor group with 4 updates - ([dc99868](https://github.com/Aleph-Alpha/pharia-kernel/commit/dc998685b287155d0fba92e95ef9d3ebb35e6f46))
+- *(deps)* Bump the wasmtime group with 15 updates - ([01ff0fd](https://github.com/Aleph-Alpha/pharia-kernel/commit/01ff0fdf7f38ef00f24d86ada81178e55f2798ce))
+- *(deps)* Bump the minor group with 7 updates - ([6c6df44](https://github.com/Aleph-Alpha/pharia-kernel/commit/6c6df442213578d204542e161d9402dcb9f44548))
+- *(deps)* Bump unicase from 2.8.0 to 2.8.1 in the minor group - ([9e89c51](https://github.com/Aleph-Alpha/pharia-kernel/commit/9e89c5192092e3779bb0e91c1241cb5d937d3f94))
+- *(deps)* Bump the minor group with 9 updates - ([3e60602](https://github.com/Aleph-Alpha/pharia-kernel/commit/3e60602202af6673dcc3b7301d239eb88116401f))
+
+
 ## [0.4.14](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.13...v0.4.14)
 
 ### Features
