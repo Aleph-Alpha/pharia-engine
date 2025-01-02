@@ -35,8 +35,8 @@ exclude = ["helm-charts", "resource_eval"]
 aleph-alpha-client = "0.15.0"
 anyhow = "1.0.95"
 async-trait = "0.1.83"
-axum = { version = "0.7.9", features = ["macros"] }
-axum-extra = { version = "0.9.6", features = ["typed-header"] }
+axum = { version = "0.8.1", features = ["macros"] }
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
 dotenvy = "0.15.7"
 futures = "0.3.31"
 oci-client = "0.14.0"
@@ -74,7 +74,7 @@ tokenizers = { version = "0.21.0", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.20.0", features = ["tokenizers"] }
+text-splitter = { version = "0.20.1", features = ["tokenizers"] }
 lingua = { version = "1.6.2", default-features = false, features = [
     "english",
     "german",
