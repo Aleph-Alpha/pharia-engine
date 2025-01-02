@@ -130,11 +130,13 @@ pub enum Registry {
     File {
         path: String,
     },
+    #[serde(rename_all = "kebab-case")]
     Oci {
-        #[serde(rename = "name")]
         registry: String,
-        repository: String,
+        base_repository: String,
+        #[serde(rename = "registry-user")]
         user: String,
+        #[serde(rename = "registry-password")]
         password: String,
     },
 }
@@ -149,6 +151,7 @@ pub enum NamespaceConfig {
     TeamOwned {
         config_url: String,
         config_access_token: Option<String>,
+        #[serde(flatten)]
         registry: Registry,
     },
     /// For development it is convenient to just watch a local repository for changing skills
@@ -160,6 +163,7 @@ pub enum NamespaceConfig {
     /// tests.
     InPlace {
         skills: Vec<SkillDescription>,
+        #[serde(flatten)]
         registry: Registry,
     },
 }
@@ -264,12 +268,10 @@ mod tests {
             r#"[namespaces.a]
 config-url = "a"
 config-access-token = "a"
-
-[namespaces.a.registry]
-name = "a"
-repository = "a"
-user =  "a"
-password =  "a""#
+registry = "a"
+base-repository = "a"
+registry-user =  "a"
+registry-password =  "a""#
         )?;
         let file_source = File::with_name(file_path.to_str().unwrap());
         let env_vars = HashMap::from([
@@ -278,15 +280,11 @@ password =  "a""#
                 "NAMESPACES__B__CONFIG_ACCESS_TOKEN".to_owned(),
                 "b".to_owned(),
             ),
-            ("NAMESPACES__B__REGISTRY__TYPE".to_owned(), "oci".to_owned()),
-            ("NAMESPACES__B__REGISTRY__NAME".to_owned(), "b".to_owned()),
+            ("NAMESPACES__B__REGISTRY".to_owned(), "b".to_owned()),
+            ("NAMESPACES__B__BASE_REPOSITORY".to_owned(), "b".to_owned()),
+            ("NAMESPACES__B__REGISTRY_USER".to_owned(), "b".to_owned()),
             (
-                "NAMESPACES__B__REGISTRY__REPOSITORY".to_owned(),
-                "b".to_owned(),
-            ),
-            ("NAMESPACES__B__REGISTRY__USER".to_owned(), "b".to_owned()),
-            (
-                "NAMESPACES__B__REGISTRY__PASSWORD".to_owned(),
+                "NAMESPACES__B__REGISTRY_PASSWORD".to_owned(),
                 "b".to_owned(),
             ),
         ]);
@@ -310,7 +308,7 @@ password =  "a""#
         let config_url = "https://acme.com/latest/config.toml";
         let config_access_token = "ACME_CONFIG_ACCESS_TOKEN";
         let registry = "registry.acme.com";
-        let repository = "engineering/skills";
+        let base_repository = "engineering/skills";
         let user = "DUMMY_USER";
         let password = "DUMMY_PASSWORD";
         let dir = tempdir()?;
@@ -320,12 +318,9 @@ password =  "a""#
             file,
             "[namespaces.acme]
 config-access-token = \"{config_access_token}\"
-
-[namespaces.acme.registry]
-type = \"oci\"
-name = \"{registry}\"
-repository = \"{repository}\"
-password =  \"{password}\"
+registry = \"{registry}\"
+base-repository = \"{base_repository}\"
+registry-password =  \"{password}\"
         "
         )?;
         let file_source = File::with_name(file_path.to_str().unwrap());
@@ -335,7 +330,7 @@ password =  \"{password}\"
                 config_url.to_owned(),
             ),
             (
-                "NAMESPACES__ACME__REGISTRY__USER".to_owned(),
+                "NAMESPACES__ACME__REGISTRY_USER".to_owned(),
                 user.to_owned(),
             ),
         ]);
@@ -351,7 +346,7 @@ password =  \"{password}\"
             config_access_token: Some(config_access_token.to_owned()),
             registry: Registry::Oci {
                 registry: registry.to_owned(),
-                repository: repository.to_owned(),
+                base_repository: base_repository.to_owned(),
                 user: user.to_owned(),
                 password: password.to_owned(),
             },
@@ -361,81 +356,6 @@ password =  \"{password}\"
             config.namespaces.get(&namespace).unwrap(),
             &namespace_config
         );
-        Ok(())
-    }
-
-    #[test]
-    fn deserialize_registry_from_env() -> anyhow::Result<()> {
-        // Given some environment variable
-        let registry = "gitlab.aleph-alpha.de".to_owned();
-        let repository = "engineering/pharia-skills/skills".to_owned();
-        let user = "DUMMY_USER".to_owned();
-        let password = "DUMMY_PASSWORD".to_owned();
-        let env_vars = HashMap::from([
-            ("TYPE".to_owned(), "oci".to_owned()),
-            ("NAME".to_owned(), registry.clone()),
-            ("REPOSITORY".to_owned(), repository.clone()),
-            ("USER".to_owned(), user.clone()),
-            ("PASSWORD".to_owned(), password.clone()),
-        ]);
-
-        // When we  build the source from the environment variables
-        let source = OperatorConfig::environment().source(Some(env_vars));
-        let config = Config::builder()
-            .add_source(source)
-            .build()?
-            .try_deserialize::<Registry>()?;
-
-        // Then we can build the config from the source
-        let expected = Registry::Oci {
-            registry,
-            repository,
-            user,
-            password,
-        };
-        assert_eq!(config, expected);
-        Ok(())
-    }
-
-    #[test]
-    fn deserialize_namespace_config_from_env() -> anyhow::Result<()> {
-        let registry = "gitlab.aleph-alpha.de".to_owned();
-        let repository = "engineering/pharia-skills/skills".to_owned();
-        let user = "DUMMY_USER".to_owned();
-        let password = "DUMMY_PASSWORD".to_owned();
-        let config_url = "https://gitlab.aleph-alpha.de/playground".to_owned();
-        let config_access_token = "GITLAB_CONFIG_ACCESS_TOKEN".to_owned();
-
-        let env_vars = HashMap::from([
-            ("REGISTRY__TYPE".to_owned(), "oci".to_owned()),
-            ("REGISTRY__NAME".to_owned(), registry.clone()),
-            ("REGISTRY__REPOSITORY".to_owned(), repository.clone()),
-            ("REGISTRY__USER".to_owned(), user.clone()),
-            ("REGISTRY__PASSWORD".to_owned(), password.clone()),
-            ("CONFIG_URL".to_owned(), config_url.clone()),
-            (
-                "CONFIG_ACCESS_TOKEN".to_owned(),
-                config_access_token.clone(),
-            ),
-        ]);
-
-        let source = OperatorConfig::environment().source(Some(env_vars));
-        let config = Config::builder()
-            .add_source(source)
-            .build()?
-            .try_deserialize::<NamespaceConfig>()?;
-
-        let expected = NamespaceConfig::TeamOwned {
-            config_url,
-            config_access_token: Some(config_access_token.clone()),
-            registry: Registry::Oci {
-                registry,
-                repository,
-                user,
-                password,
-            },
-        };
-        assert_eq!(config, expected);
         Ok(())
     }
 
@@ -468,23 +388,19 @@ password =  \"{password}\"
                 "GITLAB_CONFIG_ACCESS_TOKEN".to_owned(),
             ),
             (
-                "NAMESPACES__PLAY_GROUND__REGISTRY__TYPE".to_owned(),
-                "oci".to_owned(),
-            ),
-            (
-                "NAMESPACES__PLAY_GROUND__REGISTRY__NAME".to_owned(),
+                "NAMESPACES__PLAY_GROUND__REGISTRY".to_owned(),
                 "registry.gitlab.aleph-alpha.de".to_owned(),
             ),
             (
-                "NAMESPACES__PLAY_GROUND__REGISTRY__REPOSITORY".to_owned(),
+                "NAMESPACES__PLAY_GROUND__BASE_REPOSITORY".to_owned(),
                 "engineering/pharia-skills/skills".to_owned(),
             ),
             (
-                "NAMESPACES__PLAY_GROUND__REGISTRY__USER".to_owned(),
+                "NAMESPACES__PLAY_GROUND__REGISTRY_USER".to_owned(),
                 "SKILL_REGISTRY_USER".to_owned(),
             ),
             (
-                "NAMESPACES__PLAY_GROUND__REGISTRY__PASSWORD".to_owned(),
+                "NAMESPACES__PLAY_GROUND__REGISTRY_PASSWORD".to_owned(),
                 "SKILL_REGISTRY_PASSWORD".to_owned(),
             ),
         ]);
@@ -529,12 +445,10 @@ password =  \"{password}\"
             r#"
             [namespaces.pharia-kernel-team]
             config-url = "https://dummy_url"
-
-            [namespaces.pharia-kernel-team.registry]
-            name = "registry.gitlab.aleph-alpha.de"
-            repository = "engineering/pharia-skills/skills"
-            user = "DUMMY_USER"
-            password = "DUMMY_PASSWORD"
+            registry = "registry.gitlab.aleph-alpha.de"
+            base-repository = "engineering/pharia-skills/skills"
+            registry-user = "DUMMY_USER"
+            registry-password = "DUMMY_PASSWORD"
             "#,
         )
         .unwrap();
@@ -544,7 +458,7 @@ password =  \"{password}\"
             pharia_kernel_team.registry(),
             Registry::Oci {
                 registry: "registry.gitlab.aleph-alpha.de".to_owned(),
-                repository: "engineering/pharia-skills/skills".to_owned(),
+                base_repository: "engineering/pharia-skills/skills".to_owned(),
                 user: "DUMMY_USER".to_owned(),
                 password: "DUMMY_PASSWORD".to_owned(),
             }
@@ -558,8 +472,6 @@ password =  \"{password}\"
             [namespaces.dummy-team]
             config-url = "file://dummy_config_url"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
-
-            [namespaces.dummy-team.registry]
             path = "dummy_file_path"
             "#,
         )
@@ -591,18 +503,14 @@ password =  \"{password}\"
             [namespaces.pharia-kernel-team]
             config-url = "https://dummy_url"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
-
-            [namespaces.pharia-kernel-team.registry]
-            name = "registry.gitlab.aleph-alpha.de"
-            repository = "engineering/pharia-skills/skills"
-            user = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
-            password = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
+            registry = "registry.gitlab.aleph-alpha.de"
+            base-repository = "engineering/pharia-skills/skills"
+            registry-user = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
+            registry-password = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
 
             [namespaces.pharia-kernel-team-local]
             config-url = "https://dummy_url"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
-
-            [namespaces.pharia-kernel-team-local.registry]
             path = "/temp/skills"
             "#,
         )
@@ -617,7 +525,7 @@ password =  \"{password}\"
                         config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
                         registry: Registry::Oci {
                             registry: "registry.gitlab.aleph-alpha.de".to_owned(),
-                            repository: "engineering/pharia-skills/skills".to_owned(),
+                            base_repository: "engineering/pharia-skills/skills".to_owned(),
                             user: "PHARIA_KERNEL_TEAM_REGISTRY_USER".to_owned(),
                             password: "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD".to_owned(),
                         },

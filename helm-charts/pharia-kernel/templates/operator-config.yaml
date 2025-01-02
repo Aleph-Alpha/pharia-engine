@@ -6,31 +6,24 @@ data:
   operator-config.toml: |
     {{- if .Values.namespaces }}
     {{- range $k, $v := .Values.namespaces }}
-    {{- if or $v.config_url $v.config_access_token }}
     [namespaces.{{ $k }}]
+    {{- if $v.configUrl }}
+    config-url = {{ $v.configUrl | quote }}
     {{- end }}
-    {{- if $v.config_url }}
-    config-url = {{ $v.config_url | quote }}
-    {{- end }}
-    {{- if $v.config_access_token }}
-    config-access-token = {{ $v.config_access_token | quote }}
-    {{- end }}
-    {{- if or $v.registry $v.repository $v.user $v.password }}
-    [namespaces.{{ $k }}.registry]
+    {{- if $v.configAccessToken }}
+    config-access-token = {{ $v.configAccessToken | quote }}
     {{- end }}
     {{- if $v.registry }}
-    name = {{ $v.registry | quote }}
+    registry = {{ $v.registry | quote }}
     {{- end }}
-    {{- if $v.repository }}
-    repository = {{ $v.repository | quote }}
+    {{- if $v.baseRepository }}
+    base-repository = {{ $v.baseRepository | quote }}
     {{- end }}
-    {{- if $v.user }}
-    user = {{ $v.user | quote }}
+    {{- if $v.registryUser }}
+    registry-user = {{ $v.registryUser | quote }}
     {{- end }}
-    {{- if $v.password }}
-    password = {{ $v.password | quote }}
+    {{- if $v.registryPassword }}
+    registry-password = {{ $v.registryPassword | quote }}
     {{- end }}
     {{ end }}
-    {{- else }}
-    [namespaces]
     {{- end }}
