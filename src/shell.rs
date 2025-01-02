@@ -34,7 +34,7 @@ use utoipa::{
     },
     Modify, OpenApi, ToSchema,
 };
-use utoipa_scalar::{Scalar, Servable};
+use utoipa_scalar::Scalar;
 
 use crate::{
     authorization::{authorization_middleware, AuthorizationApi},
@@ -156,12 +156,15 @@ where
 
     Router::new()
         // Authenticated routes
-        .route("/v1/skills/:namespace/:name/run", post(run_skill))
+        .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
         .route("/csi", post(http_csi_handle::<C>))
         .route("/skills", get(skills))
         .route("/execute_skill", post(execute_skill))
         .route("/cached_skills", get(cached_skills))
-        .route("/cached_skills/:namespace/:name", delete(drop_cached_skill))
+        .route(
+            "/cached_skills/{namespace}/{name}",
+            delete(drop_cached_skill),
+        )
         .nest_service("/docs", serve_dir.clone())
         .route("/", get(index))
         .route_layer(middleware::from_fn_with_state(
@@ -171,7 +174,10 @@ where
         .with_state(app_state)
         // Unauthenticated routes
         .route("/skill.wit", get(skill_wit()))
-        .merge(Scalar::with_url("/api-docs", ApiDoc::openapi()))
+        .route(
+            "/api-docs",
+            get(|| async { Html(Scalar::new(ApiDoc::openapi()).to_html()) }),
+        )
         .route("/openapi.json", get(serve_docs))
         // maintaining `healthcheck` route for backward compatibility
         .route("/healthcheck", get(|| async { "ok" }))

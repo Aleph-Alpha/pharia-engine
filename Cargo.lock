@@ -4452,7 +4452,6 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1291aa7a2223c2f8399d1c6627ca0ba57ca0d7ecac762a2094a9dfd6376445a"
 dependencies = [
- "axum 0.7.9",
  "serde",
  "serde_json",
  "utoipa",
