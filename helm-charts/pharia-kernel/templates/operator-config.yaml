@@ -17,7 +17,6 @@ data:
     {{- end }}
     {{- if or $v.registry $v.repository $v.user $v.password }}
     [namespaces.{{ $k }}.registry]
-    type = "oci"
     {{- end }}
     {{- if $v.registry }}
     name = {{ $v.registry | quote }}
