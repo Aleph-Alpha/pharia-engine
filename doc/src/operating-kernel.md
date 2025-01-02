@@ -26,46 +26,49 @@ Pharia Kernel wants to enable teams outside of the Pharia Kernel Operators to de
 
 Each namespace configuration typically would reside in a Git repository owned by the Team which owns the namespace. Changes in this file will be automatically detected by the Kernel.
 
-A namespace is also associated with a registry to load the skills from. These skill registries can either be directories in filesystem (mostly used for a development setup) or point to an OCI registry (recommended for production).
+A [namespace](skill-deployment.md#configuring-namespace) is also associated with a registry to load the skills from. These skill registries can either be directories in filesystem (mostly used for a development setup) or point to an OCI registry (recommended for production).
 
 ### Namespace with Local Config and Local Registry
 
 ```toml
-[namespaces.local]
-config_url = "file://namespace.toml"
+# `my-team` is the name of this namespace
+[namespaces.my-team]
+# Path to the local namespace configuration file
+config-url = "file://namespace.toml"
 
-[namespaces.local.registry]
-type = "file"
+# Path to the local skill directory
 path = "skills"
 ```
 
-With the local configuration above, Pharia Kernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace "local". This is mostly intended for local development of skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommended to use a remote namespace.
+With the local configuration above, Pharia Kernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace `my-team`. This is mostly intended for local development of skills without a remote instance of Pharia Kernel. To deploy skills in production it is recommended to use a remote namespace.
 
 ### Namespace with Remote Config and Remote Registry
 
 ```toml
+# `my-team` is the name of this namespace
 [namespaces.my-team]
 # The URL to the configuration listing the skills of this namespace
 # Pharia kernel will use the contents of the `NAMESPACES__MY_TEAM__CONFIG_ACCESS_TOKEN` environment variable to access (authorize) the config
-config_url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
+config-url = "https://github.com/Aleph-Alpha/my-team/blob/main/config.toml"
 
-# Registry to load skills from
-# Pharia kernel will use the contents of the `NAMESPACES__MY_TEAM__REGISTRY__USER` and `NAMESPACES__MY_TEAM__REGISTRY__PASSWORD` environment variables to access (authorize) the registry
-[namespaces.my-team.registry]
-type = "oci"
-name = "registry.gitlab.aleph-alpha.de"
-repository = "engineering/pharia-skills/skills"
+# OCI Registry to load skills from
+# Pharia kernel will use the contents of the `NAMESPACES__MY_TEAM__REGISTRY_USER` and `NAMESPACES__MY_TEAM__REGISTRY_PASSWORD` environment variables to access (authorize) the registry
+registry = "registry.acme.com"
+
+# This is the common prefix added to the skill name when composing the OCI repository.
+# e.g. ${base-repository}/${skill_name}
+base-repository = "my-org/my-team/skills"
 ```
 
-With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace "my-team".
+With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace `my-team`.
 
 ### Authentication against OCI Registries
 
 You can provide each namespace in Pharia Kernel with credentials to authenticate against the specified OCI registry. Set the environment variables that are expected from the operator config:
 
 ```shell
-MY_TEAM_REGISTRY_USER=Joe.Plumber
-MY_TEAM_REGISTRY_PASSWORD=****
+NAMESPACES__MY_TEAM__REGISTRY_USER=Joe.Plumber
+NAMESPACES__MY_TEAM__REGISTRY_PASSWORD=****
 ```
 
 ## Update interval
