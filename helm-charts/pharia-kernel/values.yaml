@@ -50,19 +50,19 @@ serviceMonitor:
 defaultNamespacesEnabled: false
 # -- Active namespaces for Pharia Kernel. e.g.:
 # playground:
-#   config_url: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
-#   config_access_token: "GITLAB_CONFIG_ACCESS_TOKEN"
+#   configUrl: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
+#   configAccessToken: "GITLAB_CONFIG_ACCESS_TOKEN"
 #   registry: "registry.gitlab.aleph-alpha.de"
-#   repository: "engineering/pharia-kernel-playground/skills"
-#   user: "REGISTRY_USER"
-#   password: "REGISTRY_PASSWORD"
+#   baseRepository: "engineering/pharia-kernel-playground/skills"
+#   registryUser: "REGISTRY_USER"
+#   registryPassword: "REGISTRY_PASSWORD"
 # Each of the value can alternatively be provided as environment variables, which have higher precedence:
 # NAMESPACES__PLAYGROUND__CONFIG_URL
 # NAMESPACES__PLAYGROUND__CONFIG_ACCESS_TOKEN
-# NAMESPACES__PLAYGROUND__REGISTRY__NAME
-# NAMESPACES__PLAYGROUND__REGISTRY__REPOSITORY
-# NAMESPACES__PLAYGROUND__REGISTRY__USER
-# NAMESPACES__PLAYGROUND__REGISTRY__PASSWORD
+# NAMESPACES__PLAYGROUND__REGISTRY
+# NAMESPACES__PLAYGROUND__BASE_REPOSITORY
+# NAMESPACES__PLAYGROUND__REGISTRY_USER
+# NAMESPACES__PLAYGROUND__REGISTRY_PASSWORD
 namespaces: {}
 logLevel: info
 openTelemetryEndpoint: ""

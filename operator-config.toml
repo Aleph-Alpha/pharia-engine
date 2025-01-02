@@ -4,7 +4,6 @@
 config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/966/repository/files/config.toml/raw?ref=main"
 
 # Registry to load skills from
-# Pharia kernel will use the contents of the `NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER` and `NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD` environment variables to access (authorize) the registry
-[namespaces.pharia-kernel-team.registry]
-name = "registry.gitlab.aleph-alpha.de"
-repository = "engineering/pharia-skills/skills"
+# Pharia kernel will use the contents of the `NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER` and `NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD` environment variables to access (authorize) the registry
+registry = "registry.gitlab.aleph-alpha.de"
+base-repository = "engineering/pharia-skills/skills"

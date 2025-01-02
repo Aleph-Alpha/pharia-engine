@@ -14,20 +14,25 @@ use crate::registries::SkillRegistry;
 pub struct OciRegistry {
     client: WasmClient,
     registry: String,
-    repository: String,
+    base_repository: String,
     username: String,
     password: String,
 }
 
 impl OciRegistry {
-    pub fn new(registry: String, repository: String, username: String, password: String) -> Self {
+    pub fn new(
+        registry: String,
+        base_repository: String,
+        username: String,
+        password: String,
+    ) -> Self {
         let client = Client::new(ClientConfig::default());
         let client = WasmClient::new(client);
 
         Self {
             client,
             registry,
-            repository: repository.trim_matches('/').to_owned(),
+            base_repository: base_repository.trim_matches('/').to_owned(),
             username,
             password,
         }
@@ -38,10 +43,10 @@ impl OciRegistry {
     }
 
     fn reference(&self, name: &str, tag: impl Into<String>) -> Reference {
-        let repository = if self.repository.is_empty() {
+        let repository = if self.base_repository.is_empty() {
             name.to_owned()
         } else {
-            format!("{}/{name}", self.repository)
+            format!("{}/{name}", self.base_repository)
         };
         Reference::with_tag(self.registry.clone(), repository, tag.into())
     }
@@ -149,10 +154,10 @@ mod tests {
 
     impl OciRegistry {
         fn from_env() -> Option<Self> {
-            let maybe_registry = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__NAME");
-            let maybe_repository = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__REPOSITORY");
-            let maybe_username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER");
-            let maybe_password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD");
+            let maybe_registry = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY");
+            let maybe_repository = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__BASE_REPOSITORY");
+            let maybe_username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER");
+            let maybe_password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD");
             match (
                 maybe_registry,
                 maybe_repository,
@@ -167,16 +172,16 @@ mod tests {
         }
 
         async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str, tag: &str) {
-            let repository = format!("{}/{skill_name}", self.repository);
+            let repository = format!("{}/{skill_name}", self.base_repository);
             let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
             let (config, component_layer) = WasmConfig::from_component(path, None)
                 .await
                 .expect("component must be valid");
 
-            let username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER")
-                .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__USER variable not set");
-            let password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD")
-                .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY__PASSWORD variable not set");
+            let username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER")
+                .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER variable not set");
+            let password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD")
+                .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD variable not set");
             let auth = RegistryAuth::Basic(username, password);
 
             self.client
@@ -279,7 +284,7 @@ mod tests {
             "dummy-password".to_owned(),
         );
 
-        assert_eq!(registry.repository, "skills");
+        assert_eq!(registry.base_repository, "skills");
     }
 
     #[test]
