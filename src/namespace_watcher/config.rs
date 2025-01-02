@@ -127,9 +127,11 @@ impl OperatorConfig {
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(untagged)]
 pub enum Registry {
-    File {
-        path: String,
-    },
+    // https://serde.rs/enum-representations.html#untagged
+    // Serde will try to match the data against each variant in order and the first one that
+    // deserializes successfully is the one returned.
+    //
+    // Therefore, we put `Oci` first as this is most likely the variant someone will use in production.
     #[serde(rename_all = "kebab-case")]
     Oci {
         registry: String,
@@ -138,6 +140,9 @@ pub enum Registry {
         user: String,
         #[serde(rename = "registry-password")]
         password: String,
+    },
+    File {
+        path: String,
     },
 }
 
@@ -494,6 +499,31 @@ registry-password =  \"{password}\"
         let config = OperatorConfig::new("operator-config.toml").unwrap();
         let namespace = Namespace::new("pharia-kernel-team");
         assert!(config.namespaces.contains_key(&namespace));
+    }
+
+    #[test]
+    fn prioritizes_oci_registry() {
+        // When deserializing a config which contains both, an oci and a file registry
+        // for the same namespace
+        let config = toml::from_str::<OperatorConfig>(
+            r#"
+            [namespaces.pharia-kernel-team]
+            config-url = "https://dummy_url"
+            config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
+            registry = "registry.gitlab.aleph-alpha.de"
+            base-repository = "engineering/pharia-skills/skills"
+            registry-user = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
+            registry-password = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
+            path = "local-path"
+            "#,
+        )
+        .unwrap();
+
+        let key = Namespace::new("pharia-kernel-team");
+        let namespace = config.namespaces.get(&key).unwrap();
+
+        // Then the `Oci` variants is prioritized
+        assert!(matches!(namespace.registry(), Registry::Oci { .. }));
     }
 
     #[test]
