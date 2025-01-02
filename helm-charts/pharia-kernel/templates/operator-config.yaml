@@ -6,7 +6,7 @@ data:
   operator-config.toml: |
     {{- if .Values.namespaces }}
     {{- range $k, $v := .Values.namespaces }}
-    [namespaces.{{ $k }}]
+    [namespaces.{{ $k | kebabcase }}]
     {{- if $v.configUrl }}
     config-url = {{ $v.configUrl | quote }}
     {{- end }}
