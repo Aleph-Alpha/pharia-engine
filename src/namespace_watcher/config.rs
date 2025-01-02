@@ -125,7 +125,7 @@ impl OperatorConfig {
 }
 
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
-#[serde(rename_all = "snake_case", tag = "type")]
+#[serde(untagged)]
 pub enum Registry {
     File {
         path: String,
@@ -145,7 +145,7 @@ pub enum NamespaceConfig {
     /// Namespaces are our way to enable teams to deploy skills in self service via Git Ops. This
     /// implies that the skills in team owned namespaces are configured by a team rather than the
     /// operators of Pharia Kernel, which in turn means we only refer the teams documentation here.
-    #[serde(rename_all="kebab-case")]
+    #[serde(rename_all = "kebab-case")]
     TeamOwned {
         config_url: String,
         config_access_token: Option<String>,
@@ -266,7 +266,6 @@ config-url = "a"
 config-access-token = "a"
 
 [namespaces.a.registry]
-type = "oci"
 name = "a"
 repository = "a"
 user =  "a"
@@ -532,7 +531,6 @@ password =  \"{password}\"
             config-url = "https://dummy_url"
 
             [namespaces.pharia-kernel-team.registry]
-            type = "oci"
             name = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
             user = "DUMMY_USER"
@@ -562,7 +560,6 @@ password =  \"{password}\"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
             [namespaces.dummy-team.registry]
-            type = "file"
             path = "dummy_file_path"
             "#,
         )
@@ -596,7 +593,6 @@ password =  \"{password}\"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
             [namespaces.pharia-kernel-team.registry]
-            type = "oci"
             name = "registry.gitlab.aleph-alpha.de"
             repository = "engineering/pharia-skills/skills"
             user = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
@@ -607,7 +603,6 @@ password =  \"{password}\"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
 
             [namespaces.pharia-kernel-team-local.registry]
-            type = "file"
             path = "/temp/skills"
             "#,
         )
