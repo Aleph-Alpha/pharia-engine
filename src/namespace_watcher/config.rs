@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use heck::ToKebabCase;
 use serde::{Deserialize, Deserializer};
 use std::{collections::HashMap, path::PathBuf};
@@ -75,35 +74,6 @@ pub struct OperatorConfig {
 }
 
 impl OperatorConfig {
-    /// # Errors
-    /// Cannot parse operator config from the provided file or the environment variables.
-    pub fn new(config_file: &str) -> anyhow::Result<Self> {
-        let file = File::with_name(config_file).required(false);
-        let env = Self::environment();
-        Self::from_sources(file, env)
-    }
-
-    /// A namespace can contain the characters `[a-z0-9-]` e.g. `pharia-kernel-team`.
-    ///
-    /// As only `SCREAMING_SNAKE_CASE` is widely supported for environment variable keys,
-    /// we support it by converting each key into `kebab-case`.
-    /// Because we have a nested configuration, we use double underscores as the separators.
-    fn environment() -> Environment {
-        Environment::with_convert_case(Case::Kebab).separator("__")
-    }
-
-    fn from_sources(
-        file: File<FileSourceFile, FileFormat>,
-        env: Environment,
-    ) -> anyhow::Result<Self> {
-        let config = Config::builder()
-            .add_source(file)
-            .add_source(env)
-            .build()?
-            .try_deserialize::<OperatorConfig>()?;
-        Ok(config)
-    }
-
     /// Create an operator config which checks the local `skills` directory for
     /// a list of skills that are provided in the `skills` argument.
     /// Compared to the `NamespaceConfig::TeamOwned` variant, this removes one
@@ -252,11 +222,6 @@ impl NamespaceConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::io::Write;
-
-    use tempfile::tempdir;
-
     use super::*;
 
     impl OperatorConfig {
@@ -287,226 +252,6 @@ mod tests {
     fn non_ascii_chars_are_rejected() {
         let name = "nameø";
         Namespace::new(name).unwrap_err();
-    }
-
-    #[test]
-    fn empty_namespace_name_is_rejected() -> anyhow::Result<()> {
-        // Given toml file with non kebab-case namespaces
-        let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
-        let mut file = fs::File::create_new(&file_path)?;
-        writeln!(
-            file,
-            r#"[namespaces.""]
-            directory = "skills""#
-        )?;
-        let file_source = File::with_name(file_path.to_str().unwrap());
-        let env_source = OperatorConfig::environment().source(Some(HashMap::new()));
-
-        // When loading from the sources
-        let error = OperatorConfig::from_sources(file_source, env_source).unwrap_err();
-
-        // Then we receive an error
-        assert!(error.to_string().contains("empty"));
-        Ok(())
-    }
-
-    #[test]
-    fn load_non_kebab_case_namespace_name() -> anyhow::Result<()> {
-        // Given toml file with non kebab-case namespaces
-        let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
-        let mut file = fs::File::create_new(&file_path)?;
-        writeln!(
-            file,
-            r#"[namespaces.-myteam]
-            directory = "skills""#
-        )?;
-        let file_source = File::with_name(file_path.to_str().unwrap());
-        let env_source = OperatorConfig::environment().source(Some(HashMap::new()));
-
-        // When loading from the sources
-        let error = OperatorConfig::from_sources(file_source, env_source).unwrap_err();
-
-        // Then we receive an error
-        assert!(error.to_string().contains("kebab-case"));
-        Ok(())
-    }
-
-    #[test]
-    fn load_from_two_empty_sources() -> anyhow::Result<()> {
-        // Given a TOML file and environment variables
-        let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
-        fs::File::create_new(&file_path)?;
-        let file_source = File::with_name(file_path.to_str().unwrap());
-        let env_vars = HashMap::new();
-        let env_source = OperatorConfig::environment().source(Some(env_vars));
-
-        // When loading from the sources
-        let config = OperatorConfig::from_sources(file_source, env_source)?;
-
-        // Then both sources are applied, with the values from environment variables having precedence
-        assert_eq!(config.namespaces.len(), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn load_two_namespaces_from_independent_sources() -> anyhow::Result<()> {
-        // Given a TOML file and environment variables
-        let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
-        let mut file = fs::File::create_new(&file_path)?;
-        writeln!(
-            file,
-            r#"[namespaces.a]
-config-url = "a"
-config-access-token = "a"
-registry = "a"
-base-repository = "a"
-registry-user =  "a"
-registry-password =  "a""#
-        )?;
-        let file_source = File::with_name(file_path.to_str().unwrap());
-        let env_vars = HashMap::from([
-            ("NAMESPACES__B__CONFIG_URL".to_owned(), "b".to_owned()),
-            (
-                "NAMESPACES__B__CONFIG_ACCESS_TOKEN".to_owned(),
-                "b".to_owned(),
-            ),
-            ("NAMESPACES__B__REGISTRY".to_owned(), "b".to_owned()),
-            ("NAMESPACES__B__BASE_REPOSITORY".to_owned(), "b".to_owned()),
-            ("NAMESPACES__B__REGISTRY_USER".to_owned(), "b".to_owned()),
-            (
-                "NAMESPACES__B__REGISTRY_PASSWORD".to_owned(),
-                "b".to_owned(),
-            ),
-        ]);
-        let env_source = OperatorConfig::environment().source(Some(env_vars));
-
-        // When loading from the sources
-        let config = OperatorConfig::from_sources(file_source, env_source)?;
-
-        // Then both namespaces are loaded
-        assert_eq!(config.namespaces.len(), 2);
-        let namespace_a = Namespace::new("a").unwrap();
-        assert!(config.namespaces.contains_key(&namespace_a));
-        let namespace_b = Namespace::new("b").unwrap();
-        assert!(config.namespaces.contains_key(&namespace_b));
-        Ok(())
-    }
-
-    #[test]
-    fn load_one_namespace_from_two_partial_sources() -> anyhow::Result<()> {
-        // Given a TOML file and environment variables
-        let config_url = "https://acme.com/latest/config.toml";
-        let config_access_token = "ACME_CONFIG_ACCESS_TOKEN";
-        let registry = "registry.acme.com";
-        let base_repository = "engineering/skills";
-        let user = "DUMMY_USER";
-        let password = "DUMMY_PASSWORD";
-        let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
-        let mut file = fs::File::create_new(&file_path)?;
-        writeln!(
-            file,
-            "[namespaces.acme]
-config-access-token = \"{config_access_token}\"
-registry = \"{registry}\"
-base-repository = \"{base_repository}\"
-registry-password =  \"{password}\"
-        "
-        )?;
-        let file_source = File::with_name(file_path.to_str().unwrap());
-        let env_vars = HashMap::from([
-            (
-                "NAMESPACES__ACME__CONFIG_URL".to_owned(),
-                config_url.to_owned(),
-            ),
-            (
-                "NAMESPACES__ACME__REGISTRY_USER".to_owned(),
-                user.to_owned(),
-            ),
-        ]);
-        let env_source = OperatorConfig::environment().source(Some(env_vars));
-
-        // When loading from the sources
-        let config = OperatorConfig::from_sources(file_source, env_source)?;
-
-        // Then both sources are applied, with the values from environment variables having higher precedence
-        assert_eq!(config.namespaces.len(), 1);
-        let namespace_config = NamespaceConfig::TeamOwned {
-            config_url: config_url.to_owned(),
-            config_access_token: Some(config_access_token.to_owned()),
-            registry: Registry::Oci {
-                registry: registry.to_owned(),
-                base_repository: base_repository.to_owned(),
-                user: user.to_owned(),
-                password: password.to_owned(),
-            },
-        };
-        let namespace = Namespace::new("acme").unwrap();
-        assert_eq!(
-            config.namespaces.get(&namespace).unwrap(),
-            &namespace_config
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn deserialize_empty_operator_config() -> anyhow::Result<()> {
-        // Given a hashmap with variables
-        let env_vars = HashMap::from([]);
-
-        // When we build the source from the environment variables
-        let source = OperatorConfig::environment().source(Some(env_vars));
-        let config = Config::builder()
-            .add_source(source)
-            .build()?
-            .try_deserialize::<OperatorConfig>()?;
-
-        assert_eq!(config, OperatorConfig::empty());
-        Ok(())
-    }
-
-    #[test]
-    fn deserialize_operator_config_with_namespaces() -> anyhow::Result<()> {
-        // Given a hashmap with variables
-        let env_vars = HashMap::from([
-            (
-                "NAMESPACES__PLAY_GROUND__CONFIG_URL".to_owned(),
-                "https://gitlab.aleph-alpha.de/playground".to_owned(),
-            ),
-            (
-                "NAMESPACES__PLAY_GROUND__CONFIG_ACCESS_TOKEN".to_owned(),
-                "GITLAB_CONFIG_ACCESS_TOKEN".to_owned(),
-            ),
-            (
-                "NAMESPACES__PLAY_GROUND__REGISTRY".to_owned(),
-                "registry.gitlab.aleph-alpha.de".to_owned(),
-            ),
-            (
-                "NAMESPACES__PLAY_GROUND__BASE_REPOSITORY".to_owned(),
-                "engineering/pharia-skills/skills".to_owned(),
-            ),
-            (
-                "NAMESPACES__PLAY_GROUND__REGISTRY_USER".to_owned(),
-                "SKILL_REGISTRY_USER".to_owned(),
-            ),
-            (
-                "NAMESPACES__PLAY_GROUND__REGISTRY_PASSWORD".to_owned(),
-                "SKILL_REGISTRY_PASSWORD".to_owned(),
-            ),
-        ]);
-
-        // When we build the source from the environment variables
-        let source = OperatorConfig::environment().source(Some(env_vars));
-        let config = Config::builder()
-            .add_source(source)
-            .build()?
-            .try_deserialize::<OperatorConfig>()?;
-        assert_eq!(config.namespaces.len(), 1);
-        Ok(())
     }
 
     #[test]
@@ -580,14 +325,6 @@ registry-password =  \"{password}\"
             },
         };
         assert_eq!(namespace_cfg, &expected);
-    }
-
-    #[test]
-    fn reads_from_file() {
-        drop(dotenvy::dotenv());
-        let config = OperatorConfig::new("operator-config.toml").unwrap();
-        let namespace = Namespace::new("pharia-kernel-team").unwrap();
-        assert!(config.namespaces.contains_key(&namespace));
     }
 
     #[test]
