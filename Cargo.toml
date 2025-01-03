@@ -102,7 +102,7 @@ fake = "3.1.0"
 http-body-util = "0.1.2"
 mime = "0.3.17"
 rand = "0.8.5"
-tempfile = "3.14.0"
+tempfile = "3.15.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.42.0", features = ["test-util"] }
 tokio-test = "0.4.4"
