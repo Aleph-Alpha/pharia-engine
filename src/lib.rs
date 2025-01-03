@@ -163,7 +163,6 @@ mod tests {
     use std::time::Duration;
 
     use dotenvy::dotenv;
-    use namespace_watcher::OperatorConfig;
     use tokio_test::assert_ok;
 
     use super::*;
@@ -203,14 +202,7 @@ mod tests {
         let config = AppConfig {
             tcp_addr: "127.0.0.1:8888".parse().unwrap(),
             metrics_addr: "127.0.0.1:0".parse().unwrap(),
-            inference_addr: "https://inference-api.product.pharia.com".to_owned(),
-            document_index_addr: "https://document-index.product.pharia.com".to_owned(),
-            authorization_addr: "https://pharia-iam.product.pharia.com".to_owned(),
-            operator_config: OperatorConfig::empty(),
-            namespace_update_interval: Duration::from_secs(10),
-            log_level: "info".to_owned(),
-            open_telemetry_endpoint: None,
-            use_pooling_allocator: false,
+            ..AppConfig::default()
         };
         let kernel = Kernel::new(config, ready(())).await.unwrap();
 

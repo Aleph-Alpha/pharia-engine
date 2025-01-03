@@ -68,7 +68,7 @@ impl<'de> Deserialize<'de> for Namespace {
     }
 }
 
-#[derive(Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(Deserialize, PartialEq, Eq, Debug, Clone, Default)]
 pub struct OperatorConfig {
     #[serde(default)]
     pub namespaces: HashMap<Namespace, NamespaceConfig>,
