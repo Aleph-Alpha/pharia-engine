@@ -24,7 +24,7 @@ impl Namespace {
 
     pub fn new(input: impl Into<String>) -> anyhow::Result<Self> {
         let input = input.into();
-        if input.len() == 0 {
+        if input.is_empty() {
             return Err(anyhow!(
                 "Invalid namespace name ``. Namespaces must not be an empty String."
             ));
@@ -266,13 +266,12 @@ mod tests {
     }
 
     #[test]
-    fn long_namespace_is_rejected() -> anyhow::Result<()> {
+    fn long_namespace_is_rejected() {
         // Given a very long string
         let name = "a".repeat(100);
 
         // When constructing a namespace from it, then we receive an error
         Namespace::new(name).unwrap_err();
-        Ok(())
     }
 
     #[test]
