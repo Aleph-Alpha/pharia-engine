@@ -24,6 +24,11 @@ impl Namespace {
 
     pub fn new(input: impl Into<String>) -> anyhow::Result<Self> {
         let input = input.into();
+        if input.len() == 0 {
+            return Err(anyhow!(
+                "Invalid namespace name ``. Namespaces must not be an empty String."
+            ));
+        }
         if input != input.to_kebab_case() {
             return Err(anyhow!(
                 "Invalid namespace name `{input}`. Namespaces must be kebab-case."
@@ -267,6 +272,28 @@ mod tests {
 
         // When constructing a namespace from it, then we receive an error
         Namespace::new(name).unwrap_err();
+        Ok(())
+    }
+
+    #[test]
+    fn empty_namespace_name_is_rejected() -> anyhow::Result<()> {
+        // Given toml file with non kebab-case namespaces
+        let dir = tempdir()?;
+        let file_path = dir.path().join("operator-config.toml");
+        let mut file = fs::File::create_new(&file_path)?;
+        writeln!(
+            file,
+            r#"[namespaces.""]
+            directory = "skills""#
+        )?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
+        let env_source = OperatorConfig::environment().source(Some(HashMap::new()));
+
+        // When loading from the sources
+        let error = OperatorConfig::from_sources(file_source, env_source).unwrap_err();
+
+        // Then we receive an error
+        assert!(error.to_string().contains("empty"));
         Ok(())
     }
 
