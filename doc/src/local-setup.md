@@ -41,8 +41,7 @@ In order to run Pharia Kernel, you need to provide a namespace configuration:
     ```shell
         podman run \
             -v ./skills:/app/skills \
-            -e NAMESPACES__DEV__DIRECTORY = "/app/skills"
-            -e PHARIA_AI_TOKEN=$PHARIA_AI_TOKEN \
+            -e NAMESPACES__DEV__DIRECTORY="skills" \
             -e NAMESPACE_UPDATE_INTERVAL=1s \
             -e LOG_LEVEL="pharia_kernel=debug" \
             -p 8081:8081 \
@@ -142,7 +141,7 @@ Specify the collector endpoint via the environment variable `OPEN_TELEMETRY_ENDP
 ```shell
     podman run \
         -v ./skills:/app/skills \
-        -e PHARIA_AI_TOKEN=$PHARIA_AI_TOKEN \
+        -e NAMESPACES__DEV__DIRECTORY="skills" \
         -e NAMESPACE_UPDATE_INTERVAL=1s \
         -e OPEN_TELEMETRY_ENDPOINT=http://host.containers.internal:4317 \
         -p 8081:8081 \
