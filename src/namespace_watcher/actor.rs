@@ -408,7 +408,7 @@ pub mod tests {
     async fn watch_skills_in_empty_directory() {
         let temp_dir = tempdir().unwrap();
         let namespaces = [(
-            Namespace::new("local"),
+            Namespace::new("local").unwrap(),
             NamespaceConfig::Watch {
                 directory: temp_dir.path().to_owned(),
             },
@@ -431,7 +431,7 @@ pub mod tests {
         fs::File::create(directory.join("skill_1.wasm")).unwrap();
         fs::File::create(directory.join("skill_2.wasm")).unwrap();
         let namespaces = [(
-            Namespace::new("local"),
+            Namespace::new("local").unwrap(),
             NamespaceConfig::Watch {
                 directory: directory.to_owned(),
             },
