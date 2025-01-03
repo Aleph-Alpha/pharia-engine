@@ -19,11 +19,21 @@ use super::{
 pub struct Namespace(String);
 
 impl Namespace {
+    // Reasoning to choose 64 is it seems reasonable and we can increase it if there is a need.
+    const MAX_LEN: usize = 64;
+
     pub fn new(input: impl Into<String>) -> anyhow::Result<Self> {
         let input = input.into();
         if input != input.to_kebab_case() {
             return Err(anyhow!(
                 "Invalid namespace name `{input}`. Namespaces must be kebab-case."
+            ));
+        }
+
+        if input.len() > Self::MAX_LEN {
+            return Err(anyhow!(
+                "Invalid namespace name `{input}`. Namespaces must not be longer then {}",
+                Self::MAX_LEN
             ));
         }
         Ok(Self(input))
@@ -248,6 +258,16 @@ mod tests {
         pub fn from_toml(config: &str) -> anyhow::Result<Self> {
             Ok(toml::from_str(config)?)
         }
+    }
+
+    #[test]
+    fn long_namespace_is_rejected() -> anyhow::Result<()> {
+        // Given a very long string
+        let name = "a".repeat(100);
+
+        // When constructing a namespace from it, then we receive an error
+        Namespace::new(name).unwrap_err();
+        Ok(())
     }
 
     #[test]
