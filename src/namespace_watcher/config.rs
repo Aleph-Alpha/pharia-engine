@@ -19,8 +19,14 @@ use super::{
 pub struct Namespace(String);
 
 impl Namespace {
-    pub fn new(input: impl Into<String>) -> Self {
-        Self(input.into().to_kebab_case())
+    pub fn new(input: impl Into<String>) -> anyhow::Result<Self> {
+        let input = input.into();
+        if input != input.to_kebab_case() {
+            return Err(anyhow!(
+                "Invalid namespace name `{input}`. Namespaces must be kebab-case."
+            ));
+        }
+        Ok(Self(input))
     }
 
     pub fn into_string(self) -> String {
@@ -34,7 +40,7 @@ impl<'de> Deserialize<'de> for Namespace {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Ok(Namespace::new(s))
+        Namespace::new(s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -82,7 +88,7 @@ impl OperatorConfig {
     pub fn local(skills: &[&str]) -> Self {
         OperatorConfig {
             namespaces: [(
-                Namespace::new("local"),
+                Namespace::new("local").unwrap(),
                 NamespaceConfig::InPlace {
                     skills: skills
                         .iter()
@@ -114,7 +120,7 @@ impl OperatorConfig {
     #[must_use]
     pub fn dev() -> Self {
         let namespaces = [(
-            Namespace::new("dev"),
+            Namespace::new("dev").unwrap(),
             NamespaceConfig::Watch {
                 directory: "skills".into(),
             },
@@ -245,6 +251,28 @@ mod tests {
     }
 
     #[test]
+    fn load_non_kebab_case_namespace_name() -> anyhow::Result<()> {
+        // Given toml file with non kebab-case namespaces
+        let dir = tempdir()?;
+        let file_path = dir.path().join("operator-config.toml");
+        let mut file = fs::File::create_new(&file_path)?;
+        writeln!(
+            file,
+            r#"[namespaces.my_team]
+            directory = "skills""#
+        )?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
+        let env_source = OperatorConfig::environment().source(Some(HashMap::new()));
+
+        // When loading from the sources
+        let error = OperatorConfig::from_sources(file_source, env_source).unwrap_err();
+
+        // Then we receive an error
+        assert!(error.to_string().contains("kebab-case"));
+        Ok(())
+    }
+
+    #[test]
     fn load_from_two_empty_sources() -> anyhow::Result<()> {
         // Given a TOML file and environment variables
         let dir = tempdir()?;
@@ -300,9 +328,9 @@ registry-password =  "a""#
 
         // Then both namespaces are loaded
         assert_eq!(config.namespaces.len(), 2);
-        let namespace_a = Namespace::new("a");
+        let namespace_a = Namespace::new("a").unwrap();
         assert!(config.namespaces.contains_key(&namespace_a));
-        let namespace_b = Namespace::new("b");
+        let namespace_b = Namespace::new("b").unwrap();
         assert!(config.namespaces.contains_key(&namespace_b));
         Ok(())
     }
@@ -356,7 +384,7 @@ registry-password =  \"{password}\"
                 password: password.to_owned(),
             },
         };
-        let namespace = Namespace::new("acme");
+        let namespace = Namespace::new("acme").unwrap();
         assert_eq!(
             config.namespaces.get(&namespace).unwrap(),
             &namespace_config
@@ -423,7 +451,7 @@ registry-password =  \"{password}\"
     #[test]
     fn deserialize_config_with_file_registry() {
         let config = OperatorConfig::local(&[]);
-        let namespace = Namespace::new("local");
+        let namespace = Namespace::new("local").unwrap();
         assert!(config.namespaces.contains_key(&namespace));
     }
 
@@ -436,7 +464,7 @@ registry-password =  \"{password}\"
             "#,
         )
         .unwrap();
-        let namespace = Namespace::new("local");
+        let namespace = Namespace::new("local").unwrap();
         let local_namespace = config.namespaces.get(&namespace).unwrap();
 
         let registry = local_namespace.registry();
@@ -457,7 +485,7 @@ registry-password =  \"{password}\"
             "#,
         )
         .unwrap();
-        let namespace = Namespace::new("pharia-kernel-team");
+        let namespace = Namespace::new("pharia-kernel-team").unwrap();
         let pharia_kernel_team = config.namespaces.get(&namespace).unwrap();
         assert_eq!(
             pharia_kernel_team.registry(),
@@ -481,7 +509,7 @@ registry-password =  \"{password}\"
             "#,
         )
         .unwrap();
-        let namespace = Namespace::new("dummy-team");
+        let namespace = Namespace::new("dummy-team").unwrap();
         let namespace_cfg = config.namespaces.get(&namespace).unwrap();
         let expected = NamespaceConfig::TeamOwned {
             config_url: "file://dummy_config_url".to_owned(),
@@ -497,7 +525,7 @@ registry-password =  \"{password}\"
     fn reads_from_file() {
         drop(dotenvy::dotenv());
         let config = OperatorConfig::new("operator-config.toml").unwrap();
-        let namespace = Namespace::new("pharia-kernel-team");
+        let namespace = Namespace::new("pharia-kernel-team").unwrap();
         assert!(config.namespaces.contains_key(&namespace));
     }
 
@@ -519,7 +547,7 @@ registry-password =  \"{password}\"
         )
         .unwrap();
 
-        let key = Namespace::new("pharia-kernel-team");
+        let key = Namespace::new("pharia-kernel-team").unwrap();
         let namespace = config.namespaces.get(&key).unwrap();
 
         // Then the `Oci` variants is prioritized
@@ -549,7 +577,7 @@ registry-password =  \"{password}\"
         let expected = OperatorConfig {
             namespaces: [
                 (
-                    Namespace::new("pharia-kernel-team"),
+                    Namespace::new("pharia-kernel-team").unwrap(),
                     NamespaceConfig::TeamOwned {
                         config_url: "https://dummy_url".to_owned(),
                         config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
@@ -562,7 +590,7 @@ registry-password =  \"{password}\"
                     },
                 ),
                 (
-                    Namespace::new("pharia-kernel-team-local"),
+                    Namespace::new("pharia-kernel-team-local").unwrap(),
                     NamespaceConfig::TeamOwned {
                         config_url: "https://dummy_url".to_owned(),
                         config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
