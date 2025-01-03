@@ -37,14 +37,9 @@ impl TestKernel {
         let app_config = AppConfig {
             tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
             metrics_addr: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
-            inference_addr: "https://inference-api.product.pharia.com".to_owned(),
-            document_index_addr: "https://document-index.product.pharia.com".to_owned(),
-            authorization_addr: "https://pharia-iam.product.pharia.com".to_owned(),
             operator_config: OperatorConfig::local(skills),
-            namespace_update_interval: Duration::from_secs(10),
-            log_level: "info".to_owned(),
-            open_telemetry_endpoint: None,
             use_pooling_allocator: true,
+            ..AppConfig::default()
         };
         Self::new(app_config).await
     }
