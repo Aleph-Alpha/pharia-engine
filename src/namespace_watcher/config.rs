@@ -1,9 +1,8 @@
-use std::{collections::HashMap, path::PathBuf};
-
 use anyhow::anyhow;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use heck::ToKebabCase;
 use serde::{Deserialize, Deserializer};
+use std::{collections::HashMap, path::PathBuf};
 use url::Url;
 
 use crate::skill_loader::RegistryConfig;
@@ -29,9 +28,19 @@ impl Namespace {
                 "Invalid namespace name ``. Namespaces must not be an empty String."
             ));
         }
+
+        if input
+            .chars()
+            .any(|c| !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'))
+        {
+            return Err(anyhow!(
+                "Invalid namespace name `{input}`. Namespaces characters must be `^[a-z0-9/-]`"
+            ));
+        }
+
         if input != input.to_kebab_case() {
             return Err(anyhow!(
-                "Invalid namespace name `{input}`. Namespaces must be kebab-case."
+                "Invalid namespace name `{input}`. Namespaces must be kebab-case"
             ));
         }
 
@@ -275,6 +284,12 @@ mod tests {
     }
 
     #[test]
+    fn non_ascii_chars_are_rejected() {
+        let name = "nameø";
+        Namespace::new(name).unwrap_err();
+    }
+
+    #[test]
     fn empty_namespace_name_is_rejected() -> anyhow::Result<()> {
         // Given toml file with non kebab-case namespaces
         let dir = tempdir()?;
@@ -304,7 +319,7 @@ mod tests {
         let mut file = fs::File::create_new(&file_path)?;
         writeln!(
             file,
-            r#"[namespaces.my_team]
+            r#"[namespaces.-myteam]
             directory = "skills""#
         )?;
         let file_source = File::with_name(file_path.to_str().unwrap());
