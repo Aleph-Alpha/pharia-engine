@@ -1,6 +1,7 @@
-use anyhow::anyhow;
+use anyhow::Ok;
+use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use serde::Deserialize;
-use std::{env, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use crate::namespace_watcher::OperatorConfig;
 
@@ -80,72 +81,53 @@ pub struct AppConfig {
 impl AppConfig {
     /// # Panics
     ///
-    /// Will panic if the `PHARIA_KERNEL_ADDRESS` environment variable is not parseable as a TCP Address.
+    /// Will panic if the environment variables `inference_addr` or `authorization_addr` are provided but empty.
     ///
     /// # Errors
     ///
-    /// Will return error if operator config exists but is invalid.
-    pub fn from_env() -> anyhow::Result<Self> {
-        drop(dotenvy::dotenv());
+    /// Cannot parse operator config from the provided file or the environment variables.
+    pub fn new() -> anyhow::Result<Self> {
+        let file = File::with_name("operator-config.toml").required(false);
+        let env = Self::environment();
+        Self::from_sources(file, env)
+    }
 
-        let addr = env::var("PHARIA_KERNEL_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8081".to_owned());
-        let metrics_addr =
-            env::var("PHARIA_KERNEL_METRICS_ADDRESS").unwrap_or_else(|_| "0.0.0.0:9000".to_owned());
-
-        let inference_addr = env::var("AA_INFERENCE_ADDRESS")
-            .unwrap_or_else(|_| "https://inference-api.product.pharia.com".to_owned());
-
-        let document_index_addr = env::var("DOCUMENT_INDEX_ADDRESS")
-            .unwrap_or_else(|_| "https://document-index.product.pharia.com".to_owned());
-
-        let authorization_addr = env::var("AUTHORIZATION_ADDRESS")
-            .unwrap_or_else(|_| "https://pharia-iam.product.pharia.com".to_owned());
-
-        let log_level = match env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_owned()) {
-            level if ["debug", "trace"].contains(&level.as_str()) => {
-                // Don't allow third-party crates to go below info unless they user passed in a
-                // RUST_LOG formatted string themselves
-                format!("info,pharia_kernel={level}")
-            }
-            level => level,
-        };
-
-        let open_telemetry_endpoint = env::var("OPEN_TELEMETRY_ENDPOINT").ok();
+    fn from_sources(
+        file: File<FileSourceFile, FileFormat>,
+        env: Environment,
+    ) -> anyhow::Result<Self> {
+        let mut config = Config::builder()
+            .add_source(file)
+            .add_source(env)
+            .build()?
+            .try_deserialize::<Self>()?;
 
         assert!(
-            !inference_addr.is_empty(),
+            !config.inference_addr.is_empty(),
             "The inference address must be available."
         );
+
         assert!(
-            !authorization_addr.is_empty(),
+            !config.authorization_addr.is_empty(),
             "The authorization address must be available."
         );
 
-        let namespace_update_interval: humantime::Duration = env::var("NAMESPACE_UPDATE_INTERVAL")
-            .as_deref()
-            .unwrap_or("10s")
-            .parse()?;
+        if ["debug", "trace"].contains(&config.log_level.as_str()) {
+            // Don't allow third-party crates to go below info unless they user passed in a
+            // RUST_LOG formatted string themselves
+            config.log_level = format!("info,pharia_kernel={}", config.log_level);
+        }
 
-        let operator_config = OperatorConfig::new("operator-config.toml")
-            .map_err(|err| anyhow!("The provided operator configuration must be valid: {err}"))?;
+        Ok(config)
+    }
 
-        let use_pooling_allocator = env::var("USE_POOLING_ALLOCATOR")
-            .as_deref()
-            .unwrap_or("false")
-            .parse()?;
-
-        Ok(AppConfig {
-            tcp_addr: addr.parse().unwrap(),
-            metrics_addr: metrics_addr.parse().unwrap(),
-            inference_addr,
-            document_index_addr,
-            authorization_addr,
-            operator_config,
-            namespace_update_interval: namespace_update_interval.into(),
-            log_level,
-            open_telemetry_endpoint,
-            use_pooling_allocator,
-        })
+    /// A namespace can contain the characters `[a-z0-9-]` e.g. `pharia-kernel-team`.
+    ///
+    /// As only `SCREAMING_SNAKE_CASE` is widely supported for environment variable keys,
+    /// we support it by converting each key into `kebab-case`.
+    /// Because we have a nested configuration, we use double underscores as the separators.
+    fn environment() -> Environment {
+        Environment::with_convert_case(Case::Kebab).separator("__")
     }
 }
 
@@ -168,21 +150,29 @@ impl Default for AppConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, time::Duration};
+    use std::{collections::HashMap, fs, time::Duration};
 
-    use config::{Case, Config, Environment};
+    use config::Config;
+    use tempfile::tempdir;
 
-    use crate::AppConfig;
+    use super::*;
 
-    impl AppConfig {
-        /// A namespace can contain the characters `[a-z0-9-]` e.g. `pharia-kernel-team`.
-        ///
-        /// As only `SCREAMING_SNAKE_CASE` is widely supported for environment variable keys,
-        /// we support it by converting each key into `kebab-case`.
-        /// Because we have a nested configuration, we use double underscores as the separators.
-        fn environment() -> Environment {
-            Environment::with_convert_case(Case::Kebab).separator("__")
-        }
+    #[test]
+    fn load_debug_log_level() -> anyhow::Result<()> {
+        // Given a hashmap with debug log level
+        let dir = tempdir()?;
+        let file_path = dir.path().join("operator-config.toml");
+        fs::File::create_new(&file_path)?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
+        let env_vars = HashMap::from([("LOG_LEVEL".to_owned(), "debug".to_owned())]);
+        let env_source = AppConfig::environment().source(Some(env_vars));
+
+        // When we build the source from the environment variables
+        let config = AppConfig::from_sources(file_source, env_source)?;
+
+        // Then the debug log level is only applied for Pharia Kernel
+        assert_eq!(config.log_level, "info,pharia_kernel=debug");
+        Ok(())
     }
 
     #[test]
@@ -218,13 +208,14 @@ mod tests {
             ("USE_POOLING_ALLOCATOR".to_owned(), "true".to_owned()),
             ("NAMESPACES__DEV__DIRECTORY".to_owned(), "skills".to_owned()),
         ]);
+        let dir = tempdir()?;
+        let file_path = dir.path().join("operator-config.toml");
+        fs::File::create_new(&file_path)?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
+        let env_source = AppConfig::environment().source(Some(env_vars));
 
         // When we build the source from the environment variables
-        let source = AppConfig::environment().source(Some(env_vars));
-        let config = Config::builder()
-            .add_source(source)
-            .build()?
-            .try_deserialize::<AppConfig>()?;
+        let config = AppConfig::from_sources(file_source, env_source)?;
 
         assert_eq!(config.tcp_addr, "192.123.1.1:8081".parse().unwrap());
         assert_eq!(config.log_level, "dummy");
