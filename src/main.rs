@@ -6,7 +6,7 @@ use pharia_kernel::{initialize_metrics, initialize_tracing, AppConfig, Kernel};
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     drop(dotenvy::dotenv());
-    let app_config = AppConfig::from_env()?;
+    let app_config = AppConfig::new()?;
     initialize_tracing(&app_config)?;
     initialize_metrics(app_config.metrics_addr)?;
 
