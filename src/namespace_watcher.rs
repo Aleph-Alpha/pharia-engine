@@ -8,5 +8,5 @@ pub use self::namespace_description::NamespaceDescriptionLoader;
 
 #[cfg(test)]
 pub mod tests {
-    pub use super::config::NamespaceConfig;
+    pub use super::config::{Namespace, NamespaceConfig};
 }
