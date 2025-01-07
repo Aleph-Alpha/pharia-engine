@@ -53,10 +53,6 @@ impl Namespace {
         }
         Ok(Self(input))
     }
-
-    pub fn into_string(self) -> String {
-        self.0
-    }
 }
 
 impl<'de> Deserialize<'de> for Namespace {
