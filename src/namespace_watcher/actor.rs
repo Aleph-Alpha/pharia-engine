@@ -28,7 +28,7 @@ pub struct NamespaceDescriptionLoaders {
 impl NamespaceDescriptionLoaders {
     pub fn new(deserialized: NamespaceConfigs) -> anyhow::Result<Self> {
         let namespaces = deserialized
-            .namespaces
+            .into_inner()
             .into_iter()
             .map(|(namespace, config)| {
                 config
@@ -415,7 +415,7 @@ pub mod tests {
         )]
         .into_iter()
         .collect();
-        let config = NamespaceConfigs { namespaces };
+        let config = NamespaceConfigs::new(namespaces);
 
         let mut loaders = NamespaceDescriptionLoaders::new(config).unwrap();
 
@@ -438,7 +438,7 @@ pub mod tests {
         )]
         .into_iter()
         .collect();
-        let config = NamespaceConfigs { namespaces };
+        let config = NamespaceConfigs::new(namespaces);
 
         let mut loaders = NamespaceDescriptionLoaders::new(config).unwrap();
 

@@ -69,19 +69,22 @@ impl<'de> Deserialize<'de> for Namespace {
 
 #[derive(Deserialize, PartialEq, Eq, Debug, Clone, Default)]
 #[serde(transparent)]
-pub struct NamespaceConfigs {
-    pub namespaces: HashMap<Namespace, NamespaceConfig>,
-}
+pub struct NamespaceConfigs(pub HashMap<Namespace, NamespaceConfig>);
 
 impl NamespaceConfigs {
+    #[must_use]
+    pub fn new(namespaces: HashMap<Namespace, NamespaceConfig>) -> Self {
+        Self(namespaces)
+    }
+
     /// Create an operator config which checks the local `skills` directory for
     /// a list of skills that are provided in the `skills` argument.
     /// Compared to the `NamespaceConfig::TeamOwned` variant, this removes one
     /// level of indirection (namespace config), allowing for easier testing.
     #[must_use]
     pub fn local(skills: &[&str]) -> Self {
-        NamespaceConfigs {
-            namespaces: [(
+        NamespaceConfigs::new(
+            [(
                 Namespace::new("local").unwrap(),
                 NamespaceConfig::InPlace {
                     skills: skills
@@ -97,14 +100,14 @@ impl NamespaceConfigs {
                 },
             )]
             .into(),
-        }
+        )
     }
 
     /// Which namespaces is backed by which registry
     #[must_use]
     pub fn registry_config(&self) -> RegistryConfig {
         RegistryConfig::new(
-            self.namespaces
+            self.0
                 .iter()
                 .map(|(k, v)| (k.to_owned().0, v.registry()))
                 .collect(),
@@ -120,7 +123,12 @@ impl NamespaceConfigs {
             },
         )]
         .into();
-        Self { namespaces }
+        Self::new(namespaces)
+    }
+
+    #[must_use]
+    pub fn into_inner(self) -> HashMap<Namespace, NamespaceConfig> {
+        self.0
     }
 }
 
@@ -258,7 +266,7 @@ mod tests {
     fn deserialize_config_with_file_registry() {
         let config = NamespaceConfigs::local(&[]);
         let namespace = Namespace::new("local").unwrap();
-        assert!(config.namespaces.contains_key(&namespace));
+        assert!(config.0.contains_key(&namespace));
     }
 
     #[test]
@@ -271,7 +279,7 @@ mod tests {
         )
         .unwrap();
         let namespace = Namespace::new("local").unwrap();
-        let local_namespace = config.namespaces.get(&namespace).unwrap();
+        let local_namespace = config.0.get(&namespace).unwrap();
 
         let registry = local_namespace.registry();
 
@@ -292,7 +300,7 @@ mod tests {
         )
         .unwrap();
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
-        let pharia_kernel_team = config.namespaces.get(&namespace).unwrap();
+        let pharia_kernel_team = config.0.get(&namespace).unwrap();
         assert_eq!(
             pharia_kernel_team.registry(),
             Registry::Oci {
@@ -316,7 +324,7 @@ mod tests {
         )
         .unwrap();
         let namespace = Namespace::new("dummy-team").unwrap();
-        let namespace_cfg = config.namespaces.get(&namespace).unwrap();
+        let namespace_cfg = config.0.get(&namespace).unwrap();
         let expected = NamespaceConfig::TeamOwned {
             config_url: "file://dummy_config_url".to_owned(),
             config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
@@ -346,7 +354,7 @@ mod tests {
         .unwrap();
 
         let key = Namespace::new("pharia-kernel-team").unwrap();
-        let namespace = config.namespaces.get(&key).unwrap();
+        let namespace = config.0.get(&key).unwrap();
 
         // Then the `Oci` variants is prioritized
         assert!(matches!(namespace.registry(), Registry::Oci { .. }));
@@ -372,8 +380,8 @@ mod tests {
         )
         .unwrap();
 
-        let expected = NamespaceConfigs {
-            namespaces: [
+        let expected = NamespaceConfigs::new(
+            [
                 (
                     Namespace::new("pharia-kernel-team").unwrap(),
                     NamespaceConfig::TeamOwned {
@@ -400,8 +408,7 @@ mod tests {
             ]
             .into_iter()
             .collect(),
-        };
-
+        );
         assert_eq!(config, expected);
     }
 }
