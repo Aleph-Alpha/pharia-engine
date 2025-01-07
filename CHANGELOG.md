@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.5.0...v0.6.0)
+
+### Features
+
+- Update index html about what kernel is - ([b6f291f](https://github.com/Aleph-Alpha/pharia-kernel/commit/b6f291fca631d4d9d2ed687bef555d3676b051f7))
+- [**breaking**] Streamline naming of environment variables - ([d22f999](https://github.com/Aleph-Alpha/pharia-kernel/commit/d22f999b546d8d45fef440eeedbcefbfa69cdfed))
+- [**breaking**] Rename operator-config file to just config - ([999a784](https://github.com/Aleph-Alpha/pharia-kernel/commit/999a784e62e08471be0f607a7585593f310520a8))
+- Support loading config from file and env variables - ([0c8286d](https://github.com/Aleph-Alpha/pharia-kernel/commit/0c8286dfa64339cdd2648bb1af98eab96f9421c6))
+- Limit valid namespace names to ascii chars, digits and hyphens - ([b8b3705](https://github.com/Aleph-Alpha/pharia-kernel/commit/b8b3705ff49cea91cc14c9cf644a106cb750e2c9))
+- Reject empty namespace names - ([26554f9](https://github.com/Aleph-Alpha/pharia-kernel/commit/26554f9bd4376d58f98ce6c5bc17c587033f7528))
+- Restrict namespace length to 64 chars - ([8ae2c10](https://github.com/Aleph-Alpha/pharia-kernel/commit/8ae2c107a160e8cf815c88ed11532229805029db))
+- Validate namespace name is specified in kebab-case - ([5860525](https://github.com/Aleph-Alpha/pharia-kernel/commit/5860525062987086cc68ab28321c30458ade8993))
+
+### Documentation
+
+- Pharia ai token is not needed to run kernel locally - ([6e5755c](https://github.com/Aleph-Alpha/pharia-kernel/commit/6e5755c3b1c9f33a4a8d19d4a51df7ca3e73056d))
+
+### Builds
+
+- *(deps)* Bump the minor group with 8 updates - ([49c3237](https://github.com/Aleph-Alpha/pharia-kernel/commit/49c32377f97a9c364e695baad8bd30c436093579))
+- *(deps)* Bump the minor group with 7 updates - ([cd86400](https://github.com/Aleph-Alpha/pharia-kernel/commit/cd86400a3475fb142a66a31ec2c371744217fe08))
+- *(deps)* Bump tempfile from 3.14.0 to 3.15.0 in the minor group - ([936aeba](https://github.com/Aleph-Alpha/pharia-kernel/commit/936aeba6106a0e026ba6a42185472c37b4307fb4))
+
+
 ## [0.5.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.14...v0.5.0)
 
 ### Features
