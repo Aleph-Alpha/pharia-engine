@@ -136,14 +136,14 @@ You can monitor your skill by connecting the Pharia Kernel to an OpenTelemetry c
     podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
-Specify the collector endpoint via the environment variable `OPEN_TELEMETRY_ENDPOINT`:
+Specify the collector endpoint via the environment variable `OTEL_ENDPOINT`:
 
 ```shell
     podman run \
         -v ./skills:/app/skills \
         -e NAMESPACES__DEV__DIRECTORY="skills" \
         -e NAMESPACE_UPDATE_INTERVAL=1s \
-        -e OPEN_TELEMETRY_ENDPOINT=http://host.containers.internal:4317 \
+        -e OTEL_ENDPOINT=http://host.containers.internal:4317 \
         -p 8081:8081 \
         pharia-kernel
 ```

@@ -209,7 +209,7 @@ impl SearchClient for Client {
 pub mod tests {
     use super::*;
 
-    use crate::tests::{api_token, document_index_address};
+    use crate::tests::{api_token, document_index_url};
 
     pub struct StubClient;
 
@@ -263,7 +263,7 @@ pub mod tests {
     #[tokio::test]
     async fn search_request() {
         // Given a search client pointed at the document index
-        let host = document_index_address().to_owned();
+        let host = document_index_url().to_owned();
         let api_token = api_token();
         let client = Client::new(host).unwrap();
 
@@ -295,7 +295,7 @@ pub mod tests {
     #[tokio::test]
     async fn request_metadata() {
         // Given a search client pointed at the document index
-        let host = document_index_address().to_owned();
+        let host = document_index_url().to_owned();
         let api_token = api_token();
         let client = Client::new(host).unwrap();
 
@@ -321,7 +321,7 @@ pub mod tests {
     #[tokio::test]
     async fn min_score() {
         // Given a search client pointed at the document index
-        let host = document_index_address().to_owned();
+        let host = document_index_url().to_owned();
         let api_token = api_token();
         let client = Client::new(host).unwrap();
         let max_results = 5;

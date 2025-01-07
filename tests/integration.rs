@@ -20,7 +20,7 @@ impl TestKernel {
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
-        let port = app_config.tcp_addr.port();
+        let port = app_config.kernel_address.port();
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
 
@@ -35,8 +35,8 @@ impl TestKernel {
         let port = free_test_port();
         let metrics_port = free_test_port();
         let app_config = AppConfig {
-            tcp_addr: format!("127.0.0.1:{port}").parse().unwrap(),
-            metrics_addr: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
+            kernel_address: format!("127.0.0.1:{port}").parse().unwrap(),
+            metrics_address: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
             operator_config: OperatorConfig::local(skills),
             use_pooling_allocator: true,
             ..AppConfig::default()

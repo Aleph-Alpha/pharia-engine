@@ -70,9 +70,9 @@ impl Kernel {
         );
 
         // Boot up the drivers which power the CSI.
-        let tokenizers = Tokenizers::new(app_config.inference_addr.clone()).unwrap();
-        let inference = Inference::new(app_config.inference_addr.clone());
-        let search = Search::new(app_config.document_index_addr.clone());
+        let tokenizers = Tokenizers::new(app_config.inference_url.clone()).unwrap();
+        let inference = Inference::new(app_config.inference_url.clone());
+        let search = Search::new(app_config.document_index_url.clone());
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
             search: search.api(),
@@ -95,10 +95,10 @@ impl Kernel {
         // Wait for the first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        let authorization = Authorization::new(app_config.authorization_addr);
+        let authorization = Authorization::new(app_config.authorization_url);
 
         let shell = match Shell::new(
-            app_config.tcp_addr,
+            app_config.kernel_address,
             authorization.api(),
             skill_executor.api(),
             skill_store.api(),
@@ -177,31 +177,31 @@ mod tests {
     }
 
     /// Inference address used by tests.
-    pub fn inference_address() -> &'static str {
-        static AA_INFERENCE_ADDRESS: LazyLock<String> = LazyLock::new(|| {
+    pub fn inference_url() -> &'static str {
+        static INFERENCE_URL: LazyLock<String> = LazyLock::new(|| {
             drop(dotenv());
-            env::var("AA_INFERENCE_ADDRESS")
+            env::var("INFERENCE_URL")
                 .unwrap_or_else(|_| "https://inference-api.product.pharia.com".to_owned())
         });
-        &AA_INFERENCE_ADDRESS
+        &INFERENCE_URL
     }
 
     /// Inference address used by tests.
-    pub fn document_index_address() -> &'static str {
-        static DOCUMENT_INDEX_ADDRESS: LazyLock<String> = LazyLock::new(|| {
+    pub fn document_index_url() -> &'static str {
+        static DOCUMENT_INDEX_URL: LazyLock<String> = LazyLock::new(|| {
             drop(dotenv());
-            env::var("DOCUMENT_INDEX_ADDRESS")
+            env::var("DOCUMENT_INDEX_URL")
                 .unwrap_or_else(|_| "https://document-index.product.pharia.com".to_owned())
         });
-        &DOCUMENT_INDEX_ADDRESS
+        &DOCUMENT_INDEX_URL
     }
 
     // tests if the shutdown procedure is executed properly (not blocking)
     #[tokio::test]
     async fn shutdown() {
         let config = AppConfig {
-            tcp_addr: "127.0.0.1:8888".parse().unwrap(),
-            metrics_addr: "127.0.0.1:0".parse().unwrap(),
+            kernel_address: "127.0.0.1:8888".parse().unwrap(),
+            metrics_address: "127.0.0.1:0".parse().unwrap(),
             ..AppConfig::default()
         };
         let kernel = Kernel::new(config, ready(())).await.unwrap();
