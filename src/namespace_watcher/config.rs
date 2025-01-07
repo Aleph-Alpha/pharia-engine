@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use derive_more::derive::{Constructor, Deref, IntoIterator};
 use heck::ToKebabCase;
 use serde::{Deserialize, Deserializer};
 use std::{collections::HashMap, path::PathBuf};
@@ -67,16 +68,11 @@ impl<'de> Deserialize<'de> for Namespace {
     }
 }
 
-#[derive(Deserialize, PartialEq, Eq, Debug, Clone, Default)]
+#[derive(Deserialize, PartialEq, Eq, Debug, Clone, Default, Constructor, IntoIterator, Deref)]
 #[serde(transparent)]
-pub struct NamespaceConfigs(pub HashMap<Namespace, NamespaceConfig>);
+pub struct NamespaceConfigs(HashMap<Namespace, NamespaceConfig>);
 
 impl NamespaceConfigs {
-    #[must_use]
-    pub fn new(namespaces: HashMap<Namespace, NamespaceConfig>) -> Self {
-        Self(namespaces)
-    }
-
     /// Create an operator config which checks the local `skills` directory for
     /// a list of skills that are provided in the `skills` argument.
     /// Compared to the `NamespaceConfig::TeamOwned` variant, this removes one
@@ -107,8 +103,7 @@ impl NamespaceConfigs {
     #[must_use]
     pub fn registry_config(&self) -> RegistryConfig {
         RegistryConfig::new(
-            self.0
-                .iter()
+            self.iter()
                 .map(|(k, v)| (k.to_owned().0, v.registry()))
                 .collect(),
         )
@@ -124,11 +119,6 @@ impl NamespaceConfigs {
         )]
         .into();
         Self::new(namespaces)
-    }
-
-    #[must_use]
-    pub fn into_inner(self) -> HashMap<Namespace, NamespaceConfig> {
-        self.0
     }
 }
 
@@ -266,7 +256,7 @@ mod tests {
     fn deserialize_config_with_file_registry() {
         let config = NamespaceConfigs::local(&[]);
         let namespace = Namespace::new("local").unwrap();
-        assert!(config.0.contains_key(&namespace));
+        assert!(config.contains_key(&namespace));
     }
 
     #[test]
@@ -279,7 +269,7 @@ mod tests {
         )
         .unwrap();
         let namespace = Namespace::new("local").unwrap();
-        let local_namespace = config.0.get(&namespace).unwrap();
+        let local_namespace = config.get(&namespace).unwrap();
 
         let registry = local_namespace.registry();
 
@@ -300,7 +290,7 @@ mod tests {
         )
         .unwrap();
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
-        let pharia_kernel_team = config.0.get(&namespace).unwrap();
+        let pharia_kernel_team = config.get(&namespace).unwrap();
         assert_eq!(
             pharia_kernel_team.registry(),
             Registry::Oci {
@@ -324,7 +314,7 @@ mod tests {
         )
         .unwrap();
         let namespace = Namespace::new("dummy-team").unwrap();
-        let namespace_cfg = config.0.get(&namespace).unwrap();
+        let namespace_cfg = config.get(&namespace).unwrap();
         let expected = NamespaceConfig::TeamOwned {
             config_url: "file://dummy_config_url".to_owned(),
             config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
@@ -354,7 +344,7 @@ mod tests {
         .unwrap();
 
         let key = Namespace::new("pharia-kernel-team").unwrap();
-        let namespace = config.0.get(&key).unwrap();
+        let namespace = config.get(&key).unwrap();
 
         // Then the `Oci` variants is prioritized
         assert!(matches!(namespace.registry(), Registry::Oci { .. }));

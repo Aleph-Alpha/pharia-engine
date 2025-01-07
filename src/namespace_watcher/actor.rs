@@ -28,7 +28,6 @@ pub struct NamespaceDescriptionLoaders {
 impl NamespaceDescriptionLoaders {
     pub fn new(deserialized: NamespaceConfigs) -> anyhow::Result<Self> {
         let namespaces = deserialized
-            .into_inner()
             .into_iter()
             .map(|(namespace, config)| {
                 config
