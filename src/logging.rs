@@ -27,7 +27,7 @@ pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<()> {
     let registry = tracing_subscriber::registry()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer());
-    if let Some(endpoint) = &app_config.open_telemetry_endpoint {
+    if let Some(endpoint) = &app_config.otel_endpoint {
         let otel_tracer = init_otel_tracer(endpoint)?;
         registry.with(OpenTelemetryLayer::new(otel_tracer)).init();
     } else {

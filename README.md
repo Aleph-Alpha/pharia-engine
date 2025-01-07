@@ -33,7 +33,7 @@ Then, run the image with
 podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
 
-We configure the bind address and port via the environment variable `PHARIA_KERNEL_ADDRESS`.
+We configure the bind address and port via the environment variable `KERNEL_ADDRESS`.
 If not configured it defaults to "0.0.0.0:8081", which is necessary in the container, but locally may cause the firewall to complain.
 
 #### MacOS

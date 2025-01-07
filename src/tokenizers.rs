@@ -143,7 +143,7 @@ pub mod tests {
     use super::{Tokenizer, TokenizerApi};
 
     use crate::{
-        tests::{api_token, inference_address},
+        tests::{api_token, inference_url},
         tokenizers::Tokenizers,
     };
 
@@ -179,7 +179,7 @@ pub mod tests {
     async fn fetch_pharia_1_llm_7b_control_tokenizer() {
         // Given a model name and the actual inference API
         let model_name = "pharia-1-llm-7b-control";
-        let base_url = inference_address();
+        let base_url = inference_url();
         let api_token = api_token().to_owned();
 
         // When we can request a tokenizer from the AA API

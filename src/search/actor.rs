@@ -321,7 +321,7 @@ mod tests {
     use serde_json::Value;
     use tokio::{time::sleep, try_join};
 
-    use crate::tests::{api_token, document_index_address};
+    use crate::tests::{api_token, document_index_url};
 
     use super::*;
 
@@ -349,7 +349,7 @@ mod tests {
     #[tokio::test]
     async fn search_request() {
         // Given a search client pointed at the document index
-        let host = document_index_address().to_owned();
+        let host = document_index_url().to_owned();
         let api_token = api_token().to_owned();
         let search = Search::new(host);
 
@@ -372,7 +372,7 @@ mod tests {
     #[tokio::test]
     async fn request_metadata() {
         // Given a search client pointed at the document index
-        let host = document_index_address().to_owned();
+        let host = document_index_url().to_owned();
         let api_token = api_token().to_owned();
         let search = Search::new(host);
 
@@ -400,7 +400,7 @@ mod tests {
     #[tokio::test]
     async fn min_score() {
         // Given a search client pointed at the document index
-        let host = document_index_address().to_owned();
+        let host = document_index_url().to_owned();
         let api_token = api_token().to_owned();
         let search = Search::new(host);
         let max_results = 5;

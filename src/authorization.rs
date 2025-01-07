@@ -197,7 +197,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::tests::{api_token, inference_address};
+    use crate::tests::{api_token, inference_url};
 
     /// An authorization double, loaded up with predefined answers.
     pub struct StubAuthorization {
@@ -223,7 +223,7 @@ pub mod tests {
     #[tokio::test]
     async fn true_for_valid_permissions() {
         // Given a client that is configured against the inference api
-        let url = inference_address();
+        let url = inference_url();
         let client = HttpAuthorizationClient::new(url.to_owned());
 
         // When the client is used to check a valid api token
@@ -236,7 +236,7 @@ pub mod tests {
     #[tokio::test]
     async fn false_for_invalid_token() {
         // Given a client that is configured against the inference api
-        let url = inference_address();
+        let url = inference_url();
         let client = HttpAuthorizationClient::new(url.to_owned());
 
         // When the client is used to check an invalid api token

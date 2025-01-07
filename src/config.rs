@@ -8,23 +8,23 @@ use crate::namespace_watcher::OperatorConfig;
 mod defaults {
     use std::{net::SocketAddr, time::Duration};
 
-    pub fn tcp_addr() -> SocketAddr {
+    pub fn kernel_address() -> SocketAddr {
         "0.0.0.0:8081".parse().unwrap()
     }
 
-    pub fn metrics_addr() -> SocketAddr {
+    pub fn metrics_address() -> SocketAddr {
         "0.0.0.0:9000".parse().unwrap()
     }
 
-    pub fn inference_addr() -> String {
+    pub fn inference_url() -> String {
         "https://inference-api.product.pharia.com".to_owned()
     }
 
-    pub fn document_index_addr() -> String {
+    pub fn document_index_url() -> String {
         "https://document-index.product.pharia.com".to_owned()
     }
 
-    pub fn authorization_addr() -> String {
+    pub fn authorization_url() -> String {
         "https://pharia-iam.product.pharia.com".to_owned()
     }
 
@@ -40,30 +40,21 @@ mod defaults {
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct AppConfig {
-    #[serde(rename = "pharia-kernel-address", default = "defaults::tcp_addr")]
-    pub tcp_addr: SocketAddr,
+    #[serde(default = "defaults::kernel_address")]
+    pub kernel_address: SocketAddr,
     /// Address to expose metrics on
-    #[serde(
-        rename = "pharia-kernel-metrics-address",
-        default = "defaults::metrics_addr"
-    )]
-    pub metrics_addr: SocketAddr,
+    #[serde(default = "defaults::metrics_address")]
+    pub metrics_address: SocketAddr,
     /// This base URL is used to do inference against models hosted by the Aleph Alpha inference
     /// stack, as well as used to fetch Tokenizers for said models.
-    #[serde(rename = "aa-inference-address", default = "defaults::inference_addr")]
-    pub inference_addr: String,
+    #[serde(default = "defaults::inference_url")]
+    pub inference_url: String,
     /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
-    #[serde(
-        rename = "document-index-address",
-        default = "defaults::document_index_addr"
-    )]
-    pub document_index_addr: String,
+    #[serde(default = "defaults::document_index_url")]
+    pub document_index_url: String,
     /// This base URL is used to authorize an `PHARIA_AI_TOKEN` for use by the kernel
-    #[serde(
-        rename = "authorization-address",
-        default = "defaults::authorization_addr"
-    )]
-    pub authorization_addr: String,
+    #[serde(default = "defaults::authorization_url")]
+    pub authorization_url: String,
     #[serde(flatten)]
     pub operator_config: OperatorConfig,
     #[serde(
@@ -73,7 +64,7 @@ pub struct AppConfig {
     pub namespace_update_interval: Duration,
     #[serde(default = "defaults::log_level")]
     pub log_level: String,
-    pub open_telemetry_endpoint: Option<String>,
+    pub otel_endpoint: Option<String>,
     #[serde(default)]
     pub use_pooling_allocator: bool,
 }
@@ -81,7 +72,7 @@ pub struct AppConfig {
 impl AppConfig {
     /// # Panics
     ///
-    /// Will panic if the environment variables `inference_addr` or `authorization_addr` are provided but empty.
+    /// Will panic if the environment variables `inference_url` or `authorization_url` are provided but empty.
     ///
     /// # Errors
     ///
@@ -103,12 +94,12 @@ impl AppConfig {
             .try_deserialize::<Self>()?;
 
         assert!(
-            !config.inference_addr.is_empty(),
+            !config.inference_url.is_empty(),
             "The inference address must be available."
         );
 
         assert!(
-            !config.authorization_addr.is_empty(),
+            !config.authorization_url.is_empty(),
             "The authorization address must be available."
         );
 
@@ -134,15 +125,15 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            tcp_addr: defaults::tcp_addr(),
-            metrics_addr: defaults::metrics_addr(),
-            inference_addr: defaults::inference_addr(),
-            document_index_addr: defaults::document_index_addr(),
-            authorization_addr: defaults::authorization_addr(),
+            kernel_address: defaults::kernel_address(),
+            metrics_address: defaults::metrics_address(),
+            inference_url: defaults::inference_url(),
+            document_index_url: defaults::document_index_url(),
+            authorization_url: defaults::authorization_url(),
             operator_config: OperatorConfig::default(),
             namespace_update_interval: defaults::namespace_update_interval(),
             log_level: defaults::log_level(),
-            open_telemetry_endpoint: None,
+            otel_endpoint: None,
             use_pooling_allocator: false,
         }
     }
@@ -183,32 +174,23 @@ mod tests {
     fn load_app_config_from_one_source() -> anyhow::Result<()> {
         // Given a hashmap with variables
         let env_vars = HashMap::from([
+            ("KERNEL_ADDRESS".to_owned(), "192.123.1.1:8081".to_owned()),
+            ("METRICS_ADDRESS".to_owned(), "0.0.0.0:9000".to_owned()),
             (
-                "PHARIA_KERNEL_ADDRESS".to_owned(),
-                "192.123.1.1:8081".to_owned(),
-            ),
-            (
-                "PHARIA_KERNEL_METRICS_ADDRESS".to_owned(),
-                "0.0.0.0:9000".to_owned(),
-            ),
-            (
-                "AA_INFERENCE_ADDRESS".to_owned(),
+                "INFERENCE_URL".to_owned(),
                 "https://inference-api.product.pharia.com".to_owned(),
             ),
             (
-                "DOCUMENT_INDEX_ADDRESS".to_owned(),
+                "DOCUMENT_INDEX_URL".to_owned(),
                 "https://document-index.product.pharia.com".to_owned(),
             ),
             (
-                "AUTHORIZATION_ADDRESS".to_owned(),
+                "AUTHORIZATION_URL".to_owned(),
                 "https://pharia-iam.product.pharia.com".to_owned(),
             ),
             ("NAMESPACE_UPDATE_INTERVAL".to_owned(), "10s".to_owned()),
             ("LOG_LEVEL".to_owned(), "dummy".to_owned()),
-            (
-                "OPEN_TELEMETRY_ENDPOINT".to_owned(),
-                "open-telemetry".to_owned(),
-            ),
+            ("OTEL_ENDPOINT".to_owned(), "open-telemetry".to_owned()),
             ("USE_POOLING_ALLOCATOR".to_owned(), "true".to_owned()),
             ("NAMESPACES__DEV__DIRECTORY".to_owned(), "skills".to_owned()),
         ]);
@@ -221,7 +203,7 @@ mod tests {
         // When we build the source from the environment variables
         let config = AppConfig::from_sources(file_source, env_source)?;
 
-        assert_eq!(config.tcp_addr, "192.123.1.1:8081".parse().unwrap());
+        assert_eq!(config.kernel_address, "192.123.1.1:8081".parse().unwrap());
         assert_eq!(config.log_level, "dummy");
         assert_eq!(config.operator_config.namespaces.len(), 1);
         assert_eq!(config.namespace_update_interval, Duration::from_secs(10));
@@ -237,23 +219,23 @@ mod tests {
         let config = config.try_deserialize::<AppConfig>()?;
 
         // Then the config contains the default values
-        assert_eq!(config.tcp_addr, "0.0.0.0:8081".parse().unwrap());
-        assert_eq!(config.metrics_addr, "0.0.0.0:9000".parse().unwrap());
+        assert_eq!(config.kernel_address, "0.0.0.0:8081".parse().unwrap());
+        assert_eq!(config.metrics_address, "0.0.0.0:9000".parse().unwrap());
         assert_eq!(
-            config.inference_addr,
+            config.inference_url,
             "https://inference-api.product.pharia.com"
         );
         assert_eq!(
-            config.document_index_addr,
+            config.document_index_url,
             "https://document-index.product.pharia.com"
         );
         assert_eq!(
-            config.authorization_addr,
+            config.authorization_url,
             "https://pharia-iam.product.pharia.com"
         );
         assert_eq!(config.namespace_update_interval, Duration::from_secs(10));
         assert_eq!(config.log_level, "info");
-        assert!(config.open_telemetry_endpoint.is_none());
+        assert!(config.otel_endpoint.is_none());
         assert!(!config.use_pooling_allocator);
         assert!(config.operator_config.namespaces.is_empty());
         Ok(())

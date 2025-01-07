@@ -191,7 +191,7 @@ impl From<aleph_alpha_client::Error> for InferenceClientError {
 mod tests {
     use crate::{
         inference::{ChatParams, Role},
-        tests::{api_token, inference_address},
+        tests::{api_token, inference_url},
     };
 
     use super::*;
@@ -258,7 +258,7 @@ mod tests {
     async fn test_chat_message_conversion() {
         // Given an inference client
         let api_token = api_token().to_owned();
-        let host = inference_address().to_owned();
+        let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
         // and a chat request
@@ -288,7 +288,7 @@ mod tests {
     async fn test_bad_token_gives_inference_client_error() {
         // Given an inference client and a bad token
         let bad_api_token = "bad_api_token".to_owned();
-        let host = inference_address().to_owned();
+        let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
         // and a chat request return an error
@@ -317,7 +317,7 @@ mod tests {
     async fn test_complete_response_with_special_tokens() {
         // Given an inference client
         let api_token = api_token().to_owned();
-        let host = inference_address().to_owned();
+        let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
         // and a completion request

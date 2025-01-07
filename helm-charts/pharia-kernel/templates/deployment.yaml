@@ -71,34 +71,34 @@ spec:
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | quote }}
             {{- if .Values.openTelemetryEndpoint }}
-            - name: OPEN_TELEMETRY_ENDPOINT
+            - name: OTEL_ENDPOINT
               value: {{ .Values.openTelemetryEndpoint | quote }}
             {{- end }}
             {{- if .Values.authorizationAddress }}
-            - name: AUTHORIZATION_ADDRESS
+            - name: AUTHORIZATION_URL
               value: {{ .Values.authorizationAddress | quote }}
             {{- else if .Values.global.phariaAIConfigMap }}
-            - name: AUTHORIZATION_ADDRESS
+            - name: AUTHORIZATION_URL
               valueFrom:
                 configMapKeyRef:
                   name: {{ .Values.global.phariaAIConfigMap }}
                   key: PHARIA_IAM_URL
             {{- end }}
             {{- if .Values.inferenceAddress }}
-            - name: AA_INFERENCE_ADDRESS
+            - name: INFERENCE_URL
               value: {{ .Values.inferenceAddress | quote }}
             {{- else if .Values.global.phariaAIConfigMap }}
-            - name: AA_INFERENCE_ADDRESS
+            - name: INFERENCE_URL
               valueFrom:
                 configMapKeyRef:
                   name: {{ .Values.global.phariaAIConfigMap }}
                   key: API_SCHEDULER_URL
             {{- end }}
             {{- if .Values.documentIndexAddress }}
-            - name: DOCUMENT_INDEX_ADDRESS
+            - name: DOCUMENT_INDEX_URL
               value: {{ .Values.documentIndexAddress | quote }}
             {{- else if .Values.global.phariaAIConfigMap }}
-            - name: DOCUMENT_INDEX_ADDRESS
+            - name: DOCUMENT_INDEX_URL
               valueFrom:
                 configMapKeyRef:
                   name: {{ .Values.global.phariaAIConfigMap }}

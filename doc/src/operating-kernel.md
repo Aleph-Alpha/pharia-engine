@@ -89,10 +89,10 @@ LOG_LEVEL=info
 
 ## Observability
 
-Pharia Kernel can be configured to use an OpenTelemetry Collector endpoint by setting the `OPEN_TELEMETRY_ENDPOINT` environment variable.
+Pharia Kernel can be configured to use an OpenTelemetry Collector endpoint by setting the `OTEL_ENDPOINT` environment variable.
 
 ```shell
-OPEN_TELEMETRY_ENDPOINT=http://127.0.0.1:4317
+OTEL_ENDPOINT=http://127.0.0.1:4317
 ```
 
 For local testing, a supported collector like the Jaeger [All in One](https://www.jaegertracing.io/docs/1.60/getting-started/#all-in-one) executable can be used:
