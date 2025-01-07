@@ -55,8 +55,8 @@ pub struct AppConfig {
     /// This base URL is used to authorize an `PHARIA_AI_TOKEN` for use by the kernel
     #[serde(default = "defaults::authorization_url")]
     pub authorization_url: String,
-    #[serde(flatten)]
-    pub operator_config: OperatorConfig,
+    #[serde(default)]
+    pub namespaces: OperatorConfig,
     #[serde(
         with = "humantime_serde",
         default = "defaults::namespace_update_interval"
@@ -130,7 +130,7 @@ impl Default for AppConfig {
             inference_url: defaults::inference_url(),
             document_index_url: defaults::document_index_url(),
             authorization_url: defaults::authorization_url(),
-            operator_config: OperatorConfig::default(),
+            namespaces: OperatorConfig::default(),
             namespace_update_interval: defaults::namespace_update_interval(),
             log_level: defaults::log_level(),
             otel_endpoint: None,
@@ -205,7 +205,7 @@ mod tests {
 
         assert_eq!(config.kernel_address, "192.123.1.1:8081".parse().unwrap());
         assert_eq!(config.log_level, "dummy");
-        assert_eq!(config.operator_config.namespaces.len(), 1);
+        assert_eq!(config.namespaces.namespaces.len(), 1);
         assert_eq!(config.namespace_update_interval, Duration::from_secs(10));
         Ok(())
     }
@@ -237,7 +237,7 @@ mod tests {
         assert_eq!(config.log_level, "info");
         assert!(config.otel_endpoint.is_none());
         assert!(!config.use_pooling_allocator);
-        assert!(config.operator_config.namespaces.is_empty());
+        assert!(config.namespaces.namespaces.is_empty());
         Ok(())
     }
 
@@ -299,7 +299,7 @@ mod tests {
         let config = AppConfig::from_sources(file_source, env_source)?;
 
         // Then both sources are applied, with the values from environment variables having precedence
-        assert_eq!(config.operator_config.namespaces.len(), 0);
+        assert_eq!(config.namespaces.namespaces.len(), 0);
         Ok(())
     }
 
@@ -340,11 +340,11 @@ registry-password =  "a""#
         let config = AppConfig::from_sources(file_source, env_source)?;
 
         // Then both namespaces are loaded
-        assert_eq!(config.operator_config.namespaces.len(), 2);
+        assert_eq!(config.namespaces.namespaces.len(), 2);
         let namespace_a = Namespace::new("a").unwrap();
-        assert!(config.operator_config.namespaces.contains_key(&namespace_a));
+        assert!(config.namespaces.namespaces.contains_key(&namespace_a));
         let namespace_b = Namespace::new("b").unwrap();
-        assert!(config.operator_config.namespaces.contains_key(&namespace_b));
+        assert!(config.namespaces.namespaces.contains_key(&namespace_b));
         Ok(())
     }
 
@@ -386,7 +386,7 @@ registry-password =  \"{password}\"
         let config = AppConfig::from_sources(file_source, env_source)?;
 
         // Then both sources are applied, with the values from environment variables having higher precedence
-        assert_eq!(config.operator_config.namespaces.len(), 1);
+        assert_eq!(config.namespaces.namespaces.len(), 1);
         let namespace_config = NamespaceConfig::TeamOwned {
             config_url: config_url.to_owned(),
             config_access_token: Some(config_access_token.to_owned()),
@@ -399,7 +399,7 @@ registry-password =  \"{password}\"
         };
         let namespace = Namespace::new("acme").unwrap();
         assert_eq!(
-            config.operator_config.namespaces.get(&namespace).unwrap(),
+            config.namespaces.namespaces.get(&namespace).unwrap(),
             &namespace_config
         );
         Ok(())
@@ -410,6 +410,6 @@ registry-password =  \"{password}\"
         drop(dotenvy::dotenv());
         let config = AppConfig::new().unwrap();
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
-        assert!(config.operator_config.namespaces.contains_key(&namespace));
+        assert!(config.namespaces.namespaces.contains_key(&namespace));
     }
 }

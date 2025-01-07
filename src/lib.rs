@@ -62,7 +62,7 @@ impl Kernel {
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, Error> {
         let loaders = Box::new(
-            NamespaceDescriptionLoaders::new(app_config.operator_config.clone())
+            NamespaceDescriptionLoaders::new(app_config.namespaces.clone())
                 .context("Unable to read the configuration for namespaces")?,
         );
         let engine = Arc::new(
@@ -79,7 +79,7 @@ impl Kernel {
             tokenizers: tokenizers.api(),
         };
 
-        let registry_config = app_config.operator_config.registry_config();
+        let registry_config = app_config.namespaces.registry_config();
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config);
         let skill_store = SkillStore::new(skill_loader.api(), app_config.namespace_update_interval);
 
