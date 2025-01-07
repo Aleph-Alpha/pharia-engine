@@ -3,10 +3,10 @@ mod config;
 mod namespace_description;
 
 pub use self::actor::{NamespaceDescriptionLoaders, NamespaceWatcher};
-pub use self::config::{NamespaceConfigs, Registry};
+pub use self::config::{Namespace, NamespaceConfigs, Registry};
 pub use self::namespace_description::NamespaceDescriptionLoader;
 
 #[cfg(test)]
 pub mod tests {
-    pub use super::config::{Namespace, NamespaceConfig};
+    pub use super::config::NamespaceConfig;
 }

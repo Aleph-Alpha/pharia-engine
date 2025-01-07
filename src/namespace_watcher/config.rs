@@ -14,7 +14,7 @@ use super::{
     NamespaceDescriptionLoader,
 };
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Deref, derive_more::Display)]
 pub struct Namespace(String);
 
 impl Namespace {
