@@ -100,7 +100,7 @@ jobs:
 
       - name: Integration test
         run: |
-          (podman run -p 8081:8081 -v ./operator-config.toml:/app/operator-config.toml \
+          (podman run -p 8081:8081 -v ./config.toml:/app/config.toml \
             -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER=dummy \
             -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD=dummy \
             -e NAMESPACES__PHARIA_KERNEL_TEAM__CONFIG_ACCESS_TOKEN=dummy \

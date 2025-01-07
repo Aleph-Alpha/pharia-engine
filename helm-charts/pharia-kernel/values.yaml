@@ -91,11 +91,11 @@ resources: {}
 volumes:
   - name: config-volume
     configMap:
-      name: pharia-kernel-operator-config
+      name: pharia-kernel-config
 volumeMounts:
   - name: config-volume
-    mountPath: /app/operator-config.toml
-    subPath: operator-config.toml
+    mountPath: /app/config.toml
+    subPath: config.toml
     readOnly: true
 nodeSelector: {}
 tolerations: []
