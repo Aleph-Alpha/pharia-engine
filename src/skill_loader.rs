@@ -5,7 +5,7 @@ use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
 
-use crate::namespace_watcher::Registry;
+use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{Digest, FileRegistry, OciRegistry, SkillImage, SkillRegistry};
 use crate::skills::{Engine, Skill};
 use futures::stream::FuturesUnordered;
@@ -16,7 +16,7 @@ use std::{future::Future, pin::Pin};
 // A skill that has been configured and may be fetched and executed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfiguredSkill {
-    pub namespace: String,
+    pub namespace: Namespace,
     pub name: String,
     pub tag: String,
 }
@@ -28,13 +28,9 @@ impl std::fmt::Display for ConfiguredSkill {
 }
 
 impl ConfiguredSkill {
-    pub fn new(
-        namespace: impl Into<String>,
-        name: impl Into<String>,
-        tag: impl Into<String>,
-    ) -> Self {
+    pub fn new(namespace: Namespace, name: impl Into<String>, tag: impl Into<String>) -> Self {
         Self {
-            namespace: namespace.into(),
+            namespace,
             name: name.into(),
             tag: tag.into(),
         }
@@ -264,7 +260,7 @@ pub mod tests {
 
     impl ConfiguredSkill {
         pub fn from_path(skill_path: &SkillPath) -> Self {
-            Self::new(&skill_path.namespace, &skill_path.name, "latest")
+            Self::new(skill_path.namespace.clone(), &skill_path.name, "latest")
         }
     }
 
@@ -304,15 +300,22 @@ pub mod tests {
     async fn test_skill_loader_fetches_multiple_skills_concurrently() {
         // Given a skill loader with two registries, one that never resolves and one that always does
         let engine = Arc::new(Engine::new(false).unwrap());
-        let never_resolving =
-            Arc::new(NeverResolvingRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
-        let ready_registry = Arc::new(ReadyRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
         let mut registries = HashMap::new();
-        registries.insert("never-resolving".to_owned(), never_resolving);
-        registries.insert("ready".to_owned(), ready_registry);
+
+        let never_resolving = Namespace::new("never-resolving").unwrap();
+        let never_resolving_registry =
+            Arc::new(NeverResolvingRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
+        registries.insert(
+            never_resolving.clone().to_string(),
+            never_resolving_registry,
+        );
+
+        let ready = Namespace::new("ready").unwrap();
+        let ready_registry = Arc::new(ReadyRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
+        registries.insert(ready.clone().to_string(), ready_registry);
         let skill_loader = SkillLoader::new(engine, registries);
-        let never_resolving_skill_path = SkillPath::new("never-resolving", "dummy");
-        let ready_skill_path = SkillPath::new("ready", "dummy");
+        let never_resolving_skill_path = SkillPath::new(never_resolving, "dummy");
+        let ready_skill_path = SkillPath::new(ready, "dummy");
 
         // When we fetch the never resolving skill
         let api = skill_loader.api();

@@ -351,6 +351,13 @@ async fn execute_skill(
         );
     };
 
+    let Ok(namespace) = Namespace::new(namespace) else {
+        return (
+            VALIDATION_ERROR_STATUS_CODE,
+            Json(json!("Invalid namespace for skill.")),
+        );
+    };
+
     let skill_path = SkillPath::new(namespace, name);
     let result = skill_executor_api
         .execute_skill(skill_path, args.input, bearer.token().to_owned())
@@ -389,7 +396,7 @@ async fn run_skill(
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
 ) -> (StatusCode, Json<Value>) {
-    let skill_path = SkillPath::new(namespace.to_string(), name);
+    let skill_path = SkillPath::new(namespace, name);
     let result = skill_executor_api
         .execute_skill(skill_path, input, bearer.token().to_owned())
         .await;
@@ -469,7 +476,7 @@ async fn drop_cached_skill(
     State(skill_store_api): State<SkillStoreApi>,
     Path((namespace, name)): Path<(Namespace, String)>,
 ) -> (StatusCode, Json<String>) {
-    let skill_path = SkillPath::new(namespace.to_string(), name);
+    let skill_path = SkillPath::new(namespace, name);
     let skill_was_cached = skill_store_api.invalidate_cache(skill_path).await;
     let msg = if skill_was_cached {
         "Skill removed from cache".to_string()
@@ -479,7 +486,7 @@ async fn drop_cached_skill(
     (StatusCode::OK, Json(msg))
 }
 
-/// WIT (Webassembly Interface Types) of Skills
+/// WIT (WebAssembly Interface Types) of Skills
 ///
 /// Skills are web assembly components build against a wit world. This route returns this wit world.
 /// This allows you to build your own skill in many languages. We hope to provide higher level
@@ -625,7 +632,7 @@ mod tests {
             let SkillExecutorMsg {
                 skill_path, send, ..
             } = msg;
-            assert_eq!(skill_path, SkillPath::new("local", "greet_skill"));
+            assert_eq!(skill_path, SkillPath::local("greet_skill"));
             send.send(Ok(json!("dummy completion"))).unwrap();
         });
         let skill_executor_api = skill_executer_mock.api();
@@ -705,7 +712,7 @@ mod tests {
                 api_token,
                 input,
             } = msg;
-            assert_eq!(skill_path, SkillPath::new("local", "greet_skill"));
+            assert_eq!(skill_path, SkillPath::local("greet_skill"));
             assert_eq!(api_token, "dummy auth token");
             assert_eq!(input, json!("Homer"));
             send.send(Ok(json!("dummy completion"))).unwrap();
@@ -823,11 +830,12 @@ mod tests {
         let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
         let skill_store_api = SkillStoreApi::new(send);
+        let namespace = Namespace::new("ns").unwrap();
         tokio::spawn(async move {
             if let SkillStoreMessage::ListCached { send } = recv.recv().await.unwrap() {
                 send.send(vec![
-                    SkillPath::new("ns", "first"),
-                    SkillPath::new("ns", "second"),
+                    SkillPath::new(namespace.clone(), "first"),
+                    SkillPath::new(namespace, "second"),
                 ])
             } else {
                 panic!("unexpected message in test")
@@ -872,6 +880,7 @@ mod tests {
         let skill_path_clone = skill_path.clone();
         let (send, mut recv) = mpsc::channel(1);
         let skill_store_api = SkillStoreApi::new(send);
+        let namespace = Namespace::new("pharia-kernel-team").unwrap();
         tokio::spawn(async move {
             if let SkillStoreMessage::InvalidateCache { skill_path, send } =
                 recv.recv().await.unwrap()
@@ -895,7 +904,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri("/cached_skills/pharia-kernel-team/haiku_skill".to_owned())
+                    .uri(format!("/cached_skills/{namespace}/haiku_skill"))
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
@@ -907,7 +916,7 @@ mod tests {
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         assert_eq!(
             skill_path.lock().unwrap().take().unwrap(),
-            SkillPath::new("pharia-kernel-team", "haiku_skill")
+            SkillPath::new(namespace, "haiku_skill")
         );
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
@@ -928,6 +937,7 @@ mod tests {
         let skill_path_clone = skill_path.clone();
         let (send, mut recv) = mpsc::channel(1);
         let skill_store_api = SkillStoreApi::new(send);
+        let namespace = Namespace::new("pharia-kernel-team").unwrap();
         tokio::spawn(async move {
             if let SkillStoreMessage::InvalidateCache { skill_path, send } =
                 recv.recv().await.unwrap()
@@ -951,7 +961,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(http::Method::DELETE)
-                    .uri("/cached_skills/pharia-kernel-team/haiku_skill".to_owned())
+                    .uri(format!("/cached_skills/{namespace}/haiku_skill"))
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
@@ -963,7 +973,7 @@ mod tests {
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         assert_eq!(
             skill_path.lock().unwrap().take().unwrap(),
-            SkillPath::new("pharia-kernel-team", "haiku_skill")
+            SkillPath::new(namespace, "haiku_skill")
         );
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
@@ -1066,15 +1076,15 @@ mod tests {
 
     #[tokio::test]
     async fn list_skills() {
-        // Given we can provide two skills "ns_one/one" and "ns_two/two"
+        // Given we can provide two skills "ns-one/one" and "ns-two/two"
         let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
         let skill_store_api = SkillStoreApi::new(send);
         tokio::spawn(async move {
             if let SkillStoreMessage::List { send } = recv.recv().await.unwrap() {
                 send.send(vec![
-                    SkillPath::new("ns_one", "one"),
-                    SkillPath::new("ns_two", "two"),
+                    SkillPath::new(Namespace::new("ns-one").unwrap(), "one"),
+                    SkillPath::new(Namespace::new("ns-two").unwrap(), "two"),
                 ])
                 .unwrap();
             } else {
@@ -1105,7 +1115,7 @@ mod tests {
         // Then
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let actual = String::from_utf8(body.to_vec()).unwrap();
-        let expected = "[\"ns_one/one\",\"ns_two/two\"]";
+        let expected = "[\"ns-one/one\",\"ns-two/two\"]";
         assert_eq!(actual, expected);
     }
 
@@ -1162,18 +1172,14 @@ mod tests {
 
         // When executing a skill in the namespace
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
-        let args = ExecuteSkillArgs {
-            skill: "any_namespace/any_skill".to_owned(),
-            input: json!("Homer"),
-        };
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::POST)
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(header::AUTHORIZATION, auth_value)
-                    .uri("/execute_skill")
-                    .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .uri("/v1/skills/any-namespace/any_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
             )
             .await
@@ -1199,18 +1205,14 @@ mod tests {
 
         // When executing a skill
         let http = http(app_state);
-        let args = ExecuteSkillArgs {
-            skill: "my_namespace/my_skill".to_owned(),
-            input: json!("Homer"),
-        };
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::POST)
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(header::AUTHORIZATION, auth_value)
-                    .uri("/execute_skill")
-                    .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .uri("/v1/skills/any-namespace/any_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
             )
             .await

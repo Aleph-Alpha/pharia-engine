@@ -431,7 +431,7 @@ pub mod tests {
         // When a skill is requested, but it is not listed in the namespace
         let result = api
             .execute_skill(
-                SkillPath::new("my_namespace", "my_skill"),
+                SkillPath::local("my_skill"),
                 json!("Any input"),
                 "Dummy api token".to_owned(),
             )
@@ -456,7 +456,7 @@ pub mod tests {
         let result = executor
             .api()
             .execute_skill(
-                SkillPath::new("test", "greet"),
+                SkillPath::local("greet"),
                 json!("Homer"),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
@@ -481,7 +481,7 @@ pub mod tests {
         let result = executor
             .api()
             .execute_skill(
-                SkillPath::new("test", "greet"),
+                SkillPath::local("greet"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
@@ -505,7 +505,7 @@ pub mod tests {
         let api = executor.api();
 
         // When executing tw tasks in parallel
-        let skill_path = SkillPath::new("test", "greet");
+        let skill_path = SkillPath::local("greet");
         let input = json!("Homer");
         let token = "TOKEN_NOT_REQUIRED";
         let result = try_join!(
@@ -594,7 +594,7 @@ pub mod tests {
                 while let Some(msg) = recv.recv().await {
                     match msg {
                         SkillStoreMessage::Fetch { skill_path, send } => {
-                            let skill = if skill_path == SkillPath::new("test", "greet") {
+                            let skill = if skill_path == SkillPath::local("greet") {
                                 Some(skill.clone())
                             } else {
                                 None

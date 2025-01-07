@@ -58,7 +58,7 @@ impl SkillStoreState {
 
     pub fn upsert_skill(&mut self, skill: ConfiguredSkill) {
         info!("New or changed skill: {skill}");
-        let skill_path = SkillPath::new(&skill.namespace, &skill.name);
+        let skill_path = SkillPath::new(skill.namespace, &skill.name);
         if self
             .known_skills
             .insert(skill_path.clone(), skill.tag)
@@ -114,7 +114,10 @@ impl SkillStoreState {
 
     /// Return the registered tag for a given skill
     fn tag(&self, skill_path: &SkillPath) -> anyhow::Result<Option<&str>> {
-        if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
+        if let Some(error) = self
+            .invalid_namespaces
+            .get(&skill_path.namespace.clone().into_string())
+        {
             return Err(anyhow!("Invalid namespace: {error}"));
         }
         Ok(self.known_skills.get(skill_path).map(String::as_str))
@@ -142,7 +145,7 @@ impl SkillStoreState {
             .expect("Bad namespace configuration for skill")
             .expect("Missing tag for skill");
 
-        let skill = ConfiguredSkill::new(&skill_path.namespace, &skill_path.name, tag);
+        let skill = ConfiguredSkill::new(skill_path.namespace.clone(), &skill_path.name, tag);
         match self.skill_loader.fetch_digest(skill).await {
             // There is a new digest behind the tag, delete the cache entry
             Ok(Some(new_digest)) if &new_digest != digest => {
@@ -445,8 +448,11 @@ impl SkillStoreActor {
                 match self.provider.tag(&skill_path) {
                     Ok(Some(tag)) => {
                         let skill_loader = self.provider.skill_loader.clone();
-                        let skill =
-                            ConfiguredSkill::new(&skill_path.namespace, &skill_path.name, tag);
+                        let skill = ConfiguredSkill::new(
+                            skill_path.namespace.clone(),
+                            &skill_path.name,
+                            tag,
+                        );
                         let cloned_skill_path = skill_path.clone();
                         let fut = async move {
                             let result = skill_loader.fetch(skill).await;
@@ -497,6 +503,7 @@ pub mod tests {
     use test_skills::{given_chat_skill, given_greet_skill_v0_2};
     use tokio::time::{sleep, timeout};
 
+    use crate::namespace_watcher::Namespace;
     use crate::skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg};
     use crate::skills::{Engine, SkillPath};
 
@@ -512,7 +519,7 @@ pub mod tests {
     impl SkillStoreState {
         fn with_namespace_and_skill(engine: Arc<Engine>, skill_path: &SkillPath) -> Self {
             let skill_loader =
-                SkillLoader::with_file_registry(engine, skill_path.namespace.clone()).api();
+                SkillLoader::with_file_registry(engine, skill_path.namespace.to_string()).api();
 
             let mut provider = SkillStoreState::new(skill_loader);
             let skill = ConfiguredSkill::from_path(skill_path);
@@ -571,8 +578,8 @@ pub mod tests {
     async fn requests_for_different_skills_are_not_cached() {
         // Given a skill request cache
         let mut cache = SkillRequests::new();
-        let first_skill = SkillPath::new("local", "first_skill");
-        let second_skill = SkillPath::new("local", "second_skill");
+        let first_skill = SkillPath::local("first_skill");
+        let second_skill = SkillPath::local("second_skill");
 
         // When pushing two requests for different skills to the cache
         let first_skill_clone = first_skill.clone();
@@ -615,7 +622,7 @@ pub mod tests {
         let skill_loader = SkillLoaderApi::new(send);
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10)).api();
 
-        let skill_path = SkillPath::new("local", "greet_skill_v0_2");
+        let skill_path = SkillPath::local("greet_skill_v0_2");
         let skill = ConfiguredSkill::from_path(&skill_path);
         skill_store.upsert(skill).await;
 
@@ -652,34 +659,33 @@ pub mod tests {
         // Given a provider with two skills
         let (sender, _recv) = mpsc::channel(1);
         let skill_loader = SkillLoaderApi::new(sender);
+        let a = Namespace::new("a").unwrap();
+        let b = Namespace::new("b").unwrap();
 
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10)).api();
         skill_store
-            .upsert(ConfiguredSkill::new("a", "a", "latest"))
+            .upsert(ConfiguredSkill::new(a.clone(), "a", "latest"))
             .await;
         skill_store
-            .upsert(ConfiguredSkill::new("a", "b", "latest"))
+            .upsert(ConfiguredSkill::new(a, "b", "latest"))
             .await;
         skill_store
-            .upsert(ConfiguredSkill::new("b", "a", "latest"))
+            .upsert(ConfiguredSkill::new(b.clone(), "a", "latest"))
             .await;
         skill_store
-            .upsert(ConfiguredSkill::new("b", "b", "latest"))
+            .upsert(ConfiguredSkill::new(b, "b", "latest"))
             .await;
 
         // When skills are listed
-        let skills = skill_store.list().await;
+        let skills: Vec<String> = skill_store
+            .list()
+            .await
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
 
         // Then the skills are sorted
-        assert_eq!(
-            skills,
-            vec![
-                SkillPath::new("a", "a"),
-                SkillPath::new("a", "b"),
-                SkillPath::new("b", "a"),
-                SkillPath::new("b", "b"),
-            ]
-        );
+        assert_eq!(skills, ["a/a", "a/b", "b/a", "b/b"]);
     }
 
     #[tokio::test]
@@ -689,7 +695,7 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader =
-            SkillLoader::with_file_registry(engine, skill_path.namespace.clone()).api();
+            SkillLoader::with_file_registry(engine, skill_path.namespace.to_string()).api();
 
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10)).api();
 
@@ -711,18 +717,23 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
-        let result = provider.tag(&SkillPath::new(&skill_path.namespace, "non_existing_skill"));
+        let result = provider.tag(&SkillPath::new(skill_path.namespace, "non_existing_skill"));
         assert!(matches!(result, Ok(None)));
     }
 
     #[tokio::test]
     async fn namespace_not_in_config() {
-        let skill_path = SkillPath::dummy();
+        // Given a provider with a skill in a particular namespace
+        let namespace = Namespace::new("non-existing").unwrap();
+        let existing = SkillPath::new(namespace.clone(), "existing_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
+        let provider = SkillStoreState::with_namespace_and_skill(engine, &existing);
 
-        let result = provider.tag(&SkillPath::new("non_existing_namespace", &skill_path.name));
+        // When requesting a different, non-existing skill in the same namespace
+        let non_existing = SkillPath::new(namespace, "non_existing_skill");
+        let result = provider.tag(&non_existing);
 
+        // Then the skill is not found
         assert!(matches!(result, Ok(None)));
     }
 
@@ -730,7 +741,7 @@ pub mod tests {
     async fn cached_skill_removed() {
         // Given one cached skill
         given_greet_skill_v0_2();
-        let skill_path = SkillPath::new("local", "greet_skill_v0_2");
+        let skill_path = SkillPath::local("greet_skill_v0_2");
         let configured_skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
@@ -747,10 +758,10 @@ pub mod tests {
     #[tokio::test]
     async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
-        let skill_path = SkillPath::new("local", "greet_skill_v0_2");
+        let skill_path = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
-        provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
+        provider.add_invalid_namespace(skill_path.namespace.to_string(), anyhow!(""));
 
         // when fetching the tag
         let result = provider.tag(&skill_path);
@@ -767,10 +778,10 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
-        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
+        let greet_skill = SkillPath::local("greet_skill_v0_2");
         let skill = ConfiguredSkill::from_path(&greet_skill);
         skill_store.api().upsert(skill).await;
-        let skill = ConfiguredSkill::from_path(&SkillPath::new("local", "greet-py-v0_2"));
+        let skill = ConfiguredSkill::from_path(&SkillPath::local("greet-py-v0_2"));
         skill_store.api().upsert(skill).await;
 
         // When fetching "greet_skill" but not "greet-py"
@@ -794,16 +805,19 @@ pub mod tests {
         let api = skill_store.api();
 
         // When adding two skills
-        let skill = ConfiguredSkill::from_path(&SkillPath::new("local", "one"));
+        let first = SkillPath::local("one");
+        let skill = ConfiguredSkill::from_path(&first);
         api.upsert(skill).await;
-        let skill = ConfiguredSkill::from_path(&SkillPath::new("local", "two"));
+
+        let second = SkillPath::local("two");
+        let skill = ConfiguredSkill::from_path(&second);
         api.upsert(skill).await;
         let skills = api.list().await;
 
         // Then the skills are listed by the skill executor api
         assert_eq!(skills.len(), 2);
-        assert!(skills.contains(&SkillPath::new("local", "one")));
-        assert!(skills.contains(&SkillPath::new("local", "two")));
+        assert!(skills.contains(&first));
+        assert!(skills.contains(&second));
 
         // Cleanup
         drop(api);
@@ -814,7 +828,7 @@ pub mod tests {
     async fn should_remove_invalidated_skill_from_cache() {
         // Given one cached "greet_skill"
         given_greet_skill_v0_2();
-        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
+        let greet_skill = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
@@ -836,7 +850,7 @@ pub mod tests {
     #[tokio::test]
     async fn invalidation_of_an_uncached_skill() {
         // Given one "greet_skill" which is not in cache
-        let greet_skill = SkillPath::new("local", "greet_skill");
+        let greet_skill = SkillPath::local("greet_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
@@ -865,7 +879,7 @@ pub mod tests {
         let skill_loader = SkillLoader::from_config(engine, registry_config).api();
         let mut skill_store_state = SkillStoreState::new(skill_loader);
 
-        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
+        let greet_skill = SkillPath::local("greet_skill_v0_2");
         let configured_skill = ConfiguredSkill::from_path(&greet_skill);
         skill_store_state.upsert_skill(configured_skill.clone());
         let (skill, digest) = skill_store_state
@@ -906,7 +920,7 @@ pub mod tests {
     async fn doesnt_invalidate_unchanged_digests() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
         given_greet_skill_v0_2();
-        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
+        let greet_skill = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::with_file_registry(engine, "local".to_owned()).api();
         let mut skill_store_state = SkillStoreState::new(skill_loader);
@@ -935,7 +949,7 @@ pub mod tests {
     async fn should_invalidate_cached_skill_whose_digest_has_changed() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
         let (registry_config, temp_dir) = tmp_registries_with_skill()?;
-        let greet_skill = SkillPath::new("local", "greet_skill_v0_2");
+        let greet_skill = SkillPath::local("greet_skill_v0_2");
         let configured_skill = ConfiguredSkill::from_path(&greet_skill);
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader = SkillLoader::from_config(engine, registry_config).api();
