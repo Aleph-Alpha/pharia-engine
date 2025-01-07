@@ -9,7 +9,7 @@ use crate::{skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::S
 
 use super::{
     namespace_description::{NamespaceDescriptionError, SkillDescription},
-    NamespaceDescriptionLoader, OperatorConfig,
+    NamespaceConfigs, NamespaceDescriptionLoader,
 };
 
 #[async_trait]
@@ -26,7 +26,7 @@ pub struct NamespaceDescriptionLoaders {
 }
 
 impl NamespaceDescriptionLoaders {
-    pub fn new(deserialized: OperatorConfig) -> anyhow::Result<Self> {
+    pub fn new(deserialized: NamespaceConfigs) -> anyhow::Result<Self> {
         let namespaces = deserialized
             .namespaces
             .into_iter()
@@ -415,7 +415,7 @@ pub mod tests {
         )]
         .into_iter()
         .collect();
-        let config = OperatorConfig { namespaces };
+        let config = NamespaceConfigs { namespaces };
 
         let mut loaders = NamespaceDescriptionLoaders::new(config).unwrap();
 
@@ -438,7 +438,7 @@ pub mod tests {
         )]
         .into_iter()
         .collect();
-        let config = OperatorConfig { namespaces };
+        let config = NamespaceConfigs { namespaces };
 
         let mut loaders = NamespaceDescriptionLoaders::new(config).unwrap();
 

@@ -69,18 +69,18 @@ impl<'de> Deserialize<'de> for Namespace {
 
 #[derive(Deserialize, PartialEq, Eq, Debug, Clone, Default)]
 #[serde(transparent)]
-pub struct OperatorConfig {
+pub struct NamespaceConfigs {
     pub namespaces: HashMap<Namespace, NamespaceConfig>,
 }
 
-impl OperatorConfig {
+impl NamespaceConfigs {
     /// Create an operator config which checks the local `skills` directory for
     /// a list of skills that are provided in the `skills` argument.
     /// Compared to the `NamespaceConfig::TeamOwned` variant, this removes one
     /// level of indirection (namespace config), allowing for easier testing.
     #[must_use]
     pub fn local(skills: &[&str]) -> Self {
-        OperatorConfig {
+        NamespaceConfigs {
             namespaces: [(
                 Namespace::new("local").unwrap(),
                 NamespaceConfig::InPlace {
@@ -224,7 +224,7 @@ impl NamespaceConfig {
 mod tests {
     use super::*;
 
-    impl OperatorConfig {
+    impl NamespaceConfigs {
         /// # Panics
         /// Cannot parse config.
         #[must_use]
@@ -256,14 +256,14 @@ mod tests {
 
     #[test]
     fn deserialize_config_with_file_registry() {
-        let config = OperatorConfig::local(&[]);
+        let config = NamespaceConfigs::local(&[]);
         let namespace = Namespace::new("local").unwrap();
         assert!(config.namespaces.contains_key(&namespace));
     }
 
     #[test]
     fn deserialize_watch_config() {
-        let config = OperatorConfig::from_toml(
+        let config = NamespaceConfigs::from_toml(
             r#"
             [local]
             directory = "skills"
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn deserialize_config_with_oci_registry() {
-        let config = OperatorConfig::from_toml(
+        let config = NamespaceConfigs::from_toml(
             r#"
             [pharia-kernel-team]
             config-url = "https://dummy_url"
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn deserialize_config_with_config_access_token() {
-        let config = OperatorConfig::from_toml(
+        let config = NamespaceConfigs::from_toml(
             r#"
             [dummy-team]
             config-url = "file://dummy_config_url"
@@ -331,7 +331,7 @@ mod tests {
     fn prioritizes_oci_registry() {
         // When deserializing a config which contains both, an oci and a file registry
         // for the same namespace
-        let config = toml::from_str::<OperatorConfig>(
+        let config = toml::from_str::<NamespaceConfigs>(
             r#"
             [pharia-kernel-team]
             config-url = "https://dummy_url"
@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn deserializes_multiple_namespaces() {
-        let config = toml::from_str::<OperatorConfig>(
+        let config = toml::from_str::<NamespaceConfigs>(
             r#"
             [pharia-kernel-team]
             config-url = "https://dummy_url"
@@ -372,7 +372,7 @@ mod tests {
         )
         .unwrap();
 
-        let expected = OperatorConfig {
+        let expected = NamespaceConfigs {
             namespaces: [
                 (
                     Namespace::new("pharia-kernel-team").unwrap(),

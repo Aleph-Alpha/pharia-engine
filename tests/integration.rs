@@ -2,7 +2,7 @@ use std::{env, net::TcpListener, sync::OnceLock, time::Duration};
 
 use axum::http;
 use dotenvy::dotenv;
-use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, OperatorConfig};
+use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, NamespaceConfigs};
 use reqwest::{header, Body};
 use serde_json::{json, Value};
 use test_skills::{given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill};
@@ -37,7 +37,7 @@ impl TestKernel {
         let app_config = AppConfig {
             kernel_address: format!("127.0.0.1:{port}").parse().unwrap(),
             metrics_address: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
-            namespaces: OperatorConfig::local(skills),
+            namespaces: NamespaceConfigs::local(skills),
             use_pooling_allocator: true,
             ..AppConfig::default()
         };
