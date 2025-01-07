@@ -208,7 +208,7 @@ impl NamespaceWatcherActor {
             Ok(incoming) => {
                 if self.invalid_namespaces.contains(namespace) {
                     self.skill_store_api
-                        .set_namespace_error(namespace.clone().into_string(), None)
+                        .set_namespace_error(namespace.clone(), None)
                         .await;
                     self.invalid_namespaces.remove(namespace);
                 }
@@ -225,7 +225,7 @@ impl NamespaceWatcherActor {
                     "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
                 self.skill_store_api
-                    .set_namespace_error(namespace.clone().into_string(), Some(e))
+                    .set_namespace_error(namespace.clone(), Some(e))
                     .await;
                 self.invalid_namespaces.insert(namespace.to_owned());
                 vec![]
@@ -542,7 +542,7 @@ pub mod tests {
 
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMessage>(2);
         let skill_store_api = SkillStoreApi::new(sender);
-        let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.to_owned()]));
+        let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.clone()]));
 
         let mut coa = NamespaceWatcherActor::with_skills(namespaces, skill_store_api, config);
 
@@ -557,7 +557,7 @@ pub mod tests {
             SkillStoreMessage::SetNamespaceError {
                 namespace, ..
             }
-            if namespace == dummy_namespace.as_ref()
+            if namespace == dummy_namespace
         ));
 
         let msg = receiver.try_recv().unwrap();
@@ -644,7 +644,7 @@ pub mod tests {
             SkillStoreMessage::SetNamespaceError {
                 namespace, error: None
             }
-            if namespace == dummy_namespace.as_ref()
+            if namespace == dummy_namespace
         ));
 
         let msg = timeout(

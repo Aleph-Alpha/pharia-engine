@@ -1,6 +1,7 @@
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::{
+    namespace_watcher::Namespace,
     registries::Digest,
     skill_loader::{ConfiguredSkill, SkillLoaderApi},
     skills::{Skill, SkillPath},
@@ -41,8 +42,7 @@ impl CachedSkill {
 struct SkillStoreState {
     known_skills: HashMap<SkillPath, String>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
-    // key: Namespace, value: Error
-    invalid_namespaces: HashMap<String, anyhow::Error>,
+    invalid_namespaces: HashMap<Namespace, anyhow::Error>,
     skill_loader: SkillLoaderApi,
 }
 
@@ -91,11 +91,11 @@ impl SkillStoreState {
         self.cached_skills.remove(skill_path).is_some()
     }
 
-    pub fn add_invalid_namespace(&mut self, namespace: String, e: anyhow::Error) {
+    pub fn add_invalid_namespace(&mut self, namespace: Namespace, e: anyhow::Error) {
         self.invalid_namespaces.insert(namespace, e);
     }
 
-    pub fn remove_invalid_namespace(&mut self, namespace: &str) {
+    pub fn remove_invalid_namespace(&mut self, namespace: &Namespace) {
         self.invalid_namespaces.remove(namespace);
     }
 
@@ -114,10 +114,7 @@ impl SkillStoreState {
 
     /// Return the registered tag for a given skill
     fn tag(&self, skill_path: &SkillPath) -> anyhow::Result<Option<&str>> {
-        if let Some(error) = self
-            .invalid_namespaces
-            .get(&skill_path.namespace.clone().into_string())
-        {
+        if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
             return Err(anyhow!("Invalid namespace: {error}"));
         }
         Ok(self.known_skills.get(skill_path).map(String::as_str))
@@ -242,7 +239,7 @@ impl SkillStoreApi {
 
     /// Report a namespace as erroneous (e.g. in case its configuration is messed up). Set `None`
     /// to communicate that a namespace is no longer erroneous.
-    pub async fn set_namespace_error(&self, namespace: String, error: Option<anyhow::Error>) {
+    pub async fn set_namespace_error(&self, namespace: Namespace, error: Option<anyhow::Error>) {
         let msg = SkillStoreMessage::SetNamespaceError { namespace, error };
         self.sender
             .send(msg)
@@ -315,7 +312,7 @@ pub enum SkillStoreMessage {
         skill: ConfiguredSkill,
     },
     SetNamespaceError {
-        namespace: String,
+        namespace: Namespace,
         error: Option<anyhow::Error>,
     },
     InvalidateCache {
@@ -681,7 +678,7 @@ pub mod tests {
             .list()
             .await
             .iter()
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
             .collect();
 
         // Then the skills are sorted
@@ -761,7 +758,7 @@ pub mod tests {
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
-        provider.add_invalid_namespace(skill_path.namespace.to_string(), anyhow!(""));
+        provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
 
         // when fetching the tag
         let result = provider.tag(&skill_path);
