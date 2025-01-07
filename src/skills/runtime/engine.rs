@@ -119,6 +119,8 @@ impl Engine {
 pub enum Skill {
     /// Skills targeting versions 0.2.x of the skill world
     V0_2(v0_2::SkillPre<LinkedCtx>),
+    /// Skills targeting versions 0.3.x of the skill world
+    V0_3(v0_3::SkillPre<LinkedCtx>),
 }
 
 impl Skill {
@@ -132,6 +134,10 @@ impl Skill {
             SupportedVersion::V0_2 => {
                 let skill = v0_2::SkillPre::new(pre)?;
                 Ok(Skill::V0_2(skill))
+            }
+            SupportedVersion::V0_3 => {
+                let skill = v0_3::SkillPre::new(pre)?;
+                Ok(Skill::V0_3(skill))
             }
         }
     }
@@ -166,6 +172,28 @@ impl Skill {
                 };
                 Ok(serde_json::from_slice(&result)?)
             }
+            Self::V0_3(skill) => {
+                let input = serde_json::to_vec(&input)?;
+                let bindings = skill.instantiate_async(&mut store).await?;
+                let result = bindings
+                    .pharia_skill_skill_handler()
+                    .call_run(store, &input)
+                    .await?;
+                let result = match result {
+                    Ok(result) => result,
+                    Err(e) => match e {
+                        v0_3::exports::pharia::skill::skill_handler::Error::Internal(e) => {
+                            tracing::error!("Failed to run skill, internal skill error:\n{e}");
+                            return Err(anyhow!("Internal skill error:\n{e}"));
+                        }
+                        v0_3::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                            tracing::error!("Failed to run skill, invalid input:\n{e}");
+                            return Err(anyhow!("Invalid input:\n{e}"));
+                        }
+                    },
+                };
+                Ok(serde_json::from_slice(&result)?)
+            }
         }
     }
 }
@@ -175,6 +203,8 @@ impl Skill {
 pub enum SupportedVersion {
     /// Versions 0.2.x of the skill world
     V0_2,
+    /// Versions 0.3.x of the skill world
+    V0_3,
 }
 
 impl SupportedVersion {
@@ -186,6 +216,13 @@ impl SupportedVersion {
                     v0_2::Skill::add_to_linker(
                         linker,
                         v0_2::LinkOptions::default().document_metadata(true),
+                        |state: &mut LinkedCtx| state,
+                    )?;
+                }
+                Self::V0_3 => {
+                    v0_3::Skill::add_to_linker(
+                        linker,
+                        v0_3::LinkOptions::default().document_metadata(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
@@ -245,6 +282,15 @@ impl SupportedVersion {
                 });
                 &VERSION
             }
+            Self::V0_3 => {
+                static VERSION: LazyLock<Version> = LazyLock::new(|| {
+                    SupportedVersion::extract_wit_package_version(
+                        "./wit/skill@0.3/skill.wit",
+                        include_str!("../../../wit/skill@0.3/skill.wit"),
+                    )
+                });
+                &VERSION
+            }
         }
     }
 
@@ -270,9 +316,23 @@ impl SupportedVersion {
         match version {
             Version {
                 major: 0, minor: 2, ..
-            } if &version <= Self::V0_2.current_supported_version() => Ok(Self::V0_2),
+            } => {
+                if &version <= Self::V0_2.current_supported_version() {
+                    Ok(Self::V0_2)
+                } else {
+                    Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
+                }
+            }
+            Version {
+                major: 0, minor: 3, ..
+            } => {
+                if &version <= Self::V0_3.current_supported_version() {
+                    Ok(Self::V0_3)
+                } else {
+                    Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
+                }
+            }
             _ => {
-                // Once we have more than one supported version, we will need to account for 0.2.x being greater than current but less than latest
                 if &version > Self::latest_supported_version() {
                     Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
                 } else {
@@ -588,6 +648,284 @@ mod v0_2 {
     }
 }
 
+mod v0_3 {
+    use pharia::skill::csi::{
+        ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
+        DocumentPath, FinishReason, Host, IndexPath, Language, Message, Role, SearchResult,
+    };
+    use wasmtime::component::bindgen;
+
+    use crate::{
+        csi::ChunkRequest,
+        inference,
+        language_selection::{self, SelectLanguageRequest},
+        search::{self, SearchRequest},
+    };
+
+    use super::LinkedCtx;
+
+    bindgen!({ world: "skill", path: "./wit/skill@0.3", async: true });
+
+    #[async_trait::async_trait]
+    impl Host for LinkedCtx {
+        #[must_use]
+        async fn complete(
+            &mut self,
+            model: String,
+            prompt: String,
+            options: CompletionParams,
+        ) -> Completion {
+            let CompletionParams {
+                max_tokens,
+                temperature,
+                top_k,
+                top_p,
+                stop,
+                special_tokens,
+            } = options;
+            let params = inference::CompletionParams {
+                special_tokens,
+                max_tokens,
+                temperature,
+                top_k,
+                top_p,
+                stop,
+            };
+            let request = inference::CompletionRequest::new(prompt, model).with_params(params);
+            self.skill_ctx.complete_text(request).await.into()
+        }
+
+        async fn chat(
+            &mut self,
+            model: String,
+            messages: Vec<Message>,
+            params: ChatParams,
+        ) -> ChatResponse {
+            let request = inference::ChatRequest {
+                model,
+                messages: messages.into_iter().map(Into::into).collect(),
+                params: params.into(),
+            };
+            self.skill_ctx.chat(request).await.into()
+        }
+
+        async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
+            let ChunkParams { model, max_tokens } = params;
+            let request = ChunkRequest::new(text, model, max_tokens);
+            self.skill_ctx.chunk(request).await
+        }
+
+        async fn select_language(
+            &mut self,
+            text: String,
+            languages: Vec<Language>,
+        ) -> Option<Language> {
+            let languages = languages
+                .iter()
+                .map(|l| match l {
+                    Language::Eng => language_selection::Language::Eng,
+                    Language::Deu => language_selection::Language::Deu,
+                })
+                .collect::<Vec<_>>();
+            let request = SelectLanguageRequest::new(text, languages);
+            self.skill_ctx
+                .select_language(request)
+                .await
+                .map(|l| match l {
+                    language_selection::Language::Eng => Language::Eng,
+                    language_selection::Language::Deu => Language::Deu,
+                })
+        }
+
+        async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            let requests = requests
+                .into_iter()
+                .map(|r| {
+                    let CompletionParams {
+                        special_tokens,
+                        max_tokens,
+                        temperature,
+                        top_k,
+                        top_p,
+                        stop,
+                    } = r.params;
+                    inference::CompletionRequest {
+                        prompt: r.prompt,
+                        model: r.model,
+                        params: inference::CompletionParams {
+                            special_tokens,
+                            max_tokens,
+                            temperature,
+                            top_k,
+                            top_p,
+                            stop,
+                        },
+                    }
+                })
+                .collect();
+
+            self.skill_ctx
+                .complete_all(requests)
+                .await
+                .into_iter()
+                .map(|c| Completion {
+                    text: c.text,
+                    finish_reason: match c.finish_reason {
+                        inference::FinishReason::Stop => FinishReason::Stop,
+                        inference::FinishReason::Length => FinishReason::Length,
+                        inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
+                    },
+                })
+                .collect()
+        }
+
+        async fn search(
+            &mut self,
+            index_path: IndexPath,
+            query: String,
+            max_results: u32,
+            min_score: Option<f64>,
+        ) -> Vec<SearchResult> {
+            let IndexPath {
+                namespace,
+                collection,
+                index,
+            } = index_path;
+            let index_path = search::IndexPath {
+                namespace,
+                collection,
+                index,
+            };
+            let request = SearchRequest {
+                index_path,
+                query,
+                max_results,
+                min_score,
+            };
+            self.skill_ctx
+                .search(request)
+                .await
+                .into_iter()
+                .map(
+                    |search::SearchResult {
+                         document_path:
+                             search::DocumentPath {
+                                 namespace,
+                                 collection,
+                                 name,
+                             },
+                         content,
+                         score,
+                     }| SearchResult {
+                        document_path: DocumentPath {
+                            namespace,
+                            collection,
+                            name,
+                        },
+                        content,
+                        score,
+                    },
+                )
+                .collect()
+        }
+
+        async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Vec<u8>> {
+            let DocumentPath {
+                namespace,
+                collection,
+                name,
+            } = document_path;
+            let document_path = search::DocumentPath {
+                namespace,
+                collection,
+                name,
+            };
+            self.skill_ctx
+                .document_metadata(document_path)
+                .await
+                .map(|value| {
+                    serde_json::to_vec(&value).expect("Value should have valid to_bytes repr.")
+                })
+        }
+    }
+
+    impl From<inference::Completion> for Completion {
+        fn from(completion: inference::Completion) -> Self {
+            Self {
+                text: completion.text,
+                finish_reason: completion.finish_reason.into(),
+            }
+        }
+    }
+
+    impl From<Message> for inference::Message {
+        fn from(message: Message) -> Self {
+            Self {
+                role: message.role.into(),
+                content: message.content,
+            }
+        }
+    }
+
+    impl From<ChatParams> for inference::ChatParams {
+        fn from(params: ChatParams) -> Self {
+            Self {
+                max_tokens: params.max_tokens,
+                temperature: params.temperature,
+                top_p: params.top_p,
+            }
+        }
+    }
+
+    impl From<Role> for inference::Role {
+        fn from(role: Role) -> Self {
+            match role {
+                Role::User => inference::Role::User,
+                Role::Assistant => inference::Role::Assistant,
+                Role::System => inference::Role::System,
+            }
+        }
+    }
+
+    impl From<inference::Role> for Role {
+        fn from(role: inference::Role) -> Self {
+            match role {
+                inference::Role::User => Self::User,
+                inference::Role::Assistant => Self::Assistant,
+                inference::Role::System => Self::System,
+            }
+        }
+    }
+
+    impl From<inference::Message> for Message {
+        fn from(message: inference::Message) -> Self {
+            Self {
+                role: message.role.into(),
+                content: message.content,
+            }
+        }
+    }
+
+    impl From<inference::ChatResponse> for ChatResponse {
+        fn from(response: inference::ChatResponse) -> Self {
+            Self {
+                message: response.message.into(),
+                finish_reason: response.finish_reason.into(),
+            }
+        }
+    }
+
+    impl From<inference::FinishReason> for FinishReason {
+        fn from(finish_reason: inference::FinishReason) -> Self {
+            match finish_reason {
+                inference::FinishReason::Stop => Self::Stop,
+                inference::FinishReason::Length => Self::Length,
+                inference::FinishReason::ContentFilter => Self::ContentFilter,
+            }
+        }
+    }
+}
+
 /// The pooling allocator is tailor made for our use case, so
 /// try to use it when we can. The main cost of the pooling allocator, however,
 /// is the virtual memory required to run it. Not all systems support the same
@@ -638,7 +976,8 @@ mod tests {
 
     use serde_json::json;
     use test_skills::{
-        given_chat_skill, given_greet_py_v0_2, given_greet_skill_v0_2, given_search_skill,
+        given_chat_skill, given_greet_py_v0_2, given_greet_skill_v0_2, given_greet_skill_v0_3,
+        given_search_skill,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -696,6 +1035,23 @@ mod tests {
         // Then English is selected as the language
         assert!(language.is_some());
         assert_eq!(language.unwrap(), Language::Eng);
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_v0_3_module() {
+        // Given a skill loaded by our engine
+        given_greet_skill_v0_3();
+        let wasm = fs::read("skills/greet_skill_v0_3.wasm").unwrap();
+        let engine = Engine::new(false).unwrap();
+        let skill = Skill::new(&engine, wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let input = json!("Homer");
+        let result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string
+        assert_eq!(result, json!("Hello Homer"));
     }
 
     #[tokio::test]
@@ -779,7 +1135,7 @@ mod tests {
     #[test]
     fn latest_supported_version() {
         assert_eq!(
-            SupportedVersion::V0_2.current_supported_version(),
+            SupportedVersion::V0_3.current_supported_version(),
             SupportedVersion::latest_supported_version(),
         );
     }
