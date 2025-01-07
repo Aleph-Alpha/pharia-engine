@@ -87,7 +87,7 @@ impl AppConfig {
     ///
     /// Cannot parse operator config from the provided file or the environment variables.
     pub fn new() -> anyhow::Result<Self> {
-        let file = File::with_name("operator-config.toml").required(false);
+        let file = File::with_name("config.toml").required(false);
         let env = Self::environment();
         Self::from_sources(file, env)
     }
@@ -165,7 +165,7 @@ mod tests {
     fn load_debug_log_level() -> anyhow::Result<()> {
         // Given a hashmap with debug log level
         let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
+        let file_path = dir.path().join("config.toml");
         fs::File::create_new(&file_path)?;
         let file_source = File::with_name(file_path.to_str().unwrap());
         let env_vars = HashMap::from([("LOG_LEVEL".to_owned(), "debug".to_owned())]);
@@ -213,7 +213,7 @@ mod tests {
             ("NAMESPACES__DEV__DIRECTORY".to_owned(), "skills".to_owned()),
         ]);
         let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
+        let file_path = dir.path().join("config.toml");
         fs::File::create_new(&file_path)?;
         let file_source = File::with_name(file_path.to_str().unwrap());
         let env_source = AppConfig::environment().source(Some(env_vars));
@@ -263,7 +263,7 @@ mod tests {
     fn empty_namespace_name_is_rejected() -> anyhow::Result<()> {
         // Given toml file with non kebab-case namespaces
         let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
+        let file_path = dir.path().join("config.toml");
         let mut file = fs::File::create_new(&file_path)?;
         writeln!(
             file,
@@ -285,7 +285,7 @@ mod tests {
     fn load_non_kebab_case_namespace_name() -> anyhow::Result<()> {
         // Given toml file with non kebab-case namespaces
         let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
+        let file_path = dir.path().join("config.toml");
         let mut file = fs::File::create_new(&file_path)?;
         writeln!(
             file,
@@ -307,7 +307,7 @@ mod tests {
     fn load_from_two_empty_sources() -> anyhow::Result<()> {
         // Given a TOML file and environment variables
         let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
+        let file_path = dir.path().join("config.toml");
         fs::File::create_new(&file_path)?;
         let file_source = File::with_name(file_path.to_str().unwrap());
         let env_vars = HashMap::new();
@@ -325,7 +325,7 @@ mod tests {
     fn load_two_namespaces_from_independent_sources() -> anyhow::Result<()> {
         // Given a TOML file and environment variables
         let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
+        let file_path = dir.path().join("config.toml");
         let mut file = fs::File::create_new(&file_path)?;
         writeln!(
             file,
@@ -376,7 +376,7 @@ registry-password =  "a""#
         let user = "DUMMY_USER";
         let password = "DUMMY_PASSWORD";
         let dir = tempdir()?;
-        let file_path = dir.path().join("operator-config.toml");
+        let file_path = dir.path().join("config.toml");
         let mut file = fs::File::create_new(&file_path)?;
         writeln!(
             file,

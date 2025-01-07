@@ -34,7 +34,7 @@ In order to run Pharia Kernel, you need to provide a namespace configuration:
     ```
 
     All skills in this folder are exposed in the namespace "dev" with the environment variable `NAMESPACES__DEV__DIRECTORY`.
-    Any changes in this folder will be picked up by the Pharia Kernel automatically. The `operator-config.toml` and `namespace.toml` should not be provided.
+    Any changes in this folder will be picked up by the Pharia Kernel automatically. The `config.toml` and `namespace.toml` should not be provided.
 
 2. Start the container:
 

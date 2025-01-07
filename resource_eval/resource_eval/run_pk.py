@@ -129,9 +129,9 @@ class PhariaKernel:
         )
         # where to send requests later
         self.pk_addr = os.environ.get(PHARIA_KERNEL_ADDRESS)
-        # we need a skills directory and must not have an operator-config nor namespace.toml
-        if os.path.isfile("operator-config.toml"):
-            raise Exception("there must not be an operator-config.toml")
+        # we need a skills directory and must not have an config nor namespace.toml
+        if os.path.isfile("config.toml"):
+            raise Exception("there must not be a config.toml")
         if os.path.isfile("namespace.toml"):
             raise Exception("there must not be a namespace.toml")
         if os.path.isfile("skills"):
