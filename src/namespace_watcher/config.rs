@@ -68,8 +68,8 @@ impl<'de> Deserialize<'de> for Namespace {
 }
 
 #[derive(Deserialize, PartialEq, Eq, Debug, Clone, Default)]
+#[serde(transparent)]
 pub struct OperatorConfig {
-    #[serde(default)]
     pub namespaces: HashMap<Namespace, NamespaceConfig>,
 }
 
@@ -265,7 +265,7 @@ mod tests {
     fn deserialize_watch_config() {
         let config = OperatorConfig::from_toml(
             r#"
-            [namespaces.local]
+            [local]
             directory = "skills"
             "#,
         )
@@ -282,7 +282,7 @@ mod tests {
     fn deserialize_config_with_oci_registry() {
         let config = OperatorConfig::from_toml(
             r#"
-            [namespaces.pharia-kernel-team]
+            [pharia-kernel-team]
             config-url = "https://dummy_url"
             registry = "registry.gitlab.aleph-alpha.de"
             base-repository = "engineering/pharia-skills/skills"
@@ -308,7 +308,7 @@ mod tests {
     fn deserialize_config_with_config_access_token() {
         let config = OperatorConfig::from_toml(
             r#"
-            [namespaces.dummy-team]
+            [dummy-team]
             config-url = "file://dummy_config_url"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
             path = "dummy_file_path"
@@ -333,7 +333,7 @@ mod tests {
         // for the same namespace
         let config = toml::from_str::<OperatorConfig>(
             r#"
-            [namespaces.pharia-kernel-team]
+            [pharia-kernel-team]
             config-url = "https://dummy_url"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
             registry = "registry.gitlab.aleph-alpha.de"
@@ -356,7 +356,7 @@ mod tests {
     fn deserializes_multiple_namespaces() {
         let config = toml::from_str::<OperatorConfig>(
             r#"
-            [namespaces.pharia-kernel-team]
+            [pharia-kernel-team]
             config-url = "https://dummy_url"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
             registry = "registry.gitlab.aleph-alpha.de"
@@ -364,7 +364,7 @@ mod tests {
             registry-user = "PHARIA_KERNEL_TEAM_REGISTRY_USER"
             registry-password = "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD"
 
-            [namespaces.pharia-kernel-team-local]
+            [pharia-kernel-team-local]
             config-url = "https://dummy_url"
             config-access-token = "GITLAB_CONFIG_ACCESS_TOKEN"
             path = "/temp/skills"

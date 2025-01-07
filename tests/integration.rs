@@ -37,7 +37,7 @@ impl TestKernel {
         let app_config = AppConfig {
             kernel_address: format!("127.0.0.1:{port}").parse().unwrap(),
             metrics_address: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
-            operator_config: OperatorConfig::local(skills),
+            namespaces: OperatorConfig::local(skills),
             use_pooling_allocator: true,
             ..AppConfig::default()
         };
