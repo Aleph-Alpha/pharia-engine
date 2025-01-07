@@ -4,6 +4,7 @@ use heck::ToKebabCase;
 use serde::{Deserialize, Deserializer};
 use std::{collections::HashMap, path::PathBuf};
 use url::Url;
+use utoipa::ToSchema;
 
 use crate::skill_loader::RegistryConfig;
 
@@ -14,7 +15,7 @@ use super::{
     NamespaceDescriptionLoader,
 };
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Deref, derive_more::Display)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Deref, derive_more::Display, ToSchema)]
 pub struct Namespace(String);
 
 impl Namespace {

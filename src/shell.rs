@@ -40,6 +40,7 @@ use crate::{
     authorization::{authorization_middleware, AuthorizationApi},
     csi::Csi,
     csi_shell::http_csi_handle,
+    namespace_watcher::Namespace,
     skill_store::SkillStoreApi,
     skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
 };
@@ -385,10 +386,10 @@ async fn execute_skill(
 async fn run_skill(
     State(skill_executor_api): State<SkillExecutorApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
-    Path((namespace, name)): Path<(String, String)>,
+    Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
 ) -> (StatusCode, Json<Value>) {
-    let skill_path = SkillPath::new(namespace, name);
+    let skill_path = SkillPath::new(namespace.to_string(), name);
     let result = skill_executor_api
         .execute_skill(skill_path, input, bearer.token().to_owned())
         .await;
@@ -466,9 +467,9 @@ async fn cached_skills(
 )]
 async fn drop_cached_skill(
     State(skill_store_api): State<SkillStoreApi>,
-    Path((namespace, name)): Path<(String, String)>,
+    Path((namespace, name)): Path<(Namespace, String)>,
 ) -> (StatusCode, Json<String>) {
-    let skill_path = SkillPath::new(namespace, name);
+    let skill_path = SkillPath::new(namespace.to_string(), name);
     let skill_was_cached = skill_store_api.invalidate_cache(skill_path).await;
     let msg = if skill_was_cached {
         "Skill removed from cache".to_string()
@@ -656,6 +657,42 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = serde_json::from_slice::<String>(&body).unwrap();
         assert_eq!(answer, "dummy completion");
+    }
+
+    #[tokio::test]
+    async fn run_skill_with_bad_namespace() {
+        // Given an invalid namespace
+        let bad_namespace = "bad_namespace";
+        let skill_executer_mock = StubSkillExecuter::new(move |msg| {
+            let SkillExecutorMsg { send, .. } = msg;
+            send.send(Ok(json!("dummy completion"))).unwrap();
+        });
+        let skill_executor_api = skill_executer_mock.api();
+        let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
+        let http = http(app_state);
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri(format!("/v1/skills/{bad_namespace}/greet_skill/run"))
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let error = String::from_utf8(body.to_vec()).unwrap();
+        assert!(error.to_lowercase().contains("invalid namespace"));
     }
 
     #[tokio::test]
