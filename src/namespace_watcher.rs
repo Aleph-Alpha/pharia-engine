@@ -3,7 +3,7 @@ mod config;
 mod namespace_description;
 
 pub use self::actor::{NamespaceDescriptionLoaders, NamespaceWatcher};
-pub use self::config::{OperatorConfig, Registry};
+pub use self::config::{NamespaceConfigs, Registry};
 pub use self::namespace_description::NamespaceDescriptionLoader;
 
 #[cfg(test)]

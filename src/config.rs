@@ -3,7 +3,7 @@ use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use serde::Deserialize;
 use std::{net::SocketAddr, time::Duration};
 
-use crate::namespace_watcher::OperatorConfig;
+use crate::namespace_watcher::NamespaceConfigs;
 
 mod defaults {
     use std::{net::SocketAddr, time::Duration};
@@ -56,7 +56,7 @@ pub struct AppConfig {
     #[serde(default = "defaults::authorization_url")]
     pub authorization_url: String,
     #[serde(default)]
-    pub namespaces: OperatorConfig,
+    pub namespaces: NamespaceConfigs,
     #[serde(
         with = "humantime_serde",
         default = "defaults::namespace_update_interval"
@@ -130,7 +130,7 @@ impl Default for AppConfig {
             inference_url: defaults::inference_url(),
             document_index_url: defaults::document_index_url(),
             authorization_url: defaults::authorization_url(),
-            namespaces: OperatorConfig::default(),
+            namespaces: NamespaceConfigs::default(),
             namespace_update_interval: defaults::namespace_update_interval(),
             log_level: defaults::log_level(),
             otel_endpoint: None,
