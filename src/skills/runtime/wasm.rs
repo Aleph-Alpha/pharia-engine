@@ -54,6 +54,7 @@ pub mod tests {
         csi::ChunkRequest,
         inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, Message, Role},
         language_selection::{select_language, Language, SelectLanguageRequest},
+        namespace_watcher::Namespace,
         search::{DocumentPath, SearchRequest, SearchResult},
         skill_loader::{ConfiguredSkill, SkillLoader},
         skill_store::SkillStore,
@@ -72,7 +73,7 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader =
-            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.to_string()).api();
+            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.clone()).api();
 
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_store.api().upsert(skill).await;
@@ -89,8 +90,8 @@ pub mod tests {
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader =
-            SkillLoader::with_file_registry(engine.clone(), "local".to_owned()).api();
+        let namespace = Namespace::new("local").unwrap();
+        let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
@@ -108,11 +109,11 @@ pub mod tests {
     async fn rust_greeting_skill() {
         given_greet_skill_v0_2();
         let skill_ctx = Box::new(CsiGreetingMock);
-        let namespace = "local".to_owned();
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
+        let skill_loader =
+            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.clone()).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_store.api().upsert(skill).await;
         let runtime = WasmRuntime::new(engine, skill_store.api());
@@ -136,7 +137,7 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader =
-            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.to_string()).api();
+            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.clone()).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_store.api().upsert(skill).await;
         let runtime = WasmRuntime::new(engine, skill_store.api());
@@ -153,14 +154,14 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn can_call_preinstantiated_multiple_times() {
+    async fn can_call_pre_instantiated_multiple_times() {
         given_greet_skill_v0_2();
         let skill_ctx = Box::new(CsiCounter::new());
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader =
-            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.to_string()).api();
+            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.clone()).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         skill_store.api().upsert(skill).await;
         let runtime = WasmRuntime::new(engine, skill_store.api());

@@ -50,16 +50,16 @@ pub enum SkillLoaderMsg {
 
 /// Which registry is backing which namespace
 pub struct RegistryConfig {
-    registries: HashMap<String, Registry>,
+    registries: HashMap<Namespace, Registry>,
 }
 
 impl RegistryConfig {
-    pub fn new(registries: HashMap<String, Registry>) -> Self {
+    pub fn new(registries: HashMap<Namespace, Registry>) -> Self {
         Self { registries }
     }
 
     /// Convert the registry config into a map of namespace to actual skill registry implementations
-    pub fn skill_registries(&self) -> HashMap<String, Arc<dyn SkillRegistry + Send + Sync>> {
+    pub fn skill_registries(&self) -> HashMap<Namespace, Arc<dyn SkillRegistry + Send + Sync>> {
         self.registries
             .iter()
             .map(|(k, v)| (k.to_owned(), v.into()))
@@ -103,7 +103,7 @@ impl SkillLoader {
 
     pub fn new(
         engine: Arc<Engine>,
-        registries: HashMap<String, Arc<dyn SkillRegistry + Send + Sync>>,
+        registries: HashMap<Namespace, Arc<dyn SkillRegistry + Send + Sync>>,
     ) -> Self {
         let (sender, recv) = mpsc::channel(1);
         let handle = tokio::spawn(async move {
@@ -165,7 +165,7 @@ type SkillRequest = Pin<Box<dyn Future<Output = ()> + Send>>;
 pub struct SkillLoaderActor {
     receiver: mpsc::Receiver<SkillLoaderMsg>,
     engine: Arc<Engine>,
-    registries: HashMap<String, Arc<dyn SkillRegistry + Send + Sync>>,
+    registries: HashMap<Namespace, Arc<dyn SkillRegistry + Send + Sync>>,
     running_requests: FuturesUnordered<SkillRequest>,
 }
 
@@ -173,7 +173,7 @@ impl SkillLoaderActor {
     pub fn new(
         receiver: mpsc::Receiver<SkillLoaderMsg>,
         engine: Arc<Engine>,
-        registries: HashMap<String, Arc<dyn SkillRegistry + Send + Sync>>,
+        registries: HashMap<Namespace, Arc<dyn SkillRegistry + Send + Sync>>,
     ) -> Self {
         Self {
             receiver,
@@ -198,7 +198,7 @@ impl SkillLoaderActor {
         }
     }
 
-    pub fn registry(&self, namespace: &str) -> Arc<dyn SkillRegistry + Send + Sync> {
+    pub fn registry(&self, namespace: &Namespace) -> Arc<dyn SkillRegistry + Send + Sync> {
         self.registries
             .get(namespace)
             .expect("If skill exists, so must the namespace it resides in.")
@@ -267,7 +267,7 @@ pub mod tests {
     use super::*;
 
     impl RegistryConfig {
-        pub fn with_file_registry_named_skills(namespace: String) -> Self {
+        pub fn with_file_registry_named_skills(namespace: Namespace) -> Self {
             let registry = Registry::File {
                 path: "skills".to_owned(),
             };
@@ -276,7 +276,7 @@ pub mod tests {
             Self::new(registries)
         }
 
-        pub fn with_file_registry(namespace: String, path: String) -> Self {
+        pub fn with_file_registry(namespace: Namespace, path: String) -> Self {
             let registry = Registry::File { path };
             let mut registries = HashMap::new();
             registries.insert(namespace, registry);
@@ -290,7 +290,7 @@ pub mod tests {
 
     impl SkillLoader {
         /// Skill loader loading skills from a local `skills` directory
-        pub fn with_file_registry(engine: Arc<Engine>, namespace: String) -> Self {
+        pub fn with_file_registry(engine: Arc<Engine>, namespace: Namespace) -> Self {
             let registry_config = RegistryConfig::with_file_registry_named_skills(namespace);
             SkillLoader::from_config(engine, registry_config)
         }
@@ -305,14 +305,12 @@ pub mod tests {
         let never_resolving = Namespace::new("never-resolving").unwrap();
         let never_resolving_registry =
             Arc::new(NeverResolvingRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
-        registries.insert(
-            never_resolving.clone().to_string(),
-            never_resolving_registry,
-        );
+        registries.insert(never_resolving.clone(), never_resolving_registry);
 
         let ready = Namespace::new("ready").unwrap();
         let ready_registry = Arc::new(ReadyRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
-        registries.insert(ready.clone().to_string(), ready_registry);
+        registries.insert(ready.clone(), ready_registry);
+
         let skill_loader = SkillLoader::new(engine, registries);
         let never_resolving_skill_path = SkillPath::new(never_resolving, "dummy");
         let ready_skill_path = SkillPath::new(ready, "dummy");
