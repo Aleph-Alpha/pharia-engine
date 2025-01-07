@@ -9,20 +9,20 @@ use crate::{skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::S
 
 use super::{
     namespace_description::{NamespaceDescriptionError, SkillDescription},
-    NamespaceConfigs, NamespaceDescriptionLoader,
+    Namespace, NamespaceConfigs, NamespaceDescriptionLoader,
 };
 
 #[async_trait]
 pub trait ObservableConfig {
-    fn namespaces(&self) -> Vec<String>;
+    fn namespaces(&self) -> Vec<Namespace>;
     async fn skills(
         &mut self,
-        namespace: &str,
+        namespace: &Namespace,
     ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError>;
 }
 
 pub struct NamespaceDescriptionLoaders {
-    namespaces: HashMap<String, Box<dyn NamespaceDescriptionLoader + Send>>,
+    namespaces: HashMap<Namespace, Box<dyn NamespaceDescriptionLoader + Send>>,
 }
 
 impl NamespaceDescriptionLoaders {
@@ -35,7 +35,7 @@ impl NamespaceDescriptionLoaders {
                     .with_context(|| {
                         format!("Unable to load configuration of namespace: '{namespace:?}'")
                     })
-                    .map(|loader| (namespace.into_string(), loader))
+                    .map(|loader| (namespace, loader))
             })
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
         Ok(Self { namespaces })
@@ -44,13 +44,13 @@ impl NamespaceDescriptionLoaders {
 
 #[async_trait]
 impl ObservableConfig for NamespaceDescriptionLoaders {
-    fn namespaces(&self) -> Vec<String> {
+    fn namespaces(&self) -> Vec<Namespace> {
         self.namespaces.keys().cloned().collect()
     }
 
     async fn skills(
         &mut self,
-        namespace: &str,
+        namespace: &Namespace,
     ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
         let skills = self
             .namespaces
@@ -117,8 +117,8 @@ struct NamespaceWatcherActor {
     skill_store_api: SkillStoreApi,
     config: Box<dyn ObservableConfig + Send>,
     update_interval: Duration,
-    skills: HashMap<String, Vec<SkillDescription>>,
-    invalid_namespaces: HashSet<String>,
+    skills: HashMap<Namespace, Vec<SkillDescription>>,
+    invalid_namespaces: HashSet<Namespace>,
 }
 
 /// Keep track of changes that need to be propagated to the skill provider.
@@ -203,12 +203,12 @@ impl NamespaceWatcherActor {
         }
     }
 
-    async fn report_changes_in_namespace(&mut self, namespace: &str) {
+    async fn report_changes_in_namespace(&mut self, namespace: &Namespace) {
         let incoming = match self.config.skills(namespace).await {
             Ok(incoming) => {
                 if self.invalid_namespaces.contains(namespace) {
                     self.skill_store_api
-                        .set_namespace_error(namespace.to_owned(), None)
+                        .set_namespace_error(namespace.clone().into_string(), None)
                         .await;
                     self.invalid_namespaces.remove(namespace);
                 }
@@ -225,7 +225,7 @@ impl NamespaceWatcherActor {
                     "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
                 );
                 self.skill_store_api
-                    .set_namespace_error(namespace.to_owned(), Some(e))
+                    .set_namespace_error(namespace.clone().into_string(), Some(e))
                     .await;
                 self.invalid_namespaces.insert(namespace.to_owned());
                 vec![]
@@ -239,13 +239,13 @@ impl NamespaceWatcherActor {
         let diff = Self::compute_diff(&existing, incoming);
         for skill in diff.added_or_changed {
             let tag = skill.tag.as_deref().unwrap_or("latest");
-            let skill = ConfiguredSkill::new(namespace, skill.name, tag);
+            let skill = ConfiguredSkill::new(namespace.clone().into_string(), skill.name, tag);
             self.skill_store_api.upsert(skill).await;
         }
 
         for skill_name in diff.removed {
             self.skill_store_api
-                .remove(SkillPath::new(namespace, &skill_name))
+                .remove(SkillPath::new(namespace.clone().into_string(), &skill_name))
                 .await;
         }
     }
@@ -283,37 +283,37 @@ pub mod tests {
 
     #[async_trait]
     impl ObservableConfig for UpdatableConfig {
-        fn namespaces(&self) -> Vec<String> {
+        fn namespaces(&self) -> Vec<Namespace> {
             block_on(self.config.lock()).namespaces()
         }
 
         async fn skills(
             &mut self,
-            namespace: &str,
+            namespace: &Namespace,
         ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             self.config.lock().await.skills(namespace).await
         }
     }
 
     pub struct StubConfig {
-        namespaces: HashMap<String, Vec<SkillDescription>>,
+        namespaces: HashMap<Namespace, Vec<SkillDescription>>,
     }
 
     impl StubConfig {
-        pub fn new(namespaces: HashMap<String, Vec<SkillDescription>>) -> Self {
+        pub fn new(namespaces: HashMap<Namespace, Vec<SkillDescription>>) -> Self {
             Self { namespaces }
         }
     }
 
     #[async_trait]
     impl ObservableConfig for StubConfig {
-        fn namespaces(&self) -> Vec<String> {
+        fn namespaces(&self) -> Vec<Namespace> {
             self.namespaces.keys().cloned().collect()
         }
 
         async fn skills(
             &mut self,
-            namespace: &str,
+            namespace: &Namespace,
         ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             Ok(self
                 .namespaces
@@ -327,13 +327,13 @@ pub mod tests {
 
     #[async_trait]
     impl ObservableConfig for PendingConfig {
-        fn namespaces(&self) -> Vec<String> {
-            vec!["dummy_namespace".to_owned()]
+        fn namespaces(&self) -> Vec<Namespace> {
+            vec![Namespace::new("dummy-namespace").unwrap()]
         }
 
         async fn skills(
             &mut self,
-            _namespace: &str,
+            _namespace: &Namespace,
         ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             pending().await
         }
@@ -453,11 +453,11 @@ pub mod tests {
     #[tokio::test]
     async fn on_start_reports_all_skills() {
         // Given some configured skills
-        let dummy_namespace = "dummy_namespace";
+        let dummy_namespace = Namespace::new("dummy-namespace").unwrap();
         let dummy_skill = "dummy_skill";
         let update_interval_ms = 1;
         let namespaces = HashMap::from([(
-            dummy_namespace.to_owned(),
+            dummy_namespace.clone(),
             vec![SkillDescription::with_name(dummy_skill)],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
@@ -478,7 +478,7 @@ pub mod tests {
             SkillStoreMessage::Upsert {
                 skill,
             }
-            if skill == ConfiguredSkill::new(dummy_namespace, dummy_skill, "latest")
+            if skill == ConfiguredSkill::new(dummy_namespace.into_string(), dummy_skill, "latest")
         ));
 
         observer.wait_for_shutdown().await;
@@ -486,7 +486,7 @@ pub mod tests {
 
     impl NamespaceWatcherActor {
         fn with_skills(
-            skills: HashMap<String, Vec<SkillDescription>>,
+            skills: HashMap<Namespace, Vec<SkillDescription>>,
             skill_store_api: SkillStoreApi,
             config: Box<dyn ObservableConfig + Send>,
         ) -> Self {
@@ -505,24 +505,24 @@ pub mod tests {
     }
 
     struct SaboteurConfig {
-        namespaces: Vec<String>,
+        namespaces: Vec<Namespace>,
     }
 
     impl SaboteurConfig {
-        fn new(namespaces: Vec<String>) -> Self {
+        fn new(namespaces: Vec<Namespace>) -> Self {
             Self { namespaces }
         }
     }
 
     #[async_trait]
     impl ObservableConfig for SaboteurConfig {
-        fn namespaces(&self) -> Vec<String> {
+        fn namespaces(&self) -> Vec<Namespace> {
             self.namespaces.clone()
         }
 
         async fn skills(
             &mut self,
-            _namespace: &str,
+            _namespace: &Namespace,
         ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             Err(NamespaceDescriptionError::Unrecoverable(anyhow!(
                 "SaboteurConfig will always fail."
@@ -533,10 +533,10 @@ pub mod tests {
     #[tokio::test]
     async fn add_invalid_namespace_and_unload_skill_for_invalid_namespace_description() {
         // given an configuration observer actor
-        let dummy_namespace = "dummy_namespace";
+        let dummy_namespace = Namespace::new("dummy-namespace").unwrap();
         let dummy_skill = "dummy_skill";
         let namespaces = HashMap::from([(
-            dummy_namespace.to_owned(),
+            dummy_namespace.clone(),
             vec![SkillDescription::with_name(dummy_skill)],
         )]);
 
@@ -547,7 +547,7 @@ pub mod tests {
         let mut coa = NamespaceWatcherActor::with_skills(namespaces, skill_store_api, config);
 
         // when we load an invalid namespace
-        coa.report_changes_in_namespace(dummy_namespace).await;
+        coa.report_changes_in_namespace(&dummy_namespace).await;
 
         // then mark the namespace as invalid and remove all skills of that namespace
         let msg = receiver.try_recv().unwrap();
@@ -557,7 +557,7 @@ pub mod tests {
             SkillStoreMessage::SetNamespaceError {
                 namespace, ..
             }
-            if namespace == dummy_namespace
+            if namespace == dummy_namespace.as_ref()
         ));
 
         let msg = receiver.try_recv().unwrap();
@@ -567,18 +567,18 @@ pub mod tests {
             SkillStoreMessage::Remove {
                 skill_path
             }
-            if skill_path == SkillPath::new(dummy_namespace, dummy_skill)
+            if skill_path == SkillPath::new(dummy_namespace.clone().into_string(), dummy_skill)
         ));
     }
 
     #[tokio::test]
     async fn new_skill_only_reported_once() {
         // Given some configured skills
-        let dummy_namespace = "dummy_namespace";
+        let dummy_namespace = Namespace::new("dummy-namespace").unwrap();
         let dummy_skill = "dummy_skill";
         let update_interval_ms = 1;
         let namespaces = HashMap::from([(
-            dummy_namespace.to_owned(),
+            dummy_namespace,
             vec![SkillDescription::with_name(dummy_skill)],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
@@ -610,10 +610,10 @@ pub mod tests {
         let skill_store_api = SkillStoreApi::new(sender);
         let update_interval_ms = 1;
         let update_interval = Duration::from_millis(update_interval_ms);
-        let dummy_namespace = "dummy_namespace";
+        let dummy_namespace = Namespace::new("dummy-namespace").unwrap();
         let config_arc: Arc<Mutex<Box<dyn ObservableConfig + Send>>> =
             Arc::new(Mutex::new(Box::new(SaboteurConfig::new(vec![
-                dummy_namespace.to_owned(),
+                dummy_namespace.clone(),
             ]))));
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
@@ -624,7 +624,7 @@ pub mod tests {
         // when the namespace become valid
         let dummy_skill = "dummy_skill";
         let namespaces = HashMap::from([(
-            dummy_namespace.to_owned(),
+            dummy_namespace.clone(),
             vec![SkillDescription::with_name(dummy_skill)],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
@@ -644,7 +644,7 @@ pub mod tests {
             SkillStoreMessage::SetNamespaceError {
                 namespace, error: None
             }
-            if namespace == dummy_namespace
+            if namespace == dummy_namespace.as_ref()
         ));
 
         let msg = timeout(
@@ -660,7 +660,7 @@ pub mod tests {
             SkillStoreMessage::Upsert {
                 skill,
             }
-            if skill == ConfiguredSkill::new(dummy_namespace, dummy_skill, "latest")
+            if skill == ConfiguredSkill::new(dummy_namespace.clone().into_string(), dummy_skill, "latest")
         ));
     }
 }

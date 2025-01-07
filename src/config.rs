@@ -147,8 +147,8 @@ mod tests {
     use config::Config;
     use tempfile::tempdir;
 
-    use crate::namespace_watcher::tests::{Namespace, NamespaceConfig};
-    use crate::namespace_watcher::Registry;
+    use crate::namespace_watcher::tests::NamespaceConfig;
+    use crate::namespace_watcher::{Namespace, Registry};
 
     use super::*;
 
