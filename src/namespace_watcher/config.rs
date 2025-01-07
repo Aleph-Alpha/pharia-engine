@@ -105,7 +105,7 @@ impl NamespaceConfigs {
     pub fn registry_config(&self) -> RegistryConfig {
         RegistryConfig::new(
             self.iter()
-                .map(|(k, v)| (k.to_owned().0, v.registry()))
+                .map(|(k, v)| (k.to_owned(), v.registry()))
                 .collect(),
         )
     }
