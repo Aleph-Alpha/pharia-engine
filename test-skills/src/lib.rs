@@ -9,6 +9,14 @@ use tempfile::{tempdir, TempDir};
 const WASI_TARGET: &str = "wasm32-wasip2";
 
 /// Creates `greet_skill_v0_2.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
+pub fn given_greet_skill_v0_3() {
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("greet-skill-v0_3");
+    });
+    *WASM_BUILD;
+}
+
+/// Creates `greet_skill_v0_2.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
 pub fn given_greet_skill_v0_2() {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("greet-skill-v0_2");
