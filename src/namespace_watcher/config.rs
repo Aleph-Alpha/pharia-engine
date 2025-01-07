@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn non_ascii_chars_are_rejected() {
-        let name = "nameø";
+        let name = "nameø"; // spell-checker:disable-line
         Namespace::new(name).unwrap_err();
     }
 
