@@ -16,6 +16,7 @@ use crate::{
     skills::SupportedVersion,
 };
 
+#[allow(clippy::too_many_lines)]
 pub async fn http_csi_handle<C>(
     State(app_state): State<AppState<C>>,
     bearer: TypedHeader<Authorization<Bearer>>,
@@ -70,6 +71,50 @@ where
                 return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
             }
         },
+        VersionedCsiRequest::V0_3(request) => match request {
+            V0_3CsiRequest::Complete(completion_request) => drivers
+                .complete_text(bearer.token().to_owned(), completion_request.into())
+                .await
+                .map(|r| json!(r)),
+            V0_3CsiRequest::Chunk(chunk_request) => drivers
+                .chunk(bearer.token().to_owned(), chunk_request)
+                .await
+                .map(|r| json!(r)),
+            V0_3CsiRequest::SelectLanguage(select_language_request) => drivers
+                .select_language(select_language_request)
+                .await
+                .map(|r| json!(r)),
+            V0_3CsiRequest::CompleteAll(complete_all_request) => drivers
+                .complete_all(
+                    bearer.token().to_owned(),
+                    complete_all_request
+                        .requests
+                        .into_iter()
+                        .map(Into::into)
+                        .collect(),
+                )
+                .await
+                .map(|v| json!(v)),
+            V0_3CsiRequest::Search(search_request) => drivers
+                .search(bearer.token().to_owned(), search_request)
+                .await
+                .map(|v| json!(v)),
+            V0_3CsiRequest::Chat(chat_request) => drivers
+                .chat(bearer.token().to_owned(), chat_request)
+                .await
+                .map(|v| json!(v)),
+            V0_3CsiRequest::DocumentMetadata(document_metadata_request) => drivers
+                .document_metadata(
+                    bearer.token().to_owned(),
+                    document_metadata_request.document_path,
+                )
+                .await
+                .map(|r| json!(r)),
+            V0_3CsiRequest::Unknown { function } => {
+                let msg = format!("The CSI function {} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.", function.as_deref().unwrap_or("specified"));
+                return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
+            }
+        },
         VersionedCsiRequest::Unknown { version } => {
             let error = match version.map(|v| VersionReq::parse(&v)) {
                 Some(Ok(req)) if req.comparators.len() == 1 => {
@@ -109,10 +154,28 @@ where
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "version")]
 pub enum VersionedCsiRequest {
+    #[serde(rename = "0.3")]
+    V0_3(V0_3CsiRequest),
     #[serde(rename = "0.2")]
     V0_2(V0_2CsiRequest),
     #[serde(untagged)]
     Unknown { version: Option<String> },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case", tag = "function")]
+pub enum V0_3CsiRequest {
+    Complete(V0_2CompletionRequest),
+    Chunk(ChunkRequest),
+    SelectLanguage(SelectLanguageRequest),
+    CompleteAll(CompleteAllRequest),
+    Search(SearchRequest),
+    Chat(ChatRequest),
+    DocumentMetadata(DocumentMetadataRequest),
+    #[serde(untagged)]
+    Unknown {
+        function: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -161,6 +224,8 @@ impl From<V0_2CompletionRequest> for CompletionRequest {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct V0_2CompletionParams {
+    #[serde(default)]
+    pub special_tokens: bool,
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
     pub top_k: Option<u32>,
@@ -171,6 +236,7 @@ pub struct V0_2CompletionParams {
 impl From<V0_2CompletionParams> for CompletionParams {
     fn from(
         V0_2CompletionParams {
+            special_tokens,
             max_tokens,
             temperature,
             top_k,
@@ -180,7 +246,7 @@ impl From<V0_2CompletionParams> for CompletionParams {
     ) -> Self {
         Self {
             // the option to include special tokens is only supported since v0.3
-            special_tokens: false,
+            special_tokens,
             max_tokens,
             temperature,
             top_k,
@@ -210,6 +276,32 @@ mod tests {
             "prompt": "Hello",
             "model": "pharia-1-llm-7b-control",
             "params": {
+                "max_tokens": 128,
+                "temperature": null,
+                "top_k": null,
+                "top_p": null,
+                "stop": []
+            }
+        });
+
+        // When it is deserialized into a `VersionedCsiRequest`
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        // Then it should be deserialized successfully
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn csi_v_3_request_is_deserialized() {
+        // Given a request in JSON format
+        let request = json!({
+            "version": "0.3",
+            "function": "complete",
+            "prompt": "Hello",
+            "model": "pharia-1-llm-7b-control",
+            "params": {
+                "special_tokens": true,
                 "max_tokens": 128,
                 "temperature": null,
                 "top_k": null,
