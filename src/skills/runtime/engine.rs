@@ -220,11 +220,7 @@ impl SupportedVersion {
                     )?;
                 }
                 Self::V0_3 => {
-                    v0_3::Skill::add_to_linker(
-                        linker,
-                        v0_3::LinkOptions::default().document_metadata(true),
-                        |state: &mut LinkedCtx| state,
-                    )?;
+                    v0_3::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
             }
         }
