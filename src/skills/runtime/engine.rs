@@ -414,6 +414,31 @@ mod v0_2 {
             self.skill_ctx.complete_text(request).await.into()
         }
 
+        async fn complete_return_special_tokens(
+            &mut self,
+            model: String,
+            prompt: String,
+            options: CompletionParams,
+        ) -> Completion {
+            let CompletionParams {
+                max_tokens,
+                temperature,
+                top_k,
+                top_p,
+                stop,
+            } = options;
+            let params = inference::CompletionParams {
+                return_special_tokens: true,
+                max_tokens,
+                temperature,
+                top_k,
+                top_p,
+                stop,
+            };
+            let request = inference::CompletionRequest::new(prompt, model).with_params(params);
+            self.skill_ctx.complete_text(request).await.into()
+        }
+
         async fn chat(
             &mut self,
             model: String,
@@ -993,7 +1018,7 @@ mod tests {
         let version = SupportedVersion::extract_pharia_skill_version(wasm)
             .unwrap()
             .unwrap();
-        assert_eq!(version, Version::new(0, 2, 8));
+        assert_eq!(version, Version::new(0, 2, 9));
     }
 
     #[test]
@@ -1124,7 +1149,7 @@ mod tests {
     fn can_parse_latest_wit_world_version() {
         assert_eq!(
             SupportedVersion::V0_2.current_supported_version(),
-            &Version::new(0, 2, 8)
+            &Version::new(0, 2, 9)
         );
     }
 

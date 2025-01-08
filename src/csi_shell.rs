@@ -245,7 +245,6 @@ impl From<V0_2CompletionParams> for CompletionParams {
         }: V0_2CompletionParams,
     ) -> Self {
         Self {
-            // the option to include special tokens is only supported since v0.3
             return_special_tokens,
             max_tokens,
             temperature,
