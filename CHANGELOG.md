@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.6.0...v0.7.0)
+
+### Features
+
+- Add complete-return-special-tokens function to wit world - ([7defb90](https://github.com/Aleph-Alpha/pharia-kernel/commit/7defb90a8d86f80b9c8a4e73ba2285e1ae221a6b))
+- Support v3 requests in csi shell - ([daa16d0](https://github.com/Aleph-Alpha/pharia-kernel/commit/daa16d090ffaa9086e28d1e81fdbadf916e8c3b0))
+- Introduce pharia:skill@0.3.0-alpha.1 - ([8f6b22e](https://github.com/Aleph-Alpha/pharia-kernel/commit/8f6b22efcede3f89c6404f9eb42d3b958584480b))
+- Make namespace pattern show up in docs - ([2d2d03d](https://github.com/Aleph-Alpha/pharia-kernel/commit/2d2d03dc527f6df007f81777df1fd54672c5b383))
+- Validate skill requests into namespace new type - ([926fc44](https://github.com/Aleph-Alpha/pharia-kernel/commit/926fc445d4955870edc05fedcdbb0dfe6b8943a7))
+
+### Fixes
+
+- Add back since gates - ([cbea6f4](https://github.com/Aleph-Alpha/pharia-kernel/commit/cbea6f4090594e59e9d3345d411442674e232489))
+- Don't swallow error messages from skill creation - ([5b6d557](https://github.com/Aleph-Alpha/pharia-kernel/commit/5b6d557b1ff8c0b54d506d933f4cd4182ba5edb3))
+
+
 ## [0.6.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.5.0...v0.6.0)
 
 ### Features
