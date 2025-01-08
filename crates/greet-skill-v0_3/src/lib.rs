@@ -28,7 +28,7 @@ Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|
             "pharia-1-llm-7b-control",
             &prompt,
             &CompletionParams {
-                special_tokens: true,
+                return_special_tokens: true,
                 max_tokens: None,
                 temperature: None,
                 top_k: None,

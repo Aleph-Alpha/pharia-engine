@@ -225,7 +225,7 @@ impl From<V0_2CompletionRequest> for CompletionRequest {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct V0_2CompletionParams {
     #[serde(default)]
-    pub special_tokens: bool,
+    pub return_special_tokens: bool,
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
     pub top_k: Option<u32>,
@@ -236,7 +236,7 @@ pub struct V0_2CompletionParams {
 impl From<V0_2CompletionParams> for CompletionParams {
     fn from(
         V0_2CompletionParams {
-            special_tokens,
+            return_special_tokens,
             max_tokens,
             temperature,
             top_k,
@@ -246,7 +246,7 @@ impl From<V0_2CompletionParams> for CompletionParams {
     ) -> Self {
         Self {
             // the option to include special tokens is only supported since v0.3
-            special_tokens,
+            return_special_tokens,
             max_tokens,
             temperature,
             top_k,
@@ -301,7 +301,7 @@ mod tests {
             "prompt": "Hello",
             "model": "pharia-1-llm-7b-control",
             "params": {
-                "special_tokens": true,
+                "return_special_tokens": true,
                 "max_tokens": 128,
                 "temperature": null,
                 "top_k": null,
