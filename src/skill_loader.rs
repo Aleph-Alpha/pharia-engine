@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
@@ -216,8 +216,7 @@ impl SkillLoaderActor {
             skill_bytes.ok_or_else(|| anyhow!("Skill {skill} configured but not loadable."))?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
-            .expect("Spawned linking thread must run to completion without being poisoned.")
-            .with_context(|| format!("Failed to initialize {skill}."))?;
+            .expect("Spawned linking thread must run to completion without being poisoned.")?;
         Ok((skill, digest))
     }
 
