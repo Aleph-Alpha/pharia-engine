@@ -16,6 +16,7 @@ use super::{
 };
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Deref, derive_more::Display, ToSchema)]
+#[schema(pattern = "^[a-z0-9]+(-[a-z0-9]+)*$`")]
 pub struct Namespace(String);
 
 impl Namespace {
@@ -24,34 +25,20 @@ impl Namespace {
 
     pub fn new(input: impl Into<String>) -> anyhow::Result<Self> {
         let input = input.into();
-        if input.is_empty() {
-            return Err(anyhow!(
-                "Invalid namespace name ``. Namespaces must not be an empty String."
-            ));
+        if Self::is_valid(&input) {
+            Ok(Self(input))
+        } else {
+            Err(anyhow!(format!("Invalid namespace `{input}`. Namespaces must be between 1 and 64 characters long and must follow the pattern `^[a-z0-9]+(-[a-z0-9]+)*$`")))
         }
+    }
 
-        if input
-            .chars()
-            .any(|c| !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'))
-        {
-            return Err(anyhow!(
-                "Invalid namespace name `{input}`. Namespaces characters must be `^[a-z0-9/-]`"
-            ));
-        }
-
-        if input != input.to_kebab_case() {
-            return Err(anyhow!(
-                "Invalid namespace name `{input}`. Namespaces must be kebab-case"
-            ));
-        }
-
-        if input.len() > Self::MAX_LEN {
-            return Err(anyhow!(
-                "Invalid namespace name `{input}`. Namespaces must not be longer then {}",
-                Self::MAX_LEN
-            ));
-        }
-        Ok(Self(input))
+    fn is_valid(input: &str) -> bool {
+        !input.is_empty()
+            && input == input.to_kebab_case()
+            && input
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            && input.len() <= Self::MAX_LEN
     }
 }
 
