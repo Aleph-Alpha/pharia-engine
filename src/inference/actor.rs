@@ -98,7 +98,7 @@ impl InferenceApi {
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct CompletionParams {
-    pub special_tokens: bool,
+    pub return_special_tokens: bool,
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
     pub top_k: Option<u32>,

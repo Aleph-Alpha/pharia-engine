@@ -51,7 +51,7 @@ impl InferenceClient for Client {
             prompt,
             params:
                 CompletionParams {
-                    special_tokens,
+                    return_special_tokens,
                     max_tokens,
                     temperature,
                     top_k,
@@ -72,7 +72,7 @@ impl InferenceClient for Client {
                 top_p: *top_p,
                 complete_with_one_of: &[],
             },
-            special_tokens: *special_tokens,
+            special_tokens: *return_special_tokens,
         };
         let how = How {
             api_token: Some(api_token),
@@ -328,7 +328,7 @@ Environment: ipython<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Write code to check if number is prime, use that to see if the number 7 is prime<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             model: "llama-3.1-8b-instruct".to_owned(),
-            params:CompletionParams {special_tokens: true, ..CompletionParams ::default()}
+            params:CompletionParams {return_special_tokens: true, ..CompletionParams ::default()}
         };
 
         // When completing text with inference client

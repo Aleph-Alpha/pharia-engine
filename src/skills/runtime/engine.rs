@@ -403,7 +403,7 @@ mod v0_2 {
                 stop,
             } = options;
             let params = inference::CompletionParams {
-                special_tokens: false,
+                return_special_tokens: false,
                 max_tokens,
                 temperature,
                 top_k,
@@ -471,7 +471,7 @@ mod v0_2 {
                         prompt: r.prompt,
                         model: r.model,
                         params: inference::CompletionParams {
-                            special_tokens: false,
+                            return_special_tokens: false,
                             max_tokens,
                             temperature,
                             top_k,
@@ -677,10 +677,10 @@ mod v0_3 {
                 top_k,
                 top_p,
                 stop,
-                special_tokens,
+                return_special_tokens,
             } = options;
             let params = inference::CompletionParams {
-                special_tokens,
+                return_special_tokens,
                 max_tokens,
                 temperature,
                 top_k,
@@ -738,7 +738,7 @@ mod v0_3 {
                 .into_iter()
                 .map(|r| {
                     let CompletionParams {
-                        special_tokens,
+                        return_special_tokens,
                         max_tokens,
                         temperature,
                         top_k,
@@ -749,7 +749,7 @@ mod v0_3 {
                         prompt: r.prompt,
                         model: r.model,
                         params: inference::CompletionParams {
-                            special_tokens,
+                            return_special_tokens,
                             max_tokens,
                             temperature,
                             top_k,
