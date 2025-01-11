@@ -206,7 +206,7 @@ impl SkillLoaderActor {
     }
 
     /// Load a skill from the registry and build it to a `Skill`
-    async fn fetch<'a>(
+    async fn fetch(
         registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
         skill: &ConfiguredSkill,
