@@ -135,14 +135,14 @@ jobs:
               --wait --timeout 10m
           helm test pharia-kernel
 
-          kubectl port-forward service/pharia-kernel 8081:80 &
+          kubectl port-forward service/pharia-kernel 8082:80 &
 
-          while ! nc -vz localhost 8081 > /dev/null 2>&1 ; do
+          while ! nc -vz localhost 8082 > /dev/null 2>&1 ; do
             echo "Waiting for port-forward to be ready..."
             sleep 0.1
           done
 
-          ./tests/test-list-skills.sh "${{ secrets.PHARIA_AI_TOKEN }}"
+          ./tests/test-list-skills.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
 
       - if: github.event_name != 'pull_request'
         name: Log in to JFrog Artifactory
