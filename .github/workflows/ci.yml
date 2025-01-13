@@ -108,7 +108,7 @@ jobs:
             pharia-kernel:$IMAGE_ID | cat) &
           bash -x ./tests/test-image.sh 8081 127.0.0.1
 
-      - name: Kubernetes KinD Cluster
+      - name: Set up kind cluster
         id: kind
         uses: helm/kind-action@v1
 
@@ -127,9 +127,22 @@ jobs:
               --docker-email=$JFROG_ACCESS_TOKEN_SUBJECT
 
           helm install pharia-kernel helm-charts/pharia-kernel \
+              -f helm-charts/pharia-kernel/values-kind.yaml \
               --set "imagePullSecrets[0].name=docker-jfrog" \
+              --set "namespaces.playground.configAccessToken=${{ secrets.GITLAB_TOKEN }}" \
+              --set "namespaces.playground.registryUser=${{ secrets.GITLAB_USER }}" \
+              --set "namespaces.playground.registryPassword=${{ secrets.GITLAB_TOKEN }}" \
               --wait --timeout 10m
           helm test pharia-kernel
+
+          kubectl port-forward service/pharia-kernel 8081:80 &
+
+          while ! nc -vz localhost 8081 > /dev/null 2>&1 ; do
+            echo "Waiting for port-forward to be ready..."
+            sleep 0.1
+          done
+
+          ./tests/test-list-skills.sh "${{ secrets.PHARIA_AI_TOKEN }}"
 
       - if: github.event_name != 'pull_request'
         name: Log in to JFrog Artifactory
