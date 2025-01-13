@@ -111,32 +111,24 @@ jobs:
       - name: Kubernetes KinD Cluster
         id: kind
         uses: helm/kind-action@v1
-        with:
-          registry: true
-          registry_name: local-registry
-          registry_port: 5001
+
+      - name: Get JFrog Artifactory login credentials
+        uses: ./.github/actions/jfrog
 
       - name: Helm test
-        env:
-          LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
         run: |
           kubectl cluster-info
           kubectl get storageclass standard
 
-          podman tag pharia-kernel:$IMAGE_ID $LOCAL_REGISTRY/pharia-kernel:$IMAGE_ID
-          podman push $LOCAL_REGISTRY/pharia-kernel:$IMAGE_ID
-
-          kubectl create job test --image=$LOCAL_REGISTRY/pharia-kernel:$IMAGE_ID
-          kubectl wait --for=condition=complete --timeout=30s job/test
+          kubectl create secret docker-registry docker-jfrog \
+              --docker-server=alephalpha.jfrog.io \
+              --docker-username=$JFROG_ACCESS_TOKEN_SUBJECT \
+              --docker-password=$JFROG_ACCESS_TOKEN \
+              --docker-email=$JFROG_ACCESS_TOKEN_SUBJECT
 
           helm install pharia-kernel helm-charts/pharia-kernel \
-              --set "image.repository=$LOCAL_REGISTRY/pharia-kernel" \
-              --set "image.tag=$IMAGE_ID"
+              --set "imagePullSecrets[0].name=docker-jfrog"
           helm test pharia-kernel
-
-      - if: github.event_name != 'pull_request'
-        name: Get JFrog Artifactory login credentials
-        uses: ./.github/actions/jfrog
 
       - if: github.event_name != 'pull_request'
         name: Log in to JFrog Artifactory
