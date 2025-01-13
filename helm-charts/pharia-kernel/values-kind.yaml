@@ -1,0 +1,14 @@
+# -- Active namespaces for Pharia Kernel.
+# The credentials can be provided via the values:
+#   configAccessToken
+#   registryUser
+#   registryPassword
+# or the environment variables:
+#   NAMESPACES__PLAYGROUND__CONFIG_ACCESS_TOKEN
+#   NAMESPACES__PLAYGROUND__REGISTRY_USER
+#   NAMESPACES__PLAYGROUND__REGISTRY_PASSWORD
+namespaces:
+  playground:
+    configUrl: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
+    registry: "registry.gitlab.aleph-alpha.de"
+    baseRepository: "engineering/pharia-kernel-playground/skills"
