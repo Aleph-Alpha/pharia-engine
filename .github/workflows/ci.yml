@@ -127,7 +127,8 @@ jobs:
               --docker-email=$JFROG_ACCESS_TOKEN_SUBJECT
 
           helm install pharia-kernel helm-charts/pharia-kernel \
-              --set "imagePullSecrets[0].name=docker-jfrog"
+              --set "imagePullSecrets[0].name=docker-jfrog" \
+              --wait --timeout 10m
           helm test pharia-kernel
 
       - if: github.event_name != 'pull_request'
