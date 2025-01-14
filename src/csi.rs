@@ -75,6 +75,12 @@ pub trait Csi {
         auth: String,
         document_path: DocumentPath,
     ) -> Result<Option<Value>, anyhow::Error>;
+
+    async fn document_metadata_all(
+        &self,
+        auth: String,
+        requests: Vec<DocumentPath>,
+    ) -> Result<Vec<Option<Value>>, anyhow::Error>;
 }
 
 #[derive(IntoStaticStr)]
@@ -215,6 +221,19 @@ where
         );
         self.search.document_metadata(document_path, auth).await
     }
+    async fn document_metadata_all(
+        &self,
+        auth: String,
+        requests: Vec<DocumentPath>,
+    ) -> Result<Vec<Option<Value>>, anyhow::Error> {
+        try_join_all(
+            requests
+                .into_iter()
+                .map(|r| self.document_metadata(auth.clone(), r))
+                .collect::<Vec<_>>(),
+        )
+        .await
+    }
 }
 
 #[cfg(test)]
@@ -232,7 +251,7 @@ pub mod tests {
             tests::InferenceStub, ChatParams, ChatRequest, ChatResponse, Completion,
             CompletionParams, CompletionRequest, InferenceApi, Message, Role,
         },
-        search::{DocumentPath, SearchRequest, SearchResult},
+        search::{tests::SearchStub, DocumentPath, SearchRequest, SearchResult},
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
         FinishReason,
@@ -326,6 +345,46 @@ pub mod tests {
         assert!(completions.get(1).unwrap().text.contains("2nd"));
     }
 
+    #[tokio::test]
+    async fn document_metadata_requests_in_respective_order() {
+        // Given a CSI drivers with stub search
+        let search_stub = SearchStub::new(|r| Ok(Some(Value::String(r.name.clone()))));
+        let csi_apis = CsiDrivers {
+            search: search_stub.api(),
+            ..dummy_csi_drivers()
+        };
+
+        // When requesting multiple metadata
+        let request_1 = DocumentPath {
+            namespace: "dummy_namespace".to_owned(),
+            collection: "dummy_collection".to_owned(),
+            name: "1st_request".to_owned(),
+        };
+
+        let request_2 = DocumentPath {
+            name: "2nd request".to_owned(),
+            ..request_1.clone()
+        };
+
+        let responses = csi_apis
+            .document_metadata_all(api_token().to_owned(), vec![request_1, request_2])
+            .await
+            .unwrap();
+
+        drop(csi_apis);
+        search_stub.wait_for_shutdown().await;
+
+        // Then the responses must have the same order as the respective requests
+        let responses: Vec<String> = responses
+            .into_iter()
+            .map(|v| v.unwrap().to_string())
+            .collect();
+
+        assert_eq!(responses.len(), 2);
+        assert!(responses[0].contains("1st"));
+        assert!(responses[1].contains("2nd"));
+    }
+
     fn dummy_csi_drivers() -> CsiDrivers<FakeTokenizers> {
         let (send, _recv) = mpsc::channel(1);
         let inference = InferenceApi::new(send);
@@ -390,6 +449,14 @@ pub mod tests {
             _auth: String,
             _document_path: DocumentPath,
         ) -> Result<Option<Value>, anyhow::Error> {
+            panic!("DummyCsi metadata_document called")
+        }
+
+        async fn document_metadata_all(
+            &self,
+            _auth: String,
+            _document_path: Vec<DocumentPath>,
+        ) -> Result<Vec<Option<Value>>, anyhow::Error> {
             panic!("DummyCsi metadata_document called")
         }
     }
@@ -490,6 +557,14 @@ pub mod tests {
             _auth: String,
             _document_path: DocumentPath,
         ) -> Result<Option<Value>, anyhow::Error> {
+            unimplemented!()
+        }
+
+        async fn document_metadata_all(
+            &self,
+            _auth: String,
+            _document_path: Vec<DocumentPath>,
+        ) -> Result<Vec<Option<Value>>, anyhow::Error> {
             unimplemented!()
         }
     }

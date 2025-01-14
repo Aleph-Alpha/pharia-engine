@@ -312,7 +312,7 @@ impl DocumentIndexMessage {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::{
         sync::atomic::{AtomicUsize, Ordering},
         time::Duration,
@@ -324,6 +324,47 @@ mod tests {
     use crate::tests::{api_token, document_index_url};
 
     use super::*;
+
+    /// Always return the same completion
+    pub struct SearchStub {
+        send: mpsc::Sender<DocumentIndexMessage>,
+        join_handle: JoinHandle<()>,
+    }
+
+    impl SearchStub {
+        pub fn new(
+            result: impl Fn(DocumentPath) -> anyhow::Result<Option<Value>> + Send + 'static,
+        ) -> Self {
+            let (send, mut recv) = mpsc::channel::<DocumentIndexMessage>(1);
+            let join_handle = tokio::spawn(async move {
+                while let Some(msg) = recv.recv().await {
+                    match msg {
+                        DocumentIndexMessage::MetadataMessage {
+                            document_path,
+                            send,
+                            ..
+                        } => {
+                            send.send(result(document_path)).unwrap();
+                        }
+                        DocumentIndexMessage::SearchMessage { .. } => {
+                            unimplemented!()
+                        }
+                    }
+                }
+            });
+
+            Self { send, join_handle }
+        }
+
+        pub async fn wait_for_shutdown(self) {
+            drop(self.send);
+            self.join_handle.await.unwrap();
+        }
+
+        pub fn api(&self) -> mpsc::Sender<DocumentIndexMessage> {
+            self.send.clone()
+        }
+    }
 
     impl SearchRequest {
         pub fn new(index: IndexPath, query: impl Into<String>) -> Self {
