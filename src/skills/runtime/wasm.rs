@@ -216,7 +216,7 @@ pub mod tests {
             unimplemented!()
         }
 
-        async fn document_metadata(&mut self, _document_path: DocumentPath) -> Option<Value> {
+        async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
             unimplemented!()
         }
     }
@@ -283,8 +283,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             }]
         }
 
-        async fn document_metadata(&mut self, _document_path: DocumentPath) -> Option<Value> {
-            Some(json!({ "url": "http://example.de" }))
+        async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
+            vec![Some(json!({ "url": "http://example.de" }))]
         }
     }
 
@@ -327,7 +327,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             unimplemented!()
         }
 
-        async fn document_metadata(&mut self, _document_path: DocumentPath) -> Option<Value> {
+        async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
             unimplemented!()
         }
     }
