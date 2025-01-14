@@ -575,6 +575,14 @@ pub mod tests {
         ) -> Result<Option<Value>, anyhow::Error> {
             bail!("Test error")
         }
+
+        async fn document_metadata_all(
+            &self,
+            _auth: String,
+            _document_path: Vec<DocumentPath>,
+        ) -> Result<Vec<Option<Value>>, anyhow::Error> {
+            bail!("Test error")
+        }
     }
     /// Only serves test/greet skill
     pub struct SkillStoreGreetStub {
