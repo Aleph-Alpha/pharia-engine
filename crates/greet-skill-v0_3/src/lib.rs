@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest};
-use pharia::skill::csi::{complete, CompletionParams};
+use pharia::skill::csi::{complete, CompletionParams, CompletionRequest};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
@@ -24,10 +24,10 @@ You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         );
-        let result = complete(
-            "pharia-1-llm-7b-control",
-            &prompt,
-            &CompletionParams {
+        let result = complete(&[CompletionRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            prompt,
+            params: CompletionParams {
                 return_special_tokens: true,
                 max_tokens: None,
                 temperature: None,
@@ -39,7 +39,8 @@ Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|
                     "<|eot_id|>".to_owned(),
                 ],
             },
-        );
+        }])
+        .remove(0);
         let output = serde_json::to_vec(&json!(result.text))
             .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
         Ok(output)

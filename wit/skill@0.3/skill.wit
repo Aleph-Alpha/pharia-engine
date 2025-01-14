@@ -65,9 +65,6 @@ interface csi {
         return-special-tokens: bool
     }
 
-    // @since(version = 0.3.0)
-    complete: func(model: string, prompt: string, params: completion-params) -> completion;
-
     @since(version = 0.2.7)
     enum role {
         user,
@@ -145,8 +142,8 @@ interface csi {
         params: completion-params
     }
 
-    @since(version = 0.2.3)
-    complete-all: func(requests: list<completion-request>) -> list<completion>;
+    /// @since(version = 0.3.0)
+    complete: func(requests: list<completion-request>) -> list<completion>;
 
     /// Which documents you want to search in, and which type of index should be used
     @since(version = 0.2.6)
@@ -176,6 +173,6 @@ interface csi {
     @since(version = 0.2.6)
     search: func(index-path: index-path, query: string, max-results: u32, min-score: option<f64>) -> list<search-result>;
 
-    // @since(version = 0.3.0)
+    /// @since(version = 0.3.0)
     document-metadata: func(requests: list<document-path>) -> list<option<list<u8>>>;
 }

@@ -72,10 +72,6 @@ where
             }
         },
         VersionedCsiRequest::V0_3(request) => match request {
-            V0_3CsiRequest::Complete(completion_request) => drivers
-                .complete_text(bearer.token().to_owned(), completion_request.into())
-                .await
-                .map(|r| json!(r)),
             V0_3CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(bearer.token().to_owned(), chunk_request)
                 .await
@@ -84,7 +80,7 @@ where
                 .select_language(select_language_request)
                 .await
                 .map(|r| json!(r)),
-            V0_3CsiRequest::CompleteAll(complete_all_request) => drivers
+            V0_3CsiRequest::Complete(complete_all_request) => drivers
                 .complete_all(
                     bearer.token().to_owned(),
                     complete_all_request
@@ -165,10 +161,9 @@ pub enum VersionedCsiRequest {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum V0_3CsiRequest {
-    Complete(V0_2CompletionRequest),
     Chunk(ChunkRequest),
     SelectLanguage(SelectLanguageRequest),
-    CompleteAll(CompleteAllRequest),
+    Complete(CompleteAllRequest),
     Search(SearchRequest),
     Chat(ChatRequest),
     DocumentMetadata(DocumentMetadataRequest),
