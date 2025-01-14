@@ -584,8 +584,9 @@ mod v0_2 {
                 name,
             };
             self.skill_ctx
-                .document_metadata(document_path)
+                .document_metadata(vec![document_path])
                 .await
+                .remove(0) // we know there will be exactly one document returned
                 .map(|value| {
                     serde_json::to_vec(&value).expect("Value should have valid to_bytes repr.")
                 })
@@ -862,8 +863,9 @@ mod v0_3 {
                 name,
             };
             self.skill_ctx
-                .document_metadata(document_path)
+                .document_metadata(vec![document_path])
                 .await
+                .remove(0) // we know there will be exactly one document returned
                 .map(|value| {
                     serde_json::to_vec(&value).expect("Value should have valid to_bytes repr.")
                 })

@@ -326,24 +326,25 @@ where
         }
     }
 
-    async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Value> {
+    async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
         let span = span!(
             Level::DEBUG,
             "document_metadata",
-            namespace = document_path.namespace,
-            collection = document_path.collection,
-            name = document_path.name
+            requests_len = requests.len()
         );
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }
         match self
             .csi_apis
-            .document_metadata(self.api_token.clone(), vec![document_path])
+            .document_metadata(self.api_token.clone(), requests)
             .await
         {
             // We know there will always be exactly one element in the vector
-            Ok(mut value) => value.remove(0),
+            Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
     }
