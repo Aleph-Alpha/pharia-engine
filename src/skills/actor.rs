@@ -234,23 +234,8 @@ impl<C> CsiForSkills for SkillInvocationCtx<C>
 where
     C: Csi + Send + Sync,
 {
-    async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
-        let span = span!(Level::DEBUG, "complete_text", model = request.model);
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
-        match self
-            .csi_apis
-            .complete(self.api_token.clone(), vec![request])
-            .await
-        {
-            Ok(mut value) => value.remove(0),
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-        let span = span!(Level::DEBUG, "complete_all", requests_len = requests.len());
+    async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+        let span = span!(Level::DEBUG, "complete", requests_len = requests.len());
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }

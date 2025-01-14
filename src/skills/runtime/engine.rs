@@ -411,7 +411,11 @@ mod v0_2 {
                 stop,
             };
             let request = inference::CompletionRequest::new(prompt, model).with_params(params);
-            self.skill_ctx.complete_text(request).await.into()
+            self.skill_ctx
+                .complete(vec![request])
+                .await
+                .remove(0)
+                .into()
         }
 
         async fn complete_return_special_tokens(
@@ -436,7 +440,11 @@ mod v0_2 {
                 stop,
             };
             let request = inference::CompletionRequest::new(prompt, model).with_params(params);
-            self.skill_ctx.complete_text(request).await.into()
+            self.skill_ctx
+                .complete(vec![request])
+                .await
+                .remove(0)
+                .into()
         }
 
         async fn chat(
@@ -508,7 +516,7 @@ mod v0_2 {
                 .collect();
 
             self.skill_ctx
-                .complete_all(requests)
+                .complete(requests)
                 .await
                 .into_iter()
                 .map(|c| Completion {
@@ -760,7 +768,7 @@ mod v0_3 {
                 .collect();
 
             self.skill_ctx
-                .complete_all(requests)
+                .complete(requests)
                 .await
                 .into_iter()
                 .map(|c| Completion {

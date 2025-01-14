@@ -179,25 +179,24 @@ pub mod tests {
 
     /// A test double for a [`Csi`] implementation which always completes with the provided function.
     pub struct CsiCompleteStub {
-        complete: Box<dyn FnMut(CompletionRequest) -> Completion + Send>,
+        complete_fn: Box<dyn FnMut(CompletionRequest) -> Completion + Send>,
     }
 
     impl CsiCompleteStub {
         pub fn new(complete: impl FnMut(CompletionRequest) -> Completion + Send + 'static) -> Self {
             Self {
-                complete: Box::new(complete),
+                complete_fn: Box::new(complete),
             }
         }
     }
 
     #[async_trait]
     impl CsiForSkills for CsiCompleteStub {
-        async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
-            (self.complete)(request)
-        }
-
-        async fn complete_all(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            unimplemented!()
+        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            requests
+                .into_iter()
+                .map(|r| (self.complete_fn)(r))
+                .collect()
         }
 
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
@@ -223,9 +222,8 @@ pub mod tests {
     /// Asserts a specific prompt and model and returns a greeting message
     pub struct CsiGreetingMock;
 
-    #[async_trait]
-    impl CsiForSkills for CsiGreetingMock {
-        async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
+    impl CsiGreetingMock {
+        fn complete_text(request: CompletionRequest) -> Completion {
             let expected_prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
 Cutting Knowledge Date: December 2023
@@ -247,13 +245,12 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 Completion::from_text("Mock expectation violated")
             }
         }
+    }
 
-        async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            let mut completions = Vec::new();
-            for request in requests {
-                completions.push(self.complete_text(request).await);
-            }
-            completions
+    #[async_trait]
+    impl CsiForSkills for CsiGreetingMock {
+        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            requests.into_iter().map(Self::complete_text).collect()
         }
 
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
@@ -305,14 +302,15 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
     #[async_trait]
     impl CsiForSkills for CsiCounter {
-        async fn complete_text(&mut self, _params: CompletionRequest) -> Completion {
-            let mut counter = self.counter.lock().unwrap();
-            *counter += 1;
-            Completion::from_text(counter.to_string())
-        }
-
-        async fn complete_all(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            unimplemented!()
+        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            requests
+                .iter()
+                .map(|_| {
+                    let mut counter = self.counter.lock().unwrap();
+                    *counter += 1;
+                    Completion::from_text(counter.to_string())
+                })
+                .collect()
         }
 
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
