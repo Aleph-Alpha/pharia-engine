@@ -1,4 +1,4 @@
-package pharia:skill@0.3.0-alpha.1;
+package pharia:skill@0.3.0-alpha.2;
 
 @since(version = 0.1.0)
 world skill {
@@ -177,5 +177,5 @@ interface csi {
     search: func(index-path: index-path, query: string, max-results: u32, min-score: option<f64>) -> list<search-result>;
 
     // @since(version = 0.3.0)
-    document-metadata: func(document-path: document-path) -> option<list<u8>>;
+    document-metadata: func(requests: list<document-path>) -> list<option<list<u8>>>;
 }
