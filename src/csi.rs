@@ -182,9 +182,7 @@ where
         request: SearchRequest,
     ) -> Result<Vec<SearchResult>, anyhow::Error> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "search")]).increment(1);
-
         let index_path = &request.index_path;
-
         trace!(
             "search: namespace={} collection={} max_results={} min_score={}",
             index_path.namespace,
@@ -207,14 +205,7 @@ where
             &[("function", "document_metadata")]
         )
         .increment(1);
-        for document_path in &requests {
-            trace!(
-                "document_metadata: namespace={}, collection={}, name={}",
-                document_path.namespace,
-                document_path.collection,
-                document_path.name,
-            );
-        }
+        trace!("document_metadata: requests.len()={}", requests.len());
         try_join_all(
             requests
                 .into_iter()
