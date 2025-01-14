@@ -62,10 +62,10 @@ where
             V0_2CsiRequest::DocumentMetadata(document_metadata_request) => drivers
                 .document_metadata(
                     bearer.token().to_owned(),
-                    document_metadata_request.document_path,
+                    vec![document_metadata_request.document_path],
                 )
                 .await
-                .map(|r| json!(r)),
+                .map(|r| json!(r.first().unwrap())),
             V0_2CsiRequest::Unknown { function } => {
                 let msg = format!("The CSI function {} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.", function.as_deref().unwrap_or("specified"));
                 return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
@@ -106,10 +106,10 @@ where
             V0_3CsiRequest::DocumentMetadata(document_metadata_request) => drivers
                 .document_metadata(
                     bearer.token().to_owned(),
-                    document_metadata_request.document_path,
+                    vec![document_metadata_request.document_path],
                 )
                 .await
-                .map(|r| json!(r)),
+                .map(|r| json!(r.first().unwrap())),
             V0_3CsiRequest::Unknown { function } => {
                 let msg = format!("The CSI function {} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.", function.as_deref().unwrap_or("specified"));
                 return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));

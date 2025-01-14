@@ -339,10 +339,11 @@ where
         }
         match self
             .csi_apis
-            .document_metadata(self.api_token.clone(), document_path)
+            .document_metadata(self.api_token.clone(), vec![document_path])
             .await
         {
-            Ok(value) => value,
+            // We know there will always be exactly one element in the vector
+            Ok(mut value) => value.remove(0),
             Err(error) => self.send_error(error).await,
         }
     }
@@ -569,14 +570,6 @@ pub mod tests {
         }
 
         async fn document_metadata(
-            &self,
-            _auth: String,
-            _document_path: DocumentPath,
-        ) -> Result<Option<Value>, anyhow::Error> {
-            bail!("Test error")
-        }
-
-        async fn document_metadata_all(
             &self,
             _auth: String,
             _document_path: Vec<DocumentPath>,

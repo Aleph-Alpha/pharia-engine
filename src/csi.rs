@@ -73,12 +73,6 @@ pub trait Csi {
     async fn document_metadata(
         &self,
         auth: String,
-        document_path: DocumentPath,
-    ) -> Result<Option<Value>, anyhow::Error>;
-
-    async fn document_metadata_all(
-        &self,
-        auth: String,
         requests: Vec<DocumentPath>,
     ) -> Result<Vec<Option<Value>>, anyhow::Error>;
 }
@@ -206,30 +200,25 @@ where
     async fn document_metadata(
         &self,
         auth: String,
-        document_path: DocumentPath,
-    ) -> Result<Option<Value>, anyhow::Error> {
+        requests: Vec<DocumentPath>,
+    ) -> Result<Vec<Option<Value>>, anyhow::Error> {
         metrics::counter!(
             CsiMetrics::CsiRequestsTotal,
             &[("function", "document_metadata")]
         )
         .increment(1);
-        trace!(
-            "document_metadata: namespace={}, collection={}, name={}",
-            document_path.namespace,
-            document_path.collection,
-            document_path.name,
-        );
-        self.search.document_metadata(document_path, auth).await
-    }
-    async fn document_metadata_all(
-        &self,
-        auth: String,
-        requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Option<Value>>, anyhow::Error> {
+        for document_path in &requests {
+            trace!(
+                "document_metadata: namespace={}, collection={}, name={}",
+                document_path.namespace,
+                document_path.collection,
+                document_path.name,
+            );
+        }
         try_join_all(
             requests
                 .into_iter()
-                .map(|r| self.document_metadata(auth.clone(), r))
+                .map(|r| self.search.document_metadata(r, auth.clone()))
                 .collect::<Vec<_>>(),
         )
         .await
@@ -367,7 +356,7 @@ pub mod tests {
         };
 
         let responses = csi_apis
-            .document_metadata_all(api_token().to_owned(), vec![request_1, request_2])
+            .document_metadata(api_token().to_owned(), vec![request_1, request_2])
             .await
             .unwrap();
 
@@ -445,14 +434,6 @@ pub mod tests {
         }
 
         async fn document_metadata(
-            &self,
-            _auth: String,
-            _document_path: DocumentPath,
-        ) -> Result<Option<Value>, anyhow::Error> {
-            panic!("DummyCsi metadata_document called")
-        }
-
-        async fn document_metadata_all(
             &self,
             _auth: String,
             _document_path: Vec<DocumentPath>,
@@ -553,14 +534,6 @@ pub mod tests {
         }
 
         async fn document_metadata(
-            &self,
-            _auth: String,
-            _document_path: DocumentPath,
-        ) -> Result<Option<Value>, anyhow::Error> {
-            unimplemented!()
-        }
-
-        async fn document_metadata_all(
             &self,
             _auth: String,
             _document_path: Vec<DocumentPath>,
