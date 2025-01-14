@@ -33,13 +33,7 @@ pub struct CsiDrivers<T> {
 /// See its sibling trait `CsiForSkills`.
 #[async_trait]
 pub trait Csi {
-    async fn complete_text(
-        &self,
-        auth: String,
-        request: CompletionRequest,
-    ) -> Result<Completion, anyhow::Error>;
-
-    async fn complete_all(
+    async fn complete(
         &self,
         auth: String,
         requests: Vec<CompletionRequest>,
@@ -95,35 +89,27 @@ impl<T> Csi for CsiDrivers<T>
 where
     T: TokenizerApi + Send + Sync,
 {
-    async fn complete_text(
-        &self,
-        auth: String,
-        request: CompletionRequest,
-    ) -> Result<Completion, anyhow::Error> {
-        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "complete")]).increment(1);
-
-        trace!(
-            "complete_text: request.model={} request.params.max_tokens={}",
-            request.model,
-            request
-                .params
-                .max_tokens
-                .map_or_else(|| "None".to_owned(), |val| val.to_string()),
-        );
-
-        self.inference.complete_text(request, auth).await
-    }
-
-    async fn complete_all(
+    async fn complete(
         &self,
         auth: String,
         requests: Vec<CompletionRequest>,
     ) -> Result<Vec<Completion>, anyhow::Error> {
-        trace!("complete_all: requests.len()={}", requests.len());
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "complete")])
+            .increment(requests.len() as u64);
         try_join_all(
             requests
                 .into_iter()
-                .map(|r| self.complete_text(auth.clone(), r))
+                .map(|r| {
+                    trace!(
+                        "complete: request.model={} request.params.max_tokens={}",
+                        r.model,
+                        r.params
+                            .max_tokens
+                            .map_or_else(|| "None".to_owned(), |val| val.to_string()),
+                    );
+
+                    self.inference.complete(r, auth.clone())
+                })
                 .collect::<Vec<_>>(),
         )
         .await
@@ -288,7 +274,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn complete_all_completion_requests_in_respective_order() {
+    async fn completion_requests_in_respective_order() {
         // Given a CSI drivers with stub completion
         let inference_stub = InferenceStub::new(|r| Ok(Completion::from_text(r.prompt)));
         let csi_apis = CsiDrivers {
@@ -309,7 +295,7 @@ pub mod tests {
         };
 
         let completions = csi_apis
-            .complete_all(
+            .complete(
                 api_token().to_owned(),
                 vec![completion_req_1, completion_req_2],
             )
@@ -384,20 +370,12 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for DummyCsi {
-        async fn complete_text(
-            &self,
-            _auth: String,
-            _request: CompletionRequest,
-        ) -> Result<Completion, anyhow::Error> {
-            panic!("DummyCsi complete_text called")
-        }
-
-        async fn complete_all(
+        async fn complete(
             &self,
             _auth: String,
             _requests: Vec<CompletionRequest>,
         ) -> Result<Vec<Completion>, anyhow::Error> {
-            panic!("DummyCsi complete_all called")
+            panic!("DummyCsi complete called")
         }
 
         async fn chunk(
@@ -405,7 +383,7 @@ pub mod tests {
             _auth: String,
             _request: ChunkRequest,
         ) -> Result<Vec<String>, anyhow::Error> {
-            panic!("DummyCsi complete_all called");
+            panic!("DummyCsi complete called");
         }
 
         async fn chat(
@@ -478,15 +456,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for StubCsi {
-        async fn complete_text(
-            &self,
-            _auth: String,
-            request: CompletionRequest,
-        ) -> Result<Completion, anyhow::Error> {
-            (*self.completion)(request)
-        }
-
-        async fn complete_all(
+        async fn complete(
             &self,
             _auth: String,
             requests: Vec<CompletionRequest>,
