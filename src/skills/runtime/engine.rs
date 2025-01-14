@@ -690,33 +690,6 @@ mod v0_3 {
 
     #[async_trait::async_trait]
     impl Host for LinkedCtx {
-        #[must_use]
-        async fn complete(
-            &mut self,
-            model: String,
-            prompt: String,
-            options: CompletionParams,
-        ) -> Completion {
-            let CompletionParams {
-                max_tokens,
-                temperature,
-                top_k,
-                top_p,
-                stop,
-                return_special_tokens,
-            } = options;
-            let params = inference::CompletionParams {
-                return_special_tokens,
-                max_tokens,
-                temperature,
-                top_k,
-                top_p,
-                stop,
-            };
-            let request = inference::CompletionRequest::new(prompt, model).with_params(params);
-            self.skill_ctx.complete_text(request).await.into()
-        }
-
         async fn chat(
             &mut self,
             model: String,
@@ -759,7 +732,7 @@ mod v0_3 {
                 })
         }
 
-        async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             let requests = requests
                 .into_iter()
                 .map(|r| {

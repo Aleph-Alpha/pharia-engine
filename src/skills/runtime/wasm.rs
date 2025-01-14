@@ -248,8 +248,12 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             }
         }
 
-        async fn complete_all(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            unimplemented!()
+        async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            let mut completions = Vec::new();
+            for request in requests {
+                completions.push(self.complete_text(request).await);
+            }
+            completions
         }
 
         async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
