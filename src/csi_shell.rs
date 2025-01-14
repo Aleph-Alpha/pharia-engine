@@ -29,9 +29,9 @@ where
     let result = match args {
         VersionedCsiRequest::V0_2(request) => match request {
             V0_2CsiRequest::Complete(completion_request) => drivers
-                .complete_text(bearer.token().to_owned(), completion_request.into())
+                .complete(bearer.token().to_owned(), vec![completion_request.into()])
                 .await
-                .map(|r| json!(r)),
+                .map(|r| json!(r.first().unwrap())),
             V0_2CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(bearer.token().to_owned(), chunk_request)
                 .await
@@ -41,7 +41,7 @@ where
                 .await
                 .map(|r| json!(r)),
             V0_2CsiRequest::CompleteAll(complete_all_request) => drivers
-                .complete_all(
+                .complete(
                     bearer.token().to_owned(),
                     complete_all_request
                         .requests
@@ -81,7 +81,7 @@ where
                 .await
                 .map(|r| json!(r)),
             V0_3CsiRequest::Complete(complete_all_request) => drivers
-                .complete_all(
+                .complete(
                     bearer.token().to_owned(),
                     complete_all_request
                         .requests

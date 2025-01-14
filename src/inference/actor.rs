@@ -57,7 +57,7 @@ impl InferenceApi {
         InferenceApi { send }
     }
 
-    pub async fn complete_text(
+    pub async fn complete(
         &self,
         request: CompletionRequest,
         api_token: String,
@@ -403,7 +403,7 @@ pub mod tests {
 
         // when
         let result = inference_api
-            .complete_text(request, "dummy_api".to_owned())
+            .complete(request, "dummy_api".to_owned())
             .await;
 
         // then
@@ -469,8 +469,8 @@ pub mod tests {
         // When
         // Schedule two tasks
         let resp = try_join!(
-            api.complete_text(complete_text_params_dummy(), "0".to_owned()),
-            api.complete_text(complete_text_params_dummy(), "1".to_owned())
+            api.complete(complete_text_params_dummy(), "0".to_owned()),
+            api.complete(complete_text_params_dummy(), "1".to_owned())
         );
 
         // Then: Both run concurrently and only return once both are completed.

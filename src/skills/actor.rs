@@ -234,17 +234,17 @@ impl<C> CsiForSkills for SkillInvocationCtx<C>
 where
     C: Csi + Send + Sync,
 {
-    async fn complete_text(&mut self, params: CompletionRequest) -> Completion {
-        let span = span!(Level::DEBUG, "complete_text", model = params.model);
+    async fn complete_text(&mut self, request: CompletionRequest) -> Completion {
+        let span = span!(Level::DEBUG, "complete_text", model = request.model);
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }
         match self
             .csi_apis
-            .complete_text(self.api_token.clone(), params)
+            .complete(self.api_token.clone(), vec![request])
             .await
         {
-            Ok(value) => value,
+            Ok(mut value) => value.remove(0),
             Err(error) => self.send_error(error).await,
         }
     }
@@ -256,7 +256,7 @@ where
         }
         match self
             .csi_apis
-            .complete_all(self.api_token.clone(), requests)
+            .complete(self.api_token.clone(), requests)
             .await
         {
             Ok(value) => value,
@@ -530,15 +530,7 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for SaboteurCsi {
-        async fn complete_text(
-            &self,
-            _auth: String,
-            _request: CompletionRequest,
-        ) -> Result<Completion, anyhow::Error> {
-            bail!("Test error")
-        }
-
-        async fn complete_all(
+        async fn complete(
             &self,
             _auth: String,
             _requests: Vec<CompletionRequest>,
