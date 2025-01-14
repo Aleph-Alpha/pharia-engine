@@ -851,24 +851,32 @@ mod v0_3 {
                 .collect()
         }
 
-        async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Vec<u8>> {
-            let DocumentPath {
-                namespace,
-                collection,
-                name,
-            } = document_path;
-            let document_path = search::DocumentPath {
-                namespace,
-                collection,
-                name,
-            };
-            self.skill_ctx
-                .document_metadata(vec![document_path])
-                .await
-                .remove(0) // we know there will be exactly one document returned
-                .map(|value| {
-                    serde_json::to_vec(&value).expect("Value should have valid to_bytes repr.")
+        async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Vec<u8>>> {
+            let requests = requests
+                .into_iter()
+                .map(|r| {
+                    let DocumentPath {
+                        namespace,
+                        collection,
+                        name,
+                    } = r;
+                    search::DocumentPath {
+                        namespace,
+                        collection,
+                        name,
+                    }
                 })
+                .collect();
+            self.skill_ctx
+                .document_metadata(requests)
+                .await
+                .into_iter()
+                .map(|value| {
+                    value.map(|v| {
+                        serde_json::to_vec(&v).expect("Value should have valid to_bytes repr.")
+                    })
+                })
+                .collect()
         }
     }
 
