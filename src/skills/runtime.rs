@@ -22,8 +22,7 @@ pub use self::{
 /// This is the CSI as passed to user defined code in WASM.
 #[async_trait]
 pub trait CsiForSkills {
-    async fn complete_text(&mut self, request: CompletionRequest) -> Completion;
-    async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
+    async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
     async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language>;
     async fn chat(&mut self, request: ChatRequest) -> ChatResponse;
