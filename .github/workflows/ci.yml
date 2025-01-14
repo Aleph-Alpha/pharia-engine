@@ -150,6 +150,7 @@ jobs:
           done
 
           ./tests/test-list-skills.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
+          ./tests/test-run-skill.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
 
       - if: github.event_name != 'pull_request'
         name: Get JFrog Artifactory login credentials
