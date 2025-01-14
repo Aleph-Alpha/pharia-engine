@@ -11,7 +11,7 @@ use crate::{
     csi::{ChunkRequest, Csi},
     inference::{ChatRequest, CompletionParams, CompletionRequest},
     language_selection::SelectLanguageRequest,
-    search::{DocumentMetadataRequest, SearchRequest},
+    search::{DocumentPath, SearchRequest},
     shell::AppState,
     skills::SupportedVersion,
 };
@@ -99,13 +99,10 @@ where
                 .chat(bearer.token().to_owned(), chat_request)
                 .await
                 .map(|v| json!(v)),
-            V0_3CsiRequest::DocumentMetadata(document_metadata_request) => drivers
-                .document_metadata(
-                    bearer.token().to_owned(),
-                    vec![document_metadata_request.document_path],
-                )
+            V0_3CsiRequest::DocumentMetadata { requests } => drivers
+                .document_metadata(bearer.token().to_owned(), requests)
                 .await
-                .map(|r| json!(r.first().unwrap())),
+                .map(|r| json!(r)),
             V0_3CsiRequest::Unknown { function } => {
                 let msg = format!("The CSI function {} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.", function.as_deref().unwrap_or("specified"));
                 return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
@@ -166,7 +163,9 @@ pub enum V0_3CsiRequest {
     Complete(CompleteAllRequest),
     Search(SearchRequest),
     Chat(ChatRequest),
-    DocumentMetadata(DocumentMetadataRequest),
+    DocumentMetadata {
+        requests: Vec<DocumentPath>,
+    },
     #[serde(untagged)]
     Unknown {
         function: Option<String>,
@@ -187,6 +186,13 @@ pub enum V0_2CsiRequest {
     Unknown {
         function: Option<String>,
     },
+}
+
+/// Retrieve the metadata of a document
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DocumentMetadataRequest {
+    /// Which Document
+    pub document_path: DocumentPath,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -310,5 +316,61 @@ mod tests {
 
         // Then it should be deserialized successfully
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn csi_v_2_metadata_request_is_deserialized() {
+        // Given a request in JSON format
+        let request = json!({
+            "version": "0.2",
+            "function": "document_metadata",
+            "document_path": {
+                "namespace": "Kernel",
+                "collection": "test",
+                "name": "kernel/docs"
+            }
+        });
+
+        // When it is deserialized into a `VersionedCsiRequest`
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        // Then it should be deserialized successfully
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::DocumentMetadata(
+                _
+            )))
+        ));
+    }
+
+    #[test]
+    fn csi_v_3_metadata_request_is_deserialized() {
+        // Given a request in JSON format
+        let request = json!({
+            "version": "0.3",
+            "function": "document_metadata",
+            "requests": [
+                {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "asym-64"
+                },
+                {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "asym-64"
+                }
+            ]
+        });
+
+        // When it is deserialized into a `VersionedCsiRequest`
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        // Then it should be deserialized successfully
+        assert!(
+            matches!(result, Ok(VersionedCsiRequest::V0_3(V0_3CsiRequest::DocumentMetadata { requests })) if requests.len() == 2)
+        );
     }
 }
