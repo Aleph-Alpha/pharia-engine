@@ -152,25 +152,25 @@ interface csi {
     @since(version = 0.2.6)
     record index-path {
         /// The namespace the collection belongs to
-         namespace: string,
+        namespace: string,
         /// The collection you want to search in
-         collection: string,
+        collection: string,
         /// The search index you want to use for the collection
-         index: string,
+        index: string,
     }
 
     @since(version = 0.2.6)
     record document-path {
-         namespace: string,
-         collection: string,
-         name: string,
+        namespace: string,
+        collection: string,
+        name: string,
     }
 
     @since(version = 0.2.6)
     record search-result {
-         document-path: document-path,
-         content: string,
-         score: f64,
+        document-path: document-path,
+        content: string,
+        score: f64,
     }
 
     @since(version = 0.2.6)
