@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.0...v0.7.1)
+
+### Features
+
+- Make complete parallel in 0.3 wit world - ([e6d7a11](https://github.com/Aleph-Alpha/pharia-kernel/commit/e6d7a11591288367514bcaeed180282f8313a265))
+- Push parallel document metadata to 0.3 wit world - ([e3aa9b3](https://github.com/Aleph-Alpha/pharia-kernel/commit/e3aa9b3849b33f71efc8afff8725c4027d4bc618))
+
+### Fixes
+
+- Expose parallel search metadata interface via csi shell - ([f6dc770](https://github.com/Aleph-Alpha/pharia-kernel/commit/f6dc770a445bf273b57313aa8634639d29a4d898))
+- Only trace number of parallel document metadata requests - ([f1672a2](https://github.com/Aleph-Alpha/pharia-kernel/commit/f1672a249ce316c86c8f0a7ee6471049fa3b9711))
+
+### Documentation
+
+- Add release process - ([eae95ea](https://github.com/Aleph-Alpha/pharia-kernel/commit/eae95ea3af2e96fc3dc4f49f96232d8c0b613b3e))
+
+### Builds
+
+- *(deps)* Bump the minor group with 34 updates - ([849b80c](https://github.com/Aleph-Alpha/pharia-kernel/commit/849b80c9540e1208b20da1d1d1b74dce349e25a7))
+- *(deps)* Bump the minor group with 2 updates - ([14fd7db](https://github.com/Aleph-Alpha/pharia-kernel/commit/14fd7db14e5b74315e4bcd62a41ca8fbb5f9da15))
+- *(deps)* Bump the minor group with 14 updates - ([f3a5266](https://github.com/Aleph-Alpha/pharia-kernel/commit/f3a5266f102d4cb2970798650fcd4277f87ec6cb))
+- *(deps)* Bump the minor group with 5 updates - ([9360c1c](https://github.com/Aleph-Alpha/pharia-kernel/commit/9360c1c0a1cb60d46598c431bae2102d53afa3b6))
+
+
 ## [0.7.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.6.0...v0.7.0)
 
 ### Features
