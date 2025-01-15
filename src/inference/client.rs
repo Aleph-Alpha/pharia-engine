@@ -1,8 +1,12 @@
-use std::future::Future;
+use std::{
+    future::Future,
+    time::{Duration, SystemTime},
+};
 
 use aleph_alpha_client::{
     Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat, TaskCompletion,
 };
+use retry_policies::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
 use tracing::{error, warn};
 
 use thiserror::Error;
@@ -152,17 +156,41 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, aleph_alpha_client::Error>>,
 {
-    let mut remaining_retries = 5;
+    // Retry with backoff for a total of 5 times.
+    let backoff = ExponentialBackoff::builder().build_with_max_retries(5);
+    let request_start_time = SystemTime::now();
+    let mut n_past_retries = 0;
+
     loop {
         match f().await {
             Ok(value) => return Ok(value),
-            Err(e) if remaining_retries <= 0 => {
-                error!("Error after all retries: {e}");
+            Err(
+                e @ (aleph_alpha_client::Error::Busy
+                | aleph_alpha_client::Error::Unavailable
+                | aleph_alpha_client::Error::TooManyRequests),
+            ) => match backoff.should_retry(request_start_time, n_past_retries) {
+                RetryDecision::Retry { execute_after } => {
+                    let duration = execute_after
+                        .duration_since(SystemTime::now())
+                        .unwrap_or_else(|_| Duration::default());
+                    warn!("Retrying operation: {e} attempt #{n_past_retries}. Sleeping {duration:?} before the next attempt");
+                    tokio::time::sleep(duration).await;
+                    n_past_retries += 1;
+                }
+                RetryDecision::DoNotRetry => {
+                    error!("Error after all retries: {e}");
+                    return Err(e);
+                }
+            },
+            Err(
+                e @ (aleph_alpha_client::Error::Http { .. }
+                | aleph_alpha_client::Error::Other(_)
+                | aleph_alpha_client::Error::ClientTimeout(_)
+                | aleph_alpha_client::Error::InvalidStream { .. }
+                | aleph_alpha_client::Error::InvalidTokenizer { .. }),
+            ) => {
+                error!("Unrecoverable inference error: {e}");
                 return Err(e);
-            }
-            Err(e) => {
-                warn!("Retrying operation: {e}");
-                remaining_retries -= 1;
             }
         }
     }
@@ -196,7 +224,7 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn future_which_returns_okay_on_first_try() {
         // Given a future that always returns okay
         let mut counter = 0;
@@ -214,7 +242,7 @@ mod tests {
         assert_eq!(counter, 1);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn future_which_returns_okay_on_third_try() {
         // Given a future that always returns okay
         let mut counter = 0;
@@ -236,7 +264,7 @@ mod tests {
         assert_eq!(counter, 2);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn future_which_always_returns_error() {
         // Given a future that always returns error
         let mut counter = 0;

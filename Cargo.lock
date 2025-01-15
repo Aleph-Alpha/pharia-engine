@@ -3009,6 +3009,7 @@ dependencies = [
  "opentelemetry_sdk",
  "rand",
  "reqwest",
+ "retry-policies",
  "semver",
  "serde",
  "serde_json",
@@ -3498,6 +3499,15 @@ dependencies = [
  "wasm-streams",
  "web-sys",
  "windows-registry",
+]
+
+[[package]]
+name = "retry-policies"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5875471e6cab2871bc150ecb8c727db5113c9338cc3354dc5ee3425b6aa40a1c"
+dependencies = [
+ "rand",
 ]
 
 [[package]]
