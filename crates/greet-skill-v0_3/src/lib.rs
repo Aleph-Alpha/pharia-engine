@@ -2,7 +2,7 @@
 #![expect(unsafe_op_in_unsafe_fn)]
 
 use anyhow::anyhow;
-use exports::pharia::skill::skill_handler::{Error, Guest};
+use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::csi::{complete, CompletionParams, CompletionRequest};
 use serde_json::json;
 
@@ -44,6 +44,10 @@ Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|
         let output = serde_json::to_vec(&json!(result.text))
             .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
         Ok(output)
+    }
+
+    fn metadata() -> SkillMetadata {
+        unimplemented!()
     }
 }
 
