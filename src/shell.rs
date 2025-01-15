@@ -153,6 +153,10 @@ where
 {
     Router::new()
         // Authenticated routes
+        .route(
+            "/v1/skills/{namespace}/{name}/metadata",
+            get(skill_metadata),
+        )
         .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
         .route("/csi", post(http_csi_handle::<C>))
         .route("/skills", get(skills))
@@ -355,6 +359,64 @@ async fn execute_skill(
     let skill_path = SkillPath::new(namespace, name);
     let result = skill_executor_api
         .execute_skill(skill_path, args.input, bearer.token().to_owned())
+        .await;
+    match result {
+        Ok(response) => (StatusCode::OK, Json(json!(response))),
+        Err(ExecuteSkillError::SkillDoesNotExist) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
+        ),
+        Err(ExecuteSkillError::Other(err)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!(err.to_string())),
+        ),
+    }
+}
+
+/// skill_metadata
+///
+/// Get the metadata for the skill.
+#[utoipa::path(
+    get,
+    operation_id = "skill metadata",
+    path = "/v1/skills/{namespace}/{name}/metadata",
+    security(("api_token" = [])),
+    tag = "skills",
+    responses(
+        (status = 200, description = "Description, input schema, and output schema of the skill if specified",
+            body=Value, example = json!({
+                "description": "The summary of the text.",
+                "input_schema": {
+                    "properties": {
+                        "topic": {
+                            "description": "The topic of the haiku",
+                            "examples": ["Banana", "Oat milk"],
+                            "title": "Topic",
+                            "type": "string",
+                        }
+                    },
+                    "required": ["topic"],
+                    "title": "Input",
+                    "type": "object",
+                },
+                "output_schema": {
+                    "properties": {"message": {"title": "Message", "type": "string"}},
+                    "required": ["message"],
+                    "title": "Output",
+                    "type": "object",
+                }
+            })),
+        (status = 400, description = "Failed to get skill metadata.", body=Value, example = json!("Invalid skill input schema."))
+    ),
+)]
+async fn skill_metadata(
+    State(skill_executor_api): State<SkillExecutorApi>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Path((namespace, name)): Path<(Namespace, String)>,
+) -> (StatusCode, Json<Value>) {
+    let skill_path = SkillPath::new(namespace, name);
+    let result = skill_executor_api
+        .execute_skill(skill_path, json!(""), bearer.token().to_owned())
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(json!(response))),
