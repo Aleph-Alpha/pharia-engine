@@ -106,6 +106,7 @@ derive_more = { version = "1.0.0", features = [
     "display",
     "into_iterator",
 ] }
+retry-policies = "0.4.0"
 
 [dev-dependencies]
 test-skills = { path = "./test-skills" }
