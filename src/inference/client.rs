@@ -217,6 +217,8 @@ impl From<aleph_alpha_client::Error> for InferenceClientError {
 
 #[cfg(test)]
 mod tests {
+    use tokio::time::Instant;
+
     use crate::{
         inference::{ChatParams, Role},
         tests::{api_token, inference_url},
@@ -275,11 +277,15 @@ mod tests {
         };
 
         // When retrying the future
+        let start = Instant::now();
         let result = retry(future).await;
+        let duration = start.elapsed();
 
         // Then the future is invoked six times and returns an error
         assert!(result.is_err());
         assert_eq!(counter, 6);
+        // Some backoff applied
+        assert!(duration > Duration::from_secs(1));
     }
 
     #[tokio::test]
