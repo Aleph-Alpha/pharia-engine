@@ -68,7 +68,7 @@ tower-http = { version = "0.6.2", features = [
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
-utoipa-scalar = { version = "0.2.1" }
+utoipa-scalar = { version = "0.3.0" }
 wasmtime = "28.0.1"
 wasmtime-wasi = "28.0.1"
 wit-parser = "0.223.0"
@@ -78,7 +78,7 @@ tokenizers = { version = "0.21.0", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.20.1", features = ["tokenizers"] }
+text-splitter = { version = "0.21.0", features = ["tokenizers"] }
 lingua = { version = "1.6.2", default-features = false, features = [
     "english",
     "german",
