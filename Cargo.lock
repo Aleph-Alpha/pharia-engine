@@ -199,9 +199,9 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "auto_enums"
-version = "0.8.6"
+version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "459b77b7e855f875fd15f101064825cd79eb83185a961d66e6298560126facfb"
+checksum = "9c170965892137a3a9aeb000b4524aa3cc022a310e709d848b6e1cdce4ab4781"
 dependencies = [
  "derive_utils",
  "proc-macro2",
@@ -1057,9 +1057,9 @@ dependencies = [
 
 [[package]]
 name = "derive_utils"
-version = "0.14.2"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65f152f4b8559c4da5d574bafc7af85454d706b4c5fe8b530d508cacbb6807ea"
+checksum = "ccfae181bab5ab6c5478b2ccb69e4c68a02f8c3ec72f6616bfec9dbc599d2ee0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4090,9 +4090,9 @@ dependencies = [
 
 [[package]]
 name = "text-splitter"
-version = "0.20.1"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15c80dc44717b5ce7681336346c95b007d031b269754e52f2bb90e3613587d9f"
+checksum = "645b1f5e2ae900c4415cd0618ba47b0be0ade6f512b27a9904fd8103b7581810"
 dependencies = [
  "ahash",
  "auto_enums",
@@ -4100,7 +4100,6 @@ dependencies = [
  "icu_provider",
  "icu_segmenter",
  "itertools 0.14.0",
- "once_cell",
  "regex",
  "strum 0.26.3",
  "thiserror 2.0.11",
@@ -4676,9 +4675,9 @@ dependencies = [
 
 [[package]]
 name = "utoipa-scalar"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "088e93bf19f6bd06e0aacb02ca432b3c5a449c4aec2e4aa9fc333a667f2b2c55"
+checksum = "59559e1509172f6b26c1cdbc7247c4ddd1ac6560fe94b584f81ee489b141f719"
 dependencies = [
  "serde",
  "serde_json",
