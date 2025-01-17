@@ -78,7 +78,7 @@ tokenizers = { version = "0.21.0", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.21.0", features = ["tokenizers"] }
+text-splitter = { version = "0.22.0", features = ["tokenizers"] }
 lingua = { version = "1.6.2", default-features = false, features = [
     "english",
     "german",
