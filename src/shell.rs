@@ -23,7 +23,6 @@ use tower_http::{
     cors::CorsLayer,
     decompression::DecompressionLayer,
     sensitive_headers::SetSensitiveRequestHeadersLayer,
-    services::{ServeDir, ServeFile},
     trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
 use tracing::{error, info, info_span, Level};
@@ -152,9 +151,6 @@ pub fn http<C>(app_state: AppState<C>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
 {
-    let serve_dir =
-        ServeDir::new("./doc/book/html").not_found_service(ServeFile::new("docs/index.html"));
-
     Router::new()
         // Authenticated routes
         .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
@@ -166,7 +162,6 @@ where
             "/cached_skills/{namespace}/{name}",
             delete(drop_cached_skill),
         )
-        .nest_service("/docs", serve_dir.clone())
         .route("/", get(index))
         .route_layer(middleware::from_fn_with_state(
             app_state.clone(),
