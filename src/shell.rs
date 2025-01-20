@@ -162,13 +162,13 @@ where
             "/cached_skills/{namespace}/{name}",
             delete(drop_cached_skill),
         )
-        .route("/", get(index))
         .route_layer(middleware::from_fn_with_state(
             app_state.clone(),
             authorization_middleware,
         ))
         .with_state(app_state)
         // Unauthenticated routes
+        .route("/", get(index))
         .route("/skill.wit", get(skill_wit()))
         .route(
             "/api-docs",
