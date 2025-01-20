@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.1...v0.7.2)
+
+### Features
+
+- Remove auth for index route - ([a6c708d](https://github.com/Aleph-Alpha/pharia-kernel/commit/a6c708d77e373f4b49ecf20711f1f2c078aae144))
+
+### Documentation
+
+- Happy 2025 - ([ca675bf](https://github.com/Aleph-Alpha/pharia-kernel/commit/ca675bf31b2b16506fb0637f3a182ea48b9c3014))
+
+### Builds
+
+- *(deps)* Bump the minor group with 5 updates - ([3cc6c61](https://github.com/Aleph-Alpha/pharia-kernel/commit/3cc6c612f9986b5ad7a20058f2e6ac82425c663c))
+- *(deps)* Text-splitter 0.22 - ([6f8b518](https://github.com/Aleph-Alpha/pharia-kernel/commit/6f8b5181b5f104f9bb8c6b18b33e80d8667deb86))
+- *(deps)* Bump the minor group with 4 updates - ([6713297](https://github.com/Aleph-Alpha/pharia-kernel/commit/67132973557dd8ab501d1ab8808be3ceb0909638))
+- Remove docs from container - ([e8e038f](https://github.com/Aleph-Alpha/pharia-kernel/commit/e8e038fd6bb11b43a5af05c20c46b99a3720f326))
+
+
 ## [0.7.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.0...v0.7.1)
 
 ### Features
