@@ -134,5 +134,5 @@ panic = 'abort'
 # link time optimizations
 lto = true
 
-[profile.dev.package."*"]
+[profile.dev.package.cranelift-codegen]
 opt-level = 3
