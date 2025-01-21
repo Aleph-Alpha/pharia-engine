@@ -386,7 +386,6 @@ mod v0_2 {
 
     bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true });
 
-    #[async_trait::async_trait]
     impl Host for LinkedCtx {
         #[must_use]
         async fn complete(
@@ -696,7 +695,6 @@ mod v0_3 {
 
     bindgen!({ world: "skill", path: "./wit/skill@0.3", async: true });
 
-    #[async_trait::async_trait]
     impl Host for LinkedCtx {
         async fn chat(
             &mut self,
