@@ -186,6 +186,16 @@ mod tests {
         &INFERENCE_URL
     }
 
+    /// Authorization address used by tests.
+    pub fn authorization_url() -> &'static str {
+        static AUTHORIZATION_URL: LazyLock<String> = LazyLock::new(|| {
+            drop(dotenv());
+            env::var("AUTHORIZATION_URL")
+                .unwrap_or_else(|_| "https://pharia-iam.product.pharia.com".to_owned())
+        });
+        &AUTHORIZATION_URL
+    }
+
     /// Inference address used by tests.
     pub fn document_index_url() -> &'static str {
         static DOCUMENT_INDEX_URL: LazyLock<String> = LazyLock::new(|| {
