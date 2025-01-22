@@ -831,7 +831,7 @@ mod v0_3 {
                 .collect()
         }
 
-        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
             vec![]
         }
 

@@ -70,7 +70,7 @@ pub trait Csi {
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Document>, anyhow::Error>;
+    ) -> Result<Vec<Option<Document>>, anyhow::Error>;
 
     async fn document_metadata(
         &self,
@@ -193,7 +193,7 @@ where
         &self,
         _auth: String,
         _requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Document>, anyhow::Error> {
+    ) -> Result<Vec<Option<Document>>, anyhow::Error> {
         Ok(vec![])
     }
 
@@ -290,6 +290,31 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn documents() {
+        // Given a skill invocation context with a stub tokenizer provider
+        let search = SearchStub::with_documents(|r| Some(Document));
+        let csi_apis = CsiDrivers {
+            search: search.api(),
+            ..dummy_csi_drivers()
+        };
+
+        // When requesting documents
+        let request = vec![DocumentPath {
+            namespace: "kernel".to_owned(),
+            collection: "test".to_owned(),
+            name: "docs".to_owned(),
+        }];
+        let documents = csi_apis
+            .documents("dummy_token".to_owned(), request)
+            .await
+            .unwrap();
+
+        // Then a single document is returned
+        assert_eq!(documents.len(), 1);
+        assert!(documents.first().unwrap().is_some());
+    }
+
+    #[tokio::test]
     async fn completion_requests_in_respective_order() {
         // Given a CSI drivers with stub completion
         let inference_stub = InferenceStub::new(|r| Ok(Completion::from_text(r.prompt)));
@@ -330,7 +355,7 @@ pub mod tests {
     #[tokio::test]
     async fn document_metadata_requests_in_respective_order() {
         // Given a CSI drivers with stub search
-        let search_stub = SearchStub::new(|r| Ok(Some(Value::String(r.name.clone()))));
+        let search_stub = SearchStub::with_metadata(|r| Ok(Some(Value::String(r.name.clone()))));
         let csi_apis = CsiDrivers {
             search: search_stub.api(),
             ..dummy_csi_drivers()
@@ -422,7 +447,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<DocumentPath>,
-        ) -> Result<Vec<Document>, anyhow::Error> {
+        ) -> Result<Vec<Option<Document>>, anyhow::Error> {
             panic!("DummyCsi documents called")
         }
 
@@ -522,7 +547,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<DocumentPath>,
-        ) -> Result<Vec<Document>, anyhow::Error> {
+        ) -> Result<Vec<Option<Document>>, anyhow::Error> {
             unimplemented!()
         }
 
