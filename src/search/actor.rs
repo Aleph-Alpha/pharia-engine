@@ -12,7 +12,7 @@ use tokio::{
 use tracing::error;
 
 use super::client::{
-    Client, Cursor, DocumentPath, IndexPath, Modality, SearchClient,
+    Client, Cursor, Document,DocumentPath, IndexPath, Modality, SearchClient,
     SearchRequest as ClientSearchRequest, SearchResult as ClientSearchResult,
 };
 
@@ -167,8 +167,6 @@ pub struct DocumentIndexSearchResult {
     pub end: Cursor,
 }
 
-#[derive(Debug)]
-pub struct Document;
 
 /// Allows for searching different collections in the Document Index
 struct SearchActor<C: SearchClient> {
@@ -348,7 +346,7 @@ impl DocumentIndexMessage {
         document_path: DocumentPath,
         api_token: &str,
     ) -> anyhow::Result<Option<Document>> {
-        unimplemented!()
+        client.document(document_path, api_token).await
     }
 }
 
@@ -568,6 +566,14 @@ pub mod tests {
             _document_path: DocumentPath,
             _api_token: &str,
         ) -> anyhow::Result<Option<Value>> {
+            unimplemented!()
+        }
+
+        async fn document(
+            &self,
+            _document_path: DocumentPath,
+            _api_token: &str,
+        ) -> anyhow::Result<Option<Document>> {
             unimplemented!()
         }
     }

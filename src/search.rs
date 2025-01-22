@@ -1,8 +1,8 @@
 mod actor;
 mod client;
 
-pub use actor::{Document, DocumentIndexMessage, Search, SearchApi, SearchRequest, SearchResult};
-pub use client::{DocumentPath, IndexPath};
+pub use actor::{DocumentIndexMessage, Search, SearchApi, SearchRequest, SearchResult};
+pub use client::{Document, DocumentPath, IndexPath};
 
 #[cfg(test)]
 pub mod tests {

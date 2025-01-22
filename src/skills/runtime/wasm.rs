@@ -289,7 +289,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         }
 
         async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
-            vec![Some(Document)]
+            vec![Some(Document::dummy())]
         }
 
         async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {

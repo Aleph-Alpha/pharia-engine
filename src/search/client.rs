@@ -17,6 +17,12 @@ pub trait SearchClient: Send + Sync + 'static {
         document_path: DocumentPath,
         api_token: &str,
     ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
+
+    fn document(
+        &self,
+        document_path: DocumentPath,
+        api_token: &str,
+    ) -> impl Future<Output = anyhow::Result<Option<Document>>> + Send;
 }
 
 /// Search a Document Index collection
@@ -94,6 +100,12 @@ pub struct DocumentPath {
     pub collection: String,
     /// The name of the document
     pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Document {
+    pub contents: Vec<Modality>,
+    pub metadata: Option<Value>,
 }
 
 /// A result for a given search that comes back from the API
@@ -203,6 +215,44 @@ impl SearchClient for Client {
 
         Ok(document.metadata)
     }
+
+    async fn document(
+        &self,
+        document_path: DocumentPath,
+        api_token: &str,
+    ) -> anyhow::Result<Option<Document>> {
+        let DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = document_path;
+
+        // Namespaces and collections must match regex ^[a-zA-Z0-9\-\.]+$
+        // therefore, we do not need to url encode them
+        // A document name can contain characters like `/`, which need to be url encoded
+        let encoded_name = urlencoding::encode(&name);
+        let response =self
+            .http
+            .get(format!(
+                "{}/collections/{namespace}/{collection}/docs/{encoded_name}",
+                &self.host
+            ))
+            .bearer_auth(api_token)
+            .send()
+            .await?
+            .error_for_status();
+
+        match response {
+            Ok(response) => Ok(Some(response.json::<Document>().await?)),
+            Err(err) => {
+                if err.status() == Some(reqwest::StatusCode::NOT_FOUND) {
+                    Ok(None)
+                } else {
+                    Err(err.into())
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -212,6 +262,15 @@ pub mod tests {
     use crate::tests::{api_token, document_index_url};
 
     pub struct StubClient;
+
+    impl Document {
+        pub fn dummy() -> Self {
+            Self {
+                contents: vec![Modality::Text { text: "Hello Homer".to_owned() }],
+                metadata: Some(json!({ "url": "http://example.de" })),
+            }
+        }
+    }
 
     impl SearchClient for StubClient {
         async fn search(
@@ -228,6 +287,14 @@ pub mod tests {
             _document_path: DocumentPath,
             _api_token: &str,
         ) -> anyhow::Result<Option<Value>> {
+            Ok(None)
+        }
+
+        async fn document(
+            &self,
+            _document_path: DocumentPath,
+            _api_token: &str,
+        ) -> anyhow::Result<Option<Document>> {
             Ok(None)
         }
     }
@@ -258,6 +325,36 @@ pub mod tests {
                 name: name.into(),
             }
         }
+    }
+
+    #[tokio::test]
+    async fn document_exists() {
+        // Given a search client pointed at the document index
+        let host = document_index_url().to_owned();
+        let api_token = api_token();
+        let client = Client::new(host).unwrap();
+
+        // When requesting a document
+        let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
+        let maybe_document = client.document(document_path, api_token).await.unwrap();
+
+        // Then we get the expected document
+        assert!(maybe_document.is_some());
+    }
+
+    #[tokio::test]
+    async fn document_not_found() {
+        // Given a search client pointed at the document index
+        let host = document_index_url().to_owned();
+        let api_token = api_token();
+        let client = Client::new(host).unwrap();
+
+        // When requesting a document that does not exist
+        let document_path = DocumentPath::new("Kernel", "test", "kernel-docs-not-found");
+        let maybe_document = client.document(document_path, api_token).await.unwrap();
+
+        // Then we get no document
+        assert!(maybe_document.is_none());
     }
 
     #[tokio::test]
