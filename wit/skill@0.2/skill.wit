@@ -177,7 +177,7 @@ interface csi {
     @since(version = 0.2.9)
     complete-return-special-tokens: func(model: string, prompt: string, params: completion-params) -> completion;
 
-    @unstable(feature=document-metadata)
+    @since(version = 0.2.10)
     document-metadata: func(document-path: document-path) -> option<list<u8>>;
 
     @since(version = 0.2.10)

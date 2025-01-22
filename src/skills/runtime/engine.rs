@@ -213,11 +213,7 @@ impl SupportedVersion {
         for version in Self::iter() {
             match version {
                 Self::V0_2 => {
-                    v0_2::Skill::add_to_linker(
-                        linker,
-                        v0_2::LinkOptions::default().document_metadata(true),
-                        |state: &mut LinkedCtx| state,
-                    )?;
+                    v0_2::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
                 Self::V0_3 => {
                     v0_3::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
