@@ -31,7 +31,7 @@ impl Guest for Skill {
         let request = DocumentPath {
             namespace: "Kernel".to_owned(),
             collection: "test".to_owned(),
-            name: "docs".to_owned(),
+            name: "kernel-docs".to_owned(),
         };
         let result = documents(&[request]);
         assert!(!result.is_empty());
