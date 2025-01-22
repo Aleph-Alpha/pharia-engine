@@ -394,22 +394,8 @@ mod v0_2 {
             prompt: String,
             options: CompletionParams,
         ) -> Completion {
-            let CompletionParams {
-                max_tokens,
-                temperature,
-                top_k,
-                top_p,
-                stop,
-            } = options;
-            let params = inference::CompletionParams {
-                return_special_tokens: false,
-                max_tokens,
-                temperature,
-                top_k,
-                top_p,
-                stop,
-            };
-            let request = inference::CompletionRequest::new(prompt, model).with_params(params);
+            let request =
+                inference::CompletionRequest::new(prompt, model).with_params(options.into());
             self.skill_ctx
                 .complete(vec![request])
                 .await
@@ -471,61 +457,22 @@ mod v0_2 {
             text: String,
             languages: Vec<Language>,
         ) -> Option<Language> {
-            let languages = languages
-                .iter()
-                .map(|l| match l {
-                    Language::Eng => language_selection::Language::Eng,
-                    Language::Deu => language_selection::Language::Deu,
-                })
-                .collect::<Vec<_>>();
+            let languages = languages.into_iter().map(Into::into).collect::<Vec<_>>();
             let request = SelectLanguageRequest::new(text, languages);
             self.skill_ctx
                 .select_language(request)
                 .await
-                .map(|l| match l {
-                    language_selection::Language::Eng => Language::Eng,
-                    language_selection::Language::Deu => Language::Deu,
-                })
+                .map(Into::into)
         }
 
         async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            let requests = requests
-                .into_iter()
-                .map(|r| {
-                    let CompletionParams {
-                        max_tokens,
-                        temperature,
-                        top_k,
-                        top_p,
-                        stop,
-                    } = r.params;
-                    inference::CompletionRequest {
-                        prompt: r.prompt,
-                        model: r.model,
-                        params: inference::CompletionParams {
-                            return_special_tokens: false,
-                            max_tokens,
-                            temperature,
-                            top_k,
-                            top_p,
-                            stop,
-                        },
-                    }
-                })
-                .collect();
+            let requests = requests.into_iter().map(Into::into).collect();
 
             self.skill_ctx
                 .complete(requests)
                 .await
                 .into_iter()
-                .map(|c| Completion {
-                    text: c.text,
-                    finish_reason: match c.finish_reason {
-                        inference::FinishReason::Stop => FinishReason::Stop,
-                        inference::FinishReason::Length => FinishReason::Length,
-                        inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
-                    },
-                })
+                .map(Into::into)
                 .collect()
         }
 
@@ -536,18 +483,8 @@ mod v0_2 {
             max_results: u32,
             min_score: Option<f64>,
         ) -> Vec<SearchResult> {
-            let IndexPath {
-                namespace,
-                collection,
-                index,
-            } = index_path;
-            let index_path = search::IndexPath {
-                namespace,
-                collection,
-                index,
-            };
             let request = SearchRequest {
-                index_path,
+                index_path: index_path.into(),
                 query,
                 max_results,
                 min_score,
@@ -556,47 +493,99 @@ mod v0_2 {
                 .search(request)
                 .await
                 .into_iter()
-                .map(
-                    |search::SearchResult {
-                         document_path:
-                             search::DocumentPath {
-                                 namespace,
-                                 collection,
-                                 name,
-                             },
-                         content,
-                         score,
-                     }| SearchResult {
-                        document_path: DocumentPath {
-                            namespace,
-                            collection,
-                            name,
-                        },
-                        content,
-                        score,
-                    },
-                )
+                .map(Into::into)
                 .collect()
         }
 
         async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Vec<u8>> {
-            let DocumentPath {
-                namespace,
-                collection,
-                name,
-            } = document_path;
-            let document_path = search::DocumentPath {
-                namespace,
-                collection,
-                name,
-            };
             self.skill_ctx
-                .document_metadata(vec![document_path])
+                .document_metadata(vec![document_path.into()])
                 .await
                 .remove(0) // we know there will be exactly one document returned
                 .map(|value| {
                     serde_json::to_vec(&value).expect("Value should have valid to_bytes repr.")
                 })
+        }
+    }
+
+    impl From<language_selection::Language> for Language {
+        fn from(language: language_selection::Language) -> Self {
+            match language {
+                language_selection::Language::Eng => Language::Eng,
+                language_selection::Language::Deu => Language::Deu,
+            }
+        }
+    }
+
+    impl From<Language> for language_selection::Language {
+        fn from(language: Language) -> Self {
+            match language {
+                Language::Eng => language_selection::Language::Eng,
+                Language::Deu => language_selection::Language::Deu,
+            }
+        }
+    }
+
+    impl From<IndexPath> for search::IndexPath {
+        fn from(index_path: IndexPath) -> Self {
+            Self {
+                namespace: index_path.namespace,
+                collection: index_path.collection,
+                index: index_path.index,
+            }
+        }
+    }
+
+    impl From<search::SearchResult> for SearchResult {
+        fn from(search_result: search::SearchResult) -> Self {
+            Self {
+                document_path: search_result.document_path.into(),
+                content: search_result.content,
+                score: search_result.score,
+            }
+        }
+    }
+
+    impl From<search::DocumentPath> for DocumentPath {
+        fn from(document_path: search::DocumentPath) -> Self {
+            Self {
+                namespace: document_path.namespace,
+                collection: document_path.collection,
+                name: document_path.name,
+            }
+        }
+    }
+
+    impl From<DocumentPath> for search::DocumentPath {
+        fn from(document_path: DocumentPath) -> Self {
+            Self {
+                namespace: document_path.namespace,
+                collection: document_path.collection,
+                name: document_path.name,
+            }
+        }
+    }
+
+    impl From<CompletionParams> for inference::CompletionParams {
+        fn from(params: CompletionParams) -> Self {
+            Self {
+                return_special_tokens: false,
+                max_tokens: params.max_tokens,
+                temperature: params.temperature,
+                top_k: params.top_k,
+                top_p: params.top_p,
+                stop: params.stop,
+            }
+        }
+    }
+
+    impl From<CompletionRequest> for inference::CompletionRequest {
+        fn from(request: CompletionRequest) -> Self {
+            Self {
+                prompt: request.prompt,
+                model: request.model,
+                params: request.params.into(),
+            }
         }
     }
 
@@ -722,10 +711,7 @@ mod v0_3 {
             text: String,
             languages: Vec<Language>,
         ) -> Option<Language> {
-            let languages = languages
-                .into_iter()
-                .map(Into::into)
-                .collect::<Vec<_>>();
+            let languages = languages.into_iter().map(Into::into).collect::<Vec<_>>();
             let request = SelectLanguageRequest::new(text, languages);
             self.skill_ctx
                 .select_language(request)
@@ -734,10 +720,7 @@ mod v0_3 {
         }
 
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            let requests = requests
-                .into_iter()
-                .map(Into::into)
-                .collect();
+            let requests = requests.into_iter().map(Into::into).collect();
 
             self.skill_ctx
                 .complete(requests)
