@@ -25,7 +25,7 @@ use crate::{
     csi::{chunking::ChunkParams, ChunkRequest, Csi},
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
-    search::{DocumentPath, SearchRequest, SearchResult},
+    search::{Document, DocumentPath, SearchRequest, SearchResult},
     skill_store::SkillStoreApi,
 };
 
@@ -311,6 +311,21 @@ where
         }
     }
 
+    async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
+        let span = span!(Level::DEBUG, "documents", requests_len = requests.len());
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
+        match self
+            .csi_apis
+            .documents(self.api_token.clone(), requests)
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
     async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
         let span = span!(
             Level::DEBUG,
@@ -544,6 +559,14 @@ pub mod tests {
             _auth: String,
             _request: SearchRequest,
         ) -> Result<Vec<SearchResult>, anyhow::Error> {
+            bail!("Test error")
+        }
+
+        async fn documents(
+            &self,
+            _auth: String,
+            _requests: Vec<DocumentPath>,
+        ) -> Result<Vec<Document>, anyhow::Error> {
             bail!("Test error")
         }
 

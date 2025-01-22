@@ -144,6 +144,8 @@ pub struct DocumentIndexSearchResult {
     pub end: Cursor,
 }
 
+pub struct Document;
+
 /// Allows for searching different collections in the Document Index
 struct SearchActor<C: SearchClient> {
     /// Internal client to interact with the Document Index API
