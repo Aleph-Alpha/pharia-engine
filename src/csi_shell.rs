@@ -27,102 +27,17 @@ where
 {
     let drivers = app_state.csi_drivers;
     let result = match args {
-        VersionedCsiRequest::V0_2(request) => match request {
-            V0_2CsiRequest::Complete(completion_request) => drivers
-                .complete(bearer.token().to_owned(), vec![completion_request.into()])
-                .await
-                .map(|r| json!(r.first().unwrap())),
-            V0_2CsiRequest::Chunk(chunk_request) => drivers
-                .chunk(bearer.token().to_owned(), chunk_request)
-                .await
-                .map(|r| json!(r)),
-            V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
-                .select_language(select_language_request)
-                .await
-                .map(|r| json!(r)),
-            V0_2CsiRequest::CompleteAll(complete_all_request) => drivers
-                .complete(
-                    bearer.token().to_owned(),
-                    complete_all_request
-                        .requests
-                        .into_iter()
-                        .map(Into::into)
-                        .collect(),
-                )
-                .await
-                .map(|v| json!(v)),
-            V0_2CsiRequest::Search(search_request) => drivers
-                .search(bearer.token().to_owned(), search_request)
-                .await
-                .map(|v| json!(v)),
-            V0_2CsiRequest::Chat(chat_request) => drivers
-                .chat(bearer.token().to_owned(), chat_request)
-                .await
-                .map(|v| json!(v)),
-            V0_2CsiRequest::DocumentMetadata(document_metadata_request) => drivers
-                .document_metadata(
-                    bearer.token().to_owned(),
-                    vec![document_metadata_request.document_path],
-                )
-                .await
-                .map(|r| json!(r.first().unwrap())),
-            V0_2CsiRequest::Unknown { function } => {
-                let msg = format!("The CSI function {} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.", function.as_deref().unwrap_or("specified"));
-                return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
-            }
-        },
-        VersionedCsiRequest::V0_3(request) => match request {
-            V0_3CsiRequest::Chunk(chunk_request) => drivers
-                .chunk(bearer.token().to_owned(), chunk_request)
-                .await
-                .map(|r| json!(r)),
-            V0_3CsiRequest::SelectLanguage(select_language_request) => drivers
-                .select_language(select_language_request)
-                .await
-                .map(|r| json!(r)),
-            V0_3CsiRequest::Complete(complete_all_request) => drivers
-                .complete(
-                    bearer.token().to_owned(),
-                    complete_all_request
-                        .requests
-                        .into_iter()
-                        .map(Into::into)
-                        .collect(),
-                )
-                .await
-                .map(|v| json!(v)),
-            V0_3CsiRequest::Search(search_request) => drivers
-                .search(bearer.token().to_owned(), search_request)
-                .await
-                .map(|v| json!(v)),
-            V0_3CsiRequest::Chat(chat_request) => drivers
-                .chat(bearer.token().to_owned(), chat_request)
-                .await
-                .map(|v| json!(v)),
-            V0_3CsiRequest::DocumentMetadata { requests } => drivers
-                .document_metadata(bearer.token().to_owned(), requests)
-                .await
-                .map(|r| json!(r)),
-            V0_3CsiRequest::Documents { requests } => drivers
-                .documents(bearer.token().to_owned(), requests)
-                .await
-                .map(|r| json!(r)),
-            V0_3CsiRequest::Unknown { function } => {
-                let msg = format!("The CSI function {} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.", function.as_deref().unwrap_or("specified"));
-                return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
-            }
-        },
-        VersionedCsiRequest::Unknown(request) => {
-            let error = request.error();
-            return (error.status_code(), Json(json!(error.to_string())));
+        VersionedCsiRequest::V0_2(request) => {
+            request.act(&drivers, bearer.token().to_owned()).await
         }
+        VersionedCsiRequest::V0_3(request) => {
+            request.act(&drivers, bearer.token().to_owned()).await
+        }
+        VersionedCsiRequest::Unknown(request) => Err(request.error()),
     };
     match result {
         Ok(result) => (StatusCode::OK, Json(result)),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!(e.to_string())),
-        ),
+        Err(e) => (e.status_code(), Json(json!(e.to_string()))),
     }
 }
 
@@ -152,7 +67,7 @@ pub enum CsiShellError {
     #[error("This CSI version is no longer supported by the Kernel. Try upgrading your SDK.")]
     NoLongerSupported,
     #[error("A valid CSI version is required. Try upgrading your SDK.")]
-    InvalidVersion
+    InvalidVersion,
 }
 
 impl CsiShellError {
@@ -186,15 +101,13 @@ impl UnknownCsiRequest {
                     || (comp.major == max_supported_version.major
                         && comp.minor.is_some_and(|m| m > max_supported_version.minor))
                 {
-                   CsiShellError::NotSupported
+                    CsiShellError::NotSupported
                 } else {
                     CsiShellError::NoLongerSupported
                 }
             }
             // If the user passes in a random string, the parse will fail and we will end up down here
-            Some(Ok(_) | Err(_)) | None => {
-                CsiShellError::InvalidVersion
-            }
+            Some(Ok(_) | Err(_)) | None => CsiShellError::InvalidVersion,
         }
     }
 }
