@@ -215,7 +215,7 @@ pub mod tests {
             unimplemented!()
         }
 
-        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
             unimplemented!()
         }
 
@@ -288,8 +288,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             }]
         }
 
-        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
-            vec![Document]
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
+            vec![Some(Document)]
         }
 
         async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
@@ -337,7 +337,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             unimplemented!()
         }
 
-        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
             unimplemented!()
         }
 

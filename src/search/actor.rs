@@ -328,7 +328,7 @@ pub mod tests {
     }
 
     impl SearchStub {
-        pub fn new(
+        pub fn with_metadata(
             result: impl Fn(DocumentPath) -> anyhow::Result<Option<Value>> + Send + 'static,
         ) -> Self {
             let (send, mut recv) = mpsc::channel::<DocumentIndexMessage>(1);
@@ -352,6 +352,25 @@ pub mod tests {
             Self { send, join_handle }
         }
 
+        pub fn with_documents(
+            result: impl Fn(DocumentPath) -> Option<Document> + Send + 'static,
+        ) -> Self {
+            let (send, mut recv) = mpsc::channel::<DocumentIndexMessage>(1);
+            let join_handle = tokio::spawn(async move {
+                while let Some(msg) = recv.recv().await {
+                    match msg {
+                        DocumentIndexMessage::MetadataMessage { .. } => {
+                            unimplemented!()
+                        }
+                        DocumentIndexMessage::SearchMessage { .. } => {
+                            unimplemented!()
+                        }
+                    }
+                }
+            });
+
+            Self { send, join_handle }
+        }
         pub async fn wait_for_shutdown(self) {
             drop(self.send);
             self.join_handle.await.unwrap();
