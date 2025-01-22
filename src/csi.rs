@@ -300,7 +300,7 @@ pub mod tests {
     #[tokio::test]
     async fn documents() {
         // Given a skill invocation context with a stub tokenizer provider
-        let search = SearchStub::with_documents(|_| Some(Document));
+        let search = SearchStub::with_documents(|_| Some(Document::dummy()));
         let csi_apis = CsiDrivers {
             search: search.api(),
             ..dummy_csi_drivers()
