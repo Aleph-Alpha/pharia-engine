@@ -680,7 +680,8 @@ mod v0_2 {
 mod v0_3 {
     use pharia::skill::csi::{
         ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
-        DocumentPath, FinishReason, Host, IndexPath, Language, Message, Role, SearchResult,
+        Document, DocumentPath, FinishReason, Host, IndexPath, Language, Message, Role,
+        SearchResult,
     };
     use wasmtime::component::bindgen;
 
@@ -828,6 +829,10 @@ mod v0_3 {
                     },
                 )
                 .collect()
+        }
+
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+            vec![]
         }
 
         async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Vec<u8>>> {
