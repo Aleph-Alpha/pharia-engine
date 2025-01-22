@@ -102,7 +102,7 @@ pub struct DocumentPath {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize,Deserialize)]
 pub struct Document {
     pub path: DocumentPath,
     pub contents: Vec<Modality>,
