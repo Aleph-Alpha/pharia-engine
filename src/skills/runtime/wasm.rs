@@ -55,7 +55,7 @@ pub mod tests {
         inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, Message, Role},
         language_selection::{select_language, Language, SelectLanguageRequest},
         namespace_watcher::Namespace,
-        search::{DocumentPath, SearchRequest, SearchResult},
+        search::{Document, DocumentPath, SearchRequest, SearchResult},
         skill_loader::{ConfiguredSkill, SkillLoader},
         skill_store::SkillStore,
         FinishReason,
@@ -215,6 +215,10 @@ pub mod tests {
             unimplemented!()
         }
 
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+            unimplemented!()
+        }
+
         async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
             unimplemented!()
         }
@@ -284,6 +288,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             }]
         }
 
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+            vec![Document]
+        }
+
         async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
             vec![Some(json!({ "url": "http://example.de" }))]
         }
@@ -326,6 +334,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         }
 
         async fn search(&mut self, _request: SearchRequest) -> Vec<SearchResult> {
+            unimplemented!()
+        }
+
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
             unimplemented!()
         }
 

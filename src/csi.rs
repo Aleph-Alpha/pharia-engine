@@ -9,7 +9,9 @@ use tracing::trace;
 use crate::{
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
-    search::{DocumentIndexMessage, DocumentPath, SearchApi, SearchRequest, SearchResult},
+    search::{
+        Document, DocumentIndexMessage, DocumentPath, SearchApi, SearchRequest, SearchResult,
+    },
     tokenizers::TokenizerApi,
 };
 
@@ -63,6 +65,12 @@ pub trait Csi {
         auth: String,
         request: SearchRequest,
     ) -> Result<Vec<SearchResult>, anyhow::Error>;
+
+    async fn documents(
+        &self,
+        auth: String,
+        requests: Vec<DocumentPath>,
+    ) -> Result<Vec<Document>, anyhow::Error>;
 
     async fn document_metadata(
         &self,
@@ -181,6 +189,14 @@ where
         self.search.search(request, auth).await
     }
 
+    async fn documents(
+        &self,
+        _auth: String,
+        _requests: Vec<DocumentPath>,
+    ) -> Result<Vec<Document>, anyhow::Error> {
+        Ok(vec![])
+    }
+
     async fn document_metadata(
         &self,
         auth: String,
@@ -217,7 +233,7 @@ pub mod tests {
             tests::InferenceStub, ChatParams, ChatRequest, ChatResponse, Completion,
             CompletionParams, CompletionRequest, InferenceApi, Message, Role,
         },
-        search::{tests::SearchStub, DocumentPath, SearchRequest, SearchResult},
+        search::{tests::SearchStub, Document, DocumentPath, SearchRequest, SearchResult},
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
         FinishReason,
@@ -402,6 +418,14 @@ pub mod tests {
             panic!("DummyCsi search called")
         }
 
+        async fn documents(
+            &self,
+            _auth: String,
+            _requests: Vec<DocumentPath>,
+        ) -> Result<Vec<Document>, anyhow::Error> {
+            panic!("DummyCsi documents called")
+        }
+
         async fn document_metadata(
             &self,
             _auth: String,
@@ -491,6 +515,14 @@ pub mod tests {
             _auth: String,
             _request: SearchRequest,
         ) -> Result<Vec<SearchResult>, anyhow::Error> {
+            unimplemented!()
+        }
+
+        async fn documents(
+            &self,
+            _auth: String,
+            _requests: Vec<DocumentPath>,
+        ) -> Result<Vec<Document>, anyhow::Error> {
             unimplemented!()
         }
 
