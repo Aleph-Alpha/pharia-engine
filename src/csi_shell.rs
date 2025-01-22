@@ -112,27 +112,9 @@ where
                 return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
             }
         },
-        VersionedCsiRequest::Unknown { version } => {
-            let error = match version.map(|v| VersionReq::parse(&v)) {
-                Some(Ok(req)) if req.comparators.len() == 1 => {
-                    let max_supported_version = SupportedVersion::latest_supported_version();
-                    let comp = req.comparators.first().unwrap();
-                    // Only applies to unknown versions. If we parse `1.x.x` as `1` then we are only doing a major version check and minor version only applies `0.x`
-                    if comp.major > max_supported_version.major
-                        || (comp.major == max_supported_version.major
-                            && comp.minor.is_some_and(|m| m > max_supported_version.minor))
-                    {
-                        "The specified CSI version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK."
-                    } else {
-                        "This CSI version is no longer supported by the Kernel. Try upgrading your SDK."
-                    }
-                }
-                // If the user passes in a random string, the parse will fail and we will end up down here
-                Some(Ok(_) | Err(_)) | None => {
-                    "A valid CSI version is required. Try upgrading your SDK."
-                }
-            };
-            return (VALIDATION_ERROR_STATUS_CODE, Json(json!(error)));
+        VersionedCsiRequest::Unknown(request) => {
+            let error = request.error();
+            return (error.status_code(), Json(json!(error.to_string())));
         }
     };
     match result {
@@ -156,7 +138,7 @@ pub enum VersionedCsiRequest {
     #[serde(rename = "0.2")]
     V0_2(V0_2CsiRequest),
     #[serde(untagged)]
-    Unknown { version: Option<String> },
+    Unknown(UnknownCsiRequest),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -165,13 +147,19 @@ pub enum CsiShellError {
     Internal(#[from] anyhow::Error),
     #[error("The CSI function {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
     UnknownFunction(String),
+    #[error("The specified CSI version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
+    NotSupported,
+    #[error("This CSI version is no longer supported by the Kernel. Try upgrading your SDK.")]
+    NoLongerSupported,
+    #[error("A valid CSI version is required. Try upgrading your SDK.")]
+    InvalidVersion
 }
 
 impl CsiShellError {
     fn status_code(&self) -> StatusCode {
         match self {
-            CsiShellError::UnknownFunction(_) => VALIDATION_ERROR_STATUS_CODE,
             CsiShellError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => VALIDATION_ERROR_STATUS_CODE,
         }
     }
 }
@@ -179,6 +167,35 @@ impl CsiShellError {
 impl From<CsiShellError> for (StatusCode, Json<Value>) {
     fn from(e: CsiShellError) -> Self {
         (e.status_code(), Json(json!(e.to_string())))
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UnknownCsiRequest {
+    version: Option<String>,
+}
+
+impl UnknownCsiRequest {
+    pub fn error(self) -> CsiShellError {
+        match self.version.map(|v| VersionReq::parse(&v)) {
+            Some(Ok(req)) if req.comparators.len() == 1 => {
+                let max_supported_version = SupportedVersion::latest_supported_version();
+                let comp = req.comparators.first().unwrap();
+                // Only applies to unknown versions. If we parse `1.x.x` as `1` then we are only doing a major version check and minor version only applies `0.x`
+                if comp.major > max_supported_version.major
+                    || (comp.major == max_supported_version.major
+                        && comp.minor.is_some_and(|m| m > max_supported_version.minor))
+                {
+                   CsiShellError::NotSupported
+                } else {
+                    CsiShellError::NoLongerSupported
+                }
+            }
+            // If the user passes in a random string, the parse will fail and we will end up down here
+            Some(Ok(_) | Err(_)) | None => {
+                CsiShellError::InvalidVersion
+            }
+        }
     }
 }
 
