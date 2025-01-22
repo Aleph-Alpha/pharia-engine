@@ -3,10 +3,10 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest};
-use pharia::skill::csi::{search, IndexPath};
+use pharia::skill::csi::{documents, search, DocumentPath, IndexPath};
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill" });
+wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
 
 struct Skill;
 
@@ -26,6 +26,15 @@ impl Guest for Skill {
             .collect::<Vec<_>>();
         let output = serde_json::to_vec(&json!(results))
             .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
+
+        // Test invocation of documents
+        let request = DocumentPath {
+            namespace: "Kernel".to_owned(),
+            collection: "test".to_owned(),
+            name: "docs".to_owned(),
+        };
+        let result = documents(&[request]);
+        assert!(result.is_empty());
         Ok(output)
     }
 }
