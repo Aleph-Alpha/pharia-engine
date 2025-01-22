@@ -723,61 +723,27 @@ mod v0_3 {
             languages: Vec<Language>,
         ) -> Option<Language> {
             let languages = languages
-                .iter()
-                .map(|l| match l {
-                    Language::Eng => language_selection::Language::Eng,
-                    Language::Deu => language_selection::Language::Deu,
-                })
+                .into_iter()
+                .map(Into::into)
                 .collect::<Vec<_>>();
             let request = SelectLanguageRequest::new(text, languages);
             self.skill_ctx
                 .select_language(request)
                 .await
-                .map(|l| match l {
-                    language_selection::Language::Eng => Language::Eng,
-                    language_selection::Language::Deu => Language::Deu,
-                })
+                .map(Into::into)
         }
 
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             let requests = requests
                 .into_iter()
-                .map(|r| {
-                    let CompletionParams {
-                        return_special_tokens,
-                        max_tokens,
-                        temperature,
-                        top_k,
-                        top_p,
-                        stop,
-                    } = r.params;
-                    inference::CompletionRequest {
-                        prompt: r.prompt,
-                        model: r.model,
-                        params: inference::CompletionParams {
-                            return_special_tokens,
-                            max_tokens,
-                            temperature,
-                            top_k,
-                            top_p,
-                            stop,
-                        },
-                    }
-                })
+                .map(Into::into)
                 .collect();
 
             self.skill_ctx
                 .complete(requests)
                 .await
                 .into_iter()
-                .map(|c| Completion {
-                    text: c.text,
-                    finish_reason: match c.finish_reason {
-                        inference::FinishReason::Stop => FinishReason::Stop,
-                        inference::FinishReason::Length => FinishReason::Length,
-                        inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
-                    },
-                })
+                .map(Into::into)
                 .collect()
         }
 
@@ -824,6 +790,24 @@ mod v0_3 {
                     })
                 })
                 .collect()
+        }
+    }
+
+    impl From<language_selection::Language> for Language {
+        fn from(language: language_selection::Language) -> Self {
+            match language {
+                language_selection::Language::Eng => Language::Eng,
+                language_selection::Language::Deu => Language::Deu,
+            }
+        }
+    }
+
+    impl From<Language> for language_selection::Language {
+        fn from(language: Language) -> Self {
+            match language {
+                Language::Eng => language_selection::Language::Eng,
+                Language::Deu => language_selection::Language::Deu,
+            }
         }
     }
 
@@ -905,6 +889,29 @@ mod v0_3 {
                 max_tokens: params.max_tokens,
                 temperature: params.temperature,
                 top_p: params.top_p,
+            }
+        }
+    }
+
+    impl From<CompletionParams> for inference::CompletionParams {
+        fn from(params: CompletionParams) -> Self {
+            Self {
+                return_special_tokens: params.return_special_tokens,
+                max_tokens: params.max_tokens,
+                temperature: params.temperature,
+                top_k: params.top_k,
+                top_p: params.top_p,
+                stop: params.stop,
+            }
+        }
+    }
+
+    impl From<CompletionRequest> for inference::CompletionRequest {
+        fn from(request: CompletionRequest) -> Self {
+            Self {
+                prompt: request.prompt,
+                model: request.model,
+                params: request.params.into(),
             }
         }
     }
