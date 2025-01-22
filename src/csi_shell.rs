@@ -189,6 +189,9 @@ pub enum V0_2CsiRequest {
     CompleteAll(CompleteAllRequest),
     Search(SearchRequest),
     Chat(ChatRequest),
+    Documents {
+        requests: Vec<DocumentPath>,
+    },
     DocumentMetadata(DocumentMetadataRequest),
     #[serde(untagged)]
     Unknown {
@@ -230,6 +233,9 @@ impl V0_2CsiRequest {
                 .map(|v| json!(v))?,
             V0_2CsiRequest::Chat(chat_request) => {
                 drivers.chat(auth, chat_request).await.map(|v| json!(v))?
+            }
+            V0_2CsiRequest::Documents { requests } => {
+                drivers.documents(auth, requests).await.map(|r| json!(r))?
             }
             V0_2CsiRequest::DocumentMetadata(document_metadata_request) => drivers
                 .document_metadata(auth, vec![document_metadata_request.document_path])
