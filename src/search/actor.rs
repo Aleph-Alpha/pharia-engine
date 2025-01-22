@@ -12,7 +12,7 @@ use tokio::{
 use tracing::error;
 
 use super::client::{
-    Client, Cursor, Document,DocumentPath, IndexPath, Modality, SearchClient,
+    Client, Cursor, Document, DocumentPath, IndexPath, Modality, SearchClient,
     SearchRequest as ClientSearchRequest, SearchResult as ClientSearchResult,
 };
 
@@ -67,7 +67,7 @@ pub trait SearchApi: Clone + Send + Sync + 'static {
         &self,
         document_path: DocumentPath,
         api_token: String,
-    ) -> anyhow::Result<Option<Document>>;
+    ) -> anyhow::Result<Document>;
 }
 
 #[derive(Debug, Serialize)]
@@ -119,7 +119,7 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         &self,
         document_path: DocumentPath,
         api_token: String,
-    ) -> anyhow::Result<Option<Document>> {
+    ) -> anyhow::Result<Document> {
         let (send, recv) = oneshot::channel();
         let msg = DocumentIndexMessage::Document {
             document_path,
@@ -166,7 +166,6 @@ pub struct DocumentIndexSearchResult {
     #[expect(dead_code, reason = "Unused so far")]
     pub end: Cursor,
 }
-
 
 /// Allows for searching different collections in the Document Index
 struct SearchActor<C: SearchClient> {
@@ -225,7 +224,7 @@ pub enum DocumentIndexMessage {
     },
     Document {
         document_path: DocumentPath,
-        send: oneshot::Sender<anyhow::Result<Option<Document>>>,
+        send: oneshot::Sender<anyhow::Result<Document>>,
         api_token: String,
     },
 }
@@ -345,7 +344,7 @@ impl DocumentIndexMessage {
         client: &impl SearchClient,
         document_path: DocumentPath,
         api_token: &str,
-    ) -> anyhow::Result<Option<Document>> {
+    ) -> anyhow::Result<Document> {
         client.document(document_path, api_token).await
     }
 }
@@ -398,9 +397,7 @@ pub mod tests {
             Self { send, join_handle }
         }
 
-        pub fn with_documents(
-            result: impl Fn(DocumentPath) -> Option<Document> + Send + 'static,
-        ) -> Self {
+        pub fn with_documents(result: impl Fn(DocumentPath) -> Document + Send + 'static) -> Self {
             let (send, mut recv) = mpsc::channel::<DocumentIndexMessage>(1);
             let join_handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
@@ -573,7 +570,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
-        ) -> anyhow::Result<Option<Document>> {
+        ) -> anyhow::Result<Document> {
             unimplemented!()
         }
     }

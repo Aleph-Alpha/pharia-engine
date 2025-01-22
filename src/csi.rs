@@ -70,7 +70,7 @@ pub trait Csi {
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Option<Document>>, anyhow::Error>;
+    ) -> Result<Vec<Document>, anyhow::Error>;
 
     async fn document_metadata(
         &self,
@@ -193,7 +193,7 @@ where
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Option<Document>>, anyhow::Error> {
+    ) -> Result<Vec<Document>, anyhow::Error> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "documents")]).increment(1);
         trace!("documents: requests.len()={}", requests.len());
         try_join_all(
@@ -300,7 +300,7 @@ pub mod tests {
     #[tokio::test]
     async fn documents() {
         // Given a skill invocation context with a stub tokenizer provider
-        let search = SearchStub::with_documents(|_| Some(Document::dummy()));
+        let search = SearchStub::with_documents(|_| Document::dummy());
         let csi_apis = CsiDrivers {
             search: search.api(),
             ..dummy_csi_drivers()
@@ -319,7 +319,6 @@ pub mod tests {
 
         // Then a single document is returned
         assert_eq!(documents.len(), 1);
-        assert!(documents.first().unwrap().is_some());
     }
 
     #[tokio::test]
@@ -455,7 +454,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<DocumentPath>,
-        ) -> Result<Vec<Option<Document>>, anyhow::Error> {
+        ) -> Result<Vec<Document>, anyhow::Error> {
             panic!("DummyCsi documents called")
         }
 
@@ -555,7 +554,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<DocumentPath>,
-        ) -> Result<Vec<Option<Document>>, anyhow::Error> {
+        ) -> Result<Vec<Document>, anyhow::Error> {
             unimplemented!()
         }
 
