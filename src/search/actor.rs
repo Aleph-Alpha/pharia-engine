@@ -127,7 +127,6 @@ pub struct SearchRequest {
 
 /// A section of a document that is returned from a search request
 #[derive(Debug)]
-#[expect(dead_code, reason = "Unused so far")]
 pub struct DocumentIndexSearchResult {
     /// Which document this search result can be found in
     pub document_path: DocumentPath,
@@ -137,9 +136,11 @@ pub struct DocumentIndexSearchResult {
     /// metric of the index used in the search.
     pub score: f64,
     /// The position within the document where the section begins. The cursor is always inclusive.
+    #[expect(dead_code, reason = "Unused so far")]
     pub start: Cursor,
     /// The position within the document where the section ends.
     /// The cursor is always inclusive, so the section includes the position represented by this cursor.
+    #[expect(dead_code, reason = "Unused so far")]
     pub end: Cursor,
 }
 
