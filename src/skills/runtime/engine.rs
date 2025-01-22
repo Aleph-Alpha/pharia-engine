@@ -371,7 +371,8 @@ impl WasiView for LinkedCtx {
 mod v0_2 {
     use pharia::skill::csi::{
         ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
-        DocumentPath, FinishReason, Host, IndexPath, Language, Message, Role, SearchResult,
+        Document, DocumentPath, FinishReason, Host, IndexPath, Language, Message, Modality, Role,
+        SearchResult,
     };
     use wasmtime::component::bindgen;
 
@@ -497,6 +498,16 @@ mod v0_2 {
                 .collect()
         }
 
+        async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
+            let requests = requests.into_iter().map(Into::into).collect();
+            self.skill_ctx
+                .documents(requests)
+                .await
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        }
+
         async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Vec<u8>> {
             self.skill_ctx
                 .document_metadata(vec![document_path.into()])
@@ -562,6 +573,27 @@ mod v0_2 {
                 namespace: document_path.namespace,
                 collection: document_path.collection,
                 name: document_path.name,
+            }
+        }
+    }
+
+    impl From<search::Modality> for Modality {
+        fn from(modality: search::Modality) -> Self {
+            match modality {
+                search::Modality::Text { text } => Modality::Text(text),
+                search::Modality::Image { .. } => Modality::Image,
+            }
+        }
+    }
+
+    impl From<search::Document> for Document {
+        fn from(document: search::Document) -> Self {
+            Self {
+                path: document.path.into(),
+                contents: document.contents.into_iter().map(Into::into).collect(),
+                metadata: document.metadata.map(|v| {
+                    serde_json::to_vec(&v).expect("Value should have valid to_bytes repr.")
+                }),
             }
         }
     }
@@ -1026,7 +1058,7 @@ mod tests {
         let version = SupportedVersion::extract_pharia_skill_version(wasm)
             .unwrap()
             .unwrap();
-        assert_eq!(version, Version::new(0, 2, 9));
+        assert_eq!(version, Version::new(0, 2, 10));
     }
 
     #[test]
@@ -1157,7 +1189,7 @@ mod tests {
     fn can_parse_latest_wit_world_version() {
         assert_eq!(
             SupportedVersion::V0_2.current_supported_version(),
-            &Version::new(0, 2, 9)
+            &Version::new(0, 2, 10)
         );
     }
 
