@@ -788,18 +788,8 @@ mod v0_3 {
             max_results: u32,
             min_score: Option<f64>,
         ) -> Vec<SearchResult> {
-            let IndexPath {
-                namespace,
-                collection,
-                index,
-            } = index_path;
-            let index_path = search::IndexPath {
-                namespace,
-                collection,
-                index,
-            };
             let request = SearchRequest {
-                index_path,
+                index_path: index_path.into(),
                 query,
                 max_results,
                 min_score,
@@ -808,26 +798,7 @@ mod v0_3 {
                 .search(request)
                 .await
                 .into_iter()
-                .map(
-                    |search::SearchResult {
-                         document_path:
-                             search::DocumentPath {
-                                 namespace,
-                                 collection,
-                                 name,
-                             },
-                         content,
-                         score,
-                     }| SearchResult {
-                        document_path: DocumentPath {
-                            namespace,
-                            collection,
-                            name,
-                        },
-                        content,
-                        score,
-                    },
-                )
+                .map(Into::into)
                 .collect()
         }
 
@@ -870,12 +841,42 @@ mod v0_3 {
         }
     }
 
+    impl From<IndexPath> for search::IndexPath {
+        fn from(index_path: IndexPath) -> Self {
+            Self {
+                namespace: index_path.namespace,
+                collection: index_path.collection,
+                index: index_path.index,
+            }
+        }
+    }
+
     impl From<DocumentPath> for search::DocumentPath {
         fn from(document_path: DocumentPath) -> Self {
             Self {
                 namespace: document_path.namespace,
                 collection: document_path.collection,
                 name: document_path.name,
+            }
+        }
+    }
+
+    impl From<search::DocumentPath> for DocumentPath {
+        fn from(document_path: search::DocumentPath) -> Self {
+            Self {
+                namespace: document_path.namespace,
+                collection: document_path.collection,
+                name: document_path.name,
+            }
+        }
+    }
+
+    impl From<search::SearchResult> for SearchResult {
+        fn from(search_result: search::SearchResult) -> Self {
+            Self {
+                document_path: search_result.document_path.into(),
+                content: search_result.content,
+                score: search_result.score,
             }
         }
     }
