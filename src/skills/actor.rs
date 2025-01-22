@@ -311,7 +311,7 @@ where
         }
     }
 
-    async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
+    async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
         let span = span!(Level::DEBUG, "documents", requests_len = requests.len());
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
@@ -566,7 +566,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<DocumentPath>,
-        ) -> Result<Vec<Option<Document>>, anyhow::Error> {
+        ) -> Result<Vec<Document>, anyhow::Error> {
             bail!("Test error")
         }
 

@@ -669,7 +669,7 @@ mod v0_2 {
 mod v0_3 {
     use pharia::skill::csi::{
         ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
-        Document, DocumentPath, FinishReason, Host, IndexPath, Language, Message, Role,
+        Document, DocumentPath, FinishReason, Host, IndexPath, Language, Message, Modality, Role,
         SearchResult,
     };
     use wasmtime::component::bindgen;
@@ -751,13 +751,13 @@ mod v0_3 {
                 .collect()
         }
 
-        async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
+        async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
             let requests = requests.into_iter().map(Into::into).collect();
             self.skill_ctx
                 .documents(requests)
                 .await
                 .into_iter()
-                .map(|d| d.map(Into::into))
+                .map(Into::into)
                 .collect()
         }
 
@@ -794,16 +794,23 @@ mod v0_3 {
         }
     }
 
+    impl From<search::Modality> for Modality {
+        fn from(modality: search::Modality) -> Self {
+            match modality {
+                search::Modality::Text { text } => Modality::Text(text),
+                search::Modality::Image { .. } => Modality::Image,
+            }
+        }
+    }
+
     impl From<search::Document> for Document {
         fn from(document: search::Document) -> Self {
             Self {
-                contents: vec![],
-                metadata: None,
-                path: DocumentPath {
-                    namespace: String::new(),
-                    collection: String::new(),
-                    name: String::new(),
-                },
+                path: document.path.into(),
+                contents: document.contents.into_iter().map(Into::into).collect(),
+                metadata: document.metadata.map(|v| {
+                    serde_json::to_vec(&v).expect("Value should have valid to_bytes repr.")
+                }),
             }
         }
     }

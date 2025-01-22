@@ -191,5 +191,5 @@ interface csi {
     }
 
     /// @since(version = 0.3.0)
-    documents: func(requests: list<document-path>) -> list<option<document>>;
+    documents: func(requests: list<document-path>) -> list<document>;
 }
