@@ -34,7 +34,7 @@ impl Guest for Skill {
             name: "docs".to_owned(),
         };
         let result = documents(&[request]);
-        assert!(result.is_empty());
+        assert!(!result.is_empty());
         Ok(output)
     }
 }

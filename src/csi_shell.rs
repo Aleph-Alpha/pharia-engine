@@ -103,6 +103,10 @@ where
                 .document_metadata(bearer.token().to_owned(), requests)
                 .await
                 .map(|r| json!(r)),
+            V0_3CsiRequest::Documents { requests } => drivers
+                .documents(bearer.token().to_owned(), requests)
+                .await
+                .map(|r| json!(r)),
             V0_3CsiRequest::Unknown { function } => {
                 let msg = format!("The CSI function {} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.", function.as_deref().unwrap_or("specified"));
                 return (VALIDATION_ERROR_STATUS_CODE, Json(json!(msg)));
@@ -163,6 +167,7 @@ pub enum V0_3CsiRequest {
     Complete(CompleteAllRequest),
     Search(SearchRequest),
     Chat(ChatRequest),
+    Documents{requests: Vec<DocumentPath>},
     DocumentMetadata {
         requests: Vec<DocumentPath>,
     },
@@ -316,6 +321,29 @@ mod tests {
 
         // Then it should be deserialized successfully
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn csi_v_3_documents_request_is_deserialized() {
+        // Given a request in JSON format
+        let request = json!({
+            "version": "0.3",
+            "function": "documents",
+            "requests": [
+                {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "kernel-docs"
+                }
+            ]
+        });
+
+        // When it is deserialized into a `VersionedCsiRequest`
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        // Then it should be deserialized successfully
+        assert!(matches!(result, Ok(VersionedCsiRequest::V0_3(V0_3CsiRequest::Documents { requests })) if requests.len() == 1));
     }
 
     #[test]
