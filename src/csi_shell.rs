@@ -159,6 +159,29 @@ pub enum VersionedCsiRequest {
     Unknown { version: Option<String> },
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum CsiShellError {
+    #[error(transparent)]
+    Internal(#[from] anyhow::Error),
+    #[error("The CSI function {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
+    UnknownFunction(String),
+}
+
+impl CsiShellError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            CsiShellError::UnknownFunction(_) => VALIDATION_ERROR_STATUS_CODE,
+            CsiShellError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+impl From<CsiShellError> for (StatusCode, Json<Value>) {
+    fn from(e: CsiShellError) -> Self {
+        (e.status_code(), Json(json!(e.to_string())))
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum V0_3CsiRequest {
@@ -167,7 +190,9 @@ pub enum V0_3CsiRequest {
     Complete(CompleteAllRequest),
     Search(SearchRequest),
     Chat(ChatRequest),
-    Documents{requests: Vec<DocumentPath>},
+    Documents {
+        requests: Vec<DocumentPath>,
+    },
     DocumentMetadata {
         requests: Vec<DocumentPath>,
     },
@@ -175,6 +200,54 @@ pub enum V0_3CsiRequest {
     Unknown {
         function: Option<String>,
     },
+}
+
+impl V0_3CsiRequest {
+    pub async fn act<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
+    where
+        C: Csi + Sync,
+    {
+        let result = match self {
+            V0_3CsiRequest::Chunk(chunk_request) => {
+                drivers.chunk(auth, chunk_request).await.map(|r| json!(r))?
+            }
+            V0_3CsiRequest::SelectLanguage(select_language_request) => drivers
+                .select_language(select_language_request)
+                .await
+                .map(|r| json!(r))?,
+            V0_3CsiRequest::Complete(complete_all_request) => drivers
+                .complete(
+                    auth,
+                    complete_all_request
+                        .requests
+                        .into_iter()
+                        .map(Into::into)
+                        .collect(),
+                )
+                .await
+                .map(|v| json!(v))?,
+            V0_3CsiRequest::Search(search_request) => drivers
+                .search(auth, search_request)
+                .await
+                .map(|v| json!(v))?,
+            V0_3CsiRequest::Chat(chat_request) => {
+                drivers.chat(auth, chat_request).await.map(|v| json!(v))?
+            }
+            V0_3CsiRequest::DocumentMetadata { requests } => drivers
+                .document_metadata(auth, requests)
+                .await
+                .map(|r| json!(r))?,
+            V0_3CsiRequest::Documents { requests } => {
+                drivers.documents(auth, requests).await.map(|r| json!(r))?
+            }
+            V0_3CsiRequest::Unknown { function } => {
+                return Err(CsiShellError::UnknownFunction(
+                    function.unwrap_or_else(|| "specified".to_owned()),
+                ));
+            }
+        };
+        Ok(result)
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -191,6 +264,55 @@ pub enum V0_2CsiRequest {
     Unknown {
         function: Option<String>,
     },
+}
+
+impl V0_2CsiRequest {
+    pub async fn act<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
+    where
+        C: Csi + Sync,
+    {
+        let result = match self {
+            V0_2CsiRequest::Complete(completion_request) => drivers
+                .complete(auth, vec![completion_request.into()])
+                .await
+                .map(|r| json!(r.first().unwrap()))?,
+            V0_2CsiRequest::Chunk(chunk_request) => {
+                drivers.chunk(auth, chunk_request).await.map(|r| json!(r))?
+            }
+            V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
+                .select_language(select_language_request)
+                .await
+                .map(|r| json!(r))?,
+            V0_2CsiRequest::CompleteAll(complete_all_request) => drivers
+                .complete(
+                    auth,
+                    complete_all_request
+                        .requests
+                        .into_iter()
+                        .map(Into::into)
+                        .collect(),
+                )
+                .await
+                .map(|v| json!(v))?,
+            V0_2CsiRequest::Search(search_request) => drivers
+                .search(auth, search_request)
+                .await
+                .map(|v| json!(v))?,
+            V0_2CsiRequest::Chat(chat_request) => {
+                drivers.chat(auth, chat_request).await.map(|v| json!(v))?
+            }
+            V0_2CsiRequest::DocumentMetadata(document_metadata_request) => drivers
+                .document_metadata(auth, vec![document_metadata_request.document_path])
+                .await
+                .map(|r| json!(r.first().unwrap()))?,
+            V0_2CsiRequest::Unknown { function } => {
+                return Err(CsiShellError::UnknownFunction(
+                    function.unwrap_or_else(|| "specified".to_owned()),
+                ));
+            }
+        };
+        Ok(result)
+    }
 }
 
 /// Retrieve the metadata of a document
@@ -343,7 +465,9 @@ mod tests {
             serde_json::from_value(request);
 
         // Then it should be deserialized successfully
-        assert!(matches!(result, Ok(VersionedCsiRequest::V0_3(V0_3CsiRequest::Documents { requests })) if requests.len() == 1));
+        assert!(
+            matches!(result, Ok(VersionedCsiRequest::V0_3(V0_3CsiRequest::Documents { requests })) if requests.len() == 1)
+        );
     }
 
     #[test]
