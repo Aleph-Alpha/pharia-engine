@@ -63,6 +63,11 @@ pub trait SearchApi: Clone + Send + Sync + 'static {
         document_path: DocumentPath,
         api_token: String,
     ) -> anyhow::Result<Option<Value>>;
+    async fn document(
+        &self,
+        document_path: DocumentPath,
+        api_token: String,
+    ) -> anyhow::Result<Option<Document>>;
 }
 
 #[derive(Debug, Serialize)]
@@ -80,7 +85,7 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         api_token: String,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let (send, recv) = oneshot::channel();
-        let msg = DocumentIndexMessage::SearchMessage {
+        let msg = DocumentIndexMessage::Search {
             request,
             send,
             api_token,
@@ -98,7 +103,25 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         api_token: String,
     ) -> anyhow::Result<Option<Value>> {
         let (send, recv) = oneshot::channel();
-        let msg = DocumentIndexMessage::MetadataMessage {
+        let msg = DocumentIndexMessage::Metadata {
+            document_path,
+            send,
+            api_token,
+        };
+        self.send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await
+            .expect("sender must be alive when awaiting for answers")
+    }
+
+    async fn document(
+        &self,
+        document_path: DocumentPath,
+        api_token: String,
+    ) -> anyhow::Result<Option<Document>> {
+        let (send, recv) = oneshot::channel();
+        let msg = DocumentIndexMessage::Document {
             document_path,
             send,
             api_token,
@@ -144,6 +167,7 @@ pub struct DocumentIndexSearchResult {
     pub end: Cursor,
 }
 
+#[derive(Debug)]
 pub struct Document;
 
 /// Allows for searching different collections in the Document Index
@@ -191,14 +215,19 @@ impl<C: SearchClient> SearchActor<C> {
 
 #[derive(Debug)]
 pub enum DocumentIndexMessage {
-    SearchMessage {
+    Search {
         request: SearchRequest,
         send: oneshot::Sender<anyhow::Result<Vec<SearchResult>>>,
         api_token: String,
     },
-    MetadataMessage {
+    Metadata {
         document_path: DocumentPath,
         send: oneshot::Sender<anyhow::Result<Option<Value>>>,
+        api_token: String,
+    },
+    Document {
+        document_path: DocumentPath,
+        send: oneshot::Sender<anyhow::Result<Option<Document>>>,
         api_token: String,
     },
 }
@@ -206,7 +235,7 @@ pub enum DocumentIndexMessage {
 impl DocumentIndexMessage {
     async fn act(self, client: &impl SearchClient) {
         match self {
-            Self::SearchMessage {
+            Self::Search {
                 request,
                 send,
                 api_token,
@@ -230,12 +259,20 @@ impl DocumentIndexMessage {
                 });
                 drop(send.send(results));
             }
-            Self::MetadataMessage {
+            Self::Metadata {
                 document_path,
                 send,
                 api_token,
             } => {
                 let results = Self::document_metadata(client, document_path, &api_token).await;
+                drop(send.send(results));
+            }
+            Self::Document {
+                document_path,
+                send,
+                api_token,
+            } => {
+                let results = Self::document(client, document_path, &api_token).await;
                 drop(send.send(results));
             }
         }
@@ -305,6 +342,14 @@ impl DocumentIndexMessage {
     ) -> anyhow::Result<Option<Value>> {
         client.document_metadata(document_path, api_token).await
     }
+
+    async fn document(
+        client: &impl SearchClient,
+        document_path: DocumentPath,
+        api_token: &str,
+    ) -> anyhow::Result<Option<Document>> {
+        unimplemented!()
+    }
 }
 
 #[cfg(test)]
@@ -335,14 +380,17 @@ pub mod tests {
             let join_handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
                     match msg {
-                        DocumentIndexMessage::MetadataMessage {
+                        DocumentIndexMessage::Metadata {
                             document_path,
                             send,
                             ..
                         } => {
                             send.send(result(document_path)).unwrap();
                         }
-                        DocumentIndexMessage::SearchMessage { .. } => {
+                        DocumentIndexMessage::Search { .. } => {
+                            unimplemented!()
+                        }
+                        DocumentIndexMessage::Document { .. } => {
                             unimplemented!()
                         }
                     }
@@ -359,11 +407,18 @@ pub mod tests {
             let join_handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
                     match msg {
-                        DocumentIndexMessage::MetadataMessage { .. } => {
+                        DocumentIndexMessage::Metadata { .. } => {
                             unimplemented!()
                         }
-                        DocumentIndexMessage::SearchMessage { .. } => {
+                        DocumentIndexMessage::Search { .. } => {
                             unimplemented!()
+                        }
+                        DocumentIndexMessage::Document {
+                            document_path,
+                            send,
+                            ..
+                        } => {
+                            send.send(Ok(result(document_path))).unwrap();
                         }
                     }
                 }

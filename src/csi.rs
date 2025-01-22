@@ -191,10 +191,18 @@ where
 
     async fn documents(
         &self,
-        _auth: String,
-        _requests: Vec<DocumentPath>,
+        auth: String,
+        requests: Vec<DocumentPath>,
     ) -> Result<Vec<Option<Document>>, anyhow::Error> {
-        Ok(vec![])
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "documents")]).increment(1);
+        trace!("documents: requests.len()={}", requests.len());
+        try_join_all(
+            requests
+                .into_iter()
+                .map(|r| self.search.document(r, auth.clone()))
+                .collect::<Vec<_>>(),
+        )
+        .await
     }
 
     async fn document_metadata(
@@ -292,7 +300,7 @@ pub mod tests {
     #[tokio::test]
     async fn documents() {
         // Given a skill invocation context with a stub tokenizer provider
-        let search = SearchStub::with_documents(|r| Some(Document));
+        let search = SearchStub::with_documents(|_| Some(Document));
         let csi_apis = CsiDrivers {
             search: search.api(),
             ..dummy_csi_drivers()
