@@ -831,26 +831,18 @@ mod v0_3 {
                 .collect()
         }
 
-        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
-            vec![]
+        async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Document>> {
+            let requests = requests.into_iter().map(Into::into).collect();
+            self.skill_ctx
+                .documents(requests)
+                .await
+                .into_iter()
+                .map(|d| d.map(Into::into))
+                .collect()
         }
 
         async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Vec<u8>>> {
-            let requests = requests
-                .into_iter()
-                .map(|r| {
-                    let DocumentPath {
-                        namespace,
-                        collection,
-                        name,
-                    } = r;
-                    search::DocumentPath {
-                        namespace,
-                        collection,
-                        name,
-                    }
-                })
-                .collect();
+            let requests = requests.into_iter().map(Into::into).collect();
             self.skill_ctx
                 .document_metadata(requests)
                 .await
@@ -861,6 +853,30 @@ mod v0_3 {
                     })
                 })
                 .collect()
+        }
+    }
+
+    impl From<search::Document> for Document {
+        fn from(document: search::Document) -> Self {
+            Self {
+                contents: vec![],
+                metadata: None,
+                path: DocumentPath {
+                    namespace: String::new(),
+                    collection: String::new(),
+                    name: String::new(),
+                },
+            }
+        }
+    }
+
+    impl From<DocumentPath> for search::DocumentPath {
+        fn from(document_path: DocumentPath) -> Self {
+            Self {
+                namespace: document_path.namespace,
+                collection: document_path.collection,
+                name: document_path.name,
+            }
         }
     }
 
