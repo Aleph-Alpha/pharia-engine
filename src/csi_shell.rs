@@ -33,7 +33,7 @@ where
         VersionedCsiRequest::V0_3(request) => {
             request.act(&drivers, bearer.token().to_owned()).await
         }
-        VersionedCsiRequest::Unknown(request) => Err(request.error()),
+        VersionedCsiRequest::Unknown(request) => Err(request.into()),
     };
     match result {
         Ok(result) => (StatusCode::OK, Json(result)),
@@ -89,10 +89,9 @@ impl From<CsiShellError> for (StatusCode, Json<Value>) {
 pub struct UnknownCsiRequest {
     version: Option<String>,
 }
-
-impl UnknownCsiRequest {
-    pub fn error(self) -> CsiShellError {
-        match self.version.map(|v| VersionReq::parse(&v)) {
+impl From<UnknownCsiRequest> for CsiShellError {
+    fn from(e: UnknownCsiRequest) -> Self {
+        match e.version.map(|v| VersionReq::parse(&v)) {
             Some(Ok(req)) if req.comparators.len() == 1 => {
                 let max_supported_version = SupportedVersion::latest_supported_version();
                 let comp = req.comparators.first().unwrap();
