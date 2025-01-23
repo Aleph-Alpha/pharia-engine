@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.2...v0.7.3)
+
+### Features
+
+- Stabilize document-metadata in 2.10 wit world - ([cc074b6](https://github.com/Aleph-Alpha/pharia-kernel/commit/cc074b6e53d0446343ed7881094ff4fdef1fcdbf))
+- Add document function to 2.10 wit world - ([f697f10](https://github.com/Aleph-Alpha/pharia-kernel/commit/f697f1065dac0be90f1e0152169df7725288b01f))
+- Expose document function in v3 csi shell - ([170daf9](https://github.com/Aleph-Alpha/pharia-kernel/commit/170daf9811fe8b949a7d8213c5c43c85ba300803))
+- Do not return option on document request - ([c3b2624](https://github.com/Aleph-Alpha/pharia-kernel/commit/c3b26245d39fb40f93a3b74d52ace75353fa067a))
+- Add documents function to 0.3 wit world - ([6718eae](https://github.com/Aleph-Alpha/pharia-kernel/commit/6718eaebd958725d34eafb2bce9bcf6d910b71d0))
+
+### Documentation
+
+- Cleanup outdated docs - ([738efed](https://github.com/Aleph-Alpha/pharia-kernel/commit/738efeded5a44f7fe5da285d444ec005add66248))
+
+### Builds
+
+- *(deps)* Bump the minor group with 6 updates - ([8c7adae](https://github.com/Aleph-Alpha/pharia-kernel/commit/8c7adaebec273ec408569339af30a6895e1a694c))
+- *(deps)* Bump the minor group with 37 updates - ([c5dccba](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5dccba5c9e02e4130a49b411df02c6711fb5bc4))
+- *(deps)* Bump the wasmtime group with 15 updates - ([debd8ba](https://github.com/Aleph-Alpha/pharia-kernel/commit/debd8ba147fa6f275e40895bb1a2e21dc2051c3a))
+
+
 ## [0.7.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.1...v0.7.2)
 
 ### Features
