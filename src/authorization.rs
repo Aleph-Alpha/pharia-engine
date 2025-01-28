@@ -14,6 +14,8 @@ use axum_extra::{
 use futures::{channel::oneshot, stream::FuturesUnordered, StreamExt};
 use tokio::{select, sync::mpsc, task::JoinHandle};
 
+use crate::http::HttpClient;
+
 pub struct Authorization {
     send: mpsc::Sender<AuthorizationMsg>,
     handle: JoinHandle<()>,
@@ -157,17 +159,14 @@ pub trait AuthorizationClient: Send + Sync + 'static {
 
 struct HttpAuthorizationClient {
     url: String,
-    client: reqwest::Client,
+    client: HttpClient,
 }
 
 impl HttpAuthorizationClient {
     pub fn new(url: String) -> Self {
         Self {
             url,
-            client: reqwest::Client::builder()
-                .use_rustls_tls()
-                .build()
-                .expect("Client should be valid."),
+            client: HttpClient::default(),
         }
     }
 }

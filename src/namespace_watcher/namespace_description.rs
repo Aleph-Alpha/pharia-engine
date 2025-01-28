@@ -9,6 +9,8 @@ use axum::http::HeaderValue;
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 
+use crate::http::HttpClient;
+
 #[derive(Debug, thiserror::Error)]
 pub enum NamespaceDescriptionError {
     #[error(transparent)]
@@ -117,17 +119,14 @@ impl NamespaceDescriptionLoader for FileLoader {
     }
 }
 pub struct HttpLoader {
-    client: reqwest::Client,
+    client: HttpClient,
     url: String,
     token: Option<String>,
 }
 impl HttpLoader {
     pub fn from_url(url: &str, token: Option<String>) -> Self {
         Self {
-            client: reqwest::Client::builder()
-                .use_rustls_tls()
-                .build()
-                .expect("Client should be valid."),
+            client: HttpClient::default(),
             url: url.to_owned(),
             token,
         }
