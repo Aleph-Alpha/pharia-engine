@@ -199,8 +199,11 @@ pub mod tests {
                 .collect()
         }
 
-        async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
-            vec![request.text]
+        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+            requests
+                .into_iter()
+                .map(|request| vec![request.text])
+                .collect()
         }
 
         async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language> {
@@ -257,8 +260,11 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             requests.into_iter().map(Self::complete_text).collect()
         }
 
-        async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
-            vec![request.text]
+        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+            requests
+                .into_iter()
+                .map(|request| vec![request.text])
+                .collect()
         }
 
         async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language> {
@@ -324,8 +330,11 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 .collect()
         }
 
-        async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
-            vec![request.text]
+        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+            requests
+                .into_iter()
+                .map(|request| vec![request.text])
+                .collect()
         }
 
         async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language> {

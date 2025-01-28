@@ -23,7 +23,7 @@ pub use self::{
 #[async_trait]
 pub trait CsiForSkills {
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
-    async fn chunk(&mut self, request: ChunkRequest) -> Vec<String>;
+    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>>;
     async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language>;
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse>;
     async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult>;

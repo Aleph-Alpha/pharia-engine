@@ -47,7 +47,11 @@ pub trait Csi {
         requests: Vec<ChatRequest>,
     ) -> anyhow::Result<Vec<ChatResponse>>;
 
-    async fn chunk(&self, auth: String, request: ChunkRequest) -> anyhow::Result<Vec<String>>;
+    async fn chunk(
+        &self,
+        auth: String,
+        requests: Vec<ChunkRequest>,
+    ) -> anyhow::Result<Vec<Vec<String>>>;
 
     // While the implementation might not be async, we want the interface to be asynchronous.
     // It is up to the implementer whether the actual implementation is async.
@@ -149,28 +153,41 @@ where
         .await
     }
 
-    async fn chunk(&self, auth: String, request: ChunkRequest) -> anyhow::Result<Vec<String>> {
-        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chunk")]).increment(1);
+    async fn chunk(
+        &self,
+        auth: String,
+        requests: Vec<ChunkRequest>,
+    ) -> anyhow::Result<Vec<Vec<String>>> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chunk")])
+            .increment(requests.len() as u64);
 
-        let ChunkRequest {
-            text,
-            params: ChunkParams { model, max_tokens },
-        } = request;
-        let text_len = text.len();
+        let auth = &auth;
+        try_join_all(requests.into_iter().map(|request| async move {
+            let ChunkRequest {
+                text,
+                params: ChunkParams { model, max_tokens },
+            } = request;
+            let text_len = text.len();
 
-        let tokenizer = self.tokenizers.tokenizer_by_model(auth, model).await?;
-        // Push into the blocking thread pool because this can be expensive for long documents
-        let chunks =
-            tokio::task::spawn_blocking(move || chunking::chunking(&text, &tokenizer, max_tokens))
+            let tokenizer = self
+                .tokenizers
+                .tokenizer_by_model(auth.clone(), model)
                 .await?;
+            // Push into the blocking thread pool because this can be expensive for long documents
+            let chunks = tokio::task::spawn_blocking(move || {
+                chunking::chunking(&text, &tokenizer, max_tokens)
+            })
+            .await?;
 
-        trace!(
-            "chunk: text_len={} max_tokens={} -> chunks.len()={}",
-            text_len,
-            max_tokens,
-            chunks.len()
-        );
-        Ok(chunks)
+            trace!(
+                "chunk: text_len={} max_tokens={} -> chunks.len()={}",
+                text_len,
+                max_tokens,
+                chunks.len()
+            );
+            Ok(chunks)
+        }))
+        .await
     }
 
     async fn search(
@@ -292,12 +309,12 @@ pub mod tests {
             params: ChunkParams { model, max_tokens },
         };
         let chunks = csi_apis
-            .chunk("dummy_token".to_owned(), request)
+            .chunk("dummy_token".to_owned(), vec![request])
             .await
             .unwrap();
 
         // Then a single chunk is returned
-        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].len(), 1);
     }
 
     #[tokio::test]
@@ -432,8 +449,8 @@ pub mod tests {
         async fn chunk(
             &self,
             _auth: String,
-            _request: ChunkRequest,
-        ) -> anyhow::Result<Vec<String>> {
+            _requests: Vec<ChunkRequest>,
+        ) -> anyhow::Result<Vec<Vec<String>>> {
             panic!("DummyCsi complete called");
         }
 
@@ -473,7 +490,8 @@ pub mod tests {
     type CompleteFn =
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
-    type ChunkFn = dyn Fn(ChunkRequest) -> anyhow::Result<Vec<String>> + Send + Sync + 'static;
+    type ChunkFn =
+        dyn Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<String>>> + Send + Sync + 'static;
 
     #[derive(Clone)]
     pub struct StubCsi {
@@ -491,7 +509,7 @@ pub mod tests {
 
         pub fn set_chunking(
             &mut self,
-            f: impl Fn(ChunkRequest) -> anyhow::Result<Vec<String>> + Send + Sync + 'static,
+            f: impl Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<String>>> + Send + Sync + 'static,
         ) {
             self.chunking = Arc::new(Box::new(f));
         }
@@ -525,8 +543,12 @@ pub mod tests {
                 .collect()
         }
 
-        async fn chunk(&self, _auth: String, request: ChunkRequest) -> anyhow::Result<Vec<String>> {
-            (*self.chunking)(request)
+        async fn chunk(
+            &self,
+            _auth: String,
+            requests: Vec<ChunkRequest>,
+        ) -> anyhow::Result<Vec<Vec<String>>> {
+            (*self.chunking)(requests)
         }
 
         async fn chat(
