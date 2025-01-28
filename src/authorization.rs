@@ -12,6 +12,8 @@ use axum_extra::{
     TypedHeader,
 };
 use futures::{channel::oneshot, stream::FuturesUnordered, StreamExt};
+use reqwest::header::AUTHORIZATION;
+use serde::{Deserialize, Serialize};
 use tokio::{select, sync::mpsc, task::JoinHandle};
 
 use crate::http::HttpClient;
@@ -173,21 +175,37 @@ impl HttpAuthorizationClient {
 
 impl AuthorizationClient for HttpAuthorizationClient {
     async fn token_valid(&self, api_token: String) -> anyhow::Result<bool> {
-        let url = format!("{}/check_privileges", self.url);
-        let body: Vec<String> = vec![];
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "Authorization",
-            format!("Bearer {api_token}").parse().unwrap(),
-        );
+        #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+        #[serde(tag = "permission")]
+        enum Permission {
+            KernelAccess,
+        }
+
+        let required_permissions = [Permission::KernelAccess];
         let response = self
             .client
-            .post(url)
-            .json(&body)
-            .headers(headers)
+            .post(format!("{}/check_privileges", self.url))
+            .headers(HeaderMap::from_iter([(
+                AUTHORIZATION,
+                format!("Bearer {api_token}").parse().unwrap(),
+            )]))
+            .json(&required_permissions)
             .send()
             .await?;
-        Ok(response.status().is_success())
+
+        // Response succeeded, but not allowed
+        if [StatusCode::FORBIDDEN, StatusCode::UNAUTHORIZED].contains(&response.status()) {
+            return Ok(false);
+        }
+
+        let allowed_permissions = response
+            // Error for any other status
+            .error_for_status()?
+            .json::<Vec<Permission>>()
+            .await?;
+
+        // Check that we got the same list back
+        Ok(allowed_permissions == required_permissions)
     }
 }
 
