@@ -2,6 +2,7 @@ mod authorization;
 mod config;
 mod csi;
 mod csi_shell;
+mod http;
 mod inference;
 mod language_selection;
 mod logging;

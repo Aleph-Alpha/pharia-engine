@@ -115,6 +115,9 @@ derive_more = { version = "1.0.0", features = [
     "into_iterator",
 ] }
 retry-policies = "0.4.0"
+reqwest-middleware = "0.4.0"
+reqwest-tracing = { version = "0.5.5", features = ["opentelemetry_0_27"] }
+reqwest-retry = "0.7.0"
 
 [dev-dependencies]
 test-skills = { path = "./test-skills" }
