@@ -104,14 +104,14 @@ pub mod tests {
             _name: &'a str,
             _tag: &'a str,
         ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
-            Box::pin(pending::<Result<Option<SkillImage>, anyhow::Error>>())
+            Box::pin(pending::<anyhow::Result<Option<SkillImage>>>())
         }
         fn fetch_digest<'a>(
             &'a self,
             _name: &'a str,
             _tag: &'a str,
         ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
-            Box::pin(pending::<Result<Option<Digest>, anyhow::Error>>())
+            Box::pin(pending::<anyhow::Result<Option<Digest>>>())
         }
     }
 

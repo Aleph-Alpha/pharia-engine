@@ -534,7 +534,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<CompletionRequest>,
-        ) -> Result<Vec<Completion>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Completion>> {
             bail!("Test error")
         }
 
@@ -542,7 +542,7 @@ pub mod tests {
             &self,
             _auth: String,
             _request: ChunkRequest,
-        ) -> Result<Vec<String>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<String>> {
             bail!("Test error")
         }
 
@@ -550,7 +550,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<ChatRequest>,
-        ) -> Result<Vec<ChatResponse>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<ChatResponse>> {
             bail!("Test error")
         }
 
@@ -558,7 +558,7 @@ pub mod tests {
             &self,
             _auth: String,
             _request: SearchRequest,
-        ) -> Result<Vec<SearchResult>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<SearchResult>> {
             bail!("Test error")
         }
 
@@ -566,7 +566,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<DocumentPath>,
-        ) -> Result<Vec<Document>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Document>> {
             bail!("Test error")
         }
 
@@ -574,7 +574,7 @@ pub mod tests {
             &self,
             _auth: String,
             _document_paths: Vec<DocumentPath>,
-        ) -> Result<Vec<Option<Value>>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Option<Value>>> {
             bail!("Test error")
         }
     }

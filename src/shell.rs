@@ -58,7 +58,7 @@ impl Shell {
         skill_store_api: SkillStoreApi,
         csi_drivers: impl Csi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> anyhow::Result<Self> {
         let addr = addr.into();
         // It is important to construct the listener outside of the `spawn` invocation. We need to
         // guarantee the listener is already bound to the port, once `Self` is constructed.
