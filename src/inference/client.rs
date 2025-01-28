@@ -37,8 +37,7 @@ impl InferenceClient for Client {
             api_token: Some(api_token),
             ..Default::default()
         };
-        let fetch_chat_output = || self.chat(&task, &request.model, &how);
-        let chat_result = retry(fetch_chat_output).await;
+        let chat_result = retry(|| self.chat(&task, &request.model, &how)).await;
         match chat_result {
             Ok(chat_output) => chat_output.try_into().map_err(InferenceClientError::Other),
             Err(e) => Err(e.into()),
@@ -82,9 +81,8 @@ impl InferenceClient for Client {
             api_token: Some(api_token),
             ..Default::default()
         };
-        let fetch_completion_output = || self.completion(&task, model, &how);
 
-        let completion_result = retry(fetch_completion_output).await;
+        let completion_result = retry(|| self.completion(&task, model, &how)).await;
         match completion_result {
             Ok(completion_output) => completion_output
                 .try_into()
