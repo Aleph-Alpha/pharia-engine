@@ -117,12 +117,17 @@ impl NamespaceDescriptionLoader for FileLoader {
     }
 }
 pub struct HttpLoader {
+    client: reqwest::Client,
     url: String,
     token: Option<String>,
 }
 impl HttpLoader {
     pub fn from_url(url: &str, token: Option<String>) -> Self {
         Self {
+            client: reqwest::Client::builder()
+                .use_rustls_tls()
+                .build()
+                .expect("Client should be valid."),
             url: url.to_owned(),
             token,
         }
@@ -131,7 +136,7 @@ impl HttpLoader {
 #[async_trait]
 impl NamespaceDescriptionLoader for HttpLoader {
     async fn description(&mut self) -> NamespaceDescriptionResult {
-        let mut req_builder = reqwest::Client::new().get(&self.url);
+        let mut req_builder = self.client.get(&self.url);
         if let Some(token) = &self.token {
             let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
             auth_value.set_sensitive(true);

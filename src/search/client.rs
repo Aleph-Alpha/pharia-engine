@@ -1,6 +1,5 @@
 use std::future::Future;
 
-use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -131,7 +130,7 @@ impl Client {
     pub fn new(host: String) -> anyhow::Result<Self> {
         Ok(Self {
             host,
-            http: ClientBuilder::new().build()?,
+            http: reqwest::Client::builder().use_rustls_tls().build()?,
         })
     }
 }
