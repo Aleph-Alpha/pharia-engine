@@ -22,7 +22,7 @@ use super::{
 };
 
 use crate::{
-    csi::{chunking::ChunkParams, ChunkRequest, Csi},
+    csi::{ChunkRequest, Csi},
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -260,19 +260,12 @@ where
         }
     }
 
-    async fn chunk(&mut self, request: ChunkRequest) -> Vec<String> {
-        let ChunkParams { model, max_tokens } = &request.params;
-        let span = span!(
-            Level::DEBUG,
-            "chunk",
-            text_len = request.text.len(),
-            model = model,
-            max_tokens = max_tokens,
-        );
+    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+        let span = span!(Level::DEBUG, "chunk", requests_len = requests.len());
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }
-        match self.csi_apis.chunk(self.api_token.clone(), request).await {
+        match self.csi_apis.chunk(self.api_token.clone(), requests).await {
             Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
         }
@@ -362,7 +355,10 @@ pub mod tests {
     use tokio::try_join;
 
     use crate::{
-        csi::tests::{DummyCsi, StubCsi},
+        csi::{
+            chunking::ChunkParams,
+            tests::{DummyCsi, StubCsi},
+        },
         inference::{
             tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },
@@ -377,7 +373,7 @@ pub mod tests {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
         let mut csi = StubCsi::empty();
-        csi.set_chunking(|_| Ok(vec!["my_chunk".to_owned()]));
+        csi.set_chunking(|r| Ok(r.into_iter().map(|_| vec!["my_chunk".to_owned()]).collect()));
 
         let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), None);
 
@@ -388,10 +384,10 @@ pub mod tests {
             text: "Greet".to_owned(),
             params: ChunkParams { model, max_tokens },
         };
-        let chunks = invocation_ctx.chunk(request).await;
+        let chunks = invocation_ctx.chunk(vec![request]).await;
 
         // Then a single chunk is returned
-        assert_eq!(chunks, vec!["my_chunk".to_owned()]);
+        assert_eq!(chunks[0], vec!["my_chunk".to_owned()]);
     }
 
     #[tokio::test]
@@ -411,7 +407,7 @@ pub mod tests {
         };
         let error = select! {
             error = recv => error.unwrap(),
-            _ = invocation_ctx.chunk(request)  => unreachable!(),
+            _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
         };
 
         // Then receive the error from saboteur tokenizer provider
@@ -541,8 +537,8 @@ pub mod tests {
         async fn chunk(
             &self,
             _auth: String,
-            _request: ChunkRequest,
-        ) -> anyhow::Result<Vec<String>> {
+            _requests: Vec<ChunkRequest>,
+        ) -> anyhow::Result<Vec<Vec<String>>> {
             bail!("Test error")
         }
 

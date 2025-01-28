@@ -446,7 +446,7 @@ mod v0_2 {
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
             let ChunkParams { model, max_tokens } = params;
             let request = ChunkRequest::new(text, model, max_tokens);
-            self.skill_ctx.chunk(request).await
+            self.skill_ctx.chunk(vec![request]).await.remove(0)
         }
 
         async fn select_language(
@@ -696,14 +696,14 @@ mod v0_2 {
 
 mod v0_3 {
     use pharia::skill::csi::{
-        ChatParams, ChatRequest, ChatResponse, ChunkParams, Completion, CompletionParams,
-        CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath, Language,
-        Message, Modality, Role, SearchResult,
+        ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion,
+        CompletionParams, CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath,
+        Language, Message, Modality, Role, SearchResult,
     };
     use wasmtime::component::bindgen;
 
     use crate::{
-        csi::ChunkRequest,
+        csi::chunking,
         inference,
         language_selection::{self, SelectLanguageRequest},
         search::{self, SearchRequest},
@@ -728,6 +728,23 @@ mod v0_3 {
         }
     }
 
+    impl From<ChunkParams> for chunking::ChunkParams {
+        fn from(params: ChunkParams) -> Self {
+            let ChunkParams { model, max_tokens } = params;
+            Self { model, max_tokens }
+        }
+    }
+
+    impl From<ChunkRequest> for chunking::ChunkRequest {
+        fn from(request: ChunkRequest) -> Self {
+            let ChunkRequest { text, params } = request;
+            Self {
+                text,
+                params: params.into(),
+            }
+        }
+    }
+
     impl Host for LinkedCtx {
         async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
             let requests = requests.into_iter().map(Into::into).collect();
@@ -740,10 +757,9 @@ mod v0_3 {
                 .collect()
         }
 
-        async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
-            let ChunkParams { model, max_tokens } = params;
-            let request = ChunkRequest::new(text, model, max_tokens);
-            self.skill_ctx.chunk(request).await
+        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+            let requests = requests.into_iter().map(Into::into).collect();
+            self.skill_ctx.chunk(requests).await
         }
 
         async fn select_language(

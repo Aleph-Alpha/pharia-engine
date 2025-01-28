@@ -121,8 +121,14 @@ interface csi {
         max-tokens: u32,
     }
 
-    @since(version = 0.2.1)
-    chunk: func(text: string, params: chunk-params) -> list<string>;
+    // @since(version = 0.3.0)
+    record chunk-request {
+        text: string,
+        params: chunk-params,
+    }
+
+    // @since(version = 0.3.0)
+    chunk: func(request: list<chunk-request>) -> list<list<string>>;
 
     /// ISO 639-3
     @since(version = 0.2.2)

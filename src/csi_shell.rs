@@ -114,7 +114,9 @@ impl From<UnknownCsiRequest> for CsiShellError {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum V0_3CsiRequest {
-    Chunk(ChunkRequest),
+    Chunk {
+        requests: Vec<ChunkRequest>,
+    },
     SelectLanguage(SelectLanguageRequest),
     Complete {
         requests: Vec<CompletionRequest>,
@@ -141,8 +143,8 @@ impl V0_3CsiRequest {
         C: Csi + Sync,
     {
         let result = match self {
-            V0_3CsiRequest::Chunk(chunk_request) => {
-                drivers.chunk(auth, chunk_request).await.map(|r| json!(r))?
+            V0_3CsiRequest::Chunk { requests } => {
+                drivers.chunk(auth, requests).await.map(|r| json!(r))?
             }
             V0_3CsiRequest::SelectLanguage(select_language_request) => drivers
                 .select_language(select_language_request)
@@ -205,9 +207,10 @@ impl V0_2CsiRequest {
                 .complete(auth, vec![completion_request.into()])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
-            V0_2CsiRequest::Chunk(chunk_request) => {
-                drivers.chunk(auth, chunk_request).await.map(|r| json!(r))?
-            }
+            V0_2CsiRequest::Chunk(chunk_request) => drivers
+                .chunk(auth, vec![chunk_request])
+                .await
+                .map(|r| json!(r.first().unwrap()))?,
             V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
                 .select_language(select_language_request)
                 .await
