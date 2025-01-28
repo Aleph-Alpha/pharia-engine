@@ -116,9 +116,13 @@ impl From<UnknownCsiRequest> for CsiShellError {
 pub enum V0_3CsiRequest {
     Chunk(ChunkRequest),
     SelectLanguage(SelectLanguageRequest),
-    Complete(CompleteAllRequest),
+    Complete {
+        requests: Vec<CompletionRequest>,
+    },
     Search(SearchRequest),
-    Chat(ChatRequest),
+    Chat {
+        requests: Vec<ChatRequest>,
+    },
     Documents {
         requests: Vec<DocumentPath>,
     },
@@ -144,23 +148,16 @@ impl V0_3CsiRequest {
                 .select_language(select_language_request)
                 .await
                 .map(|r| json!(r))?,
-            V0_3CsiRequest::Complete(complete_all_request) => drivers
-                .complete(
-                    auth,
-                    complete_all_request
-                        .requests
-                        .into_iter()
-                        .map(Into::into)
-                        .collect(),
-                )
+            V0_3CsiRequest::Complete { requests } => drivers
+                .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|v| json!(v))?,
             V0_3CsiRequest::Search(search_request) => drivers
                 .search(auth, search_request)
                 .await
                 .map(|v| json!(v))?,
-            V0_3CsiRequest::Chat(chat_request) => {
-                drivers.chat(auth, chat_request).await.map(|v| json!(v))?
+            V0_3CsiRequest::Chat { requests } => {
+                drivers.chat(auth, requests).await.map(|v| json!(v))?
             }
             V0_3CsiRequest::DocumentMetadata { requests } => drivers
                 .document_metadata(auth, requests)
@@ -230,9 +227,10 @@ impl V0_2CsiRequest {
                 .search(auth, search_request)
                 .await
                 .map(|v| json!(v))?,
-            V0_2CsiRequest::Chat(chat_request) => {
-                drivers.chat(auth, chat_request).await.map(|v| json!(v))?
-            }
+            V0_2CsiRequest::Chat(chat_request) => drivers
+                .chat(auth, vec![chat_request])
+                .await
+                .map(|v| json!(v.first().unwrap()))?,
             V0_2CsiRequest::Documents { requests } => {
                 drivers.documents(auth, requests).await.map(|r| json!(r))?
             }

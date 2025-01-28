@@ -440,7 +440,7 @@ mod v0_2 {
                 messages: messages.into_iter().map(Into::into).collect(),
                 params: params.into(),
             };
-            self.skill_ctx.chat(request).await.into()
+            self.skill_ctx.chat(vec![request]).await.remove(0).into()
         }
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
@@ -696,9 +696,9 @@ mod v0_2 {
 
 mod v0_3 {
     use pharia::skill::csi::{
-        ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
-        Document, DocumentPath, FinishReason, Host, IndexPath, Language, Message, Modality, Role,
-        SearchResult,
+        ChatParams, ChatRequest, ChatResponse, ChunkParams, Completion, CompletionParams,
+        CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath, Language,
+        Message, Modality, Role, SearchResult,
     };
     use wasmtime::component::bindgen;
 
@@ -713,19 +713,31 @@ mod v0_3 {
 
     bindgen!({ world: "skill", path: "./wit/skill@0.3", async: true });
 
-    impl Host for LinkedCtx {
-        async fn chat(
-            &mut self,
-            model: String,
-            messages: Vec<Message>,
-            params: ChatParams,
-        ) -> ChatResponse {
-            let request = inference::ChatRequest {
+    impl From<ChatRequest> for inference::ChatRequest {
+        fn from(request: ChatRequest) -> Self {
+            let ChatRequest {
+                model,
+                messages,
+                params,
+            } = request;
+            Self {
                 model,
                 messages: messages.into_iter().map(Into::into).collect(),
                 params: params.into(),
-            };
-            self.skill_ctx.chat(request).await.into()
+            }
+        }
+    }
+
+    impl Host for LinkedCtx {
+        async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            let requests = requests.into_iter().map(Into::into).collect();
+
+            self.skill_ctx
+                .chat(requests)
+                .await
+                .into_iter()
+                .map(Into::into)
+                .collect()
         }
 
         async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {

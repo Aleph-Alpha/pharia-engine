@@ -41,8 +41,11 @@ pub trait Csi {
         requests: Vec<CompletionRequest>,
     ) -> Result<Vec<Completion>, anyhow::Error>;
 
-    async fn chat(&self, auth: String, request: ChatRequest)
-        -> Result<ChatResponse, anyhow::Error>;
+    async fn chat(
+        &self,
+        auth: String,
+        requests: Vec<ChatRequest>,
+    ) -> Result<Vec<ChatResponse>, anyhow::Error>;
 
     async fn chunk(
         &self,
@@ -126,20 +129,28 @@ where
     async fn chat(
         &self,
         auth: String,
-        request: ChatRequest,
-    ) -> Result<ChatResponse, anyhow::Error> {
-        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")]).increment(1);
+        requests: Vec<ChatRequest>,
+    ) -> Result<Vec<ChatResponse>, anyhow::Error> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")])
+            .increment(requests.len() as u64);
 
-        trace!(
-            "chat: request.model={} request.params.max_tokens={}",
-            request.model,
-            request
-                .params
-                .max_tokens
-                .map_or_else(|| "None".to_owned(), |val| val.to_string()),
-        );
+        try_join_all(
+            requests
+                .into_iter()
+                .map(|r| {
+                    trace!(
+                        "chat: request.model={} request.params.max_tokens={}",
+                        r.model,
+                        r.params
+                            .max_tokens
+                            .map_or_else(|| "None".to_owned(), |val| val.to_string()),
+                    );
 
-        self.inference.chat(request, auth).await
+                    self.inference.chat(r, auth.clone())
+                })
+                .collect::<Vec<_>>(),
+        )
+        .await
     }
 
     async fn chunk(
@@ -264,12 +275,12 @@ pub mod tests {
         // When chatting with the StubCsi
         let csi = StubCsi::empty();
         let result = csi
-            .chat("dummy-token".to_owned(), chat_request)
+            .chat("dummy-token".to_owned(), vec![chat_request])
             .await
             .unwrap();
 
         // Then the response is the same as the request
-        assert_eq!(result.message.content, "Hello");
+        assert_eq!(result[0].message.content, "Hello");
     }
 
     #[tokio::test]
@@ -437,8 +448,8 @@ pub mod tests {
         async fn chat(
             &self,
             _auth: String,
-            _request: ChatRequest,
-        ) -> Result<ChatResponse, anyhow::Error> {
+            _requests: Vec<ChatRequest>,
+        ) -> Result<Vec<ChatResponse>, anyhow::Error> {
             panic!("DummyCsi chat called")
         }
 
@@ -461,7 +472,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             _auth: String,
-            _document_path: Vec<DocumentPath>,
+            _document_paths: Vec<DocumentPath>,
         ) -> Result<Vec<Option<Value>>, anyhow::Error> {
             panic!("DummyCsi metadata_document called")
         }
@@ -534,12 +545,15 @@ pub mod tests {
         async fn chat(
             &self,
             _auth: String,
-            request: ChatRequest,
-        ) -> Result<ChatResponse, anyhow::Error> {
-            Ok(ChatResponse {
-                message: request.messages.first().unwrap().clone(),
-                finish_reason: FinishReason::Stop,
-            })
+            requests: Vec<ChatRequest>,
+        ) -> Result<Vec<ChatResponse>, anyhow::Error> {
+            Ok(requests
+                .into_iter()
+                .map(|request| ChatResponse {
+                    message: request.messages.first().unwrap().clone(),
+                    finish_reason: FinishReason::Stop,
+                })
+                .collect())
         }
 
         async fn search(
@@ -561,7 +575,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             _auth: String,
-            _document_path: Vec<DocumentPath>,
+            _document_paths: Vec<DocumentPath>,
         ) -> Result<Vec<Option<Value>>, anyhow::Error> {
             unimplemented!()
         }

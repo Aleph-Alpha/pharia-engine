@@ -207,7 +207,7 @@ pub mod tests {
             select_language(request)
         }
 
-        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
             unimplemented!()
         }
 
@@ -265,14 +265,17 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             select_language(request)
         }
 
-        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
-            ChatResponse {
-                message: Message {
-                    role: Role::Assistant,
-                    content: "dummy-content".to_owned(),
-                },
-                finish_reason: FinishReason::Stop,
-            }
+        async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            requests
+                .iter()
+                .map(|_| ChatResponse {
+                    message: Message {
+                        role: Role::Assistant,
+                        content: "dummy-content".to_owned(),
+                    },
+                    finish_reason: FinishReason::Stop,
+                })
+                .collect()
         }
 
         async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult> {
@@ -329,7 +332,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             select_language(request)
         }
 
-        async fn chat(&mut self, _request: ChatRequest) -> ChatResponse {
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
             unimplemented!()
         }
 
