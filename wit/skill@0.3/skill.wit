@@ -1,4 +1,4 @@
-package pharia:skill@0.3.0-alpha.3;
+package pharia:skill@0.3.0-alpha.4;
 
 @since(version = 0.1.0)
 world skill {
@@ -101,8 +101,15 @@ interface csi {
         finish-reason: finish-reason,
     }
 
-    @since(version = 0.2.7)
-    chat: func(model: string, messages: list<message>, params: chat-params) -> chat-response;
+    // @since(version = 0.3.0)
+    record chat-request {
+        model: string,
+        messages: list<message>,
+        params: chat-params,
+    }
+
+    // @since(version = 0.3.0)
+    chat: func(requests: list<chat-request>) -> list<chat-response>;
 
     /// Chunking parameters
     @since(version = 0.2.1)

@@ -249,12 +249,12 @@ where
         }
     }
 
-    async fn chat(&mut self, request: ChatRequest) -> ChatResponse {
-        let span = span!(Level::DEBUG, "chat", model = request.model);
+    async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+        let span = span!(Level::DEBUG, "chat", requests_len = requests.len());
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }
-        match self.csi_apis.chat(self.api_token.clone(), request).await {
+        match self.csi_apis.chat(self.api_token.clone(), requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
@@ -549,8 +549,8 @@ pub mod tests {
         async fn chat(
             &self,
             _auth: String,
-            _request: ChatRequest,
-        ) -> Result<ChatResponse, anyhow::Error> {
+            _requests: Vec<ChatRequest>,
+        ) -> Result<Vec<ChatResponse>, anyhow::Error> {
             bail!("Test error")
         }
 
@@ -573,7 +573,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             _auth: String,
-            _document_path: Vec<DocumentPath>,
+            _document_paths: Vec<DocumentPath>,
         ) -> Result<Vec<Option<Value>>, anyhow::Error> {
             bail!("Test error")
         }
