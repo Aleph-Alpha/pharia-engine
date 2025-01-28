@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use derive_more::Deref;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
@@ -11,6 +12,7 @@ use reqwest_tracing::TracingMiddleware;
 /// - Tracing
 /// - Retries
 /// - Timeout
+#[derive(Deref)]
 pub struct HttpClient(ClientWithMiddleware);
 
 impl HttpClient {

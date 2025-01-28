@@ -3,6 +3,8 @@ use std::future::Future;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::http::HttpClient;
+
 pub trait SearchClient: Send + Sync + 'static {
     fn search(
         &self,
@@ -123,15 +125,15 @@ pub struct Client {
     /// The base host to use for all API requests
     host: String,
     /// Shared client to reuse connections
-    http: reqwest::Client,
+    http: HttpClient,
 }
 
 impl Client {
-    pub fn new(host: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(host: String) -> Self {
+        Self {
             host,
-            http: reqwest::Client::builder().use_rustls_tls().build()?,
-        })
+            http: HttpClient::default(),
+        }
     }
 }
 
@@ -338,7 +340,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token();
-        let client = Client::new(host).unwrap();
+        let client = Client::new(host);
 
         // When requesting a document
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
@@ -353,7 +355,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token();
-        let client = Client::new(host).unwrap();
+        let client = Client::new(host);
 
         // When requesting a document that does not exist
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs-not-found");
@@ -368,7 +370,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token();
-        let client = Client::new(host).unwrap();
+        let client = Client::new(host);
 
         // When making a query on an existing collection
         let index = IndexPath::new("Kernel", "test", "asym-64");
@@ -400,7 +402,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token();
-        let client = Client::new(host).unwrap();
+        let client = Client::new(host);
 
         // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel/docs");
@@ -426,7 +428,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token();
-        let client = Client::new(host).unwrap();
+        let client = Client::new(host);
         let max_results = 5;
         let min_score = 0.99;
 

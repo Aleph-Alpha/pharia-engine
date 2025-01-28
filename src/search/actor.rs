@@ -26,7 +26,7 @@ impl Search {
     /// Starts a new search Actor. Calls to this method be balanced by calls to
     /// [`Self::shutdown`].
     pub fn new(search_addr: String) -> Self {
-        let client = Client::new(search_addr).unwrap();
+        let client = Client::new(search_addr);
         Self::with_client(client)
     }
 
