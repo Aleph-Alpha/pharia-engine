@@ -164,7 +164,10 @@ impl HttpAuthorizationClient {
     pub fn new(url: String) -> Self {
         Self {
             url,
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .use_rustls_tls()
+                .build()
+                .expect("Client should be valid."),
         }
     }
 }
