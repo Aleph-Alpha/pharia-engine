@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.3...v0.7.4)
+
+### Fixes
+
+- Actually use correct permission to check authorization, not just existence of the token - ([0bdd2c7](https://github.com/Aleph-Alpha/pharia-kernel/commit/0bdd2c79fe7d644630dc6628d2fe978abe2643c4))
+
+
 ## [0.7.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.2...v0.7.3)
 
 ### Features
