@@ -136,7 +136,7 @@ impl SkillLoaderApi {
 }
 
 impl SkillLoaderApi {
-    pub async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), anyhow::Error> {
+    pub async fn fetch(&self, skill: ConfiguredSkill) -> anyhow::Result<(Skill, Digest)> {
         let (send, recv) = oneshot::channel();
         self.sender
             .send(SkillLoaderMsg::Fetch { skill, send })
@@ -145,10 +145,7 @@ impl SkillLoaderApi {
         recv.await.unwrap()
     }
 
-    pub async fn fetch_digest(
-        &self,
-        skill: ConfiguredSkill,
-    ) -> Result<Option<Digest>, anyhow::Error> {
+    pub async fn fetch_digest(&self, skill: ConfiguredSkill) -> anyhow::Result<Option<Digest>> {
         let (send, recv) = oneshot::channel();
         self.sender
             .send(SkillLoaderMsg::FetchDigest { skill, send })

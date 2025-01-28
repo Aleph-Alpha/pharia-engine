@@ -39,19 +39,15 @@ pub trait Csi {
         &self,
         auth: String,
         requests: Vec<CompletionRequest>,
-    ) -> Result<Vec<Completion>, anyhow::Error>;
+    ) -> anyhow::Result<Vec<Completion>>;
 
     async fn chat(
         &self,
         auth: String,
         requests: Vec<ChatRequest>,
-    ) -> Result<Vec<ChatResponse>, anyhow::Error>;
+    ) -> anyhow::Result<Vec<ChatResponse>>;
 
-    async fn chunk(
-        &self,
-        auth: String,
-        request: ChunkRequest,
-    ) -> Result<Vec<String>, anyhow::Error>;
+    async fn chunk(&self, auth: String, request: ChunkRequest) -> anyhow::Result<Vec<String>>;
 
     // While the implementation might not be async, we want the interface to be asynchronous.
     // It is up to the implementer whether the actual implementation is async.
@@ -67,19 +63,19 @@ pub trait Csi {
         &self,
         auth: String,
         request: SearchRequest,
-    ) -> Result<Vec<SearchResult>, anyhow::Error>;
+    ) -> anyhow::Result<Vec<SearchResult>>;
 
     async fn documents(
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Document>, anyhow::Error>;
+    ) -> anyhow::Result<Vec<Document>>;
 
     async fn document_metadata(
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Option<Value>>, anyhow::Error>;
+    ) -> anyhow::Result<Vec<Option<Value>>>;
 }
 
 #[derive(IntoStaticStr)]
@@ -104,7 +100,7 @@ where
         &self,
         auth: String,
         requests: Vec<CompletionRequest>,
-    ) -> Result<Vec<Completion>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<Completion>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "complete")])
             .increment(requests.len() as u64);
         try_join_all(
@@ -130,7 +126,7 @@ where
         &self,
         auth: String,
         requests: Vec<ChatRequest>,
-    ) -> Result<Vec<ChatResponse>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<ChatResponse>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")])
             .increment(requests.len() as u64);
 
@@ -153,11 +149,7 @@ where
         .await
     }
 
-    async fn chunk(
-        &self,
-        auth: String,
-        request: ChunkRequest,
-    ) -> Result<Vec<String>, anyhow::Error> {
+    async fn chunk(&self, auth: String, request: ChunkRequest) -> anyhow::Result<Vec<String>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chunk")]).increment(1);
 
         let ChunkRequest {
@@ -185,7 +177,7 @@ where
         &self,
         auth: String,
         request: SearchRequest,
-    ) -> Result<Vec<SearchResult>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<SearchResult>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "search")]).increment(1);
         let index_path = &request.index_path;
         trace!(
@@ -204,7 +196,7 @@ where
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Document>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<Document>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "documents")]).increment(1);
         trace!("documents: requests.len()={}", requests.len());
         try_join_all(
@@ -220,7 +212,7 @@ where
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> Result<Vec<Option<Value>>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<Option<Value>>> {
         metrics::counter!(
             CsiMetrics::CsiRequestsTotal,
             &[("function", "document_metadata")]
@@ -433,7 +425,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<CompletionRequest>,
-        ) -> Result<Vec<Completion>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Completion>> {
             panic!("DummyCsi complete called")
         }
 
@@ -441,7 +433,7 @@ pub mod tests {
             &self,
             _auth: String,
             _request: ChunkRequest,
-        ) -> Result<Vec<String>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<String>> {
             panic!("DummyCsi complete called");
         }
 
@@ -449,7 +441,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<ChatRequest>,
-        ) -> Result<Vec<ChatResponse>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<ChatResponse>> {
             panic!("DummyCsi chat called")
         }
 
@@ -457,7 +449,7 @@ pub mod tests {
             &self,
             _auth: String,
             _request: SearchRequest,
-        ) -> Result<Vec<SearchResult>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<SearchResult>> {
             panic!("DummyCsi search called")
         }
 
@@ -465,7 +457,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<DocumentPath>,
-        ) -> Result<Vec<Document>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Document>> {
             panic!("DummyCsi documents called")
         }
 
@@ -473,16 +465,15 @@ pub mod tests {
             &self,
             _auth: String,
             _document_paths: Vec<DocumentPath>,
-        ) -> Result<Vec<Option<Value>>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Option<Value>>> {
             panic!("DummyCsi metadata_document called")
         }
     }
 
     type CompleteFn =
-        dyn Fn(CompletionRequest) -> Result<Completion, anyhow::Error> + Send + Sync + 'static;
+        dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
-    type ChunkFn =
-        dyn Fn(ChunkRequest) -> Result<Vec<String>, anyhow::Error> + Send + Sync + 'static;
+    type ChunkFn = dyn Fn(ChunkRequest) -> anyhow::Result<Vec<String>> + Send + Sync + 'static;
 
     #[derive(Clone)]
     pub struct StubCsi {
@@ -500,7 +491,7 @@ pub mod tests {
 
         pub fn set_chunking(
             &mut self,
-            f: impl Fn(ChunkRequest) -> Result<Vec<String>, anyhow::Error> + Send + Sync + 'static,
+            f: impl Fn(ChunkRequest) -> anyhow::Result<Vec<String>> + Send + Sync + 'static,
         ) {
             self.chunking = Arc::new(Box::new(f));
         }
@@ -527,18 +518,14 @@ pub mod tests {
             &self,
             _auth: String,
             requests: Vec<CompletionRequest>,
-        ) -> Result<Vec<Completion>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Completion>> {
             requests
                 .into_iter()
                 .map(|r| (*self.completion)(r))
                 .collect()
         }
 
-        async fn chunk(
-            &self,
-            _auth: String,
-            request: ChunkRequest,
-        ) -> Result<Vec<String>, anyhow::Error> {
+        async fn chunk(&self, _auth: String, request: ChunkRequest) -> anyhow::Result<Vec<String>> {
             (*self.chunking)(request)
         }
 
@@ -546,7 +533,7 @@ pub mod tests {
             &self,
             _auth: String,
             requests: Vec<ChatRequest>,
-        ) -> Result<Vec<ChatResponse>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<ChatResponse>> {
             Ok(requests
                 .into_iter()
                 .map(|request| ChatResponse {
@@ -560,7 +547,7 @@ pub mod tests {
             &self,
             _auth: String,
             _request: SearchRequest,
-        ) -> Result<Vec<SearchResult>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<SearchResult>> {
             unimplemented!()
         }
 
@@ -568,7 +555,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<DocumentPath>,
-        ) -> Result<Vec<Document>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Document>> {
             unimplemented!()
         }
 
@@ -576,7 +563,7 @@ pub mod tests {
             &self,
             _auth: String,
             _document_paths: Vec<DocumentPath>,
-        ) -> Result<Vec<Option<Value>>, anyhow::Error> {
+        ) -> anyhow::Result<Vec<Option<Value>>> {
             unimplemented!()
         }
     }

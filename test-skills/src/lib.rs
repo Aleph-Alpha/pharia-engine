@@ -209,7 +209,7 @@ fn create_virtual_environment(venv_path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn error_on_status(context: &str, output: Output) -> Result<(), anyhow::Error> {
+fn error_on_status(context: &str, output: Output) -> anyhow::Result<()> {
     if output.status.success() {
         Ok(())
     } else {

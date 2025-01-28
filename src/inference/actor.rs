@@ -80,7 +80,7 @@ impl InferenceApi {
         &self,
         request: ChatRequest,
         api_token: String,
-    ) -> Result<ChatResponse, anyhow::Error> {
+    ) -> anyhow::Result<ChatResponse> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Chat {
             request,

@@ -248,7 +248,7 @@ impl SkillStoreApi {
     }
 
     /// Fetch an executable skill
-    pub async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, anyhow::Error> {
+    pub async fn fetch(&self, skill_path: SkillPath) -> anyhow::Result<Option<Arc<Skill>>> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::Fetch { skill_path, send };
         self.sender
@@ -297,7 +297,7 @@ impl SkillStoreApi {
 pub enum SkillStoreMessage {
     Fetch {
         skill_path: SkillPath,
-        send: oneshot::Sender<Result<Option<Arc<Skill>>, anyhow::Error>>,
+        send: oneshot::Sender<anyhow::Result<Option<Arc<Skill>>>>,
     },
     List {
         send: oneshot::Sender<Vec<SkillPath>>,
@@ -329,9 +329,9 @@ struct SkillStoreActor {
 }
 
 type SkillRequest =
-    Pin<Box<dyn Future<Output = (SkillPath, Result<(Skill, Digest), anyhow::Error>)> + Send>>;
+    Pin<Box<dyn Future<Output = (SkillPath, anyhow::Result<(Skill, Digest)>)> + Send>>;
 
-type Recipient = oneshot::Sender<Result<Option<Arc<Skill>>, anyhow::Error>>;
+type Recipient = oneshot::Sender<anyhow::Result<Option<Arc<Skill>>>>;
 struct SkillRequests {
     requests: FuturesUnordered<SkillRequest>,
     recipients: HashMap<SkillPath, Vec<Recipient>>,

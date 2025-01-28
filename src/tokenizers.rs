@@ -15,7 +15,7 @@ pub trait TokenizerApi {
         &self,
         api_token: String,
         model_name: String,
-    ) -> Result<Arc<Tokenizer>, anyhow::Error>;
+    ) -> anyhow::Result<Arc<Tokenizer>>;
 }
 
 #[async_trait]
@@ -24,7 +24,7 @@ impl TokenizerApi for mpsc::Sender<TokenizersMsg> {
         &self,
         api_token: String,
         model_name: String,
-    ) -> Result<Arc<Tokenizer>, anyhow::Error> {
+    ) -> anyhow::Result<Arc<Tokenizer>> {
         let (send, recv) = oneshot::channel();
         let msg = TokenizersMsg::TokenizerByModel {
             api_token,
@@ -43,7 +43,7 @@ pub struct Tokenizers {
 }
 
 impl Tokenizers {
-    pub fn new(api_base_url: String) -> Result<Self, anyhow::Error> {
+    pub fn new(api_base_url: String) -> anyhow::Result<Self> {
         let (sender, receiver) = mpsc::channel(1);
         let client = Client::new(api_base_url, None)?;
         let handle = tokio::spawn(async move {
@@ -67,7 +67,7 @@ pub enum TokenizersMsg {
     TokenizerByModel {
         api_token: String,
         model_name: String,
-        send: oneshot::Sender<Result<Arc<Tokenizer>, anyhow::Error>>,
+        send: oneshot::Sender<anyhow::Result<Arc<Tokenizer>>>,
     },
 }
 
@@ -163,7 +163,7 @@ pub mod tests {
             &self,
             _api_token: String,
             model_name: String,
-        ) -> Result<Arc<Tokenizer>, anyhow::Error> {
+        ) -> anyhow::Result<Arc<Tokenizer>> {
             if model_name == "Pharia-1-LLM-7B-control" {
                 Ok(Arc::new(pharia_1_llm_7b_control_tokenizer()))
             } else {
