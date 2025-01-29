@@ -1,7 +1,9 @@
 use std::{
+    borrow::Cow,
     future::{pending, Future},
     pin::Pin,
     sync::Arc,
+    time::Instant,
 };
 
 use async_trait::async_trait;
@@ -174,17 +176,13 @@ pub struct SkillExecutorMsg {
 
 impl SkillExecutorMsg {
     async fn run_skill(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
+        let start = Instant::now();
         let SkillExecutorMsg {
             skill_path,
             input,
             send,
             api_token,
         } = self;
-        let labels = [
-            ("namespace", skill_path.namespace.to_string()),
-            ("name", skill_path.name.clone()),
-        ];
-        metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
 
         let span = span!(
             Level::DEBUG,
@@ -204,6 +202,25 @@ impl SkillExecutorMsg {
             // An error occurred during skill execution.
             Ok(error) = recv_rt_err => Err(ExecuteSkillError::Other(error))
         };
+
+        let latency = start.elapsed().as_secs_f64();
+        let labels = [
+            ("namespace", Cow::from(skill_path.namespace.to_string())),
+            ("name", Cow::from(skill_path.name)),
+            (
+                "status",
+                match response {
+                    Ok(_) => "ok",
+                    Err(ExecuteSkillError::SkillDoesNotExist) => "not_found",
+                    Err(ExecuteSkillError::Other(_)) => "internal_error",
+                }
+                .into(),
+            ),
+        ];
+        metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
+        metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
+            .record(latency);
+
         // Error is expected to happen during shutdown. Ignore result.
         drop(send.send(response));
     }
@@ -550,7 +567,7 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let csi = StubCsi::with_completion_from_text("Hello");
         let (send, _) = oneshot::channel();
-        let skill_path = SkillPath::dummy();
+        let skill_path = SkillPath::local("greet");
         let msg = SkillExecutorMsg {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
@@ -570,6 +587,7 @@ pub mod tests {
         let expected_labels = [
             &Label::new("namespace", skill_path.namespace.to_string()),
             &Label::new("name", skill_path.name),
+            &Label::new("status", "ok"),
         ];
         assert!(metrics.iter().any(|(key, _, _, value)| {
             let key = key.key();
@@ -577,6 +595,11 @@ pub mod tests {
             key.name() == "kernel_skill_execution_total"
                 && labels == expected_labels
                 && value == &DebugValue::Counter(1)
+        }));
+        assert!(metrics.iter().any(|(key, _, _, _)| {
+            let key = key.key();
+            let labels = key.labels().collect::<Vec<_>>();
+            key.name() == "kernel_skill_execution_duration_seconds" && labels == expected_labels
         }));
     }
 
