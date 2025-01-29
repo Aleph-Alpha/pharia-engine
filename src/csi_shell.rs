@@ -9,11 +9,11 @@ use serde_json::{json, Value};
 
 use crate::{
     csi::{ChunkRequest, Csi},
-    engine::SupportedVersion,
     inference::{ChatRequest, CompletionParams, CompletionRequest},
     language_selection::SelectLanguageRequest,
     search::{DocumentPath, SearchRequest},
     shell::AppState,
+    skills::SupportedVersion,
 };
 
 #[allow(clippy::too_many_lines)]

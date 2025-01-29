@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use metrics::KeyName;
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
 
-use crate::{shell::ShellMetrics, skills::SkillRuntimeMetrics};
+use crate::{shell::ShellMetrics, skill_runtime::SkillRuntimeMetrics};
 
 /// Initializes a recorder for metrics macros and exposes a Prometheus exporter
 /// and exposes it over port 9000 (by default). Any GET request at the port

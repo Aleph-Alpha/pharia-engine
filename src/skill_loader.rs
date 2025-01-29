@@ -5,9 +5,9 @@ use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
 
-use crate::engine::{Engine, Skill};
 use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{Digest, FileRegistry, OciRegistry, SkillImage, SkillRegistry};
+use crate::skills::{Engine, Skill};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::collections::HashMap;
@@ -248,9 +248,9 @@ pub mod tests {
     use tokio::time::{sleep, timeout, Duration};
 
     use crate::{
-        engine::{Engine, SkillPath},
         namespace_watcher::Registry,
         registries::tests::{NeverResolvingRegistry, ReadyRegistry},
+        skills::{Engine, SkillPath},
     };
 
     use super::*;
