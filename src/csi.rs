@@ -56,10 +56,15 @@ pub trait Csi {
     // It is up to the implementer whether the actual implementation is async.
     async fn select_language(
         &self,
-        request: SelectLanguageRequest,
-    ) -> anyhow::Result<Option<Language>> {
+        requests: Vec<SelectLanguageRequest>,
+    ) -> anyhow::Result<Vec<Option<Language>>> {
         // default implementation can be provided here because language selection is stateless
-        Ok(tokio::task::spawn_blocking(move || select_language(request)).await?)
+        Ok(try_join_all(
+            requests
+                .into_iter()
+                .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
+        )
+        .await?)
     }
 
     async fn search(

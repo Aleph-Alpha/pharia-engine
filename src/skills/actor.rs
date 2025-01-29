@@ -309,17 +309,19 @@ where
         }
     }
 
-    async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language> {
+    async fn select_language(
+        &mut self,
+        requests: Vec<SelectLanguageRequest>,
+    ) -> Vec<Option<Language>> {
         let span = span!(
             Level::DEBUG,
             "select_language",
-            text_len = request.text.len(),
-            languages_len = request.languages.len()
+            requests_len = requests.len()
         );
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }
-        match self.csi_apis.select_language(request).await {
+        match self.csi_apis.select_language(requests).await {
             Ok(language) => language,
             Err(error) => self.send_error(error).await,
         }

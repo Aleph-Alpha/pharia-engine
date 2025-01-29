@@ -457,8 +457,9 @@ mod v0_2 {
             let languages = languages.into_iter().map(Into::into).collect::<Vec<_>>();
             let request = SelectLanguageRequest::new(text, languages);
             self.skill_ctx
-                .select_language(request)
+                .select_language(vec![request])
                 .await
+                .remove(0)
                 .map(Into::into)
         }
 
@@ -699,16 +700,11 @@ mod v0_3 {
     use pharia::skill::csi::{
         ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion,
         CompletionParams, CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath,
-        Language, Message, Modality, Role, SearchRequest, SearchResult,
+        Language, Message, Modality, Role, SearchRequest, SearchResult, SelectLanguageRequest,
     };
     use wasmtime::component::bindgen;
 
-    use crate::{
-        csi::chunking,
-        inference,
-        language_selection::{self, SelectLanguageRequest},
-        search,
-    };
+    use crate::{csi::chunking, inference, language_selection, search};
 
     use super::LinkedCtx;
 
@@ -764,15 +760,14 @@ mod v0_3 {
 
         async fn select_language(
             &mut self,
-            text: String,
-            languages: Vec<Language>,
-        ) -> Option<Language> {
-            let languages = languages.into_iter().map(Into::into).collect::<Vec<_>>();
-            let request = SelectLanguageRequest::new(text, languages);
+            requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
             self.skill_ctx
-                .select_language(request)
+                .select_language(requests.into_iter().map(Into::into).collect())
                 .await
-                .map(Into::into)
+                .into_iter()
+                .map(|r| r.map(Into::into))
+                .collect()
         }
 
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
@@ -813,6 +808,16 @@ mod v0_3 {
                     })
                 })
                 .collect()
+        }
+    }
+
+    impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
+        fn from(request: SelectLanguageRequest) -> Self {
+            let SelectLanguageRequest { text, languages } = request;
+            Self {
+                text,
+                languages: languages.into_iter().map(Into::into).collect(),
+            }
         }
     }
 
