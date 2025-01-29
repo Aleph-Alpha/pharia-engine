@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use metrics::KeyName;
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
 
 use crate::shell::ShellMetrics;
@@ -19,7 +20,11 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
 
     PrometheusBuilder::new()
         .set_buckets_for_metric(
-            Matcher::Full(<&'static str>::from(ShellMetrics::HttpRequestsDurationSeconds).into()),
+            Matcher::Full(
+                KeyName::from(ShellMetrics::HttpRequestsDurationSeconds)
+                    .as_str()
+                    .to_owned(),
+            ),
             EXPONENTIAL_SECONDS,
         )?
         .with_http_listener(addr)

@@ -15,7 +15,6 @@ use axum_extra::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use strum::IntoStaticStr;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -210,18 +209,18 @@ where
         )
 }
 
-#[derive(IntoStaticStr)]
-#[strum(serialize_all = "snake_case")]
 pub enum ShellMetrics {
-    #[strum(to_string = "kernel_http_requests_total")]
     HttpRequestsTotal,
-    #[strum(to_string = "kernel_http_requests_duration_seconds")]
     HttpRequestsDurationSeconds,
 }
 
 impl From<ShellMetrics> for metrics::KeyName {
     fn from(value: ShellMetrics) -> Self {
-        Self::from_const_str(value.into())
+        match value {
+            ShellMetrics::HttpRequestsTotal => "kernel_http_requests_total",
+            ShellMetrics::HttpRequestsDurationSeconds => "kernel_http_requests_duration_seconds",
+        }
+        .into()
     }
 }
 

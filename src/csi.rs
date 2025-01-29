@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use chunking::ChunkParams;
 use futures::future::try_join_all;
 use serde_json::Value;
-use strum::IntoStaticStr;
 use tokio::sync::mpsc;
 use tracing::trace;
 
@@ -82,16 +81,16 @@ pub trait Csi {
     ) -> anyhow::Result<Vec<Option<Value>>>;
 }
 
-#[derive(IntoStaticStr)]
-#[strum(serialize_all = "snake_case")]
 pub enum CsiMetrics {
-    #[strum(to_string = "kernel_csi_requests_total")]
     CsiRequestsTotal,
 }
 
 impl From<CsiMetrics> for metrics::KeyName {
     fn from(value: CsiMetrics) -> Self {
-        Self::from_const_str(value.into())
+        match value {
+            CsiMetrics::CsiRequestsTotal => "kernel_csi_requests_total",
+        }
+        .into()
     }
 }
 
