@@ -325,18 +325,12 @@ where
         }
     }
 
-    async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult> {
-        let span = span!(
-            Level::DEBUG,
-            "search",
-            namespace = request.index_path.namespace,
-            collection = request.index_path.collection,
-            index = request.index_path.index
-        );
+    async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+        let span = span!(Level::DEBUG, "search", requests_len = requests.len());
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }
-        match self.csi_apis.search(self.api_token.clone(), request).await {
+        match self.csi_apis.search(self.api_token.clone(), requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
@@ -643,8 +637,8 @@ pub mod tests {
         async fn search(
             &self,
             _auth: String,
-            _request: SearchRequest,
-        ) -> anyhow::Result<Vec<SearchResult>> {
+            _requests: Vec<SearchRequest>,
+        ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
             bail!("Test error")
         }
 

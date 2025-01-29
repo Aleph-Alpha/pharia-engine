@@ -26,7 +26,7 @@ pub trait CsiForSkills {
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>>;
     async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language>;
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse>;
-    async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult>;
+    async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>>;
     async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;
     async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
 }

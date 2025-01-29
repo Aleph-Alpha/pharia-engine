@@ -65,8 +65,8 @@ pub trait Csi {
     async fn search(
         &self,
         auth: String,
-        request: SearchRequest,
-    ) -> anyhow::Result<Vec<SearchResult>>;
+        requests: Vec<SearchRequest>,
+    ) -> anyhow::Result<Vec<Vec<SearchResult>>>;
 
     async fn documents(
         &self,
@@ -191,20 +191,25 @@ where
     async fn search(
         &self,
         auth: String,
-        request: SearchRequest,
-    ) -> anyhow::Result<Vec<SearchResult>> {
-        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "search")]).increment(1);
-        let index_path = &request.index_path;
-        trace!(
-            "search: namespace={} collection={} max_results={} min_score={}",
-            index_path.namespace,
-            index_path.collection,
-            request.max_results,
-            request
-                .min_score
-                .map_or_else(|| "None".to_owned(), |val| val.to_string())
-        );
-        self.search.search(request, auth).await
+        requests: Vec<SearchRequest>,
+    ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "search")])
+            .increment(requests.len() as u64);
+
+        try_join_all(requests.into_iter().map(|request| {
+            let index_path = &request.index_path;
+            trace!(
+                "search: namespace={} collection={} max_results={} min_score={}",
+                index_path.namespace,
+                index_path.collection,
+                request.max_results,
+                request
+                    .min_score
+                    .map_or_else(|| "None".to_owned(), |val| val.to_string())
+            );
+            self.search.search(request, auth.clone())
+        }))
+        .await
     }
 
     async fn documents(
@@ -463,8 +468,8 @@ pub mod tests {
         async fn search(
             &self,
             _auth: String,
-            _request: SearchRequest,
-        ) -> anyhow::Result<Vec<SearchResult>> {
+            _requests: Vec<SearchRequest>,
+        ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
             panic!("DummyCsi search called")
         }
 
@@ -566,8 +571,8 @@ pub mod tests {
         async fn search(
             &self,
             _auth: String,
-            _request: SearchRequest,
-        ) -> anyhow::Result<Vec<SearchResult>> {
+            _requests: Vec<SearchRequest>,
+        ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
             unimplemented!()
         }
 
