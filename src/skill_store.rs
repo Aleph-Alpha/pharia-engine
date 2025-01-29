@@ -1,10 +1,10 @@
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::{
+    engine::{Skill, SkillPath},
     namespace_watcher::Namespace,
     registries::Digest,
     skill_loader::{ConfiguredSkill, SkillLoaderApi},
-    skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
 use futures::stream::FuturesUnordered;
@@ -500,9 +500,11 @@ pub mod tests {
     use test_skills::{given_chat_skill, given_greet_skill_v0_2};
     use tokio::time::{sleep, timeout};
 
-    use crate::namespace_watcher::Namespace;
-    use crate::skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg};
-    use crate::skills::{Engine, SkillPath};
+    use crate::{
+        engine::{Engine, SkillPath},
+        namespace_watcher::Namespace,
+        skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg},
+    };
 
     use super::*;
 

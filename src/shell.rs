@@ -38,9 +38,10 @@ use crate::{
     authorization::{authorization_middleware, AuthorizationApi},
     csi::Csi,
     csi_shell::http_csi_handle,
+    engine::SkillPath,
     namespace_watcher::Namespace,
     skill_store::SkillStoreApi,
-    skills::{ExecuteSkillError, SkillExecutorApi, SkillPath},
+    skills::{ExecuteSkillError, SkillExecutorApi},
 };
 
 pub struct Shell {
@@ -512,9 +513,10 @@ mod tests {
         csi_shell::{
             V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest, VersionedCsiRequest,
         },
+        engine::SkillPath,
         inference::{self, Completion},
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
-        skills::{tests::SkillExecutorMsg, ExecuteSkillError, SkillPath},
+        skills::{tests::SkillExecutorMsg, ExecuteSkillError},
         tests::api_token,
     };
 
