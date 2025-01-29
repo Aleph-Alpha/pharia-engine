@@ -216,11 +216,10 @@ pub enum ShellMetrics {
 
 impl From<ShellMetrics> for metrics::KeyName {
     fn from(value: ShellMetrics) -> Self {
-        match value {
+        Self::from_const_str(match value {
             ShellMetrics::HttpRequestsTotal => "kernel_http_requests_total",
             ShellMetrics::HttpRequestsDurationSeconds => "kernel_http_requests_duration_seconds",
-        }
-        .into()
+        })
     }
 }
 
