@@ -18,13 +18,11 @@ use tokio::{
 use tracing::{span, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use super::{
-    runtime::{CsiForSkills, WasmRuntime},
-    Engine, SkillPath,
-};
+use super::runtime::WasmRuntime;
 
 use crate::{
-    csi::{ChunkRequest, Csi},
+    csi::{ChunkRequest, Csi, CsiForSkills},
+    engine::{Engine, SkillPath},
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -396,13 +394,13 @@ pub mod tests {
             chunking::ChunkParams,
             tests::{DummyCsi, StubCsi},
         },
+        engine::Skill,
         inference::{
             tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },
         search::DocumentPath,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, SkillStoreMessage},
-        skills::Skill,
     };
 
     #[tokio::test]

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
 
-use crate::{skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::SkillPath};
+use crate::{engine::SkillPath, skill_loader::ConfiguredSkill, skill_store::SkillStoreApi};
 
 use super::{
     namespace_description::{NamespaceDescriptionError, SkillDescription},
@@ -263,10 +263,11 @@ pub mod tests {
     use tokio::sync::{mpsc, Mutex};
     use tokio::time::timeout;
 
-    use crate::namespace_watcher::config::Namespace;
-    use crate::namespace_watcher::tests::NamespaceConfig;
-    use crate::skill_store::tests::SkillStoreMessage;
-    use crate::skills::SkillPath;
+    use crate::{
+        engine::SkillPath,
+        namespace_watcher::{config::Namespace, tests::NamespaceConfig},
+        skill_store::tests::SkillStoreMessage,
+    };
 
     use super::*;
     use anyhow::anyhow;

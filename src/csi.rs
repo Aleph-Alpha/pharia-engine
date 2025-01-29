@@ -29,6 +29,24 @@ pub struct CsiDrivers<T> {
     pub tokenizers: T,
 }
 
+/// Cognitive System Interface (CSI) as consumed by Skill developers. In particular some accidental
+/// complexity has been stripped away, by implementations due to removing accidental errors from the
+/// interface. It also assumes all authentication and authorization is handled behind the scenes.
+/// This is the CSI as passed to user defined code in WASM.
+#[async_trait]
+pub trait CsiForSkills {
+    async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
+    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>>;
+    async fn select_language(
+        &mut self,
+        requests: Vec<SelectLanguageRequest>,
+    ) -> Vec<Option<Language>>;
+    async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse>;
+    async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>>;
+    async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;
+    async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
+}
+
 /// Cognitive System Interface (CSI) as consumed internally by Pharia Kernel, before the CSI is
 /// passed to the end user in Skill code we further strip away some of the accidental complexity.
 /// See its sibling trait `CsiForSkills`.
@@ -256,26 +274,21 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::sync::Arc;
+
+    use std::sync::{Arc, Mutex};
 
     use anyhow::bail;
-    use async_trait::async_trait;
-    use serde_json::Value;
-    use tokio::sync::mpsc;
+    use serde_json::json;
 
     use crate::{
-        csi::chunking::ChunkParams,
-        inference::{
-            tests::InferenceStub, ChatParams, ChatRequest, ChatResponse, Completion,
-            CompletionParams, CompletionRequest, InferenceApi, Message, Role,
-        },
-        search::{tests::SearchStub, Document, DocumentPath, SearchRequest, SearchResult},
+        inference::{tests::InferenceStub, ChatParams, CompletionParams, Message, Role},
+        search::tests::SearchStub,
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
         FinishReason,
     };
 
-    use super::{ChunkRequest, Csi, CsiDrivers};
+    use super::*;
 
     #[tokio::test]
     async fn chat() {
@@ -594,6 +607,207 @@ pub mod tests {
             _auth: String,
             _document_paths: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Option<Value>>> {
+            unimplemented!()
+        }
+    }
+
+    /// A test double for a [`Csi`] implementation which always completes with the provided function.
+    pub struct CsiCompleteStub {
+        complete_fn: Box<dyn FnMut(CompletionRequest) -> Completion + Send>,
+    }
+
+    impl CsiCompleteStub {
+        pub fn new(complete: impl FnMut(CompletionRequest) -> Completion + Send + 'static) -> Self {
+            Self {
+                complete_fn: Box::new(complete),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl CsiForSkills for CsiCompleteStub {
+        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            requests
+                .into_iter()
+                .map(|r| (self.complete_fn)(r))
+                .collect()
+        }
+
+        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+            requests
+                .into_iter()
+                .map(|request| vec![request.text])
+                .collect()
+        }
+
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            unimplemented!()
+        }
+
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            unimplemented!()
+        }
+
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            unimplemented!()
+        }
+
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+            unimplemented!()
+        }
+
+        async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
+            unimplemented!()
+        }
+    }
+    /// Asserts a specific prompt and model and returns a greeting message
+    pub struct CsiGreetingMock;
+
+    impl CsiGreetingMock {
+        fn complete_text(request: CompletionRequest) -> Completion {
+            let expected_prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 23 Jul 2024
+
+You are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>";
+
+            let expected_model = "pharia-1-llm-7b-control";
+
+            // Print actual parameters in case of failure
+            eprintln!("{request:?}");
+
+            if matches!(request, CompletionRequest{ prompt, model, ..} if model == expected_model && prompt == expected_prompt)
+            {
+                Completion::from_text("Hello Homer")
+            } else {
+                Completion::from_text("Mock expectation violated")
+            }
+        }
+    }
+
+    #[async_trait]
+    impl CsiForSkills for CsiGreetingMock {
+        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            requests.into_iter().map(Self::complete_text).collect()
+        }
+
+        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+            requests
+                .into_iter()
+                .map(|request| vec![request.text])
+                .collect()
+        }
+
+        async fn select_language(
+            &mut self,
+            requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            try_join_all(
+                requests
+                    .into_iter()
+                    .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
+            )
+            .await
+            .unwrap()
+        }
+
+        async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            requests
+                .iter()
+                .map(|_| ChatResponse {
+                    message: Message {
+                        role: Role::Assistant,
+                        content: "dummy-content".to_owned(),
+                    },
+                    finish_reason: FinishReason::Stop,
+                })
+                .collect()
+        }
+
+        async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            requests
+                .into_iter()
+                .map(|request| {
+                    let document_path = DocumentPath {
+                        namespace: "aleph-alpha".to_owned(),
+                        collection: "test-collection".to_owned(),
+                        name: "small".to_owned(),
+                    };
+                    vec![SearchResult {
+                        document_path,
+                        content: request.query,
+                        score: 1.0,
+                    }]
+                })
+                .collect()
+        }
+
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+            vec![Document::dummy()]
+        }
+
+        async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
+            vec![Some(json!({ "url": "http://example.de" }))]
+        }
+    }
+
+    #[derive(Default, Clone)]
+    pub struct CsiCounter {
+        counter: Arc<Mutex<u32>>,
+    }
+
+    impl CsiCounter {
+        pub fn new() -> Self {
+            Self::default()
+        }
+    }
+
+    #[async_trait]
+    impl CsiForSkills for CsiCounter {
+        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            requests
+                .iter()
+                .map(|_| {
+                    let mut counter = self.counter.lock().unwrap();
+                    *counter += 1;
+                    Completion::from_text(counter.to_string())
+                })
+                .collect()
+        }
+
+        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+            requests
+                .into_iter()
+                .map(|request| vec![request.text])
+                .collect()
+        }
+
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            unimplemented!()
+        }
+
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            unimplemented!()
+        }
+
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            unimplemented!()
+        }
+
+        async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+            unimplemented!()
+        }
+
+        async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
             unimplemented!()
         }
     }

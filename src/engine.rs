@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     path::Path,
     sync::LazyLock,
     time::{Duration, Instant},
@@ -17,7 +18,27 @@ use wasmtime::{
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
-use super::CsiForSkills;
+use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SkillPath {
+    pub namespace: Namespace,
+    pub name: String,
+}
+
+impl SkillPath {
+    pub fn new(namespace: Namespace, name: impl Into<String>) -> Self {
+        Self {
+            namespace,
+            name: name.into(),
+        }
+    }
+}
+impl fmt::Display for SkillPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.namespace, self.name)
+    }
+}
 
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
@@ -269,7 +290,7 @@ impl SupportedVersion {
                 static VERSION: LazyLock<Version> = LazyLock::new(|| {
                     SupportedVersion::extract_wit_package_version(
                         "./wit/skill@0.2/skill.wit",
-                        include_str!("../../../wit/skill@0.2/skill.wit"),
+                        include_str!("../wit/skill@0.2/skill.wit"),
                     )
                 });
                 &VERSION
@@ -278,7 +299,7 @@ impl SupportedVersion {
                 static VERSION: LazyLock<Version> = LazyLock::new(|| {
                     SupportedVersion::extract_wit_package_version(
                         "./wit/skill@0.3/skill.wit",
-                        include_str!("../../../wit/skill@0.3/skill.wit"),
+                        include_str!("../wit/skill@0.3/skill.wit"),
                     )
                 });
                 &VERSION
@@ -1065,6 +1086,8 @@ fn pooling_allocator_is_supported() -> bool {
 mod tests {
     use std::fs;
 
+    use fake::{faker::company::en::Buzzword, Dummy, Fake, Faker};
+    use rand::Rng;
     use serde_json::json;
     use test_skills::{
         given_chat_skill, given_greet_py_v0_2, given_greet_skill_v0_2, given_greet_skill_v0_3,
@@ -1074,12 +1097,35 @@ mod tests {
     use v0_2::pharia::skill::csi::{Host, Language};
 
     use crate::{
-        csi::tests::DummyCsi,
-        skills::{actor::SkillInvocationCtx, runtime::wasm::tests::CsiGreetingMock},
+        csi::tests::{CsiGreetingMock, DummyCsi},
+        skills::tests::SkillInvocationCtx,
         tests::api_token,
     };
 
     use super::*;
+
+    impl SkillPath {
+        pub fn dummy() -> Self {
+            Faker.fake()
+        }
+
+        pub fn local(name: impl Into<String>) -> Self {
+            let namespace = Namespace::new("local").unwrap();
+            Self {
+                namespace,
+                name: name.into(),
+            }
+        }
+    }
+
+    impl Dummy<Faker> for SkillPath {
+        fn dummy_with_rng<R: Rng + ?Sized>(_config: &Faker, rng: &mut R) -> Self {
+            Self {
+                namespace: Namespace::new("dummy").unwrap(),
+                name: Fake::fake_with_rng::<_, _>(&Buzzword(), rng),
+            }
+        }
+    }
 
     #[test]
     fn can_parse_module() {
