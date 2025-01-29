@@ -144,8 +144,14 @@ interface csi {
     ///
     /// text: Text input
     /// languages: All languages that should be considered during detection.
-    @since(version = 0.2.2)
-    select-language: func(text: string, languages: list<language>) -> option<language>;
+    // @since(version = 0.3.0)
+    record select-language-request {
+        text: string,
+        languages: list<language>,
+    }
+
+    // @since(version = 0.3.0)
+    select-language: func(request: list<select-language-request>) -> list<option<language>>;
 
     /// Completion request parameters
     @since(version = 0.2.3)

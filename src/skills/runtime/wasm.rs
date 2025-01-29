@@ -63,6 +63,7 @@ pub mod tests {
 
     use super::*;
     use async_trait::async_trait;
+    use futures::future::try_join_all;
     use serde_json::json;
     use test_skills::{given_greet_py_v0_2, given_greet_skill_v0_2};
 
@@ -206,8 +207,11 @@ pub mod tests {
                 .collect()
         }
 
-        async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language> {
-            select_language(request)
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            unimplemented!()
         }
 
         async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
@@ -267,8 +271,17 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 .collect()
         }
 
-        async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language> {
-            select_language(request)
+        async fn select_language(
+            &mut self,
+            requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            try_join_all(
+                requests
+                    .into_iter()
+                    .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
+            )
+            .await
+            .unwrap()
         }
 
         async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
@@ -342,8 +355,11 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 .collect()
         }
 
-        async fn select_language(&mut self, request: SelectLanguageRequest) -> Option<Language> {
-            select_language(request)
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            unimplemented!()
         }
 
         async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {

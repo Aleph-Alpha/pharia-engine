@@ -117,7 +117,9 @@ pub enum V0_3CsiRequest {
     Chunk {
         requests: Vec<ChunkRequest>,
     },
-    SelectLanguage(SelectLanguageRequest),
+    SelectLanguage {
+        requests: Vec<SelectLanguageRequest>,
+    },
     Complete {
         requests: Vec<CompletionRequest>,
     },
@@ -148,10 +150,9 @@ impl V0_3CsiRequest {
             V0_3CsiRequest::Chunk { requests } => {
                 drivers.chunk(auth, requests).await.map(|r| json!(r))?
             }
-            V0_3CsiRequest::SelectLanguage(select_language_request) => drivers
-                .select_language(select_language_request)
-                .await
-                .map(|r| json!(r))?,
+            V0_3CsiRequest::SelectLanguage { requests } => {
+                drivers.select_language(requests).await.map(|r| json!(r))?
+            }
             V0_3CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -213,9 +214,9 @@ impl V0_2CsiRequest {
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
             V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
-                .select_language(select_language_request)
+                .select_language(vec![select_language_request])
                 .await
-                .map(|r| json!(r))?,
+                .map(|r| json!(r.first().unwrap()))?,
             V0_2CsiRequest::CompleteAll(complete_all_request) => drivers
                 .complete(
                     auth,
