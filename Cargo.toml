@@ -56,7 +56,7 @@ reqwest = { version = "0.12.12", features = [
 ] }
 semver = "1.0.25"
 serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.137"
+serde_json = "1.0.138"
 toml = "0.8.19"
 strum = { version = "0.26.3", features = ["derive"] }
 tokio = { version = "1.43.0", features = [
@@ -129,8 +129,8 @@ test-skills = { path = "./test-skills" }
 fake = "3.1.0"
 http-body-util = "0.1.2"
 mime = "0.3.17"
-rand = "0.8.5"
-tempfile = "3.15.0"
+rand = "0.9.0"
+tempfile = "3.16.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.43.0", features = ["test-util"] }
 tokio-test = "0.4.4"
