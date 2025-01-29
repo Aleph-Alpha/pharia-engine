@@ -16,6 +16,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_PROFILE_TEST_DEBUG: 0
 
 jobs:
   tests:
@@ -27,13 +28,13 @@ jobs:
           targets: wasm32-wasip2
       - uses: taiki-e/install-action@v2
         with:
-          tool: wasm-tools
+          tool: wasm-tools,cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run cargo test
-        run: cargo test --workspace --all-features
+      - run: cargo nextest run --workspace --all-features
+      - run: cargo test --doc
     env:
       NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY: ghcr.io
       NAMESPACES__PHARIA_KERNEL_TEAM__BASE_REPOSITORY: aleph-alpha/pharia-kernel
