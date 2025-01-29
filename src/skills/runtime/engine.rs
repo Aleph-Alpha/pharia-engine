@@ -487,8 +487,9 @@ mod v0_2 {
                 min_score,
             };
             self.skill_ctx
-                .search(request)
+                .search(vec![request])
                 .await
+                .remove(0)
                 .into_iter()
                 .map(Into::into)
                 .collect()
@@ -698,7 +699,7 @@ mod v0_3 {
     use pharia::skill::csi::{
         ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion,
         CompletionParams, CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath,
-        Language, Message, Modality, Role, SearchResult,
+        Language, Message, Modality, Role, SearchRequest, SearchResult,
     };
     use wasmtime::component::bindgen;
 
@@ -706,7 +707,7 @@ mod v0_3 {
         csi::chunking,
         inference,
         language_selection::{self, SelectLanguageRequest},
-        search::{self, SearchRequest},
+        search,
     };
 
     use super::LinkedCtx;
@@ -747,10 +748,8 @@ mod v0_3 {
 
     impl Host for LinkedCtx {
         async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-            let requests = requests.into_iter().map(Into::into).collect();
-
             self.skill_ctx
-                .chat(requests)
+                .chat(requests.into_iter().map(Into::into).collect())
                 .await
                 .into_iter()
                 .map(Into::into)
@@ -758,8 +757,9 @@ mod v0_3 {
         }
 
         async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
-            let requests = requests.into_iter().map(Into::into).collect();
-            self.skill_ctx.chunk(requests).await
+            self.skill_ctx
+                .chunk(requests.into_iter().map(Into::into).collect())
+                .await
         }
 
         async fn select_language(
@@ -776,41 +776,26 @@ mod v0_3 {
         }
 
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            let requests = requests.into_iter().map(Into::into).collect();
-
             self.skill_ctx
-                .complete(requests)
+                .complete(requests.into_iter().map(Into::into).collect())
                 .await
                 .into_iter()
                 .map(Into::into)
                 .collect()
         }
 
-        async fn search(
-            &mut self,
-            index_path: IndexPath,
-            query: String,
-            max_results: u32,
-            min_score: Option<f64>,
-        ) -> Vec<SearchResult> {
-            let request = SearchRequest {
-                index_path: index_path.into(),
-                query,
-                max_results,
-                min_score,
-            };
+        async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             self.skill_ctx
-                .search(request)
+                .search(requests.into_iter().map(Into::into).collect())
                 .await
                 .into_iter()
-                .map(Into::into)
+                .map(|results| results.into_iter().map(Into::into).collect())
                 .collect()
         }
 
         async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
-            let requests = requests.into_iter().map(Into::into).collect();
             self.skill_ctx
-                .documents(requests)
+                .documents(requests.into_iter().map(Into::into).collect())
                 .await
                 .into_iter()
                 .map(Into::into)
@@ -818,9 +803,8 @@ mod v0_3 {
         }
 
         async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Vec<u8>>> {
-            let requests = requests.into_iter().map(Into::into).collect();
             self.skill_ctx
-                .document_metadata(requests)
+                .document_metadata(requests.into_iter().map(Into::into).collect())
                 .await
                 .into_iter()
                 .map(|value| {
@@ -837,6 +821,23 @@ mod v0_3 {
             match language {
                 language_selection::Language::Eng => Language::Eng,
                 language_selection::Language::Deu => Language::Deu,
+            }
+        }
+    }
+
+    impl From<SearchRequest> for search::SearchRequest {
+        fn from(request: SearchRequest) -> Self {
+            let SearchRequest {
+                index_path,
+                query,
+                max_results,
+                min_score,
+            } = request;
+            Self {
+                index_path: index_path.into(),
+                query,
+                max_results,
+                min_score,
             }
         }
     }

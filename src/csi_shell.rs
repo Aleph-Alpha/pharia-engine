@@ -121,7 +121,9 @@ pub enum V0_3CsiRequest {
     Complete {
         requests: Vec<CompletionRequest>,
     },
-    Search(SearchRequest),
+    Search {
+        requests: Vec<SearchRequest>,
+    },
     Chat {
         requests: Vec<ChatRequest>,
     },
@@ -154,10 +156,9 @@ impl V0_3CsiRequest {
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|v| json!(v))?,
-            V0_3CsiRequest::Search(search_request) => drivers
-                .search(auth, search_request)
-                .await
-                .map(|v| json!(v))?,
+            V0_3CsiRequest::Search { requests } => {
+                drivers.search(auth, requests).await.map(|v| json!(v))?
+            }
             V0_3CsiRequest::Chat { requests } => {
                 drivers.chat(auth, requests).await.map(|v| json!(v))?
             }
@@ -227,9 +228,9 @@ impl V0_2CsiRequest {
                 .await
                 .map(|v| json!(v))?,
             V0_2CsiRequest::Search(search_request) => drivers
-                .search(auth, search_request)
+                .search(auth, vec![search_request])
                 .await
-                .map(|v| json!(v))?,
+                .map(|v| json!(v.first().unwrap()))?,
             V0_2CsiRequest::Chat(chat_request) => drivers
                 .chat(auth, vec![chat_request])
                 .await

@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest};
-use pharia::skill::csi::{documents, search, DocumentPath, IndexPath};
+use pharia::skill::csi::{documents, search, DocumentPath, IndexPath, SearchRequest};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
@@ -19,8 +19,15 @@ impl Guest for Skill {
             collection: "test".to_owned(),
             index: "asym-64".to_owned(),
         };
-        let results = search(&index_path, &query, 10, None);
+        let request = SearchRequest {
+            index_path,
+            query,
+            max_results: 10,
+            min_score: None,
+        };
+        let mut results = search(&[request]);
         let results = results
+            .remove(0)
             .iter()
             .map(|r| r.content.clone())
             .collect::<Vec<_>>();

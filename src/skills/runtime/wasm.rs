@@ -214,7 +214,7 @@ pub mod tests {
             unimplemented!()
         }
 
-        async fn search(&mut self, _request: SearchRequest) -> Vec<SearchResult> {
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             unimplemented!()
         }
 
@@ -284,17 +284,22 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 .collect()
         }
 
-        async fn search(&mut self, request: SearchRequest) -> Vec<SearchResult> {
-            let document_path = DocumentPath {
-                namespace: "aleph-alpha".to_owned(),
-                collection: "test-collection".to_owned(),
-                name: "small".to_owned(),
-            };
-            vec![SearchResult {
-                document_path,
-                content: request.query,
-                score: 1.0,
-            }]
+        async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            requests
+                .into_iter()
+                .map(|request| {
+                    let document_path = DocumentPath {
+                        namespace: "aleph-alpha".to_owned(),
+                        collection: "test-collection".to_owned(),
+                        name: "small".to_owned(),
+                    };
+                    vec![SearchResult {
+                        document_path,
+                        content: request.query,
+                        score: 1.0,
+                    }]
+                })
+                .collect()
         }
 
         async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
@@ -345,7 +350,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             unimplemented!()
         }
 
-        async fn search(&mut self, _request: SearchRequest) -> Vec<SearchResult> {
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             unimplemented!()
         }
 
