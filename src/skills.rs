@@ -2,7 +2,7 @@ mod actor;
 mod runtime;
 use std::fmt;
 
-pub use actor::{ExecuteSkillError, SkillExecutor, SkillExecutorApi};
+pub use actor::{ExecuteSkillError, SkillExecutor, SkillExecutorApi, SkillRuntimeMetrics};
 pub use runtime::{Engine, Skill, SupportedVersion};
 
 use crate::namespace_watcher::Namespace;

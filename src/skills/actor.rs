@@ -148,6 +148,22 @@ where
     }
 }
 
+pub enum SkillRuntimeMetrics {
+    SkillExecutionTotal,
+    SkillExecutionDurationSeconds,
+}
+
+impl From<SkillRuntimeMetrics> for metrics::KeyName {
+    fn from(value: SkillRuntimeMetrics) -> Self {
+        Self::from_const_str(match value {
+            SkillRuntimeMetrics::SkillExecutionTotal => "kernel_skill_execution_total",
+            SkillRuntimeMetrics::SkillExecutionDurationSeconds => {
+                "kernel_skill_execution_duration_seconds"
+            }
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct SkillExecutorMsg {
     pub skill_path: SkillPath,
@@ -164,6 +180,11 @@ impl SkillExecutorMsg {
             send,
             api_token,
         } = self;
+        let labels = [
+            ("namespace", skill_path.namespace.to_string()),
+            ("name", skill_path.name.clone()),
+        ];
+        metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
 
         let span = span!(
             Level::DEBUG,
@@ -350,6 +371,9 @@ pub mod tests {
     use super::*;
 
     use anyhow::{anyhow, bail};
+    use metrics::Label;
+    use metrics_util::debugging::DebugValue;
+    use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
     use test_skills::given_greet_skill_v0_2;
     use tokio::try_join;
@@ -519,6 +543,49 @@ pub mod tests {
         // Then they both have completed with the same values
         let (result1, result2) = result.unwrap();
         assert_eq!(result1, result2);
+    }
+
+    #[test]
+    fn skill_runtime_metrics_emitted() {
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let csi = StubCsi::with_completion_from_text("Hello");
+        let (send, _) = oneshot::channel();
+        let skill_path = SkillPath::dummy();
+        let msg = SkillExecutorMsg {
+            skill_path: skill_path.clone(),
+            input: json!("Hello"),
+            send,
+            api_token: "dummy".to_owned(),
+        };
+        // Metrics requires sync, so all of the async parts are moved into this closure.
+        let snapshot = metrics_snapshot(|| async move {
+            let store = SkillStoreGreetStub::new(engine.clone());
+            let runtime = WasmRuntime::new(engine, store.api());
+            msg.run_skill(csi, &runtime).await;
+            drop(runtime);
+            store.wait_for_shutdown().await;
+        });
+
+        let metrics = snapshot.into_vec();
+        let expected_labels = [
+            &Label::new("namespace", skill_path.namespace.to_string()),
+            &Label::new("name", skill_path.name),
+        ];
+        assert!(metrics.iter().any(|(key, _, _, value)| {
+            let key = key.key();
+            let labels = key.labels().collect::<Vec<_>>();
+            key.name() == "kernel_skill_execution_total"
+                && labels == expected_labels
+                && value == &DebugValue::Counter(1)
+        }));
+    }
+
+    fn metrics_snapshot<F: Future<Output = ()>>(f: impl FnOnce() -> F) -> Snapshot {
+        let recorder = DebuggingRecorder::new();
+        let snapshotter = recorder.snapshotter();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        metrics::with_local_recorder(&recorder, || runtime.block_on(f()));
+        snapshotter.snapshot()
     }
 
     #[derive(Clone)]

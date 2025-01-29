@@ -87,10 +87,9 @@ pub enum CsiMetrics {
 
 impl From<CsiMetrics> for metrics::KeyName {
     fn from(value: CsiMetrics) -> Self {
-        match value {
+        Self::from_const_str(match value {
             CsiMetrics::CsiRequestsTotal => "kernel_csi_requests_total",
-        }
-        .into()
+        })
     }
 }
 
