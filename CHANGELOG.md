@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.5...v0.7.6)
+
+### Features
+
+- Load namespace descriptions concurrently - ([a6106f2](https://github.com/Aleph-Alpha/pharia-kernel/commit/a6106f22b696806f99c696da3fb6af0a4a2a575a))
+
+### Fixes
+
+- Do not retry loading of namespace description - ([8be2930](https://github.com/Aleph-Alpha/pharia-kernel/commit/8be2930c187d0f989c13f7cceaa9ff7eeee271df))
+
+
 ## [0.7.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.4...v0.7.5)
 
 ### Features
