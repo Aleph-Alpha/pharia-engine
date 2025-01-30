@@ -106,11 +106,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by(cluster, namespace, name, status) (increase(kernel_skill_execution_total[1m]))",
+          "expr": "sum by(cluster, exported_namespace, name, status) (increase(kernel_skill_execution_total[1m]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{cluster}} {{namespace}}/{{name}} -> {{status}}",
+          "legendFormat": "{{cluster}} {{exported_namespace}}/{{name}} -> {{status}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -372,9 +372,7 @@
         "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -932,13 +930,13 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Pharia Kernel",
   "uid": "de5pijc6rvbpca",
-  "version": 59,
+  "version": 60,
   "weekStart": ""
 }
