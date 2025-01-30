@@ -16,11 +16,9 @@ use reqwest_tracing::TracingMiddleware;
 pub struct HttpClient(ClientWithMiddleware);
 
 impl HttpClient {
-    pub fn new() -> Self {
-        let retry_middleware = RetryTransientMiddleware::new_with_policy(
-            ExponentialBackoff::builder().build_with_max_retries(3),
-        );
-        let tracing_middleware = TracingMiddleware::default();
+    pub fn new(retry: bool) -> Self {
+        // Make retry optional, as it is not needed for namespace observing where we do it
+        // continuously anyway.
         let client = Client::builder()
             .use_rustls_tls()
             // Reasonable default (not used for inference)
@@ -28,17 +26,19 @@ impl HttpClient {
             .build()
             .expect("Invalid reqwest client");
 
-        Self(
-            ClientBuilder::new(client)
-                .with(retry_middleware)
-                .with(tracing_middleware)
-                .build(),
-        )
+        let mut client = ClientBuilder::new(client);
+        if retry {
+            let retry_middleware = RetryTransientMiddleware::new_with_policy(
+                ExponentialBackoff::builder().build_with_max_retries(3),
+            );
+            client = client.with(retry_middleware);
+        }
+        Self(client.with(TracingMiddleware::default()).build())
     }
 }
 
 impl Default for HttpClient {
     fn default() -> Self {
-        Self::new()
+        Self::new(true)
     }
 }
