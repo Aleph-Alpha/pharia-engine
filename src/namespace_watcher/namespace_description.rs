@@ -126,7 +126,8 @@ pub struct HttpLoader {
 impl HttpLoader {
     pub fn from_url(url: &str, token: Option<String>) -> Self {
         Self {
-            client: HttpClient::default(),
+            // We do not need retries for namespace observing, as we do it continuously anyway.
+            client: HttpClient::new(false),
             url: url.to_owned(),
             token,
         }
