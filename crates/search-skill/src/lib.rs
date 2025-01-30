@@ -2,7 +2,7 @@
 #![expect(unsafe_op_in_unsafe_fn)]
 
 use anyhow::anyhow;
-use exports::pharia::skill::skill_handler::{Error, Guest};
+use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::csi::{documents, search, DocumentPath, IndexPath, SearchRequest};
 use serde_json::json;
 
@@ -43,6 +43,14 @@ impl Guest for Skill {
         let result = documents(&[request]);
         assert!(!result.is_empty());
         Ok(output)
+    }
+
+    fn metadata() -> SkillMetadata {
+        SkillMetadata {
+            description: None,
+            input_schema: vec![],
+            output_schema: vec![],
+        }
     }
 }
 

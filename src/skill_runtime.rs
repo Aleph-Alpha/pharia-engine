@@ -130,20 +130,28 @@ impl SkillExecutorApi {
         &self,
         skill_path: SkillPath,
     ) -> anyhow::Result<Option<SkillMetadata>> {
-        anyhow::bail!("Not implemented")
+        let (send, recv) = oneshot::channel();
+        let msg = SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { skill_path, send });
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await.unwrap()
     }
 }
 
-#[derive(ToSchema, Serialize)]
+#[derive(ToSchema, Serialize, Debug)]
+#[serde(tag = "version")]
 pub enum SkillMetadata {
+    #[serde(rename = "v1")]
     V1(SkillMetadataV1),
 }
 
-#[derive(ToSchema, Serialize)]
+#[derive(ToSchema, Serialize, Debug)]
 pub struct SkillMetadataV1 {
-    description: Option<String>,
-    input_schema: Value,
-    output_schema: Value,
+    pub description: Option<String>,
+    pub input_schema: Value,
+    pub output_schema: Value,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -221,16 +229,25 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
 
 pub enum SkillExecutorMsg {
     ExecuteSkill(ExecuteSkill),
+    SkillMetadata(SkillMetadataRequest),
 }
 
 impl SkillExecutorMsg {
     async fn act(self, runtime: &WasmRuntime, csi_apis: impl Csi + Send + Sync + 'static) {
         match self {
             SkillExecutorMsg::ExecuteSkill(execute_skill) => {
-                execute_skill.run_skill(csi_apis, runtime).await
+                execute_skill.run_skill(csi_apis, runtime).await;
+            }
+            SkillExecutorMsg::SkillMetadata(skill_metadata_request) => {
+                let error = anyhow::anyhow!("Not implemented");
+                drop(skill_metadata_request.send.send(Err(error)));
             }
         }
     }
+}
+pub struct SkillMetadataRequest {
+    pub skill_path: SkillPath,
+    pub send: oneshot::Sender<anyhow::Result<Option<SkillMetadata>>>,
 }
 
 #[derive(Debug)]
