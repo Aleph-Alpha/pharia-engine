@@ -16,13 +16,13 @@ use super::{
 pub trait ObservableConfig {
     fn namespaces(&self) -> Vec<Namespace>;
     async fn skills(
-        &mut self,
+        &self,
         namespace: &Namespace,
     ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError>;
 }
 
 pub struct NamespaceDescriptionLoaders {
-    namespaces: HashMap<Namespace, Box<dyn NamespaceDescriptionLoader + Send>>,
+    namespaces: HashMap<Namespace, Box<dyn NamespaceDescriptionLoader + Send + Sync>>,
 }
 
 impl NamespaceDescriptionLoaders {
@@ -49,12 +49,12 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
     }
 
     async fn skills(
-        &mut self,
+        &self,
         namespace: &Namespace,
     ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
         let skills = self
             .namespaces
-            .get_mut(namespace)
+            .get(namespace)
             .expect("namespace must exist.")
             .description()
             .await?
@@ -294,7 +294,7 @@ pub mod tests {
         }
 
         async fn skills(
-            &mut self,
+            &self,
             namespace: &Namespace,
         ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             self.config.lock().await.skills(namespace).await
@@ -318,7 +318,7 @@ pub mod tests {
         }
 
         async fn skills(
-            &mut self,
+            &self,
             namespace: &Namespace,
         ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             Ok(self
@@ -338,7 +338,7 @@ pub mod tests {
         }
 
         async fn skills(
-            &mut self,
+            &self,
             _namespace: &Namespace,
         ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             pending().await
@@ -422,7 +422,7 @@ pub mod tests {
         .collect();
         let config = NamespaceConfigs::new(namespaces);
 
-        let mut loaders = NamespaceDescriptionLoaders::new(config).unwrap();
+        let loaders = NamespaceDescriptionLoaders::new(config).unwrap();
 
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);
@@ -445,7 +445,7 @@ pub mod tests {
         .collect();
         let config = NamespaceConfigs::new(namespaces);
 
-        let mut loaders = NamespaceDescriptionLoaders::new(config).unwrap();
+        let loaders = NamespaceDescriptionLoaders::new(config).unwrap();
 
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);
@@ -527,7 +527,7 @@ pub mod tests {
         }
 
         async fn skills(
-            &mut self,
+            &self,
             _namespace: &Namespace,
         ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
             Err(NamespaceDescriptionError::Unrecoverable(anyhow!(

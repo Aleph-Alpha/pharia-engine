@@ -166,7 +166,9 @@ impl NamespaceConfig {
         }
     }
 
-    pub fn loader(&self) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + 'static>> {
+    pub fn loader(
+        &self,
+    ) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + Sync + 'static>> {
         match self {
             NamespaceConfig::TeamOwned {
                 config_url,
