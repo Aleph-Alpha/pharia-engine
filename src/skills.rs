@@ -21,8 +21,10 @@ use wit_parser::decoding::{decode, DecodedWasm};
 use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(test, derive(fake::Dummy))]
 pub struct SkillPath {
     pub namespace: Namespace,
+    #[cfg_attr(test, dummy(faker = "fake::faker::company::en::Buzzword()"))]
     pub name: String,
 }
 
@@ -1086,8 +1088,7 @@ fn pooling_allocator_is_supported() -> bool {
 mod tests {
     use std::fs;
 
-    use fake::{faker::company::en::Buzzword, Dummy, Fake, Faker};
-    use rand::Rng;
+    use fake::{Fake, Faker};
     use serde_json::json;
     use test_skills::{
         given_chat_skill, given_greet_py_v0_2, given_greet_skill_v0_2, given_greet_skill_v0_3,
@@ -1114,15 +1115,6 @@ mod tests {
             Self {
                 namespace,
                 name: name.into(),
-            }
-        }
-    }
-
-    impl Dummy<Faker> for SkillPath {
-        fn dummy_with_rng<R: Rng + ?Sized>(_config: &Faker, rng: &mut R) -> Self {
-            Self {
-                namespace: Namespace::new("dummy").unwrap(),
-                name: Fake::fake_with_rng::<_, _>(&Buzzword(), rng),
             }
         }
     }
