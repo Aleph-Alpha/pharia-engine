@@ -23,8 +23,8 @@ interface skill-handler {
     // @since(version = 0.3.0)
     record skill-metadata {
         description: option<string>,
-        input-schema: string,
-        output-schema: string,
+        input-schema: list<u8>,
+        output-schema: list<u8>,
     }
 
     // @since(version = 0.3.0)

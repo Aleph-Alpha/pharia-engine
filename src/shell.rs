@@ -39,7 +39,7 @@ use crate::{
     csi::Csi,
     csi_shell::http_csi_handle,
     namespace_watcher::Namespace,
-    skill_runtime::{ExecuteSkillError, SkillExecutorApi},
+    skill_runtime::{ExecuteSkillError, SkillExecutorApi, SkillMetadata},
     skill_store::SkillStoreApi,
     skills::SkillPath,
 };
@@ -384,7 +384,7 @@ async fn execute_skill(
     tag = "skills",
     responses(
         (status = 200, description = "Description, input schema, and output schema of the skill if specified",
-            body=Value, example = json!({
+            body=SkillMetadata, example = json!({
                 "description": "The summary of the text.",
                 "input_schema": {
                     "properties": {
@@ -406,25 +406,20 @@ async fn execute_skill(
                     "type": "object",
                 }
             })),
+        (status = 204, description = "The skill does not provide metadata."),
         (status = 400, description = "Failed to get skill metadata.", body=Value, example = json!("Invalid skill input schema."))
     ),
 )]
 async fn skill_metadata(
     State(skill_executor_api): State<SkillExecutorApi>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    _bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
 ) -> (StatusCode, Json<Value>) {
     let skill_path = SkillPath::new(namespace, name);
-    let result = skill_executor_api
-        .execute_skill(skill_path, json!(""), bearer.token().to_owned())
-        .await;
+    let result = skill_executor_api.skill_metadata(skill_path).await;
     match result {
         Ok(response) => (StatusCode::OK, Json(json!(response))),
-        Err(ExecuteSkillError::SkillDoesNotExist) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
-        ),
-        Err(ExecuteSkillError::Other(err)) => (
+        Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
@@ -457,7 +452,7 @@ async fn run_skill(
         .execute_skill(skill_path, input, bearer.token().to_owned())
         .await;
     match result {
-        Ok(response) => (StatusCode::OK, Json(json!(response))),
+        Ok(response) => (StatusCode::OK, Json(response)),
         Err(ExecuteSkillError::SkillDoesNotExist) => (
             StatusCode::BAD_REQUEST,
             Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
@@ -643,6 +638,28 @@ mod tests {
                 csi_drivers,
             )
         }
+    }
+
+    #[tokio::test]
+    async fn skill_metadata() {
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let app_state = AppState::dummy();
+        let http = http(app_state);
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::GET)
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/greet_skill/metadata")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
     }
 
     #[tokio::test]

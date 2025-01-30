@@ -9,6 +9,7 @@ use std::{
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
 use opentelemetry::Context;
+use serde::Serialize;
 use serde_json::Value;
 use tokio::{
     select,
@@ -17,6 +18,7 @@ use tokio::{
 };
 use tracing::{span, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use utoipa::ToSchema;
 
 use crate::{
     csi::{ChunkRequest, Csi, CsiForSkills},
@@ -123,6 +125,25 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
+
+    pub async fn skill_metadata(
+        &self,
+        skill_path: SkillPath,
+    ) -> anyhow::Result<Option<SkillMetadata>> {
+        anyhow::bail!("Not implemented")
+    }
+}
+
+#[derive(ToSchema, Serialize)]
+pub enum SkillMetadata {
+    V1(SkillMetadataV1),
+}
+
+#[derive(ToSchema, Serialize)]
+pub struct SkillMetadataV1 {
+    description: Option<String>,
+    input_schema: Value,
+    output_schema: Value,
 }
 
 #[derive(Debug, thiserror::Error)]
