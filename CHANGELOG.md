@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.4...v0.7.5)
+
+### Features
+
+- Make language selection concurrent in WIT 0.3 - ([35c2a3a](https://github.com/Aleph-Alpha/pharia-kernel/commit/35c2a3ae2b7160af4a8340ffb2caf68ce11974f7))
+- Move search in 0.3 WIT to be concurrent - ([fda99df](https://github.com/Aleph-Alpha/pharia-kernel/commit/fda99dff731bd1a3bb745c64f1839efa025ac83d))
+- Add metrics for skill execution duration - ([7fe7645](https://github.com/Aleph-Alpha/pharia-kernel/commit/7fe7645e11891cb7baef99f41bcd7287b5ecda27))
+- Expose skill execution metric - ([518c17b](https://github.com/Aleph-Alpha/pharia-kernel/commit/518c17b9d78abb2048e5f66ad0e1c0bb77555215))
+- Make chunk requests concurrent in v0.3 WIT world - ([e85f36d](https://github.com/Aleph-Alpha/pharia-kernel/commit/e85f36da9d362751c90ffd6c683c126a9252ef6d))
+- Make chat requests concurrent in v0.3 wit world - ([9e457cb](https://github.com/Aleph-Alpha/pharia-kernel/commit/9e457cbd996b7d09a9c82c5105b9c83ce35297f3))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 13 updates - ([484473d](https://github.com/Aleph-Alpha/pharia-kernel/commit/484473d911ddd67a3a3f5155bbfde7435062c6ff))
+
+
 ## [0.7.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.3...v0.7.4)
 
 ### Fixes
