@@ -199,12 +199,17 @@ impl NamespaceWatcherActor {
 
     async fn report_all_changes(&mut self) {
         for namespace in &self.config.namespaces() {
-            self.report_changes_in_namespace(namespace).await;
+            let skills = self.config.skills(namespace).await;
+            self.report_changes_in_namespace(namespace, skills).await;
         }
     }
 
-    async fn report_changes_in_namespace(&mut self, namespace: &Namespace) {
-        let incoming = match self.config.skills(namespace).await {
+    async fn report_changes_in_namespace(
+        &mut self,
+        namespace: &Namespace,
+        skills: Result<Vec<SkillDescription>, NamespaceDescriptionError>,
+    ) {
+        let incoming = match skills {
             Ok(incoming) => {
                 if self.invalid_namespaces.contains(namespace) {
                     self.skill_store_api
@@ -545,10 +550,13 @@ pub mod tests {
         let skill_store_api = SkillStoreApi::new(sender);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.clone()]));
 
-        let mut coa = NamespaceWatcherActor::with_skills(namespaces, skill_store_api, config);
+        let mut watcher = NamespaceWatcherActor::with_skills(namespaces, skill_store_api, config);
 
         // when we load an invalid namespace
-        coa.report_changes_in_namespace(&dummy_namespace).await;
+        let skills = watcher.config.skills(&dummy_namespace).await;
+        watcher
+            .report_changes_in_namespace(&dummy_namespace, skills)
+            .await;
 
         // then mark the namespace as invalid and remove all skills of that namespace
         let msg = receiver.try_recv().unwrap();
