@@ -571,7 +571,10 @@ mod tests {
             V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest, VersionedCsiRequest,
         },
         inference::{self, Completion},
-        skill_runtime::{ExecuteSkill, ExecuteSkillError, SkillExecutorMsg},
+        skill_runtime::{
+            ExecuteSkill, ExecuteSkillError, SkillExecutorMsg, SkillMetadataRequest,
+            SkillMetadataV1,
+        },
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
         skills::SkillPath,
         tests::api_token,
@@ -642,11 +645,28 @@ mod tests {
 
     #[tokio::test]
     async fn skill_metadata() {
+        // Given
+        let skill_executer_mock = StubSkillExecuter::new(move |msg| match msg {
+            SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { skill_path, send }) => {
+                assert_eq!(skill_path, SkillPath::local("greet_skill"));
+                send.send(Ok(Some(SkillMetadata::V1(SkillMetadataV1 {
+                    description: Some("dummy description".to_owned()),
+                    input_schema: json!({}),
+                    output_schema: json!({}),
+                }))))
+                .unwrap();
+            },
+            SkillExecutorMsg::ExecuteSkill(ExecuteSkill { .. }) => {
+                panic!("unexpected message in test");
+            },
+        });
+        let skill_executor_api = skill_executer_mock.api();
+        let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
+
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
 
-        let app_state = AppState::dummy();
         let http = http(app_state);
         let resp = http
             .oneshot(
@@ -660,6 +680,15 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let metadata = serde_json::from_slice::<Value>(&body).unwrap();
+        let expected = json!({
+            "description": "dummy description",
+            "input_schema": {},
+            "output_schema": {},
+            "version": "v1",
+        });
+        assert_eq!(metadata, expected);
     }
 
     #[tokio::test]
@@ -702,12 +731,16 @@ mod tests {
     #[tokio::test]
     async fn execute_skill() {
         // Given
-        let skill_executer_mock = StubSkillExecuter::new(move |msg| {
-            let ExecuteSkill {
+        let skill_executer_mock = StubSkillExecuter::new(move |msg| match msg {
+            SkillExecutorMsg::ExecuteSkill(ExecuteSkill {
                 skill_path, send, ..
-            } = msg;
-            assert_eq!(skill_path, SkillPath::local("greet_skill"));
-            send.send(Ok(json!("dummy completion"))).unwrap();
+            }) => {
+                assert_eq!(skill_path, SkillPath::local("greet_skill"));
+                send.send(Ok(json!("dummy completion"))).unwrap();
+            },
+            SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
+                panic!("unexpected message in test");
+            }
         });
         let skill_executor_api = skill_executer_mock.api();
         let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
@@ -744,9 +777,13 @@ mod tests {
     async fn run_skill_with_bad_namespace() {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";
-        let skill_executer_mock = StubSkillExecuter::new(move |msg| {
-            let ExecuteSkill { send, .. } = msg;
-            send.send(Ok(json!("dummy completion"))).unwrap();
+        let skill_executer_mock = StubSkillExecuter::new(move |msg| match msg {
+            SkillExecutorMsg::ExecuteSkill(ExecuteSkill { send, .. }) => {
+                send.send(Ok(json!("dummy completion"))).unwrap();
+            },
+            SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
+                panic!("unexpected message in test");
+            }
         });
         let skill_executor_api = skill_executer_mock.api();
         let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
@@ -779,17 +816,21 @@ mod tests {
     #[tokio::test]
     async fn run_skill() {
         // Given
-        let skill_executer_mock = StubSkillExecuter::new(move |msg| {
-            let ExecuteSkill {
+        let skill_executer_mock = StubSkillExecuter::new(move |msg| match msg {
+            SkillExecutorMsg::ExecuteSkill(ExecuteSkill {
                 skill_path,
                 send,
                 api_token,
                 input,
-            } = msg;
-            assert_eq!(skill_path, SkillPath::local("greet_skill"));
-            assert_eq!(api_token, "dummy auth token");
-            assert_eq!(input, json!("Homer"));
-            send.send(Ok(json!("dummy completion"))).unwrap();
+            }) => {
+                assert_eq!(skill_path, SkillPath::local("greet_skill"));
+                assert_eq!(api_token, "dummy auth token");
+                assert_eq!(input, json!("Homer"));
+                send.send(Ok(json!("dummy completion"))).unwrap();
+            },
+            SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
+                panic!("unexpected message in test");
+            }
         });
         let skill_executor_api = skill_executer_mock.api();
         let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
@@ -1234,12 +1275,16 @@ mod tests {
     #[tokio::test]
     async fn invalid_namespace_config_is_500_error() {
         // Given a skill executor which has an invalid namespace
-        let skill_executor = StubSkillExecuter::new(|msg| {
-            let ExecuteSkill { send, .. } = msg;
-            send.send(Err(ExecuteSkillError::Other(anyhow!(
-                "Namespace is invalid"
-            ))))
-            .unwrap();
+        let skill_executor = StubSkillExecuter::new(|msg| match msg {
+            SkillExecutorMsg::ExecuteSkill(ExecuteSkill { send, .. }) => {
+                send.send(Err(ExecuteSkillError::Other(anyhow!(
+                    "Namespace is invalid"
+                ))))
+                .unwrap();
+            }
+            SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
+                panic!("unexpected message in test");
+            }
         });
         let app_state = AppState::dummy().with_skill_executor_api(skill_executor.api());
         let http = http(app_state);
@@ -1269,10 +1314,14 @@ mod tests {
     #[tokio::test]
     async fn not_existing_skill_is_400_error() {
         // Given a skill executer which always replies Skill does not exist
-        let skill_executer_dummy = StubSkillExecuter::new(|msg| {
-            let ExecuteSkill { send, .. } = msg;
-            send.send(Err(ExecuteSkillError::SkillDoesNotExist))
-                .unwrap();
+        let skill_executer_dummy = StubSkillExecuter::new(|msg| match msg {
+            SkillExecutorMsg::ExecuteSkill(ExecuteSkill { send, .. }) => {
+                send.send(Err(ExecuteSkillError::SkillDoesNotExist))
+                    .unwrap();
+            }
+            SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
+                panic!("unexpected message in test");
+            }
         });
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
         let app_state = AppState::dummy().with_skill_executor_api(skill_executer_dummy.api());
