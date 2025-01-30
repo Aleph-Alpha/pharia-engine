@@ -45,7 +45,7 @@ impl SkillDescription {
 // but could also load skills
 #[async_trait]
 pub trait NamespaceDescriptionLoader {
-    async fn description(&mut self) -> NamespaceDescriptionResult;
+    async fn description(&self) -> NamespaceDescriptionResult;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -72,7 +72,7 @@ impl WatchLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for WatchLoader {
-    async fn description(&mut self) -> NamespaceDescriptionResult {
+    async fn description(&self) -> NamespaceDescriptionResult {
         if !self.directory.is_dir() {
             return Err(NamespaceDescriptionError::Unrecoverable(anyhow!(
                 "The directory to watch '{:?}' is not a directory.",
@@ -103,7 +103,7 @@ impl FileLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for FileLoader {
-    async fn description(&mut self) -> NamespaceDescriptionResult {
+    async fn description(&self) -> NamespaceDescriptionResult {
         let config = std::fs::read_to_string(&self.path)
             .with_context(|| format!("Unable to read file {}", self.path.to_string_lossy()))
             .map_err(NamespaceDescriptionError::Unrecoverable)?;
@@ -135,7 +135,7 @@ impl HttpLoader {
 }
 #[async_trait]
 impl NamespaceDescriptionLoader for HttpLoader {
-    async fn description(&mut self) -> NamespaceDescriptionResult {
+    async fn description(&self) -> NamespaceDescriptionResult {
         let mut req_builder = self.client.get(&self.url);
         if let Some(token) = &self.token {
             let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
@@ -166,7 +166,7 @@ impl NamespaceDescriptionLoader for HttpLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for NamespaceDescription {
-    async fn description(&mut self) -> NamespaceDescriptionResult {
+    async fn description(&self) -> NamespaceDescriptionResult {
         Ok(self.clone())
     }
 }
