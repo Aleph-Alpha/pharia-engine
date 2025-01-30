@@ -571,7 +571,7 @@ mod tests {
             V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest, VersionedCsiRequest,
         },
         inference::{self, Completion},
-        skill_runtime::{ExecuteSkillError, SkillExecutorMsg},
+        skill_runtime::{ExecuteSkill, ExecuteSkillError, SkillExecutorMsg},
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
         skills::SkillPath,
         tests::api_token,
@@ -703,7 +703,7 @@ mod tests {
     async fn execute_skill() {
         // Given
         let skill_executer_mock = StubSkillExecuter::new(move |msg| {
-            let SkillExecutorMsg {
+            let ExecuteSkill {
                 skill_path, send, ..
             } = msg;
             assert_eq!(skill_path, SkillPath::local("greet_skill"));
@@ -745,7 +745,7 @@ mod tests {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";
         let skill_executer_mock = StubSkillExecuter::new(move |msg| {
-            let SkillExecutorMsg { send, .. } = msg;
+            let ExecuteSkill { send, .. } = msg;
             send.send(Ok(json!("dummy completion"))).unwrap();
         });
         let skill_executor_api = skill_executer_mock.api();
@@ -780,7 +780,7 @@ mod tests {
     async fn run_skill() {
         // Given
         let skill_executer_mock = StubSkillExecuter::new(move |msg| {
-            let SkillExecutorMsg {
+            let ExecuteSkill {
                 skill_path,
                 send,
                 api_token,
@@ -1235,7 +1235,7 @@ mod tests {
     async fn invalid_namespace_config_is_500_error() {
         // Given a skill executor which has an invalid namespace
         let skill_executor = StubSkillExecuter::new(|msg| {
-            let SkillExecutorMsg { send, .. } = msg;
+            let ExecuteSkill { send, .. } = msg;
             send.send(Err(ExecuteSkillError::Other(anyhow!(
                 "Namespace is invalid"
             ))))
@@ -1270,7 +1270,7 @@ mod tests {
     async fn not_existing_skill_is_400_error() {
         // Given a skill executer which always replies Skill does not exist
         let skill_executer_dummy = StubSkillExecuter::new(|msg| {
-            let SkillExecutorMsg { send, .. } = msg;
+            let ExecuteSkill { send, .. } = msg;
             send.send(Err(ExecuteSkillError::SkillDoesNotExist))
                 .unwrap();
         });
