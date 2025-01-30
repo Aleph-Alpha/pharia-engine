@@ -113,12 +113,12 @@ impl SkillExecutorApi {
         api_token: String,
     ) -> Result<Value, ExecuteSkillError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMsg {
+        let msg = SkillExecutorMsg::ExecuteSkill(ExecuteSkill {
             skill_path,
             input,
             send,
             api_token,
-        };
+        });
         self.send
             .send(msg)
             .await
@@ -161,7 +161,8 @@ struct SkillExecutorActor<C> {
     runtime: Arc<WasmRuntime>,
     recv: mpsc::Receiver<SkillExecutorMsg>,
     csi_apis: C,
-    running_skills: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    // Can be a skill execution or a skill metadata request
+    running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
 impl<C> SkillExecutorActor<C>
@@ -173,7 +174,7 @@ where
             runtime: Arc::new(runtime),
             recv,
             csi_apis,
-            running_skills: FuturesUnordered::new(),
+            running_requests: FuturesUnordered::new(),
         }
     }
 
@@ -187,8 +188,8 @@ where
                     Some(msg) => {
                         let csi_apis = self.csi_apis.clone();
                         let runtime = self.runtime.clone();
-                        self.running_skills.push(Box::pin(async move {
-                            msg.run_skill(csi_apis, runtime.as_ref()).await;
+                        self.running_requests.push(Box::pin(async move {
+                            msg.act(runtime.as_ref(), csi_apis).await;
                         }));
                     },
                     // Senders are gone, break out of the loop for shutdown.
@@ -196,7 +197,7 @@ where
                 },
                 // FuturesUnordered will let them run in parallel. It will
                 // yield once one of them is completed.
-                () = self.running_skills.select_next_some(), if !self.running_skills.is_empty()  => {}
+                () = self.running_requests.select_next_some(), if !self.running_requests.is_empty()  => {}
             }
         }
     }
@@ -218,18 +219,32 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
     }
 }
 
+pub enum SkillExecutorMsg {
+    ExecuteSkill(ExecuteSkill),
+}
+
+impl SkillExecutorMsg {
+    async fn act(self, runtime: &WasmRuntime, csi_apis: impl Csi + Send + Sync + 'static) {
+        match self {
+            SkillExecutorMsg::ExecuteSkill(execute_skill) => {
+                execute_skill.run_skill(csi_apis, runtime).await
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
-pub struct SkillExecutorMsg {
+pub struct ExecuteSkill {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: oneshot::Sender<Result<Value, ExecuteSkillError>>,
     pub api_token: String,
 }
 
-impl SkillExecutorMsg {
+impl ExecuteSkill {
     async fn run_skill(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         let start = Instant::now();
-        let SkillExecutorMsg {
+        let ExecuteSkill {
             skill_path,
             input,
             send,
@@ -730,7 +745,7 @@ pub mod tests {
         let csi = StubCsi::with_completion_from_text("Hello");
         let (send, _) = oneshot::channel();
         let skill_path = SkillPath::local("greet");
-        let msg = SkillExecutorMsg {
+        let msg = ExecuteSkill {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
             send,
