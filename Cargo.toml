@@ -126,10 +126,9 @@ reqwest-retry = "0.7.0"
 
 [dev-dependencies]
 test-skills = { path = "./test-skills" }
-fake = "3.1.0"
+fake = { version = "3.1.0", features = ["derive"] }
 http-body-util = "0.1.2"
 mime = "0.3.17"
-rand = "0.8.5"
 tempfile = "3.16.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.43.0", features = ["test-util"] }

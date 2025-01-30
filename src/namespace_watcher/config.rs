@@ -16,8 +16,9 @@ use super::{
 };
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Deref, derive_more::Display, ToSchema)]
+#[cfg_attr(test, derive(fake::Dummy))]
 #[schema(pattern = "^[a-z0-9]+(-[a-z0-9]+)*$`")]
-pub struct Namespace(String);
+pub struct Namespace(#[cfg_attr(test, dummy(expr = "\"dummy\".into()"))] String);
 
 impl Namespace {
     // Reasoning to choose 64 is it seems reasonable and we can increase it if there is a need.
