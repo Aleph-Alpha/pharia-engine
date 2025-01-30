@@ -82,7 +82,7 @@ impl NamespaceWatcher {
 
     pub fn with_config(
         skill_store_api: SkillStoreApi,
-        config: Box<dyn ObservableConfig + Send>,
+        config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
         let (ready_sender, ready_receiver) = tokio::sync::watch::channel(false);
@@ -115,7 +115,7 @@ struct NamespaceWatcherActor {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_store_api: SkillStoreApi,
-    config: Box<dyn ObservableConfig + Send>,
+    config: Box<dyn ObservableConfig + Send + Sync>,
     update_interval: Duration,
     skills: HashMap<Namespace, Vec<SkillDescription>>,
     invalid_namespaces: HashSet<Namespace>,
@@ -153,7 +153,7 @@ impl NamespaceWatcherActor {
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_store_api: SkillStoreApi,
-        config: Box<dyn ObservableConfig + Send>,
+        config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
         Self {
@@ -198,9 +198,16 @@ impl NamespaceWatcherActor {
     }
 
     async fn report_all_changes(&mut self) {
-        for namespace in &self.config.namespaces() {
-            let skills = self.config.skills(namespace).await;
-            self.report_changes_in_namespace(namespace, skills).await;
+        let config = &self.config;
+        let futures = config.namespaces().into_iter().map(|namespace| async {
+            let skills = config.skills(&namespace).await;
+            (namespace, skills)
+        });
+        // While it would be nice to use a stream and update the state after each future has finished,
+        // this would only work if all the members except config go into a member object.
+        // If they are top level, we can not obtain a exclusive reference, as we already have shared references to them in the futures.
+        for (namespace, skills) in futures::future::join_all(futures).await {
+            self.report_changes_in_namespace(&namespace, skills).await;
         }
     }
 
@@ -494,7 +501,7 @@ pub mod tests {
         fn with_skills(
             skills: HashMap<Namespace, Vec<SkillDescription>>,
             skill_store_api: SkillStoreApi,
-            config: Box<dyn ObservableConfig + Send>,
+            config: Box<dyn ObservableConfig + Send + Sync>,
         ) -> Self {
             let (ready, _) = tokio::sync::watch::channel(false);
             let (_, shutdown) = tokio::sync::watch::channel(false);
