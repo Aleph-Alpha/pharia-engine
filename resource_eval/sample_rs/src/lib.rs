@@ -29,7 +29,7 @@ fn consume_memory(mut mem_size: usize) -> Result<Vec<Layout>, LayoutError> {
         return Ok(chunks);
     }
     while mem_size > 300 {
-        let chunk_size = (rand::random::<usize>() % 201) + 100;
+        let chunk_size = (rand::random::<u64>() as usize % 201) + 100;
         let chunk = Layout::array::<u8>(chunk_size)?;
         chunks.push(chunk);
         mem_size -= chunk_size;
