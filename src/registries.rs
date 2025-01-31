@@ -5,6 +5,7 @@ mod oci;
 
 pub use file::FileRegistry;
 pub use oci::OciRegistry;
+use oci_client::errors::OciDistributionError;
 
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
@@ -28,19 +29,33 @@ impl SkillImage {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum RegistryError {
+    #[error("Error retrieving skill from registry: {0}")]
+    SkillRetrievalError(#[from] anyhow::Error),
+    #[error("Error retrieving digest from registry: {0}")]
+    DigestRetrievalError(#[from] OciDistributionError),
+    #[error("Digest should exist for skill {name}:{tag} in registry {registry}")]
+    DigestShouldExist {
+        name: String,
+        tag: String,
+        registry: String,
+    },
+}
+
 pub trait SkillRegistry {
     fn load_skill<'a>(
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>>;
+    ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>>;
 
     /// Retrieve the current digest value for the name and tag
     fn fetch_digest<'a>(
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Digest>>>;
+    ) -> DynFuture<'a, Result<Option<Digest>, RegistryError>>;
 }
 
 impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
@@ -48,7 +63,7 @@ impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
+    ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
         self.as_ref().load_skill(name, tag)
     }
 
@@ -56,7 +71,7 @@ impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
+    ) -> DynFuture<'a, Result<Option<Digest>, RegistryError>> {
         self.as_ref().fetch_digest(name, tag)
     }
 }
@@ -70,14 +85,14 @@ pub mod tests {
 
     use crate::registries::FileRegistry;
 
-    use super::{Digest, DynFuture, SkillImage, SkillRegistry};
+    use super::{Digest, DynFuture, RegistryError, SkillImage, SkillRegistry};
 
     impl SkillRegistry for HashMap<String, Vec<u8>> {
         fn load_skill<'a>(
             &'a self,
             name: &'a str,
             tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
+        ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
             if let Some(bytes) = self.get(name) {
                 Box::pin(
                     async move { Ok(Some(SkillImage::new(bytes.clone(), Digest(tag.to_owned())))) },
@@ -91,7 +106,7 @@ pub mod tests {
             &'a self,
             _name: &'a str,
             tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
+        ) -> DynFuture<'a, Result<Option<Digest>, RegistryError>> {
             Box::pin(async { Ok(Some(Digest(tag.to_owned()))) })
         }
     }
@@ -103,15 +118,15 @@ pub mod tests {
             &'a self,
             _name: &'a str,
             _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
-            Box::pin(pending::<anyhow::Result<Option<SkillImage>>>())
+        ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
+            Box::pin(pending::<Result<Option<SkillImage>, RegistryError>>())
         }
         fn fetch_digest<'a>(
             &'a self,
             _name: &'a str,
             _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
-            Box::pin(pending::<anyhow::Result<Option<Digest>>>())
+        ) -> DynFuture<'a, Result<Option<Digest>, RegistryError>> {
+            Box::pin(pending::<Result<Option<Digest>, RegistryError>>())
         }
     }
 
@@ -122,14 +137,14 @@ pub mod tests {
             &'a self,
             _name: &'a str,
             _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
+        ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
             Box::pin(ready(Ok(None)))
         }
         fn fetch_digest<'a>(
             &'a self,
             _name: &'a str,
             _tag: &'a str,
-        ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
+        ) -> DynFuture<'a, Result<Option<Digest>, RegistryError>> {
             Box::pin(ready(Ok(None)))
         }
     }

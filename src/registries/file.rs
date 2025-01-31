@@ -1,4 +1,4 @@
-use super::{Digest, DynFuture, SkillImage, SkillRegistry};
+use super::{Digest, DynFuture, RegistryError, SkillImage, SkillRegistry};
 
 use std::{
     fs,
@@ -39,11 +39,11 @@ impl SkillRegistry for FileRegistry {
         &'a self,
         name: &'a str,
         _tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
+    ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
         let fut = async move {
             let skill_path = self.skill_path(name);
             if skill_path.exists() {
-                let binary = fs::read(&skill_path)?;
+                let binary = fs::read(&skill_path).map_err(anyhow::Error::from)?;
                 let digest = Self::skill_digest(&skill_path)?;
                 Ok(Some(SkillImage::new(binary, digest)))
             } else {
@@ -57,7 +57,7 @@ impl SkillRegistry for FileRegistry {
         &'a self,
         name: &'a str,
         _tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
+    ) -> DynFuture<'a, Result<Option<Digest>, RegistryError>> {
         Box::pin(async move {
             let skill_path = self.skill_path(name);
             if skill_path.exists() {

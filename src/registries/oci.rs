@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use oci_client::{
     client::ClientConfig,
     errors::{OciDistributionError, OciErrorCode},
@@ -6,9 +5,9 @@ use oci_client::{
     Client, Reference,
 };
 use oci_wasm::WasmClient;
-use tracing::{error, warn};
+use tracing::warn;
 
-use super::{Digest, DynFuture, SkillImage};
+use super::{Digest, DynFuture, RegistryError, SkillImage};
 use crate::registries::SkillRegistry;
 
 pub struct OciRegistry {
@@ -57,7 +56,7 @@ impl SkillRegistry for OciRegistry {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<SkillImage>>> {
+    ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
         let image = self.reference(name, tag);
 
         Box::pin(async move {
@@ -72,10 +71,11 @@ impl SkillRegistry for OciRegistry {
                     } else {
                         warn!("Registry doesn't return digests. Fetching manually.");
                         self.fetch_digest(name, tag).await?.ok_or_else(|| {
-                            anyhow!(
-                                "Digest should exist for skill {name}:{tag} in registry {}",
-                                self.registry
-                            )
+                            RegistryError::DigestShouldExist {
+                                name: name.to_owned(),
+                                tag: tag.to_owned(),
+                                registry: self.registry.clone(),
+                            }
                         })?
                     };
                     Ok(Some(SkillImage::new(binary, digest)))
@@ -85,8 +85,7 @@ impl SkillRegistry for OciRegistry {
                     if anyhow_is_skill_not_found(&e) {
                         Ok(None)
                     } else {
-                        error!("Error retrieving skill from registry: {e}");
-                        Err(e)
+                        Err(RegistryError::SkillRetrievalError(e))
                     }
                 }
             }
@@ -97,7 +96,7 @@ impl SkillRegistry for OciRegistry {
         &'a self,
         name: &'a str,
         tag: &'a str,
-    ) -> DynFuture<'a, anyhow::Result<Option<Digest>>> {
+    ) -> DynFuture<'a, Result<Option<Digest>, RegistryError>> {
         Box::pin(async move {
             let result = self
                 .client
@@ -110,8 +109,7 @@ impl SkillRegistry for OciRegistry {
                     if is_skill_not_found(&e) {
                         Ok(None)
                     } else {
-                        error!("Error retrieving digest from registry: {e}");
-                        Err(e.into())
+                        Err(RegistryError::DigestRetrievalError(e))
                     }
                 }
             }

@@ -153,7 +153,7 @@ impl SkillStoreState {
                 let result = match other_case {
                     // Errors fetching the digest
                     Ok(None) => Err(anyhow!("Missing digest for skill {skill_path}")),
-                    Err(e) => Err(e),
+                    Err(e) => Err(e.into()),
                     // Digest has not changed
                     _ => Ok(()),
                 };

@@ -6,7 +6,9 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
 
 use crate::namespace_watcher::{Namespace, Registry};
-use crate::registries::{Digest, FileRegistry, OciRegistry, SkillImage, SkillRegistry};
+use crate::registries::{
+    Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
+};
 use crate::skills::{Engine, Skill};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -44,7 +46,7 @@ pub enum SkillLoaderMsg {
     },
     FetchDigest {
         skill: ConfiguredSkill,
-        send: oneshot::Sender<anyhow::Result<Option<Digest>>>,
+        send: oneshot::Sender<Result<Option<Digest>, RegistryError>>,
     },
 }
 
@@ -145,7 +147,10 @@ impl SkillLoaderApi {
         recv.await.unwrap()
     }
 
-    pub async fn fetch_digest(&self, skill: ConfiguredSkill) -> anyhow::Result<Option<Digest>> {
+    pub async fn fetch_digest(
+        &self,
+        skill: ConfiguredSkill,
+    ) -> Result<Option<Digest>, RegistryError> {
         let (send, recv) = oneshot::channel();
         self.sender
             .send(SkillLoaderMsg::FetchDigest { skill, send })
