@@ -606,10 +606,14 @@ pub mod tests {
                 assert_eq!(
                     metadata.input_schema,
                     json!({"type": "string", "description": "The name of the person to greet"})
+                        .try_into()
+                        .unwrap()
                 );
                 assert_eq!(
                     metadata.output_schema,
                     json!({"type": "string", "description": "A friendly greeting message"})
+                        .try_into()
+                        .unwrap()
                 );
             }
             _ => panic!("Expected SkillMetadata::V1"),
