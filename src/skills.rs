@@ -51,19 +51,25 @@ pub enum SkillMetadata {
     V1(SkillMetadataV1),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum MetadataError {
+    #[error("Invalid JSON Schema")]
+    InvalidJsonSchema,
+}
+
 /// Validated to be valid JSON Schema
 #[derive(ToSchema, Serialize, Debug, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct JsonSchema(Value);
 
 impl TryFrom<Value> for JsonSchema {
-    type Error = anyhow::Error;
+    type Error = MetadataError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         if jsonschema::meta::is_valid(&value) {
             Ok(Self(value))
         } else {
-            Err(anyhow!("Invalid JSON Schema"))
+            Err(MetadataError::InvalidJsonSchema)
         }
     }
 }
@@ -1248,7 +1254,10 @@ mod tests {
     #[test]
     fn validate_invalid_schema() {
         let schema = json!("invalid");
-        assert!(JsonSchema::try_from(schema).is_err());
+        assert!(matches!(
+            JsonSchema::try_from(schema).unwrap_err(),
+            MetadataError::InvalidJsonSchema
+        ));
     }
 
     #[tokio::test]
