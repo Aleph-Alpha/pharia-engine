@@ -39,7 +39,7 @@ use crate::{
     csi::Csi,
     csi_shell::http_csi_handle,
     namespace_watcher::Namespace,
-    skill_runtime::{ExecuteSkillError, SkillExecutorApi},
+    skill_runtime::{SkillRuntimeError, SkillExecutorApi},
     skill_store::SkillStoreApi,
     skills::{SkillMetadata, SkillPath},
 };
@@ -362,15 +362,15 @@ async fn execute_skill(
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(json!(response))),
-        Err(ExecuteSkillError::SkillDoesNotExist) => (
+        Err(SkillRuntimeError::SkillNotConfigured) => (
             StatusCode::BAD_REQUEST,
-            Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
+            Json(json!(SkillRuntimeError::SkillNotConfigured.to_string())),
         ),
-        Err(ExecuteSkillError::SkillStoreError(err)) => (
+        Err(SkillRuntimeError::SkillStoreError(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
-        Err(ExecuteSkillError::Other(err)) => (
+        Err(SkillRuntimeError::Other(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
@@ -456,15 +456,15 @@ async fn run_skill(
         .await;
     match result {
         Ok(response) => (StatusCode::OK, Json(response)),
-        Err(ExecuteSkillError::SkillDoesNotExist) => (
+        Err(SkillRuntimeError::SkillNotConfigured) => (
             StatusCode::BAD_REQUEST,
-            Json(json!(ExecuteSkillError::SkillDoesNotExist.to_string())),
+            Json(json!(SkillRuntimeError::SkillNotConfigured.to_string())),
         ),
-        Err(ExecuteSkillError::SkillStoreError(err)) => (
+        Err(SkillRuntimeError::SkillStoreError(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
-        Err(ExecuteSkillError::Other(err)) => (
+        Err(SkillRuntimeError::Other(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
@@ -578,7 +578,7 @@ mod tests {
             V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest, VersionedCsiRequest,
         },
         inference::{self, Completion},
-        skill_runtime::{ExecuteSkill, ExecuteSkillError, SkillExecutorMsg, SkillMetadataRequest},
+        skill_runtime::{ExecuteSkill, SkillRuntimeError, SkillExecutorMsg, SkillMetadataRequest},
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
         skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
@@ -1273,7 +1273,7 @@ mod tests {
         // Given a skill executor which has an invalid namespace
         let skill_executor = StubSkillExecuter::new(|msg| match msg {
             SkillExecutorMsg::ExecuteSkill(ExecuteSkill { send, .. }) => {
-                send.send(Err(ExecuteSkillError::Other(anyhow!(
+                send.send(Err(SkillRuntimeError::Other(anyhow!(
                     "Namespace is invalid"
                 ))))
                 .unwrap();
@@ -1312,7 +1312,7 @@ mod tests {
         // Given a skill executer which always replies Skill does not exist
         let skill_executer_dummy = StubSkillExecuter::new(|msg| match msg {
             SkillExecutorMsg::ExecuteSkill(ExecuteSkill { send, .. }) => {
-                send.send(Err(ExecuteSkillError::SkillDoesNotExist))
+                send.send(Err(SkillRuntimeError::SkillNotConfigured))
                     .unwrap();
             }
             SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {

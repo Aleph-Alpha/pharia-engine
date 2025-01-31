@@ -48,10 +48,10 @@ impl WasmRuntime {
         skill_path: &SkillPath,
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<Value, ExecuteSkillError> {
+    ) -> Result<Value, SkillRuntimeError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
-        let skill = skill.ok_or(ExecuteSkillError::SkillDoesNotExist)?;
+        let skill = skill.ok_or(SkillRuntimeError::SkillNotConfigured)?;
         Ok(skill.run(&self.engine, ctx, input).await?)
     }
 
@@ -59,10 +59,10 @@ impl WasmRuntime {
         &self,
         skill_path: &SkillPath,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<Option<SkillMetadata>, ExecuteSkillError> {
+    ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
-        let skill = skill.ok_or(ExecuteSkillError::SkillDoesNotExist)?;
+        let skill = skill.ok_or(SkillRuntimeError::SkillNotConfigured)?;
         Ok(skill.metadata(self.engine.as_ref(), ctx).await?)
     }
 }
@@ -114,7 +114,7 @@ impl SkillExecutorApi {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> Result<Value, ExecuteSkillError> {
+    ) -> Result<Value, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMsg::ExecuteSkill(ExecuteSkill {
             skill_path,
@@ -132,7 +132,7 @@ impl SkillExecutorApi {
     pub async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<Option<SkillMetadata>, ExecuteSkillError> {
+    ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { skill_path, send });
         self.send
@@ -144,12 +144,12 @@ impl SkillExecutorApi {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ExecuteSkillError {
+pub enum SkillRuntimeError {
     #[error(
         "The requested skill does not exist. Make sure it is configured in the configuration \
         associated with the namespace."
     )]
-    SkillDoesNotExist,
+    SkillNotConfigured,
     #[error(transparent)]
     SkillStoreError(#[from] SkillStoreError),
     #[error(transparent)]
@@ -237,7 +237,7 @@ impl SkillExecutorMsg {
 }
 pub struct SkillMetadataRequest {
     pub skill_path: SkillPath,
-    pub send: oneshot::Sender<Result<Option<SkillMetadata>, ExecuteSkillError>>,
+    pub send: oneshot::Sender<Result<Option<SkillMetadata>, SkillRuntimeError>>,
 }
 
 impl SkillMetadataRequest {
@@ -247,7 +247,7 @@ impl SkillMetadataRequest {
         let response = select! {
             result = runtime.metadata(&self.skill_path, ctx) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(ExecuteSkillError::Other(error))
+            Ok(error) = recv_rt_err => Err(SkillRuntimeError::Other(error))
         };
         drop(self.send.send(response));
     }
@@ -257,7 +257,7 @@ impl SkillMetadataRequest {
 pub struct ExecuteSkill {
     pub skill_path: SkillPath,
     pub input: Value,
-    pub send: oneshot::Sender<Result<Value, ExecuteSkillError>>,
+    pub send: oneshot::Sender<Result<Value, SkillRuntimeError>>,
     pub api_token: String,
 }
 
@@ -287,7 +287,7 @@ impl ExecuteSkill {
         let response = select! {
             result = runtime.run(&skill_path, input, ctx) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(ExecuteSkillError::Other(error))
+            Ok(error) = recv_rt_err => Err(SkillRuntimeError::Other(error))
         };
 
         let latency = start.elapsed().as_secs_f64();
@@ -298,9 +298,9 @@ impl ExecuteSkill {
                 "status",
                 match response {
                     Ok(_) => "ok",
-                    Err(ExecuteSkillError::SkillDoesNotExist) => "not_found",
-                    Err(ExecuteSkillError::SkillStoreError(_)) => "internal_error",
-                    Err(ExecuteSkillError::Other(_)) => "internal_error",
+                    Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
+                    Err(SkillRuntimeError::SkillStoreError(_)) => "internal_error",
+                    Err(SkillRuntimeError::Other(_)) => "internal_error",
                 }
                 .into(),
             ),
@@ -822,7 +822,7 @@ pub mod tests {
         skill_store.wait_for_shutdown().await;
 
         // Then result indicates that the skill is missing
-        assert!(matches!(result, Err(ExecuteSkillError::SkillDoesNotExist)));
+        assert!(matches!(result, Err(SkillRuntimeError::SkillNotConfigured)));
     }
 
     #[tokio::test]
