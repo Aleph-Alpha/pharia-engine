@@ -384,7 +384,7 @@ async fn execute_skill(
     tag = "skills",
     responses(
         (status = 200, description = "Description, input schema, and output schema of the skill if specified",
-            body=SkillMetadata, example = json!({
+            body=Option<SkillMetadata>, example = json!({
                 "description": "The summary of the text.",
                 "input_schema": {
                     "properties": {
@@ -406,7 +406,6 @@ async fn execute_skill(
                     "type": "object",
                 }
             })),
-        (status = 204, description = "The skill does not provide metadata."),
         (status = 400, description = "Failed to get skill metadata.", body=Value, example = json!("Invalid skill input schema."))
     ),
 )]
