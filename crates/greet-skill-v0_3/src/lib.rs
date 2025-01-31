@@ -47,7 +47,19 @@ Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|
     }
 
     fn metadata() -> SkillMetadata {
-        unimplemented!()
+        SkillMetadata {
+            description: Some("A friendly greeting skill".to_owned()),
+            input_schema: serde_json::to_vec(&json!({
+                "type": "string",
+                "description": "The name of the person to greet",
+            }))
+            .unwrap(),
+            output_schema: serde_json::to_vec(&json!({
+                "type": "string",
+                "description": "A friendly greeting message"
+            }))
+            .unwrap(),
+        }
     }
 }
 

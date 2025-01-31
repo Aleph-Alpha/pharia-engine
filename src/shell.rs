@@ -39,9 +39,9 @@ use crate::{
     csi::Csi,
     csi_shell::http_csi_handle,
     namespace_watcher::Namespace,
-    skill_runtime::{ExecuteSkillError, SkillExecutorApi, SkillMetadata},
+    skill_runtime::{ExecuteSkillError, SkillExecutorApi},
     skill_store::SkillStoreApi,
-    skills::SkillPath,
+    skills::{SkillMetadata, SkillPath},
 };
 
 pub struct Shell {
@@ -571,12 +571,9 @@ mod tests {
             V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest, VersionedCsiRequest,
         },
         inference::{self, Completion},
-        skill_runtime::{
-            ExecuteSkill, ExecuteSkillError, SkillExecutorMsg, SkillMetadataRequest,
-            SkillMetadataV1,
-        },
+        skill_runtime::{ExecuteSkill, ExecuteSkillError, SkillExecutorMsg, SkillMetadataRequest},
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
-        skills::SkillPath,
+        skills::{SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
     };
 
@@ -686,7 +683,7 @@ mod tests {
             "description": "dummy description",
             "input_schema": {},
             "output_schema": {},
-            "version": "v1",
+            "version": "1",
         });
         assert_eq!(metadata, expected);
     }
