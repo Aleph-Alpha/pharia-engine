@@ -67,30 +67,30 @@ impl WasmRuntime {
     }
 }
 
-/// Starts and stops the execution of skills as it owns the skill executer actor.
-pub struct SkillExecutor {
-    send: mpsc::Sender<SkillExecutorMsg>,
+/// Starts and stops the execution of skills as it owns the skill runtime actor.
+pub struct SkillRuntime {
+    send: mpsc::Sender<SkillRuntimeMsg>,
     handle: JoinHandle<()>,
 }
 
-impl SkillExecutor {
-    /// Create a new skill executer with the default web assembly runtime
+impl SkillRuntime {
+    /// Create a new skill runtime with the default web assembly runtime
     pub fn new<C>(engine: Arc<Engine>, csi_apis: C, skill_store_api: SkillStoreApi) -> Self
     where
         C: Csi + Clone + Send + Sync + 'static,
     {
         let runtime = WasmRuntime::new(engine, skill_store_api);
-        let (send, recv) = mpsc::channel::<SkillExecutorMsg>(1);
+        let (send, recv) = mpsc::channel::<SkillRuntimeMsg>(1);
         let handle = tokio::spawn(async {
-            SkillExecutorActor::new(runtime, recv, csi_apis).run().await;
+            SkillRuntimeActor::new(runtime, recv, csi_apis).run().await;
         });
-        SkillExecutor { send, handle }
+        SkillRuntime { send, handle }
     }
 
     /// Retrieve a handle in order to interact with skills. All handles have to be dropped in order
     /// for [`Self::wait_for_shutdown`] to complete.
-    pub fn api(&self) -> SkillExecutorApi {
-        SkillExecutorApi::new(self.send.clone())
+    pub fn api(&self) -> SkillRuntimeApi {
+        SkillRuntimeApi::new(self.send.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -100,23 +100,23 @@ impl SkillExecutor {
 }
 
 #[derive(Clone)]
-pub struct SkillExecutorApi {
-    send: mpsc::Sender<SkillExecutorMsg>,
+pub struct SkillRuntimeApi {
+    send: mpsc::Sender<SkillRuntimeMsg>,
 }
 
-impl SkillExecutorApi {
-    pub fn new(send: mpsc::Sender<SkillExecutorMsg>) -> Self {
+impl SkillRuntimeApi {
+    pub fn new(send: mpsc::Sender<SkillRuntimeMsg>) -> Self {
         Self { send }
     }
 
-    pub async fn execute_skill(
+    pub async fn skill_run(
         &self,
         skill_path: SkillPath,
         input: Value,
         api_token: String,
     ) -> Result<Value, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMsg::ExecuteSkill(ExecuteSkill {
+        let msg = SkillRuntimeMsg::Run(SkillRunRequest {
             skill_path,
             input,
             send,
@@ -134,7 +134,7 @@ impl SkillExecutorApi {
         skill_path: SkillPath,
     ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { skill_path, send });
+        let msg = SkillRuntimeMsg::Metadata(SkillMetadataRequest { skill_path, send });
         self.send
             .send(msg)
             .await
@@ -156,20 +156,20 @@ pub enum SkillRuntimeError {
     ExecutionError(#[from] anyhow::Error),
 }
 
-struct SkillExecutorActor<C> {
+struct SkillRuntimeActor<C> {
     runtime: Arc<WasmRuntime>,
-    recv: mpsc::Receiver<SkillExecutorMsg>,
+    recv: mpsc::Receiver<SkillRuntimeMsg>,
     csi_apis: C,
     // Can be a skill execution or a skill metadata request
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
-impl<C> SkillExecutorActor<C>
+impl<C> SkillRuntimeActor<C>
 where
     C: Csi + Clone + Send + Sync + 'static,
 {
-    fn new(runtime: WasmRuntime, recv: mpsc::Receiver<SkillExecutorMsg>, csi_apis: C) -> Self {
-        SkillExecutorActor {
+    fn new(runtime: WasmRuntime, recv: mpsc::Receiver<SkillRuntimeMsg>, csi_apis: C) -> Self {
+        SkillRuntimeActor {
             runtime: Arc::new(runtime),
             recv,
             csi_apis,
@@ -218,18 +218,18 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
     }
 }
 
-pub enum SkillExecutorMsg {
-    ExecuteSkill(ExecuteSkill),
-    SkillMetadata(SkillMetadataRequest),
+pub enum SkillRuntimeMsg {
+    Run(SkillRunRequest),
+    Metadata(SkillMetadataRequest),
 }
 
-impl SkillExecutorMsg {
+impl SkillRuntimeMsg {
     async fn act(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         match self {
-            SkillExecutorMsg::ExecuteSkill(execute_skill) => {
+            SkillRuntimeMsg::Run(execute_skill) => {
                 execute_skill.act(csi_apis, runtime).await;
             }
-            SkillExecutorMsg::SkillMetadata(skill_metadata_request) => {
+            SkillRuntimeMsg::Metadata(skill_metadata_request) => {
                 skill_metadata_request.act(runtime).await;
             }
         }
@@ -254,17 +254,17 @@ impl SkillMetadataRequest {
 }
 
 #[derive(Debug)]
-pub struct ExecuteSkill {
+pub struct SkillRunRequest {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: oneshot::Sender<Result<Value, SkillRuntimeError>>,
     pub api_token: String,
 }
 
-impl ExecuteSkill {
+impl SkillRunRequest {
     async fn act(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         let start = Instant::now();
-        let ExecuteSkill {
+        let SkillRunRequest {
             skill_path,
             input,
             send,
@@ -300,8 +300,7 @@ impl ExecuteSkill {
                     Ok(_) => "ok",
                     Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
                     Err(
-                        SkillRuntimeError::StoreError(_)
-                        | SkillRuntimeError::ExecutionError(_),
+                        SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_),
                     ) => "internal_error",
                 }
                 .into(),
@@ -559,15 +558,15 @@ pub mod tests {
 
     #[tokio::test]
     async fn csi_usage_from_metadata_leads_to_suspension() {
-        // Given a skill executor that always returns a skill that uses the csi from the metadata function
+        // Given a skill runtime that always returns a skill that uses the csi from the metadata function
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::with_csi_from_metadata_skill(engine.clone());
-        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
-        let metadata = executor.api().skill_metadata(skill_path).await;
-        executor.wait_for_shutdown().await;
+        let metadata = runtime.api().skill_metadata(skill_path).await;
+        runtime.wait_for_shutdown().await;
 
         // Then the metadata is None
         assert_eq!(
@@ -578,15 +577,15 @@ pub mod tests {
 
     #[tokio::test]
     async fn skill_metadata_v0_2_is_none() {
-        // Given a skill executor that always returns a v0.2 skill
+        // Given a skill runtime that always returns a v0.2 skill
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::with_greet_skill_v2(engine.clone());
-        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
-        let metadata = executor.api().skill_metadata(skill_path).await.unwrap();
-        executor.wait_for_shutdown().await;
+        let metadata = runtime.api().skill_metadata(skill_path).await.unwrap();
+        runtime.wait_for_shutdown().await;
 
         // Then the metadata is None
         assert!(metadata.is_none());
@@ -594,15 +593,15 @@ pub mod tests {
 
     #[tokio::test]
     async fn skill_metadata_v0_3() {
-        // Given a skill executor api that always returns a v0.3 skill
+        // Given a skill runtime api that always returns a v0.3 skill
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
-        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
-        let metadata = executor.api().skill_metadata(skill_path).await.unwrap();
-        executor.wait_for_shutdown().await;
+        let metadata = runtime.api().skill_metadata(skill_path).await.unwrap();
+        runtime.wait_for_shutdown().await;
 
         // Then the metadata is returned
         match metadata {
@@ -627,15 +626,15 @@ pub mod tests {
 
     #[tokio::test]
     async fn skill_metadata_invalid_output() {
-        // Given a skill executor that always returns an invalid output skill
+        // Given a skill runtime that always returns an invalid output skill
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::with_invalid_output_skill(engine.clone());
-        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
-        let metadata = executor.api().skill_metadata(skill_path).await;
-        executor.wait_for_shutdown().await;
+        let metadata = runtime.api().skill_metadata(skill_path).await;
+        runtime.wait_for_shutdown().await;
 
         // Then the metadata gives an error
         assert!(metadata.is_err());
@@ -807,12 +806,12 @@ pub mod tests {
 
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let csi_apis = DummyCsi;
-        let executer = SkillExecutor::new(engine, csi_apis, skill_store.api());
+        let executer = SkillRuntime::new(engine, csi_apis, skill_store.api());
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace
         let result = api
-            .execute_skill(
+            .skill_run(
                 SkillPath::local("my_skill"),
                 json!("Any input"),
                 "Dummy api token".to_owned(),
@@ -828,23 +827,23 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn skill_executor_forwards_csi_errors() {
+    async fn skill_runtime_forwards_csi_errors() {
         // Given csi which emits errors for completion request
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
-        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When trying to generate a greeting for Homer using the greet skill
-        let result = executor
+        let result = runtime
             .api()
-            .execute_skill(
+            .skill_run(
                 SkillPath::local("greet"),
                 json!("Homer"),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;
 
-        executor.wait_for_shutdown().await;
+        runtime.wait_for_shutdown().await;
         store.wait_for_shutdown().await;
 
         // Then
@@ -859,16 +858,16 @@ pub mod tests {
         let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
 
         // When
-        let executor = SkillExecutor::new(engine, csi, store.api());
-        let result = executor
+        let runtime = SkillRuntime::new(engine, csi, store.api());
+        let result = runtime
             .api()
-            .execute_skill(
+            .skill_run(
                 SkillPath::local("greet"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
             .await;
-        executor.wait_for_shutdown().await;
+        runtime.wait_for_shutdown().await;
         store.wait_for_shutdown().await;
 
         // Then
@@ -883,20 +882,20 @@ pub mod tests {
         let inference = Inference::with_client(client);
         let csi = StubCsi::with_completion_from_text("Hello, Homer!");
         let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
-        let executor = SkillExecutor::new(engine, csi, store.api());
-        let api = executor.api();
+        let runtime = SkillRuntime::new(engine, csi, store.api());
+        let api = runtime.api();
 
         // When executing tw tasks in parallel
         let skill_path = SkillPath::local("greet");
         let input = json!("Homer");
         let token = "TOKEN_NOT_REQUIRED";
         let result = try_join!(
-            api.execute_skill(skill_path.clone(), input.clone(), token.to_owned()),
-            api.execute_skill(skill_path, input, token.to_owned()),
+            api.skill_run(skill_path.clone(), input.clone(), token.to_owned()),
+            api.skill_run(skill_path, input, token.to_owned()),
         );
 
         drop(api);
-        executor.wait_for_shutdown().await;
+        runtime.wait_for_shutdown().await;
         inference.wait_for_shutdown().await;
         store.wait_for_shutdown().await;
 
@@ -911,7 +910,7 @@ pub mod tests {
         let csi = StubCsi::with_completion_from_text("Hello");
         let (send, _) = oneshot::channel();
         let skill_path = SkillPath::local("greet");
-        let msg = ExecuteSkill {
+        let msg = SkillRunRequest {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
             send,
