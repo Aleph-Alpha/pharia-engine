@@ -366,7 +366,7 @@ impl SkillMetadataCtx {
         self.0
             .take()
             .expect("Only one error must be send during skill invocation")
-            .send(anyhow!("Not implemented"))
+            .send(anyhow!("CSI usage from metadata is not allowed"))
             .unwrap();
         pending().await
     }
@@ -526,7 +526,10 @@ pub mod tests {
     use metrics_util::debugging::DebugValue;
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
-    use test_skills::{given_greet_py_v0_2, given_greet_skill_v0_2, given_greet_skill_v0_3, given_invalid_output_skill};
+    use test_skills::{
+        given_csi_from_metadata_skill, given_greet_py_v0_2, given_greet_skill_v0_2,
+        given_greet_skill_v0_3, given_invalid_output_skill,
+    };
     use tokio::try_join;
 
     use crate::csi::tests::{CsiCompleteStub, CsiCounter, CsiGreetingMock};
@@ -548,6 +551,25 @@ pub mod tests {
     };
 
     use super::*;
+
+    #[tokio::test]
+    async fn csi_usage_from_metadata_leads_to_suspension() {
+        // Given a skill executor that always returns a skill that uses the csi from the metadata function
+        let skill_path = SkillPath::local("greet");
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let store = SkillStoreStub::with_csi_from_metadata_skill(engine.clone());
+        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+
+        // When metadata for a skill is requested
+        let metadata = executor.api().skill_metadata(skill_path).await;
+        executor.wait_for_shutdown().await;
+
+        // Then the metadata is None
+        assert_eq!(
+            metadata.unwrap_err().to_string(),
+            "CSI usage from metadata is not allowed"
+        );
+    }
 
     #[tokio::test]
     async fn skill_metadata_v0_2_is_none() {
@@ -1023,6 +1045,13 @@ pub mod tests {
             let path = "./skills/invalid_output_skill.wasm";
             Self::new(engine, path)
         }
+
+        pub fn with_csi_from_metadata_skill(engine: Arc<Engine>) -> Self {
+            given_csi_from_metadata_skill();
+            let path = "./skills/csi_from_metadata.wasm";
+            Self::new(engine, path)
+        }
+
         pub async fn wait_for_shutdown(self) {
             drop(self.send);
             self.join_handle.await.unwrap();
