@@ -655,10 +655,10 @@ mod tests {
                     output_schema: json!({}),
                 }))))
                 .unwrap();
-            },
+            }
             SkillExecutorMsg::ExecuteSkill(ExecuteSkill { .. }) => {
                 panic!("unexpected message in test");
-            },
+            }
         });
         let skill_executor_api = skill_executer_mock.api();
         let app_state = AppState::dummy().with_skill_executor_api(skill_executor_api.clone());
@@ -737,7 +737,7 @@ mod tests {
             }) => {
                 assert_eq!(skill_path, SkillPath::local("greet_skill"));
                 send.send(Ok(json!("dummy completion"))).unwrap();
-            },
+            }
             SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
                 panic!("unexpected message in test");
             }
@@ -780,7 +780,7 @@ mod tests {
         let skill_executer_mock = StubSkillExecuter::new(move |msg| match msg {
             SkillExecutorMsg::ExecuteSkill(ExecuteSkill { send, .. }) => {
                 send.send(Ok(json!("dummy completion"))).unwrap();
-            },
+            }
             SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
                 panic!("unexpected message in test");
             }
@@ -827,7 +827,7 @@ mod tests {
                 assert_eq!(api_token, "dummy auth token");
                 assert_eq!(input, json!("Homer"));
                 send.send(Ok(json!("dummy completion"))).unwrap();
-            },
+            }
             SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
                 panic!("unexpected message in test");
             }

@@ -6,6 +6,7 @@ use std::{
     time::Instant,
 };
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
 use opentelemetry::Context;
@@ -50,17 +51,24 @@ impl WasmRuntime {
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> Result<Value, ExecuteSkillError> {
-        let skill = self
-            .skill_store_api
-            .fetch(skill_path.to_owned())
-            .await
-            .map_err(ExecuteSkillError::Other)?;
+        let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(ExecuteSkillError::SkillDoesNotExist)?;
-        skill
-            .run(&self.engine, ctx, input)
+        Ok(skill.run(&self.engine, ctx, input).await?)
+    }
+
+    pub async fn metadata(
+        &self,
+        skill_path: &SkillPath,
+        ctx: Box<dyn CsiForSkills + Send>,
+    ) -> Result<Option<SkillMetadata>, ExecuteSkillError> {
+        let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
+        // Unwrap Skill, raise error if it is not existing
+        let skill = skill.ok_or(ExecuteSkillError::SkillDoesNotExist)?;
+        Ok(skill
+            .metadata(self.engine.as_ref(), ctx)
             .await
-            .map_err(ExecuteSkillError::Other)
+            .map_err(ExecuteSkillError::Other)?)
     }
 }
 
@@ -129,7 +137,7 @@ impl SkillExecutorApi {
     pub async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> anyhow::Result<Option<SkillMetadata>> {
+    ) -> Result<Option<SkillMetadata>, ExecuteSkillError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { skill_path, send });
         self.send
@@ -162,7 +170,7 @@ pub enum ExecuteSkillError {
     )]
     SkillDoesNotExist,
     #[error(transparent)]
-    Other(anyhow::Error),
+    Other(#[from] anyhow::Error),
 }
 
 struct SkillExecutorActor<C> {
@@ -197,7 +205,7 @@ where
                         let csi_apis = self.csi_apis.clone();
                         let runtime = self.runtime.clone();
                         self.running_requests.push(Box::pin(async move {
-                            msg.act(runtime.as_ref(), csi_apis).await;
+                            msg.act(csi_apis, runtime.as_ref()).await;
                         }));
                     },
                     // Senders are gone, break out of the loop for shutdown.
@@ -233,21 +241,33 @@ pub enum SkillExecutorMsg {
 }
 
 impl SkillExecutorMsg {
-    async fn act(self, runtime: &WasmRuntime, csi_apis: impl Csi + Send + Sync + 'static) {
+    async fn act(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         match self {
             SkillExecutorMsg::ExecuteSkill(execute_skill) => {
-                execute_skill.run_skill(csi_apis, runtime).await;
+                execute_skill.act(csi_apis, runtime).await;
             }
             SkillExecutorMsg::SkillMetadata(skill_metadata_request) => {
-                let error = anyhow::anyhow!("Not implemented");
-                drop(skill_metadata_request.send.send(Err(error)));
+                skill_metadata_request.act(runtime).await;
             }
         }
     }
 }
 pub struct SkillMetadataRequest {
     pub skill_path: SkillPath,
-    pub send: oneshot::Sender<anyhow::Result<Option<SkillMetadata>>>,
+    pub send: oneshot::Sender<Result<Option<SkillMetadata>, ExecuteSkillError>>,
+}
+
+impl SkillMetadataRequest {
+    pub async fn act(self, runtime: &WasmRuntime) {
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let ctx = Box::new(SkillMetadataCtx::new(send_rt_err));
+        let response = select! {
+            result = runtime.metadata(&self.skill_path, ctx) => result,
+            // An error occurred during skill execution.
+            Ok(error) = recv_rt_err => Err(ExecuteSkillError::Other(error))
+        };
+        drop(self.send.send(response));
+    }
 }
 
 #[derive(Debug)]
@@ -259,7 +279,7 @@ pub struct ExecuteSkill {
 }
 
 impl ExecuteSkill {
-    async fn run_skill(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
+    async fn act(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         let start = Instant::now();
         let ExecuteSkill {
             skill_path,
@@ -348,6 +368,60 @@ impl<C> SkillInvocationCtx<C> {
             .send(error)
             .unwrap();
         pending().await
+    }
+}
+
+/// We know that skill metadata will not invoke any csi functions, but still need to provide an implementation of CsiForSkills
+/// We do not want to panic, as someone could build a component that uses the csi functions inside the metadata function.
+/// Therefore, we always send a runtime error which will lead to skill suspension.
+struct SkillMetadataCtx(Option<oneshot::Sender<anyhow::Error>>);
+
+impl SkillMetadataCtx {
+    pub fn new(send_rt_err: oneshot::Sender<anyhow::Error>) -> Self {
+        Self(Some(send_rt_err))
+    }
+
+    async fn send_error<T>(&mut self) -> T {
+        self.0
+            .take()
+            .expect("Only one error must be send during skill invocation")
+            .send(anyhow!("Not implemented"))
+            .unwrap();
+        pending().await
+    }
+}
+
+#[async_trait]
+impl CsiForSkills for SkillMetadataCtx {
+    async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+        self.send_error().await
+    }
+
+    async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+        self.send_error().await
+    }
+
+    async fn select_language(
+        &mut self,
+        _requests: Vec<SelectLanguageRequest>,
+    ) -> Vec<Option<Language>> {
+        self.send_error().await
+    }
+
+    async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+        self.send_error().await
+    }
+
+    async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+        self.send_error().await
+    }
+
+    async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
+        self.send_error().await
+    }
+
+    async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+        self.send_error().await
     }
 }
 
@@ -772,7 +846,7 @@ pub mod tests {
         let snapshot = metrics_snapshot(|| async move {
             let store = SkillStoreGreetStub::new(engine.clone());
             let runtime = WasmRuntime::new(engine, store.api());
-            msg.run_skill(csi, &runtime).await;
+            msg.act(csi, &runtime).await;
             drop(runtime);
             store.wait_for_shutdown().await;
         });
