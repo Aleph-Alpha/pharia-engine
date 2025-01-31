@@ -18,7 +18,7 @@ use wasmtime::{
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
-use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
+use crate::{csi::CsiForSkills, namespace_watcher::Namespace, skill_runtime::SkillMetadata};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(test, derive(fake::Dummy))]
@@ -162,6 +162,18 @@ impl Skill {
                 let skill = v0_3::SkillPre::new(pre)?;
                 Ok(Skill::V0_3(skill))
             }
+        }
+    }
+
+    pub async fn metadata(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+    ) -> anyhow::Result<Option<SkillMetadata>> {
+        let mut store = engine.store(LinkedCtx::new(ctx));
+        match self {
+            Self::V0_2(skill) => Ok(None),
+            Self::V0_3(skill) => Ok(None),
         }
     }
 
