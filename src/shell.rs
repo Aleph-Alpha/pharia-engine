@@ -876,18 +876,14 @@ mod tests {
         auth_value.set_sensitive(true);
 
         let http = http(app_state);
-        let args = ExecuteSkillArgs {
-            skill: "greet".to_owned(),
-            input: json!("Homer"),
-        };
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::POST)
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(header::AUTHORIZATION, auth_value)
-                    .uri("/execute_skill")
-                    .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .uri("/v1/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
             )
             .await
@@ -903,24 +899,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn api_token_missing_in_execute_skill() {
+    async fn api_token_missing_in_run_skill() {
         // Given
         let saboteur_skill_executer = StubSkillExecuter::new(|_| panic!());
         let app_state = AppState::dummy().with_skill_executor_api(saboteur_skill_executer.api());
 
         // When
         let http = http(app_state);
-        let args = ExecuteSkillArgs {
-            skill: "greet".to_owned(),
-            input: json!("Homer"),
-        };
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(http::Method::POST)
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .uri("/execute_skill")
-                    .body(Body::from(serde_json::to_string(&args).unwrap()))
+                    .uri("/v1/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
             )
             .await

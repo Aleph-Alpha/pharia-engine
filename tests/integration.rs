@@ -56,7 +56,7 @@ impl TestKernel {
 
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
-async fn execute_skill() {
+async fn run_skill() {
     given_greet_skill_v0_2();
     let kernel = TestKernel::with_skills(&["greet_skill_v0_2"]).await;
 
@@ -65,12 +65,13 @@ async fn execute_skill() {
     auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
-        .post(format!("http://127.0.0.1:{}/execute_skill", kernel.port()))
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/greet_skill_v0_2/run",
+            kernel.port()
+        ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
-        .body(Body::from(
-            json!({ "skill": "local/greet_skill_v0_2", "input": "Homer"}).to_string(),
-        ))
+        .body(Body::from(json!("Homer").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
         .await
@@ -85,7 +86,7 @@ async fn execute_skill() {
 
 #[cfg_attr(not(feature = "test_document_index"), ignore)]
 #[tokio::test]
-async fn execute_search_skill() {
+async fn run_search_skill() {
     given_search_skill();
     let kernel = TestKernel::with_skills(&["search_skill"]).await;
 
@@ -94,13 +95,13 @@ async fn execute_search_skill() {
     auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
-        .post(format!("http://127.0.0.1:{}/execute_skill", kernel.port()))
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/search_skill/run",
+            kernel.port()
+        ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
-        .body(Body::from(
-            json!({ "skill": "local/search_skill", "input": "What is the Pharia Kernel?"})
-                .to_string(),
-        ))
+        .body(Body::from(json!("What is the Pharia Kernel?").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
         .await
@@ -117,7 +118,7 @@ async fn execute_search_skill() {
 }
 
 #[tokio::test]
-async fn execute_doc_metadata_skill() {
+async fn run_doc_metadata_skill() {
     given_doc_metadata_skill();
     let kernel = TestKernel::with_skills(&["doc_metadata_skill"]).await;
 
@@ -126,12 +127,13 @@ async fn execute_doc_metadata_skill() {
     auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
-        .post(format!("http://127.0.0.1:{}/execute_skill", kernel.port()))
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/doc_metadata_skill/run",
+            kernel.port()
+        ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
-        .body(Body::from(
-            json!({ "skill": "local/doc_metadata_skill", "input": "ignore for now"}).to_string(),
-        ))
+        .body(Body::from(json!("ignore for now").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
         .await
