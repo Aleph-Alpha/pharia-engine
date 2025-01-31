@@ -80,6 +80,29 @@ pub struct SkillMetadataV1 {
     pub input_schema: JsonSchema,
     pub output_schema: JsonSchema,
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum SkillError {
+    #[error("Failed to pre-instantiate the skill: {0}")]
+    SkillPreError(String),
+    #[error("Failed to pre-instantiate the component: {0}")]
+    LinkerError(String),
+    #[error("Failed to instantiate the component: {0}")]
+    ComponentError(String),
+    #[error("Skill version is missing.")]
+    MissingVersion,
+    #[error("Skill version {0} is no longer supported by the Kernel. Try upgrading your SDK.")]
+    NoLongerSupported(Version),
+    #[error("Skill version {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
+    NotSupportedYet(Version),
+    #[error("Error decoding Wasm component: {0}")]
+    WasmDecodeError(String),
+    #[error("Wasm isn't a component.")]
+    NotComponent,
+    #[error("Wasm component isn't using Pharia Skill.")]
+    NotPhariaSkill,
+}
+
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
 pub struct Engine {
@@ -146,9 +169,12 @@ impl Engine {
     pub fn instantiate_pre(
         &self,
         bytes: impl AsRef<[u8]>,
-    ) -> anyhow::Result<InstancePre<LinkedCtx>> {
-        let component = Component::new(&self.inner, bytes)?;
-        self.linker.instantiate_pre(&component)
+    ) -> Result<InstancePre<LinkedCtx>, SkillError> {
+        let component = Component::new(&self.inner, bytes)
+            .map_err(|e| SkillError::ComponentError(e.to_string()))?;
+        self.linker
+            .instantiate_pre(&component)
+            .map_err(|e| SkillError::LinkerError(e.to_string()))
     }
 
     /// Generates a store for a specific invocation.
@@ -187,17 +213,19 @@ pub enum Skill {
 impl Skill {
     /// Extracts the version of the skill WIT world from the provided bytes,
     /// and links it to the appropriate version in the linker.
-    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> Result<Self, SkillError> {
         let skill_version = SupportedVersion::extract(&bytes)?;
         let pre = engine.instantiate_pre(&bytes)?;
 
         match skill_version {
             SupportedVersion::V0_2 => {
-                let skill = v0_2::SkillPre::new(pre)?;
+                let skill = v0_2::SkillPre::new(pre)
+                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
                 Ok(Skill::V0_2(skill))
             }
             SupportedVersion::V0_3 => {
-                let skill = v0_3::SkillPre::new(pre)?;
+                let skill = v0_3::SkillPre::new(pre)
+                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
                 Ok(Skill::V0_3(skill))
             }
         }
@@ -304,22 +332,23 @@ impl SupportedVersion {
         Ok(())
     }
 
-    fn extract(wasm: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+    fn extract(wasm: impl AsRef<[u8]>) -> Result<Self, SkillError> {
         let version = Self::extract_pharia_skill_version(wasm)?;
         Self::validate_version(version)
     }
 
-    fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> anyhow::Result<Option<Version>> {
-        let decoded = decode(wasm.as_ref())?;
+    fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> Result<Option<Version>, SkillError> {
+        let decoded =
+            decode(wasm.as_ref()).map_err(|e| SkillError::WasmDecodeError(e.to_string()))?;
         if let DecodedWasm::Component(resolve, ..) = decoded {
             let package_name = &resolve
                 .package_names
                 .keys()
                 .find(|k| (k.namespace == "pharia" && k.name == "skill"))
-                .ok_or_else(|| anyhow!("Wasm component isn't using Pharia Skill."))?;
+                .ok_or_else(|| SkillError::NotPhariaSkill)?;
             Ok(package_name.version.clone())
         } else {
-            Err(anyhow!("Wasm isn't a component."))
+            Err(SkillError::NotComponent)
         }
     }
 
@@ -375,14 +404,9 @@ impl SupportedVersion {
     }
 
     /// Check if a given version is valid
-    fn validate_version(version: Option<Version>) -> anyhow::Result<Self> {
-        const NO_LONGER_SUPPORTED: &str =
-            "This Skill version is no longer supported by the Kernel. Try upgrading your SDK.";
-        const NOT_SUPPORTED_YET: &str =
-            "This Skill version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.";
-
+    fn validate_version(version: Option<Version>) -> Result<Self, SkillError> {
         let Some(version) = version else {
-            return Err(anyhow::anyhow!(NO_LONGER_SUPPORTED));
+            return Err(SkillError::MissingVersion);
         };
 
         match version {
@@ -392,7 +416,7 @@ impl SupportedVersion {
                 if &version <= Self::V0_2.current_supported_version() {
                     Ok(Self::V0_2)
                 } else {
-                    Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
+                    Err(SkillError::NotSupportedYet(version))
                 }
             }
             Version {
@@ -401,14 +425,14 @@ impl SupportedVersion {
                 if &version <= Self::V0_3.current_supported_version() {
                     Ok(Self::V0_3)
                 } else {
-                    Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
+                    Err(SkillError::NotSupportedYet(version))
                 }
             }
             _ => {
                 if &version > Self::latest_supported_version() {
-                    Err(anyhow::anyhow!(NOT_SUPPORTED_YET))
+                    Err(SkillError::NotSupportedYet(version))
                 } else {
-                    Err(anyhow::anyhow!(NO_LONGER_SUPPORTED))
+                    Err(SkillError::NoLongerSupported(version))
                 }
             }
         }
@@ -1389,13 +1413,13 @@ mod tests {
     #[test]
     fn unsupported_unversioned() {
         let error = SupportedVersion::validate_version(None).unwrap_err();
-        assert!(error.to_string().contains("no longer supported"));
+        assert!(matches!(error, SkillError::MissingVersion));
     }
 
     #[test]
     fn unsupported_v0_1() {
         let error = SupportedVersion::validate_version(Some(Version::new(0, 1, 0))).unwrap_err();
-        assert!(error.to_string().contains("no longer supported"));
+        assert!(matches!(error, SkillError::NoLongerSupported(..)));
     }
 
     #[test]
@@ -1410,9 +1434,7 @@ mod tests {
     fn invalid_0_2_version() {
         let error =
             SupportedVersion::validate_version(Some(Version::new(0, 2, u64::MAX))).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("not supported by this Kernel installation yet"));
+        assert!(matches!(error, SkillError::NotSupportedYet(..)));
     }
 
     #[test]
@@ -1420,8 +1442,6 @@ mod tests {
         let error =
             SupportedVersion::validate_version(Some(Version::new(u64::MAX, u64::MAX, u64::MAX)))
                 .unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("not supported by this Kernel installation yet"));
+        assert!(matches!(error, SkillError::NotSupportedYet(..)));
     }
 }
