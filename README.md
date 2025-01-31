@@ -68,14 +68,14 @@ curl -v GET 127.0.0.1:8081/cached_skills
 j
 ```
 
-execute skill:
+run a skill:
 
 ```shell
 set -a; source .env
-curl -v -X POST 127.0.0.1:8081/execute_skill \
+curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill \
 -H "Authorization: Bearer $PHARIA_AI_TOKEN" \
 -H 'Content-Type: application/json' \
--d '{"skill":"pharia-kernel-team/greet_skill", "input":"Homer"}'
+-d '"Homer"'
 ```
 
 ## User manual

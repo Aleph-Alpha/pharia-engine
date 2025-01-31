@@ -213,13 +213,13 @@ In order to run Pharia Kernel, you need to provide a namespace configuration:
        componentize-py -d skill.wit -w skill componentize my_skill -o ./skills/my_skill.wasm
    ```
 
-4. Execute your skill:
+4. Run your skill:
 
    ```shell
-       curl -v -X POST 127.0.0.1:8081/execute_skill \
+       curl -v -X POST 127.0.0.1:8081/v1/skills/dev/my_skill \
            -H "Authorization: Bearer $PHARIA_AI_TOKEN" \
            -H 'Content-Type: application/json' \
-           -d '{"skill":"dev/my_skill", "input":"Homer"}'
+           -d '"Homer"'
    ```
 
 5. Iterate
