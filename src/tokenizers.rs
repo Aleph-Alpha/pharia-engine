@@ -77,7 +77,7 @@ struct TokenizersActor {
     client: Client,
     /// Cache Tokenizers by model name. Currently this is case sensitive, due to the AA API being
     /// case sensitive. We wrap tokenizers in `Arc` so we can send them in a fire and forget manner
-    /// to the requesting skillexecuter, and we do not need to worry about keeping them alive.
+    /// to the requesting skill runtime, and we do not need to worry about keeping them alive.
     cache: HashMap<String, Arc<Tokenizer>>,
 }
 

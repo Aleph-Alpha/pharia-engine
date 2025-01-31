@@ -846,7 +846,7 @@ pub mod tests {
         api.upsert(skill).await;
         let skills = api.list().await;
 
-        // Then the skills are listed by the skill executor api
+        // Then the skills are listed by the skill runtime api
         assert_eq!(skills.len(), 2);
         assert!(skills.contains(&first));
         assert!(skills.contains(&second));

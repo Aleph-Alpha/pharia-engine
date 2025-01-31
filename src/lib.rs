@@ -31,7 +31,7 @@ use skill_store::SkillStore;
 use skills::Engine;
 use tokenizers::Tokenizers;
 
-use self::{inference::Inference, skill_runtime::SkillExecutor};
+use self::{inference::Inference, skill_runtime::SkillRuntime};
 
 pub use config::AppConfig;
 pub use inference::{Completion, FinishReason};
@@ -45,7 +45,7 @@ pub struct Kernel {
     search: Search,
     skill_loader: SkillLoader,
     skill_store: SkillStore,
-    skill_executor: SkillExecutor,
+    skill_runtime: SkillRuntime,
     namespace_watcher: NamespaceWatcher,
     authorization: Authorization,
     shell: Shell,
@@ -86,7 +86,7 @@ impl Kernel {
         let skill_store = SkillStore::new(skill_loader.api(), app_config.namespace_update_interval);
 
         // Boot up the runtime we need to execute Skills
-        let skill_executor = SkillExecutor::new(engine, csi_drivers.clone(), skill_store.api());
+        let skill_runtime = SkillRuntime::new(engine, csi_drivers.clone(), skill_store.api());
 
         let mut namespace_watcher = NamespaceWatcher::with_config(
             skill_store.api(),
@@ -102,7 +102,7 @@ impl Kernel {
         let shell = match Shell::new(
             app_config.kernel_address,
             authorization.api(),
-            skill_executor.api(),
+            skill_runtime.api(),
             skill_store.api(),
             csi_drivers,
             shutdown_signal,
@@ -116,7 +116,7 @@ impl Kernel {
                 // detached threads.
                 authorization.wait_for_shutdown().await;
                 namespace_watcher.wait_for_shutdown().await;
-                skill_executor.wait_for_shutdown().await;
+                skill_runtime.wait_for_shutdown().await;
                 skill_store.wait_for_shutdown().await;
                 skill_loader.wait_for_shutdown().await;
                 tokenizers.wait_for_shutdown().await;
@@ -133,7 +133,7 @@ impl Kernel {
             search,
             skill_loader,
             skill_store,
-            skill_executor,
+            skill_runtime,
             namespace_watcher,
             authorization,
             shell,
@@ -148,7 +148,7 @@ impl Kernel {
         self.shell.wait_for_shutdown().await;
         self.authorization.wait_for_shutdown().await;
         self.namespace_watcher.wait_for_shutdown().await;
-        self.skill_executor.wait_for_shutdown().await;
+        self.skill_runtime.wait_for_shutdown().await;
         self.skill_store.wait_for_shutdown().await;
         self.skill_loader.wait_for_shutdown().await;
         self.tokenizers.wait_for_shutdown().await;
