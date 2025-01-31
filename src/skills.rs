@@ -7,9 +7,11 @@ use std::{
 
 use anyhow::anyhow;
 use semver::Version;
+use serde::Serialize;
 use serde_json::Value;
 use strum::{EnumIter, IntoEnumIterator};
 use tracing::info;
+use utoipa::ToSchema;
 use wasmtime::{
     component::{Component, InstancePre, Linker as WasmtimeLinker},
     Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType, OptLevel,
@@ -18,7 +20,7 @@ use wasmtime::{
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
-use crate::{csi::CsiForSkills, namespace_watcher::Namespace, skill_runtime::SkillMetadata};
+use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(test, derive(fake::Dummy))]
@@ -42,6 +44,19 @@ impl fmt::Display for SkillPath {
     }
 }
 
+#[derive(ToSchema, Serialize, Debug)]
+#[serde(tag = "version")]
+pub enum SkillMetadata {
+    #[serde(rename = "1")]
+    V1(SkillMetadataV1),
+}
+
+#[derive(ToSchema, Serialize, Debug)]
+pub struct SkillMetadataV1 {
+    pub description: Option<String>,
+    pub input_schema: Value,
+    pub output_schema: Value,
+}
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
 pub struct Engine {
@@ -170,10 +185,17 @@ impl Skill {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> anyhow::Result<Option<SkillMetadata>> {
-        let mut store = engine.store(LinkedCtx::new(ctx));
         match self {
-            Self::V0_2(skill) => Ok(None),
-            Self::V0_3(skill) => Ok(None),
+            Self::V0_2(_) => Ok(None),
+            Self::V0_3(skill) => {
+                let mut store = engine.store(LinkedCtx::new(ctx));
+                let bindings = skill.instantiate_async(&mut store).await?;
+                let metadata = bindings
+                    .pharia_skill_skill_handler()
+                    .call_metadata(store)
+                    .await?;
+                Some(metadata.try_into()).transpose()
+            }
         }
     }
 
@@ -732,6 +754,7 @@ mod v0_2 {
 }
 
 mod v0_3 {
+    use exports::pharia::skill::skill_handler::SkillMetadata;
     use pharia::skill::csi::{
         ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion,
         CompletionParams, CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath,
@@ -744,6 +767,18 @@ mod v0_3 {
     use super::LinkedCtx;
 
     bindgen!({ world: "skill", path: "./wit/skill@0.3", async: true });
+
+    impl TryFrom<SkillMetadata> for super::SkillMetadata {
+        type Error = anyhow::Error;
+
+        fn try_from(metadata: SkillMetadata) -> Result<Self, Self::Error> {
+            Ok(Self::V1(super::SkillMetadataV1 {
+                description: metadata.description,
+                input_schema: serde_json::from_slice(&metadata.input_schema)?,
+                output_schema: serde_json::from_slice(&metadata.output_schema)?,
+            }))
+        }
+    }
 
     impl From<ChatRequest> for inference::ChatRequest {
         fn from(request: ChatRequest) -> Self {

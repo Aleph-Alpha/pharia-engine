@@ -10,7 +10,6 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
 use opentelemetry::Context;
-use serde::Serialize;
 use serde_json::Value;
 use tokio::{
     select,
@@ -19,7 +18,6 @@ use tokio::{
 };
 use tracing::{span, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use utoipa::ToSchema;
 
 use crate::{
     csi::{ChunkRequest, Csi, CsiForSkills},
@@ -27,7 +25,7 @@ use crate::{
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skill_store::SkillStoreApi,
-    skills::{Engine, SkillPath},
+    skills::{Engine, SkillMetadata, SkillPath},
 };
 
 pub struct WasmRuntime {
@@ -65,10 +63,7 @@ impl WasmRuntime {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(ExecuteSkillError::SkillDoesNotExist)?;
-        Ok(skill
-            .metadata(self.engine.as_ref(), ctx)
-            .await
-            .map_err(ExecuteSkillError::Other)?)
+        Ok(skill.metadata(self.engine.as_ref(), ctx).await?)
     }
 }
 
@@ -146,20 +141,6 @@ impl SkillExecutorApi {
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
-}
-
-#[derive(ToSchema, Serialize, Debug)]
-#[serde(tag = "version")]
-pub enum SkillMetadata {
-    #[serde(rename = "v1")]
-    V1(SkillMetadataV1),
-}
-
-#[derive(ToSchema, Serialize, Debug)]
-pub struct SkillMetadataV1 {
-    pub description: Option<String>,
-    pub input_schema: Value,
-    pub output_schema: Value,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -371,7 +352,7 @@ impl<C> SkillInvocationCtx<C> {
     }
 }
 
-/// We know that skill metadata will not invoke any csi functions, but still need to provide an implementation of CsiForSkills
+/// We know that skill metadata will not invoke any csi functions, but still need to provide an implementation of `CsiForSkills`
 /// We do not want to panic, as someone could build a component that uses the csi functions inside the metadata function.
 /// Therefore, we always send a runtime error which will lead to skill suspension.
 struct SkillMetadataCtx(Option<oneshot::Sender<anyhow::Error>>);
@@ -537,6 +518,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
+    use std::path::Path;
     use std::{fs, time::Duration};
 
     use anyhow::{anyhow, bail};
@@ -544,12 +526,13 @@ pub mod tests {
     use metrics_util::debugging::DebugValue;
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
-    use test_skills::{given_greet_py_v0_2, given_greet_skill_v0_2};
+    use test_skills::{given_greet_py_v0_2, given_greet_skill_v0_2, given_greet_skill_v0_3};
     use tokio::try_join;
 
     use crate::csi::tests::{CsiCompleteStub, CsiCounter, CsiGreetingMock};
     use crate::namespace_watcher::Namespace;
     use crate::skill_loader::ConfiguredSkill;
+    use crate::skills::SkillMetadata;
     use crate::{
         csi::{
             chunking::ChunkParams,
@@ -565,6 +548,51 @@ pub mod tests {
     };
 
     use super::*;
+
+    #[tokio::test]
+    async fn skill_metadata_v0_2_is_none() {
+        // Given a skill executor that always returns a v0.2 skill
+        let skill_path = SkillPath::local("greet");
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let store = SkillStoreGreetStub::with_greet_skill_v2(engine.clone());
+        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+
+        // When metadata for a skill is requested
+        let metadata = executor.api().skill_metadata(skill_path).await.unwrap();
+        executor.wait_for_shutdown().await;
+
+        // Then the metadata is None
+        assert!(metadata.is_none());
+    }
+
+    #[tokio::test]
+    async fn skill_metadata_v0_3() {
+        // Given a skill executor api that always returns a v0.3 skill
+        let skill_path = SkillPath::local("greet");
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
+        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+
+        // When metadata for a skill is requested
+        let metadata = executor.api().skill_metadata(skill_path).await.unwrap();
+        executor.wait_for_shutdown().await;
+
+        // Then the metadata is returned
+        match metadata {
+            Some(SkillMetadata::V1(metadata)) => {
+                assert_eq!(metadata.description.unwrap(), "A friendly greeting skill");
+                assert_eq!(
+                    metadata.input_schema,
+                    json!({"type": "string", "description": "The name of the person to greet"})
+                );
+                assert_eq!(
+                    metadata.output_schema,
+                    json!({"type": "string", "description": "A friendly greeting message"})
+                );
+            }
+            _ => panic!("Expected SkillMetadata::V1"),
+        }
+    }
 
     #[tokio::test]
     async fn greet_skill_component() {
@@ -756,7 +784,7 @@ pub mod tests {
     async fn skill_executor_forwards_csi_errors() {
         // Given csi which emits errors for completion request
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreGreetStub::new(engine.clone());
+        let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
         let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
 
         // When trying to generate a greeting for Homer using the greet skill
@@ -781,7 +809,7 @@ pub mod tests {
         // Given
         let csi = StubCsi::with_completion_from_text("Hello");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreGreetStub::new(engine.clone());
+        let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
 
         // When
         let executor = SkillExecutor::new(engine, csi, store.api());
@@ -807,7 +835,7 @@ pub mod tests {
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
         let csi = StubCsi::with_completion_from_text("Hello, Homer!");
-        let store = SkillStoreGreetStub::new(engine.clone());
+        let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
         let executor = SkillExecutor::new(engine, csi, store.api());
         let api = executor.api();
 
@@ -844,7 +872,7 @@ pub mod tests {
         };
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(|| async move {
-            let store = SkillStoreGreetStub::new(engine.clone());
+            let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
             let runtime = WasmRuntime::new(engine, store.api());
             msg.act(csi, &runtime).await;
             drop(runtime);
@@ -939,9 +967,8 @@ pub mod tests {
     }
 
     impl SkillStoreGreetStub {
-        pub fn new(engine: Arc<Engine>) -> Self {
-            given_greet_skill_v0_2();
-            let greet_bytes = fs::read("./skills/greet_skill_v0_2.wasm").unwrap();
+        pub fn new(engine: Arc<Engine>, path: impl AsRef<Path>) -> Self {
+            let greet_bytes = fs::read(path).unwrap();
             let skill = Skill::new(&engine, greet_bytes.clone()).unwrap();
             let skill = Arc::new(skill);
 
@@ -963,6 +990,17 @@ pub mod tests {
             });
 
             Self { send, join_handle }
+        }
+        pub fn with_greet_skill_v3(engine: Arc<Engine>) -> Self {
+            given_greet_skill_v0_3();
+            let path = "./skills/greet_skill_v0_3.wasm";
+            Self::new(engine, path)
+        }
+
+        pub fn with_greet_skill_v2(engine: Arc<Engine>) -> Self {
+            given_greet_skill_v0_2();
+            let path = "./skills/greet_skill_v0_2.wasm";
+            Self::new(engine, path)
         }
 
         pub async fn wait_for_shutdown(self) {
