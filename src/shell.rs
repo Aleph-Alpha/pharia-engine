@@ -572,7 +572,7 @@ mod tests {
         inference::{self, Completion},
         skill_runtime::{ExecuteSkill, ExecuteSkillError, SkillExecutorMsg, SkillMetadataRequest},
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
-        skills::{SkillMetadata, SkillMetadataV1, SkillPath},
+        skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
     };
 
@@ -647,8 +647,8 @@ mod tests {
                 assert_eq!(skill_path, SkillPath::local("greet_skill"));
                 send.send(Ok(Some(SkillMetadata::V1(SkillMetadataV1 {
                     description: Some("dummy description".to_owned()),
-                    input_schema: json!({}),
-                    output_schema: json!({}),
+                    input_schema: JsonSchema::dummy(),
+                    output_schema: JsonSchema::dummy(),
                 }))))
                 .unwrap();
             }
@@ -680,8 +680,8 @@ mod tests {
         let metadata = serde_json::from_slice::<Value>(&body).unwrap();
         let expected = json!({
             "description": "dummy description",
-            "input_schema": {},
-            "output_schema": {},
+            "input_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
+            "output_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
             "version": "1",
         });
         assert_eq!(metadata, expected);

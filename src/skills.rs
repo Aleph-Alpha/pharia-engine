@@ -51,11 +51,28 @@ pub enum SkillMetadata {
     V1(SkillMetadataV1),
 }
 
+/// Validated to be valid JSON Schema
+#[derive(ToSchema, Serialize, Debug, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct JsonSchema(Value);
+
+impl TryFrom<Value> for JsonSchema {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if jsonschema::meta::is_valid(&value) {
+            Ok(Self(value))
+        } else {
+            Err(anyhow!("Invalid JSON Schema"))
+        }
+    }
+}
+
 #[derive(ToSchema, Serialize, Debug)]
 pub struct SkillMetadataV1 {
     pub description: Option<String>,
-    pub input_schema: Value,
-    pub output_schema: Value,
+    pub input_schema: JsonSchema,
+    pub output_schema: JsonSchema,
 }
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
@@ -760,6 +777,7 @@ mod v0_3 {
         CompletionParams, CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath,
         Language, Message, Modality, Role, SearchRequest, SearchResult, SelectLanguageRequest,
     };
+    use serde_json::Value;
     use wasmtime::component::bindgen;
 
     use crate::{csi::chunking, inference, language_selection, search};
@@ -774,8 +792,10 @@ mod v0_3 {
         fn try_from(metadata: SkillMetadata) -> Result<Self, Self::Error> {
             Ok(Self::V1(super::SkillMetadataV1 {
                 description: metadata.description,
-                input_schema: serde_json::from_slice(&metadata.input_schema)?,
-                output_schema: serde_json::from_slice(&metadata.output_schema)?,
+                input_schema: serde_json::from_slice::<Value>(&metadata.input_schema)?
+                    .try_into()?,
+                output_schema: serde_json::from_slice::<Value>(&metadata.output_schema)?
+                    .try_into()?,
             }))
         }
     }
@@ -1166,6 +1186,25 @@ mod tests {
         }
     }
 
+    impl JsonSchema {
+        pub fn dummy() -> Self {
+            let schema = json!(
+                {
+                    "properties": {
+                        "topic": {
+                            "title": "Topic",
+                            "type": "string"
+                        }
+                    },
+                    "required": ["topic"],
+                    "title": "Input",
+                    "type": "object"
+                }
+            );
+            Self(schema)
+        }
+    }
+
     #[test]
     fn can_parse_module() {
         given_greet_skill_v0_2();
@@ -1188,6 +1227,28 @@ mod tests {
         let wasm = wat::parse_str("(module)").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(wasm);
         assert!(version.is_err());
+    }
+
+    #[test]
+    fn validate_metaschema() {
+        let schema = json!({
+            "properties": {
+                "topic": {
+                    "title": "Topic",
+                    "type": "string"
+                }
+            },
+            "required": ["topic"],
+            "title": "Input",
+            "type": "object"
+        });
+        assert!(JsonSchema::try_from(schema).is_ok());
+    }
+
+    #[test]
+    fn validate_invalid_schema() {
+        let schema = json!("invalid");
+        assert!(JsonSchema::try_from(schema).is_err());
     }
 
     #[tokio::test]
