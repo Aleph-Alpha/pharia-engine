@@ -299,8 +299,7 @@ impl ExecuteSkill {
                 match response {
                     Ok(_) => "ok",
                     Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
-                    Err(SkillRuntimeError::SkillStoreError(_)) => "internal_error",
-                    Err(SkillRuntimeError::Other(_)) => "internal_error",
+                    Err(SkillRuntimeError::SkillStoreError(_) | SkillRuntimeError::Other(_)) => "internal_error",
                 }
                 .into(),
             ),

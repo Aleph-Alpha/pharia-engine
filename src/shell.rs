@@ -39,7 +39,7 @@ use crate::{
     csi::Csi,
     csi_shell::http_csi_handle,
     namespace_watcher::Namespace,
-    skill_runtime::{SkillRuntimeError, SkillExecutorApi},
+    skill_runtime::{SkillExecutorApi, SkillRuntimeError},
     skill_store::SkillStoreApi,
     skills::{SkillMetadata, SkillPath},
 };
@@ -578,7 +578,7 @@ mod tests {
             V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest, VersionedCsiRequest,
         },
         inference::{self, Completion},
-        skill_runtime::{ExecuteSkill, SkillRuntimeError, SkillExecutorMsg, SkillMetadataRequest},
+        skill_runtime::{ExecuteSkill, SkillExecutorMsg, SkillMetadataRequest, SkillRuntimeError},
         skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
         skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
