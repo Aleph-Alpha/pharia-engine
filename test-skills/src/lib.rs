@@ -56,9 +56,12 @@ pub fn given_greet_py_v0_2() {
 }
 
 pub fn given_invalid_output_skill() {
-    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
-        given_rust_skill("invalid-output-skill")
-    });
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| given_rust_skill("invalid-output-skill"));
+    *WASM_BUILD;
+}
+
+pub fn given_csi_from_metadata_skill() {
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| given_rust_skill("csi-from-metadata"));
     *WASM_BUILD;
 }
 
