@@ -366,11 +366,11 @@ async fn execute_skill(
             StatusCode::BAD_REQUEST,
             Json(json!(SkillRuntimeError::SkillNotConfigured.to_string())),
         ),
-        Err(SkillRuntimeError::SkillStoreError(err)) => (
+        Err(SkillRuntimeError::StoreError(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
-        Err(SkillRuntimeError::Other(err)) => (
+        Err(SkillRuntimeError::ExecutionError(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
@@ -460,11 +460,11 @@ async fn run_skill(
             StatusCode::BAD_REQUEST,
             Json(json!(SkillRuntimeError::SkillNotConfigured.to_string())),
         ),
-        Err(SkillRuntimeError::SkillStoreError(err)) => (
+        Err(SkillRuntimeError::StoreError(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
-        Err(SkillRuntimeError::Other(err)) => (
+        Err(SkillRuntimeError::ExecutionError(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
         ),
@@ -579,14 +579,16 @@ mod tests {
         },
         inference::{self, Completion},
         skill_runtime::{ExecuteSkill, SkillExecutorMsg, SkillMetadataRequest, SkillRuntimeError},
-        skill_store::tests::{dummy_skill_store_api, SkillStoreMessage},
+        skill_store::{
+            tests::{dummy_skill_store_api, SkillStoreMessage},
+            SkillStoreError,
+        },
         skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
     };
 
     use super::*;
 
-    use anyhow::anyhow;
     use axum::{
         body::Body,
         http::{self, header, Request},
@@ -1273,9 +1275,12 @@ mod tests {
         // Given a skill executor which has an invalid namespace
         let skill_executor = StubSkillExecuter::new(|msg| match msg {
             SkillExecutorMsg::ExecuteSkill(ExecuteSkill { send, .. }) => {
-                send.send(Err(SkillRuntimeError::Other(anyhow!(
-                    "Namespace is invalid"
-                ))))
+                send.send(Err(SkillRuntimeError::StoreError(
+                    SkillStoreError::InvalidNamespaceError(
+                        Namespace::new("playground").unwrap(),
+                        "error msg".to_owned(),
+                    ),
+                )))
                 .unwrap();
             }
             SkillExecutorMsg::SkillMetadata(SkillMetadataRequest { .. }) => {
@@ -1304,7 +1309,7 @@ mod tests {
         assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let response = serde_json::from_slice::<String>(&body).unwrap();
-        assert_eq!(response, "Namespace is invalid");
+        assert_eq!(response, "Namespace playground is invalid: error msg");
     }
 
     #[tokio::test]
