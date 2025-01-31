@@ -3,7 +3,7 @@ use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Durat
 use crate::{
     namespace_watcher::Namespace,
     registries::Digest,
-    skill_loader::{ConfiguredSkill, SkillLoaderApi},
+    skill_loader::{ConfiguredSkill, SkillLoaderApi, SkillLoaderError},
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
@@ -113,9 +113,12 @@ impl SkillStoreState {
     }
 
     /// Return the registered tag for a given skill
-    fn tag(&self, skill_path: &SkillPath) -> anyhow::Result<Option<&str>> {
+    fn tag(&self, skill_path: &SkillPath) -> Result<Option<&str>, SkillStoreError> {
         if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
-            return Err(anyhow!("Invalid namespace: {error}"));
+            return Err(SkillStoreError::InvalidNamespaceError(
+                skill_path.namespace.clone(),
+                error.to_string(),
+            ));
         }
         Ok(self.known_skills.get(skill_path).map(String::as_str))
     }
@@ -248,7 +251,10 @@ impl SkillStoreApi {
     }
 
     /// Fetch an executable skill
-    pub async fn fetch(&self, skill_path: SkillPath) -> anyhow::Result<Option<Arc<Skill>>> {
+    pub async fn fetch(
+        &self,
+        skill_path: SkillPath,
+    ) -> Result<Option<Arc<Skill>>, SkillStoreError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::Fetch { skill_path, send };
         self.sender
@@ -297,7 +303,7 @@ impl SkillStoreApi {
 pub enum SkillStoreMessage {
     Fetch {
         skill_path: SkillPath,
-        send: oneshot::Sender<anyhow::Result<Option<Arc<Skill>>>>,
+        send: oneshot::Sender<Result<Option<Arc<Skill>>, SkillStoreError>>,
     },
     List {
         send: oneshot::Sender<Vec<SkillPath>>,
@@ -321,6 +327,14 @@ pub enum SkillStoreMessage {
     },
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SkillStoreError {
+    #[error(transparent)]
+    SkillLoaderError(#[from] SkillLoaderError),
+    #[error("Namespace {0} is invalid: {1}")]
+    InvalidNamespaceError(Namespace, String),
+}
+
 struct SkillStoreActor {
     receiver: mpsc::Receiver<SkillStoreMessage>,
     provider: SkillStoreState,
@@ -329,9 +343,9 @@ struct SkillStoreActor {
 }
 
 type SkillRequest =
-    Pin<Box<dyn Future<Output = (SkillPath, anyhow::Result<(Skill, Digest)>)> + Send>>;
+    Pin<Box<dyn Future<Output = (SkillPath, Result<(Skill, Digest), SkillLoaderError>)> + Send>>;
 
-type Recipient = oneshot::Sender<anyhow::Result<Option<Arc<Skill>>>>;
+type Recipient = oneshot::Sender<Result<Option<Arc<Skill>>, SkillStoreError>>;
 struct SkillRequests {
     requests: FuturesUnordered<SkillRequest>,
     recipients: HashMap<SkillPath, Vec<Recipient>>,
@@ -370,7 +384,9 @@ impl SkillRequests {
 
     /// Select the next finished skill request and send the result to the recipients.
     /// Return the skill path and result.
-    pub async fn select_next_some(&mut self) -> anyhow::Result<(SkillPath, (Arc<Skill>, Digest))> {
+    pub async fn select_next_some(
+        &mut self,
+    ) -> Result<(SkillPath, (Arc<Skill>, Digest)), SkillLoaderError> {
         let (skill_path, result) = self.requests.select_next_some().await;
         let senders = self.recipients.remove(&skill_path).unwrap();
         match result {
@@ -383,7 +399,7 @@ impl SkillRequests {
             }
             Err(e) => {
                 for sender in senders {
-                    drop(sender.send(Err(anyhow!(e.to_string()))));
+                    drop(sender.send(Err(e.clone().into())));
                 }
                 Err(e)
             }
@@ -424,7 +440,7 @@ impl SkillStoreActor {
                         error!("Error refreshing digest: {e}");
                     }
                 },
-            // FuturesUnordered will let them run in parallel. It will
+                // FuturesUnordered will let them run in parallel. It will
                 // yield once one of them is completed.
                 result = self.skill_requests.select_next_some(), if !self.skill_requests.is_empty()  => {
                     if let Ok((skill_path, (skill, digest))) = result {
@@ -537,22 +553,26 @@ pub mod tests {
     #[tokio::test]
     async fn requests_for_same_skill_are_cached() {
         // Given a skill request cache
-        let mut cache = SkillRequests::new();
-        let skill_path = SkillPath::dummy();
-        let skill_path_clone = skill_path.clone();
+        let mut requests = SkillRequests::new();
+        let first_skill = SkillPath::local("first_skill");
+        let second_skill = SkillPath::local("second_skill");
+        let first_error = SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(&first_skill));
+        let second_error =
+            SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(&second_skill));
 
-        // When pushing two requests for the same skill to the cache
-        let fut = async move { (skill_path_clone, Err(anyhow!("First response"))) };
+        // When pushing two requests for the same skill to the cache (but their futures return different errors)
+        let first_skill_clone = first_skill.clone();
+        let first_skill_clone_2 = first_skill.clone();
+        let fut = async move { (first_skill_clone, Err(first_error)) };
         let (first_send, first_recv) = oneshot::channel();
-        cache.push(skill_path.clone(), Box::pin(fut), first_send);
+        requests.push(first_skill.clone(), Box::pin(fut), first_send);
 
-        let skill_path_clone = skill_path.clone();
-        let fut = async move { (skill_path_clone, Err(anyhow!("Second response"))) };
+        let fut = async move { (first_skill_clone_2, Err(second_error)) };
         let (second_send, second_recv) = oneshot::channel();
-        cache.push(skill_path, Box::pin(fut), second_send);
+        requests.push(first_skill, Box::pin(fut), second_send);
 
         // And awaiting the next skill request
-        cache.select_next_some().await.unwrap_err();
+        requests.select_next_some().await.unwrap_err();
 
         // Then both have been answered by the first response
         assert!(first_recv
@@ -560,17 +580,17 @@ pub mod tests {
             .unwrap()
             .unwrap_err()
             .to_string()
-            .contains("First response"));
+            .contains("first_skill"));
         assert!(second_recv
             .await
             .unwrap()
             .unwrap_err()
             .to_string()
-            .contains("First response"));
+            .contains("first_skill"));
 
         // And the cache is empty
-        assert!(cache.recipients.is_empty());
-        assert!(cache.requests.is_empty());
+        assert!(requests.recipients.is_empty());
+        assert!(requests.requests.is_empty());
     }
 
     #[tokio::test]
@@ -582,12 +602,26 @@ pub mod tests {
 
         // When pushing two requests for different skills to the cache
         let first_skill_clone = first_skill.clone();
-        let fut = async move { (first_skill_clone, Err(anyhow!("First response"))) };
+        let fut = async move {
+            (
+                first_skill_clone.clone(),
+                Err(SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(
+                    &first_skill_clone,
+                ))),
+            )
+        };
         let (first_send, first_recv) = oneshot::channel();
         cache.push(first_skill, Box::pin(fut), first_send);
 
         let second_skill_clone = second_skill.clone();
-        let fut = async move { (second_skill_clone, Err(anyhow!("Second response"))) };
+        let fut = async move {
+            (
+                second_skill_clone.clone(),
+                Err(SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(
+                    &second_skill_clone,
+                ))),
+            )
+        };
         let (second_send, second_recv) = oneshot::channel();
         cache.push(second_skill, Box::pin(fut), second_send);
 
@@ -601,13 +635,13 @@ pub mod tests {
             .unwrap()
             .unwrap_err()
             .to_string()
-            .contains("First response"));
+            .contains("first_skill"));
         assert!(second_recv
             .await
             .unwrap()
             .unwrap_err()
             .to_string()
-            .contains("Second response"));
+            .contains("second_skill"));
 
         // And the cache is empty
         assert!(cache.requests.is_empty());
@@ -623,7 +657,7 @@ pub mod tests {
 
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let skill = ConfiguredSkill::from_path(&skill_path);
-        skill_store.upsert(skill).await;
+        skill_store.upsert(skill.clone()).await;
 
         // And given two pending fetch requests
         let cloned_skill_path = skill_path.clone();
@@ -639,7 +673,7 @@ pub mod tests {
         // When answering the first request with an error message
         match recv.recv().await.unwrap() {
             SkillLoaderMsg::Fetch { send, .. } => {
-                drop(send.send(Err(anyhow!("First request response"))));
+                drop(send.send(Err(SkillLoaderError::SkillNotFound(skill))));
             }
             SkillLoaderMsg::FetchDigest { .. } => unreachable!(),
         }
@@ -704,10 +738,7 @@ pub mod tests {
         let result = skill_store.fetch(skill_path).await;
 
         // Then a good error message is returned
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("configured but not loadable"));
+        assert!(result.unwrap_err().to_string().contains("not found"));
     }
 
     #[tokio::test]

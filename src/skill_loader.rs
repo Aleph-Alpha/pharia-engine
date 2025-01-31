@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
@@ -9,7 +8,7 @@ use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
-use crate::skills::{Engine, Skill};
+use crate::skills::{Engine, Skill, SkillError};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::collections::HashMap;
@@ -39,10 +38,20 @@ impl ConfiguredSkill {
     }
 }
 
+#[derive(Debug, thiserror::Error, Clone)]
+pub enum SkillLoaderError {
+    #[error(transparent)]
+    RegistryError(#[from] RegistryError),
+    #[error(transparent)]
+    SkillError(#[from] SkillError),
+    #[error("Skill {0} not found in registry.")]
+    SkillNotFound(ConfiguredSkill),
+}
+
 pub enum SkillLoaderMsg {
     Fetch {
         skill: ConfiguredSkill,
-        send: oneshot::Sender<anyhow::Result<(Skill, Digest)>>,
+        send: oneshot::Sender<Result<(Skill, Digest), SkillLoaderError>>,
     },
     FetchDigest {
         skill: ConfiguredSkill,
@@ -138,7 +147,7 @@ impl SkillLoaderApi {
 }
 
 impl SkillLoaderApi {
-    pub async fn fetch(&self, skill: ConfiguredSkill) -> anyhow::Result<(Skill, Digest)> {
+    pub async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), SkillLoaderError> {
         let (send, recv) = oneshot::channel();
         self.sender
             .send(SkillLoaderMsg::Fetch { skill, send })
@@ -212,10 +221,10 @@ impl SkillLoaderActor {
         registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
         skill: &ConfiguredSkill,
-    ) -> anyhow::Result<(Skill, Digest)> {
+    ) -> Result<(Skill, Digest), SkillLoaderError> {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
-            skill_bytes.ok_or_else(|| anyhow!("Skill {skill} configured but not loadable."))?;
+            skill_bytes.ok_or_else(|| SkillLoaderError::SkillNotFound(skill.clone()))?;
         let skill = spawn_blocking(move || Skill::new(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")?;

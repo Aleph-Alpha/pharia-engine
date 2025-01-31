@@ -43,8 +43,10 @@ impl SkillRegistry for FileRegistry {
         let fut = async move {
             let skill_path = self.skill_path(name);
             if skill_path.exists() {
-                let binary = fs::read(&skill_path).map_err(anyhow::Error::from)?;
-                let digest = Self::skill_digest(&skill_path)?;
+                let binary = fs::read(&skill_path)
+                    .map_err(|e| RegistryError::SkillRetrievalError(e.to_string()))?;
+                let digest = Self::skill_digest(&skill_path)
+                    .map_err(|e| RegistryError::DigestRetrievalError(e.to_string()))?;
                 Ok(Some(SkillImage::new(binary, digest)))
             } else {
                 Ok(None)
@@ -61,7 +63,9 @@ impl SkillRegistry for FileRegistry {
         Box::pin(async move {
             let skill_path = self.skill_path(name);
             if skill_path.exists() {
-                Ok(Some(Self::skill_digest(&skill_path)?))
+                Ok(Some(Self::skill_digest(&skill_path).map_err(|e| {
+                    RegistryError::DigestRetrievalError(e.to_string())
+                })?))
             } else {
                 Ok(None)
             }

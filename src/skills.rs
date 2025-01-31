@@ -81,7 +81,7 @@ pub struct SkillMetadataV1 {
     pub output_schema: JsonSchema,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Clone)]
 pub enum SkillError {
     #[error("Failed to pre-instantiate the skill: {0}")]
     SkillPreError(String),
