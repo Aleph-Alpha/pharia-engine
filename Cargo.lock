@@ -2218,6 +2218,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "invalid-output-skill"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "io-extras"
 version = "0.18.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

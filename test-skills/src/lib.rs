@@ -55,6 +55,13 @@ pub fn given_greet_py_v0_2() {
     *WASM_BUILD;
 }
 
+pub fn given_invalid_output_skill() {
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("invalid-output-skill")
+    });
+    *WASM_BUILD;
+}
+
 fn given_python_skill(package_name: &str, wit_version: &str) {
     if !Path::new(&format!("./skills/{package_name}.wasm")).exists() {
         build_python_skill(package_name, wit_version);

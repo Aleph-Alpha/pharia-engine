@@ -526,7 +526,7 @@ pub mod tests {
     use metrics_util::debugging::DebugValue;
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
-    use test_skills::{given_greet_py_v0_2, given_greet_skill_v0_2, given_greet_skill_v0_3};
+    use test_skills::{given_greet_py_v0_2, given_greet_skill_v0_2, given_greet_skill_v0_3, given_invalid_output_skill};
     use tokio::try_join;
 
     use crate::csi::tests::{CsiCompleteStub, CsiCounter, CsiGreetingMock};
@@ -554,7 +554,7 @@ pub mod tests {
         // Given a skill executor that always returns a v0.2 skill
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreGreetStub::with_greet_skill_v2(engine.clone());
+        let store = SkillStoreStub::with_greet_skill_v2(engine.clone());
         let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -570,7 +570,7 @@ pub mod tests {
         // Given a skill executor api that always returns a v0.3 skill
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
+        let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
         let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -592,6 +592,22 @@ pub mod tests {
             }
             _ => panic!("Expected SkillMetadata::V1"),
         }
+    }
+
+    #[tokio::test]
+    async fn skill_metadata_invalid_output() {
+        // Given a skill executor that always returns an invalid output skill
+        let skill_path = SkillPath::local("greet");
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let store = SkillStoreStub::with_invalid_output_skill(engine.clone());
+        let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
+
+        // When metadata for a skill is requested
+        let metadata = executor.api().skill_metadata(skill_path).await;
+        executor.wait_for_shutdown().await;
+
+        // Then the metadata gives an error
+        assert!(metadata.is_err());
     }
 
     #[tokio::test]
@@ -784,7 +800,7 @@ pub mod tests {
     async fn skill_executor_forwards_csi_errors() {
         // Given csi which emits errors for completion request
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
+        let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
         let executor = SkillExecutor::new(engine, SaboteurCsi, store.api());
 
         // When trying to generate a greeting for Homer using the greet skill
@@ -809,7 +825,7 @@ pub mod tests {
         // Given
         let csi = StubCsi::with_completion_from_text("Hello");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
+        let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
 
         // When
         let executor = SkillExecutor::new(engine, csi, store.api());
@@ -835,7 +851,7 @@ pub mod tests {
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
         let csi = StubCsi::with_completion_from_text("Hello, Homer!");
-        let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
+        let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
         let executor = SkillExecutor::new(engine, csi, store.api());
         let api = executor.api();
 
@@ -872,7 +888,7 @@ pub mod tests {
         };
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(|| async move {
-            let store = SkillStoreGreetStub::with_greet_skill_v3(engine.clone());
+            let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
             let runtime = WasmRuntime::new(engine, store.api());
             msg.act(csi, &runtime).await;
             drop(runtime);
@@ -960,13 +976,12 @@ pub mod tests {
             bail!("Test error")
         }
     }
-    /// Only serves test/greet skill
-    pub struct SkillStoreGreetStub {
+    pub struct SkillStoreStub {
         send: mpsc::Sender<SkillStoreMessage>,
         join_handle: JoinHandle<()>,
     }
 
-    impl SkillStoreGreetStub {
+    impl SkillStoreStub {
         pub fn new(engine: Arc<Engine>, path: impl AsRef<Path>) -> Self {
             let greet_bytes = fs::read(path).unwrap();
             let skill = Skill::new(&engine, greet_bytes.clone()).unwrap();
@@ -1003,6 +1018,11 @@ pub mod tests {
             Self::new(engine, path)
         }
 
+        pub fn with_invalid_output_skill(engine: Arc<Engine>) -> Self {
+            given_invalid_output_skill();
+            let path = "./skills/invalid_output_skill.wasm";
+            Self::new(engine, path)
+        }
         pub async fn wait_for_shutdown(self) {
             drop(self.send);
             self.join_handle.await.unwrap();
