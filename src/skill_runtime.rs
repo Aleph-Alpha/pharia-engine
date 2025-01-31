@@ -151,9 +151,9 @@ pub enum SkillRuntimeError {
     )]
     SkillNotConfigured,
     #[error(transparent)]
-    SkillStoreError(#[from] SkillStoreError),
+    StoreError(#[from] SkillStoreError),
     #[error(transparent)]
-    Other(#[from] anyhow::Error),
+    ExecutionError(#[from] anyhow::Error),
 }
 
 struct SkillExecutorActor<C> {
@@ -247,7 +247,7 @@ impl SkillMetadataRequest {
         let response = select! {
             result = runtime.metadata(&self.skill_path, ctx) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillRuntimeError::Other(error))
+            Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
         };
         drop(self.send.send(response));
     }
@@ -287,7 +287,7 @@ impl ExecuteSkill {
         let response = select! {
             result = runtime.run(&skill_path, input, ctx) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillRuntimeError::Other(error))
+            Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
         };
 
         let latency = start.elapsed().as_secs_f64();
@@ -299,7 +299,10 @@ impl ExecuteSkill {
                 match response {
                     Ok(_) => "ok",
                     Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
-                    Err(SkillRuntimeError::SkillStoreError(_) | SkillRuntimeError::Other(_)) => "internal_error",
+                    Err(
+                        SkillRuntimeError::StoreError(_)
+                        | SkillRuntimeError::ExecutionError(_),
+                    ) => "internal_error",
                 }
                 .into(),
             ),
