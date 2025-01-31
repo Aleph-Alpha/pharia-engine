@@ -5,7 +5,7 @@ use oci_client::{
     Client, Reference,
 };
 use oci_wasm::WasmClient;
-use tracing::warn;
+use tracing::{error, warn};
 
 use super::{Digest, DynFuture, RegistryError, SkillImage};
 use crate::registries::SkillRegistry;
@@ -85,7 +85,8 @@ impl SkillRegistry for OciRegistry {
                     if anyhow_is_skill_not_found(&e) {
                         Ok(None)
                     } else {
-                        Err(RegistryError::SkillRetrievalError(e))
+                        error!("Error retrieving skill from registry: {e}");
+                        Err(RegistryError::SkillRetrievalError(e.to_string()))
                     }
                 }
             }
@@ -109,7 +110,8 @@ impl SkillRegistry for OciRegistry {
                     if is_skill_not_found(&e) {
                         Ok(None)
                     } else {
-                        Err(RegistryError::DigestRetrievalError(e))
+                        error!("Error retrieving digest from registry: {e}");
+                        Err(RegistryError::DigestRetrievalError(e.to_string()))
                     }
                 }
             }

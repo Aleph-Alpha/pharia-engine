@@ -24,7 +24,7 @@ use crate::{
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    skill_store::SkillStoreApi,
+    skill_store::{SkillStoreApi, SkillStoreError},
     skills::{Engine, SkillMetadata, SkillPath},
 };
 
@@ -150,6 +150,8 @@ pub enum ExecuteSkillError {
         associated with the namespace."
     )]
     SkillDoesNotExist,
+    #[error(transparent)]
+    SkillStoreError(#[from] SkillStoreError),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -297,6 +299,7 @@ impl ExecuteSkill {
                 match response {
                     Ok(_) => "ok",
                     Err(ExecuteSkillError::SkillDoesNotExist) => "not_found",
+                    Err(ExecuteSkillError::SkillStoreError(_)) => "internal_error",
                     Err(ExecuteSkillError::Other(_)) => "internal_error",
                 }
                 .into(),

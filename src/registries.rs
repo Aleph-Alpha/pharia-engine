@@ -5,7 +5,6 @@ mod oci;
 
 pub use file::FileRegistry;
 pub use oci::OciRegistry;
-use oci_client::errors::OciDistributionError;
 
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
@@ -29,12 +28,12 @@ impl SkillImage {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Clone)]
 pub enum RegistryError {
     #[error("Error retrieving skill from registry: {0}")]
-    SkillRetrievalError(#[from] anyhow::Error),
+    SkillRetrievalError(String),
     #[error("Error retrieving digest from registry: {0}")]
-    DigestRetrievalError(#[from] OciDistributionError),
+    DigestRetrievalError(String),
     #[error("Digest should exist for skill {name}:{tag} in registry {registry}")]
     DigestShouldExist {
         name: String,
