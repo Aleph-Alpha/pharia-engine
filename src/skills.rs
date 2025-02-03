@@ -751,22 +751,27 @@ mod v0_2 {
         }
     }
 
-    impl From<Role> for inference::Role {
+    impl From<Role> for String {
         fn from(role: Role) -> Self {
             match role {
-                Role::User => inference::Role::User,
-                Role::Assistant => inference::Role::Assistant,
-                Role::System => inference::Role::System,
+                Role::User => "user",
+                Role::Assistant => "assistant",
+                Role::System => "system",
             }
+            .to_owned()
         }
     }
 
-    impl From<inference::Role> for Role {
-        fn from(role: inference::Role) -> Self {
-            match role {
-                inference::Role::User => Self::User,
-                inference::Role::Assistant => Self::Assistant,
-                inference::Role::System => Self::System,
+    impl From<String> for Role {
+        fn from(role: String) -> Self {
+            match role.as_str() {
+                "user" => Self::User,
+                "system" => Self::System,
+                // An unsupported role can happen if the api scheduler introduces more roles in the future.
+                // It is unclear what to pass to the skill in this case, as it only knows three roles.
+                // We could terminate skill execution, but as we know that this will be a reply from the model,
+                // returning assistant seems like a sensible fallback.
+                _ => Self::Assistant,
             }
         }
     }
@@ -805,7 +810,7 @@ mod v0_3 {
     use pharia::skill::csi::{
         ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion,
         CompletionParams, CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath,
-        Language, Message, Modality, Role, SearchRequest, SearchResult, SelectLanguageRequest,
+        Language, Message, Modality, SearchRequest, SearchResult, SelectLanguageRequest,
     };
     use serde_json::Value;
     use wasmtime::component::bindgen;
@@ -1049,7 +1054,7 @@ mod v0_3 {
     impl From<Message> for inference::Message {
         fn from(message: Message) -> Self {
             Self {
-                role: message.role.into(),
+                role: message.role,
                 content: message.content,
             }
         }
@@ -1088,30 +1093,10 @@ mod v0_3 {
         }
     }
 
-    impl From<Role> for inference::Role {
-        fn from(role: Role) -> Self {
-            match role {
-                Role::User => inference::Role::User,
-                Role::Assistant => inference::Role::Assistant,
-                Role::System => inference::Role::System,
-            }
-        }
-    }
-
-    impl From<inference::Role> for Role {
-        fn from(role: inference::Role) -> Self {
-            match role {
-                inference::Role::User => Self::User,
-                inference::Role::Assistant => Self::Assistant,
-                inference::Role::System => Self::System,
-            }
-        }
-    }
-
     impl From<inference::Message> for Message {
         fn from(message: inference::Message) -> Self {
             Self {
-                role: message.role.into(),
+                role: message.role,
                 content: message.content,
             }
         }

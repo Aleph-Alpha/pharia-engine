@@ -281,7 +281,7 @@ pub mod tests {
     use serde_json::json;
 
     use crate::{
-        inference::{tests::InferenceStub, ChatParams, CompletionParams, Message, Role},
+        inference::{tests::InferenceStub, ChatParams, CompletionParams, Message},
         search::tests::SearchStub,
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
@@ -295,10 +295,7 @@ pub mod tests {
         // Given a chat request
         let chat_request = ChatRequest {
             model: "dummy_model".to_owned(),
-            messages: vec![Message {
-                role: Role::User,
-                content: "Hello".to_owned(),
-            }],
+            messages: vec![Message::new("user", "Hello")],
             params: ChatParams::default(),
         };
 
@@ -721,10 +718,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             requests
                 .iter()
                 .map(|_| ChatResponse {
-                    message: Message {
-                        role: Role::Assistant,
-                        content: "dummy-content".to_owned(),
-                    },
+                    message: Message::new("assistant", "dummy-content"),
                     finish_reason: FinishReason::Stop,
                 })
                 .collect()
