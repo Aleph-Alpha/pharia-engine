@@ -3,7 +3,7 @@ mod client;
 
 pub use actor::{
     ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
-    FinishReason, Inference, InferenceApi, Message, Role,
+    FinishReason, Inference, InferenceApi, Message,
 };
 
 #[cfg(test)]

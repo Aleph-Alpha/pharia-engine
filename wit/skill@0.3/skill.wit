@@ -1,4 +1,4 @@
-package pharia:skill@0.3.0-alpha.6;
+package pharia:skill@0.3.0-alpha.7;
 
 @since(version = 0.1.0)
 world skill {
@@ -75,16 +75,9 @@ interface csi {
         return-special-tokens: bool
     }
 
-    @since(version = 0.2.7)
-    enum role {
-        user,
-        assistant,
-        system,
-    }
-
-    @since(version = 0.2.7)
+    // @since(version = 0.3.0)
     record message {
-        role: role,
+        role: string,
         content: string,
     }
 

@@ -103,14 +103,9 @@ impl TryFrom<CompletionOutput> for Completion {
     }
 }
 
-impl TryFrom<aleph_alpha_client::Message<'_>> for Message {
-    type Error = anyhow::Error;
-
-    fn try_from(message: aleph_alpha_client::Message<'_>) -> anyhow::Result<Self> {
-        Ok(Message {
-            role: message.role.parse()?,
-            content: message.content.into(),
-        })
+impl From<aleph_alpha_client::Message<'_>> for Message {
+    fn from(message: aleph_alpha_client::Message<'_>) -> Self {
+        Message::new(message.role, message.content)
     }
 }
 
@@ -128,7 +123,7 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
 
     fn try_from(chat_output: aleph_alpha_client::ChatOutput) -> anyhow::Result<Self> {
         Ok(ChatResponse {
-            message: Message::try_from(chat_output.message)?,
+            message: chat_output.message.into(),
             finish_reason: chat_output.finish_reason.parse()?,
         })
     }
@@ -218,7 +213,7 @@ mod tests {
     use tokio::time::Instant;
 
     use crate::{
-        inference::{ChatParams, Role},
+        inference::ChatParams,
         tests::{api_token, inference_url},
     };
 
@@ -301,10 +296,7 @@ mod tests {
                 temperature: None,
                 top_p: None,
             },
-            messages: vec![Message {
-                role: Role::User,
-                content: "Hello, world!".to_owned(),
-            }],
+            messages: vec![Message::new("user", "Hello, world!")],
         };
 
         // When chatting with inference client
@@ -327,10 +319,7 @@ mod tests {
         let chat_request = ChatRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
             params: ChatParams::default(),
-            messages: vec![Message {
-                role: Role::User,
-                content: "Hello, world!".to_owned(),
-            }],
+            messages: vec![Message::new("user", "Hello, world!")],
         };
 
         // When chatting with inference client

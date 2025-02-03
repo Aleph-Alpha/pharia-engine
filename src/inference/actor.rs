@@ -1,6 +1,4 @@
 use aleph_alpha_client::Client;
-use anyhow::anyhow;
-use core::fmt;
 use futures::{stream::FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
@@ -122,36 +120,16 @@ pub struct ChatParams {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
-    pub role: Role,
+    pub role: String,
     pub content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Role {
-    User,
-    Assistant,
-    System,
-}
-impl FromStr for Role {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "user" => Ok(Role::User),
-            "assistant" => Ok(Role::Assistant),
-            "system" => Ok(Role::System),
-            _ => Err(anyhow!("Unsupported role: '{s}'.")),
+impl Message {
+    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            role: role.into(),
+            content: content.into(),
         }
-    }
-}
-impl fmt::Display for Role {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Self::User => "user",
-            Self::Assistant => "assistant",
-            Self::System => "system",
-        };
-        write!(f, "{s}")
     }
 }
 
