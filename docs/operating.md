@@ -98,7 +98,7 @@ OTEL_ENDPOINT=http://127.0.0.1:4317
 For local testing, a supported collector like the Jaeger [All in One](https://www.jaegertracing.io/docs/1.60/getting-started/#all-in-one) executable can be used:
 
 ```shell
-podman run -d -p4317:4317 -p16686:16686 jaegertracing/all-in-one
+podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
 ## Local Pharia Kernel Setup
