@@ -38,7 +38,7 @@ exclude = ["helm-charts", "resource_eval"]
 [dependencies]
 aleph-alpha-client = "0.15.0"
 anyhow = "1.0.95"
-async-trait = "0.1.85"
+async-trait = "0.1.86"
 axum = { version = "0.8.2", features = ["macros"] }
 axum-extra = { version = "0.11.0", features = ["typed-header"] }
 dotenvy = "0.15.7"
@@ -100,7 +100,7 @@ opentelemetry-semantic-conventions = { version = "0.27.0", features = [
 ] }
 humantime = "2.1.0"
 metrics = "0.24.1"
-metrics-exporter-prometheus = { version = "0.16.1", default-features = false, features = [
+metrics-exporter-prometheus = { version = "0.16.2", default-features = false, features = [
     "http-listener",
 ] }
 itertools = "0.14.0"
