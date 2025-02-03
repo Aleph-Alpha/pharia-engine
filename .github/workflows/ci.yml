@@ -21,6 +21,9 @@ env:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -39,7 +42,7 @@ jobs:
       NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY: ghcr.io
       NAMESPACES__PHARIA_KERNEL_TEAM__BASE_REPOSITORY: aleph-alpha/pharia-kernel
       NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER: ${{ github.actor }}
-      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD: ${{ secrets.SKILL_REGISTRY_PASSWORD }}
+      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       PHARIA_AI_TOKEN: ${{ secrets.PHARIA_AI_TOKEN }}
       INFERENCE_URL: https://inference-api.product.pharia.com
       AUTHORIZATION_URL: https://pharia-iam.product.pharia.com
