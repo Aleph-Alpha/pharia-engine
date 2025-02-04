@@ -113,7 +113,7 @@ spec:
             - name: NAMESPACES__ASSISTANT__REGISTRY
               value: "alephalpha.jfrog.io"
             - name: NAMESPACES__ASSISTANT__BASE_REPOSITORY
-              value: "assistant-skills"
+              value: "assistant-kernel-skills"
             {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
