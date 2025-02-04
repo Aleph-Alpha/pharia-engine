@@ -61,6 +61,8 @@ impl InferenceClient for Client {
                     top_k,
                     top_p,
                     stop,
+                    frequency_penalty,
+                    presence_penalty,
                 },
         } = &request;
 
@@ -74,8 +76,8 @@ impl InferenceClient for Client {
                 temperature: *temperature,
                 top_k: *top_k,
                 top_p: *top_p,
-                frequency_penalty: None,
-                presence_penalty: None,
+                frequency_penalty: *frequency_penalty,
+                presence_penalty: *presence_penalty,
             },
             special_tokens: *return_special_tokens,
         };
@@ -399,5 +401,43 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             .filter(|word| *word == "oat")
             .count();
         assert!(number_oat_mentioned >= 5);
+    }
+
+    #[tokio::test]
+    async fn sampling_parameters_for_completion() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let completion_request = CompletionRequest {
+            prompt: "An apple a day".to_owned(),
+            model: "pharia-1-llm-7b-control".to_owned(),
+            params: CompletionParams {
+                return_special_tokens: false,
+                max_tokens: Some(24),
+                temperature: None,
+                top_k: Some(10),
+                top_p: None,
+                frequency_penalty: None,
+                presence_penalty: None,
+                stop: Vec::new(),
+            },
+        };
+        let completion_response =
+            <Client as InferenceClient>::complete_text(&client, &completion_request, api_token)
+                .await
+                .unwrap();
+
+        // Then we expect the word oat, to appear at least five times
+        let completion = completion_response.text;
+        // Since for every token we pick one of the top 10 tokens, yet not the most likely it should
+        // be fairly certain it is different from the completion we would expect if we would sample
+        // deterministically. Sadly we can not specify a seed to make sure the randomness of the
+        // test is not leading to a false positive, nor can we narrow down the assertion.
+        let deteriministic = " keeps the doctor away.\nThis old saying has been around for a long \
+            time, and it’s true";
+        assert_ne!(deteriministic, completion);
     }
 }
