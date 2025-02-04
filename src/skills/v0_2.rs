@@ -52,6 +52,8 @@ impl Host for LinkedCtx {
             top_k,
             top_p,
             stop,
+            frequency_penalty: None,
+            presence_penalty: None,
         };
         let request = inference::CompletionRequest::new(prompt, model).with_params(params);
         self.skill_ctx
@@ -237,6 +239,8 @@ impl From<CompletionParams> for inference::CompletionParams {
             top_k: params.top_k,
             top_p: params.top_p,
             stop: params.stop,
+            frequency_penalty: None,
+            presence_penalty: None,
         }
     }
 }
@@ -336,6 +340,8 @@ impl From<inference::FinishReason> for FinishReason {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
 
     #[test]
@@ -357,6 +363,36 @@ mod tests {
                 max_tokens: Some(10),
                 temperature: Some(0.5),
                 top_p: Some(0.9),
+                frequency_penalty: None,
+                presence_penalty: None,
+            }
+        );
+    }
+
+    #[test]
+    fn forward_completion_params() {
+        // Given
+        let source = CompletionParams {
+            max_tokens: Some(10),
+            temperature: Some(0.5),
+            top_k: Some(5),
+            top_p: Some(0.9),
+            stop: vec!["stop".to_string()],
+        };
+
+        // When
+        let result: inference::CompletionParams = source.into();
+
+        // Then
+        assert_eq!(
+            result,
+            inference::CompletionParams {
+                return_special_tokens: false,
+                max_tokens: Some(10),
+                temperature: Some(0.5),
+                top_k: Some(5),
+                top_p: Some(0.9),
+                stop: vec!["stop".to_string()],
                 frequency_penalty: None,
                 presence_penalty: None,
             }

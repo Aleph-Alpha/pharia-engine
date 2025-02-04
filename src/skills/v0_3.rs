@@ -264,13 +264,26 @@ impl From<ChatParams> for inference::ChatParams {
 
 impl From<CompletionParams> for inference::CompletionParams {
     fn from(params: CompletionParams) -> Self {
+        let CompletionParams {
+            return_special_tokens,
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+            frequency_penalty,
+            presence_penalty,
+        } = params;
+
         Self {
-            return_special_tokens: params.return_special_tokens,
-            max_tokens: params.max_tokens,
-            temperature: params.temperature,
-            top_k: params.top_k,
-            top_p: params.top_p,
-            stop: params.stop,
+            return_special_tokens,
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+            frequency_penalty,
+            presence_penalty,
         }
     }
 }
