@@ -111,7 +111,7 @@ pub struct CompletionRequest {
     pub params: CompletionParams,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ChatParams {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
