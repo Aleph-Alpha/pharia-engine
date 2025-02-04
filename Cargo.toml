@@ -39,8 +39,8 @@ exclude = ["helm-charts", "resource_eval"]
 aleph-alpha-client = "0.15.0"
 anyhow = "1.0.95"
 async-trait = "0.1.86"
-axum = { version = "0.8.2", features = ["macros"] }
-axum-extra = { version = "0.11.0", features = ["typed-header"] }
+axum = { version = "0.8.1", features = ["macros"] }
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
 dotenvy = "0.15.7"
 futures = "0.3.31"
 oci-client = "0.14.0"
@@ -49,7 +49,6 @@ reqwest = { version = "0.12.12", features = [
     "brotli",
     "deflate",
     "gzip",
-    "hickory-dns",
     "json",
     "rustls-tls",
     "zstd",
