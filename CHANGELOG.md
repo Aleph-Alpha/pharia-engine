@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.6...v0.7.7)
+
+### Features
+
+- Validate skill metadata schema - ([97d117e](https://github.com/Aleph-Alpha/pharia-kernel/commit/97d117e09c43579a6a6ed27f996faeacd8ef6a10))
+- Invoke metadata function from component - ([568b033](https://github.com/Aleph-Alpha/pharia-kernel/commit/568b0330d1f44cff7e9dab571d61a1c49f6affb7))
+- Add skill metadata in WIT definition - ([6bbcb3f](https://github.com/Aleph-Alpha/pharia-kernel/commit/6bbcb3fb9d129ec749a5009cfeaf366d5bf42441))
+
+### Documentation
+
+- Add whitespace between shell arguments - ([e3c0ffc](https://github.com/Aleph-Alpha/pharia-kernel/commit/e3c0ffc9a9e28170a1fcee6a78d590bc43eb3d19))
+- Fix casing in operating docs - ([f738a6c](https://github.com/Aleph-Alpha/pharia-kernel/commit/f738a6cadb01fbd2f08e903aedd2e69589bd2efc))
+- Remove skill development section from operating doc - ([247f2f0](https://github.com/Aleph-Alpha/pharia-kernel/commit/247f2f0dc2fcd57a46d5c670edaf022b139ecadd))
+- Return 200 status code if metadata is not implemented - ([e34eb7a](https://github.com/Aleph-Alpha/pharia-kernel/commit/e34eb7aa4830dbac5b86075c4414e471924bea18))
+
+### Builds
+
+- *(deps)* Bump the minor group with 4 updates - ([147043b](https://github.com/Aleph-Alpha/pharia-kernel/commit/147043b47e048e0f0894f5cd0569afeb3188b3ad))
+- *(deps)* Bump derive_more from 1.0.0 to 2.0.1 - ([d98a1d8](https://github.com/Aleph-Alpha/pharia-kernel/commit/d98a1d89b646fc78c87b7aa84f791e3d03ca59f0))
+- *(deps)* Bump the minor group with 7 updates - ([babfd16](https://github.com/Aleph-Alpha/pharia-kernel/commit/babfd16229ffe0b987b254e44959bee9c60c7557))
+- *(deps)* Bump the minor group across 1 directory with 10 updates - ([ad9de3a](https://github.com/Aleph-Alpha/pharia-kernel/commit/ad9de3a6f13f67626fed09cf8ca832d29fe76b92))
+
+
 ## [0.7.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.5...v0.7.6)
 
 ### Features
