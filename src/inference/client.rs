@@ -373,7 +373,6 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         let api_token = api_token().to_owned();
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
-        
 
         // When
         let chat_request = ChatRequest {
@@ -392,7 +391,9 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             .unwrap();
 
         // Then we expect the word oat, to appear at least five times
-        let number_oat_mentioned = chat_response.message.content
+        let number_oat_mentioned = chat_response
+            .message
+            .content
             .to_lowercase()
             .split_whitespace()
             .filter(|word| *word == "oat")
