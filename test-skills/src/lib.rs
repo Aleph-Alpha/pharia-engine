@@ -192,7 +192,7 @@ impl Venv {
         create_virtual_environment(&venv_path)?;
         run_in_venv(
             &venv_path,
-            &["python3", "-m", "pip", "install", "componentize-py"],
+            &["python", "-m", "pip", "install", "componentize-py"],
         )?;
 
         Ok(Venv { directory })
