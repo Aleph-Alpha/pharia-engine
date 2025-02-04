@@ -4,7 +4,8 @@ use std::{
 };
 
 use aleph_alpha_client::{
-    Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat, TaskCompletion,
+    ChatSampling, Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat,
+    TaskCompletion,
 };
 use retry_policies::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
 use tracing::{error, warn};
@@ -142,9 +143,8 @@ impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
                 maximum_tokens: request.params.max_tokens,
                 stop_sequences: &[],
             },
-            sampling: Sampling {
+            sampling: ChatSampling {
                 temperature: request.params.temperature,
-                top_k: None,
                 top_p: request.params.top_p,
                 frequency_penalty: request.params.frequency_penalty,
                 presence_penalty: request.params.presence_penalty,
