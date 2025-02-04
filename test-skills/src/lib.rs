@@ -8,6 +8,13 @@ use tempfile::{tempdir, TempDir};
 
 const WASI_TARGET: &str = "wasm32-wasip2";
 
+pub fn given_chat_skill_new_params_v0_3() {
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("chat-skill-new-params-v0_3");
+    });
+    *WASM_BUILD;
+}
+
 /// Creates `greet_skill_v0_3.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
 pub fn given_greet_skill_v0_3() {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {

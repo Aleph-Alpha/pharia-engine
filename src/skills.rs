@@ -747,6 +747,8 @@ mod v0_2 {
                 max_tokens: params.max_tokens,
                 temperature: params.temperature,
                 top_p: params.top_p,
+                frequency_penalty: None,
+                presence_penalty: None,
             }
         }
     }
@@ -1066,6 +1068,8 @@ mod v0_3 {
                 max_tokens: params.max_tokens,
                 temperature: params.temperature,
                 top_p: params.top_p,
+                frequency_penalty: params.frequency_penalty,
+                presence_penalty: params.presence_penalty,
             }
         }
     }

@@ -146,8 +146,8 @@ impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
                 temperature: request.params.temperature,
                 top_k: None,
                 top_p: request.params.top_p,
-                frequency_penalty: None,
-                presence_penalty: None,
+                frequency_penalty: request.params.frequency_penalty,
+                presence_penalty: request.params.presence_penalty,
             },
         }
     }
@@ -300,11 +300,7 @@ mod tests {
         // and a chat request
         let chat_request = ChatRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
-            params: ChatParams {
-                max_tokens: None,
-                temperature: None,
-                top_p: None,
-            },
+            params: ChatParams::default(),
             messages: vec![Message::new("user", "Hello, world!")],
         };
 
@@ -369,5 +365,38 @@ Write code to check if number is prime, use that to see if the number 7 is prime
 
         // Then a completion response is returned
         assert!(completion_response.text.contains("<|python_tag|>"));
+    }
+
+    #[tokio::test]
+    async fn frequency_penalty_for_chat() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+        
+
+        // When
+        let chat_request = ChatRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            params: ChatParams {
+                max_tokens: Some(20),
+                temperature: None,
+                top_p: None,
+                frequency_penalty: Some(-10.0),
+                presence_penalty: None,
+            },
+            messages: vec![Message::new("user", "Haiku about oat milk!")],
+        };
+        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token)
+            .await
+            .unwrap();
+
+        // Then we expect the word oat, to appear at least five times
+        let number_oat_mentioned = chat_response.message.content
+            .to_lowercase()
+            .split_whitespace()
+            .filter(|word| *word == "oat")
+            .count();
+        assert!(number_oat_mentioned >= 5);
     }
 }
