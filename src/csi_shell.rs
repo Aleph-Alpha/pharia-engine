@@ -317,6 +317,8 @@ impl From<V0_2CompletionParams> for CompletionParams {
             top_k,
             top_p,
             stop,
+            frequency_penalty: None,
+            presence_penalty: None,
         }
     }
 }

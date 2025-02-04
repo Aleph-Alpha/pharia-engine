@@ -94,7 +94,7 @@ impl InferenceApi {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub struct CompletionParams {
     pub return_special_tokens: bool,
     pub max_tokens: Option<u32>,
@@ -102,6 +102,8 @@ pub struct CompletionParams {
     pub top_k: Option<u32>,
     pub top_p: Option<f64>,
     pub stop: Vec<String>,
+    pub frequency_penalty: Option<f64>,
+    pub presence_penalty: Option<f64>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
