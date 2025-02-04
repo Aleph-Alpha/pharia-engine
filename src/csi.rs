@@ -49,7 +49,8 @@ pub trait CsiForSkills {
 
 /// Cognitive System Interface (CSI) as consumed internally by Pharia Kernel, before the CSI is
 /// passed to the end user in Skill code we further strip away some of the accidental complexity.
-/// See its sibling trait `CsiForSkills`.
+/// See its sibling trait `CsiForSkills`. These methods take `Vec`s rather than individual requests
+/// in order to allow for parallization behind the scenes.
 #[async_trait]
 pub trait Csi {
     async fn complete(

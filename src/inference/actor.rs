@@ -116,6 +116,8 @@ pub struct ChatParams {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
+    pub frequency_penalty: Option<f64>,
+    pub presence_penalty: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
