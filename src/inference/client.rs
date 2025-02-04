@@ -73,7 +73,8 @@ impl InferenceClient for Client {
                 temperature: *temperature,
                 top_k: *top_k,
                 top_p: *top_p,
-                complete_with_one_of: &[],
+                frequency_penalty: None,
+                presence_penalty: None,
             },
             special_tokens: *return_special_tokens,
         };
@@ -137,9 +138,17 @@ impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
                 .iter()
                 .map(aleph_alpha_client::Message::from)
                 .collect(),
-            maximum_tokens: request.params.max_tokens,
-            temperature: request.params.temperature,
-            top_p: request.params.top_p,
+            stopping: Stopping {
+                maximum_tokens: request.params.max_tokens,
+                stop_sequences: &[],
+            },
+            sampling: Sampling {
+                temperature: request.params.temperature,
+                top_k: None,
+                top_p: request.params.top_p,
+                frequency_penalty: None,
+                presence_penalty: None,
+            },
         }
     }
 }
