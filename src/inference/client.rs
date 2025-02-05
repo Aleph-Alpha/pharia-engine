@@ -12,7 +12,10 @@ use tracing::{error, warn};
 
 use thiserror::Error;
 
-use super::{ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Message};
+use super::{
+    ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Logprob, Logprobs,
+    Message, TopLogprob,
+};
 
 pub trait InferenceClient: Send + Sync + 'static {
     fn complete_text(
@@ -122,6 +125,28 @@ impl<'a> From<&'a Message> for aleph_alpha_client::Message<'a> {
     }
 }
 
+impl From<aleph_alpha_client::Logprob> for Logprob {
+    fn from(logprob: aleph_alpha_client::Logprob) -> Self {
+        let aleph_alpha_client::Logprob {
+            token,
+            logprob,
+            top_logprobs,
+        } = logprob;
+        Logprob {
+            token,
+            logprob,
+            top_logprobs: top_logprobs.into_iter().map(TopLogprob::from).collect(),
+        }
+    }
+}
+
+impl From<aleph_alpha_client::TopLogprob> for TopLogprob {
+    fn from(top_logprob: aleph_alpha_client::TopLogprob) -> Self {
+        let aleph_alpha_client::TopLogprob { token, logprob } = top_logprob;
+        TopLogprob { token, logprob }
+    }
+}
+
 impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
     type Error = anyhow::Error;
 
@@ -129,6 +154,11 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
         Ok(ChatResponse {
             message: chat_output.message.into(),
             finish_reason: chat_output.finish_reason.parse()?,
+            logprobs: chat_output
+                .logprobs
+                .into_iter()
+                .map(Logprob::from)
+                .collect(),
         })
     }
 }
@@ -150,6 +180,11 @@ impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
                 top_p: request.params.top_p,
                 frequency_penalty: request.params.frequency_penalty,
                 presence_penalty: request.params.presence_penalty,
+            },
+            logprobs: match request.params.logprobs {
+                Logprobs::No => aleph_alpha_client::Logprobs::No,
+                Logprobs::Sampled => aleph_alpha_client::Logprobs::Sampled,
+                Logprobs::Top(n) => aleph_alpha_client::Logprobs::Top(n),
             },
         }
     }
@@ -221,6 +256,8 @@ impl From<aleph_alpha_client::Error> for InferenceClientError {
 
 #[cfg(test)]
 mod tests {
+    use core::str;
+
     use tokio::time::Instant;
 
     use crate::{
@@ -385,6 +422,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 top_p: None,
                 frequency_penalty: Some(-10.0),
                 presence_penalty: None,
+                logprobs: Logprobs::No,
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };
@@ -439,5 +477,34 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         let deterministic = " keeps the doctor away.\nThis old saying has been around for a long \
             time, and it’s true";
         assert_ne!(deterministic, completion);
+    }
+
+    #[tokio::test]
+    async fn top_logprobs_for_chat() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let chat_request = ChatRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            messages: vec![Message::new("user", "An apple a day, ")],
+            params: ChatParams {
+                max_tokens: Some(1),
+                logprobs: Logprobs::Top(2),
+                ..Default::default()
+            },
+        };
+        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token)
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(chat_response.logprobs.len(), 1);
+        let top_logprobs = &chat_response.logprobs[0].top_logprobs;
+        assert_eq!(top_logprobs.len(), 2);
+        assert_eq!(str::from_utf8(&top_logprobs[0].token).unwrap(), " Keep");
+        assert_eq!(str::from_utf8(&top_logprobs[1].token).unwrap(), " keeps");
     }
 }

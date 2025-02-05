@@ -580,6 +580,7 @@ pub mod tests {
                 .map(|request| ChatResponse {
                     message: request.messages.first().unwrap().clone(),
                     finish_reason: FinishReason::Stop,
+                    logprobs: vec![],
                 })
                 .collect())
         }
@@ -721,6 +722,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 .map(|_| ChatResponse {
                     message: Message::new("assistant", "dummy-content"),
                     finish_reason: FinishReason::Stop,
+                    logprobs: vec![],
                 })
                 .collect()
         }
