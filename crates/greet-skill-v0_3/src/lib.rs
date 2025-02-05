@@ -33,6 +33,8 @@ Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|
                 temperature: None,
                 top_k: None,
                 top_p: None,
+                frequency_penalty: None,
+                presence_penalty: None,
                 stop: vec![
                     "<|start_header_id|>".to_owned(),
                     "<|eom_id|>".to_owned(),

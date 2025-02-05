@@ -436,8 +436,8 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         // be fairly certain it is different from the completion we would expect if we would sample
         // deterministically. Sadly we can not specify a seed to make sure the randomness of the
         // test is not leading to a false positive, nor can we narrow down the assertion.
-        let deteriministic = " keeps the doctor away.\nThis old saying has been around for a long \
+        let deterministic = " keeps the doctor away.\nThis old saying has been around for a long \
             time, and it’s true";
-        assert_ne!(deteriministic, completion);
+        assert_ne!(deterministic, completion);
     }
 }
