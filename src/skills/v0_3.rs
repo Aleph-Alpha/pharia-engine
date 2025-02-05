@@ -136,14 +136,33 @@ impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
     }
 }
 
-impl From<language_selection::Language> for Language {
-    fn from(language: language_selection::Language) -> Self {
-        match language {
-            language_selection::Language::Eng => Language::Eng,
-            language_selection::Language::Deu => Language::Deu,
+// Works as long as variant names match exactly
+macro_rules! language_mappings {
+    ($($variant:ident),*) => {
+        impl From<Language> for language_selection::Language {
+            fn from(language: Language) -> Self {
+                match language {
+                    $(Language::$variant => language_selection::Language::$variant),*
+                }
+            }
         }
-    }
+
+        impl From<language_selection::Language> for Language {
+            fn from(language: language_selection::Language) -> Self {
+                match language {
+                    $(language_selection::Language::$variant => Language::$variant),*
+                }
+            }
+        }
+    };
 }
+
+language_mappings!(
+    Afr, Ara, Aze, Bel, Ben, Bos, Bul, Cat, Ces, Cym, Dan, Deu, Ell, Eng, Epo, Est, Eus, Fas, Fin,
+    Fra, Gle, Guj, Heb, Hin, Hrv, Hun, Hye, Ind, Isl, Ita, Jpn, Kat, Kaz, Kor, Lat, Lav, Lit, Lug,
+    Mar, Mkd, Mon, Mri, Msa, Nld, Nno, Nob, Pan, Pol, Por, Ron, Rus, Slk, Slv, Sna, Som, Sot, Spa,
+    Sqi, Srp, Swa, Swe, Tam, Tel, Tgl, Tha, Tsn, Tso, Tur, Ukr, Urd, Vie, Xho, Yor, Zho, Zul
+);
 
 impl From<SearchRequest> for search::SearchRequest {
     fn from(request: SearchRequest) -> Self {
@@ -158,15 +177,6 @@ impl From<SearchRequest> for search::SearchRequest {
             query,
             max_results,
             min_score,
-        }
-    }
-}
-
-impl From<Language> for language_selection::Language {
-    fn from(language: Language) -> Self {
-        match language {
-            Language::Eng => language_selection::Language::Eng,
-            Language::Deu => language_selection::Language::Deu,
         }
     }
 }
