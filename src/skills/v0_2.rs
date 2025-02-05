@@ -172,30 +172,45 @@ impl From<Language> for language_selection::Language {
 
 impl From<IndexPath> for search::IndexPath {
     fn from(index_path: IndexPath) -> Self {
+        let IndexPath {
+            namespace,
+            collection,
+            index,
+        } = index_path;
         Self {
-            namespace: index_path.namespace,
-            collection: index_path.collection,
-            index: index_path.index,
+            namespace,
+            collection,
+            index,
         }
     }
 }
 
 impl From<search::SearchResult> for SearchResult {
     fn from(search_result: search::SearchResult) -> Self {
+        let search::SearchResult {
+            document_path,
+            content,
+            score,
+        } = search_result;
         Self {
-            document_path: search_result.document_path.into(),
-            content: search_result.content,
-            score: search_result.score,
+            document_path: document_path.into(),
+            content,
+            score,
         }
     }
 }
 
 impl From<search::DocumentPath> for DocumentPath {
     fn from(document_path: search::DocumentPath) -> Self {
+        let search::DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = document_path;
         Self {
-            namespace: document_path.namespace,
-            collection: document_path.collection,
-            name: document_path.name,
+            namespace,
+            collection,
+            name,
         }
     }
 }
@@ -221,11 +236,15 @@ impl From<search::Modality> for Modality {
 
 impl From<search::Document> for Document {
     fn from(document: search::Document) -> Self {
+        let search::Document {
+            path,
+            contents,
+            metadata,
+        } = document;
         Self {
-            path: document.path.into(),
-            contents: document.contents.into_iter().map(Into::into).collect(),
-            metadata: document
-                .metadata
+            path: path.into(),
+            contents: contents.into_iter().map(Into::into).collect(),
+            metadata: metadata
                 .map(|v| serde_json::to_vec(&v).expect("Value should have valid to_bytes repr.")),
         }
     }
@@ -233,13 +252,20 @@ impl From<search::Document> for Document {
 
 impl From<CompletionParams> for inference::CompletionParams {
     fn from(params: CompletionParams) -> Self {
+        let CompletionParams {
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+        } = params;
         Self {
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
             return_special_tokens: false,
-            max_tokens: params.max_tokens,
-            temperature: params.temperature,
-            top_k: params.top_k,
-            top_p: params.top_p,
-            stop: params.stop,
             frequency_penalty: None,
             presence_penalty: None,
         }
@@ -248,28 +274,38 @@ impl From<CompletionParams> for inference::CompletionParams {
 
 impl From<CompletionRequest> for inference::CompletionRequest {
     fn from(request: CompletionRequest) -> Self {
+        let CompletionRequest {
+            prompt,
+            model,
+            params,
+        } = request;
         Self {
-            prompt: request.prompt,
-            model: request.model,
-            params: request.params.into(),
+            prompt,
+            model,
+            params: params.into(),
         }
     }
 }
 
 impl From<inference::Completion> for Completion {
     fn from(completion: inference::Completion) -> Self {
+        let inference::Completion {
+            text,
+            finish_reason,
+        } = completion;
         Self {
-            text: completion.text,
-            finish_reason: completion.finish_reason.into(),
+            text,
+            finish_reason: finish_reason.into(),
         }
     }
 }
 
 impl From<Message> for inference::Message {
     fn from(message: Message) -> Self {
+        let Message { role, content } = message;
         Self {
-            role: message.role.into(),
-            content: message.content,
+            role: role.into(),
+            content,
         }
     }
 }
@@ -319,18 +355,24 @@ impl From<String> for Role {
 
 impl From<inference::Message> for Message {
     fn from(message: inference::Message) -> Self {
+        let inference::Message { role, content } = message;
         Self {
-            role: message.role.into(),
-            content: message.content,
+            role: role.into(),
+            content,
         }
     }
 }
 
 impl From<inference::ChatResponse> for ChatResponse {
     fn from(response: inference::ChatResponse) -> Self {
+        let inference::ChatResponse {
+            message,
+            finish_reason,
+            logprobs: _,
+        } = response;
         Self {
-            message: response.message.into(),
-            finish_reason: response.finish_reason.into(),
+            message: message.into(),
+            finish_reason: finish_reason.into(),
         }
     }
 }
