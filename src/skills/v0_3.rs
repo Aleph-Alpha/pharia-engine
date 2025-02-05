@@ -1,8 +1,8 @@
 use exports::pharia::skill::skill_handler::SkillMetadata;
 use pharia::skill::csi::{
     ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion, CompletionParams,
-    CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath, Language, Message,
-    Modality, SearchRequest, SearchResult, SelectLanguageRequest,
+    CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath, Language, Logprob,
+    Logprobs, Message, Modality, SearchRequest, SearchResult, SelectLanguageRequest, TopLogprob,
 };
 use serde_json::Value;
 use wasmtime::component::bindgen;
@@ -262,12 +262,31 @@ impl From<Message> for inference::Message {
 
 impl From<ChatParams> for inference::ChatParams {
     fn from(params: ChatParams) -> Self {
+        let ChatParams {
+            max_tokens,
+            temperature,
+            top_p,
+            frequency_penalty,
+            presence_penalty,
+            logprobs,
+        } = params;
         Self {
-            max_tokens: params.max_tokens,
-            temperature: params.temperature,
-            top_p: params.top_p,
-            frequency_penalty: params.frequency_penalty,
-            presence_penalty: params.presence_penalty,
+            max_tokens,
+            temperature,
+            top_p,
+            frequency_penalty,
+            presence_penalty,
+            logprobs: logprobs.into(),
+        }
+    }
+}
+
+impl From<Logprobs> for inference::Logprobs {
+    fn from(logprobs: Logprobs) -> Self {
+        match logprobs {
+            Logprobs::No => inference::Logprobs::No,
+            Logprobs::Sampled => inference::Logprobs::Sampled,
+            Logprobs::Top(n) => inference::Logprobs::Top(n),
         }
     }
 }
@@ -319,9 +338,15 @@ impl From<inference::Message> for Message {
 
 impl From<inference::ChatResponse> for ChatResponse {
     fn from(response: inference::ChatResponse) -> Self {
+        let inference::ChatResponse {
+            message,
+            finish_reason,
+            logprobs,
+        } = response;
         Self {
-            message: response.message.into(),
-            finish_reason: response.finish_reason.into(),
+            message: message.into(),
+            finish_reason: finish_reason.into(),
+            logprobs: logprobs.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -333,6 +358,28 @@ impl From<inference::FinishReason> for FinishReason {
             inference::FinishReason::Length => Self::Length,
             inference::FinishReason::ContentFilter => Self::ContentFilter,
         }
+    }
+}
+
+impl From<inference::Logprob> for Logprob {
+    fn from(logprob: inference::Logprob) -> Self {
+        let inference::Logprob {
+            token,
+            logprob,
+            top_logprobs,
+        } = logprob;
+        Self {
+            token,
+            logprob,
+            top_logprobs: top_logprobs.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<inference::TopLogprob> for TopLogprob {
+    fn from(top_logprob: inference::TopLogprob) -> Self {
+        let inference::TopLogprob { token, logprob } = top_logprob;
+        Self { token, logprob }
     }
 }
 
@@ -349,6 +396,7 @@ mod tests {
             top_p: Some(0.9),
             frequency_penalty: Some(0.8),
             presence_penalty: Some(0.7),
+            logprobs: Logprobs::Top(2),
         };
 
         // When
@@ -363,7 +411,39 @@ mod tests {
                 top_p: Some(0.9),
                 frequency_penalty: Some(0.8),
                 presence_penalty: Some(0.7),
+                logprobs: inference::Logprobs::Top(2),
             }
         );
+    }
+
+    #[test]
+    fn forward_logprobs() {
+        // Given
+        let token: Vec<u8> = "Hello".to_string().into();
+        let source = inference::ChatResponse {
+            message: inference::Message {
+                role: "user".to_string(),
+                content: "Hello, world!".to_string(),
+            },
+            finish_reason: inference::FinishReason::Stop,
+            logprobs: vec![inference::Logprob {
+                token: token.clone(),
+                logprob: 0.0,
+                top_logprobs: vec![inference::TopLogprob {
+                    token: token.clone(),
+                    logprob: 0.0,
+                }],
+            }],
+        };
+
+        // When
+        let result: ChatResponse = source.into();
+
+        // Then
+        assert_eq!(result.logprobs.len(), 1);
+        assert_eq!(result.logprobs[0].token, token);
+
+        assert_eq!(result.logprobs[0].top_logprobs.len(), 1);
+        assert_eq!(result.logprobs[0].top_logprobs[0].token, token);
     }
 }

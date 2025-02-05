@@ -276,12 +276,18 @@ impl From<Message> for inference::Message {
 
 impl From<ChatParams> for inference::ChatParams {
     fn from(params: ChatParams) -> Self {
+        let ChatParams {
+            max_tokens,
+            temperature,
+            top_p,
+        } = params;
         Self {
-            max_tokens: params.max_tokens,
-            temperature: params.temperature,
-            top_p: params.top_p,
+            max_tokens,
+            temperature,
+            top_p,
             frequency_penalty: None,
             presence_penalty: None,
+            logprobs: inference::Logprobs::No,
         }
     }
 }
@@ -366,6 +372,7 @@ mod tests {
                 top_p: Some(0.9),
                 frequency_penalty: None,
                 presence_penalty: None,
+                logprobs: inference::Logprobs::No,
             }
         );
     }

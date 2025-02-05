@@ -120,6 +120,7 @@ pub struct ChatParams {
     pub top_p: Option<f64>,
     pub frequency_penalty: Option<f64>,
     pub presence_penalty: Option<f64>,
+    pub logprobs: Logprobs,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -137,11 +138,22 @@ impl Message {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<Message>,
     pub params: ChatParams,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+pub enum Logprobs {
+    /// Do not return any logprobs
+    #[default]
+    No,
+    /// Return only the logprob of the tokens which have actually been sampled into the completion.
+    Sampled,
+    /// Request between 0 and 20 tokens
+    Top(u8),
 }
 
 impl CompletionRequest {
@@ -190,6 +202,24 @@ pub struct Completion {
 pub struct ChatResponse {
     pub message: Message,
     pub finish_reason: FinishReason,
+    /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
+    /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
+    pub logprobs: Vec<Logprob>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Logprob {
+    pub token: Vec<u8>,
+    // while the naming might not be optimal, it is consistent with the inference api and the rust client
+    #[allow(clippy::struct_field_names)]
+    pub logprob: f64,
+    pub top_logprobs: Vec<TopLogprob>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopLogprob {
+    pub token: Vec<u8>,
+    pub logprob: f64,
 }
 
 /// Private implementation of the inference actor running in its own dedicated green thread.
