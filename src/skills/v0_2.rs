@@ -154,8 +154,9 @@ impl Host for LinkedCtx {
 impl From<language_selection::Language> for Language {
     fn from(language: language_selection::Language) -> Self {
         match language {
-            language_selection::Language::Eng => Language::Eng,
             language_selection::Language::Deu => Language::Deu,
+            language_selection::Language::Eng => Language::Eng,
+            _ => unreachable!("Language not allowed as input"),
         }
     }
 }

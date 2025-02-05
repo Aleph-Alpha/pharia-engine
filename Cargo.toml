@@ -86,10 +86,7 @@ tokenizers = { version = "0.21.0", default-features = false, features = [
     "esaxx_fast",
 ] }
 text-splitter = { version = "0.22.0", features = ["tokenizers"] }
-lingua = { version = "1.6.2", default-features = false, features = [
-    "english",
-    "german",
-] }
+lingua = { version = "1.6.2" }
 opentelemetry = "0.27.1"
 opentelemetry_sdk = { version = "0.27.1", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.28.0"
