@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.8](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.7...v0.7.8)
+
+### Features
+
+- Support more languages for select-language in v0.3 WIT world - ([8efa4ac](https://github.com/Aleph-Alpha/pharia-kernel/commit/8efa4ac9b72a25068b8daf7ace018a07556daf71))
+- Frequency and presence penalty for completion - ([e5fdb20](https://github.com/Aleph-Alpha/pharia-kernel/commit/e5fdb2083b6b67ad35086a32b9094799210bd3fe))
+- Add frequency and presence penalaty to chat params - ([c6cb207](https://github.com/Aleph-Alpha/pharia-kernel/commit/c6cb207bb43d78428e8a1296efe52041f79dd61c))
+
+### Fixes
+
+- Missing comma in wit world - ([e251ae6](https://github.com/Aleph-Alpha/pharia-kernel/commit/e251ae6a0d2b7f64c667205040189300cb4a13e2))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 8 updates - ([af91400](https://github.com/Aleph-Alpha/pharia-kernel/commit/af914005462cab6cbe7acf3ad58c9b3c59d605d0))
+
+
 ## [0.7.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.6...v0.7.7)
 
 ### Features
