@@ -12,4 +12,10 @@ namespaces:
     configUrl: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
     registry: "registry.gitlab.aleph-alpha.de"
     baseRepository: "engineering/pharia-kernel-playground/skills"
-resources: {}
+resources:
+  limits:
+    cpu: "1"
+    memory: 1Gi
+  requests:
+    cpu: "1"
+    memory: 1Gi
