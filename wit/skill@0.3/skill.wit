@@ -60,6 +60,13 @@ interface csi {
         top: list<logprob>,
     }
 
+    record token-usage {
+        /// Number of tokens in the prompt
+        prompt: u32,
+        /// Number of tokens in the generated completion
+        completion: u32,
+    }
+
     /// The result of a completion, including the text generated as well as
     /// why the model finished completing.
     /// @since(version = 0.3.0)
@@ -71,6 +78,8 @@ interface csi {
         /// Contains the logprobs for the sampled and top n tokens, given that
         /// `completion-request.params.logprobs` has been set to `sampled` or `top`.
         logprobs: list<distribution>,
+        /// Usage statistics for the completion request.
+        usage: token-usage,
     }
 
     /// Completion request parameters
@@ -162,6 +171,8 @@ interface csi {
         /// Contains the logprobs for the sampled and top n tokens, given that
         /// `chat-request.params.logprobs` has been set to `sampled` or `top`.
         logprobs: list<distribution>,
+        /// Usage statistics for the completion request.
+        usage: token-usage,
     }
 
     // @since(version = 0.3.0)

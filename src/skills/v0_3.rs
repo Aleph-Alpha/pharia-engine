@@ -3,7 +3,7 @@ use pharia::skill::csi::{
     ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion, CompletionParams,
     CompletionRequest, Distribution, Document, DocumentPath, FinishReason, Host, IndexPath,
     Language, Logprob, Logprobs, Message, Modality, SearchRequest, SearchResult,
-    SelectLanguageRequest,
+    SelectLanguageRequest, TokenUsage,
 };
 use serde_json::Value;
 use wasmtime::component::bindgen;
@@ -284,7 +284,15 @@ impl From<inference::Completion> for Completion {
             text,
             finish_reason: finish_reason.into(),
             logprobs: logprobs.into_iter().map(Into::into).collect(),
+            usage: usage.into(),
         }
+    }
+}
+
+impl From<inference::TokenUsage> for TokenUsage {
+    fn from(usage: inference::TokenUsage) -> Self {
+        let inference::TokenUsage { prompt, completion } = usage;
+        Self { prompt, completion }
     }
 }
 
@@ -388,6 +396,7 @@ impl From<inference::ChatResponse> for ChatResponse {
             message: message.into(),
             finish_reason: finish_reason.into(),
             logprobs: logprobs.into_iter().map(Into::into).collect(),
+            usage: usage.into(),
         }
     }
 }
@@ -487,5 +496,50 @@ mod tests {
 
         assert_eq!(result.logprobs[0].top.len(), 1);
         assert_eq!(result.logprobs[0].top[0].token, token);
+    }
+
+    #[test]
+    fn forward_token_usage_chat() {
+        // Given
+        let source = inference::ChatResponse {
+            usage: inference::TokenUsage {
+                prompt: 4,
+                completion: 1,
+            },
+            message: inference::Message {
+                role: "user".to_string(),
+                content: "Hello, world!".to_string(),
+            },
+            finish_reason: inference::FinishReason::Stop,
+            logprobs: vec![],
+        };
+
+        // When
+        let result: ChatResponse = source.into();
+
+        // Then
+        assert_eq!(result.usage.prompt, 4);
+        assert_eq!(result.usage.completion, 1);
+    }
+
+    #[test]
+    fn forward_token_usage_completion() {
+        // Given
+        let source = inference::Completion {
+            text: "Hello, world!".to_string(),
+            finish_reason: inference::FinishReason::Stop,
+            logprobs: vec![],
+            usage: inference::TokenUsage {
+                prompt: 4,
+                completion: 1,
+            },
+        };
+
+        // When
+        let result: Completion = source.into();
+
+        // Then
+        assert_eq!(result.usage.prompt, 4);
+        assert_eq!(result.usage.completion, 1);
     }
 }
