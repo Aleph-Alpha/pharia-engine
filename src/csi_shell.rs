@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    chunking::ChunkRequest,
+    chunking::{ChunkParams, ChunkRequest},
     csi::Csi,
     inference::{ChatRequest, CompletionParams, CompletionRequest},
     language_selection::SelectLanguageRequest,
@@ -185,7 +185,7 @@ impl V0_3CsiRequest {
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum V0_2CsiRequest {
     Complete(V0_2CompletionRequest),
-    Chunk(ChunkRequest),
+    Chunk(V0_2ChunkRequest),
     SelectLanguage(SelectLanguageRequest),
     CompleteAll(CompleteAllRequest),
     Search(SearchRequest),
@@ -211,7 +211,7 @@ impl V0_2CsiRequest {
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
             V0_2CsiRequest::Chunk(chunk_request) => drivers
-                .chunk(auth, vec![chunk_request])
+                .chunk(auth, vec![chunk_request.into()])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
             V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
@@ -321,6 +321,35 @@ impl From<V0_2CompletionParams> for CompletionParams {
             frequency_penalty: None,
             presence_penalty: None,
         }
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct V0_2ChunkRequest {
+    pub text: String,
+    pub params: V0_2ChunkParams,
+}
+
+impl From<V0_2ChunkRequest> for ChunkRequest {
+    fn from(value: V0_2ChunkRequest) -> Self {
+        let V0_2ChunkRequest { text, params } = value;
+        Self {
+            text,
+            params: params.into(),
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct V0_2ChunkParams {
+    pub model: String,
+    pub max_tokens: u32,
+}
+
+impl From<V0_2ChunkParams> for ChunkParams {
+    fn from(value: V0_2ChunkParams) -> Self {
+        let V0_2ChunkParams { model, max_tokens } = value;
+        Self { model, max_tokens }
     }
 }
 
