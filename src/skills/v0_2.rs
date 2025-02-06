@@ -373,6 +373,7 @@ impl From<inference::ChatResponse> for ChatResponse {
             message,
             finish_reason,
             logprobs: _,
+            usage,
         } = response;
         Self {
             message: message.into(),
