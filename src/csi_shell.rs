@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use crate::{
     chunking::{ChunkParams, ChunkRequest},
     csi::Csi,
-    inference::{ChatParams, ChatRequest, CompletionParams, CompletionRequest, Message},
+    inference::{ChatParams, ChatRequest, CompletionParams, CompletionRequest, Logprobs, Message},
     language_selection::{Language, SelectLanguageRequest},
     search::{DocumentPath, SearchRequest},
     shell::AppState,
@@ -310,6 +310,7 @@ impl From<V0_2CompletionParams> for CompletionParams {
             stop,
             frequency_penalty: None,
             presence_penalty: None,
+            logprobs: Logprobs::No,
         }
     }
 }

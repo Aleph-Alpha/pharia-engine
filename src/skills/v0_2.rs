@@ -54,6 +54,7 @@ impl Host for LinkedCtx {
             stop,
             frequency_penalty: None,
             presence_penalty: None,
+            logprobs: inference::Logprobs::No,
         };
         let request = inference::CompletionRequest::new(prompt, model).with_params(params);
         self.skill_ctx
@@ -268,6 +269,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             return_special_tokens: false,
             frequency_penalty: None,
             presence_penalty: None,
+            logprobs: inference::Logprobs::No,
         }
     }
 }
@@ -292,6 +294,7 @@ impl From<inference::Completion> for Completion {
         let inference::Completion {
             text,
             finish_reason,
+            logprobs,
         } = completion;
         Self {
             text,
@@ -445,6 +448,7 @@ mod tests {
                 stop: vec!["stop".to_string()],
                 frequency_penalty: None,
                 presence_penalty: None,
+                logprobs: inference::Logprobs::No,
             }
         );
     }

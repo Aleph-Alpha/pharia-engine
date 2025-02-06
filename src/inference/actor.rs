@@ -104,6 +104,7 @@ pub struct CompletionParams {
     pub stop: Vec<String>,
     pub frequency_penalty: Option<f64>,
     pub presence_penalty: Option<f64>,
+    pub logprobs: Logprobs,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
@@ -145,7 +146,7 @@ pub struct ChatRequest {
     pub params: ChatParams,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, Default, PartialEq)]
 pub enum Logprobs {
     /// Do not return any logprobs
     #[default]
@@ -196,6 +197,9 @@ impl FromStr for FinishReason {
 pub struct Completion {
     pub text: String,
     pub finish_reason: FinishReason,
+    /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
+    /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
+    pub logprobs: Vec<Distribution>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -319,6 +323,7 @@ pub mod tests {
             Self {
                 text: completion.into(),
                 finish_reason: FinishReason::Stop,
+                logprobs: vec![],
             }
         }
     }
