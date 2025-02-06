@@ -424,7 +424,7 @@ impl From<V0_2ChatParams> for ChatParams {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct V0_2Message {
-    pub role: V0_2Role,
+    pub role: String,
     pub content: String,
 }
 
@@ -432,19 +432,10 @@ impl From<V0_2Message> for Message {
     fn from(value: V0_2Message) -> Self {
         let V0_2Message { role, content } = value;
         Self {
-            role: role.to_string(),
+            role: role.to_lowercase(),
             content,
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum V0_2Role {
-    User,
-    Assistant,
-    System,
 }
 
 /// We use `BAD_REQUEST` (400) for validation error as it is more commonly used.

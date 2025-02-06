@@ -213,7 +213,7 @@ async fn chat_v0_2_via_remote_csi() {
             json!({
                 "version": "0.2",
                 "function": "chat",
-                "messages": [{"role": "user", "content": "Say hello to Homer"}],
+                "messages": [{"role": "User", "content": "Say hello to Homer"}],
                 "model": "pharia-1-llm-7b-control",
                 "params": {
                     "max_tokens": 64,
