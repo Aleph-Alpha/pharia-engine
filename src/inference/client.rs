@@ -109,6 +109,7 @@ impl TryFrom<CompletionOutput> for Completion {
             completion,
             finish_reason,
             logprobs,
+            usage: _,
         } = completion_output;
         Ok(Self {
             text: completion,
@@ -133,23 +134,19 @@ impl<'a> From<&'a Message> for aleph_alpha_client::Message<'a> {
     }
 }
 
-impl From<aleph_alpha_client::Logprob> for Distribution {
-    fn from(logprob: aleph_alpha_client::Logprob) -> Self {
-        let aleph_alpha_client::Logprob {
-            token,
-            logprob,
-            top_logprobs,
-        } = logprob;
+impl From<aleph_alpha_client::Distribution> for Distribution {
+    fn from(logprob: aleph_alpha_client::Distribution) -> Self {
+        let aleph_alpha_client::Distribution { sampled, top } = logprob;
         Distribution {
-            sampled: Logprob { token, logprob },
-            top: top_logprobs.into_iter().map(Logprob::from).collect(),
+            sampled: sampled.into(),
+            top: top.into_iter().map(Logprob::from).collect(),
         }
     }
 }
 
-impl From<aleph_alpha_client::TopLogprob> for Logprob {
-    fn from(top_logprob: aleph_alpha_client::TopLogprob) -> Self {
-        let aleph_alpha_client::TopLogprob { token, logprob } = top_logprob;
+impl From<aleph_alpha_client::Logprob> for Logprob {
+    fn from(logprob: aleph_alpha_client::Logprob) -> Self {
+        let aleph_alpha_client::Logprob { token, logprob } = logprob;
         Logprob { token, logprob }
     }
 }
