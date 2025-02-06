@@ -523,8 +523,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::path::Path;
-    use std::{fs, time::Duration};
+    use std::time::Duration;
 
     use anyhow::{anyhow, bail};
     use metrics::Label;
@@ -558,9 +557,10 @@ pub mod tests {
     #[tokio::test]
     async fn csi_usage_from_metadata_leads_to_suspension() {
         // Given a skill runtime that always returns a skill that uses the csi from the metadata function
-        let skill_path = SkillPath::local("greet");
+        let test_skills = given_csi_from_metadata_skill();
+        let skill_path = SkillPath::local("invoke_csi_from_metadata");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::with_csi_from_metadata_skill(engine.clone());
+        let store = SkillStoreStub::new(engine.clone(), test_skills.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -580,7 +580,7 @@ pub mod tests {
         let test_skill = given_greet_skill_v0_2();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::from_bytes(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -597,8 +597,7 @@ pub mod tests {
         let test_skill = given_greet_skill_v0_3();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store =
-            SkillStoreStub::from_bytes(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -629,9 +628,10 @@ pub mod tests {
     #[tokio::test]
     async fn skill_metadata_invalid_output() {
         // Given a skill runtime that always returns an invalid output skill
-        let skill_path = SkillPath::local("greet");
+        let test_skill = given_invalid_output_skill();
+        let skill_path = SkillPath::local("invalid_output_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::with_invalid_output_skill(engine.clone());
+        let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -841,7 +841,7 @@ pub mod tests {
         // Given csi which emits errors for completion request
         let test_skill = given_greet_skill_v0_3();
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::from_bytes(
+        let store = SkillStoreStub::new(
             engine.clone(),
             test_skill.bytes(),
             SkillPath::local("greet"),
@@ -871,7 +871,7 @@ pub mod tests {
         let test_skill = given_greet_skill_v0_3();
         let csi = StubCsi::with_completion_from_text("Hello");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::from_bytes(
+        let store = SkillStoreStub::new(
             engine.clone(),
             test_skill.bytes(),
             SkillPath::local("greet"),
@@ -902,7 +902,7 @@ pub mod tests {
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
         let csi = StubCsi::with_completion_from_text("Hello, Homer!");
-        let store = SkillStoreStub::from_bytes(
+        let store = SkillStoreStub::new(
             engine.clone(),
             test_skill.bytes(),
             SkillPath::local("greet"),
@@ -944,7 +944,7 @@ pub mod tests {
         };
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(|| async move {
-            let store = SkillStoreStub::from_bytes(
+            let store = SkillStoreStub::new(
                 engine.clone(),
                 test_skill.bytes(),
                 SkillPath::local("greet"),
@@ -1042,12 +1042,7 @@ pub mod tests {
     }
 
     impl SkillStoreStub {
-        pub fn new(engine: Arc<Engine>, path: impl AsRef<Path>) -> Self {
-            let greet_bytes = fs::read(path).unwrap();
-            Self::from_bytes(engine, greet_bytes, SkillPath::local("greet"))
-        }
-
-        pub fn from_bytes(engine: Arc<Engine>, bytes: Vec<u8>, path: SkillPath) -> Self {
+        pub fn new(engine: Arc<Engine>, bytes: Vec<u8>, path: SkillPath) -> Self {
             let skill = Skill::new(&engine, bytes).unwrap();
             let skill = Arc::new(skill);
 
@@ -1069,18 +1064,6 @@ pub mod tests {
             });
 
             Self { send, join_handle }
-        }
-
-        pub fn with_invalid_output_skill(engine: Arc<Engine>) -> Self {
-            given_invalid_output_skill();
-            let path = "./skills/invalid_output_skill.wasm";
-            Self::new(engine, path)
-        }
-
-        pub fn with_csi_from_metadata_skill(engine: Arc<Engine>) -> Self {
-            given_csi_from_metadata_skill();
-            let path = "./skills/csi_from_metadata.wasm";
-            Self::new(engine, path)
         }
 
         pub async fn wait_for_shutdown(self) {
