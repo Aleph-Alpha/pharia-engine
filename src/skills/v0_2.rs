@@ -295,6 +295,7 @@ impl From<inference::Completion> for Completion {
             text,
             finish_reason,
             logprobs: _,
+            usage: _,
         } = completion;
         Self {
             text,
