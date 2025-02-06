@@ -577,9 +577,10 @@ pub mod tests {
     #[tokio::test]
     async fn skill_metadata_v0_2_is_none() {
         // Given a skill runtime that always returns a v0.2 skill
+        let test_skill = given_greet_skill_v0_2();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::with_greet_skill_v2(engine.clone());
+        let store = SkillStoreStub::from_bytes(engine.clone(), test_skill.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -1068,12 +1069,6 @@ pub mod tests {
             });
 
             Self { send, join_handle }
-        }
-
-        pub fn with_greet_skill_v2(engine: Arc<Engine>) -> Self {
-            given_greet_skill_v0_2();
-            let path = "./skills/greet_skill_v0_2.wasm";
-            Self::new(engine, path)
         }
 
         pub fn with_invalid_output_skill(engine: Arc<Engine>) -> Self {
