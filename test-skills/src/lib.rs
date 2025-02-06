@@ -1,5 +1,7 @@
 use anyhow::{anyhow, bail, Context as _, Error};
+use change_case::snake_case;
 use std::{
+    fs,
     path::Path,
     process::{Command, Output},
     sync::{LazyLock, OnceLock},
@@ -8,68 +10,91 @@ use tempfile::{tempdir, TempDir};
 
 const WASI_TARGET: &str = "wasm32-wasip2";
 
-pub fn given_chat_skill_new_params_v0_3() {
-    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
-        given_rust_skill("chat-skill-new-params-v0_3");
-    });
-    *WASM_BUILD;
+pub struct TestSkill {
+    file_name: String,
+}
+
+impl TestSkill {
+    fn rust_skill(name: &'static str) -> Self {
+        Self {
+            file_name: snake_case(name),
+        }
+    }
+
+    fn python_skill(package_name: &str) -> Self {
+        Self {
+            file_name: package_name.to_owned(),
+        }
+    }
+
+    pub fn bytes(&self) -> Vec<u8> {
+        fs::read(format!("./skills/{}.wasm", self.file_name)).unwrap()
+    }
 }
 
 /// Creates `greet_skill_v0_3.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
-pub fn given_greet_skill_v0_3() {
+pub fn given_greet_skill_v0_3() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("greet-skill-v0_3");
     });
     *WASM_BUILD;
+    TestSkill::rust_skill("greet-skill-v0_3")
 }
 
 /// Creates `greet_skill_v0_2.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
-pub fn given_greet_skill_v0_2() {
+pub fn given_greet_skill_v0_2() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("greet-skill-v0_2");
     });
     *WASM_BUILD;
+    TestSkill::rust_skill("greet-skill-v0_2")
 }
 
 /// Creates `search_skill.wasm` in `skills` directory, based on `crates/search-skill`
-pub fn given_search_skill() {
+pub fn given_search_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("search-skill");
     });
     *WASM_BUILD;
+    TestSkill::rust_skill("search-skill")
 }
 
 /// Creates `search_skill.wasm` in `skills` directory, based on `crates/search-skill`
-pub fn given_doc_metadata_skill() {
+pub fn given_doc_metadata_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("doc-metadata-skill");
     });
     *WASM_BUILD;
+    TestSkill::rust_skill("doc-metadata-skill")
 }
 
 /// Creates `chat_skill.wasm` in `skills` directory, based on `crates/chat-skill`
-pub fn given_chat_skill() {
+pub fn given_chat_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("chat-skill");
     });
     *WASM_BUILD;
+    TestSkill::rust_skill("chat-skill")
 }
 
-pub fn given_greet_py_v0_2() {
+pub fn given_greet_py_v0_2() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_python_skill("greet-py-v0_2", "0.2");
     });
     *WASM_BUILD;
+    TestSkill::python_skill("greet-py-v0_2")
 }
 
-pub fn given_invalid_output_skill() {
+pub fn given_invalid_output_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| given_rust_skill("invalid-output-skill"));
     *WASM_BUILD;
+    TestSkill::rust_skill("invalid-output-skill")
 }
 
-pub fn given_csi_from_metadata_skill() {
+pub fn given_csi_from_metadata_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| given_rust_skill("csi-from-metadata"));
     *WASM_BUILD;
+    TestSkill::rust_skill("csi-from-metadata")
 }
 
 fn given_python_skill(package_name: &str, wit_version: &str) {

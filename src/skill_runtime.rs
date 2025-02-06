@@ -593,9 +593,11 @@ pub mod tests {
     #[tokio::test]
     async fn skill_metadata_v0_3() {
         // Given a skill runtime api that always returns a v0.3 skill
+        let test_skill = given_greet_skill_v0_3();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
+        let store =
+            SkillStoreStub::from_bytes(engine.clone(), test_skill.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -836,8 +838,13 @@ pub mod tests {
     #[tokio::test]
     async fn skill_runtime_forwards_csi_errors() {
         // Given csi which emits errors for completion request
+        let test_skill = given_greet_skill_v0_3();
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
+        let store = SkillStoreStub::from_bytes(
+            engine.clone(),
+            test_skill.bytes(),
+            SkillPath::local("greet"),
+        );
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When trying to generate a greeting for Homer using the greet skill
@@ -860,9 +867,14 @@ pub mod tests {
     #[tokio::test]
     async fn greeting_skill() {
         // Given
+        let test_skill = given_greet_skill_v0_3();
         let csi = StubCsi::with_completion_from_text("Hello");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
+        let store = SkillStoreStub::from_bytes(
+            engine.clone(),
+            test_skill.bytes(),
+            SkillPath::local("greet"),
+        );
 
         // When
         let runtime = SkillRuntime::new(engine, csi, store.api());
@@ -884,11 +896,16 @@ pub mod tests {
     #[tokio::test(start_paused = true)]
     async fn concurrent_skill_execution() {
         // Given
+        let test_skill = given_greet_skill_v0_3();
         let engine = Arc::new(Engine::new(false).unwrap());
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
         let csi = StubCsi::with_completion_from_text("Hello, Homer!");
-        let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
+        let store = SkillStoreStub::from_bytes(
+            engine.clone(),
+            test_skill.bytes(),
+            SkillPath::local("greet"),
+        );
         let runtime = SkillRuntime::new(engine, csi, store.api());
         let api = runtime.api();
 
@@ -913,6 +930,7 @@ pub mod tests {
 
     #[test]
     fn skill_runtime_metrics_emitted() {
+        let test_skill = given_greet_skill_v0_3();
         let engine = Arc::new(Engine::new(false).unwrap());
         let csi = StubCsi::with_completion_from_text("Hello");
         let (send, _) = oneshot::channel();
@@ -925,7 +943,11 @@ pub mod tests {
         };
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(|| async move {
-            let store = SkillStoreStub::with_greet_skill_v3(engine.clone());
+            let store = SkillStoreStub::from_bytes(
+                engine.clone(),
+                test_skill.bytes(),
+                SkillPath::local("greet"),
+            );
             let runtime = WasmRuntime::new(engine, store.api());
             msg.act(csi, &runtime).await;
             drop(runtime);
@@ -1021,7 +1043,11 @@ pub mod tests {
     impl SkillStoreStub {
         pub fn new(engine: Arc<Engine>, path: impl AsRef<Path>) -> Self {
             let greet_bytes = fs::read(path).unwrap();
-            let skill = Skill::new(&engine, greet_bytes.clone()).unwrap();
+            Self::from_bytes(engine, greet_bytes, SkillPath::local("greet"))
+        }
+
+        pub fn from_bytes(engine: Arc<Engine>, bytes: Vec<u8>, path: SkillPath) -> Self {
+            let skill = Skill::new(&engine, bytes).unwrap();
             let skill = Arc::new(skill);
 
             let (send, mut recv) = mpsc::channel::<SkillStoreMessage>(1);
@@ -1029,7 +1055,7 @@ pub mod tests {
                 while let Some(msg) = recv.recv().await {
                     match msg {
                         SkillStoreMessage::Fetch { skill_path, send } => {
-                            let skill = if skill_path == SkillPath::local("greet") {
+                            let skill = if skill_path == path {
                                 Some(skill.clone())
                             } else {
                                 None
@@ -1042,11 +1068,6 @@ pub mod tests {
             });
 
             Self { send, join_handle }
-        }
-        pub fn with_greet_skill_v3(engine: Arc<Engine>) -> Self {
-            given_greet_skill_v0_3();
-            let path = "./skills/greet_skill_v0_3.wasm";
-            Self::new(engine, path)
         }
 
         pub fn with_greet_skill_v2(engine: Arc<Engine>) -> Self {
