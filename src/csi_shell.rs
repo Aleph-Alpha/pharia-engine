@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    csi::{ChunkRequest, Csi},
+    chunking::ChunkRequest,
+    csi::Csi,
     inference::{ChatRequest, CompletionParams, CompletionRequest},
     language_selection::SelectLanguageRequest,
     search::{DocumentPath, SearchRequest},

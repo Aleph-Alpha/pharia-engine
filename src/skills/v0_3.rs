@@ -8,7 +8,7 @@ use pharia::skill::csi::{
 use serde_json::Value;
 use wasmtime::component::bindgen;
 
-use crate::{csi::chunking, inference, language_selection, search};
+use crate::{chunking, inference, language_selection, search};
 
 use super::LinkedCtx;
 

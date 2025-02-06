@@ -6,7 +6,7 @@ use pharia::skill::csi::{
 use wasmtime::component::bindgen;
 
 use crate::{
-    csi::ChunkRequest,
+    chunking::ChunkRequest,
     inference,
     language_selection::{self, SelectLanguageRequest},
     search::{self, SearchRequest},
