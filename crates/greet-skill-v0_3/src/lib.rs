@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
-use pharia::skill::csi::{complete, CompletionParams, CompletionRequest};
+use pharia::skill::csi::{complete, CompletionParams, CompletionRequest, Logprobs};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
@@ -40,6 +40,7 @@ Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|
                     "<|eom_id|>".to_owned(),
                     "<|eot_id|>".to_owned(),
                 ],
+                logprobs: Logprobs::No,
             },
         }])
         .remove(0);
