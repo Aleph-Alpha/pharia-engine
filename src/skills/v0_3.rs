@@ -282,6 +282,7 @@ impl From<inference::Completion> for Completion {
         Self {
             text,
             finish_reason: finish_reason.into(),
+            logprobs: logprobs.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -335,6 +336,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             stop,
             frequency_penalty,
             presence_penalty,
+            logprobs,
         } = params;
 
         Self {
@@ -346,7 +348,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             stop,
             frequency_penalty,
             presence_penalty,
-            logprobs: inference::Logprobs::No,
+            logprobs: logprobs.into(),
         }
     }
 }

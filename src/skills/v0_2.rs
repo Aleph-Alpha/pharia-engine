@@ -294,7 +294,7 @@ impl From<inference::Completion> for Completion {
         let inference::Completion {
             text,
             finish_reason,
-            logprobs,
+            logprobs: _,
         } = completion;
         Self {
             text,
