@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use chunking::ChunkParams;
 use futures::future::try_join_all;
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::trace;
 
 use crate::{
+    chunking::{self, ChunkParams, ChunkRequest},
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
     search::{
@@ -13,10 +13,6 @@ use crate::{
     },
     tokenizers::TokenizerApi,
 };
-
-pub use self::chunking::ChunkRequest;
-
-pub mod chunking;
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
 ///

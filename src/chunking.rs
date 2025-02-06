@@ -37,7 +37,7 @@ mod tests {
     #[tokio::test]
     async fn chunking_splits_text() {
         // Given some text and a tokenizer
-        let text = include_str!("no_silver_bullet.txt");
+        let text = include_str!("../tests/no_silver_bullet.txt");
         let tokenizer = pharia_1_llm_7b_control_tokenizer();
 
         // When we chunk the text

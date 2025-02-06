@@ -20,7 +20,8 @@ use tracing::{span, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    csi::{ChunkRequest, Csi, CsiForSkills},
+    chunking::ChunkRequest,
+    csi::{Csi, CsiForSkills},
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -541,10 +542,8 @@ pub mod tests {
     use crate::skill_loader::ConfiguredSkill;
     use crate::skills::SkillMetadata;
     use crate::{
-        csi::{
-            chunking::ChunkParams,
-            tests::{DummyCsi, StubCsi},
-        },
+        chunking::ChunkParams,
+        csi::tests::{DummyCsi, StubCsi},
         inference::{
             tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },

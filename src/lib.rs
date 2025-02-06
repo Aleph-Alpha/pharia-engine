@@ -1,4 +1,5 @@
 mod authorization;
+mod chunking;
 mod config;
 mod csi;
 mod csi_shell;
