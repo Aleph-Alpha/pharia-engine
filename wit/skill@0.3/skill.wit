@@ -130,16 +130,17 @@ interface csi {
     }
 
     // @since(version = 0.3.0)
-    record top-logprob {
+    record logprob {
         token: list<u8>,
         logprob: f64,
     }
 
     // @since(version = 0.3.0)
-    record logprob {
-        token: list<u8>,
-        logprob: f64,
-        top-logprobs: list<top-logprob>,
+    record distribution {
+        // Logarithmic probability of the token returned in the completion
+        sampled: logprob,
+        // Logarithmic probabilities of the most probable tokens, filled if user has requested [`crate::Logprobs::Top`]
+        top: list<logprob>,
     }
 
     /// The result of a chat response, including the message generated as well as
@@ -152,7 +153,7 @@ interface csi {
         finish-reason: finish-reason,
         /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
         /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
-        logprobs: list<logprob>,
+        logprobs: list<distribution>,
     }
 
     // @since(version = 0.3.0)

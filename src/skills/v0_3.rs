@@ -1,8 +1,9 @@
 use exports::pharia::skill::skill_handler::SkillMetadata;
 use pharia::skill::csi::{
     ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion, CompletionParams,
-    CompletionRequest, Document, DocumentPath, FinishReason, Host, IndexPath, Language, Logprob,
-    Logprobs, Message, Modality, SearchRequest, SearchResult, SelectLanguageRequest, TopLogprob,
+    CompletionRequest, Distribution, Document, DocumentPath, FinishReason, Host, IndexPath,
+    Language, Logprob, Logprobs, Message, Modality, SearchRequest, SearchResult,
+    SelectLanguageRequest,
 };
 use serde_json::Value;
 use wasmtime::component::bindgen;
@@ -395,21 +396,17 @@ impl From<inference::FinishReason> for FinishReason {
     }
 }
 
-impl From<inference::Distribution> for Logprob {
+impl From<inference::Distribution> for Distribution {
     fn from(logprob: inference::Distribution) -> Self {
-        let inference::Distribution {
-            sampled,
-            top: top_logprobs,
-        } = logprob;
+        let inference::Distribution { sampled, top } = logprob;
         Self {
-            token: sampled.token,
-            logprob: sampled.logprob,
-            top_logprobs: top_logprobs.into_iter().map(Into::into).collect(),
+            sampled: sampled.into(),
+            top: top.into_iter().map(Into::into).collect(),
         }
     }
 }
 
-impl From<inference::Logprob> for TopLogprob {
+impl From<inference::Logprob> for Logprob {
     fn from(top_logprob: inference::Logprob) -> Self {
         let inference::Logprob { token, logprob } = top_logprob;
         Self { token, logprob }
@@ -476,9 +473,9 @@ mod tests {
 
         // Then
         assert_eq!(result.logprobs.len(), 1);
-        assert_eq!(result.logprobs[0].token, token);
+        assert_eq!(result.logprobs[0].sampled.token, token);
 
-        assert_eq!(result.logprobs[0].top_logprobs.len(), 1);
-        assert_eq!(result.logprobs[0].top_logprobs[0].token, token);
+        assert_eq!(result.logprobs[0].top.len(), 1);
+        assert_eq!(result.logprobs[0].top[0].token, token);
     }
 }
