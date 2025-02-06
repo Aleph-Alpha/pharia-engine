@@ -194,12 +194,19 @@ impl FromStr for FinishReason {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenUsage {
+    pub prompt: u32,
+    pub completion: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Completion {
     pub text: String,
     pub finish_reason: FinishReason,
     /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
     /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
     pub logprobs: Vec<Distribution>,
+    pub usage: TokenUsage,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -324,6 +331,10 @@ pub mod tests {
                 text: completion.into(),
                 finish_reason: FinishReason::Stop,
                 logprobs: vec![],
+                usage: TokenUsage {
+                    prompt: 0,
+                    completion: 0,
+                },
             }
         }
     }

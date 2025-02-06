@@ -278,6 +278,7 @@ impl From<inference::Completion> for Completion {
             text,
             finish_reason,
             logprobs,
+            usage,
         } = completion;
         Self {
             text,

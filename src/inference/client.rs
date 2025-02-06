@@ -13,8 +13,8 @@ use tracing::{error, warn};
 use thiserror::Error;
 
 use super::{
-    ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
-    Distribution, Logprob, Logprobs, Message,
+    actor::TokenUsage, ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams,
+    CompletionRequest, Distribution, Logprob, Logprobs, Message,
 };
 
 pub trait InferenceClient: Send + Sync + 'static {
@@ -109,13 +109,23 @@ impl TryFrom<CompletionOutput> for Completion {
             completion,
             finish_reason,
             logprobs,
-            usage: _,
+            usage,
         } = completion_output;
         Ok(Self {
             text: completion,
             finish_reason: finish_reason.parse()?,
             logprobs: logprobs.into_iter().map(Into::into).collect(),
+            usage: usage.into(),
         })
+    }
+}
+
+impl From<aleph_alpha_client::Usage> for TokenUsage {
+    fn from(usage: aleph_alpha_client::Usage) -> Self {
+        TokenUsage {
+            prompt: usage.prompt_tokens,
+            completion: usage.completion_tokens,
+        }
     }
 }
 
@@ -556,5 +566,31 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         assert_eq!(top_logprobs.len(), 2);
         assert_eq!(str::from_utf8(&top_logprobs[0].token).unwrap(), " keeps");
         assert_eq!(str::from_utf8(&top_logprobs[1].token).unwrap(), " they");
+    }
+
+    #[tokio::test]
+    async fn usage_for_completion() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let completion_request = CompletionRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            prompt: "An apple a day, ".to_owned(),
+            params: CompletionParams {
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        };
+        let completion_response =
+            <Client as InferenceClient>::complete_text(&client, &completion_request, api_token)
+                .await
+                .unwrap();
+
+        // Then
+        assert_eq!(completion_response.usage.prompt, 6);
+        assert_eq!(completion_response.usage.completion, 1);
     }
 }
