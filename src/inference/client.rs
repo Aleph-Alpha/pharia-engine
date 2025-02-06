@@ -13,8 +13,8 @@ use tracing::{error, warn};
 use thiserror::Error;
 
 use super::{
-    ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Logprob, Logprobs,
-    Message, TopLogprob,
+    ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Distribution,
+    Logprob, Logprobs, Message,
 };
 
 pub trait InferenceClient: Send + Sync + 'static {
@@ -125,25 +125,24 @@ impl<'a> From<&'a Message> for aleph_alpha_client::Message<'a> {
     }
 }
 
-impl From<aleph_alpha_client::Logprob> for Logprob {
+impl From<aleph_alpha_client::Logprob> for Distribution {
     fn from(logprob: aleph_alpha_client::Logprob) -> Self {
         let aleph_alpha_client::Logprob {
             token,
             logprob,
             top_logprobs,
         } = logprob;
-        Logprob {
-            token,
-            logprob,
-            top_logprobs: top_logprobs.into_iter().map(TopLogprob::from).collect(),
+        Distribution {
+            sampled: Logprob { token, logprob },
+            top: top_logprobs.into_iter().map(Logprob::from).collect(),
         }
     }
 }
 
-impl From<aleph_alpha_client::TopLogprob> for TopLogprob {
+impl From<aleph_alpha_client::TopLogprob> for Logprob {
     fn from(top_logprob: aleph_alpha_client::TopLogprob) -> Self {
         let aleph_alpha_client::TopLogprob { token, logprob } = top_logprob;
-        TopLogprob { token, logprob }
+        Logprob { token, logprob }
     }
 }
 
@@ -157,7 +156,7 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
             logprobs: chat_output
                 .logprobs
                 .into_iter()
-                .map(Logprob::from)
+                .map(Distribution::from)
                 .collect(),
         })
     }
@@ -502,7 +501,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
 
         // Then
         assert_eq!(chat_response.logprobs.len(), 1);
-        let top_logprobs = &chat_response.logprobs[0].top_logprobs;
+        let top_logprobs = &chat_response.logprobs[0].top;
         assert_eq!(top_logprobs.len(), 2);
         assert_eq!(str::from_utf8(&top_logprobs[0].token).unwrap(), " Keep");
         assert_eq!(str::from_utf8(&top_logprobs[1].token).unwrap(), " keeps");
