@@ -11,7 +11,7 @@ use crate::{
     chunking::{ChunkParams, ChunkRequest},
     csi::Csi,
     inference::{ChatRequest, CompletionParams, CompletionRequest},
-    language_selection::SelectLanguageRequest,
+    language_selection::{Language, SelectLanguageRequest},
     search::{DocumentPath, SearchRequest},
     shell::AppState,
     skills::SupportedVersion,
@@ -186,7 +186,7 @@ impl V0_3CsiRequest {
 pub enum V0_2CsiRequest {
     Complete(V0_2CompletionRequest),
     Chunk(V0_2ChunkRequest),
-    SelectLanguage(SelectLanguageRequest),
+    SelectLanguage(V0_2SelectLanguageRequest),
     CompleteAll {
         requests: Vec<V0_2CompletionRequest>,
     },
@@ -217,7 +217,7 @@ impl V0_2CsiRequest {
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
             V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
-                .select_language(vec![select_language_request])
+                .select_language(vec![select_language_request.into()])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
             V0_2CsiRequest::CompleteAll { requests } => drivers
@@ -340,6 +340,40 @@ impl From<V0_2ChunkParams> for ChunkParams {
     fn from(value: V0_2ChunkParams) -> Self {
         let V0_2ChunkParams { model, max_tokens } = value;
         Self { model, max_tokens }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct V0_2SelectLanguageRequest {
+    pub text: String,
+    pub languages: Vec<V0_2Language>,
+}
+
+impl From<V0_2SelectLanguageRequest> for SelectLanguageRequest {
+    fn from(value: V0_2SelectLanguageRequest) -> Self {
+        let V0_2SelectLanguageRequest { text, languages } = value;
+        Self {
+            text,
+            languages: languages.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum V0_2Language {
+    /// English
+    Eng,
+    /// German
+    Deu,
+}
+
+impl From<V0_2Language> for Language {
+    fn from(value: V0_2Language) -> Self {
+        match value {
+            V0_2Language::Eng => Self::Eng,
+            V0_2Language::Deu => Self::Deu,
+        }
     }
 }
 
