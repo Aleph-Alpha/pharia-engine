@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.8...v0.7.9)
+
+### Features
+
+- Reflect new log prob structure in wit world - ([9650195](https://github.com/Aleph-Alpha/pharia-kernel/commit/96501953fe2e58e0fa557d8e2bb593d270259ea0))
+- Expose log probs in wit world - ([84dd4f1](https://github.com/Aleph-Alpha/pharia-kernel/commit/84dd4f1ecb260b2adc2352950affecbf6c6ee582))
+
+### Fixes
+
+- Handle uppercase roles from v0_2 - ([8bc3862](https://github.com/Aleph-Alpha/pharia-kernel/commit/8bc3862ef37fa2781c2167389ac033486b10d1cc))
+- V0.2 chat request in csi - ([efd5985](https://github.com/Aleph-Alpha/pharia-kernel/commit/efd5985303af9a6cf2a24a0d3be917d621e149f2))
+- Introduce v0.2 language request - ([4882023](https://github.com/Aleph-Alpha/pharia-kernel/commit/48820230036a292cee31b73adbf8b9750b8f325b))
+
+
 ## [0.7.8](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.7...v0.7.8)
 
 ### Features
