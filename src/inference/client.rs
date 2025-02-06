@@ -36,7 +36,7 @@ impl InferenceClient for Client {
         request: &ChatRequest,
         api_token: String,
     ) -> Result<ChatResponse, InferenceClientError> {
-        let task = request.into();
+        let task = request.to_task_chat();
         let how = How {
             api_token: Some(api_token),
             ..Default::default()
@@ -170,8 +170,8 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
     }
 }
 
-impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
-    fn from(request: &'a ChatRequest) -> Self {
+impl ChatRequest {
+    pub fn to_task_chat(&self) -> TaskChat<'_> {
         let ChatRequest {
             model: _,
             messages,
@@ -184,7 +184,7 @@ impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
                     presence_penalty,
                     logprobs,
                 },
-        } = request;
+        } = self;
         TaskChat {
             messages: messages.iter().map(Into::into).collect(),
             stopping: Stopping {
