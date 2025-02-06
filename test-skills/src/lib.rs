@@ -33,6 +33,7 @@ impl TestSkill {
 }
 
 /// Creates `greet_skill_v0_3.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
+#[must_use]
 pub fn given_greet_skill_v0_3() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("greet-skill-v0_3");

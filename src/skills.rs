@@ -644,8 +644,8 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_3_module() {
         // Given a skill loaded by our engine
-        given_greet_skill_v0_3();
-        let wasm = fs::read("skills/greet_skill_v0_3.wasm").unwrap();
+        let test_skill = given_greet_skill_v0_3();
+        let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
