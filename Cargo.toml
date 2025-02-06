@@ -36,7 +36,7 @@ edition = "2021"
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-aleph-alpha-client = "0.18.1"
+aleph-alpha-client = "0.19.0"
 anyhow = "1.0.95"
 async-trait = "0.1.86"
 axum = { version = "0.8.1", features = ["macros"] }

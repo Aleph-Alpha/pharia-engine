@@ -83,6 +83,7 @@ impl InferenceClient for Client {
                 presence_penalty: *presence_penalty,
             },
             special_tokens: *return_special_tokens,
+            logprobs: aleph_alpha_client::Logprobs::No,
         };
         let how = How {
             api_token: Some(api_token),
