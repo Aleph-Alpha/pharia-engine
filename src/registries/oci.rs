@@ -140,7 +140,7 @@ fn is_skill_not_found(error: &OciDistributionError) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, path::Path};
+    use std::env;
 
     use dotenvy::dotenv;
     use oci_client::{secrets::RegistryAuth, Reference};
@@ -171,12 +171,11 @@ mod tests {
             }
         }
 
-        async fn store_skill(&self, path: impl AsRef<Path>, skill_name: &str, tag: &str) {
+        async fn store_skill(&self, wasm_bytes: Vec<u8>, skill_name: &str, tag: &str) {
             let repository = format!("{}/{skill_name}", self.base_repository);
             let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
-            let (config, component_layer) = WasmConfig::from_component(path, None)
-                .await
-                .expect("component must be valid");
+            let (config, component_layer) =
+                WasmConfig::from_raw_component(wasm_bytes, None).expect("component must be valid");
 
             let username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER")
                 .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER variable not set");
@@ -194,13 +193,13 @@ mod tests {
     #[tokio::test]
     async fn oci_push_and_pull_skill() {
         // given skill in local directory is pushed to registry
-        given_greet_skill_v0_2();
         drop(dotenvy::dotenv());
+        let test_skill = given_greet_skill_v0_2();
         let registry =
             OciRegistry::from_env().expect("Please configure registry, see .env.example");
         let tag = "latest";
         registry
-            .store_skill("./skills/greet_skill_v0_2.wasm", "greet_skill", tag)
+            .store_skill(test_skill.bytes(), "greet_skill", tag)
             .await;
 
         // when pulled from registry
