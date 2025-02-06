@@ -13,8 +13,8 @@ use tracing::{error, warn};
 use thiserror::Error;
 
 use super::{
-    ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Distribution,
-    Logprob, Logprobs, Message,
+    ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
+    Distribution, Logprob, Logprobs, Message,
 };
 
 pub trait InferenceClient: Send + Sync + 'static {
@@ -66,6 +66,7 @@ impl InferenceClient for Client {
                     stop,
                     frequency_penalty,
                     presence_penalty,
+                    logprobs,
                 },
         } = &request;
 
@@ -83,7 +84,7 @@ impl InferenceClient for Client {
                 presence_penalty: *presence_penalty,
             },
             special_tokens: *return_special_tokens,
-            logprobs: aleph_alpha_client::Logprobs::No,
+            logprobs: (*logprobs).into(),
         };
         let how = How {
             api_token: Some(api_token),
@@ -104,9 +105,15 @@ impl TryFrom<CompletionOutput> for Completion {
     type Error = anyhow::Error;
 
     fn try_from(completion_output: CompletionOutput) -> anyhow::Result<Self> {
+        let CompletionOutput {
+            completion,
+            finish_reason,
+            logprobs,
+        } = completion_output;
         Ok(Self {
-            text: completion_output.completion,
-            finish_reason: completion_output.finish_reason.parse()?,
+            text: completion,
+            finish_reason: finish_reason.parse()?,
+            logprobs: logprobs.into_iter().map(Into::into).collect(),
         })
     }
 }
@@ -165,27 +172,42 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
 
 impl<'a> From<&'a ChatRequest> for TaskChat<'a> {
     fn from(request: &'a ChatRequest) -> Self {
+        let ChatRequest {
+            model: _,
+            messages,
+            params:
+                ChatParams {
+                    max_tokens,
+                    temperature,
+                    top_p,
+                    frequency_penalty,
+                    presence_penalty,
+                    logprobs,
+                },
+        } = request;
         TaskChat {
-            messages: request
-                .messages
-                .iter()
-                .map(aleph_alpha_client::Message::from)
-                .collect(),
+            messages: messages.iter().map(Into::into).collect(),
             stopping: Stopping {
-                maximum_tokens: request.params.max_tokens,
+                maximum_tokens: *max_tokens,
                 stop_sequences: &[],
             },
             sampling: ChatSampling {
-                temperature: request.params.temperature,
-                top_p: request.params.top_p,
-                frequency_penalty: request.params.frequency_penalty,
-                presence_penalty: request.params.presence_penalty,
+                temperature: *temperature,
+                top_p: *top_p,
+                frequency_penalty: *frequency_penalty,
+                presence_penalty: *presence_penalty,
             },
-            logprobs: match request.params.logprobs {
-                Logprobs::No => aleph_alpha_client::Logprobs::No,
-                Logprobs::Sampled => aleph_alpha_client::Logprobs::Sampled,
-                Logprobs::Top(n) => aleph_alpha_client::Logprobs::Top(n),
-            },
+            logprobs: (*logprobs).into(),
+        }
+    }
+}
+
+impl From<Logprobs> for aleph_alpha_client::Logprobs {
+    fn from(logprobs: Logprobs) -> Self {
+        match logprobs {
+            Logprobs::No => aleph_alpha_client::Logprobs::No,
+            Logprobs::Sampled => aleph_alpha_client::Logprobs::Sampled,
+            Logprobs::Top(n) => aleph_alpha_client::Logprobs::Top(n),
         }
     }
 }
@@ -461,6 +483,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 frequency_penalty: None,
                 presence_penalty: None,
                 stop: Vec::new(),
+                logprobs: Logprobs::No,
             },
         };
         let completion_response =
@@ -506,5 +529,35 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         assert_eq!(top_logprobs.len(), 2);
         assert_eq!(str::from_utf8(&top_logprobs[0].token).unwrap(), " Keep");
         assert_eq!(str::from_utf8(&top_logprobs[1].token).unwrap(), " keeps");
+    }
+
+    #[tokio::test]
+    async fn top_logprobs_for_completion() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let completion_request = CompletionRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            prompt: "An apple a day, ".to_owned(),
+            params: CompletionParams {
+                max_tokens: Some(1),
+                logprobs: Logprobs::Top(2),
+                ..Default::default()
+            },
+        };
+        let completion_response =
+            <Client as InferenceClient>::complete_text(&client, &completion_request, api_token)
+                .await
+                .unwrap();
+
+        // Then
+        assert_eq!(completion_response.logprobs.len(), 1);
+        let top_logprobs = &completion_response.logprobs[0].top;
+        assert_eq!(top_logprobs.len(), 2);
+        assert_eq!(str::from_utf8(&top_logprobs[0].token).unwrap(), " keeps");
+        assert_eq!(str::from_utf8(&top_logprobs[1].token).unwrap(), " they");
     }
 }

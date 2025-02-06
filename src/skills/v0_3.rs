@@ -277,6 +277,7 @@ impl From<inference::Completion> for Completion {
         let inference::Completion {
             text,
             finish_reason,
+            logprobs,
         } = completion;
         Self {
             text,
@@ -345,6 +346,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             stop,
             frequency_penalty,
             presence_penalty,
+            logprobs: inference::Logprobs::No,
         }
     }
 }
