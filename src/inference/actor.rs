@@ -204,20 +204,19 @@ pub struct ChatResponse {
     pub finish_reason: FinishReason,
     /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
     /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
-    pub logprobs: Vec<Logprob>,
+    pub logprobs: Vec<Distribution>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Distribution {
+    // Logarithmic probability of the token returned in the completion
+    pub sampled: Logprob,
+    // Logarithmic probabilities of the most probable tokens, filled if user has requested [`crate::Logprobs::Top`]
+    pub top: Vec<Logprob>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Logprob {
-    pub token: Vec<u8>,
-    // while the naming might not be optimal, it is consistent with the inference api and the rust client
-    #[allow(clippy::struct_field_names)]
-    pub logprob: f64,
-    pub top_logprobs: Vec<TopLogprob>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TopLogprob {
     pub token: Vec<u8>,
     pub logprob: f64,
 }

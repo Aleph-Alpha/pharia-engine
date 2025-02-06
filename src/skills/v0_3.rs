@@ -395,24 +395,23 @@ impl From<inference::FinishReason> for FinishReason {
     }
 }
 
-impl From<inference::Logprob> for Logprob {
-    fn from(logprob: inference::Logprob) -> Self {
-        let inference::Logprob {
-            token,
-            logprob,
-            top_logprobs,
+impl From<inference::Distribution> for Logprob {
+    fn from(logprob: inference::Distribution) -> Self {
+        let inference::Distribution {
+            sampled,
+            top: top_logprobs,
         } = logprob;
         Self {
-            token,
-            logprob,
+            token: sampled.token,
+            logprob: sampled.logprob,
             top_logprobs: top_logprobs.into_iter().map(Into::into).collect(),
         }
     }
 }
 
-impl From<inference::TopLogprob> for TopLogprob {
-    fn from(top_logprob: inference::TopLogprob) -> Self {
-        let inference::TopLogprob { token, logprob } = top_logprob;
+impl From<inference::Logprob> for TopLogprob {
+    fn from(top_logprob: inference::Logprob) -> Self {
+        let inference::Logprob { token, logprob } = top_logprob;
         Self { token, logprob }
     }
 }
@@ -460,10 +459,12 @@ mod tests {
                 content: "Hello, world!".to_string(),
             },
             finish_reason: inference::FinishReason::Stop,
-            logprobs: vec![inference::Logprob {
-                token: token.clone(),
-                logprob: 0.0,
-                top_logprobs: vec![inference::TopLogprob {
+            logprobs: vec![inference::Distribution {
+                sampled: inference::Logprob {
+                    token: token.clone(),
+                    logprob: 0.0,
+                },
+                top: vec![inference::Logprob {
                     token: token.clone(),
                     logprob: 0.0,
                 }],
