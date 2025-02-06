@@ -187,7 +187,9 @@ pub enum V0_2CsiRequest {
     Complete(V0_2CompletionRequest),
     Chunk(V0_2ChunkRequest),
     SelectLanguage(SelectLanguageRequest),
-    CompleteAll(CompleteAllRequest),
+    CompleteAll {
+        requests: Vec<V0_2CompletionRequest>,
+    },
     Search(SearchRequest),
     Chat(ChatRequest),
     Documents {
@@ -218,15 +220,8 @@ impl V0_2CsiRequest {
                 .select_language(vec![select_language_request])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
-            V0_2CsiRequest::CompleteAll(complete_all_request) => drivers
-                .complete(
-                    auth,
-                    complete_all_request
-                        .requests
-                        .into_iter()
-                        .map(Into::into)
-                        .collect(),
-                )
+            V0_2CsiRequest::CompleteAll { requests } => drivers
+                .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|v| json!(v))?,
             V0_2CsiRequest::Search(search_request) => drivers
@@ -259,11 +254,6 @@ impl V0_2CsiRequest {
 pub struct DocumentMetadataRequest {
     /// Which Document
     pub document_path: DocumentPath,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CompleteAllRequest {
-    pub requests: Vec<V0_2CompletionRequest>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
