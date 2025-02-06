@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use crate::{
     chunking::{ChunkParams, ChunkRequest},
     csi::Csi,
-    inference::{ChatRequest, CompletionParams, CompletionRequest},
+    inference::{ChatParams, ChatRequest, CompletionParams, CompletionRequest, Message},
     language_selection::{Language, SelectLanguageRequest},
     search::{DocumentPath, SearchRequest},
     shell::AppState,
@@ -191,7 +191,7 @@ pub enum V0_2CsiRequest {
         requests: Vec<V0_2CompletionRequest>,
     },
     Search(SearchRequest),
-    Chat(ChatRequest),
+    Chat(V0_2ChatRequest),
     Documents {
         requests: Vec<DocumentPath>,
     },
@@ -229,7 +229,7 @@ impl V0_2CsiRequest {
                 .await
                 .map(|v| json!(v.first().unwrap()))?,
             V0_2CsiRequest::Chat(chat_request) => drivers
-                .chat(auth, vec![chat_request])
+                .chat(auth, vec![chat_request.into()])
                 .await
                 .map(|v| json!(v.first().unwrap()))?,
             V0_2CsiRequest::Documents { requests } => {
@@ -375,6 +375,76 @@ impl From<V0_2Language> for Language {
             V0_2Language::Deu => Self::Deu,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct V0_2ChatRequest {
+    pub model: String,
+    pub messages: Vec<V0_2Message>,
+    pub params: V0_2ChatParams,
+}
+
+impl From<V0_2ChatRequest> for ChatRequest {
+    fn from(value: V0_2ChatRequest) -> Self {
+        let V0_2ChatRequest {
+            model,
+            messages,
+            params,
+        } = value;
+        Self {
+            model,
+            messages: messages.into_iter().map(Into::into).collect(),
+            params: params.into(),
+        }
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+pub struct V0_2ChatParams {
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f64>,
+    pub top_p: Option<f64>,
+}
+
+impl From<V0_2ChatParams> for ChatParams {
+    fn from(value: V0_2ChatParams) -> Self {
+        let V0_2ChatParams {
+            max_tokens,
+            temperature,
+            top_p,
+        } = value;
+        Self {
+            max_tokens,
+            temperature,
+            top_p,
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct V0_2Message {
+    pub role: V0_2Role,
+    pub content: String,
+}
+
+impl From<V0_2Message> for Message {
+    fn from(value: V0_2Message) -> Self {
+        let V0_2Message { role, content } = value;
+        Self {
+            role: role.to_string(),
+            content,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, strum::Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum V0_2Role {
+    User,
+    Assistant,
+    System,
 }
 
 /// We use `BAD_REQUEST` (400) for validation error as it is more commonly used.

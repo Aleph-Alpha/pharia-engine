@@ -196,6 +196,53 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
     kernel.shutdown().await;
 }
 
+#[cfg_attr(not(feature = "test_inference"), ignore)]
+#[tokio::test]
+async fn chat_v0_2_via_remote_csi() {
+    let kernel = TestKernel::with_skills(&[]).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(
+            json!({
+                "version": "0.2",
+                "function": "chat",
+                "messages": [{"role": "user", "content": "Say hello to Homer"}],
+                "model": "pharia-1-llm-7b-control",
+                "params": {
+                    "max_tokens": 64,
+                    "temperature": null,
+                    "top_p": null,
+                }
+            })
+            .to_string(),
+        ))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let body = resp.bytes().await.unwrap();
+    let completion = serde_json::from_slice::<Value>(&body).unwrap();
+    assert!(completion["message"]["role"]
+        .as_str()
+        .unwrap()
+        .contains("assistant"));
+    assert!(matches!(
+        completion["finish_reason"].as_str().unwrap(),
+        "stop"
+    ));
+
+    kernel.shutdown().await;
+}
+
 #[tokio::test]
 async fn unsupported_csi_function() {
     let kernel = TestKernel::with_skills(&[]).await;
