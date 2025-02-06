@@ -27,6 +27,7 @@ impl TestSkill {
         }
     }
 
+    #[must_use]
     pub fn bytes(&self) -> Vec<u8> {
         fs::read(format!("./skills/{}.wasm", self.file_name)).unwrap()
     }
@@ -43,6 +44,7 @@ pub fn given_greet_skill_v0_3() -> TestSkill {
 }
 
 /// Creates `greet_skill_v0_2.wasm` in `skills` directory, based on `crates/greet-skill-v0_2`
+#[must_use]
 pub fn given_greet_skill_v0_2() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("greet-skill-v0_2");
