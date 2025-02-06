@@ -165,14 +165,17 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
     type Error = anyhow::Error;
 
     fn try_from(chat_output: aleph_alpha_client::ChatOutput) -> anyhow::Result<Self> {
+        let aleph_alpha_client::ChatOutput {
+            message,
+            finish_reason,
+            logprobs,
+            usage,
+        } = chat_output;
         Ok(ChatResponse {
-            message: chat_output.message.into(),
-            finish_reason: chat_output.finish_reason.parse()?,
-            logprobs: chat_output
-                .logprobs
-                .into_iter()
-                .map(Distribution::from)
-                .collect(),
+            message: message.into(),
+            finish_reason: finish_reason.parse()?,
+            logprobs: logprobs.into_iter().map(Distribution::from).collect(),
+            usage: usage.into(),
         })
     }
 }
@@ -408,7 +411,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_complete_response_with_special_tokens() {
+    async fn complete_response_with_special_tokens() {
         // Given an inference client
         let api_token = api_token().to_owned();
         let host = inference_url().to_owned();
@@ -592,5 +595,30 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         // Then
         assert_eq!(completion_response.usage.prompt, 6);
         assert_eq!(completion_response.usage.completion, 1);
+    }
+
+    #[tokio::test]
+    async fn usage_for_chat() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let chat_request = ChatRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            messages: vec![Message::new("user", "An apple a day, ")],
+            params: ChatParams {
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        };
+        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token)
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(chat_response.usage.prompt, 20);
+        assert_eq!(chat_response.usage.completion, 1);
     }
 }

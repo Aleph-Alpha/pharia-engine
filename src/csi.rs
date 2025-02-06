@@ -278,7 +278,7 @@ pub mod tests {
     use serde_json::json;
 
     use crate::{
-        inference::{tests::InferenceStub, ChatParams, CompletionParams, Message},
+        inference::{tests::InferenceStub, ChatParams, CompletionParams, Message, TokenUsage},
         search::tests::SearchStub,
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
@@ -577,6 +577,10 @@ pub mod tests {
                     message: request.messages.first().unwrap().clone(),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],
+                    usage: TokenUsage {
+                        prompt: 0,
+                        completion: 0,
+                    },
                 })
                 .collect())
         }
@@ -719,6 +723,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                     message: Message::new("assistant", "dummy-content"),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],
+                    usage: TokenUsage {
+                        prompt: 0,
+                        completion: 0,
+                    },
                 })
                 .collect()
         }

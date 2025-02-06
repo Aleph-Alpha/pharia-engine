@@ -382,6 +382,7 @@ impl From<inference::ChatResponse> for ChatResponse {
             message,
             finish_reason,
             logprobs,
+            usage,
         } = response;
         Self {
             message: message.into(),
@@ -456,6 +457,10 @@ mod tests {
         // Given
         let token: Vec<u8> = "Hello".to_string().into();
         let source = inference::ChatResponse {
+            usage: inference::TokenUsage {
+                prompt: 4,
+                completion: 1,
+            },
             message: inference::Message {
                 role: "user".to_string(),
                 content: "Hello, world!".to_string(),
