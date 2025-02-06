@@ -36,7 +36,7 @@ edition = "2021"
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-aleph-alpha-client = "0.18.1"
+aleph-alpha-client = "0.20.0"
 anyhow = "1.0.95"
 async-trait = "0.1.86"
 axum = { version = "0.8.1", features = ["macros"] }
@@ -56,7 +56,7 @@ reqwest = { version = "0.12.12", features = [
 semver = "1.0.25"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
-toml = "0.8.19"
+toml = "0.8.20"
 strum = { version = "0.26.3", features = ["derive"] }
 tokio = { version = "1.43.0", features = [
     "macros",
