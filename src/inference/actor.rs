@@ -94,6 +94,17 @@ impl InferenceApi {
     }
 }
 
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+pub enum Logprobs {
+    /// Do not return any logprobs
+    #[default]
+    No,
+    /// Return only the logprob of the tokens which have actually been sampled into the completion.
+    Sampled,
+    /// Request between 0 and 20 tokens
+    Top(u8),
+}
+
 #[derive(Default, Debug, PartialEq, Clone)]
 pub struct CompletionParams {
     pub return_special_tokens: bool,
@@ -114,7 +125,7 @@ pub struct CompletionRequest {
     pub params: CompletionParams,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct ChatParams {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
@@ -124,7 +135,7 @@ pub struct ChatParams {
     pub logprobs: Logprobs,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize)]
 pub struct Message {
     pub role: String,
     pub content: String,
@@ -139,23 +150,10 @@ impl Message {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<Message>,
     pub params: ChatParams,
-}
-
-#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Logprobs {
-    /// Do not return any logprobs
-    #[default]
-    No,
-    /// Return only the logprob of the tokens which have actually been sampled into the completion.
-    Sampled,
-    /// Request between 0 and 20 tokens
-    Top(u8),
 }
 
 impl CompletionRequest {
@@ -210,7 +208,7 @@ pub struct Completion {
     pub usage: TokenUsage,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct ChatResponse {
     pub message: Message,
     pub finish_reason: FinishReason,

@@ -567,8 +567,8 @@ pub mod tests {
         ) -> anyhow::Result<Vec<ChatResponse>> {
             Ok(requests
                 .into_iter()
-                .map(|request| ChatResponse {
-                    message: request.messages.first().unwrap().clone(),
+                .map(|mut request| ChatResponse {
+                    message: request.messages.remove(0),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],
                     usage: TokenUsage {

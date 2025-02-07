@@ -2,12 +2,12 @@
 ///
 /// See [v0_3.rs](v0_3.rs) for a more detailed explanation on the reasoning for introducing
 /// serializable/user-facing structs in here and for not serializing our "internal" representations.
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection, search};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum CsiRequest {
     Complete(CompletionRequest),
@@ -78,7 +78,7 @@ impl CsiRequest {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Deserialize)]
 pub struct DocumentPath {
     pub namespace: String,
     pub collection: String,
@@ -100,7 +100,7 @@ impl From<DocumentPath> for search::DocumentPath {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
@@ -123,7 +123,7 @@ impl From<CompletionRequest> for inference::CompletionRequest {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct CompletionParams {
     #[serde(default)]
     pub return_special_tokens: bool,
@@ -159,7 +159,7 @@ impl From<CompletionParams> for inference::CompletionParams {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct ChunkRequest {
     pub text: String,
     pub params: ChunkParams,
@@ -175,7 +175,7 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
@@ -192,7 +192,7 @@ impl From<ChunkParams> for chunking::ChunkParams {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct SelectLanguageRequest {
     pub text: String,
     pub languages: Vec<Language>,
@@ -208,7 +208,7 @@ impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Language {
     /// English
@@ -226,11 +226,11 @@ impl From<Language> for language_selection::Language {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Deserialize)]
 pub struct ChatRequest {
     pub model: String,
-    pub messages: Vec<V0_2Message>,
-    pub params: V0_2ChatParams,
+    pub messages: Vec<Message>,
+    pub params: ChatParams,
 }
 
 impl From<ChatRequest> for inference::ChatRequest {
@@ -248,16 +248,16 @@ impl From<ChatRequest> for inference::ChatRequest {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct V0_2IndexPath {
+#[derive(Deserialize)]
+pub struct IndexPath {
     pub namespace: String,
     pub collection: String,
     pub index: String,
 }
 
-impl From<V0_2IndexPath> for search::IndexPath {
-    fn from(value: V0_2IndexPath) -> Self {
-        let V0_2IndexPath {
+impl From<IndexPath> for search::IndexPath {
+    fn from(value: IndexPath) -> Self {
+        let IndexPath {
             namespace,
             collection,
             index,
@@ -270,10 +270,10 @@ impl From<V0_2IndexPath> for search::IndexPath {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Deserialize)]
 pub struct SearchRequest {
     pub query: String,
-    pub index_path: V0_2IndexPath,
+    pub index_path: IndexPath,
     pub max_results: u32,
     pub min_score: Option<f64>,
 }
@@ -295,16 +295,16 @@ impl From<SearchRequest> for search::SearchRequest {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
-pub struct V0_2ChatParams {
+#[derive(Deserialize)]
+pub struct ChatParams {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
 }
 
-impl From<V0_2ChatParams> for inference::ChatParams {
-    fn from(value: V0_2ChatParams) -> Self {
-        let V0_2ChatParams {
+impl From<ChatParams> for inference::ChatParams {
+    fn from(value: ChatParams) -> Self {
+        let ChatParams {
             max_tokens,
             temperature,
             top_p,
@@ -313,20 +313,22 @@ impl From<V0_2ChatParams> for inference::ChatParams {
             max_tokens,
             temperature,
             top_p,
-            ..Default::default()
+            frequency_penalty: None,
+            presence_penalty: None,
+            logprobs: inference::Logprobs::No,
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct V0_2Message {
+#[derive(Deserialize)]
+pub struct Message {
     pub role: String,
     pub content: String,
 }
 
-impl From<V0_2Message> for inference::Message {
-    fn from(value: V0_2Message) -> Self {
-        let V0_2Message { role, content } = value;
+impl From<Message> for inference::Message {
+    fn from(value: Message) -> Self {
+        let Message { role, content } = value;
         Self {
             role: role.to_lowercase(),
             content,
