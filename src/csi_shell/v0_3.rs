@@ -30,10 +30,10 @@ pub enum CsiRequest {
         requests: Vec<ChatRequest>,
     },
     Documents {
-        requests: Vec<search::DocumentPath>,
+        requests: Vec<DocumentPath>,
     },
     DocumentMetadata {
-        requests: Vec<search::DocumentPath>,
+        requests: Vec<DocumentPath>,
     },
     #[serde(untagged)]
     Unknown {
@@ -68,12 +68,13 @@ impl CsiRequest {
                 .await
                 .map(|v| json!(v))?,
             CsiRequest::DocumentMetadata { requests } => drivers
-                .document_metadata(auth, requests)
+                .document_metadata(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|r| json!(r))?,
-            CsiRequest::Documents { requests } => {
-                drivers.documents(auth, requests).await.map(|r| json!(r))?
-            }
+            CsiRequest::Documents { requests } => drivers
+                .documents(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|r| json!(r))?,
             CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
                     function.unwrap_or_else(|| "specified".to_owned()),
@@ -81,6 +82,28 @@ impl CsiRequest {
             }
         };
         Ok(result)
+    }
+}
+
+#[derive(Deserialize)]
+pub struct DocumentPath {
+    pub namespace: String,
+    pub collection: String,
+    pub name: String,
+}
+
+impl From<DocumentPath> for search::DocumentPath {
+    fn from(value: DocumentPath) -> Self {
+        let DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = value;
+        search::DocumentPath {
+            namespace,
+            collection,
+            name,
+        }
     }
 }
 
