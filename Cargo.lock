@@ -3978,6 +3978,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk",
+ "rayon",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
