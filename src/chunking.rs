@@ -11,19 +11,33 @@ pub struct ChunkRequest {
 pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
+    pub overlap: u32,
 }
 
 impl ChunkRequest {
-    pub fn new(text: String, model: String, max_tokens: u32) -> Self {
+    pub fn new(text: String, model: String, max_tokens: u32, overlap: u32) -> Self {
         Self {
             text,
-            params: ChunkParams { model, max_tokens },
+            params: ChunkParams {
+                model,
+                max_tokens,
+                overlap,
+            },
         }
     }
 }
 
-pub fn chunking(text: &str, tokenizer: &tokenizers::Tokenizer, max_tokens: u32) -> Vec<String> {
-    let config = ChunkConfig::new(max_tokens as usize).with_sizer(tokenizer);
+pub fn chunking(request: &ChunkRequest, tokenizer: &tokenizers::Tokenizer) -> Vec<String> {
+    let ChunkRequest {
+        text,
+        params:
+            ChunkParams {
+                model,
+                max_tokens,
+                overlap,
+            },
+    } = request;
+    let config = ChunkConfig::new(*max_tokens as usize).with_sizer(tokenizer);
     let splitter = TextSplitter::new(config);
     splitter.chunks(text).map(str::to_owned).collect()
 }
@@ -39,10 +53,18 @@ mod tests {
         // Given some text and a tokenizer
         let text = include_str!("../tests/no_silver_bullet.txt");
         let tokenizer = pharia_1_llm_7b_control_tokenizer();
+        let max_tokens = 100;
+        let request = ChunkRequest {
+            text: text.to_owned(),
+            params: ChunkParams {
+                model: "model".to_owned(),
+                max_tokens,
+                overlap: 0,
+            },
+        };
 
         // When we chunk the text
-        let max_tokens = 100;
-        let chunks = chunking(text, &tokenizer, max_tokens);
+        let chunks = chunking(&request, &tokenizer);
         assert_eq!(chunks.len(), 5);
         assert_eq!(
             chunks[1],

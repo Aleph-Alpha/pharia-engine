@@ -117,8 +117,16 @@ impl From<ChatRequest> for inference::ChatRequest {
 
 impl From<ChunkParams> for chunking::ChunkParams {
     fn from(params: ChunkParams) -> Self {
-        let ChunkParams { model, max_tokens } = params;
-        Self { model, max_tokens }
+        let ChunkParams {
+            model,
+            max_tokens,
+            overlap,
+        } = params;
+        Self {
+            model,
+            max_tokens,
+            overlap,
+        }
     }
 }
 
