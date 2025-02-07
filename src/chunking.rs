@@ -39,7 +39,7 @@ pub async fn chunking(
     rayon::spawn(move || {
         let result = ChunkConfig::new(max_tokens as usize)
             .with_sizer(tokenizer.as_ref())
-            .with_overlap(0)
+            .with_overlap(overlap as usize)
             .map(|config| {
                 TextSplitter::new(config)
                     .chunks(&text)
@@ -86,5 +86,24 @@ mod tests {
             products. So we hear desperate cries for a silver bullet--something to make software \
             costs drop as rapidly as computer hardware costs do."
         );
+    }
+
+    #[tokio::test]
+    async fn chunking_with_overlap() {
+        // Given some text and a tokenizer
+        let request = ChunkRequest {
+            text: "123456".to_owned(),
+            params: ChunkParams {
+                model: "Pharia-1-LLM-7B-control".to_owned(),
+                max_tokens: 3,
+                overlap: 2,
+            },
+        };
+
+        // When we chunk the text
+        let chunks = chunking(request, &FakeTokenizers, "dummy".to_owned())
+            .await
+            .unwrap();
+        assert_eq!(chunks, ["12", "23", "34", "456"]);
     }
 }
