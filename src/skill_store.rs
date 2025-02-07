@@ -802,7 +802,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn should_only_cache_skills_that_have_been_fetched() {
-        given_greet_skill_v0_2();
+        let _use_me_ = given_greet_skill_v0_2();
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
         let engine = Arc::new(Engine::new(false).unwrap());
@@ -859,7 +859,7 @@ pub mod tests {
     #[tokio::test]
     async fn should_remove_invalidated_skill_from_cache() {
         // Given one cached "greet_skill"
-        given_greet_skill_v0_2();
+        let _use_me_ = given_greet_skill_v0_2();
         let greet_skill = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_loader =
@@ -953,7 +953,7 @@ pub mod tests {
     #[tokio::test]
     async fn does_not_invalidate_unchanged_digests() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
-        given_greet_skill_v0_2();
+        let _use_me_ = given_greet_skill_v0_2();
         let greet_skill = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false)?);
         let skill_loader =
@@ -1018,7 +1018,7 @@ pub mod tests {
 
     /// Creates a file registry in a tempdir with one greet skill
     fn tmp_registries_with_skill() -> anyhow::Result<(RegistryConfig, TempDir)> {
-        given_greet_skill_v0_2();
+        let _use_me_ = given_greet_skill_v0_2();
         let dir = tempfile::tempdir()?;
         fs::copy(
             "./skills/greet_skill_v0_2.wasm",

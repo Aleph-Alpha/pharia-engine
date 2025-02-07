@@ -571,7 +571,7 @@ mod tests {
 
     #[test]
     fn can_parse_module() {
-        given_greet_skill_v0_2();
+        let _use_me_ = given_greet_skill_v0_2();
         let wasm = fs::read("skills/greet_skill_v0_2.wasm").unwrap();
         let version = SupportedVersion::extract_pharia_skill_version(wasm)
             .unwrap()
