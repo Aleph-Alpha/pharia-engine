@@ -54,6 +54,7 @@ pub fn given_greet_skill_v0_2() -> TestSkill {
 }
 
 /// Creates `search_skill.wasm` in `skills` directory, based on `crates/search-skill`
+#[must_use]
 pub fn given_search_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("search-skill");
@@ -63,6 +64,7 @@ pub fn given_search_skill() -> TestSkill {
 }
 
 /// Creates `search_skill.wasm` in `skills` directory, based on `crates/search-skill`
+#[must_use]
 pub fn given_doc_metadata_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("doc-metadata-skill");
@@ -72,6 +74,7 @@ pub fn given_doc_metadata_skill() -> TestSkill {
 }
 
 /// Creates `chat_skill.wasm` in `skills` directory, based on `crates/chat-skill`
+#[must_use]
 pub fn given_chat_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_rust_skill("chat-skill");
@@ -80,6 +83,7 @@ pub fn given_chat_skill() -> TestSkill {
     TestSkill::rust_skill("chat-skill")
 }
 
+#[must_use]
 pub fn given_greet_py_v0_2() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
         given_python_skill("greet-py-v0_2", "0.2");
@@ -88,12 +92,14 @@ pub fn given_greet_py_v0_2() -> TestSkill {
     TestSkill::python_skill("greet-py-v0_2")
 }
 
+#[must_use]
 pub fn given_invalid_output_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| given_rust_skill("invalid-output-skill"));
     *WASM_BUILD;
     TestSkill::rust_skill("invalid-output-skill")
 }
 
+#[must_use]
 pub fn given_csi_from_metadata_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| given_rust_skill("csi-from-metadata"));
     *WASM_BUILD;
