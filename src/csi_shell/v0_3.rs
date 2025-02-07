@@ -12,7 +12,7 @@ use crate::{
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
-pub enum V0_3CsiRequest {
+pub enum CsiRequest {
     Chunk {
         requests: Vec<ChunkRequest>,
     },
@@ -40,36 +40,36 @@ pub enum V0_3CsiRequest {
     },
 }
 
-impl V0_3CsiRequest {
+impl CsiRequest {
     pub async fn act<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
     where
         C: Csi + Sync,
     {
         let result = match self {
-            V0_3CsiRequest::Chunk { requests } => {
+            CsiRequest::Chunk { requests } => {
                 drivers.chunk(auth, requests).await.map(|r| json!(r))?
             }
-            V0_3CsiRequest::SelectLanguage { requests } => {
+            CsiRequest::SelectLanguage { requests } => {
                 drivers.select_language(requests).await.map(|r| json!(r))?
             }
-            V0_3CsiRequest::Complete { requests } => drivers
+            CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|v| json!(v))?,
-            V0_3CsiRequest::Search { requests } => {
+            CsiRequest::Search { requests } => {
                 drivers.search(auth, requests).await.map(|v| json!(v))?
             }
-            V0_3CsiRequest::Chat { requests } => {
+            CsiRequest::Chat { requests } => {
                 drivers.chat(auth, requests).await.map(|v| json!(v))?
             }
-            V0_3CsiRequest::DocumentMetadata { requests } => drivers
+            CsiRequest::DocumentMetadata { requests } => drivers
                 .document_metadata(auth, requests)
                 .await
                 .map(|r| json!(r))?,
-            V0_3CsiRequest::Documents { requests } => {
+            CsiRequest::Documents { requests } => {
                 drivers.documents(auth, requests).await.map(|r| json!(r))?
             }
-            V0_3CsiRequest::Unknown { function } => {
+            CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
                     function.unwrap_or_else(|| "specified".to_owned()),
                 ));
@@ -132,7 +132,7 @@ mod tests {
 
         // Then it should be deserialized successfully
         assert!(
-            matches!(result, Ok(VersionedCsiRequest::V0_3(V0_3CsiRequest::Documents { requests })) if requests.len() == 1)
+            matches!(result, Ok(VersionedCsiRequest::V0_3(CsiRequest::Documents { requests })) if requests.len() == 1)
         );
     }
 
@@ -162,7 +162,7 @@ mod tests {
 
         // Then it should be deserialized successfully
         assert!(
-            matches!(result, Ok(VersionedCsiRequest::V0_3(V0_3CsiRequest::DocumentMetadata { requests })) if requests.len() == 2)
+            matches!(result, Ok(VersionedCsiRequest::V0_3(CsiRequest::DocumentMetadata { requests })) if requests.len() == 2)
         );
     }
 }
