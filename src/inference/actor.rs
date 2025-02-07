@@ -94,7 +94,7 @@ impl InferenceApi {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct CompletionParams {
     pub return_special_tokens: bool,
     pub max_tokens: Option<u32>,
@@ -107,7 +107,7 @@ pub struct CompletionParams {
     pub logprobs: Logprobs,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
@@ -146,7 +146,7 @@ pub struct ChatRequest {
     pub params: ChatParams,
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, Default, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Logprobs {
     /// Do not return any logprobs
@@ -276,7 +276,6 @@ impl<C: InferenceClient> InferenceActor<C> {
     }
 }
 
-#[derive(Debug)]
 pub enum InferenceMessage {
     CompleteText {
         request: CompletionRequest,
@@ -427,7 +426,7 @@ pub mod tests {
         let request = CompletionRequest {
             prompt: "dummy_prompt".to_owned(),
             model: "dummy_model".to_owned(),
-            ..Default::default()
+            params: CompletionParams::default(),
         };
 
         // when
