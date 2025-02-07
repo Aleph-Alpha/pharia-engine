@@ -57,7 +57,7 @@ impl TestKernel {
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn run_skill() {
-    given_greet_skill_v0_2();
+    let _use_me_ = given_greet_skill_v0_2();
     let kernel = TestKernel::with_skills(&["greet_skill_v0_2"]).await;
 
     let api_token = api_token();
