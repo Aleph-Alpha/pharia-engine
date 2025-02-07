@@ -574,10 +574,8 @@ mod tests {
     use crate::{
         authorization::{self, tests::StubAuthorization},
         csi::tests::{DummyCsi, StubCsi},
+        csi_shell::tests::{V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest},
         csi_shell::VersionedCsiRequest,
-        csi_shell::tests::{
-            V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest
-        },
         inference::{self, Completion},
         skill_runtime::{
             SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg,

@@ -267,3 +267,62 @@ impl From<V0_2Message> for Message {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use serde_json::json;
+
+    use super::*;
+    pub use crate::csi_shell::VersionedCsiRequest;
+
+    #[test]
+    fn csi_v_2_request_is_deserialized() {
+        // Given a request in JSON format
+        let request = json!({
+            "version": "0.2",
+            "function": "complete",
+            "prompt": "Hello",
+            "model": "pharia-1-llm-7b-control",
+            "params": {
+                "max_tokens": 128,
+                "temperature": null,
+                "top_k": null,
+                "top_p": null,
+                "stop": []
+            }
+        });
+
+        // When it is deserialized into a `VersionedCsiRequest`
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        // Then it should be deserialized successfully
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn csi_v_2_metadata_request_is_deserialized() {
+        // Given a request in JSON format
+        let request = json!({
+            "version": "0.2",
+            "function": "document_metadata",
+            "document_path": {
+                "namespace": "Kernel",
+                "collection": "test",
+                "name": "kernel/docs"
+            }
+        });
+
+        // When it is deserialized into a `VersionedCsiRequest`
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        // Then it should be deserialized successfully
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::DocumentMetadata(
+                _
+            )))
+        ));
+    }
+}
