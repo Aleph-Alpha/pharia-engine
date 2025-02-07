@@ -1,75 +1,70 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::{
-    chunking::{ChunkParams, ChunkRequest},
-    csi::Csi,
-    csi_shell::CsiShellError,
-    inference::{ChatParams, ChatRequest, CompletionParams, CompletionRequest, Logprobs, Message},
-    language_selection::{Language, SelectLanguageRequest},
-    search::{DocumentPath, IndexPath, SearchRequest},
-};
+use crate::{chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection, search};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
-pub enum V0_2CsiRequest {
-    Complete(V0_2CompletionRequest),
-    Chunk(V0_2ChunkRequest),
-    SelectLanguage(V0_2SelectLanguageRequest),
+pub enum CsiRequest {
+    Complete(CompletionRequest),
+    Chunk(ChunkRequest),
+    SelectLanguage(SelectLanguageRequest),
     CompleteAll {
-        requests: Vec<V0_2CompletionRequest>,
+        requests: Vec<CompletionRequest>,
     },
-    Search(V0_2SearchRequest),
-    Chat(V0_2ChatRequest),
+    Search(SearchRequest),
+    Chat(ChatRequest),
     Documents {
-        requests: Vec<V0_2DocumentPath>,
+        requests: Vec<DocumentPath>,
     },
-    DocumentMetadata(DocumentMetadataRequest),
+    DocumentMetadata {
+        document_path: DocumentPath,
+    },
     #[serde(untagged)]
     Unknown {
         function: Option<String>,
     },
 }
 
-impl V0_2CsiRequest {
+impl CsiRequest {
     pub async fn act<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
     where
         C: Csi + Sync,
     {
         let result = match self {
-            V0_2CsiRequest::Complete(completion_request) => drivers
+            CsiRequest::Complete(completion_request) => drivers
                 .complete(auth, vec![completion_request.into()])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
-            V0_2CsiRequest::Chunk(chunk_request) => drivers
+            CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
-            V0_2CsiRequest::SelectLanguage(select_language_request) => drivers
+            CsiRequest::SelectLanguage(select_language_request) => drivers
                 .select_language(vec![select_language_request.into()])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
-            V0_2CsiRequest::CompleteAll { requests } => drivers
+            CsiRequest::CompleteAll { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|v| json!(v))?,
-            V0_2CsiRequest::Search(search_request) => drivers
+            CsiRequest::Search(search_request) => drivers
                 .search(auth, vec![search_request.into()])
                 .await
                 .map(|v| json!(v.first().unwrap()))?,
-            V0_2CsiRequest::Chat(chat_request) => drivers
+            CsiRequest::Chat(chat_request) => drivers
                 .chat(auth, vec![chat_request.into()])
                 .await
                 .map(|v| json!(v.first().unwrap()))?,
-            V0_2CsiRequest::Documents { requests } => drivers
+            CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|r| json!(r))?,
-            V0_2CsiRequest::DocumentMetadata(document_metadata_request) => drivers
-                .document_metadata(auth, vec![document_metadata_request.document_path.into()])
+            CsiRequest::DocumentMetadata { document_path } => drivers
+                .document_metadata(auth, vec![document_path.into()])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
-            V0_2CsiRequest::Unknown { function } => {
+            CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
                     function.unwrap_or_else(|| "specified".to_owned()),
                 ));
@@ -80,15 +75,15 @@ impl V0_2CsiRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct V0_2DocumentPath {
+pub struct DocumentPath {
     pub namespace: String,
     pub collection: String,
     pub name: String,
 }
 
-impl From<V0_2DocumentPath> for DocumentPath {
-    fn from(value: V0_2DocumentPath) -> Self {
-        let V0_2DocumentPath {
+impl From<DocumentPath> for search::DocumentPath {
+    fn from(value: DocumentPath) -> Self {
+        let DocumentPath {
             namespace,
             collection,
             name,
@@ -101,27 +96,20 @@ impl From<V0_2DocumentPath> for DocumentPath {
     }
 }
 
-/// Retrieve the metadata of a document
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DocumentMetadataRequest {
-    /// Which Document
-    pub document_path: V0_2DocumentPath,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct V0_2CompletionRequest {
+pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
-    pub params: V0_2CompletionParams,
+    pub params: CompletionParams,
 }
 
-impl From<V0_2CompletionRequest> for CompletionRequest {
+impl From<CompletionRequest> for inference::CompletionRequest {
     fn from(
-        V0_2CompletionRequest {
+        CompletionRequest {
             prompt,
             model,
             params,
-        }: V0_2CompletionRequest,
+        }: CompletionRequest,
     ) -> Self {
         Self {
             prompt,
@@ -132,7 +120,7 @@ impl From<V0_2CompletionRequest> for CompletionRequest {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct V0_2CompletionParams {
+pub struct CompletionParams {
     #[serde(default)]
     pub return_special_tokens: bool,
     pub max_tokens: Option<u32>,
@@ -142,16 +130,16 @@ pub struct V0_2CompletionParams {
     pub stop: Vec<String>,
 }
 
-impl From<V0_2CompletionParams> for CompletionParams {
+impl From<CompletionParams> for inference::CompletionParams {
     fn from(
-        V0_2CompletionParams {
+        CompletionParams {
             return_special_tokens,
             max_tokens,
             temperature,
             top_k,
             top_p,
             stop,
-        }: V0_2CompletionParams,
+        }: CompletionParams,
     ) -> Self {
         Self {
             return_special_tokens,
@@ -162,20 +150,20 @@ impl From<V0_2CompletionParams> for CompletionParams {
             stop,
             frequency_penalty: None,
             presence_penalty: None,
-            logprobs: Logprobs::No,
+            logprobs: inference::Logprobs::No,
         }
     }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct V0_2ChunkRequest {
+pub struct ChunkRequest {
     pub text: String,
-    pub params: V0_2ChunkParams,
+    pub params: ChunkParams,
 }
 
-impl From<V0_2ChunkRequest> for ChunkRequest {
-    fn from(value: V0_2ChunkRequest) -> Self {
-        let V0_2ChunkRequest { text, params } = value;
+impl From<ChunkRequest> for chunking::ChunkRequest {
+    fn from(value: ChunkRequest) -> Self {
+        let ChunkRequest { text, params } = value;
         Self {
             text,
             params: params.into(),
@@ -184,14 +172,14 @@ impl From<V0_2ChunkRequest> for ChunkRequest {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct V0_2ChunkParams {
+pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
 }
 
-impl From<V0_2ChunkParams> for ChunkParams {
-    fn from(value: V0_2ChunkParams) -> Self {
-        let V0_2ChunkParams { model, max_tokens } = value;
+impl From<ChunkParams> for chunking::ChunkParams {
+    fn from(value: ChunkParams) -> Self {
+        let ChunkParams { model, max_tokens } = value;
         Self {
             model,
             max_tokens,
@@ -201,14 +189,14 @@ impl From<V0_2ChunkParams> for ChunkParams {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct V0_2SelectLanguageRequest {
+pub struct SelectLanguageRequest {
     pub text: String,
     pub languages: Vec<V0_2Language>,
 }
 
-impl From<V0_2SelectLanguageRequest> for SelectLanguageRequest {
-    fn from(value: V0_2SelectLanguageRequest) -> Self {
-        let V0_2SelectLanguageRequest { text, languages } = value;
+impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
+    fn from(value: SelectLanguageRequest) -> Self {
+        let SelectLanguageRequest { text, languages } = value;
         Self {
             text,
             languages: languages.into_iter().map(Into::into).collect(),
@@ -225,7 +213,7 @@ pub enum V0_2Language {
     Deu,
 }
 
-impl From<V0_2Language> for Language {
+impl From<V0_2Language> for language_selection::Language {
     fn from(value: V0_2Language) -> Self {
         match value {
             V0_2Language::Eng => Self::Eng,
@@ -235,15 +223,15 @@ impl From<V0_2Language> for Language {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct V0_2ChatRequest {
+pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<V0_2Message>,
     pub params: V0_2ChatParams,
 }
 
-impl From<V0_2ChatRequest> for ChatRequest {
-    fn from(value: V0_2ChatRequest) -> Self {
-        let V0_2ChatRequest {
+impl From<ChatRequest> for inference::ChatRequest {
+    fn from(value: ChatRequest) -> Self {
+        let ChatRequest {
             model,
             messages,
             params,
@@ -263,7 +251,7 @@ pub struct V0_2IndexPath {
     pub index: String,
 }
 
-impl From<V0_2IndexPath> for IndexPath {
+impl From<V0_2IndexPath> for search::IndexPath {
     fn from(value: V0_2IndexPath) -> Self {
         let V0_2IndexPath {
             namespace,
@@ -279,16 +267,16 @@ impl From<V0_2IndexPath> for IndexPath {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct V0_2SearchRequest {
+pub struct SearchRequest {
     pub query: String,
     pub index_path: V0_2IndexPath,
     pub max_results: u32,
     pub min_score: Option<f64>,
 }
 
-impl From<V0_2SearchRequest> for SearchRequest {
-    fn from(value: V0_2SearchRequest) -> Self {
-        let V0_2SearchRequest {
+impl From<SearchRequest> for search::SearchRequest {
+    fn from(value: SearchRequest) -> Self {
+        let SearchRequest {
             query,
             index_path,
             max_results,
@@ -310,7 +298,7 @@ pub struct V0_2ChatParams {
     pub top_p: Option<f64>,
 }
 
-impl From<V0_2ChatParams> for ChatParams {
+impl From<V0_2ChatParams> for inference::ChatParams {
     fn from(value: V0_2ChatParams) -> Self {
         let V0_2ChatParams {
             max_tokens,
@@ -332,7 +320,7 @@ pub struct V0_2Message {
     pub content: String,
 }
 
-impl From<V0_2Message> for Message {
+impl From<V0_2Message> for inference::Message {
     fn from(value: V0_2Message) -> Self {
         let V0_2Message { role, content } = value;
         Self {
@@ -391,7 +379,7 @@ pub mod tests {
 
         assert!(matches!(
             result,
-            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Chunk(chunk_request))) if chunk_request.text == "Hello"
+            Ok(VersionedCsiRequest::V0_2(CsiRequest::Chunk(chunk_request))) if chunk_request.text == "Hello"
         ));
     }
 
@@ -409,7 +397,7 @@ pub mod tests {
 
         assert!(matches!(
             result,
-            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::SelectLanguage(select_language_request))) if select_language_request.text == "Hello"
+            Ok(VersionedCsiRequest::V0_2(CsiRequest::SelectLanguage(select_language_request))) if select_language_request.text == "Hello"
         ));
     }
 
@@ -452,7 +440,7 @@ pub mod tests {
         // Then it should be deserialized successfully
         assert!(matches!(
             result,
-            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::CompleteAll { requests })) if requests.len() == 2
+            Ok(VersionedCsiRequest::V0_2(CsiRequest::CompleteAll { requests })) if requests.len() == 2
         ));
     }
 
@@ -476,7 +464,7 @@ pub mod tests {
 
         assert!(matches!(
             result,
-            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Search(search_request))) if search_request.query == "Hello"
+            Ok(VersionedCsiRequest::V0_2(CsiRequest::Search(search_request))) if search_request.query == "Hello"
         ));
     }
 
@@ -504,7 +492,7 @@ pub mod tests {
 
         assert!(matches!(
             result,
-            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Chat(chat_request))) if chat_request.model == "pharia-1-llm-7b-control"
+            Ok(VersionedCsiRequest::V0_2(CsiRequest::Chat(chat_request))) if chat_request.model == "pharia-1-llm-7b-control"
         ));
     }
 
@@ -532,7 +520,7 @@ pub mod tests {
 
         assert!(matches!(
             result,
-            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Documents { requests })) if requests.len() == 2
+            Ok(VersionedCsiRequest::V0_2(CsiRequest::Documents { requests })) if requests.len() == 2
         ));
     }
 
@@ -556,9 +544,7 @@ pub mod tests {
         // Then it should be deserialized successfully
         assert!(matches!(
             result,
-            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::DocumentMetadata(
-                _
-            )))
+            Ok(VersionedCsiRequest::V0_2(CsiRequest::DocumentMetadata { document_path })) if document_path.namespace == "Kernel" && document_path.collection == "test" && document_path.name == "kernel/docs"
         ));
     }
 
@@ -574,7 +560,7 @@ pub mod tests {
 
         assert!(matches!(
             result,
-            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Unknown { function: Some(function) })) if function == "not-implemented"
+            Ok(VersionedCsiRequest::V0_2(CsiRequest::Unknown { function: Some(function) })) if function == "not-implemented"
         ));
     }
 }

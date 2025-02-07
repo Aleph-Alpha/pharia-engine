@@ -574,8 +574,6 @@ mod tests {
     use crate::{
         authorization::{self, tests::StubAuthorization},
         csi::tests::{DummyCsi, StubCsi},
-        csi_shell::tests::{V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest},
-        csi_shell::VersionedCsiRequest,
         inference::{self, Completion},
         skill_runtime::{
             SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg,
@@ -702,12 +700,19 @@ mod tests {
     async fn http_csi_handle_returns_completion() {
         // Given a versioned csi request
         let prompt = "Say hello to Homer";
-        let completion_request = V0_2CompletionRequest {
-            model: "pharia-1-llm-7b-control".to_owned(),
-            prompt: prompt.to_owned(),
-            params: V0_2CompletionParams::default(),
-        };
-        let request = VersionedCsiRequest::V0_2(V0_2CsiRequest::Complete(completion_request));
+        let body = json!({
+            "version": "0.2",
+            "function": "complete",
+            "model": "pharia-1-llm-7b-control",
+            "prompt": prompt,
+            "params": {
+                "max_tokens": 1,
+                "temperature": null,
+                "top_k": null,
+                "top_p": null,
+                "stop": [],
+            },
+        });
 
         // When
         let api_token = "dummy auth token";
@@ -724,7 +729,7 @@ mod tests {
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(header::AUTHORIZATION, auth_value)
                     .uri("/csi")
-                    .body(Body::from(serde_json::to_string(&request).unwrap()))
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
             )
             .await
