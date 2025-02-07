@@ -1,3 +1,7 @@
+/// Expose the CSI (Cognitive System Interface which is offered to skills) via HTTP.
+///
+/// This allows users to test and debug Skills on their machine while still having access
+/// to the full functionality the Kernel offers as a runtime environment.
 mod v0_2;
 mod v0_3;
 
