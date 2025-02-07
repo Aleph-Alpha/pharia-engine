@@ -27,7 +27,6 @@ pub trait SearchClient: Send + Sync + 'static {
 }
 
 /// Search a Document Index collection
-#[derive(Debug)]
 pub struct SearchRequest {
     /// What you want to search for
     query: Vec<Modality>,
@@ -57,7 +56,7 @@ impl SearchRequest {
 }
 
 /// Which documents you want to search in, and which type of index should be used
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct IndexPath {
     /// The namespace the collection belongs to
     pub namespace: String,

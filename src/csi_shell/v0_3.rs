@@ -24,7 +24,7 @@ pub enum CsiRequest {
         requests: Vec<CompletionRequest>,
     },
     Search {
-        requests: Vec<search::SearchRequest>,
+        requests: Vec<SearchRequest>,
     },
     Chat {
         requests: Vec<inference::ChatRequest>,
@@ -59,9 +59,10 @@ impl CsiRequest {
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|v| json!(v))?,
-            CsiRequest::Search { requests } => {
-                drivers.search(auth, requests).await.map(|v| json!(v))?
-            }
+            CsiRequest::Search { requests } => drivers
+                .search(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|v| json!(v))?,
             CsiRequest::Chat { requests } => {
                 drivers.chat(auth, requests).await.map(|v| json!(v))?
             }
@@ -79,6 +80,53 @@ impl CsiRequest {
             }
         };
         Ok(result)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct IndexPath {
+    pub namespace: String,
+    pub collection: String,
+    pub index: String,
+}
+
+impl From<IndexPath> for search::IndexPath {
+    fn from(value: IndexPath) -> Self {
+        let IndexPath {
+            namespace,
+            collection,
+            index,
+        } = value;
+        search::IndexPath {
+            namespace,
+            collection,
+            index,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SearchRequest {
+    pub query: String,
+    pub index_path: IndexPath,
+    pub max_results: u32,
+    pub min_score: Option<f64>,
+}
+
+impl From<SearchRequest> for search::SearchRequest {
+    fn from(value: SearchRequest) -> Self {
+        let SearchRequest {
+            query,
+            index_path,
+            max_results,
+            min_score,
+        } = value;
+        search::SearchRequest {
+            query,
+            index_path: index_path.into(),
+            max_results,
+            min_score,
+        }
     }
 }
 

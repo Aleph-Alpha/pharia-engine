@@ -2,7 +2,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::value::Value;
 use tokio::{
     select,
@@ -135,7 +135,7 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
 }
 
 /// Search a Document Index collection
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct SearchRequest {
     /// Where you want to search in
     pub index_path: IndexPath,
