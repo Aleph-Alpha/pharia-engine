@@ -7,7 +7,7 @@ use crate::{
     csi_shell::CsiShellError,
     inference::{ChatParams, ChatRequest, CompletionParams, CompletionRequest, Logprobs, Message},
     language_selection::{Language, SelectLanguageRequest},
-    search::{DocumentPath, SearchRequest},
+    search::{DocumentPath, IndexPath, SearchRequest},
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -19,10 +19,10 @@ pub enum V0_2CsiRequest {
     CompleteAll {
         requests: Vec<V0_2CompletionRequest>,
     },
-    Search(SearchRequest),
+    Search(V0_2SearchRequest),
     Chat(V0_2ChatRequest),
     Documents {
-        requests: Vec<DocumentPath>,
+        requests: Vec<V0_2DocumentPath>,
     },
     DocumentMetadata(DocumentMetadataRequest),
     #[serde(untagged)]
@@ -54,18 +54,19 @@ impl V0_2CsiRequest {
                 .await
                 .map(|v| json!(v))?,
             V0_2CsiRequest::Search(search_request) => drivers
-                .search(auth, vec![search_request])
+                .search(auth, vec![search_request.into()])
                 .await
                 .map(|v| json!(v.first().unwrap()))?,
             V0_2CsiRequest::Chat(chat_request) => drivers
                 .chat(auth, vec![chat_request.into()])
                 .await
                 .map(|v| json!(v.first().unwrap()))?,
-            V0_2CsiRequest::Documents { requests } => {
-                drivers.documents(auth, requests).await.map(|r| json!(r))?
-            }
+            V0_2CsiRequest::Documents { requests } => drivers
+                .documents(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|r| json!(r))?,
             V0_2CsiRequest::DocumentMetadata(document_metadata_request) => drivers
-                .document_metadata(auth, vec![document_metadata_request.document_path])
+                .document_metadata(auth, vec![document_metadata_request.document_path.into()])
                 .await
                 .map(|r| json!(r.first().unwrap()))?,
             V0_2CsiRequest::Unknown { function } => {
@@ -78,11 +79,33 @@ impl V0_2CsiRequest {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct V0_2DocumentPath {
+    pub namespace: String,
+    pub collection: String,
+    pub name: String,
+}
+
+impl From<V0_2DocumentPath> for DocumentPath {
+    fn from(value: V0_2DocumentPath) -> Self {
+        let V0_2DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = value;
+        Self {
+            namespace,
+            collection,
+            name,
+        }
+    }
+}
+
 /// Retrieve the metadata of a document
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DocumentMetadataRequest {
     /// Which Document
-    pub document_path: DocumentPath,
+    pub document_path: V0_2DocumentPath,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -229,6 +252,53 @@ impl From<V0_2ChatRequest> for ChatRequest {
             model,
             messages: messages.into_iter().map(Into::into).collect(),
             params: params.into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct V0_2IndexPath {
+    pub namespace: String,
+    pub collection: String,
+    pub index: String,
+}
+
+impl From<V0_2IndexPath> for IndexPath {
+    fn from(value: V0_2IndexPath) -> Self {
+        let V0_2IndexPath {
+            namespace,
+            collection,
+            index,
+        } = value;
+        Self {
+            namespace,
+            collection,
+            index,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct V0_2SearchRequest {
+    pub query: String,
+    pub index_path: V0_2IndexPath,
+    pub max_results: u32,
+    pub min_score: Option<f64>,
+}
+
+impl From<V0_2SearchRequest> for SearchRequest {
+    fn from(value: V0_2SearchRequest) -> Self {
+        let V0_2SearchRequest {
+            query,
+            index_path,
+            max_results,
+            min_score,
+        } = value;
+        Self {
+            query,
+            index_path: index_path.into(),
+            max_results,
+            min_score,
         }
     }
 }
