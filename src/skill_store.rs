@@ -770,12 +770,12 @@ pub mod tests {
     #[tokio::test]
     async fn cached_skill_removed() {
         // Given one cached skill
-        given_greet_skill_v0_2();
-        let skill_path = SkillPath::local("greet_skill_v0_2");
-        let configured_skill = ConfiguredSkill::from_path(&skill_path);
+        let test_skills = given_greet_skill_v0_2();
+        let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
-        let (skill, digest) = provider.skill_loader.fetch(configured_skill).await.unwrap();
+        let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
+        let digest = Digest("dummy".to_owned());
+        let skill = Skill::new(&engine, test_skills.bytes()).unwrap();
         provider.insert(skill_path.clone(), Arc::new(skill), digest);
 
         // When we remove the skill
