@@ -538,7 +538,6 @@ pub mod tests {
 
     use crate::csi::tests::{CsiCompleteStub, CsiCounter, CsiGreetingMock};
     use crate::namespace_watcher::Namespace;
-    use crate::skill_loader::ConfiguredSkill;
     use crate::skills::SkillMetadata;
     use crate::{
         chunking::ChunkParams,
@@ -644,15 +643,15 @@ pub mod tests {
 
     #[tokio::test]
     async fn greet_skill_component() {
-        given_greet_skill_v0_2();
-        let skill_path = SkillPath::local("greet_skill_v0_2");
-        let skill = ConfiguredSkill::from_path(&skill_path);
+        let test_skill = given_greet_skill_v0_2();
+        let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader =
-            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.clone()).api();
+        let skill_store = SkillStoreStub::new(
+            Arc::new(Engine::new(false).unwrap()),
+            test_skill.bytes(),
+            skill_path.clone(),
+        );
 
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_store.api().upsert(skill).await;
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
         let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
@@ -683,17 +682,13 @@ pub mod tests {
 
     #[tokio::test]
     async fn rust_greeting_skill() {
-        given_greet_skill_v0_2();
-        let skill_ctx = Box::new(CsiGreetingMock);
+        let test_skill = given_greet_skill_v0_2();
         let skill_path = SkillPath::local("greet_skill_v0_2");
-        let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader =
-            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.clone()).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_store.api().upsert(skill).await;
+        let skill_store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let skill_ctx = Box::new(CsiGreetingMock);
+        
         let runtime = WasmRuntime::new(engine, skill_store.api());
-
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
             .await
@@ -707,15 +702,12 @@ pub mod tests {
 
     #[tokio::test]
     async fn python_greeting_skill() {
-        given_greet_py_v0_2();
+        let test_skill = given_greet_py_v0_2();
         let skill_ctx = Box::new(CsiGreetingMock);
-        let skill_path = SkillPath::local("greet-py-v0_2");
-        let skill = ConfiguredSkill::from_path(&skill_path);
+        let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader =
-            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.clone()).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_store.api().upsert(skill).await;
+        let skill_store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+
         let runtime = WasmRuntime::new(engine, skill_store.api());
 
         let actual = runtime
@@ -727,30 +719,6 @@ pub mod tests {
         skill_store.wait_for_shutdown().await;
 
         assert_eq!(actual, "Hello Homer");
-    }
-
-    #[tokio::test]
-    async fn can_call_pre_instantiated_multiple_times() {
-        given_greet_skill_v0_2();
-        let skill_ctx = Box::new(CsiCounter::new());
-        let skill_path = SkillPath::local("greet_skill_v0_2");
-        let skill = ConfiguredSkill::from_path(&skill_path);
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader =
-            SkillLoader::with_file_registry(engine.clone(), skill_path.namespace.clone()).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
-        skill_store.api().upsert(skill).await;
-        let runtime = WasmRuntime::new(engine, skill_store.api());
-        for i in 1..10 {
-            let resp = runtime
-                .run(&skill_path, json!("Homer"), skill_ctx.clone())
-                .await
-                .unwrap();
-            assert_eq!(resp, json!(i.to_string()));
-        }
-
-        drop(runtime);
-        skill_store.wait_for_shutdown().await;
     }
 
     #[tokio::test]

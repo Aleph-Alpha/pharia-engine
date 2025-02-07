@@ -657,6 +657,7 @@ pub mod tests {
         }
     }
     /// Asserts a specific prompt and model and returns a greeting message
+    #[derive(Clone)]
     pub struct CsiGreetingMock;
 
     impl CsiGreetingMock {
