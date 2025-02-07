@@ -6,8 +6,7 @@ use pharia::skill::csi::{
 use wasmtime::component::bindgen;
 
 use crate::{
-    chunking::ChunkRequest,
-    inference,
+    chunking, inference,
     language_selection::{self, SelectLanguageRequest},
     search::{self, SearchRequest},
 };
@@ -79,8 +78,10 @@ impl Host for LinkedCtx {
     }
 
     async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
-        let ChunkParams { model, max_tokens } = params;
-        let request = ChunkRequest::new(text, model, max_tokens, 0);
+        let request = chunking::ChunkRequest {
+            text,
+            params: params.into(),
+        };
         self.skill_ctx.chunk(vec![request]).await.remove(0)
     }
 
@@ -149,6 +150,17 @@ impl Host for LinkedCtx {
             .map(|value| {
                 serde_json::to_vec(&value).expect("Value should have valid to_bytes repr.")
             })
+    }
+}
+
+impl From<ChunkParams> for chunking::ChunkParams {
+    fn from(value: ChunkParams) -> Self {
+        let ChunkParams { model, max_tokens } = value;
+        Self {
+            model,
+            max_tokens,
+            overlap: 0,
+        }
     }
 }
 
@@ -397,6 +409,31 @@ mod tests {
     use std::vec;
 
     use super::*;
+
+    #[test]
+    fn forward_chunk_params() {
+        // Given
+        let model = "model";
+        let max_tokens = 10;
+
+        let source = ChunkParams {
+            model: model.to_owned(),
+            max_tokens,
+        };
+
+        // When
+        let result: chunking::ChunkParams = source.into();
+
+        // Then
+        assert_eq!(
+            result,
+            chunking::ChunkParams {
+                model: model.to_owned(),
+                max_tokens,
+                overlap: 0,
+            }
+        );
+    }
 
     #[test]
     fn forward_chat_params() {
