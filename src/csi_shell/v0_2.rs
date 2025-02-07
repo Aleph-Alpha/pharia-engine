@@ -191,7 +191,7 @@ impl From<ChunkParams> for chunking::ChunkParams {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SelectLanguageRequest {
     pub text: String,
-    pub languages: Vec<V0_2Language>,
+    pub languages: Vec<Language>,
 }
 
 impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
@@ -206,18 +206,18 @@ impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum V0_2Language {
+pub enum Language {
     /// English
     Eng,
     /// German
     Deu,
 }
 
-impl From<V0_2Language> for language_selection::Language {
-    fn from(value: V0_2Language) -> Self {
+impl From<Language> for language_selection::Language {
+    fn from(value: Language) -> Self {
         match value {
-            V0_2Language::Eng => Self::Eng,
-            V0_2Language::Deu => Self::Deu,
+            Language::Eng => Self::Eng,
+            Language::Deu => Self::Deu,
         }
     }
 }

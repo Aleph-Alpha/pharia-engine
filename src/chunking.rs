@@ -1,16 +1,15 @@
-use serde::{Deserialize, Serialize};
 use text_splitter::{ChunkConfig, TextSplitter};
 use tokio::sync::oneshot;
 
 use crate::tokenizers::TokenizerApi;
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ChunkRequest {
     pub text: String,
     pub params: ChunkParams,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
