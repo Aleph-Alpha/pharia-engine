@@ -193,6 +193,9 @@ interface csi {
         model: string,
         /// The maximum number of tokens that should be returned per chunk.
         max-tokens: u32,
+        /// The amount of allowed overlap between chunks.
+        /// overlap must be less than max-tokens.
+        overlap: u32,
     }
 
     // @since(version = 0.3.0)

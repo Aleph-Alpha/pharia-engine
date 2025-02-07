@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tracing::trace;
 
 use crate::{
-    chunking::{self, ChunkParams, ChunkRequest},
+    chunking::{self, ChunkRequest},
     inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, InferenceApi},
     language_selection::{select_language, Language, SelectLanguageRequest},
     search::{
@@ -181,21 +181,17 @@ where
 
         let auth = &auth;
         try_join_all(requests.into_iter().map(|request| async move {
-            let ChunkRequest {
-                text,
-                params: ChunkParams { model, max_tokens },
-            } = request;
-            let text_len = text.len();
+            let text_len = request.text.len();
+            let max_tokens = request.params.max_tokens;
 
             let tokenizer = self
                 .tokenizers
-                .tokenizer_by_model(auth.clone(), model)
+                .tokenizer_by_model(auth.clone(), request.params.model.clone())
                 .await?;
             // Push into the blocking thread pool because this can be expensive for long documents
-            let chunks = tokio::task::spawn_blocking(move || {
-                chunking::chunking(&text, &tokenizer, max_tokens)
-            })
-            .await?;
+            let chunks =
+                tokio::task::spawn_blocking(move || chunking::chunking(&request, &tokenizer))
+                    .await?;
 
             trace!(
                 "chunk: text_len={} max_tokens={} -> chunks.len()={}",
@@ -278,6 +274,7 @@ pub mod tests {
     use serde_json::json;
 
     use crate::{
+        chunking::ChunkParams,
         inference::{tests::InferenceStub, ChatParams, CompletionParams, Message, TokenUsage},
         search::tests::SearchStub,
         tests::api_token,
@@ -321,7 +318,11 @@ pub mod tests {
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
-            params: ChunkParams { model, max_tokens },
+            params: ChunkParams {
+                model,
+                max_tokens,
+                overlap: 0,
+            },
         };
         let chunks = csi_apis
             .chunk("dummy_token".to_owned(), vec![request])

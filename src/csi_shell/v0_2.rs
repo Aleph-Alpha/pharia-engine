@@ -169,7 +169,11 @@ pub struct V0_2ChunkParams {
 impl From<V0_2ChunkParams> for ChunkParams {
     fn from(value: V0_2ChunkParams) -> Self {
         let V0_2ChunkParams { model, max_tokens } = value;
-        Self { model, max_tokens }
+        Self {
+            model,
+            max_tokens,
+            overlap: 0,
+        }
     }
 }
 

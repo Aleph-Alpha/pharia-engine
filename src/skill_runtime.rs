@@ -764,7 +764,11 @@ pub mod tests {
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
-            params: ChunkParams { model, max_tokens },
+            params: ChunkParams {
+                model,
+                max_tokens,
+                overlap: 0,
+            },
         };
         let chunks = invocation_ctx.chunk(vec![request]).await;
 
@@ -785,7 +789,11 @@ pub mod tests {
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
-            params: ChunkParams { model, max_tokens },
+            params: ChunkParams {
+                model,
+                max_tokens,
+                overlap: 0,
+            },
         };
         let error = select! {
             error = recv => error.unwrap(),

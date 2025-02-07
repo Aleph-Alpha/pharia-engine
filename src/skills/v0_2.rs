@@ -80,7 +80,7 @@ impl Host for LinkedCtx {
 
     async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
         let ChunkParams { model, max_tokens } = params;
-        let request = ChunkRequest::new(text, model, max_tokens);
+        let request = ChunkRequest::new(text, model, max_tokens, 0);
         self.skill_ctx.chunk(vec![request]).await.remove(0)
     }
 
