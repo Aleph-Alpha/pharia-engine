@@ -5,13 +5,13 @@
 /// It allows us to keep our external interface stable while updating our "internal" representations.
 /// Imagine we introduce a new version (0.4) with breaking changes in the api (e.g. a new field in `CompletionParams`).
 /// If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::csi_shell::CsiShellError;
 use crate::{chunking, csi::Csi, inference, language_selection, search};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum CsiRequest {
     Chunk {
@@ -27,7 +27,7 @@ pub enum CsiRequest {
         requests: Vec<SearchRequest>,
     },
     Chat {
-        requests: Vec<inference::ChatRequest>,
+        requests: Vec<ChatRequest>,
     },
     Documents {
         requests: Vec<search::DocumentPath>,
@@ -63,9 +63,10 @@ impl CsiRequest {
                 .search(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|v| json!(v))?,
-            CsiRequest::Chat { requests } => {
-                drivers.chat(auth, requests).await.map(|v| json!(v))?
-            }
+            CsiRequest::Chat { requests } => drivers
+                .chat(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|v| json!(v))?,
             CsiRequest::DocumentMetadata { requests } => drivers
                 .document_metadata(auth, requests)
                 .await
@@ -83,7 +84,73 @@ impl CsiRequest {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
+pub struct Message {
+    pub role: String,
+    pub content: String,
+}
+
+impl From<Message> for inference::Message {
+    fn from(value: Message) -> Self {
+        let Message { role, content } = value;
+        inference::Message { role, content }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ChatParams {
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f64>,
+    pub top_p: Option<f64>,
+    pub frequency_penalty: Option<f64>,
+    pub presence_penalty: Option<f64>,
+    pub logprobs: Logprobs,
+}
+
+impl From<ChatParams> for inference::ChatParams {
+    fn from(value: ChatParams) -> Self {
+        let ChatParams {
+            max_tokens,
+            temperature,
+            top_p,
+            frequency_penalty,
+            presence_penalty,
+            logprobs,
+        } = value;
+        inference::ChatParams {
+            max_tokens,
+            temperature,
+            top_p,
+            frequency_penalty,
+            presence_penalty,
+            logprobs: logprobs.into(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ChatRequest {
+    pub model: String,
+    pub messages: Vec<Message>,
+    pub params: ChatParams,
+}
+
+impl From<ChatRequest> for inference::ChatRequest {
+    fn from(value: ChatRequest) -> Self {
+        let ChatRequest {
+            model,
+            messages,
+            params,
+        } = value;
+        inference::ChatRequest {
+            model,
+            messages: messages.into_iter().map(Into::into).collect(),
+            params: params.into(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
 pub struct IndexPath {
     pub namespace: String,
     pub collection: String,
@@ -105,7 +172,7 @@ impl From<IndexPath> for search::IndexPath {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct SearchRequest {
     pub query: String,
     pub index_path: IndexPath,
@@ -130,7 +197,7 @@ impl From<SearchRequest> for search::SearchRequest {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
@@ -152,7 +219,7 @@ impl From<ChunkParams> for chunking::ChunkParams {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct ChunkRequest {
     pub text: String,
     pub params: ChunkParams,
@@ -168,7 +235,7 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Language {
     Afr,
@@ -276,7 +343,7 @@ language_mappings!(
     Sqi, Srp, Swa, Swe, Tam, Tel, Tgl, Tha, Tsn, Tso, Tur, Ukr, Urd, Vie, Xho, Yor, Zho, Zul
 );
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct SelectLanguageRequest {
     pub text: String,
     pub languages: Vec<Language>,
@@ -292,7 +359,7 @@ impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Logprobs {
     No,
@@ -310,7 +377,7 @@ impl From<Logprobs> for inference::Logprobs {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct CompletionParams {
     pub return_special_tokens: bool,
     pub max_tokens: Option<u32>,
@@ -350,7 +417,7 @@ impl From<CompletionParams> for inference::CompletionParams {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
