@@ -4,30 +4,17 @@ use tokio::sync::oneshot;
 
 use crate::tokenizers::TokenizerApi;
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ChunkRequest {
     pub text: String,
     pub params: ChunkParams,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
     pub overlap: u32,
-}
-
-impl ChunkRequest {
-    pub fn new(text: String, model: String, max_tokens: u32, overlap: u32) -> Self {
-        Self {
-            text,
-            params: ChunkParams {
-                model,
-                max_tokens,
-                overlap,
-            },
-        }
-    }
 }
 
 pub async fn chunking(

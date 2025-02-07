@@ -441,6 +441,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn forward_chunk_params() {
+        // Given
+        let model = "model";
+        let max_tokens = 10;
+        let overlap = 5;
+        let text = "text";
+
+        let source = ChunkRequest {
+            text: text.to_owned(),
+            params: ChunkParams {
+                model: model.to_owned(),
+                max_tokens,
+                overlap,
+            },
+        };
+
+        // When
+        let result: chunking::ChunkRequest = source.into();
+
+        // Then
+        assert_eq!(
+            result,
+            chunking::ChunkRequest {
+                text: text.to_owned(),
+                params: chunking::ChunkParams {
+                    model: model.to_owned(),
+                    max_tokens,
+                    overlap,
+                },
+            }
+        );
+    }
+
+    #[test]
     fn forward_chat_params() {
         // Given
         let source = ChatParams {
