@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::csi_shell::v0_2::CsiRequest as V0_2CsiRequest;
-use crate::csi_shell::v0_3::V0_3CsiRequest;
+use crate::csi_shell::v0_3::CsiRequest as V0_3CsiRequest;
 use crate::{csi::Csi, shell::AppState, skills::SupportedVersion};
 
 #[allow(clippy::too_many_lines)]
