@@ -778,4 +778,25 @@ mod tests {
                 .unwrap_err();
         assert!(matches!(error, SkillError::NotSupportedYet(..)));
     }
+
+    /// Learning test to verify nothing strange happens if a instantiated skill is invoked multiple times.
+    #[tokio::test]
+    async fn can_call_pre_instantiated_multiple_times() {
+        let test_skill = given_greet_skill_v0_2();
+        let wasm = test_skill.bytes();
+        let engine = Engine::new(false).unwrap();
+        let skill = Skill::new(&engine, wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let input = json!("Homer");
+        let first_result = skill.run(&engine, ctx.clone(), input.clone()).await.unwrap();
+        let second_result = skill.run(&engine, ctx.clone(), input.clone()).await.unwrap();
+        let third_result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string
+        assert_eq!(first_result, json!("Hello Homer"));
+        assert_eq!(second_result, json!("Hello Homer"));
+        assert_eq!(third_result, json!("Hello Homer"));
+    }
 }
