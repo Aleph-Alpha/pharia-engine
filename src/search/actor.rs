@@ -161,9 +161,9 @@ pub struct SearchResult {
 #[derive(Debug, Serialize)]
 pub struct TextCursor {
     /// Index of the item in the document
-    pub item: usize,
+    pub item: u32,
     /// The character position the cursor can be found at within the string.
-    pub position: usize,
+    pub position: u32,
 }
 
 /// Allows for searching different collections in the Document Index
@@ -299,28 +299,31 @@ impl DocumentIndexMessage {
                 }
 
                 if let (
-                        Modality::Text { text },
-                        Cursor::Text {
-                            item: start_item,
-                            position: start_position,
-                        },
-                        Cursor::Text {
-                            item: end_item,
-                            position: end_position,
-                        },
-                    ) = (section.remove(0), start, end) { Ok(SearchResult {
-                    document_path,
-                    section: text,
-                    score,
-                    start: TextCursor {
+                    Modality::Text { text },
+                    Cursor::Text {
                         item: start_item,
                         position: start_position,
                     },
-                    end: TextCursor {
+                    Cursor::Text {
                         item: end_item,
                         position: end_position,
                     },
-                }) } else {
+                ) = (section.remove(0), start, end)
+                {
+                    Ok(SearchResult {
+                        document_path,
+                        section: text,
+                        score,
+                        start: TextCursor {
+                            item: start_item,
+                            position: start_position,
+                        },
+                        end: TextCursor {
+                            item: end_item,
+                            position: end_position,
+                        },
+                    })
+                } else {
                     error!("Unexpected image result in Document Index results");
                     Err(anyhow::anyhow!("Invalid search result"))
                 }

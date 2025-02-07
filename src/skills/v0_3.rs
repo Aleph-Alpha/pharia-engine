@@ -3,7 +3,7 @@ use pharia::skill::csi::{
     ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion, CompletionParams,
     CompletionRequest, Distribution, Document, DocumentPath, FinishReason, Host, IndexPath,
     Language, Logprob, Logprobs, Message, Modality, SearchRequest, SearchResult,
-    SelectLanguageRequest, TokenUsage,
+    SelectLanguageRequest, TextCursor, TokenUsage,
 };
 use serde_json::Value;
 use wasmtime::component::bindgen;
@@ -265,6 +265,13 @@ impl From<search::DocumentPath> for DocumentPath {
     }
 }
 
+impl From<search::TextCursor> for TextCursor {
+    fn from(cursor: search::TextCursor) -> Self {
+        let search::TextCursor { item, position } = cursor;
+        Self { item, position }
+    }
+}
+
 impl From<search::SearchResult> for SearchResult {
     fn from(search_result: search::SearchResult) -> Self {
         let search::SearchResult {
@@ -276,8 +283,10 @@ impl From<search::SearchResult> for SearchResult {
         } = search_result;
         Self {
             document_path: document_path.into(),
-            content: section,
+            section,
             score,
+            start: start.into(),
+            end: end.into(),
         }
     }
 }
