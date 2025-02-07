@@ -70,13 +70,6 @@ pub trait SearchApi: Clone + Send + Sync + 'static {
     ) -> anyhow::Result<Document>;
 }
 
-#[derive(Debug, Serialize)]
-pub struct SearchResult {
-    pub document_path: DocumentPath,
-    pub content: String,
-    pub score: f64,
-}
-
 #[async_trait]
 impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
     async fn search(
@@ -149,8 +142,8 @@ pub struct SearchRequest {
 }
 
 /// A section of a document that is returned from a search request
-#[derive(Debug)]
-pub struct DocumentIndexSearchResult {
+#[derive(Debug, Serialize)]
+pub struct SearchResult {
     /// Which document this search result can be found in
     pub document_path: DocumentPath,
     /// The section of the document returned by the search
@@ -159,12 +152,18 @@ pub struct DocumentIndexSearchResult {
     /// metric of the index used in the search.
     pub score: f64,
     /// The position within the document where the section begins. The cursor is always inclusive.
-    #[expect(dead_code, reason = "Unused so far")]
-    pub start: Cursor,
+    pub start: TextCursor,
     /// The position within the document where the section ends.
     /// The cursor is always inclusive, so the section includes the position represented by this cursor.
-    #[expect(dead_code, reason = "Unused so far")]
-    pub end: Cursor,
+    pub end: TextCursor,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TextCursor {
+    /// Index of the item in the document
+    pub item: usize,
+    /// The character position the cursor can be found at within the string.
+    pub position: usize,
 }
 
 /// Allows for searching different collections in the Document Index
@@ -238,22 +237,6 @@ impl DocumentIndexMessage {
                 api_token,
             } => {
                 let results = Self::search(client, request, &api_token).await;
-                let results = results.map(|v| {
-                    v.into_iter()
-                        .map(
-                            |DocumentIndexSearchResult {
-                                 document_path,
-                                 section,
-                                 score,
-                                 ..
-                             }| SearchResult {
-                                document_path,
-                                content: section,
-                                score,
-                            },
-                        )
-                        .collect()
-                });
                 drop(send.send(results));
             }
             Self::Metadata {
@@ -279,7 +262,7 @@ impl DocumentIndexMessage {
         client: &impl SearchClient,
         request: SearchRequest,
         api_token: &str,
-    ) -> anyhow::Result<Vec<DocumentIndexSearchResult>> {
+    ) -> anyhow::Result<Vec<SearchResult>> {
         let SearchRequest {
             index_path: index,
             query,
@@ -315,18 +298,31 @@ impl DocumentIndexMessage {
                     ));
                 }
 
-                match section.remove(0) {
-                    Modality::Text { text } => Ok(DocumentIndexSearchResult {
-                        document_path,
-                        section: text,
-                        score,
-                        start,
-                        end,
-                    }),
-                    Modality::Image { .. } => {
-                        error!("Unexpected image result in Document Index results");
-                        Err(anyhow::anyhow!("Invalid search result"))
-                    }
+                if let (
+                        Modality::Text { text },
+                        Cursor::Text {
+                            item: start_item,
+                            position: start_position,
+                        },
+                        Cursor::Text {
+                            item: end_item,
+                            position: end_position,
+                        },
+                    ) = (section.remove(0), start, end) { Ok(SearchResult {
+                    document_path,
+                    section: text,
+                    score,
+                    start: TextCursor {
+                        item: start_item,
+                        position: start_position,
+                    },
+                    end: TextCursor {
+                        item: end_item,
+                        position: end_position,
+                    },
+                }) } else {
+                    error!("Unexpected image result in Document Index results");
+                    Err(anyhow::anyhow!("Invalid search result"))
                 }
             })
             .collect()
@@ -472,7 +468,7 @@ pub mod tests {
             .name
             .to_lowercase()
             .contains("kernel"));
-        assert!(results[0].content.contains("Kernel"));
+        assert!(results[0].section.contains("Kernel"));
     }
 
     #[tokio::test]

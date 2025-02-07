@@ -269,7 +269,7 @@ pub mod tests {
     use crate::{
         chunking::ChunkParams,
         inference::{tests::InferenceStub, ChatParams, CompletionParams, Message, TokenUsage},
-        search::tests::SearchStub,
+        search::{tests::SearchStub, TextCursor},
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
         FinishReason,
@@ -736,8 +736,16 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                     };
                     vec![SearchResult {
                         document_path,
-                        content: request.query,
+                        section: request.query,
                         score: 1.0,
+                        start: TextCursor {
+                            item: 0,
+                            position: 0,
+                        },
+                        end: TextCursor {
+                            item: 0,
+                            position: 0,
+                        },
                     }]
                 })
                 .collect()
