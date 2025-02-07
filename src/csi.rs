@@ -184,14 +184,7 @@ where
             let text_len = request.text.len();
             let max_tokens = request.params.max_tokens;
 
-            let tokenizer = self
-                .tokenizers
-                .tokenizer_by_model(auth.clone(), request.params.model.clone())
-                .await?;
-            // Push into the blocking thread pool because this can be expensive for long documents
-            let chunks =
-                tokio::task::spawn_blocking(move || chunking::chunking(&request, &tokenizer))
-                    .await?;
+            let chunks = chunking::chunking(request, &self.tokenizers, auth.clone()).await?;
 
             trace!(
                 "chunk: text_len={} max_tokens={} -> chunks.len()={}",
