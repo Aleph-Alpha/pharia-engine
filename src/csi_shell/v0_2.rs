@@ -276,7 +276,7 @@ pub mod tests {
     pub use crate::csi_shell::VersionedCsiRequest;
 
     #[test]
-    fn csi_v_2_request_is_deserialized() {
+    fn complete_request() {
         // Given a request in JSON format
         let request = json!({
             "version": "0.2",
@@ -301,7 +301,169 @@ pub mod tests {
     }
 
     #[test]
-    fn csi_v_2_metadata_request_is_deserialized() {
+    fn chunk_request() {
+        let request = json!({
+            "version": "0.2",
+            "function": "chunk",
+            "text": "Hello",
+            "params": {
+                "model": "pharia-1-llm-7b-control",
+                "max_tokens": 128
+            }
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Chunk(chunk_request))) if chunk_request.text == "Hello"
+        ));
+    }
+
+    #[test]
+    fn select_language_request() {
+        let request = json!({
+            "version": "0.2",
+            "function": "select_language",
+            "text": "Hello",
+            "languages": ["eng", "deu"]
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::SelectLanguage(select_language_request))) if select_language_request.text == "Hello"
+        ));
+    }
+
+    #[test]
+    fn complete_all_request() {
+        // Given a request in JSON format
+        let request = json!({
+            "version": "0.2",
+            "function": "complete_all",
+            "requests": [
+                {
+                    "prompt": "Hello",
+                    "model": "pharia-1-llm-7b-control",
+                    "params": {
+                        "max_tokens": 128,
+                        "temperature": null,
+                        "top_k": null,
+                        "top_p": null,
+                        "stop": []
+                    }
+                },
+                {
+                    "prompt": "Hello",
+                    "model": "pharia-1-llm-7b-control",
+                    "params": {
+                        "max_tokens": 128,
+                        "temperature": null,
+                        "top_k": null,
+                        "top_p": null,
+                        "stop": []
+                    }
+                }
+            ]
+        });
+
+        // When it is deserialized into a `VersionedCsiRequest`
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        // Then it should be deserialized successfully
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::CompleteAll { requests })) if requests.len() == 2
+        ));
+    }
+
+    #[test]
+    fn search_request() {
+        let request = json!({
+            "version": "0.2",
+            "function": "search",
+            "query": "Hello",
+            "index_path": {
+                "namespace": "Kernel",
+                "collection": "test",
+                "index": "asym-64"
+            },
+            "max_results": 10,
+            "min_score": null,
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Search(search_request))) if search_request.query == "Hello"
+        ));
+    }
+
+    #[test]
+    fn chat_request() {
+        let request = json!({
+            "version": "0.2",
+            "function": "chat",
+            "model": "pharia-1-llm-7b-control",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Hello"
+                }
+            ],
+            "params": {
+                "max_tokens": 128,
+                "temperature": null,
+                "top_p": null
+            }
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Chat(chat_request))) if chat_request.model == "pharia-1-llm-7b-control"
+        ));
+    }
+
+    #[test]
+    fn documents_request() {
+        let request = json!({
+            "version": "0.2",
+            "function": "documents",
+            "requests": [
+                {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "kernel-docs"
+                },
+                {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "kernel-docs"
+                }
+            ]
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Documents { requests })) if requests.len() == 2
+        ));
+    }
+
+    #[test]
+    fn document_metadata_request() {
         // Given a request in JSON format
         let request = json!({
             "version": "0.2",
@@ -323,6 +485,22 @@ pub mod tests {
             Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::DocumentMetadata(
                 _
             )))
+        ));
+    }
+
+    #[test]
+    fn unknown_request() {
+        let request = json!({
+            "version": "0.2",
+            "function": "not-implemented"
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_2(V0_2CsiRequest::Unknown { function: Some(function) })) if function == "not-implemented"
         ));
     }
 }
