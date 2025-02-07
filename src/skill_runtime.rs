@@ -646,11 +646,8 @@ pub mod tests {
         let test_skill = given_greet_skill_v0_2();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store = SkillStoreStub::new(
-            engine.clone(),
-            test_skill.bytes(),
-            skill_path.clone(),
-        );
+        let skill_store =
+            SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
@@ -685,9 +682,10 @@ pub mod tests {
         let test_skill = given_greet_skill_v0_2();
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let skill_store =
+            SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let skill_ctx = Box::new(CsiGreetingMock);
-        
+
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let actual = runtime
             .run(&skill_path, json!("Homer"), skill_ctx)
@@ -706,7 +704,8 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let skill_store =
+            SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
 
