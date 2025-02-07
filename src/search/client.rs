@@ -80,15 +80,12 @@ pub enum Modality {
 pub enum Cursor {
     Text {
         /// Index of the item in the document
-        item: usize,
+        item: u32,
         /// The character position the cursor can be found at within the string.
-        position: usize,
+        position: u32,
     },
-    Image {
-        /// Index of the item in the document
-        #[expect(dead_code)]
-        item: usize,
-    },
+    /// Contains the index of the item in the document, but we do not use it
+    Image,
 }
 
 /// The name of a given document
