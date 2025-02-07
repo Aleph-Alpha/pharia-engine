@@ -77,7 +77,6 @@ pub enum Modality {
 /// A position within a document. The cursor is always inclusive of the current position, in both start and end positions.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "modality")]
-#[expect(dead_code)]
 pub enum Cursor {
     Text {
         /// Index of the item in the document
@@ -87,6 +86,7 @@ pub enum Cursor {
     },
     Image {
         /// Index of the item in the document
+        #[expect(dead_code)]
         item: usize,
     },
 }

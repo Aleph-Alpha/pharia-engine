@@ -202,12 +202,14 @@ impl From<search::SearchResult> for SearchResult {
     fn from(search_result: search::SearchResult) -> Self {
         let search::SearchResult {
             document_path,
-            content,
+            section,
             score,
+            start: _,
+            end: _,
         } = search_result;
         Self {
             document_path: document_path.into(),
-            content,
+            content: section,
             score,
         }
     }
