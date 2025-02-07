@@ -1,3 +1,10 @@
+/// CSI Shell version 0.3
+///
+/// This module introduces serializable/user-facing structs which are very similar to our "internal" representations.
+/// While this module may appear to contain a lot of boilerplate code, there is a good reason to not serialize our "internal" representations:
+/// It allows us to keep our external interface stable while updating our "internal" representations.
+/// Imagine we introduce a new version (0.4) with breaking changes in the api (e.g. a new field in `CompletionParams`).
+/// If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -14,7 +21,7 @@ pub enum CsiRequest {
         requests: Vec<SelectLanguageRequest>,
     },
     Complete {
-        requests: Vec<inference::CompletionRequest>,
+        requests: Vec<CompletionRequest>,
     },
     Search {
         requests: Vec<search::SearchRequest>,
@@ -233,6 +240,86 @@ impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
         language_selection::SelectLanguageRequest {
             text,
             languages: languages.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Logprobs {
+    No,
+    Sampled,
+    Top(u8),
+}
+
+impl From<Logprobs> for inference::Logprobs {
+    fn from(value: Logprobs) -> Self {
+        match value {
+            Logprobs::No => inference::Logprobs::No,
+            Logprobs::Sampled => inference::Logprobs::Sampled,
+            Logprobs::Top(n) => inference::Logprobs::Top(n),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CompletionParams {
+    pub return_special_tokens: bool,
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f64>,
+    pub top_k: Option<u32>,
+    pub top_p: Option<f64>,
+    pub stop: Vec<String>,
+    pub frequency_penalty: Option<f64>,
+    pub presence_penalty: Option<f64>,
+    pub logprobs: Logprobs,
+}
+
+impl From<CompletionParams> for inference::CompletionParams {
+    fn from(value: CompletionParams) -> Self {
+        let CompletionParams {
+            return_special_tokens,
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            frequency_penalty,
+            presence_penalty,
+            logprobs,
+            stop,
+        } = value;
+        inference::CompletionParams {
+            return_special_tokens,
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+            frequency_penalty,
+            presence_penalty,
+            logprobs: logprobs.into(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CompletionRequest {
+    pub prompt: String,
+    pub model: String,
+    pub params: CompletionParams,
+}
+
+impl From<CompletionRequest> for inference::CompletionRequest {
+    fn from(value: CompletionRequest) -> Self {
+        let CompletionRequest {
+            prompt,
+            model,
+            params,
+        } = value;
+        inference::CompletionRequest {
+            prompt,
+            model,
+            params: params.into(),
         }
     }
 }
