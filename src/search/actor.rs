@@ -278,6 +278,7 @@ impl DocumentIndexMessage {
                     min_score,
                     // Make sure we only receive results of type text
                     true,
+                    None,
                 ),
                 api_token,
             )
