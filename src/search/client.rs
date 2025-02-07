@@ -37,6 +37,8 @@ pub struct SearchRequest {
     min_score: Option<f64>,
     /// Whether only text chunks should be returned
     text_only: bool,
+    /// A filter to apply to the search
+    filter: Option<Filter>,
 }
 
 impl SearchRequest {
@@ -45,14 +47,70 @@ impl SearchRequest {
         max_results: u32,
         min_score: Option<f64>,
         text_only: bool,
+        filter: Option<Filter>,
     ) -> Self {
         Self {
             query,
             max_results,
             min_score,
             text_only,
+            filter,
         }
     }
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum MetadataFieldValue {
+    String(String),
+    Integer(i64),
+    Boolean(bool),
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MetadataFilterCondition {
+    GreaterThan(f64),
+    GreaterThanOrEqualTo(f64),
+    LessThan(f64),
+    LessThanOrEqualTo(f64),
+    // Do we want to do data validation and parse to dates here, or simply forward strings
+    // and then get an error from the Document Index API?
+    After(String),
+    AtOrAfter(String),
+    Before(String),
+    AtOrBefore(String),
+    EqualTo(MetadataFieldValue),
+    IsNull(serde_bool::True),
+}
+
+#[derive(Serialize)]
+pub struct MetadataFilter {
+    field: String,
+    #[serde(flatten)]
+    condition: MetadataFilterCondition,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FilterCondition {
+    Modality(ModalityType),
+    Metadata(MetadataFilter),
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Filter {
+    Without(Vec<FilterCondition>),
+    WithOneOf(Vec<FilterCondition>),
+    With(Vec<FilterCondition>),
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModalityType {
+    Text,
+    Image,
 }
 
 /// Which documents you want to search in, and which type of index should be used
@@ -150,6 +208,7 @@ impl SearchClient for Client {
             max_results,
             min_score,
             text_only,
+            filter,
         } = request;
 
         let mut body = json!({
@@ -157,9 +216,17 @@ impl SearchClient for Client {
             "max_results": max_results,
             "min_score": min_score,
         });
-        if text_only {
-            body["filters"] = json!([{ "with": [{ "modality": "text" }]}]);
+
+        let mut filters = Vec::new();
+        if let Some(filter) = filter {
+            filters.push(filter);
         }
+        if text_only {
+            filters.push(Filter::With(vec![FilterCondition::Modality(
+                ModalityType::Text,
+            )]));
+        }
+        body["filters"] = json!(filters);
 
         // Namespaces, collections and indexes must match regex ^[a-zA-Z0-9\-\.]+$
         // therefore, we do not need to url encode them
@@ -377,6 +444,7 @@ pub mod tests {
             1,
             None,
             true,
+            None,
         );
         let results = client.search(index, request, api_token).await.unwrap();
 
@@ -436,6 +504,65 @@ pub mod tests {
             max_results,
             Some(min_score),
             true,
+            None,
+        );
+        let results = client.search(index, request, api_token).await.unwrap();
+
+        // Then we don't get any results
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn filter_for_metadata() {
+        // Given a search request with a metadata filter for a created field
+        let index = IndexPath::new("Kernel", "test", "asym-64");
+        let host = document_index_url().to_owned();
+        let api_token = api_token();
+        let client = Client::new(host);
+
+        // When filtering for documents with metadata field created after 2100-01-01
+        let filter_condition = FilterCondition::Metadata(MetadataFilter {
+            field: "created".to_owned(),
+            condition: MetadataFilterCondition::After("2100-01-01T14:10:11Z".to_owned()),
+        });
+        let filter = Filter::With(vec![filter_condition]);
+        let request = SearchRequest::new(
+            vec![Modality::Text {
+                text: "What is the Pharia Kernel?".to_owned(),
+            }],
+            1,
+            None,
+            true,
+            Some(filter),
+        );
+        let results = client.search(index, request, api_token).await.unwrap();
+
+        // Then we don't get any results
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn filter_for_without_metadata() {
+        // Given a search request with a metadata filter for a created field
+        let index = IndexPath::new("Kernel", "test", "asym-64");
+        let host = document_index_url().to_owned();
+        let api_token = api_token();
+        let client = Client::new(host);
+
+        // When filtering for documents with metadata field created after 1970-07-01
+        let filter_condition = FilterCondition::Metadata(MetadataFilter {
+            field: "created".to_owned(),
+            condition: MetadataFilterCondition::After("1970-07-01T14:10:11Z".to_owned()),
+        });
+        let filter = Filter::Without(vec![filter_condition]);
+        let request = SearchRequest::new(
+            vec![Modality::Text {
+                text: "What is the Pharia Kernel?".to_owned(),
+            }],
+            1,
+            None,
+            true,
+            Some(filter),
         );
         let results = client.search(index, request, api_token).await.unwrap();
 
