@@ -2,13 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::csi_shell::CsiShellError;
-use crate::{
-    chunking::ChunkRequest,
-    csi::Csi,
-    inference::{ChatRequest, CompletionRequest},
-    language_selection::SelectLanguageRequest,
-    search::{DocumentPath, SearchRequest},
-};
+use crate::{chunking, csi::Csi, inference, language_selection, search};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
@@ -20,19 +14,19 @@ pub enum CsiRequest {
         requests: Vec<SelectLanguageRequest>,
     },
     Complete {
-        requests: Vec<CompletionRequest>,
+        requests: Vec<inference::CompletionRequest>,
     },
     Search {
-        requests: Vec<SearchRequest>,
+        requests: Vec<search::SearchRequest>,
     },
     Chat {
-        requests: Vec<ChatRequest>,
+        requests: Vec<inference::ChatRequest>,
     },
     Documents {
-        requests: Vec<DocumentPath>,
+        requests: Vec<search::DocumentPath>,
     },
     DocumentMetadata {
-        requests: Vec<DocumentPath>,
+        requests: Vec<search::DocumentPath>,
     },
     #[serde(untagged)]
     Unknown {
@@ -46,12 +40,14 @@ impl CsiRequest {
         C: Csi + Sync,
     {
         let result = match self {
-            CsiRequest::Chunk { requests } => {
-                drivers.chunk(auth, requests).await.map(|r| json!(r))?
-            }
-            CsiRequest::SelectLanguage { requests } => {
-                drivers.select_language(requests).await.map(|r| json!(r))?
-            }
+            CsiRequest::Chunk { requests } => drivers
+                .chunk(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|r| json!(r))?,
+            CsiRequest::SelectLanguage { requests } => drivers
+                .select_language(requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|r| json!(r))?,
             CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -79,6 +75,168 @@ impl CsiRequest {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ChunkParams {
+    pub model: String,
+    pub max_tokens: u32,
+    pub overlap: u32,
+}
+
+impl From<ChunkParams> for chunking::ChunkParams {
+    fn from(value: ChunkParams) -> Self {
+        let ChunkParams {
+            model,
+            max_tokens,
+            overlap,
+        } = value;
+        chunking::ChunkParams {
+            model,
+            max_tokens,
+            overlap,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ChunkRequest {
+    pub text: String,
+    pub params: ChunkParams,
+}
+
+impl From<ChunkRequest> for chunking::ChunkRequest {
+    fn from(value: ChunkRequest) -> Self {
+        let ChunkRequest { text, params } = value;
+        chunking::ChunkRequest {
+            text,
+            params: params.into(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Language {
+    Afr,
+    Ara,
+    Aze,
+    Bel,
+    Ben,
+    Bos,
+    Bul,
+    Cat,
+    Ces,
+    Cym,
+    Dan,
+    Deu,
+    Ell,
+    Eng,
+    Epo,
+    Est,
+    Eus,
+    Fas,
+    Fin,
+    Fra,
+    Gle,
+    Guj,
+    Heb,
+    Hin,
+    Hrv,
+    Hun,
+    Hye,
+    Ind,
+    Isl,
+    Ita,
+    Jpn,
+    Kat,
+    Kaz,
+    Kor,
+    Lat,
+    Lav,
+    Lit,
+    Lug,
+    Mar,
+    Mkd,
+    Mon,
+    Mri,
+    Msa,
+    Nld,
+    Nno,
+    Nob,
+    Pan,
+    Pol,
+    Por,
+    Ron,
+    Rus,
+    Slk,
+    Slv,
+    Sna,
+    Som,
+    Sot,
+    Spa,
+    Sqi,
+    Srp,
+    Swa,
+    Swe,
+    Tam,
+    Tel,
+    Tgl,
+    Tha,
+    Tsn,
+    Tso,
+    Tur,
+    Ukr,
+    Urd,
+    Vie,
+    Xho,
+    Yor,
+    Zho,
+    Zul,
+}
+
+// Works as long as variant names match exactly
+macro_rules! language_mappings {
+    ($($variant:ident),*) => {
+        impl From<Language> for language_selection::Language {
+            fn from(language: Language) -> Self {
+                match language {
+                    $(Language::$variant => language_selection::Language::$variant),*
+                }
+            }
+        }
+
+        impl From<language_selection::Language> for Language {
+            fn from(language: language_selection::Language) -> Self {
+                match language {
+                    $(language_selection::Language::$variant => Language::$variant),*
+                }
+            }
+        }
+    };
+}
+
+language_mappings!(
+    Afr, Ara, Aze, Bel, Ben, Bos, Bul, Cat, Ces, Cym, Dan, Deu, Ell, Eng, Epo, Est, Eus, Fas, Fin,
+    Fra, Gle, Guj, Heb, Hin, Hrv, Hun, Hye, Ind, Isl, Ita, Jpn, Kat, Kaz, Kor, Lat, Lav, Lit, Lug,
+    Mar, Mkd, Mon, Mri, Msa, Nld, Nno, Nob, Pan, Pol, Por, Ron, Rus, Slk, Slv, Sna, Som, Sot, Spa,
+    Sqi, Srp, Swa, Swe, Tam, Tel, Tgl, Tha, Tsn, Tso, Tur, Ukr, Urd, Vie, Xho, Yor, Zho, Zul
+);
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SelectLanguageRequest {
+    pub text: String,
+    pub languages: Vec<Language>,
+}
+
+impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
+    fn from(value: SelectLanguageRequest) -> Self {
+        let SelectLanguageRequest { text, languages } = value;
+        language_selection::SelectLanguageRequest {
+            text,
+            languages: languages.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,14 +253,16 @@ mod tests {
                     "text": "Hello",
                     "params": {
                         "model": "pharia-1-llm-7b-control",
-                        "max_tokens": 128
+                        "max_tokens": 128,
+                        "overlap": 10
                     }
                 },
                 {
                     "text": "Hello",
                     "params": {
                         "model": "pharia-1-llm-7b-control",
-                        "max_tokens": 128
+                        "max_tokens": 128,
+                        "overlap": 10
                     }
                 }
             ]
