@@ -86,34 +86,187 @@ mod tests {
     use crate::csi_shell::VersionedCsiRequest;
 
     #[test]
-    fn csi_v_3_request_is_deserialized() {
-        // Given a request in JSON format
+    fn chunk_request() {
         let request = json!({
             "version": "0.3",
-            "function": "complete",
-            "prompt": "Hello",
-            "model": "pharia-1-llm-7b-control",
-            "params": {
-                "return_special_tokens": true,
-                "max_tokens": 128,
-                "temperature": null,
-                "top_k": null,
-                "top_p": null,
-                "stop": []
-            }
+            "function": "chunk",
+            "requests": [
+                {
+                    "text": "Hello",
+                    "params": {
+                        "model": "pharia-1-llm-7b-control",
+                        "max_tokens": 128
+                    }
+                },
+                {
+                    "text": "Hello",
+                    "params": {
+                        "model": "pharia-1-llm-7b-control",
+                        "max_tokens": 128
+                    }
+                }
+            ]
         });
 
-        // When it is deserialized into a `VersionedCsiRequest`
         let result: Result<VersionedCsiRequest, serde_json::Error> =
             serde_json::from_value(request);
 
-        // Then it should be deserialized successfully
-        assert!(result.is_ok());
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_3(CsiRequest::Chunk { requests })) if requests.len() == 2
+        ));
     }
 
     #[test]
-    fn csi_v_3_documents_request_is_deserialized() {
-        // Given a request in JSON format
+    fn select_language_request() {
+        let request = json!({
+            "version": "0.3",
+            "function": "select_language",
+            "requests": [
+                {
+                    "text": "Hello",
+                    "languages": ["eng", "deu"]
+                },
+                {
+                    "text": "Hello",
+                    "languages": ["eng", "deu"]
+                }
+            ]
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_3(CsiRequest::SelectLanguage { requests })) if requests.len() == 2
+        ));
+    }
+    #[test]
+    fn complete_request() {
+        let request = json!({
+            "version": "0.3",
+            "function": "complete",
+            "requests": [
+                {
+                    "prompt": "Hello",
+                    "model": "pharia-1-llm-7b-control",
+                    "params": {
+                        "return_special_tokens": true,
+                        "max_tokens": 128,
+                        "temperature": null,
+                        "top_k": null,
+                        "top_p": null,
+                        "stop": [],
+                        "frequency_penalty": null,
+                        "presence_penalty": null,
+                        "logprobs": "no"
+                    }
+                },
+                {
+                    "prompt": "Hello",
+                    "model": "pharia-1-llm-7b-control",
+                    "params": {
+                        "return_special_tokens": true,
+                        "max_tokens": 128,
+                        "temperature": null,
+                        "top_k": null,
+                        "top_p": null,
+                        "stop": [],
+                        "frequency_penalty": null,
+                        "presence_penalty": null,
+                        "logprobs": {
+                            "top": 10
+                        }
+                    }
+                }
+            ]
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_3(CsiRequest::Complete { requests })) if requests.len() == 2
+        ));
+    }
+
+    #[test]
+    fn search_request() {
+        let request = json!({
+            "version": "0.3",
+            "function": "search",
+            "requests": [
+                {
+                    "query": "Hello",
+                    "index_path": {
+                        "namespace": "Kernel",
+                        "collection": "test",
+                        "index": "asym-64"
+                    },
+                    "max_results": 10,
+                    "min_score": null
+                },
+                {
+                    "query": "Hello",
+                    "index_path": {
+                        "namespace": "Kernel",
+                        "collection": "test",
+                        "index": "asym-64"
+                    },
+                    "max_results": 10,
+                    "min_score": null
+                }
+            ]
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_3(CsiRequest::Search { requests })) if requests.len() == 2
+        ));
+    }
+
+    #[test]
+    fn chat_request() {
+        let request = json!({
+            "version": "0.3",
+            "function": "chat",
+            "requests": [
+                {
+                    "model": "pharia-1-llm-7b-control",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "Hello"
+                        }
+                    ],
+                    "params": {
+                        "max_tokens": 128,
+                        "temperature": null,
+                        "top_k": null,
+                        "top_p": null,
+                        "stop": [],
+                        "logprobs": "no"
+                    },
+                }
+            ]
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_3(CsiRequest::Chat { requests })) if requests.len() == 1
+        ));
+    }
+
+    #[test]
+    fn documents_request() {
         let request = json!({
             "version": "0.3",
             "function": "documents",
@@ -126,19 +279,16 @@ mod tests {
             ]
         });
 
-        // When it is deserialized into a `VersionedCsiRequest`
         let result: Result<VersionedCsiRequest, serde_json::Error> =
             serde_json::from_value(request);
 
-        // Then it should be deserialized successfully
         assert!(
             matches!(result, Ok(VersionedCsiRequest::V0_3(CsiRequest::Documents { requests })) if requests.len() == 1)
         );
     }
 
     #[test]
-    fn csi_v_3_metadata_request_is_deserialized() {
-        // Given a request in JSON format
+    fn document_metadata_request() {
         let request = json!({
             "version": "0.3",
             "function": "document_metadata",
@@ -156,13 +306,26 @@ mod tests {
             ]
         });
 
-        // When it is deserialized into a `VersionedCsiRequest`
         let result: Result<VersionedCsiRequest, serde_json::Error> =
             serde_json::from_value(request);
 
-        // Then it should be deserialized successfully
         assert!(
             matches!(result, Ok(VersionedCsiRequest::V0_3(CsiRequest::DocumentMetadata { requests })) if requests.len() == 2)
+        );
+    }
+
+    #[test]
+    fn unknown_request() {
+        let request = json!({
+            "version": "0.3",
+            "function": "whatever",
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(
+            matches!(result, Ok(VersionedCsiRequest::V0_3(CsiRequest::Unknown { function: Some(function) })) if function == "whatever")
         );
     }
 }
