@@ -678,7 +678,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_search_skill() {
         // Given a skill loaded by our engine
-        given_search_skill();
+        let _use_me_ = given_search_skill();
         let wasm = fs::read("skills/search_skill.wasm").unwrap();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
@@ -696,7 +696,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_chat_skill() {
         // Given a skill loaded by our engine
-        given_chat_skill();
+        let _use_me_ = given_chat_skill();
         let wasm = fs::read("skills/chat_skill.wasm").unwrap();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
@@ -714,7 +714,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_2_py_module() {
         // Given a skill loaded by our engine
-        given_greet_py_v0_2();
+        let _use_me_ = given_greet_py_v0_2();
         let wasm = fs::read("skills/greet-py-v0_2.wasm").unwrap();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();

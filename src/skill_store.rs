@@ -930,7 +930,7 @@ pub mod tests {
         let wasm_file = temp_dir.path().join("greet_skill_v0_2.wasm");
         let prev_time = fs::metadata(&wasm_file)?.modified()?;
         // Another skill so we can copy it over
-        given_chat_skill();
+        let _use_me_ = given_chat_skill();
         fs::copy("./skills/chat_skill.wasm", &wasm_file)?;
         let new_time = fs::metadata(&wasm_file)?.modified()?;
         assert_ne!(prev_time, new_time);
@@ -998,7 +998,7 @@ pub mod tests {
         let wasm_file = temp_dir.path().join("greet_skill_v0_2.wasm");
         let prev_time = fs::metadata(&wasm_file)?.modified()?;
         // Another skill so we can copy it over
-        given_chat_skill();
+        let _use_me_ = given_chat_skill();
         fs::copy("./skills/chat_skill.wasm", &wasm_file)?;
         let new_time = fs::metadata(&wasm_file)?.modified()?;
         assert_ne!(prev_time, new_time);

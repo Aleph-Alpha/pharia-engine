@@ -87,7 +87,7 @@ async fn run_skill() {
 #[cfg_attr(not(feature = "test_document_index"), ignore)]
 #[tokio::test]
 async fn run_search_skill() {
-    given_search_skill();
+    let _use_me_ = given_search_skill();
     let kernel = TestKernel::with_skills(&["search_skill"]).await;
 
     let api_token = api_token();
@@ -119,7 +119,7 @@ async fn run_search_skill() {
 
 #[tokio::test]
 async fn run_doc_metadata_skill() {
-    given_doc_metadata_skill();
+    let _use_me_ = given_doc_metadata_skill();
     let kernel = TestKernel::with_skills(&["doc_metadata_skill"]).await;
 
     let api_token = api_token();
