@@ -10,7 +10,7 @@ use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::csi_shell::v0_2::V0_2CsiRequest;
+use crate::csi_shell::v0_2::CsiRequest as V0_2CsiRequest;
 use crate::csi_shell::v0_3::V0_3CsiRequest;
 use crate::{csi::Csi, shell::AppState, skills::SupportedVersion};
 
@@ -113,8 +113,3 @@ impl From<UnknownCsiRequest> for CsiShellError {
 /// `UNPROCESSABLE_ENTITY` (422) is an alternative, but it may surprise users as it is less commonly
 /// known
 const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
-
-#[cfg(test)]
-pub mod tests {
-    pub use crate::csi_shell::v0_2::{V0_2CompletionParams, V0_2CompletionRequest, V0_2CsiRequest};
-}
