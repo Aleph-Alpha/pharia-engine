@@ -147,6 +147,7 @@ pub struct ChatRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Default, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum Logprobs {
     /// Do not return any logprobs
     #[default]
