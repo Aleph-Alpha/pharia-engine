@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use text_splitter::{ChunkConfig, TextSplitter};
+use tokio::sync::oneshot;
 
 use crate::tokenizers::TokenizerApi;
 
@@ -47,14 +48,22 @@ pub async fn chunking(
     let tokenizer = tokenizers.tokenizer_by_model(auth, model).await?;
 
     // Push into the blocking thread pool because this can be expensive for long documents
-    let chunks = tokio::task::spawn_blocking(move || {
-        let config = ChunkConfig::new(max_tokens as usize).with_sizer(tokenizer.as_ref());
-        let splitter = TextSplitter::new(config);
-        splitter.chunks(&text).map(str::to_owned).collect()
-    })
-    .await?;
+    let (send, recv) = oneshot::channel();
+    rayon::spawn(move || {
+        let result = ChunkConfig::new(max_tokens as usize)
+            .with_sizer(tokenizer.as_ref())
+            .with_overlap(0)
+            .map(|config| {
+                TextSplitter::new(config)
+                    .chunks(&text)
+                    .map(str::to_owned)
+                    .collect()
+            });
 
-    Ok(chunks)
+        drop(send.send(result));
+    });
+
+    Ok(recv.await??)
 }
 
 #[cfg(test)]
