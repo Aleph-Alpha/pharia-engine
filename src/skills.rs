@@ -790,8 +790,14 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let first_result = skill.run(&engine, ctx.clone(), input.clone()).await.unwrap();
-        let second_result = skill.run(&engine, ctx.clone(), input.clone()).await.unwrap();
+        let first_result = skill
+            .run(&engine, ctx.clone(), input.clone())
+            .await
+            .unwrap();
+        let second_result = skill
+            .run(&engine, ctx.clone(), input.clone())
+            .await
+            .unwrap();
         let third_result = skill.run(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
