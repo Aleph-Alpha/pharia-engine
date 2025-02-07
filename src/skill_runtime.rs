@@ -536,7 +536,7 @@ pub mod tests {
     };
     use tokio::try_join;
 
-    use crate::csi::tests::{CsiCompleteStub, CsiCounter, CsiGreetingMock};
+    use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
     use crate::namespace_watcher::Namespace;
     use crate::skills::SkillMetadata;
     use crate::{
@@ -647,7 +647,7 @@ pub mod tests {
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store = SkillStoreStub::new(
-            Arc::new(Engine::new(false).unwrap()),
+            engine.clone(),
             test_skill.bytes(),
             skill_path.clone(),
         );

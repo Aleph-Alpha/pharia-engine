@@ -766,12 +766,6 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         counter: Arc<Mutex<u32>>,
     }
 
-    impl CsiCounter {
-        pub fn new() -> Self {
-            Self::default()
-        }
-    }
-
     #[async_trait]
     impl CsiForSkills for CsiCounter {
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {

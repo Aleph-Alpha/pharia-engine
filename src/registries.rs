@@ -10,7 +10,7 @@ type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Used to check if a skill image has changed
 #[derive(Debug, Eq, PartialEq)]
-pub struct Digest(String);
+pub struct Digest(pub String);
 
 /// Contains the bytes necessary to instantiate a Skill, as well as the
 /// digest at the time of the pull associated with these bytes.
