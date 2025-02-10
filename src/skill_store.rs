@@ -39,15 +39,18 @@ impl CachedSkill {
     }
 }
 
-struct SkillStoreState {
+struct SkillStoreState<L> {
     known_skills: HashMap<SkillPath, String>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
     invalid_namespaces: HashMap<Namespace, anyhow::Error>,
-    skill_loader: SkillLoaderApi,
+    skill_loader: L,
 }
 
-impl SkillStoreState {
-    pub fn new(skill_loader: SkillLoaderApi) -> Self {
+impl<L> SkillStoreState<L>
+where
+    L: SkillLoaderApi,
+{
+    pub fn new(skill_loader: L) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
             cached_skills: HashMap::new(),
@@ -194,7 +197,10 @@ pub struct SkillStore {
 }
 
 impl SkillStore {
-    pub fn new(skill_loader: SkillLoaderApi, digest_update_interval: Duration) -> Self {
+    pub fn new(
+        skill_loader: impl SkillLoaderApi + Clone + Send + 'static,
+        digest_update_interval: Duration,
+    ) -> Self {
         let (sender, recv) = mpsc::channel(1);
         let mut actor = SkillStoreActor::new(recv, skill_loader, digest_update_interval);
         let handle = tokio::spawn(async move {
@@ -335,9 +341,9 @@ pub enum SkillStoreError {
     InvalidNamespaceError(Namespace, String),
 }
 
-struct SkillStoreActor {
+struct SkillStoreActor<L> {
     receiver: mpsc::Receiver<SkillStoreMessage>,
-    provider: SkillStoreState,
+    provider: SkillStoreState<L>,
     digest_update_interval: Duration,
     skill_requests: SkillRequests,
 }
@@ -407,10 +413,13 @@ impl SkillRequests {
     }
 }
 
-impl SkillStoreActor {
+impl<L> SkillStoreActor<L>
+where
+    L: SkillLoaderApi + Clone + Send + 'static,
+{
     pub fn new(
         receiver: mpsc::Receiver<SkillStoreMessage>,
-        skill_loader: SkillLoaderApi,
+        skill_loader: L,
         digest_update_interval: Duration,
     ) -> Self {
         SkillStoreActor {
@@ -531,7 +540,7 @@ pub mod tests {
         SkillStoreApi::new(send)
     }
 
-    impl SkillStoreState {
+    impl SkillStoreState<mpsc::Sender<SkillLoaderMsg>> {
         fn with_namespace_and_skill(engine: Arc<Engine>, skill_path: &SkillPath) -> Self {
             let skill_loader =
                 SkillLoader::with_file_registry(engine, skill_path.namespace.clone()).api();
@@ -652,8 +661,7 @@ pub mod tests {
     async fn skill_store_issues_only_one_request_for_a_skill() {
         // Given a skill store with a configured skill
         let (send, mut recv) = mpsc::channel(2);
-        let skill_loader = SkillLoaderApi::new(send);
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10)).api();
+        let skill_store = SkillStore::new(send, Duration::from_secs(10)).api();
 
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let skill = ConfiguredSkill::from_path(&skill_path);
@@ -691,7 +699,7 @@ pub mod tests {
     async fn skills_are_sorted() {
         // Given a provider with two skills
         let (sender, _recv) = mpsc::channel(1);
-        let skill_loader = SkillLoaderApi::new(sender);
+        let skill_loader = sender;
         let a = Namespace::new("a").unwrap();
         let b = Namespace::new("b").unwrap();
 
@@ -802,15 +810,16 @@ pub mod tests {
 
     #[tokio::test]
     async fn should_only_cache_skills_that_have_been_fetched() {
-        let _use_me_ = given_greet_skill_v0_2();
         // Given local is a configured namespace, backed by a file repository with "greet_skill"
         // and "greet-py"
+        let _use_me_ = given_greet_skill_v0_2();
         let engine = Arc::new(Engine::new(false).unwrap());
         let greet_skill = SkillPath::local("greet_skill_v0_2");
         let skill_loader =
             SkillLoader::with_file_registry(engine, greet_skill.namespace.clone()).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let skill = ConfiguredSkill::from_path(&greet_skill);
+
         skill_store.api().upsert(skill).await;
         let skill = ConfiguredSkill::from_path(&SkillPath::local("greet-py-v0_2"));
         skill_store.api().upsert(skill).await;

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{spawn_blocking, JoinHandle};
@@ -124,8 +125,8 @@ impl SkillLoader {
         SkillLoader { sender, handle }
     }
 
-    pub fn api(&self) -> SkillLoaderApi {
-        SkillLoaderApi::new(self.sender.clone())
+    pub fn api(&self) -> mpsc::Sender<SkillLoaderMsg> {
+        self.sender.clone()
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -135,34 +136,26 @@ impl SkillLoader {
     }
 }
 
-#[derive(Clone)]
-pub struct SkillLoaderApi {
-    sender: mpsc::Sender<SkillLoaderMsg>,
+#[async_trait]
+pub trait SkillLoaderApi {
+    async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), SkillLoaderError>;
+
+    async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError>;
 }
 
-impl SkillLoaderApi {
-    pub fn new(sender: mpsc::Sender<SkillLoaderMsg>) -> Self {
-        Self { sender }
-    }
-}
-
-impl SkillLoaderApi {
-    pub async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), SkillLoaderError> {
+#[async_trait]
+impl SkillLoaderApi for mpsc::Sender<SkillLoaderMsg> {
+    async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), SkillLoaderError> {
         let (send, recv) = oneshot::channel();
-        self.sender
-            .send(SkillLoaderMsg::Fetch { skill, send })
+        self.send(SkillLoaderMsg::Fetch { skill, send })
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
 
-    pub async fn fetch_digest(
-        &self,
-        skill: ConfiguredSkill,
-    ) -> Result<Option<Digest>, RegistryError> {
+    async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError> {
         let (send, recv) = oneshot::channel();
-        self.sender
-            .send(SkillLoaderMsg::FetchDigest { skill, send })
+        self.send(SkillLoaderMsg::FetchDigest { skill, send })
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
