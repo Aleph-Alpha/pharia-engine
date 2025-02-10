@@ -122,6 +122,7 @@ impl Host for LinkedCtx {
             query,
             max_results,
             min_score,
+            filter: None,
         };
         self.skill_ctx
             .search(vec![request])

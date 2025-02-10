@@ -12,7 +12,7 @@ use tokio::{
 use tracing::error;
 
 use super::client::{
-    Client, Cursor, Document, DocumentPath, IndexPath, Modality, SearchClient,
+    Client, Cursor, Document, DocumentPath, Filter, IndexPath, Modality, SearchClient,
     SearchRequest as ClientSearchRequest, SearchResult as ClientSearchResult,
 };
 
@@ -139,6 +139,8 @@ pub struct SearchRequest {
     /// The minimum score each result should have to be returned.
     /// By default, all results are returned, up to the `max_results`.
     pub min_score: Option<f64>,
+    /// A filter to apply to the search
+    pub filter: Option<Filter>,
 }
 
 /// A section of a document that is returned from a search request
@@ -268,6 +270,7 @@ impl DocumentIndexMessage {
             query,
             max_results,
             min_score,
+            filter,
         } = request;
         client
             .search(
@@ -278,7 +281,7 @@ impl DocumentIndexMessage {
                     min_score,
                     // Make sure we only receive results of type text
                     true,
-                    None,
+                    filter,
                 ),
                 api_token,
             )
@@ -359,7 +362,10 @@ pub mod tests {
     use serde_json::Value;
     use tokio::{time::sleep, try_join};
 
-    use crate::tests::{api_token, document_index_url};
+    use crate::{
+        search::client::{Filter, FilterCondition, MetadataFilter, MetadataFilterCondition},
+        tests::{api_token, document_index_url},
+    };
 
     use super::*;
 
@@ -438,6 +444,7 @@ pub mod tests {
                 query: query.into(),
                 max_results: 1,
                 min_score: None,
+                filter: None,
             }
         }
 
@@ -448,6 +455,11 @@ pub mod tests {
 
         pub fn with_min_score(mut self, min_score: f64) -> Self {
             self.min_score = Some(min_score);
+            self
+        }
+
+        pub fn with_filter(mut self, filter: Filter) -> Self {
+            self.filter = Some(filter);
             self
         }
     }
@@ -516,6 +528,28 @@ pub mod tests {
         let request = SearchRequest::new(index, "What is the Pharia Kernel?")
             .with_max_results(max_results)
             .with_min_score(min_score);
+        let results = search.api().search(request, api_token).await.unwrap();
+        search.wait_for_shutdown().await;
+
+        // Then we don't get any results
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn filter_index() {
+        // Given a search client pointed at the document index
+        let host = document_index_url().to_owned();
+        let api_token = api_token().to_owned();
+        let search = Search::new(host);
+
+        // When making a query on an existing collection
+        let index = IndexPath::new("Kernel", "test", "asym-64");
+        let filter_condition = FilterCondition::Metadata(MetadataFilter {
+            field: "created".to_owned(),
+            condition: MetadataFilterCondition::After("1970-07-01T14:10:11Z".to_owned()),
+        });
+        let filter = Filter::Without(vec![filter_condition]);
+        let request = SearchRequest::new(index, "What is the Pharia Kernel?").with_filter(filter);
         let results = search.api().search(request, api_token).await.unwrap();
         search.wait_for_shutdown().await;
 
