@@ -2,7 +2,7 @@ use std::{env, net::TcpListener, sync::OnceLock, time::Duration};
 
 use axum::http;
 use dotenvy::dotenv;
-use pharia_kernel::{AppConfig, Completion, FinishReason, Kernel, NamespaceConfigs};
+use pharia_kernel::{AppConfig, Kernel, NamespaceConfigs};
 use reqwest::{header, Body};
 use serde_json::{json, Value};
 use test_skills::{given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill};
@@ -187,9 +187,9 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
 
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.bytes().await.unwrap();
-    let completion = serde_json::from_slice::<Completion>(&body).unwrap();
-    assert!(completion.text.contains("Homer"));
-    assert!(matches!(completion.finish_reason, FinishReason::Stop));
+    let completion = serde_json::from_slice::<Value>(&body).unwrap();
+    assert!(completion["text"].as_str().unwrap().contains("Homer"));
+    assert_eq!(completion["finish_reason"], "stop");
 
     kernel.shutdown().await;
 }
