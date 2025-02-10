@@ -35,7 +35,6 @@ use tokenizers::Tokenizers;
 use self::{inference::Inference, skill_runtime::SkillRuntime};
 
 pub use config::AppConfig;
-pub use inference::{Completion, FinishReason};
 pub use logging::initialize_tracing;
 pub use metrics::initialize_metrics;
 pub use namespace_watcher::NamespaceConfigs;

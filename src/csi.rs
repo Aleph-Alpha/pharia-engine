@@ -268,11 +268,12 @@ pub mod tests {
 
     use crate::{
         chunking::ChunkParams,
-        inference::{tests::InferenceStub, ChatParams, CompletionParams, Message, TokenUsage},
+        inference::{
+            tests::InferenceStub, ChatParams, CompletionParams, FinishReason, Message, TokenUsage,
+        },
         search::{tests::SearchStub, TextCursor},
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
-        FinishReason,
     };
 
     use super::*;
