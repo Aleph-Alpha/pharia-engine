@@ -820,7 +820,7 @@ pub mod tests {
         skill_loader.add(ConfiguredSkill::from_path(&second_skill_path), skill_bytes);
 
         // When
-        let skill_store = SkillStore::new(skill_loader.into_api(), Duration::from_secs(10));
+        let skill_store = SkillStore::new(skill_loader.api(), Duration::from_secs(10));
         let skill = ConfiguredSkill::from_path(&first_skill_path);
         skill_store.api().upsert(skill).await;
         let skill = ConfiguredSkill::from_path(&SkillPath::local("second_skill"));
@@ -869,25 +869,26 @@ pub mod tests {
     #[tokio::test]
     async fn should_remove_invalidated_skill_from_cache() {
         // Given one cached "greet_skill"
-        let _use_me_ = given_greet_skill_v0_2();
-        let greet_skill = SkillPath::local("greet_skill_v0_2");
+        let skill_bytes = given_greet_skill_v0_2().bytes();
+        let skill_path = SkillPath::local("greet");
+        let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader =
-            SkillLoader::with_file_registry(engine, greet_skill.namespace.clone()).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let mut skill_loader = SkillLoaderStub::new(engine.clone());
+        skill_loader.add(skill.clone(), skill_bytes);
+        
+        let skill_store = SkillStore::new(skill_loader.api(), Duration::from_secs(10));
         let api = skill_store.api();
-        let skill = ConfiguredSkill::from_path(&greet_skill);
         api.upsert(skill).await;
-        api.fetch(greet_skill.clone()).await.unwrap();
+        api.fetch(skill_path.clone()).await.unwrap();
 
         // When we invalidate "greet_skill"
-        let skill_had_been_in_cache = api.invalidate_cache(greet_skill.clone()).await;
+        let skill_had_been_in_cache = api.invalidate_cache(skill_path.clone()).await;
 
         // Then greet skill is no longer listed in the cache, but of course still available in the
         // list of all skills
         assert!(skill_had_been_in_cache);
         assert!(api.list_cached().await.is_empty());
-        assert_eq!(api.list().await, vec![greet_skill]);
+        assert_eq!(api.list().await, vec![skill_path]);
     }
 
     #[tokio::test]
@@ -918,35 +919,32 @@ pub mod tests {
     #[tokio::test]
     async fn invalidate_cache_skills_after_digest_change() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
-        let (registry_config, temp_dir) = tmp_registries_with_skill()?;
+        let any_skill = given_greet_skill_v0_2().bytes();
         let engine = Arc::new(Engine::new(false)?);
-        let skill_loader = SkillLoader::from_config(engine, registry_config).api();
-        let mut skill_store_state = SkillStoreState::new(skill_loader);
-
-        let greet_skill = SkillPath::local("greet_skill_v0_2");
-        let configured_skill = ConfiguredSkill::from_path(&greet_skill);
+        let mut skill_loader = SkillLoaderStub::new(engine.clone());
+        let skill_path = SkillPath::local("greet");
+        let configured_skill = ConfiguredSkill::from_path(&skill_path);
+        skill_loader.add_with_digest(
+            configured_skill.clone(),
+            any_skill,
+            Digest("originals-digest".to_owned()),
+        );
+        let mut skill_store_state = SkillStoreState::new(skill_loader.api());
         skill_store_state.upsert_skill(configured_skill.clone());
         let (skill, digest) = skill_store_state
             .skill_loader
-            .fetch(configured_skill)
+            .fetch(configured_skill.clone())
             .await?;
-        skill_store_state.insert(greet_skill.clone(), Arc::new(skill), digest);
+        skill_store_state.insert(skill_path.clone(), Arc::new(skill), digest);
         assert_eq!(
             skill_store_state.list_cached_skills().collect::<Vec<_>>(),
-            vec![&greet_skill]
+            vec![&skill_path]
         );
 
-        // When we update "greet_skill"s contents and we clear out expired skills
-        let wasm_file = temp_dir.path().join("greet_skill_v0_2.wasm");
-        let prev_time = fs::metadata(&wasm_file)?.modified()?;
-        // Another skill so we can copy it over
-        let _use_me_ = given_chat_skill();
-        fs::copy("./skills/chat_skill.wasm", &wasm_file)?;
-        let new_time = fs::metadata(&wasm_file)?.modified()?;
-        assert_ne!(prev_time, new_time);
-
+        // When we update the digest of the "greet" skill and we clear out expired skills
+        skill_loader.change_digest(configured_skill, Digest("different-digest".to_owned()));
         skill_store_state
-            .validate_digest(greet_skill.clone())
+            .validate_digest(skill_path.clone())
             .await?;
 
         // Then greet skill is no longer listed in the cache, but of course still available in the
@@ -954,7 +952,7 @@ pub mod tests {
         assert_eq!(skill_store_state.list_cached_skills().count(), 0);
         assert_eq!(
             skill_store_state.skills().collect::<Vec<_>>(),
-            vec![&greet_skill]
+            vec![&skill_path]
         );
 
         Ok(())
@@ -1046,7 +1044,11 @@ pub mod tests {
     struct SkillLoaderStub {
         hasher: DefaultHasher,
         engine: Arc<Engine>,
-        skills: HashMap<ConfiguredSkill, (Skill, Digest)>
+        // We wrap the the hash map in an
+        // * Arc: so we can clone it for the api
+        // * Mutex: so we can mutate the state of the hash map, even after we have passed the api to
+        //   the skill store.
+        skills: Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>>
     }
 
     impl SkillLoaderStub {
@@ -1054,30 +1056,47 @@ pub mod tests {
             SkillLoaderStub {
                 hasher: DefaultHasher::new(),
                 engine,
-                skills: HashMap::new()
+                skills: Arc::new(std::sync::Mutex::new(HashMap::new()))
             }
         }
 
+        /// Adds a skill to the stub. Automatically creates a digest from the skill bytes using the
+        /// default hasher.
         pub fn add(&mut self, configured_skill: ConfiguredSkill, skill_bytes: Vec<u8>) {
             self.hasher.write(&skill_bytes);
             let digest = Digest(self.hasher.finish().to_string());
             let skill = Skill::new(&self.engine, skill_bytes).unwrap();
-            self.skills.insert(configured_skill, (skill, digest));
+            let mut guard = self.skills.lock().unwrap();
+            guard.insert(configured_skill, (skill, digest));
         }
 
-        pub fn into_api(self) -> Arc<HashMap<ConfiguredSkill, (Skill, Digest)>> {
-            Arc::new(self.skills)
+        /// Adds a skill to the stub. Allows you to set the digest manually.
+        pub fn add_with_digest(&mut self, configured_skill: ConfiguredSkill, skill_bytes: Vec<u8>, digest: Digest) {
+            self.hasher.write(&skill_bytes);
+            let skill = Skill::new(&self.engine, skill_bytes).unwrap();
+            let mut guard = self.skills.lock().unwrap();
+            guard.insert(configured_skill, (skill, digest));
+        }
+
+        pub fn change_digest(&mut self, configured_skill: ConfiguredSkill, new_digest: Digest) {
+            let mut guard = self.skills.lock().unwrap();
+            let (_skill, digest) = guard.get_mut(&configured_skill).unwrap();
+            *digest = new_digest;
+        }
+
+        pub fn api(&self) -> Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>> {
+            self.skills.clone()
         }
     }
 
     #[async_trait]
-    impl SkillLoaderApi for Arc<HashMap<ConfiguredSkill, (Skill, Digest)>> {
+    impl SkillLoaderApi for Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>> {
         async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), SkillLoaderError> {
-            self.get(&skill).cloned().ok_or(SkillLoaderError::SkillNotFound(skill))
+            self.lock().unwrap().get(&skill).cloned().ok_or(SkillLoaderError::SkillNotFound(skill))
         }
     
         async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError> {
-            let maybe_digest = self.get(&skill).map(|(_, digest)| digest.clone());
+            let maybe_digest = self.lock().unwrap().get(&skill).map(|(_, digest)| digest.clone());
             Ok(maybe_digest)
         }
     }
