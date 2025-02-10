@@ -574,7 +574,7 @@ mod tests {
     use crate::{
         authorization::{self, tests::StubAuthorization},
         csi::tests::{DummyCsi, StubCsi},
-        inference::{self, Completion},
+        inference,
         skill_runtime::{
             SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg,
         },
@@ -736,8 +736,8 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let completion = serde_json::from_slice::<Completion>(&body).unwrap();
-        assert_eq!(completion.text, prompt);
+        let json_value: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json_value["text"].as_str().unwrap(), prompt);
     }
 
     #[tokio::test]
