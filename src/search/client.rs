@@ -59,7 +59,7 @@ impl SearchRequest {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(untagged)]
 pub enum MetadataFieldValue {
     String(String),
@@ -67,7 +67,7 @@ pub enum MetadataFieldValue {
     Boolean(bool),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum MetadataFilterCondition {
     GreaterThan(f64),
@@ -84,21 +84,21 @@ pub enum MetadataFilterCondition {
     IsNull(serde_bool::True),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct MetadataFilter {
-    field: String,
+    pub field: String,
     #[serde(flatten)]
-    condition: MetadataFilterCondition,
+    pub condition: MetadataFilterCondition,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum FilterCondition {
     Modality(ModalityType),
     Metadata(MetadataFilter),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Filter {
     Without(Vec<FilterCondition>),
@@ -106,7 +106,7 @@ pub enum Filter {
     With(Vec<FilterCondition>),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ModalityType {
     Text,

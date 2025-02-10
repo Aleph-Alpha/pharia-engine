@@ -191,6 +191,7 @@ impl From<SearchRequest> for search::SearchRequest {
             query,
             max_results,
             min_score,
+            filter: None,
         }
     }
 }
