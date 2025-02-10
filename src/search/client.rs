@@ -74,8 +74,6 @@ pub enum MetadataFilterCondition {
     GreaterThanOrEqualTo(f64),
     LessThan(f64),
     LessThanOrEqualTo(f64),
-    // Do we want to do data validation and parse to dates here, or simply forward strings
-    // and then get an error from the Document Index API?
     After(String),
     AtOrAfter(String),
     Before(String),

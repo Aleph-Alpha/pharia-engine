@@ -201,6 +201,7 @@ pub struct SearchRequest {
     pub index_path: IndexPath,
     pub max_results: u32,
     pub min_score: Option<f64>,
+    pub filters: Vec<Filter>,
 }
 
 impl From<SearchRequest> for search::SearchRequest {
@@ -210,13 +211,149 @@ impl From<SearchRequest> for search::SearchRequest {
             index_path,
             max_results,
             min_score,
+            filters,
         } = value;
         search::SearchRequest {
             query,
             index_path: index_path.into(),
             max_results,
             min_score,
-            filters: Vec::new(),
+            filters: filters.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum Filter {
+    Without(Vec<FilterCondition>),
+    WithOneOf(Vec<FilterCondition>),
+    With(Vec<FilterCondition>),
+}
+
+impl From<Filter> for search::Filter {
+    fn from(value: Filter) -> Self {
+        match value {
+            Filter::Without(items) => {
+                search::Filter::Without(items.into_iter().map(Into::into).collect())
+            }
+            Filter::WithOneOf(items) => {
+                search::Filter::WithOneOf(items.into_iter().map(Into::into).collect())
+            }
+            Filter::With(items) => {
+                search::Filter::With(items.into_iter().map(Into::into).collect())
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum FilterCondition {
+    Modality(ModalityType),
+    Metadata(MetadataFilter),
+}
+
+impl From<FilterCondition> for search::FilterCondition {
+    fn from(value: FilterCondition) -> Self {
+        match value {
+            FilterCondition::Modality(modality_type) => {
+                search::FilterCondition::Modality(modality_type.into())
+            }
+            FilterCondition::Metadata(metadata_filter) => {
+                search::FilterCondition::Metadata(metadata_filter.into())
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum ModalityType {
+    Text,
+}
+
+impl From<ModalityType> for search::ModalityType {
+    fn from(value: ModalityType) -> Self {
+        match value {
+            ModalityType::Text => search::ModalityType::Text,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct MetadataFilter {
+    pub field: String,
+    #[serde(flatten)]
+    pub condition: MetadataFilterCondition,
+}
+
+impl From<MetadataFilter> for search::MetadataFilter {
+    fn from(value: MetadataFilter) -> Self {
+        let MetadataFilter { field, condition } = value;
+        Self {
+            field,
+            condition: condition.into(),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum MetadataFilterCondition {
+    GreaterThan(f64),
+    GreaterThanOrEqualTo(f64),
+    LessThan(f64),
+    LessThanOrEqualTo(f64),
+    After(String),
+    AtOrAfter(String),
+    Before(String),
+    AtOrBefore(String),
+    EqualTo(MetadataFieldValue),
+    IsNull(serde_bool::True),
+}
+
+impl From<MetadataFilterCondition> for search::MetadataFilterCondition {
+    fn from(value: MetadataFilterCondition) -> Self {
+        match value {
+            MetadataFilterCondition::GreaterThan(v) => {
+                search::MetadataFilterCondition::GreaterThan(v)
+            }
+            MetadataFilterCondition::GreaterThanOrEqualTo(v) => {
+                search::MetadataFilterCondition::GreaterThanOrEqualTo(v)
+            }
+            MetadataFilterCondition::LessThan(v) => search::MetadataFilterCondition::LessThan(v),
+            MetadataFilterCondition::LessThanOrEqualTo(v) => {
+                search::MetadataFilterCondition::LessThanOrEqualTo(v)
+            }
+            MetadataFilterCondition::After(v) => search::MetadataFilterCondition::After(v),
+            MetadataFilterCondition::AtOrAfter(v) => search::MetadataFilterCondition::AtOrAfter(v),
+            MetadataFilterCondition::Before(v) => search::MetadataFilterCondition::Before(v),
+            MetadataFilterCondition::AtOrBefore(v) => {
+                search::MetadataFilterCondition::AtOrBefore(v)
+            }
+            MetadataFilterCondition::EqualTo(v) => {
+                search::MetadataFilterCondition::EqualTo(v.into())
+            }
+            MetadataFilterCondition::IsNull(v) => search::MetadataFilterCondition::IsNull(v),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum MetadataFieldValue {
+    String(String),
+    Integer(i64),
+    Boolean(bool),
+}
+
+impl From<MetadataFieldValue> for search::MetadataFieldValue {
+    fn from(value: MetadataFieldValue) -> Self {
+        match value {
+            MetadataFieldValue::String(v) => search::MetadataFieldValue::String(v),
+            MetadataFieldValue::Integer(v) => search::MetadataFieldValue::Integer(v),
+            MetadataFieldValue::Boolean(v) => search::MetadataFieldValue::Boolean(v),
         }
     }
 }
@@ -592,7 +729,19 @@ mod tests {
                         "index": "asym-64"
                     },
                     "max_results": 10,
-                    "min_score": null
+                    "min_score": null,
+                    "filters": [
+                        {
+                            "with": [
+                                {
+                                    "metadata": {
+                                        "field": "created",
+                                        "after": "1970-07-01T14:10:11Z"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
                 },
                 {
                     "query": "Hello",
@@ -602,7 +751,8 @@ mod tests {
                         "index": "asym-64"
                     },
                     "max_results": 10,
-                    "min_score": null
+                    "min_score": null,
+                    "filters": []
                 }
             ]
         });
