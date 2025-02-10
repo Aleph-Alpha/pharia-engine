@@ -63,7 +63,8 @@ impl CsiRequest {
             CsiRequest::Search(search_request) => drivers
                 .search(auth, vec![search_request.into()])
                 .await
-                .map(|v| json!(v.first().unwrap()))?,
+                .map(|mut r| CsiResponse::Search(r.remove(0).into_iter().map(Into::into).collect()))
+                .map(|v| json!(v))?,
             CsiRequest::Chat(chat_request) => drivers
                 .chat(auth, vec![chat_request.into()])
                 .await
@@ -93,40 +94,10 @@ enum CsiResponse {
     CompleteAll(Vec<Completion>),
     Chunk(Vec<Vec<String>>),
     Language(Option<Language>),
+    Search(Vec<SearchResult>),
 }
 
-#[derive(Serialize)]
-struct Completion {
-    pub text: String,
-    pub finish_reason: FinishReason,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-enum FinishReason {
-    Stop,
-    Length,
-    ContentFilter,
-}
-
-impl TryFrom<language_selection::Language> for Language {
-    type Error = CsiShellError;
-
-    fn try_from(value: language_selection::Language) -> Result<Self, Self::Error> {
-        let language = match value {
-            language_selection::Language::Eng => Self::Eng,
-            language_selection::Language::Deu => Self::Deu,
-            _ => {
-                let err = anyhow::anyhow!("Unsupported language: {:?}", value);
-                tracing::error!("{}", err);
-                return Err(CsiShellError::Internal(err));
-            }
-        };
-        Ok(language)
-    }
-}
-
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct DocumentPath {
     pub namespace: String,
     pub collection: String,
@@ -148,27 +119,41 @@ impl From<DocumentPath> for search::DocumentPath {
     }
 }
 
-impl From<inference::FinishReason> for FinishReason {
-    fn from(value: inference::FinishReason) -> Self {
-        match value {
-            inference::FinishReason::Stop => Self::Stop,
-            inference::FinishReason::Length => Self::Length,
-            inference::FinishReason::ContentFilter => Self::ContentFilter,
+impl From<search::DocumentPath> for DocumentPath {
+    fn from(value: search::DocumentPath) -> Self {
+        let search::DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = value;
+        Self {
+            namespace,
+            collection,
+            name,
         }
     }
 }
 
-impl From<inference::Completion> for Completion {
-    fn from(value: inference::Completion) -> Self {
-        let inference::Completion {
-            text,
-            finish_reason,
-            logprobs: _,
-            usage: _,
+#[derive(Serialize)]
+struct SearchResult {
+    pub document_path: DocumentPath,
+    pub content: String,
+    pub score: f64,
+}
+
+impl From<search::SearchResult> for SearchResult {
+    fn from(value: search::SearchResult) -> Self {
+        let search::SearchResult {
+            document_path,
+            content,
+            score,
+            start: _,
+            end: _,
         } = value;
         Self {
-            text,
-            finish_reason: finish_reason.into(),
+            document_path: document_path.into(),
+            content,
+            score,
         }
     }
 }
@@ -228,6 +213,45 @@ impl From<CompletionParams> for inference::CompletionParams {
             frequency_penalty: None,
             presence_penalty: None,
             logprobs: inference::Logprobs::No,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Completion {
+    pub text: String,
+    pub finish_reason: FinishReason,
+}
+
+impl From<inference::Completion> for Completion {
+    fn from(value: inference::Completion) -> Self {
+        let inference::Completion {
+            text,
+            finish_reason,
+            logprobs: _,
+            usage: _,
+        } = value;
+        Self {
+            text,
+            finish_reason: finish_reason.into(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FinishReason {
+    Stop,
+    Length,
+    ContentFilter,
+}
+
+impl From<inference::FinishReason> for FinishReason {
+    fn from(value: inference::FinishReason) -> Self {
+        match value {
+            inference::FinishReason::Stop => Self::Stop,
+            inference::FinishReason::Length => Self::Length,
+            inference::FinishReason::ContentFilter => Self::ContentFilter,
         }
     }
 }
@@ -296,6 +320,23 @@ impl From<Language> for language_selection::Language {
             Language::Eng => Self::Eng,
             Language::Deu => Self::Deu,
         }
+    }
+}
+
+impl TryFrom<language_selection::Language> for Language {
+    type Error = CsiShellError;
+
+    fn try_from(value: language_selection::Language) -> Result<Self, Self::Error> {
+        let language = match value {
+            language_selection::Language::Eng => Self::Eng,
+            language_selection::Language::Deu => Self::Deu,
+            _ => {
+                let err = anyhow::anyhow!("Unsupported language: {:?}", value);
+                tracing::error!("{}", err);
+                return Err(CsiShellError::Internal(err));
+            }
+        };
+        Ok(language)
     }
 }
 
@@ -416,11 +457,45 @@ pub mod tests {
 
     use super::*;
     pub use crate::csi_shell::VersionedCsiRequest;
-    use crate::inference;
+    use crate::{inference, language_selection, search};
+
+    #[test]
+    fn search_response() {
+        let response = CsiResponse::Search(vec![search::SearchResult {
+            document_path: search::DocumentPath::new("Kernel", "test", "kernel-docs"),
+            content: "Hello".to_string(),
+            score: 0.5,
+            start: search::TextCursor {
+                item: 0,
+                position: 0,
+            },
+            end: search::TextCursor {
+                item: 0,
+                position: 5,
+            },
+        }
+        .into()]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!([{
+                "document_path": {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "kernel-docs"
+                },
+                "content": "Hello",
+                "score": 0.5,
+            }])
+        );
+    }
 
     #[test]
     fn language_response() {
-        let response = CsiResponse::Language(Some(Language::Eng));
+        let response =
+            CsiResponse::Language(Some(language_selection::Language::Eng.try_into().unwrap()));
 
         let serialized = serde_json::to_value(response).unwrap();
 
