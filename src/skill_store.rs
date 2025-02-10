@@ -961,23 +961,23 @@ pub mod tests {
     #[tokio::test]
     async fn does_not_invalidate_unchanged_digests() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
-        let _use_me_ = given_greet_skill_v0_2();
-        let greet_skill = SkillPath::local("greet_skill_v0_2");
+        let skill_bytes = given_greet_skill_v0_2().bytes();
+        let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false)?);
-        let skill_loader =
-            SkillLoader::with_file_registry(engine, greet_skill.namespace.clone()).api();
-        let mut skill_store_state = SkillStoreState::new(skill_loader);
+        let configured_skill = ConfiguredSkill::from_path(&skill_path);
+        let mut skill_loader = SkillLoaderStub::new(engine.clone());
+        skill_loader.add(configured_skill.clone(), skill_bytes);
+        let mut skill_store_state = SkillStoreState::new(skill_loader.api());
 
-        let configured_skill = ConfiguredSkill::from_path(&greet_skill);
         skill_store_state.upsert_skill(configured_skill.clone());
         let (skill, digest) = skill_store_state
             .skill_loader
             .fetch(configured_skill)
             .await?;
-        skill_store_state.insert(greet_skill.clone(), Arc::new(skill), digest);
+        skill_store_state.insert(skill_path.clone(), Arc::new(skill), digest);
 
         // When we check it with no changes
-        skill_store_state.validate_digest(greet_skill).await?;
+        skill_store_state.validate_digest(skill_path).await?;
 
         // Then nothing changes
         assert_eq!(
