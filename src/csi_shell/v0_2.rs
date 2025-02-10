@@ -70,12 +70,7 @@ impl CsiRequest {
             CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|r| {
-                    r.into_iter()
-                        .map(TryInto::try_into)
-                        .collect::<Result<Vec<_>, _>>()
-                        .map(CsiResponse::Documents)
-                })?,
+                .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect())),
             CsiRequest::DocumentMetadata { document_path } => drivers
                 .document_metadata(auth, vec![document_path.into()])
                 .await
@@ -144,20 +139,17 @@ impl From<search::DocumentPath> for DocumentPath {
 #[serde(rename_all = "snake_case", tag = "modality")]
 enum Modality {
     Text { text: String },
+    Image,
 }
 
-impl TryFrom<search::Modality> for Modality {
-    type Error = anyhow::Error;
-
-    fn try_from(value: search::Modality) -> Result<Self, Self::Error> {
-        if let search::Modality::Text { text } = value {
-            Ok(Modality::Text { text })
-        } else {
-            Err(anyhow::anyhow!("Unsupported modality: {:?}", value))
+impl From<search::Modality> for Modality {
+    fn from(value: search::Modality) -> Self {
+        match value {
+            search::Modality::Text { text } => Modality::Text { text },
+            search::Modality::Image { bytes: _ } => Modality::Image,
         }
     }
 }
-
 #[derive(Serialize)]
 struct Document {
     path: DocumentPath,
@@ -165,23 +157,18 @@ struct Document {
     metadata: Option<Value>,
 }
 
-impl TryFrom<search::Document> for Document {
-    type Error = anyhow::Error;
-
-    fn try_from(value: search::Document) -> Result<Self, Self::Error> {
+impl From<search::Document> for Document {
+    fn from(value: search::Document) -> Self {
         let search::Document {
             path,
             contents,
             metadata,
         } = value;
-        Ok(Document {
+        Self {
             path: path.into(),
-            contents: contents
-                .into_iter()
-                .map(Modality::try_from)
-                .collect::<Result<Vec<_>, _>>()?,
+            contents: contents.into_iter().map(Into::into).collect(),
             metadata,
-        })
+        }
     }
 }
 #[derive(Serialize)]
@@ -555,7 +542,7 @@ pub mod tests {
 
     #[test]
     fn documents_response() {
-        let response = CsiResponse::Documents(vec![search::Document::dummy().try_into().unwrap()]);
+        let response = CsiResponse::Documents(vec![search::Document::dummy().into()]);
 
         let serialized = serde_json::to_value(response).unwrap();
 
