@@ -73,11 +73,18 @@ impl CsiRequest {
             CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
+                .map(|r| {
+                    r.into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<Vec<_>, _>>()
+                        .map(CsiResponse::Documents)
+                })?
                 .map(|r| json!(r))?,
             CsiRequest::DocumentMetadata { document_path } => drivers
                 .document_metadata(auth, vec![document_path.into()])
                 .await
-                .map(|r| json!(r.first().unwrap()))?,
+                .map(|mut r| CsiResponse::DocumentMetadata(r.remove(0)))
+                .map(|r| json!(r))?,
             CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
                     function.unwrap_or_else(|| "specified".to_owned()),
@@ -97,6 +104,8 @@ enum CsiResponse {
     Language(Option<Language>),
     Search(Vec<SearchResult>),
     Chat(ChatResponse),
+    Documents(Vec<Document>),
+    DocumentMetadata(Option<Value>),
 }
 
 #[derive(Deserialize, Serialize)]
@@ -136,6 +145,53 @@ impl From<search::DocumentPath> for DocumentPath {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case", tag = "modality")]
+enum Modality {
+    Text { text: String },
+}
+
+impl TryFrom<search::Modality> for Modality {
+    type Error = CsiShellError;
+
+    fn try_from(value: search::Modality) -> Result<Self, Self::Error> {
+        if let search::Modality::Text { text } = value {
+            Ok(Modality::Text { text })
+        } else {
+            Err(CsiShellError::Internal(anyhow::anyhow!(
+                "Unsupported modality: {:?}",
+                value
+            )))
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Document {
+    path: DocumentPath,
+    contents: Vec<Modality>,
+    metadata: Option<Value>,
+}
+
+impl TryFrom<search::Document> for Document {
+    type Error = CsiShellError;
+
+    fn try_from(value: search::Document) -> Result<Self, Self::Error> {
+        let search::Document {
+            path,
+            contents,
+            metadata,
+        } = value;
+        Ok(Document {
+            path: path.into(),
+            contents: contents
+                .into_iter()
+                .map(Modality::try_from)
+                .collect::<Result<Vec<_>, _>>()?,
+            metadata,
+        })
+    }
+}
 #[derive(Serialize)]
 struct SearchResult {
     document_path: DocumentPath,
@@ -489,6 +545,48 @@ pub mod tests {
     pub use crate::csi_shell::VersionedCsiRequest;
     use crate::{inference, language_selection, search};
 
+    #[test]
+    fn document_metadata_response() {
+        let response = CsiResponse::DocumentMetadata(Some(json!({
+            "url": "http://example.de"
+        })));
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!({
+                "url": "http://example.de"
+            })
+        );
+    }
+
+    #[test]
+    fn documents_response() {
+        let response = CsiResponse::Documents(vec![search::Document::dummy().try_into().unwrap()]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!([{
+                "contents": [
+                    {
+                        "modality": "text",
+                        "text": "Hello Homer"
+                    }
+                ],
+                "metadata": {
+                    "url": "http://example.de"
+                },
+                "path": {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "kernel-docs"
+                },
+            }])
+        );
+    }
     #[test]
     fn chat_response() {
         let response = CsiResponse::Chat(
