@@ -2,7 +2,8 @@ use exports::pharia::skill::skill_handler::SkillMetadata;
 use pharia::skill::csi::{
     ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion, CompletionParams,
     CompletionRequest, Distribution, Document, DocumentPath, FinishReason, Host, IndexPath,
-    Language, Logprob, Logprobs, Message, Modality, SearchRequest, SearchResult,
+    Language, Logprob, Logprobs, Message, MetadataFieldValue, MetadataFilter,
+    MetadataFilterCondition, Modality, SearchFilter, SearchRequest, SearchResult,
     SelectLanguageRequest, TextCursor, TokenUsage,
 };
 use serde_json::Value;
@@ -185,13 +186,88 @@ impl From<SearchRequest> for search::SearchRequest {
             query,
             max_results,
             min_score,
+            filter,
         } = request;
         Self {
             index_path: index_path.into(),
             query,
             max_results,
             min_score,
-            filter: None,
+            filter: filter.map(Into::into),
+        }
+    }
+}
+
+impl From<SearchFilter> for search::Filter {
+    fn from(value: SearchFilter) -> Self {
+        match value {
+            SearchFilter::Without(metadata_filters) => search::Filter::Without(
+                metadata_filters
+                    .into_iter()
+                    .map(|f| search::FilterCondition::Metadata(f.into()))
+                    .collect(),
+            ),
+            SearchFilter::WithOneOf(metadata_filters) => search::Filter::WithOneOf(
+                metadata_filters
+                    .into_iter()
+                    .map(|f| search::FilterCondition::Metadata(f.into()))
+                    .collect(),
+            ),
+            SearchFilter::WithAll(metadata_filters) => search::Filter::With(
+                metadata_filters
+                    .into_iter()
+                    .map(|f| search::FilterCondition::Metadata(f.into()))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl From<MetadataFilter> for search::MetadataFilter {
+    fn from(value: MetadataFilter) -> Self {
+        let MetadataFilter { field, condition } = value;
+        Self {
+            field,
+            condition: condition.into(),
+        }
+    }
+}
+
+impl From<MetadataFilterCondition> for search::MetadataFilterCondition {
+    fn from(value: MetadataFilterCondition) -> Self {
+        match value {
+            MetadataFilterCondition::GreaterThan(v) => {
+                search::MetadataFilterCondition::GreaterThan(v)
+            }
+            MetadataFilterCondition::GreaterThanOrEqualTo(v) => {
+                search::MetadataFilterCondition::GreaterThanOrEqualTo(v)
+            }
+            MetadataFilterCondition::LessThan(v) => search::MetadataFilterCondition::LessThan(v),
+            MetadataFilterCondition::LessThanOrEqualTo(v) => {
+                search::MetadataFilterCondition::LessThanOrEqualTo(v)
+            }
+            MetadataFilterCondition::After(v) => search::MetadataFilterCondition::After(v),
+            MetadataFilterCondition::AtOrAfter(v) => search::MetadataFilterCondition::AtOrAfter(v),
+            MetadataFilterCondition::Before(v) => search::MetadataFilterCondition::Before(v),
+            MetadataFilterCondition::AtOrBefore(v) => {
+                search::MetadataFilterCondition::AtOrBefore(v)
+            }
+            MetadataFilterCondition::EqualTo(metadata_field_value) => {
+                search::MetadataFilterCondition::EqualTo(metadata_field_value.into())
+            }
+            MetadataFilterCondition::IsNull => {
+                search::MetadataFilterCondition::IsNull(serde_bool::True)
+            }
+        }
+    }
+}
+
+impl From<MetadataFieldValue> for search::MetadataFieldValue {
+    fn from(value: MetadataFieldValue) -> Self {
+        match value {
+            MetadataFieldValue::StringType(v) => search::MetadataFieldValue::String(v),
+            MetadataFieldValue::IntegerType(v) => search::MetadataFieldValue::Integer(v),
+            MetadataFieldValue::BooleanType(v) => search::MetadataFieldValue::Boolean(v),
         }
     }
 }

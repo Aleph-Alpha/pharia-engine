@@ -427,7 +427,8 @@ interface csi {
         index-path: index-path,
         query: string,
         max-results: u32,
-        min-score: option<f64>
+        min-score: option<f64>,
+        filter: option<search-filter>
     }
 
     // @since(version = 0.3.0)
@@ -441,6 +442,40 @@ interface csi {
         path: document-path,
         contents: list<modality>,
         metadata: option<list<u8>>,
+    }
+
+    /// @since(version = 0.3.0)
+    variant search-filter {
+        without(list<metadata-filter>),
+        with-one-of(list<metadata-filter>),
+        with-all(list<metadata-filter>),
+    }
+
+    /// @since(version = 0.3.0)
+    record metadata-filter {
+        field: string,
+        condition: metadata-filter-condition
+    }
+
+    /// @since(version = 0.3.0)
+    variant metadata-filter-condition {
+        greater-than(f64),
+        greater-than-or-equal-to(f64),
+        less-than(f64),
+        less-than-or-equal-to(f64),
+        after(string),
+        at-or-after(string),
+        before(string),
+        at-or-before(string),
+        equal-to(metadata-field-value),
+        is-null,
+    }
+
+    /// @since(version = 0.3.0)
+    variant metadata-field-value {
+        string-type(string),
+        integer-type(s64),
+        boolean-type(bool),
     }
 
     /// @since(version = 0.3.0)
