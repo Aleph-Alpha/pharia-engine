@@ -35,41 +35,38 @@ impl CsiRequest {
     where
         C: Csi + Sync,
     {
-        let result = match self {
+        let response = match self {
             CsiRequest::Complete(completion_request) => drivers
                 .complete(auth, vec![completion_request.into()])
                 .await
-                .map(|mut r| CsiResponse::Complete(r.remove(0).into()))
-                .map(|r| json!(r))?,
+                .map(|mut r| CsiResponse::Complete(r.remove(0).into())),
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await
-                .map(CsiResponse::Chunk)
-                .map(|r| json!(r))?,
+                .map(CsiResponse::Chunk),
             CsiRequest::SelectLanguage(select_language_request) => drivers
                 .select_language(vec![select_language_request.into()])
                 .await
-                .map(|r| {
-                    r[0].map(TryInto::try_into)
+                .map(|mut r| {
+                    r.remove(0)
+                        .map(TryInto::try_into)
                         .transpose()
                         .map(CsiResponse::Language)
-                })?
-                .map(|r| json!(r))?,
+                })?,
             CsiRequest::CompleteAll { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|r| CsiResponse::CompleteAll(r.into_iter().map(Into::into).collect()))
-                .map(|v| json!(v))?,
+                .map(|r| CsiResponse::CompleteAll(r.into_iter().map(Into::into).collect())),
             CsiRequest::Search(search_request) => drivers
                 .search(auth, vec![search_request.into()])
                 .await
-                .map(|mut r| CsiResponse::Search(r.remove(0).into_iter().map(Into::into).collect()))
-                .map(|v| json!(v))?,
+                .map(|mut r| {
+                    CsiResponse::Search(r.remove(0).into_iter().map(Into::into).collect())
+                }),
             CsiRequest::Chat(chat_request) => drivers
                 .chat(auth, vec![chat_request.into()])
                 .await
-                .map(|mut r| CsiResponse::Chat(r.remove(0).into()))
-                .map(|v| json!(v))?,
+                .map(|mut r| CsiResponse::Chat(r.remove(0).into())),
             CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -78,20 +75,18 @@ impl CsiRequest {
                         .map(TryInto::try_into)
                         .collect::<Result<Vec<_>, _>>()
                         .map(CsiResponse::Documents)
-                })?
-                .map(|r| json!(r))?,
+                })?,
             CsiRequest::DocumentMetadata { document_path } => drivers
                 .document_metadata(auth, vec![document_path.into()])
                 .await
-                .map(|mut r| CsiResponse::DocumentMetadata(r.remove(0)))
-                .map(|r| json!(r))?,
+                .map(|mut r| CsiResponse::DocumentMetadata(r.remove(0))),
             CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
                     function.unwrap_or_else(|| "specified".to_owned()),
                 ));
             }
-        };
-        Ok(result)
+        }?;
+        Ok(json!(response))
     }
 }
 
@@ -152,16 +147,13 @@ enum Modality {
 }
 
 impl TryFrom<search::Modality> for Modality {
-    type Error = CsiShellError;
+    type Error = anyhow::Error;
 
     fn try_from(value: search::Modality) -> Result<Self, Self::Error> {
         if let search::Modality::Text { text } = value {
             Ok(Modality::Text { text })
         } else {
-            Err(CsiShellError::Internal(anyhow::anyhow!(
-                "Unsupported modality: {:?}",
-                value
-            )))
+            Err(anyhow::anyhow!("Unsupported modality: {:?}", value))
         }
     }
 }
@@ -174,7 +166,7 @@ struct Document {
 }
 
 impl TryFrom<search::Document> for Document {
-    type Error = CsiShellError;
+    type Error = anyhow::Error;
 
     fn try_from(value: search::Document) -> Result<Self, Self::Error> {
         let search::Document {
@@ -382,7 +374,7 @@ impl From<Language> for language_selection::Language {
 }
 
 impl TryFrom<language_selection::Language> for Language {
-    type Error = CsiShellError;
+    type Error = anyhow::Error;
 
     fn try_from(value: language_selection::Language) -> Result<Self, Self::Error> {
         let language = match value {
@@ -391,7 +383,7 @@ impl TryFrom<language_selection::Language> for Language {
             _ => {
                 let err = anyhow::anyhow!("Unsupported language: {:?}", value);
                 tracing::error!("{}", err);
-                return Err(CsiShellError::Internal(err));
+                return Err(err);
             }
         };
         Ok(language)
