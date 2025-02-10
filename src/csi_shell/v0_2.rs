@@ -2,7 +2,7 @@
 ///
 /// See [v0_3.rs](v0_3.rs) for a more detailed explanation on the reasoning for introducing
 /// serializable/user-facing structs in here and for not serializing our "internal" representations.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection, search};
@@ -39,7 +39,8 @@ impl CsiRequest {
             CsiRequest::Complete(completion_request) => drivers
                 .complete(auth, vec![completion_request.into()])
                 .await
-                .map(|r| json!(r.first().unwrap()))?,
+                .map(|mut r| CsiResponse::Completion(r.remove(0).into()))
+                .map(|r| json!(r))?,
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await
@@ -78,6 +79,12 @@ impl CsiRequest {
     }
 }
 
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum CsiResponse {
+    Completion(Completion),
+}
+
 #[derive(Deserialize)]
 pub struct DocumentPath {
     pub namespace: String,
@@ -96,6 +103,45 @@ impl From<DocumentPath> for search::DocumentPath {
             namespace,
             collection,
             name,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct Completion {
+    pub text: String,
+    pub finish_reason: FinishReason,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinishReason {
+    Stop,
+    Length,
+    ContentFilter,
+}
+
+impl From<inference::FinishReason> for FinishReason {
+    fn from(value: inference::FinishReason) -> Self {
+        match value {
+            inference::FinishReason::Stop => Self::Stop,
+            inference::FinishReason::Length => Self::Length,
+            inference::FinishReason::ContentFilter => Self::ContentFilter,
+        }
+    }
+}
+
+impl From<inference::Completion> for Completion {
+    fn from(value: inference::Completion) -> Self {
+        let inference::Completion {
+            text,
+            finish_reason,
+            logprobs: _,
+            usage: _,
+        } = value;
+        Self {
+            text,
+            finish_reason: finish_reason.into(),
         }
     }
 }
@@ -343,6 +389,31 @@ pub mod tests {
 
     use super::*;
     pub use crate::csi_shell::VersionedCsiRequest;
+    use crate::inference;
+
+    #[test]
+    fn complete_response() {
+        let response = CsiResponse::Completion(
+            inference::Completion {
+                text: "Hello".to_string(),
+                finish_reason: inference::FinishReason::Stop,
+                logprobs: vec![],
+                usage: inference::TokenUsage {
+                    prompt: 0,
+                    completion: 0,
+                },
+            }
+            .into(),
+        );
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        let expected = json!({
+            "text": "Hello",
+            "finish_reason": "stop"
+        });
+        assert_eq!(serialized, expected);
+    }
 
     #[test]
     fn complete_request() {
