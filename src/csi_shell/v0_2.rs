@@ -291,7 +291,7 @@ impl From<SearchRequest> for search::SearchRequest {
             index_path: index_path.into(),
             max_results,
             min_score,
-            filter: None,
+            filters: Vec::new(),
         }
     }
 }

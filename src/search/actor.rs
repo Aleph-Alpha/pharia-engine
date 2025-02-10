@@ -140,7 +140,7 @@ pub struct SearchRequest {
     /// By default, all results are returned, up to the `max_results`.
     pub min_score: Option<f64>,
     /// A filter to apply to the search
-    pub filter: Option<Filter>,
+    pub filters: Vec<Filter>,
 }
 
 /// A section of a document that is returned from a search request
@@ -270,7 +270,7 @@ impl DocumentIndexMessage {
             query,
             max_results,
             min_score,
-            filter,
+            filters,
         } = request;
         client
             .search(
@@ -281,7 +281,7 @@ impl DocumentIndexMessage {
                     min_score,
                     // Make sure we only receive results of type text
                     true,
-                    filter,
+                    filters,
                 ),
                 api_token,
             )
@@ -444,7 +444,7 @@ pub mod tests {
                 query: query.into(),
                 max_results: 1,
                 min_score: None,
-                filter: None,
+                filters: Vec::new(),
             }
         }
 
@@ -459,7 +459,7 @@ pub mod tests {
         }
 
         pub fn with_filter(mut self, filter: Filter) -> Self {
-            self.filter = Some(filter);
+            self.filters.push(filter);
             self
         }
     }

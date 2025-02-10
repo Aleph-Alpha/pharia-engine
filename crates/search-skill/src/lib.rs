@@ -24,7 +24,7 @@ impl Guest for Skill {
             query,
             max_results: 10,
             min_score: None,
-            filter: None,
+            filters: Vec::new(),
         };
         let mut results = search(&[request]);
         let results = results

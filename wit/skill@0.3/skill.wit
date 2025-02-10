@@ -428,7 +428,7 @@ interface csi {
         query: string,
         max-results: u32,
         min-score: option<f64>,
-        filter: option<search-filter>
+        filters: list<search-filter>
     }
 
     // @since(version = 0.3.0)
