@@ -29,7 +29,7 @@ impl Guest for Skill {
         let results = results
             .remove(0)
             .iter()
-            .map(|r| r.section.clone())
+            .map(|r| r.content.clone())
             .collect::<Vec<_>>();
         let output = serde_json::to_vec(&json!(results))
             .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;

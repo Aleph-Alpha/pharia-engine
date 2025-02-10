@@ -276,14 +276,14 @@ impl From<search::SearchResult> for SearchResult {
     fn from(search_result: search::SearchResult) -> Self {
         let search::SearchResult {
             document_path,
-            section,
+            content,
             score,
             start,
             end,
         } = search_result;
         Self {
             document_path: document_path.into(),
-            section,
+            content,
             score,
             start: start.into(),
             end: end.into(),

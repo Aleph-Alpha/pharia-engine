@@ -737,7 +737,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                     };
                     vec![SearchResult {
                         document_path,
-                        section: request.query,
+                        content: request.query,
                         score: 1.0,
                         start: TextCursor {
                             item: 0,
