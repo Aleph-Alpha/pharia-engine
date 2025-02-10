@@ -44,11 +44,17 @@ impl CsiRequest {
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await
-                .map(|r| json!(r.first().unwrap()))?,
+                .map(CsiResponse::Chunk)
+                .map(|r| json!(r))?,
             CsiRequest::SelectLanguage(select_language_request) => drivers
                 .select_language(vec![select_language_request.into()])
                 .await
-                .map(|r| json!(r.first().unwrap()))?,
+                .map(|r| {
+                    r[0].map(TryInto::try_into)
+                        .transpose()
+                        .map(CsiResponse::Language)
+                })?
+                .map(|r| json!(r))?,
             CsiRequest::CompleteAll { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -82,9 +88,42 @@ impl CsiRequest {
 
 #[derive(Serialize)]
 #[serde(untagged)]
-pub enum CsiResponse {
+enum CsiResponse {
     Complete(Completion),
     CompleteAll(Vec<Completion>),
+    Chunk(Vec<Vec<String>>),
+    Language(Option<Language>),
+}
+
+#[derive(Serialize)]
+struct Completion {
+    pub text: String,
+    pub finish_reason: FinishReason,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FinishReason {
+    Stop,
+    Length,
+    ContentFilter,
+}
+
+impl TryFrom<language_selection::Language> for Language {
+    type Error = CsiShellError;
+
+    fn try_from(value: language_selection::Language) -> Result<Self, Self::Error> {
+        let language = match value {
+            language_selection::Language::Eng => Self::Eng,
+            language_selection::Language::Deu => Self::Deu,
+            _ => {
+                let err = anyhow::anyhow!("Unsupported language: {:?}", value);
+                tracing::error!("{}", err);
+                return Err(CsiShellError::Internal(err));
+            }
+        };
+        Ok(language)
+    }
 }
 
 #[derive(Deserialize)]
@@ -107,20 +146,6 @@ impl From<DocumentPath> for search::DocumentPath {
             name,
         }
     }
-}
-
-#[derive(Serialize)]
-pub struct Completion {
-    pub text: String,
-    pub finish_reason: FinishReason,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum FinishReason {
-    Stop,
-    Length,
-    ContentFilter,
 }
 
 impl From<inference::FinishReason> for FinishReason {
@@ -256,7 +281,7 @@ impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Language {
     /// English
@@ -394,6 +419,15 @@ pub mod tests {
     use crate::inference;
 
     #[test]
+    fn language_response() {
+        let response = CsiResponse::Language(Some(Language::Eng));
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(serialized, json!("eng"));
+    }
+
+    #[test]
     fn complete_response() {
         let response = CsiResponse::Complete(
             inference::Completion {
@@ -439,6 +473,15 @@ pub mod tests {
             }
         ]);
         assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn chunk_response() {
+        let response = CsiResponse::Chunk(vec![vec!["Hello".to_string()]]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(serialized, json!([["Hello"]]));
     }
 
     #[test]
