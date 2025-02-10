@@ -519,16 +519,15 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use std::fs;
+    use std::{fs, hash::{DefaultHasher, Hasher}};
+    use async_trait::async_trait;
 
     use tempfile::TempDir;
     use test_skills::{given_chat_skill, given_greet_skill_v0_2};
     use tokio::time::{sleep, timeout};
 
     use crate::{
-        namespace_watcher::Namespace,
-        skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg},
-        skills::{Engine, SkillPath},
+        namespace_watcher::Namespace, registries::RegistryError, skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg}, skills::{Engine, SkillPath}
     };
 
     use super::*;
@@ -810,27 +809,29 @@ pub mod tests {
 
     #[tokio::test]
     async fn should_only_cache_skills_that_have_been_fetched() {
-        // Given local is a configured namespace, backed by a file repository with "greet_skill"
-        // and "greet-py"
-        let _use_me_ = given_greet_skill_v0_2();
+        // Given local is a configured namespace, backed by a file repository with first_skill and
+        // second_skill
+        let skill_bytes = given_greet_skill_v0_2().bytes(); // Any skill bytes will do for this test
         let engine = Arc::new(Engine::new(false).unwrap());
-        let greet_skill = SkillPath::local("greet_skill_v0_2");
-        let skill_loader =
-            SkillLoader::with_file_registry(engine, greet_skill.namespace.clone()).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
-        let skill = ConfiguredSkill::from_path(&greet_skill);
+        let mut skill_loader = SkillLoaderStub::new(engine.clone());
+        let first_skill_path = SkillPath::local("first_skill");
+        skill_loader.add(ConfiguredSkill::from_path(&first_skill_path), skill_bytes.clone());
+        let second_skill_path = SkillPath::local("second_skill");
+        skill_loader.add(ConfiguredSkill::from_path(&second_skill_path), skill_bytes);
 
+        // When
+        let skill_store = SkillStore::new(skill_loader.into_api(), Duration::from_secs(10));
+        let skill = ConfiguredSkill::from_path(&first_skill_path);
         skill_store.api().upsert(skill).await;
-        let skill = ConfiguredSkill::from_path(&SkillPath::local("greet-py-v0_2"));
+        let skill = ConfiguredSkill::from_path(&SkillPath::local("second_skill"));
         skill_store.api().upsert(skill).await;
-
         // When fetching "greet_skill" but not "greet-py"
-        skill_store.api().fetch(greet_skill.clone()).await.unwrap();
+        skill_store.api().fetch(first_skill_path.clone()).await.unwrap();
         // and listing all cached skills
         let cached_skills = skill_store.api().list_cached().await;
 
         // Then only "greet_skill" will appear in that list, but not "greet-py"
-        assert_eq!(cached_skills, vec![greet_skill]);
+        assert_eq!(cached_skills, vec![first_skill_path]);
 
         // Cleanup
         skill_store.wait_for_shutdown().await;
@@ -1038,5 +1039,46 @@ pub mod tests {
         let namespace = Namespace::new("local").unwrap();
         let registry_config = RegistryConfig::with_file_registry(namespace, path);
         Ok((registry_config, dir))
+    }
+
+    /// A in memory skill loader stub for testing. It utilizes the hasher of its internal hash map
+    /// for digests.
+    struct SkillLoaderStub {
+        hasher: DefaultHasher,
+        engine: Arc<Engine>,
+        skills: HashMap<ConfiguredSkill, (Skill, Digest)>
+    }
+
+    impl SkillLoaderStub {
+        pub fn new(engine: Arc<Engine>) -> Self {
+            SkillLoaderStub {
+                hasher: DefaultHasher::new(),
+                engine,
+                skills: HashMap::new()
+            }
+        }
+
+        pub fn add(&mut self, configured_skill: ConfiguredSkill, skill_bytes: Vec<u8>) {
+            self.hasher.write(&skill_bytes);
+            let digest = Digest(self.hasher.finish().to_string());
+            let skill = Skill::new(&self.engine, skill_bytes).unwrap();
+            self.skills.insert(configured_skill, (skill, digest));
+        }
+
+        pub fn into_api(self) -> Arc<HashMap<ConfiguredSkill, (Skill, Digest)>> {
+            Arc::new(self.skills)
+        }
+    }
+
+    #[async_trait]
+    impl SkillLoaderApi for Arc<HashMap<ConfiguredSkill, (Skill, Digest)>> {
+        async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), SkillLoaderError> {
+            self.get(&skill).cloned().ok_or(SkillLoaderError::SkillNotFound(skill))
+        }
+    
+        async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError> {
+            let maybe_digest = self.get(&skill).map(|(_, digest)| digest.clone());
+            Ok(maybe_digest)
+        }
     }
 }

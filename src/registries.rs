@@ -9,7 +9,7 @@ pub use oci::OciRegistry;
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Used to check if a skill image has changed
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Digest(pub String);
 
 /// Contains the bytes necessary to instantiate a Skill, as well as the

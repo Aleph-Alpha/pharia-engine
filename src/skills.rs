@@ -206,6 +206,7 @@ impl Engine {
 /// Pre-initialized skills already attached to their corresponding linker.
 /// Allows for as much initialization work to be done at load time as possible,
 /// which can be cached across multiple invocations.
+#[derive(Clone)]
 pub enum Skill {
     /// Skills targeting versions 0.2.x of the skill world
     V0_2(v0_2::SkillPre<LinkedCtx>),
