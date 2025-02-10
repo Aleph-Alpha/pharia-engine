@@ -2,7 +2,10 @@ mod actor;
 mod client;
 
 pub use actor::{DocumentIndexMessage, Search, SearchApi, SearchRequest, SearchResult, TextCursor};
-pub use client::{Document, DocumentPath, IndexPath, Modality};
+pub use client::{
+    Document, DocumentPath, Filter, FilterCondition, IndexPath, MetadataFieldValue, MetadataFilter,
+    MetadataFilterCondition, Modality,
+};
 
 #[cfg(test)]
 pub mod tests {
