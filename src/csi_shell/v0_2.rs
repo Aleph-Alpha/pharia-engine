@@ -39,7 +39,7 @@ impl CsiRequest {
             CsiRequest::Complete(completion_request) => drivers
                 .complete(auth, vec![completion_request.into()])
                 .await
-                .map(|mut r| CsiResponse::Completion(r.remove(0).into()))
+                .map(|mut r| CsiResponse::Complete(r.remove(0).into()))
                 .map(|r| json!(r))?,
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
@@ -52,6 +52,7 @@ impl CsiRequest {
             CsiRequest::CompleteAll { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
+                .map(|r| CsiResponse::CompleteAll(r.into_iter().map(Into::into).collect()))
                 .map(|v| json!(v))?,
             CsiRequest::Search(search_request) => drivers
                 .search(auth, vec![search_request.into()])
@@ -82,7 +83,8 @@ impl CsiRequest {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum CsiResponse {
-    Completion(Completion),
+    Complete(Completion),
+    CompleteAll(Vec<Completion>),
 }
 
 #[derive(Deserialize)]
@@ -393,7 +395,7 @@ pub mod tests {
 
     #[test]
     fn complete_response() {
-        let response = CsiResponse::Completion(
+        let response = CsiResponse::Complete(
             inference::Completion {
                 text: "Hello".to_string(),
                 finish_reason: inference::FinishReason::Stop,
@@ -412,6 +414,30 @@ pub mod tests {
             "text": "Hello",
             "finish_reason": "stop"
         });
+        assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn complete_all_response() {
+        let response = CsiResponse::CompleteAll(vec![inference::Completion {
+            text: "Hello".to_string(),
+            finish_reason: inference::FinishReason::Stop,
+            logprobs: vec![],
+            usage: inference::TokenUsage {
+                prompt: 0,
+                completion: 0,
+            },
+        }
+        .into()]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        let expected = json!([
+            {
+                "text": "Hello",
+                "finish_reason": "stop"
+            }
+        ]);
         assert_eq!(serialized, expected);
     }
 
