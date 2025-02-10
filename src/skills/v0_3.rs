@@ -186,14 +186,14 @@ impl From<SearchRequest> for search::SearchRequest {
             query,
             max_results,
             min_score,
-            filter,
+            filters,
         } = request;
         Self {
             index_path: index_path.into(),
             query,
             max_results,
             min_score,
-            filter: filter.map(Into::into),
+            filters: filters.into_iter().map(Into::into).collect(),
         }
     }
 }

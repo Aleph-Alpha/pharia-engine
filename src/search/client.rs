@@ -38,7 +38,7 @@ pub struct SearchRequest {
     /// Whether only text chunks should be returned
     text_only: bool,
     /// A filter to apply to the search
-    filter: Option<Filter>,
+    filters: Vec<Filter>,
 }
 
 impl SearchRequest {
@@ -47,14 +47,14 @@ impl SearchRequest {
         max_results: u32,
         min_score: Option<f64>,
         text_only: bool,
-        filter: Option<Filter>,
+        filter: Vec<Filter>,
     ) -> Self {
         Self {
             query,
             max_results,
             min_score,
             text_only,
-            filter,
+            filters: filter,
         }
     }
 }
@@ -110,7 +110,6 @@ pub enum Filter {
 #[serde(rename_all = "snake_case")]
 pub enum ModalityType {
     Text,
-    Image,
 }
 
 /// Which documents you want to search in, and which type of index should be used
@@ -208,7 +207,7 @@ impl SearchClient for Client {
             max_results,
             min_score,
             text_only,
-            filter,
+            mut filters,
         } = request;
 
         let mut body = json!({
@@ -217,10 +216,6 @@ impl SearchClient for Client {
             "min_score": min_score,
         });
 
-        let mut filters = Vec::new();
-        if let Some(filter) = filter {
-            filters.push(filter);
-        }
         if text_only {
             filters.push(Filter::With(vec![FilterCondition::Modality(
                 ModalityType::Text,
@@ -444,7 +439,7 @@ pub mod tests {
             1,
             None,
             true,
-            None,
+            Vec::new(),
         );
         let results = client.search(index, request, api_token).await.unwrap();
 
@@ -504,7 +499,7 @@ pub mod tests {
             max_results,
             Some(min_score),
             true,
-            None,
+            Vec::new(),
         );
         let results = client.search(index, request, api_token).await.unwrap();
 
@@ -533,7 +528,7 @@ pub mod tests {
             1,
             None,
             true,
-            Some(filter),
+            vec![filter],
         );
         let results = client.search(index, request, api_token).await.unwrap();
 
@@ -562,7 +557,7 @@ pub mod tests {
             1,
             None,
             true,
-            Some(filter),
+            vec![filter],
         );
         let results = client.search(index, request, api_token).await.unwrap();
 
