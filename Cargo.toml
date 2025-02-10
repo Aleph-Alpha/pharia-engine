@@ -57,7 +57,7 @@ semver = "1.0.25"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 toml = "0.8.20"
-strum = { version = "0.26.3", features = ["derive"] }
+strum = { version = "0.27.0", features = ["derive"] }
 tokio = { version = "1.43.0", features = [
     "macros",
     "rt-multi-thread",
@@ -85,7 +85,7 @@ tokenizers = { version = "0.21.0", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.22.0", features = ["tokenizers"] }
+text-splitter = { version = "0.23.0", features = ["tokenizers"] }
 lingua = { version = "1.6.2" }
 opentelemetry = "0.27.1"
 opentelemetry_sdk = { version = "0.27.1", features = ["rt-tokio"] }
@@ -119,7 +119,7 @@ reqwest-middleware = { version = "0.4.0", features = [
 ] }
 reqwest-tracing = { version = "0.5.5", features = ["opentelemetry_0_27"] }
 reqwest-retry = "0.7.0"
-jsonschema = "0.28.3"
+jsonschema = "0.29.0"
 rayon = "1.10.0"
 
 [dev-dependencies]
