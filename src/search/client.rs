@@ -409,9 +409,8 @@ pub mod tests {
 
         // Then we get the expected metadata
         if let Some(metadata) = maybe_metadata {
-            assert!(metadata.is_array());
             assert_eq!(
-                metadata[0]["url"].as_str().unwrap(),
+                metadata["url"].as_str().unwrap(),
                 "https://pharia-kernel.product.pharia.com/"
             );
         } else {

@@ -141,9 +141,7 @@ async fn run_doc_metadata_skill() {
     let status = resp.status();
     let value: Value = resp.json().await.unwrap();
     assert_eq!(status, axum::http::StatusCode::OK);
-    assert!(value.is_array());
-    assert!(!value.as_array().unwrap().is_empty());
-    let first_text = value[0]["url"].as_str().unwrap();
+    let first_text = value["url"].as_str().unwrap();
     assert!(first_text.starts_with("https://pharia-kernel"));
 
     kernel.shutdown().await;
@@ -450,7 +448,7 @@ async fn metadata_via_remote_csi() {
         .unwrap();
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body: Value = resp.json().await.unwrap();
-    assert!(body[0]["url"]
+    assert!(body["url"]
         .as_str()
         .unwrap()
         .starts_with("https://pharia-kernel"));
