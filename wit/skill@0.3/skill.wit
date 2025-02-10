@@ -208,7 +208,7 @@ interface csi {
     chunk: func(request: list<chunk-request>) -> list<list<string>>;
 
     /// ISO 639-3
-    @since(version = 0.2.2)
+    // @since(version = 0.3.0)
     enum language {
         /// Afrikaans
         afr,
