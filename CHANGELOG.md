@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.9...v0.8.0)
+
+### Features
+
+- Expose text cursors in wit world - ([6e39375](https://github.com/Aleph-Alpha/pharia-kernel/commit/6e3937550c3f6c21aa5ce4a67f640481e0f5f77d))
+- Expose token usage in wit world - ([d878a75](https://github.com/Aleph-Alpha/pharia-kernel/commit/d878a7533140bb350abd6fc282d0111d579c6486))
+- Expose log probs in completion request in wit world - ([5b25f9d](https://github.com/Aleph-Alpha/pharia-kernel/commit/5b25f9da1b9e8ea1962c68e0eee45476aec0858b))
+
+### Fixes
+
+- Revert breaking rename of content to section - ([028f2f7](https://github.com/Aleph-Alpha/pharia-kernel/commit/028f2f768550656f37d6bbc781ba5004ef05ec47))
+
+### Documentation
+
+- Specify scope of csi shell - ([fb0cb0b](https://github.com/Aleph-Alpha/pharia-kernel/commit/fb0cb0b6da5d308b50437c1434d040fd45a77910))
+
+### Builds
+
+- *(deps)* Bump the minor group with 6 updates - ([c8013b6](https://github.com/Aleph-Alpha/pharia-kernel/commit/c8013b6fbbc7afb4dbe60a3178c4462afd1b04c2))
+- *(deps)* Bump the minor group across 1 directory with 7 updates - ([66eae10](https://github.com/Aleph-Alpha/pharia-kernel/commit/66eae1015d584fa8c360833d7e21c29a7bde794f))
+- *(deps)* Update aleph-alpha-client to 0.19.0 - ([cf20c00](https://github.com/Aleph-Alpha/pharia-kernel/commit/cf20c009223419a0cb8ae47abb193f05191fbcd9))
+
+
 ## [0.7.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.8...v0.7.9)
 
 ### Features
