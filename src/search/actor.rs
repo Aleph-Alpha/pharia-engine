@@ -147,7 +147,7 @@ pub struct SearchResult {
     /// Which document this search result can be found in
     pub document_path: DocumentPath,
     /// The section of the document returned by the search
-    pub section: String,
+    pub content: String,
     /// How close the result is to the query, calculated based on the distance
     /// metric of the index used in the search.
     pub score: f64,
@@ -312,7 +312,7 @@ impl DocumentIndexMessage {
                 {
                     Ok(SearchResult {
                         document_path,
-                        section: text,
+                        content: text,
                         score,
                         start: TextCursor {
                             item: start_item,
@@ -471,7 +471,7 @@ pub mod tests {
             .name
             .to_lowercase()
             .contains("kernel"));
-        assert!(results[0].section.contains("Kernel"));
+        assert!(results[0].content.contains("Kernel"));
     }
 
     #[tokio::test]

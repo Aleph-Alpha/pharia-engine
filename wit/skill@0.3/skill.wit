@@ -1,4 +1,4 @@
-package pharia:skill@0.3.0-alpha.12;
+package pharia:skill@0.3.0-alpha.13;
 
 @since(version = 0.1.0)
 world skill {
@@ -416,7 +416,7 @@ interface csi {
     // @since(version = 0.3.0)
     record search-result {
         document-path: document-path,
-        section: string,
+        content: string,
         score: f64,
         start: text-cursor,
         end: text-cursor,
