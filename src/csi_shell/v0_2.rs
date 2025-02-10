@@ -68,7 +68,8 @@ impl CsiRequest {
             CsiRequest::Chat(chat_request) => drivers
                 .chat(auth, vec![chat_request.into()])
                 .await
-                .map(|v| json!(v.first().unwrap()))?,
+                .map(|mut r| CsiResponse::Chat(r.remove(0).into()))
+                .map(|v| json!(v))?,
             CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -95,6 +96,7 @@ enum CsiResponse {
     Chunk(Vec<Vec<String>>),
     Language(Option<Language>),
     Search(Vec<SearchResult>),
+    Chat(ChatResponse),
 }
 
 #[derive(Deserialize, Serialize)]
@@ -136,9 +138,9 @@ impl From<search::DocumentPath> for DocumentPath {
 
 #[derive(Serialize)]
 struct SearchResult {
-    pub document_path: DocumentPath,
-    pub content: String,
-    pub score: f64,
+    document_path: DocumentPath,
+    content: String,
+    score: f64,
 }
 
 impl From<search::SearchResult> for SearchResult {
@@ -435,7 +437,7 @@ impl From<ChatParams> for inference::ChatParams {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Message {
     pub role: String,
     pub content: String,
@@ -451,6 +453,34 @@ impl From<Message> for inference::Message {
     }
 }
 
+impl From<inference::Message> for Message {
+    fn from(value: inference::Message) -> Self {
+        let inference::Message { role, content } = value;
+        Self { role, content }
+    }
+}
+
+#[derive(Serialize)]
+struct ChatResponse {
+    message: Message,
+    finish_reason: FinishReason,
+}
+
+impl From<inference::ChatResponse> for ChatResponse {
+    fn from(value: inference::ChatResponse) -> Self {
+        let inference::ChatResponse {
+            message,
+            finish_reason,
+            logprobs: _,
+            usage: _,
+        } = value;
+        Self {
+            message: message.into(),
+            finish_reason: finish_reason.into(),
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use serde_json::json;
@@ -459,6 +489,37 @@ pub mod tests {
     pub use crate::csi_shell::VersionedCsiRequest;
     use crate::{inference, language_selection, search};
 
+    #[test]
+    fn chat_response() {
+        let response = CsiResponse::Chat(
+            inference::ChatResponse {
+                message: inference::Message {
+                    role: "user".to_string(),
+                    content: "Hello".to_string(),
+                },
+                finish_reason: inference::FinishReason::Stop,
+                logprobs: vec![],
+                usage: inference::TokenUsage {
+                    prompt: 0,
+                    completion: 0,
+                },
+            }
+            .into(),
+        );
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!({
+                "message": {
+                    "role": "user",
+                    "content": "Hello"
+                },
+                "finish_reason": "stop",
+            })
+        );
+    }
     #[test]
     fn search_response() {
         let response = CsiResponse::Search(vec![search::SearchResult {
@@ -519,11 +580,13 @@ pub mod tests {
 
         let serialized = serde_json::to_value(response).unwrap();
 
-        let expected = json!({
-            "text": "Hello",
-            "finish_reason": "stop"
-        });
-        assert_eq!(serialized, expected);
+        assert_eq!(
+            serialized,
+            json!({
+                "text": "Hello",
+                "finish_reason": "stop"
+            })
+        );
     }
 
     #[test]
@@ -541,13 +604,15 @@ pub mod tests {
 
         let serialized = serde_json::to_value(response).unwrap();
 
-        let expected = json!([
-            {
-                "text": "Hello",
-                "finish_reason": "stop"
-            }
-        ]);
-        assert_eq!(serialized, expected);
+        assert_eq!(
+            serialized,
+            json!([
+                {
+                    "text": "Hello",
+                    "finish_reason": "stop"
+                }
+            ])
+        );
     }
 
     #[test]
