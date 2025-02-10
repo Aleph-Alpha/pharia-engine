@@ -519,15 +519,21 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use std::{fs, hash::{DefaultHasher, Hasher}};
     use async_trait::async_trait;
+    use std::{
+        fs,
+        hash::{DefaultHasher, Hasher},
+    };
 
     use tempfile::TempDir;
     use test_skills::{given_chat_skill, given_greet_skill_v0_2};
     use tokio::time::{sleep, timeout};
 
     use crate::{
-        namespace_watcher::Namespace, registries::RegistryError, skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg}, skills::{Engine, SkillPath}
+        namespace_watcher::Namespace,
+        registries::RegistryError,
+        skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg},
+        skills::{Engine, SkillPath},
     };
 
     use super::*;
@@ -815,7 +821,10 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut skill_loader = SkillLoaderStub::new(engine.clone());
         let first_skill_path = SkillPath::local("first_skill");
-        skill_loader.add(ConfiguredSkill::from_path(&first_skill_path), skill_bytes.clone());
+        skill_loader.add(
+            ConfiguredSkill::from_path(&first_skill_path),
+            skill_bytes.clone(),
+        );
         let second_skill_path = SkillPath::local("second_skill");
         skill_loader.add(ConfiguredSkill::from_path(&second_skill_path), skill_bytes);
 
@@ -826,7 +835,11 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&SkillPath::local("second_skill"));
         skill_store.api().upsert(skill).await;
         // When fetching "greet_skill" but not "greet-py"
-        skill_store.api().fetch(first_skill_path.clone()).await.unwrap();
+        skill_store
+            .api()
+            .fetch(first_skill_path.clone())
+            .await
+            .unwrap();
         // and listing all cached skills
         let cached_skills = skill_store.api().list_cached().await;
 
@@ -875,7 +888,7 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut skill_loader = SkillLoaderStub::new(engine.clone());
         skill_loader.add(skill.clone(), skill_bytes);
-        
+
         let skill_store = SkillStore::new(skill_loader.api(), Duration::from_secs(10));
         let api = skill_store.api();
         api.upsert(skill).await;
@@ -1048,7 +1061,7 @@ pub mod tests {
         // * Arc: so we can clone it for the api
         // * Mutex: so we can mutate the state of the hash map, even after we have passed the api to
         //   the skill store.
-        skills: Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>>
+        skills: Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>>,
     }
 
     impl SkillLoaderStub {
@@ -1056,7 +1069,7 @@ pub mod tests {
             SkillLoaderStub {
                 hasher: DefaultHasher::new(),
                 engine,
-                skills: Arc::new(std::sync::Mutex::new(HashMap::new()))
+                skills: Arc::new(std::sync::Mutex::new(HashMap::new())),
             }
         }
 
@@ -1071,7 +1084,12 @@ pub mod tests {
         }
 
         /// Adds a skill to the stub. Allows you to set the digest manually.
-        pub fn add_with_digest(&mut self, configured_skill: ConfiguredSkill, skill_bytes: Vec<u8>, digest: Digest) {
+        pub fn add_with_digest(
+            &mut self,
+            configured_skill: ConfiguredSkill,
+            skill_bytes: Vec<u8>,
+            digest: Digest,
+        ) {
             self.hasher.write(&skill_bytes);
             let skill = Skill::new(&self.engine, skill_bytes).unwrap();
             let mut guard = self.skills.lock().unwrap();
@@ -1092,11 +1110,22 @@ pub mod tests {
     #[async_trait]
     impl SkillLoaderApi for Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>> {
         async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), SkillLoaderError> {
-            self.lock().unwrap().get(&skill).cloned().ok_or(SkillLoaderError::SkillNotFound(skill))
+            self.lock()
+                .unwrap()
+                .get(&skill)
+                .cloned()
+                .ok_or(SkillLoaderError::SkillNotFound(skill))
         }
-    
-        async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError> {
-            let maybe_digest = self.lock().unwrap().get(&skill).map(|(_, digest)| digest.clone());
+
+        async fn fetch_digest(
+            &self,
+            skill: ConfiguredSkill,
+        ) -> Result<Option<Digest>, RegistryError> {
+            let maybe_digest = self
+                .lock()
+                .unwrap()
+                .get(&skill)
+                .map(|(_, digest)| digest.clone());
             Ok(maybe_digest)
         }
     }
