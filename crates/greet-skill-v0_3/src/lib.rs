@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
-use pharia::skill::csi::{complete, CompletionParams, CompletionRequest, Logprobs};
+use pharia::skill::inference::{complete, CompletionParams, CompletionRequest, Logprobs};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });

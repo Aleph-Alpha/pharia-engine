@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
-use pharia::skill::csi::{documents, search, DocumentPath, IndexPath, SearchRequest};
+use pharia::skill::document_index::{documents, search, DocumentPath, IndexPath, SearchRequest};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });

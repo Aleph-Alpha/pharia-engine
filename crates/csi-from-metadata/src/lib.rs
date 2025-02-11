@@ -2,7 +2,7 @@
 #![expect(unsafe_op_in_unsafe_fn)]
 
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
-use pharia::skill::csi::{select_language, SelectLanguageRequest};
+use pharia::skill::language::{select_language, SelectLanguageRequest};
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
 
