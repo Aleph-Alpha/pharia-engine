@@ -531,7 +531,7 @@ pub mod tests {
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
     use test_skills::{
-        given_csi_from_metadata_skill, given_greet_py_v0_2, given_greet_skill_v0_2,
+        given_csi_from_metadata_skill, given_greet_py_v0_3, given_greet_skill_v0_2,
         given_greet_skill_v0_3, given_invalid_output_skill,
     };
     use tokio::try_join;
@@ -700,7 +700,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn python_greeting_skill() {
-        let test_skill = given_greet_py_v0_2();
+        let test_skill = given_greet_py_v0_3();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
