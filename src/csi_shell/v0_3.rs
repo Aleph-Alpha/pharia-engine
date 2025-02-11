@@ -14,26 +14,26 @@ use crate::{chunking, csi::Csi, inference, language_selection, search};
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum CsiRequest {
+    Chat {
+        requests: Vec<ChatRequest>,
+    },
     Chunk {
         requests: Vec<ChunkRequest>,
     },
-    SelectLanguage {
-        requests: Vec<SelectLanguageRequest>,
-    },
     Complete {
         requests: Vec<CompletionRequest>,
-    },
-    Search {
-        requests: Vec<SearchRequest>,
-    },
-    Chat {
-        requests: Vec<ChatRequest>,
     },
     Documents {
         requests: Vec<DocumentPath>,
     },
     DocumentMetadata {
         requests: Vec<DocumentPath>,
+    },
+    Search {
+        requests: Vec<SearchRequest>,
+    },
+    SelectLanguage {
+        requests: Vec<SelectLanguageRequest>,
     },
     #[serde(untagged)]
     Unknown {
@@ -47,32 +47,32 @@ impl CsiRequest {
         C: Csi + Sync,
     {
         let result = match self {
+            CsiRequest::Chat { requests } => drivers
+                .chat(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|v| json!(v))?,
             CsiRequest::Chunk { requests } => drivers
                 .chunk(auth, requests.into_iter().map(Into::into).collect())
-                .await
-                .map(|r| json!(r))?,
-            CsiRequest::SelectLanguage { requests } => drivers
-                .select_language(requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|r| json!(r))?,
             CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|v| json!(v))?,
-            CsiRequest::Search { requests } => drivers
-                .search(auth, requests.into_iter().map(Into::into).collect())
+            CsiRequest::Documents { requests } => drivers
+                .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|v| json!(v))?,
-            CsiRequest::Chat { requests } => drivers
-                .chat(auth, requests.into_iter().map(Into::into).collect())
-                .await
-                .map(|v| json!(v))?,
+                .map(|r| json!(r))?,
             CsiRequest::DocumentMetadata { requests } => drivers
                 .document_metadata(auth, requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|r| json!(r))?,
-            CsiRequest::Documents { requests } => drivers
-                .documents(auth, requests.into_iter().map(Into::into).collect())
+            CsiRequest::Search { requests } => drivers
+                .search(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|v| json!(v))?,
+            CsiRequest::SelectLanguage { requests } => drivers
+                .select_language(requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|r| json!(r))?,
             CsiRequest::Unknown { function } => {
