@@ -1,12 +1,46 @@
-use std::{env, net::TcpListener, sync::OnceLock, time::Duration};
+use std::{
+    env, net::TcpListener, path::{Path, PathBuf}, str::FromStr, sync::OnceLock, time::Duration
+};
 
 use axum::http;
 use dotenvy::dotenv;
 use pharia_kernel::{AppConfig, Kernel, NamespaceConfigs};
 use reqwest::{header, Body};
 use serde_json::{json, Value};
+use tempfile::{tempdir, TempDir};
 use test_skills::{given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill};
 use tokio::sync::oneshot;
+
+struct TestFileRegistry {
+    skills: Vec<String>,
+    directory: TempDir,
+}
+
+impl TestFileRegistry {
+    fn new() -> Self {
+        Self {
+            skills: Vec::new(),
+            directory: tempdir().unwrap(),
+        }
+    }
+
+    fn with_skill(&mut self, name: &str, wasm_bytes: Vec<u8>) {
+        self.skills.push(name.to_owned());
+        std::fs::write(self.directory.path().join(name), wasm_bytes).unwrap();
+    }
+
+    fn to_namespace_config(&self) -> NamespaceConfigs {
+        let skills = self.skills.join("\"},{\"name\"=\"");
+        let dir_path = self.directory.path().to_str().unwrap();
+        toml::from_str(&format!(
+            r#"
+            [local]
+            path = "{dir_path}"
+            skills = [{{"name"="{skills}"}}]"#,
+        ))
+        .unwrap()
+    }
+}
 
 struct TestKernel {
     shutdown_trigger: oneshot::Sender<()>,
@@ -31,13 +65,26 @@ impl TestKernel {
         }
     }
 
+    async fn with_namespace_config(namespaces: NamespaceConfigs) -> Self {
+        let port = free_test_port();
+        let metrics_port = free_test_port();
+        let app_config = AppConfig {
+            kernel_address: format!("127.0.0.1:{port}").parse().unwrap(),
+            metrics_address: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
+            namespaces,
+            use_pooling_allocator: true,
+            ..AppConfig::default()
+        };
+        Self::new(app_config).await
+    }
+
     async fn with_skills(skills: &[&str]) -> Self {
         let port = free_test_port();
         let metrics_port = free_test_port();
         let app_config = AppConfig {
             kernel_address: format!("127.0.0.1:{port}").parse().unwrap(),
             metrics_address: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
-            namespaces: NamespaceConfigs::local(skills),
+            namespaces: namespace_config(&PathBuf::from_str("./skills").unwrap(), skills),
             use_pooling_allocator: true,
             ..AppConfig::default()
         };
@@ -54,11 +101,25 @@ impl TestKernel {
     }
 }
 
+fn namespace_config(dir_path: &Path, skills: &[&str]) -> NamespaceConfigs {
+    let skills = skills.join("\"},{\"name\"=\"");
+    let dir_path = dir_path.to_str().unwrap();
+    toml::from_str(&format!(
+        r#"
+        [local]
+        path = "{dir_path}"
+        skills = [{{"name"="{skills}"}}]"#,
+    ))
+    .unwrap()
+}
+
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn run_skill() {
-    let _use_me_ = given_greet_skill_v0_2();
-    let kernel = TestKernel::with_skills(&["greet_skill_v0_2"]).await;
+    let greet_skill_wasm = given_greet_skill_v0_2().bytes();
+    let mut local_skill_dir = TestFileRegistry::new();
+    local_skill_dir.with_skill("greet.wasm", greet_skill_wasm);
+    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -66,7 +127,7 @@ async fn run_skill() {
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
-            "http://127.0.0.1:{}/v1/skills/local/greet_skill_v0_2/run",
+            "http://127.0.0.1:{}/v1/skills/local/greet/run",
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
