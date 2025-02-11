@@ -55,7 +55,8 @@ impl CsiRequest {
             CsiRequest::Chunk { requests } => drivers
                 .chunk(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|r| json!(r))?,
+                .map(CsiResponse::Chunk)
+                .map(|v| json!(v))?,
             CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -64,18 +65,28 @@ impl CsiRequest {
             CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
+                .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect()))
                 .map(|r| json!(r))?,
             CsiRequest::DocumentMetadata { requests } => drivers
                 .document_metadata(auth, requests.into_iter().map(Into::into).collect())
                 .await
+                .map(CsiResponse::DocumentMetadata)
                 .map(|r| json!(r))?,
             CsiRequest::Search { requests } => drivers
                 .search(auth, requests.into_iter().map(Into::into).collect())
                 .await
+                .map(|v| {
+                    CsiResponse::SearchResult(
+                        v.into_iter()
+                            .map(|r| r.into_iter().map(Into::into).collect())
+                            .collect(),
+                    )
+                })
                 .map(|v| json!(v))?,
             CsiRequest::SelectLanguage { requests } => drivers
                 .select_language(requests.into_iter().map(Into::into).collect())
                 .await
+                .map(|r| CsiResponse::SelectLanguage(r.into_iter().map(|m| m.map(Into::into)).collect()))
                 .map(|r| json!(r))?,
             CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
@@ -92,9 +103,14 @@ impl CsiRequest {
 enum CsiResponse {
     Chat(Vec<ChatResponse>),
     Complete(Vec<Completion>),
+    Chunk(Vec<Vec<String>>),
+    Documents(Vec<Document>),
+    DocumentMetadata(Vec<Option<Value>>),
+    SearchResult(Vec<Vec<SearchResult>>),
+    SelectLanguage(Vec<Option<Language>>),
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct DocumentPath {
     pub namespace: String,
     pub collection: String,
@@ -112,6 +128,59 @@ impl From<DocumentPath> for search::DocumentPath {
             namespace,
             collection,
             name,
+        }
+    }
+}
+
+impl From<search::DocumentPath> for DocumentPath {
+    fn from(value: search::DocumentPath) -> Self {
+        let search::DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = value;
+        DocumentPath {
+            namespace,
+            collection,
+            name,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case", tag = "modality")]
+enum Modality {
+    Text { text: String },
+    Image,
+}
+
+impl From<search::Modality> for Modality {
+    fn from(value: search::Modality) -> Self {
+        match value {
+            search::Modality::Text { text } => Modality::Text { text },
+            search::Modality::Image { bytes: _ } => Modality::Image,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Document {
+    path: DocumentPath,
+    contents: Vec<Modality>,
+    metadata: Option<Value>,
+}
+
+impl From<search::Document> for Document {
+    fn from(value: search::Document) -> Self {
+        let search::Document {
+            path,
+            contents,
+            metadata,
+        } = value;
+        Document {
+            path: path.into(),
+            contents: contents.into_iter().map(Into::into).collect(),
+            metadata,
         }
     }
 }
@@ -324,6 +393,47 @@ impl From<SearchRequest> for search::SearchRequest {
     }
 }
 
+#[derive(Serialize)]
+struct TextCursor {
+    pub item: u32,
+    pub position: u32,
+}
+
+impl From<search::TextCursor> for TextCursor {
+    fn from(value: search::TextCursor) -> Self {
+        let search::TextCursor { item, position } = value;
+        TextCursor { item, position }
+    }
+}
+
+#[derive(Serialize)]
+struct SearchResult {
+    pub document_path: DocumentPath,
+    pub content: String,
+    pub score: f64,
+    pub start: TextCursor,
+    pub end: TextCursor,
+}
+
+impl From<search::SearchResult> for SearchResult {
+    fn from(value: search::SearchResult) -> Self {
+        let search::SearchResult {
+            document_path,
+            content,
+            score,
+            start,
+            end,
+        } = value;
+        SearchResult {
+            document_path: document_path.into(),
+            content,
+            score,
+            start: start.into(),
+            end: end.into(),
+        }
+    }
+}
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Filter {
@@ -497,7 +607,7 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Language {
     Afr,
@@ -731,6 +841,97 @@ mod tests {
     use super::*;
 
     use crate::csi_shell::VersionedCsiRequest;
+
+    #[test]
+    fn select_language_response() {
+        let response =
+            CsiResponse::SelectLanguage(vec![Some(language_selection::Language::Eng.into())]);
+        let serialized = serde_json::to_value(response).unwrap();
+        assert_eq!(serialized, json!(["eng"]));
+    }
+
+    #[test]
+    fn search_result_response() {
+        let response = CsiResponse::SearchResult(vec![vec![search::SearchResult {
+            document_path: search::DocumentPath {
+                namespace: "Kernel".to_string(),
+                collection: "test".to_string(),
+                name: "kernel-docs".to_string(),
+            },
+            content: "Hello".to_string(),
+            score: 0.5,
+            start: search::TextCursor {
+                item: 0,
+                position: 0,
+            },
+            end: search::TextCursor {
+                item: 0,
+                position: 0,
+            },
+        }
+        .into()]]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!([[{
+                "document_path": {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "kernel-docs"
+                },
+                "content": "Hello",
+                "score": 0.5,
+                "start": {
+                    "item": 0,
+                    "position": 0
+                },
+                "end": {
+                    "item": 0,
+                    "position": 0
+                }
+            }]])
+        );
+    }
+
+    #[test]
+    fn document_response() {
+        let response = CsiResponse::Documents(vec![search::Document {
+            path: search::DocumentPath {
+                namespace: "Kernel".to_string(),
+                collection: "test".to_string(),
+                name: "kernel-docs".to_string(),
+            },
+            contents: vec![search::Modality::Text {
+                text: "Hello".to_string(),
+            }],
+            metadata: Some(json!({ "created": "1970-07-01T14:10:11Z" })),
+        }
+        .into()]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!([{
+                "path": {
+                    "namespace": "Kernel",
+                    "collection": "test",
+                    "name": "kernel-docs"
+                },
+                "contents": [
+                    {
+                        "modality": "text",
+                        "text": "Hello"
+                    }
+                ],
+                "metadata": {
+                    "created": "1970-07-01T14:10:11Z"
+                }
+            }])
+        );
+    }
 
     #[test]
     fn complete_response() {

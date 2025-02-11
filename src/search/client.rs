@@ -144,7 +144,7 @@ pub enum Cursor {
 }
 
 /// The name of a given document
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DocumentPath {
     /// The namespace the collection belongs to
     pub namespace: String,
@@ -154,7 +154,7 @@ pub struct DocumentPath {
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Document {
     pub path: DocumentPath,
     pub contents: Vec<Modality>,
