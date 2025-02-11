@@ -93,6 +93,15 @@ pub fn given_greet_py_v0_2() -> TestSkill {
 }
 
 #[must_use]
+pub fn given_greet_py_v0_3() -> TestSkill {
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_python_skill("greet-py-v0_3", "0.3");
+    });
+    *WASM_BUILD;
+    TestSkill::python_skill("greet-py-v0_3")
+}
+
+#[must_use]
 pub fn given_invalid_output_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| given_rust_skill("invalid-output-skill"));
     *WASM_BUILD;
