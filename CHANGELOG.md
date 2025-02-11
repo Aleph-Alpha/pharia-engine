@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.8.0...v0.9.0)
+
+### Features
+
+- Finalize v0.3 WIT release - ([5987a72](https://github.com/Aleph-Alpha/pharia-kernel/commit/5987a727e2235809fccedd5c1ddbce056e13b52b))
+- [**breaking**] Remove deprecated execute_skill endpoint - ([71e4be5](https://github.com/Aleph-Alpha/pharia-kernel/commit/71e4be599f70e8d42a2626ac6712c31fe1d39637))
+- Expose search filters via CSI shell - ([963f482](https://github.com/Aleph-Alpha/pharia-kernel/commit/963f482438dac8d6f9149b0ed4185cb91a23ff3b))
+- Accept multiple filters for search request - ([e0de977](https://github.com/Aleph-Alpha/pharia-kernel/commit/e0de977aeb648ae5e1f2eda38ce92f59e8c2cbda))
+- Support search with metadata filter - ([c7732f6](https://github.com/Aleph-Alpha/pharia-kernel/commit/c7732f682772791623ff1f9bf2043c4021b1fe02))
+
+### Fixes
+
+- Expose modality in csi shell - ([e6ff26c](https://github.com/Aleph-Alpha/pharia-kernel/commit/e6ff26c76a92e7d04fe697080a2a1201e33488a0))
+- Update since tag for language enum in WIT world - ([da640a6](https://github.com/Aleph-Alpha/pharia-kernel/commit/da640a62995d9d3892be118bc8412986aab7d136))
+
+### Documentation
+
+- Remove cache endpoints from docs - ([d500267](https://github.com/Aleph-Alpha/pharia-kernel/commit/d50026756b9faeedce55e3e1f340e656fcc65add))
+
+### Builds
+
+- *(deps)* Bump the minor group with 3 updates - ([6902d38](https://github.com/Aleph-Alpha/pharia-kernel/commit/6902d381f3ddcd5c591ae2e859d852bdd7a4e0dd))
+
+
 ## [0.8.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.9...v0.8.0)
 
 ### Features
