@@ -46,32 +46,27 @@ impl CsiRequest {
     where
         C: Csi + Sync,
     {
-        let result = match self {
+        let response = match self {
             CsiRequest::Chat { requests } => drivers
                 .chat(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect()))
-                .map(|v| json!(v))?,
+                .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect())),
             CsiRequest::Chunk { requests } => drivers
                 .chunk(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(CsiResponse::Chunk)
-                .map(|v| json!(v))?,
+                .map(CsiResponse::Chunk),
             CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|v| CsiResponse::Complete(v.into_iter().map(Into::into).collect()))
-                .map(|v| json!(v))?,
+                .map(|v| CsiResponse::Complete(v.into_iter().map(Into::into).collect())),
             CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect()))
-                .map(|r| json!(r))?,
+                .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect())),
             CsiRequest::DocumentMetadata { requests } => drivers
                 .document_metadata(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(CsiResponse::DocumentMetadata)
-                .map(|r| json!(r))?,
+                .map(CsiResponse::DocumentMetadata),
             CsiRequest::Search { requests } => drivers
                 .search(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -81,20 +76,20 @@ impl CsiRequest {
                             .map(|r| r.into_iter().map(Into::into).collect())
                             .collect(),
                     )
-                })
-                .map(|v| json!(v))?,
+                }),
             CsiRequest::SelectLanguage { requests } => drivers
                 .select_language(requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|r| CsiResponse::SelectLanguage(r.into_iter().map(|m| m.map(Into::into)).collect()))
-                .map(|r| json!(r))?,
+                .map(|r| {
+                    CsiResponse::SelectLanguage(r.into_iter().map(|m| m.map(Into::into)).collect())
+                }),
             CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
                     function.unwrap_or_else(|| "specified".to_owned()),
                 ));
             }
-        };
-        Ok(result)
+        }?;
+        Ok(json!(response))
     }
 }
 
