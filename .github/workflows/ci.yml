@@ -203,6 +203,14 @@ jobs:
         run: echo "CHART_VERSION=$(yq .version < helm-charts/pharia-kernel/Chart.yaml)" >> $GITHUB_ENV
 
       - if: github.ref_type == 'tag'
+        name: Publish Helm chart changelog
+        run: |
+          CHANGELOG_FILE=Changelog-pharia-kernel-$CHART_VERSION.md
+          curl --location --header "PRIVATE-TOKEN: ${{ secrets.PACKAGE_REGISTRY_ACCESS_TOKEN }}" \
+            --upload-file helm-charts/pharia-kernel/changelogs/$CHANGELOG_FILE \
+            "https://gitlab.aleph-alpha.de/api/v4/projects/1139/packages/generic/changelogs/pharia-ai/$CHANGELOG_FILE"
+
+      - if: github.ref_type == 'tag'
         name: Push Helm charts
         uses: appany/helm-oci-chart-releaser@v0.4.2
         with:
