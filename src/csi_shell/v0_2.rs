@@ -354,8 +354,8 @@ pub enum Language {
 impl From<Language> for language_selection::Language {
     fn from(value: Language) -> Self {
         match value {
-            Language::Eng => Self::Eng,
-            Language::Deu => Self::Deu,
+            Language::Eng => Self::new("eng".to_owned()),
+            Language::Deu => Self::new("deu".to_owned()),
         }
     }
 }
@@ -365,8 +365,8 @@ impl TryFrom<language_selection::Language> for Language {
 
     fn try_from(value: language_selection::Language) -> Result<Self, Self::Error> {
         let language = match value {
-            language_selection::Language::Eng => Self::Eng,
-            language_selection::Language::Deu => Self::Deu,
+            language_selection::Language(s) if s == "eng" => Self::Eng,
+            language_selection::Language(s) if s == "deu" => Self::Deu,
             _ => {
                 let err = anyhow::anyhow!("Unsupported language: {:?}", value);
                 tracing::error!("{}", err);
@@ -632,8 +632,11 @@ pub mod tests {
 
     #[test]
     fn language_response() {
-        let response =
-            CsiResponse::Language(Some(language_selection::Language::Eng.try_into().unwrap()));
+        let response = CsiResponse::Language(Some(
+            language_selection::Language::new("eng".to_owned())
+                .try_into()
+                .unwrap(),
+        ));
 
         let serialized = serde_json::to_value(response).unwrap();
 

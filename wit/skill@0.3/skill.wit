@@ -332,161 +332,6 @@ interface inference {
 
 @since(version = 0.3.0)
 interface language {
-    /// ISO 639-3
-    @since(version = 0.3.0)
-    enum language-code {
-        /// Afrikaans
-        afr,
-        /// Arabic
-        ara,
-        /// Azerbaijani
-        aze,
-        /// Belarusian
-        bel,
-        /// Bengali
-        ben,
-        /// Bosnian
-        bos,
-        /// Bulgarian
-        bul,
-        /// Catalan
-        cat,
-        /// Czech
-        ces,
-        /// Welsh
-        cym,
-        /// Danish
-        dan,
-        /// German
-        deu,
-        /// Greek
-        ell,
-        /// English
-        eng,
-        /// Esperanto
-        epo,
-        /// Estonian
-        est,
-        /// Basque
-        eus,
-        /// Persian
-        fas,
-        /// Finnish
-        fin,
-        /// French
-        fra,
-        /// Irish
-        gle,
-        /// Gujarati
-        guj,
-        /// Hebrew
-        heb,
-        /// Hindi
-        hin,
-        /// Croatian
-        hrv,
-        /// Hungarian
-        hun,
-        /// Armenian
-        hye,
-        /// Indonesian
-        ind,
-        /// Icelandic
-        isl,
-        /// Italian
-        ita,
-        /// Japanese
-        jpn,
-        /// Georgian
-        kat,
-        /// Kazakh
-        kaz,
-        /// Korean
-        kor,
-        /// Latin
-        lat,
-        /// Latvian
-        lav,
-        /// Lithuanian
-        lit,
-        /// Ganda
-        lug,
-        /// Marathi
-        mar,
-        /// Macedonian
-        mkd,
-        /// Mongolian
-        mon,
-        /// Maori
-        mri,
-        /// Malay
-        msa,
-        /// Dutch
-        nld,
-        /// Norwegian Nynorsk
-        nno,
-        /// Norwegian Bokmål
-        nob,
-        /// Punjabi
-        pan,
-        /// Polish
-        pol,
-        /// Portuguese
-        por,
-        /// Romanian
-        ron,
-        /// Russian
-        rus,
-        /// Slovak
-        slk,
-        /// Slovene
-        slv,
-        /// Shona
-        sna,
-        /// Somali
-        som,
-        /// Sotho
-        sot,
-        /// Spanish
-        spa,
-        /// Serbian
-        srp,
-        /// Albanian
-        sqi,
-        /// Swahili
-        swa,
-        /// Swedish
-        swe,
-        /// Tamil
-        tam,
-        /// Telugu
-        tel,
-        /// Tagalog
-        tgl,
-        /// Thai
-        tha,
-        /// Tswana
-        tsn,
-        /// Tsonga
-        tso,
-        /// Turkish
-        tur,
-        /// Ukrainian
-        ukr,
-        /// Urdu
-        urd,
-        /// Vietnamese
-        vie,
-        /// Xhosa
-        xho,
-        /// Yoruba
-        yor,
-        /// Chinese
-        zho,
-        /// Zulu
-        zul,
-    }
-
     /// Select the detected language for the provided input based on the list of possible languages.
     /// If no language matches, None is returned.
     ///
@@ -495,9 +340,86 @@ interface language {
     @since(version = 0.3.0)
     record select-language-request {
         text: string,
-        languages: list<language-code>,
+        languages: list<string>,
     }
 
+    /// Select most likely language from a list of supported ISO 639-3language codes.
+    ///
+    /// Afrikaans - "afr",
+    /// Arabic - "ara",
+    /// Azerbaijani - "aze",
+    /// Belarusian - "bel",
+    /// Bengali - "ben",
+    /// Bosnian - "bos",
+    /// Bulgarian - "bul",
+    /// Catalan - "cat",
+    /// Czech - "ces",
+    /// Welsh - "cym",
+    /// Danish - "dan",
+    /// German - "deu",
+    /// Greek - "ell",
+    /// English - "eng",
+    /// Esperanto - "epo",
+    /// Estonian - "est",
+    /// Basque - "eus",
+    /// Persian - "fas",
+    /// Finnish - "fin",
+    /// French - "fra",
+    /// Irish - "gle",
+    /// Gujarati - "guj",
+    /// Hebrew - "heb",
+    /// Hindi - "hin",
+    /// Croatian - "hrv",
+    /// Hungarian - "hun",
+    /// Armenian - "hye",
+    /// Indonesian - "ind",
+    /// Icelandic - "isl",
+    /// Italian - "ita",
+    /// Japanese - "jpn",
+    /// Georgian - "kat",
+    /// Kazakh - "kaz",
+    /// Korean - "kor",
+    /// Latin - "lat",
+    /// Latvian - "lav",
+    /// Lithuanian - "lit",
+    /// Ganda - "lug",
+    /// Marathi - "mar",
+    /// Macedonian - "mkd",
+    /// Mongolian - "mon",
+    /// Maori - "mri",
+    /// Malay - "msa",
+    /// Dutch - "nld",
+    /// Norwegian Nynorsk - "nno",
+    /// Norwegian Bokmål - "nob",
+    /// Punjabi - "pan",
+    /// Polish - "pol",
+    /// Portuguese - "por",
+    /// Romanian - "ron",
+    /// Russian - "rus",
+    /// Slovak - "slk",
+    /// Slovene - "slv",
+    /// Shona - "sna",
+    /// Somali - "som",
+    /// Sotho - "sot",
+    /// Spanish - "spa",
+    /// Serbian - "srp",
+    /// Albanian - "sqi",
+    /// Swahili - "swa",
+    /// Swedish - "swe",
+    /// Tamil - "tam",
+    /// Telugu - "tel",
+    /// Tagalog - "tgl",
+    /// Thai - "tha",
+    /// Tswana - "tsn",
+    /// Tsonga - "tso",
+    /// Turkish - "tur",
+    /// Ukrainian - "ukr",
+    /// Urdu - "urd",
+    /// Vietnamese - "vie",
+    /// Xhosa - "xho",
+    /// Yoruba - "yor",
+    /// Chinese - "zho",
+    /// Zulu - "zul",
     @since(version = 0.3.0)
-    select-language: func(request: list<select-language-request>) -> list<option<language-code>>;
+    select-language: func(request: list<select-language-request>) -> list<option<string>>;
 }

@@ -10,7 +10,7 @@ use pharia::skill::{
         ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
         Distribution, FinishReason, Host as InferenceHost, Logprob, Logprobs, Message, TokenUsage,
     },
-    language::{Host as LanguageHost, LanguageCode, SelectLanguageRequest},
+    language::{Host as LanguageHost, SelectLanguageRequest},
 };
 use serde_json::Value;
 use wasmtime::component::bindgen;
@@ -86,7 +86,7 @@ impl LanguageHost for LinkedCtx {
     async fn select_language(
         &mut self,
         requests: Vec<SelectLanguageRequest>,
-    ) -> Vec<Option<LanguageCode>> {
+    ) -> Vec<Option<String>> {
         self.skill_ctx
             .select_language(requests.into_iter().map(Into::into).collect())
             .await
@@ -162,34 +162,6 @@ impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
         }
     }
 }
-
-// Works as long as variant names match exactly
-macro_rules! language_mappings {
-    ($($variant:ident),*) => {
-        impl From<LanguageCode> for language_selection::Language {
-            fn from(language: LanguageCode) -> Self {
-                match language {
-                    $(LanguageCode::$variant => language_selection::Language::$variant),*
-                }
-            }
-        }
-
-        impl From<language_selection::Language> for LanguageCode {
-            fn from(language: language_selection::Language) -> Self {
-                match language {
-                    $(language_selection::Language::$variant => LanguageCode::$variant),*
-                }
-            }
-        }
-    };
-}
-
-language_mappings!(
-    Afr, Ara, Aze, Bel, Ben, Bos, Bul, Cat, Ces, Cym, Dan, Deu, Ell, Eng, Epo, Est, Eus, Fas, Fin,
-    Fra, Gle, Guj, Heb, Hin, Hrv, Hun, Hye, Ind, Isl, Ita, Jpn, Kat, Kaz, Kor, Lat, Lav, Lit, Lug,
-    Mar, Mkd, Mon, Mri, Msa, Nld, Nno, Nob, Pan, Pol, Por, Ron, Rus, Slk, Slv, Sna, Som, Sot, Spa,
-    Sqi, Srp, Swa, Swe, Tam, Tel, Tgl, Tha, Tsn, Tso, Tur, Ukr, Urd, Vie, Xho, Yor, Zho, Zul
-);
 
 impl From<SearchRequest> for search::SearchRequest {
     fn from(request: SearchRequest) -> Self {
