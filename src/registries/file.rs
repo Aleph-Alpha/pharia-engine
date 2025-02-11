@@ -72,3 +72,63 @@ impl SkillRegistry for FileRegistry {
         })
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use tempfile::tempdir;
+    use test_skills::{given_greet_skill_v0_2, given_greet_skill_v0_3};
+
+    #[tokio::test(start_paused=true)]
+    async fn change_digest_if_file_is_modified() {
+        // Given a file `my_skill.wasm` containing a skill in a directory
+        let any_skill_bytes = given_greet_skill_v0_2().bytes();
+        // Any skill bytes do, as long as they are different
+        let different_skill_bytes = given_greet_skill_v0_3().bytes();
+        let skill_dir = tempdir().unwrap();
+        fs::write(skill_dir.path().join("my_skill.wasm"), any_skill_bytes).unwrap();
+
+        // When fetching a digest before and after modifying the file
+        let registry = FileRegistry::with_dir(skill_dir.path());
+        let original_digest = registry.fetch_digest("my_skill", "latest").await.unwrap();
+        fs::write(skill_dir.path().join("my_skill.wasm"), different_skill_bytes).unwrap();
+        // Not sure why we need this sleep. `fs::write` is flushing, but the metainformation seems
+        // to not be updated immediately.
+        tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+        let new_digest = registry.fetch_digest("my_skill", "latest").await.unwrap();
+        
+        // Then the digest should change
+        assert_ne!(original_digest, new_digest);
+    }
+
+    #[tokio::test]
+    async fn load_skill() {
+        // Given a file `my_skill.wasm` containing a skill in a directory
+        let any_skill_bytes = given_greet_skill_v0_3().bytes();
+        let skill_dir = tempdir().unwrap();
+        fs::write(skill_dir.path().join("my_skill.wasm"), &any_skill_bytes).unwrap();
+
+        // When loading a skill
+        let registry = FileRegistry::with_dir(skill_dir.path());
+        let skill_image = registry.load_skill("my_skill", "latest").await.unwrap().unwrap();
+
+        // Then the skill bytes are identical with the file contents
+        assert_eq!(skill_image.bytes, any_skill_bytes);
+    }
+
+    #[tokio::test]
+    async fn fetch_digest_yields_same_digest_as_skill_image() {
+        // Given a file `my_skill.wasm` containing a skill in a directory
+        let any_skill_bytes = given_greet_skill_v0_3().bytes();
+        let skill_dir = tempdir().unwrap();
+        fs::write(skill_dir.path().join("my_skill.wasm"), &any_skill_bytes).unwrap();
+
+        // When fetching a digest and loading a skill
+        let registry = FileRegistry::with_dir(skill_dir.path());
+        let skill_image = registry.load_skill("my_skill", "latest").await.unwrap().unwrap();
+        let digest = registry.fetch_digest("my_skill", "latest").await.unwrap().unwrap();
+
+        // Then the fetched digest is identical with the one returned from the image
+        assert_eq!(skill_image.digest, digest);
+    }
+}
