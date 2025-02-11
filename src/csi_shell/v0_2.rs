@@ -10,20 +10,20 @@ use crate::{chunking, csi::Csi, csi_shell::CsiShellError, inference, language_se
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum CsiRequest {
-    Complete(CompletionRequest),
+    Chat(ChatRequest),
     Chunk(ChunkRequest),
-    SelectLanguage(SelectLanguageRequest),
+    Complete(CompletionRequest),
     CompleteAll {
         requests: Vec<CompletionRequest>,
     },
-    Search(SearchRequest),
-    Chat(ChatRequest),
     Documents {
         requests: Vec<DocumentPath>,
     },
     DocumentMetadata {
         document_path: DocumentPath,
     },
+    Search(SearchRequest),
+    SelectLanguage(SelectLanguageRequest),
     #[serde(untagged)]
     Unknown {
         function: Option<String>,
@@ -36,14 +36,36 @@ impl CsiRequest {
         C: Csi + Sync,
     {
         let response = match self {
-            CsiRequest::Complete(completion_request) => drivers
-                .complete(auth, vec![completion_request.into()])
+            CsiRequest::Chat(chat_request) => drivers
+                .chat(auth, vec![chat_request.into()])
                 .await
-                .map(|mut r| CsiResponse::Complete(r.remove(0).into())),
+                .map(|mut r| CsiResponse::Chat(r.remove(0).into())),
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await
                 .map(CsiResponse::Chunk),
+            CsiRequest::Complete(completion_request) => drivers
+                .complete(auth, vec![completion_request.into()])
+                .await
+                .map(|mut r| CsiResponse::Complete(r.remove(0).into())),
+            CsiRequest::CompleteAll { requests } => drivers
+                .complete(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|r| CsiResponse::CompleteAll(r.into_iter().map(Into::into).collect())),
+            CsiRequest::Documents { requests } => drivers
+                .documents(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect())),
+            CsiRequest::DocumentMetadata { document_path } => drivers
+                .document_metadata(auth, vec![document_path.into()])
+                .await
+                .map(|mut r| CsiResponse::DocumentMetadata(r.remove(0))),
+            CsiRequest::Search(search_request) => drivers
+                .search(auth, vec![search_request.into()])
+                .await
+                .map(|mut r| {
+                    CsiResponse::Search(r.remove(0).into_iter().map(Into::into).collect())
+                }),
             CsiRequest::SelectLanguage(select_language_request) => drivers
                 .select_language(vec![select_language_request.into()])
                 .await
@@ -53,28 +75,6 @@ impl CsiRequest {
                         .transpose()
                         .map(CsiResponse::Language)
                 })?,
-            CsiRequest::CompleteAll { requests } => drivers
-                .complete(auth, requests.into_iter().map(Into::into).collect())
-                .await
-                .map(|r| CsiResponse::CompleteAll(r.into_iter().map(Into::into).collect())),
-            CsiRequest::Search(search_request) => drivers
-                .search(auth, vec![search_request.into()])
-                .await
-                .map(|mut r| {
-                    CsiResponse::Search(r.remove(0).into_iter().map(Into::into).collect())
-                }),
-            CsiRequest::Chat(chat_request) => drivers
-                .chat(auth, vec![chat_request.into()])
-                .await
-                .map(|mut r| CsiResponse::Chat(r.remove(0).into())),
-            CsiRequest::Documents { requests } => drivers
-                .documents(auth, requests.into_iter().map(Into::into).collect())
-                .await
-                .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect())),
-            CsiRequest::DocumentMetadata { document_path } => drivers
-                .document_metadata(auth, vec![document_path.into()])
-                .await
-                .map(|mut r| CsiResponse::DocumentMetadata(r.remove(0))),
             CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
                     function.unwrap_or_else(|| "specified".to_owned()),
@@ -88,14 +88,14 @@ impl CsiRequest {
 #[derive(Serialize)]
 #[serde(untagged)]
 enum CsiResponse {
+    Chat(ChatResponse),
+    Chunk(Vec<Vec<String>>),
     Complete(Completion),
     CompleteAll(Vec<Completion>),
-    Chunk(Vec<Vec<String>>),
-    Language(Option<Language>),
-    Search(Vec<SearchResult>),
-    Chat(ChatResponse),
     Documents(Vec<Document>),
     DocumentMetadata(Option<Value>),
+    Language(Option<Language>),
+    Search(Vec<SearchResult>),
 }
 
 #[derive(Deserialize, Serialize)]
