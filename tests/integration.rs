@@ -26,7 +26,9 @@ impl TestFileRegistry {
 
     fn with_skill(&mut self, name: &str, wasm_bytes: Vec<u8>) {
         self.skills.push(name.to_owned());
-        std::fs::write(self.directory.path().join(name), wasm_bytes).unwrap();
+        let mut file_path = self.directory.path().join(name);
+        file_path.set_extension("wasm");
+        std::fs::write(file_path, wasm_bytes).unwrap();
     }
 
     fn to_namespace_config(&self) -> NamespaceConfigs {
@@ -118,7 +120,7 @@ fn namespace_config(dir_path: &Path, skills: &[&str]) -> NamespaceConfigs {
 async fn run_skill() {
     let greet_skill_wasm = given_greet_skill_v0_2().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
-    local_skill_dir.with_skill("greet.wasm", greet_skill_wasm);
+    local_skill_dir.with_skill("greet", greet_skill_wasm);
     let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
@@ -138,6 +140,7 @@ async fn run_skill() {
         .await
         .unwrap();
 
+    eprintln!("{:?}", resp);
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
     assert!(body.contains("Homer"));
