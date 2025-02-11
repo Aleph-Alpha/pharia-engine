@@ -1,5 +1,10 @@
 use std::{
-    env, net::TcpListener, path::{Path, PathBuf}, str::FromStr, sync::OnceLock, time::Duration
+    env,
+    net::TcpListener,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::OnceLock,
+    time::Duration,
 };
 
 use axum::http;
@@ -140,7 +145,7 @@ async fn run_skill() {
         .await
         .unwrap();
 
-    eprintln!("{:?}", resp);
+    eprintln!("{resp:?}");
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
     assert!(body.contains("Homer"));
