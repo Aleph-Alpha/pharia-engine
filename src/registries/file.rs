@@ -90,7 +90,15 @@ mod test {
         let skill_dir = tempdir().unwrap();
         let file_path = skill_dir.path().join("my_skill.wasm");
         fs::write(&file_path, &any_skill_bytes).unwrap();
-        eprintln!("{:?}", File::open(&file_path).unwrap().metadata().unwrap().modified().unwrap());
+        eprintln!(
+            "{:?}",
+            File::open(&file_path)
+                .unwrap()
+                .metadata()
+                .unwrap()
+                .modified()
+                .unwrap()
+        );
 
         // When fetching a digest before and after modifying the file
         let registry = FileRegistry::with_dir(skill_dir.path());
@@ -100,8 +108,16 @@ mod test {
         // see the change, because the digest is rounded to milliseconds.
         tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         fs::write(&file_path, &different_skill_bytes).unwrap();
-        eprintln!("{:?}", File::open(file_path).unwrap().metadata().unwrap().modified().unwrap());
-        
+        eprintln!(
+            "{:?}",
+            File::open(file_path)
+                .unwrap()
+                .metadata()
+                .unwrap()
+                .modified()
+                .unwrap()
+        );
+
         // Not sure why we need this sleep. `fs::write` is flushing, but the metainformation seems
         // to not be updated immediately.
         let new_digest = registry.fetch_digest("my_skill", "latest").await.unwrap();
