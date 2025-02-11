@@ -227,8 +227,8 @@ pub enum SkillRuntimeMsg {
 impl SkillRuntimeMsg {
     async fn act(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         match self {
-            SkillRuntimeMsg::Run(execute_skill) => {
-                execute_skill.act(csi_apis, runtime).await;
+            SkillRuntimeMsg::Run(skill_run_request) => {
+                skill_run_request.act(csi_apis, runtime).await;
             }
             SkillRuntimeMsg::Metadata(skill_metadata_request) => {
                 skill_metadata_request.act(runtime).await;
@@ -274,7 +274,7 @@ impl SkillRunRequest {
 
         let span = span!(
             Level::DEBUG,
-            "execute_skill",
+            "skill_run",
             skill_path = skill_path.to_string(),
         );
         let context = span.context();
