@@ -254,7 +254,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, skills, cached_skills, execute_skill, run_skill, drop_cached_skill, skill_wit),
+    paths(serve_docs, skills, execute_skill, run_skill, skill_wit),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
