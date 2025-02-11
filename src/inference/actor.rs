@@ -1,6 +1,5 @@
 use aleph_alpha_client::Client;
 use futures::{stream::FuturesUnordered, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
@@ -171,8 +170,7 @@ impl CompletionRequest {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy)]
 pub enum FinishReason {
     Stop,
     Length,
@@ -192,13 +190,13 @@ impl FromStr for FinishReason {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct TokenUsage {
     pub prompt: u32,
     pub completion: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Completion {
     pub text: String,
     pub finish_reason: FinishReason,
@@ -218,7 +216,7 @@ pub struct ChatResponse {
     pub usage: TokenUsage,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Distribution {
     // Logarithmic probability of the token returned in the completion
     pub sampled: Logprob,
@@ -226,7 +224,7 @@ pub struct Distribution {
     pub top: Vec<Logprob>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Logprob {
     pub token: Vec<u8>,
     pub logprob: f64,

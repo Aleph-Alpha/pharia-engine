@@ -59,6 +59,7 @@ impl CsiRequest {
             CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
+                .map(|v| CsiResponse::Complete(v.into_iter().map(Into::into).collect()))
                 .map(|v| json!(v))?,
             CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
@@ -90,6 +91,7 @@ impl CsiRequest {
 #[serde(untagged)]
 enum CsiResponse {
     Chat(Vec<ChatResponse>),
+    Complete(Vec<Completion>),
 }
 
 #[derive(Deserialize)]
@@ -699,12 +701,79 @@ impl From<CompletionRequest> for inference::CompletionRequest {
     }
 }
 
+#[derive(Serialize)]
+struct Completion {
+    text: String,
+    finish_reason: FinishReason,
+    logprobs: Vec<Distribution>,
+    usage: TokenUsage,
+}
+
+impl From<inference::Completion> for Completion {
+    fn from(value: inference::Completion) -> Self {
+        let inference::Completion {
+            text,
+            finish_reason,
+            logprobs,
+            usage,
+        } = value;
+        Completion {
+            text,
+            finish_reason: finish_reason.into(),
+            logprobs: logprobs.into_iter().map(Into::into).collect(),
+            usage: usage.into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use crate::csi_shell::VersionedCsiRequest;
 
+    #[test]
+    fn complete_response() {
+        let response = CsiResponse::Complete(vec![inference::Completion {
+            text: "Hello".to_string(),
+            finish_reason: inference::FinishReason::Stop,
+            logprobs: vec![inference::Distribution {
+                sampled: inference::Logprob {
+                    token: vec![],
+                    logprob: 0.0,
+                },
+                top: vec![],
+            }],
+            usage: inference::TokenUsage {
+                prompt: 0,
+                completion: 0,
+            },
+        }
+        .into()]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!([{
+                "text": "Hello",
+                "finish_reason": "stop",
+                "logprobs": [
+                    {
+                        "sampled": {
+                            "token": [],
+                            "logprob": 0.0
+                        },
+                        "top": []
+                    }
+                ],
+                "usage": {
+                    "prompt": 0,
+                    "completion": 0
+                }
+            }])
+        );
+    }
     #[test]
     fn chat_response() {
         let response = CsiResponse::Chat(vec![inference::ChatResponse {
