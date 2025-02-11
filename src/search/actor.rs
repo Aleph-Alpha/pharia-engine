@@ -2,7 +2,6 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
-use serde::Serialize;
 use serde_json::value::Value;
 use tokio::{
     select,
@@ -144,7 +143,7 @@ pub struct SearchRequest {
 }
 
 /// A section of a document that is returned from a search request
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct SearchResult {
     /// Which document this search result can be found in
     pub document_path: DocumentPath,
@@ -160,7 +159,7 @@ pub struct SearchResult {
     pub end: TextCursor,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct TextCursor {
     /// Index of the item in the document
     pub item: u32,
