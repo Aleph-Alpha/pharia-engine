@@ -95,9 +95,9 @@ mod test {
         // When fetching a digest before and after modifying the file
         let registry = FileRegistry::with_dir(skill_dir.path());
         let original_digest = registry.fetch_digest("my_skill", "latest").await.unwrap();
-        // Wait for at least one millisecond before changing the file. Otherwise we might actually get the digest
-        // and change the file in under one millisecond, and with some bad timing not see the change, because the
-        // digest is rounded to milliseconds.
+        // Wait for at least one millisecond before changing the file. Otherwise we might actually
+        // get the digest and change the file in under one millisecond, and with some bad timing not
+        // see the change, because the digest is rounded to milliseconds.
         tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         fs::write(&file_path, &different_skill_bytes).unwrap();
         eprintln!("{:?}", File::open(file_path).unwrap().metadata().unwrap().modified().unwrap());
