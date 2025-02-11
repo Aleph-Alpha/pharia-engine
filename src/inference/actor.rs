@@ -135,7 +135,7 @@ pub struct ChatParams {
     pub logprobs: Logprobs,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct Message {
     pub role: String,
     pub content: String,
@@ -208,7 +208,7 @@ pub struct Completion {
     pub usage: TokenUsage,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct ChatResponse {
     pub message: Message,
     pub finish_reason: FinishReason,

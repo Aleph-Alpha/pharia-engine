@@ -5,7 +5,7 @@
 /// It allows us to keep our external interface stable while updating our "internal" representations.
 /// Imagine we introduce a new version (0.4) with breaking changes in the api (e.g. a new field in `CompletionParams`).
 /// If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::csi_shell::CsiShellError;
@@ -50,6 +50,7 @@ impl CsiRequest {
             CsiRequest::Chat { requests } => drivers
                 .chat(auth, requests.into_iter().map(Into::into).collect())
                 .await
+                .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect()))
                 .map(|v| json!(v))?,
             CsiRequest::Chunk { requests } => drivers
                 .chunk(auth, requests.into_iter().map(Into::into).collect())
@@ -85,6 +86,12 @@ impl CsiRequest {
     }
 }
 
+#[derive(Serialize)]
+#[serde(untagged)]
+enum CsiResponse {
+    Chat(Vec<ChatResponse>),
+}
+
 #[derive(Deserialize)]
 pub struct DocumentPath {
     pub namespace: String,
@@ -107,7 +114,7 @@ impl From<DocumentPath> for search::DocumentPath {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Message {
     pub role: String,
     pub content: String,
@@ -117,6 +124,98 @@ impl From<Message> for inference::Message {
     fn from(value: Message) -> Self {
         let Message { role, content } = value;
         inference::Message { role, content }
+    }
+}
+
+impl From<inference::Message> for Message {
+    fn from(value: inference::Message) -> Self {
+        let inference::Message { role, content } = value;
+        Message { role, content }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FinishReason {
+    Stop,
+    Length,
+    ContentFilter,
+}
+
+impl From<inference::FinishReason> for FinishReason {
+    fn from(value: inference::FinishReason) -> Self {
+        match value {
+            inference::FinishReason::Stop => FinishReason::Stop,
+            inference::FinishReason::Length => FinishReason::Length,
+            inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct TokenUsage {
+    prompt: u32,
+    completion: u32,
+}
+
+impl From<inference::TokenUsage> for TokenUsage {
+    fn from(value: inference::TokenUsage) -> Self {
+        let inference::TokenUsage { prompt, completion } = value;
+        TokenUsage { prompt, completion }
+    }
+}
+
+#[derive(Serialize)]
+struct Logprob {
+    token: Vec<u8>,
+    logprob: f64,
+}
+
+impl From<inference::Logprob> for Logprob {
+    fn from(value: inference::Logprob) -> Self {
+        let inference::Logprob { token, logprob } = value;
+        Logprob { token, logprob }
+    }
+}
+
+#[derive(Serialize)]
+struct Distribution {
+    sampled: Logprob,
+    top: Vec<Logprob>,
+}
+
+impl From<inference::Distribution> for Distribution {
+    fn from(value: inference::Distribution) -> Self {
+        let inference::Distribution { sampled, top } = value;
+        Distribution {
+            sampled: sampled.into(),
+            top: top.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ChatResponse {
+    message: Message,
+    finish_reason: FinishReason,
+    logprobs: Vec<Distribution>,
+    usage: TokenUsage,
+}
+
+impl From<inference::ChatResponse> for ChatResponse {
+    fn from(value: inference::ChatResponse) -> Self {
+        let inference::ChatResponse {
+            message,
+            finish_reason,
+            logprobs,
+            usage,
+        } = value;
+        ChatResponse {
+            message: message.into(),
+            finish_reason: finish_reason.into(),
+            logprobs: logprobs.into_iter().map(Into::into).collect(),
+            usage: usage.into(),
+        }
     }
 }
 
@@ -605,6 +704,55 @@ mod tests {
     use super::*;
 
     use crate::csi_shell::VersionedCsiRequest;
+
+    #[test]
+    fn chat_response() {
+        let response = CsiResponse::Chat(vec![inference::ChatResponse {
+            message: inference::Message {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            },
+            finish_reason: inference::FinishReason::Stop,
+            logprobs: vec![inference::Distribution {
+                sampled: inference::Logprob {
+                    token: vec![],
+                    logprob: 0.0,
+                },
+                top: vec![],
+            }],
+            usage: inference::TokenUsage {
+                prompt: 0,
+                completion: 0,
+            },
+        }
+        .into()]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!([{
+                "message": {
+                    "role": "user",
+                    "content": "Hello"
+                },
+                "finish_reason": "stop",
+                "logprobs": [
+                    {
+                        "sampled": {
+                            "token": [],
+                            "logprob": 0.0
+                        },
+                        "top": []
+                    }
+                ],
+                "usage": {
+                    "prompt": 0,
+                    "completion": 0
+                }
+            }])
+        );
+    }
 
     #[test]
     fn chunk_request() {
