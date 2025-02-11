@@ -75,30 +75,35 @@ impl SkillRegistry for FileRegistry {
 
 #[cfg(test)]
 mod test {
+    use std::fs::File;
+
     use super::*;
     use tempfile::tempdir;
     use test_skills::{given_greet_skill_v0_2, given_greet_skill_v0_3};
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn change_digest_if_file_is_modified() {
         // Given a file `my_skill.wasm` containing a skill in a directory
         let any_skill_bytes = given_greet_skill_v0_2().bytes();
         // Any skill bytes do, as long as they are different
         let different_skill_bytes = given_greet_skill_v0_3().bytes();
         let skill_dir = tempdir().unwrap();
-        fs::write(skill_dir.path().join("my_skill.wasm"), any_skill_bytes).unwrap();
+        let file_path = skill_dir.path().join("my_skill.wasm");
+        fs::write(&file_path, &any_skill_bytes).unwrap();
+        eprintln!("{:?}", File::open(&file_path).unwrap().metadata().unwrap().modified().unwrap());
 
         // When fetching a digest before and after modifying the file
         let registry = FileRegistry::with_dir(skill_dir.path());
         let original_digest = registry.fetch_digest("my_skill", "latest").await.unwrap();
-        fs::write(
-            skill_dir.path().join("my_skill.wasm"),
-            different_skill_bytes,
-        )
-        .unwrap();
+        // Wait for at least one millisecond before changing the file. Otherwise we might actually get the digest
+        // and change the file in under one millisecond, and with some bad timing not see the change, because the
+        // digest is rounded to milliseconds.
+        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        fs::write(&file_path, &different_skill_bytes).unwrap();
+        eprintln!("{:?}", File::open(file_path).unwrap().metadata().unwrap().modified().unwrap());
+        
         // Not sure why we need this sleep. `fs::write` is flushing, but the metainformation seems
         // to not be updated immediately.
-        tokio::time::sleep(std::time::Duration::from_secs(6)).await;
         let new_digest = registry.fetch_digest("my_skill", "latest").await.unwrap();
 
         // Then the digest should change
