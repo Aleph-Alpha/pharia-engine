@@ -1,3 +1,4 @@
+use derive_more::{From, Into};
 /// CSI Shell version 0.3
 ///
 /// This module introduces serializable/user-facing structs which are very similar to our "internal" representations.
@@ -602,113 +603,21 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Language {
-    Afr,
-    Ara,
-    Aze,
-    Bel,
-    Ben,
-    Bos,
-    Bul,
-    Cat,
-    Ces,
-    Cym,
-    Dan,
-    Deu,
-    Ell,
-    Eng,
-    Epo,
-    Est,
-    Eus,
-    Fas,
-    Fin,
-    Fra,
-    Gle,
-    Guj,
-    Heb,
-    Hin,
-    Hrv,
-    Hun,
-    Hye,
-    Ind,
-    Isl,
-    Ita,
-    Jpn,
-    Kat,
-    Kaz,
-    Kor,
-    Lat,
-    Lav,
-    Lit,
-    Lug,
-    Mar,
-    Mkd,
-    Mon,
-    Mri,
-    Msa,
-    Nld,
-    Nno,
-    Nob,
-    Pan,
-    Pol,
-    Por,
-    Ron,
-    Rus,
-    Slk,
-    Slv,
-    Sna,
-    Som,
-    Sot,
-    Spa,
-    Sqi,
-    Srp,
-    Swa,
-    Swe,
-    Tam,
-    Tel,
-    Tgl,
-    Tha,
-    Tsn,
-    Tso,
-    Tur,
-    Ukr,
-    Urd,
-    Vie,
-    Xho,
-    Yor,
-    Zho,
-    Zul,
+#[derive(Deserialize, Serialize, From, Into)]
+#[serde(transparent)]
+pub struct Language(String);
+
+impl From<Language> for language_selection::Language {
+    fn from(value: Language) -> Self {
+        Self::new(value.0)
+    }
 }
 
-// Works as long as variant names match exactly
-macro_rules! language_mappings {
-    ($($variant:ident),*) => {
-        impl From<Language> for language_selection::Language {
-            fn from(language: Language) -> Self {
-                match language {
-                    $(Language::$variant => language_selection::Language::$variant),*
-                }
-            }
-        }
-
-        impl From<language_selection::Language> for Language {
-            fn from(language: language_selection::Language) -> Self {
-                match language {
-                    $(language_selection::Language::$variant => Language::$variant),*
-                }
-            }
-        }
-    };
+impl From<language_selection::Language> for Language {
+    fn from(value: language_selection::Language) -> Self {
+        Self(value.into())
+    }
 }
-
-language_mappings!(
-    Afr, Ara, Aze, Bel, Ben, Bos, Bul, Cat, Ces, Cym, Dan, Deu, Ell, Eng, Epo, Est, Eus, Fas, Fin,
-    Fra, Gle, Guj, Heb, Hin, Hrv, Hun, Hye, Ind, Isl, Ita, Jpn, Kat, Kaz, Kor, Lat, Lav, Lit, Lug,
-    Mar, Mkd, Mon, Mri, Msa, Nld, Nno, Nob, Pan, Pol, Por, Ron, Rus, Slk, Slv, Sna, Som, Sot, Spa,
-    Sqi, Srp, Swa, Swe, Tam, Tel, Tgl, Tha, Tsn, Tso, Tur, Ukr, Urd, Vie, Xho, Yor, Zho, Zul
-);
 
 #[derive(Deserialize)]
 pub struct SelectLanguageRequest {
@@ -839,8 +748,9 @@ mod tests {
 
     #[test]
     fn select_language_response() {
-        let response =
-            CsiResponse::SelectLanguage(vec![Some(language_selection::Language::Eng.into())]);
+        let response = CsiResponse::SelectLanguage(vec![Some(
+            language_selection::Language::new("eng".to_owned()).into(),
+        )]);
         let serialized = serde_json::to_value(response).unwrap();
         assert_eq!(serialized, json!(["eng"]));
     }

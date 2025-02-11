@@ -79,7 +79,9 @@ pub trait Csi {
                 .into_iter()
                 .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
         )
-        .await?)
+        .await?
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?)
     }
 
     async fn search(
@@ -709,6 +711,9 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                     .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
             )
             .await
+            .unwrap()
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
             .unwrap()
         }
 

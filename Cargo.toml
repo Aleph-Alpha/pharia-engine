@@ -108,6 +108,8 @@ derive_more = { version = "2.0.1", features = [
     "constructor",
     "deref",
     "display",
+    "from",
+    "into",
     "into_iterator",
 ] }
 retry-policies = "0.4.0"
