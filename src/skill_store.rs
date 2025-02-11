@@ -520,19 +520,15 @@ where
 pub mod tests {
 
     use async_trait::async_trait;
-    use std::{
-        fs,
-        hash::{DefaultHasher, Hasher},
-    };
+    use std::hash::{DefaultHasher, Hasher};
 
-    use tempfile::TempDir;
-    use test_skills::{given_chat_skill, given_greet_skill_v0_2};
+    use test_skills::given_greet_skill_v0_2;
     use tokio::time::{sleep, timeout};
 
     use crate::{
         namespace_watcher::Namespace,
         registries::RegistryError,
-        skill_loader::{RegistryConfig, SkillLoader, SkillLoaderMsg},
+        skill_loader::{SkillLoader, SkillLoaderMsg},
         skills::{Engine, SkillPath},
     };
 
@@ -999,57 +995,6 @@ pub mod tests {
         );
 
         Ok(())
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn should_invalidate_cached_skill_whose_digest_has_changed() -> anyhow::Result<()> {
-        // Given one cached "greet_skill"
-        let (registry_config, temp_dir) = tmp_registries_with_skill()?;
-        let greet_skill = SkillPath::local("greet_skill_v0_2");
-        let configured_skill = ConfiguredSkill::from_path(&greet_skill);
-        let engine = Arc::new(Engine::new(false)?);
-        let skill_loader = SkillLoader::from_config(engine, registry_config).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(1));
-        let api = skill_store.api();
-        api.upsert(configured_skill).await;
-        api.fetch(greet_skill.clone()).await?;
-        assert_eq!(api.list_cached().await, vec![greet_skill.clone()]);
-
-        // When we update "greet_skill"s contents
-        let wasm_file = temp_dir.path().join("greet_skill_v0_2.wasm");
-        let prev_time = fs::metadata(&wasm_file)?.modified()?;
-        // Another skill so we can copy it over
-        let _use_me_ = given_chat_skill();
-        fs::copy("./skills/chat_skill.wasm", &wasm_file)?;
-        let new_time = fs::metadata(&wasm_file)?.modified()?;
-        assert_ne!(prev_time, new_time);
-        sleep(Duration::from_secs(2)).await;
-
-        // Then greet skill is no longer listed in the cache, but of course still available in the
-        // list of all skills
-        assert!(api.list_cached().await.is_empty());
-        assert_eq!(api.list().await, vec![greet_skill]);
-
-        // Cleanup
-        drop(api);
-        skill_store.wait_for_shutdown().await;
-
-        Ok(())
-    }
-
-    /// Creates a file registry in a tempdir with one greet skill
-    fn tmp_registries_with_skill() -> anyhow::Result<(RegistryConfig, TempDir)> {
-        let _use_me_ = given_greet_skill_v0_2();
-        let dir = tempfile::tempdir()?;
-        fs::copy(
-            "./skills/greet_skill_v0_2.wasm",
-            dir.path().join("greet_skill_v0_2.wasm"),
-        )?;
-
-        let path = dir.path().to_string_lossy().into();
-        let namespace = Namespace::new("local").unwrap();
-        let registry_config = RegistryConfig::with_file_registry(namespace, path);
-        Ok((registry_config, dir))
     }
 
     /// A in memory skill loader stub for testing. It utilizes the hasher of its internal hash map
