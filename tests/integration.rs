@@ -1,5 +1,10 @@
 use std::{
-    env, net::TcpListener, path::{Path, PathBuf}, str::FromStr, sync::OnceLock, time::Duration
+    env,
+    net::TcpListener,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::OnceLock,
+    time::Duration,
 };
 
 use axum::http;
@@ -151,8 +156,10 @@ async fn run_skill() {
 #[cfg_attr(not(feature = "test_document_index"), ignore)]
 #[tokio::test]
 async fn run_search_skill() {
-    let _use_me_ = given_search_skill();
-    let kernel = TestKernel::with_skills(&["search_skill"]).await;
+    let wasm_bytes = given_search_skill().bytes();
+    let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
+    local_skill_dir.with_skill("search", wasm_bytes);
+    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -160,7 +167,7 @@ async fn run_search_skill() {
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
-            "http://127.0.0.1:{}/v1/skills/local/search_skill/run",
+            "http://127.0.0.1:{}/v1/skills/local/search/run",
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
@@ -183,8 +190,10 @@ async fn run_search_skill() {
 
 #[tokio::test]
 async fn run_doc_metadata_skill() {
-    let _use_me_ = given_doc_metadata_skill();
-    let kernel = TestKernel::with_skills(&["doc_metadata_skill"]).await;
+    let wasm_bytes = given_doc_metadata_skill().bytes();
+    let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
+    local_skill_dir.with_skill("doc_metadata", wasm_bytes);
+    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -192,7 +201,7 @@ async fn run_doc_metadata_skill() {
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
-            "http://127.0.0.1:{}/v1/skills/local/doc_metadata_skill/run",
+            "http://127.0.0.1:{}/v1/skills/local/doc_metadata/run",
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
