@@ -160,7 +160,6 @@ where
         .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
         .route("/csi", post(http_csi_handle::<C>))
         .route("/skills", get(skills))
-        .route("/execute_skill", post(execute_skill))
         .route("/cached_skills", get(cached_skills))
         .route(
             "/cached_skills/{namespace}/{name}",
@@ -254,7 +253,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, skills, execute_skill, run_skill, skill_wit),
+    paths(serve_docs, skills, run_skill, skill_wit),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -311,70 +310,6 @@ struct ExecuteSkillArgs {
     /// * "input": "Hello"
     /// * "input": {"text": "some text to be summarized", "length": "short"}
     input: Value,
-}
-
-/// execute_skill
-///
-/// Execute a skill in the kernel from one of the available repositories.
-#[utoipa::path(
-    post,
-    operation_id = "execute_skill",
-    path = "/execute_skill",
-    request_body = ExecuteSkillArgs,
-    security(("api_token" = [])),
-    tag = "skills",
-    responses(
-        (status = 200, description = "The Skill was executed.", body=String, example = json!("Skill output")),
-        (status = 400, description = "The Skill invocation failed.", body=String, example = json!("Skill not found."))
-    ),
-)]
-#[deprecated]
-async fn execute_skill(
-    State(skill_runtime_api): State<SkillRuntimeApi>,
-    bearer: TypedHeader<Authorization<Bearer>>,
-    Json(args): Json<ExecuteSkillArgs>,
-) -> (StatusCode, Json<Value>) {
-    let skill_name = args.skill.trim();
-    if skill_name.is_empty() {
-        return (
-            VALIDATION_ERROR_STATUS_CODE,
-            Json(json!("Empty skill names are not allowed.")),
-        );
-    }
-
-    let Some((namespace, name)) = skill_name.split_once('/') else {
-        return (
-            VALIDATION_ERROR_STATUS_CODE,
-            Json(json!("Missing namespace for skill.")),
-        );
-    };
-
-    let Ok(namespace) = Namespace::new(namespace) else {
-        return (
-            VALIDATION_ERROR_STATUS_CODE,
-            Json(json!("Invalid namespace for skill.")),
-        );
-    };
-
-    let skill_path = SkillPath::new(namespace, name);
-    let result = skill_runtime_api
-        .skill_run(skill_path, args.input, bearer.token().to_owned())
-        .await;
-    match result {
-        Ok(response) => (StatusCode::OK, Json(json!(response))),
-        Err(SkillRuntimeError::SkillNotConfigured) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!(SkillRuntimeError::SkillNotConfigured.to_string())),
-        ),
-        Err(SkillRuntimeError::StoreError(err)) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!(err.to_string())),
-        ),
-        Err(SkillRuntimeError::ExecutionError(err)) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!(err.to_string())),
-        ),
-    }
 }
 
 /// skill_metadata
@@ -562,11 +497,6 @@ fn skill_wit() -> &'static str {
     include_str!("../wit/skill@0.2/skill.wit")
 }
 
-/// We use `BAD_REQUEST` (400) for validation error as it is more commonly used.
-/// `UNPROCESSABLE_ENTITY` (422) is an alternative, but it may surprise users as it is less commonly
-/// known
-const VALIDATION_ERROR_STATUS_CODE: StatusCode = StatusCode::BAD_REQUEST;
-
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
@@ -738,51 +668,6 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let json_value: Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json_value["text"].as_str().unwrap(), prompt);
-    }
-
-    #[tokio::test]
-    async fn execute_skill() {
-        // Given
-        let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Run(SkillRunRequest {
-                skill_path, send, ..
-            }) => {
-                assert_eq!(skill_path, SkillPath::local("greet_skill"));
-                send.send(Ok(json!("dummy completion"))).unwrap();
-            }
-            SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
-                panic!("unexpected message in test");
-            }
-        });
-        let skill_runtime_api = skill_executer_mock.api();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
-        let http = http(app_state);
-
-        // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
-        let args = ExecuteSkillArgs {
-            skill: "local/greet_skill".to_owned(),
-            input: json!("Homer"),
-        };
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
-                    .uri("/execute_skill")
-                    .body(Body::from(serde_json::to_string(&args).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let answer = serde_json::from_slice::<String>(&body).unwrap();
-        assert_eq!(answer, "dummy completion");
     }
 
     #[tokio::test]
@@ -1097,40 +982,6 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
         assert_eq!(answer, "\"Skill was not present in cache\"");
-    }
-
-    #[tokio::test]
-    async fn blank_skill_name_is_bad_request() {
-        // Given a shell with a skill runtime API
-        // drop the receiver, we expect the shell to never try to execute a skill
-        let (send, _) = mpsc::channel(1);
-        let skill_runtime_api = SkillRuntimeApi::new(send);
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
-        let http = http(app_state);
-
-        // When executing a skill with a blank name
-        let api_token = api_token();
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-        let args = ExecuteSkillArgs {
-            skill: "\n\n".to_owned(),
-            input: json!("Homer"),
-        };
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
-                    .uri("/execute_skill")
-                    .body(Body::from(serde_json::to_string(&args).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
