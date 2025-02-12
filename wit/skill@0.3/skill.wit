@@ -85,18 +85,28 @@ interface document-index {
         name: string,
     }
 
+    /// A position within a document. The cursor is always inclusive of the current position, in both start and end positions.
     @since(version = 0.3.0)
     record text-cursor {
-        /// The index of the item in the document
+        /// Index of the item in the document. A document is an array of text and image elements. These elements are referred to as items.
         item: u32,
-        /// The position of the cursor within the item
+        /// The character position the cursor can be found at within the string.
         position: u32,
     }
 
+    /// The result for semantic document search. Part of an array of document names and content of the found documents in the given collection.
     @since(version = 0.3.0)
     record search-result {
+        /// The path to a document. A path uniquely identifies a document among all managed documents.
         document-path: document-path,
+        /// The text of the found section. As we do not support multi-modal, this is always a string.
         content: string,
+        /// Search score of the found section, where a higher score indicates a closer match.
+        /// Will be between -1 and 1. A score closer to -1 indicates the section opposes the query.
+        /// A score close 0 suggests the section is unrelated to the query.
+        /// A score close to 1 suggests the section is related to the query.
+        /// The score depends on the index configuration, e.g. the score of a section differs for hybrid and non-hybrid indexes.
+        /// For searches on hybrid indexes, the score can exceed the min_score of the query as the min_score only applies to the semantic similarity sub-query.
         score: f64,
         start: text-cursor,
         end: text-cursor,
@@ -105,9 +115,18 @@ interface document-index {
     @since(version = 0.3.0)
     record search-request {
         index-path: index-path,
+        /// While the Document Index offers a list of multiple modality queries, as we do not support multi-modal search,
+        /// we only support a single text modality query.
         query: string,
+        /// Maximum number of found documents to return.
         max-results: u32,
+        /// Filter out results with a cosine similarity score below this value.
+        /// Scores range from -1 to 1. For searches on hybrid indexes, the Document Index applies the min_score to the semantic results before fusion of result sets.
+        /// As fusion re-scores results, returned scores may exceed this value.
         min-score: option<f64>,
+        /// A filter for search results that restricts the results to those document sections that match the filter criteria.
+        /// The individual conditions of this array are AND-combined (i.e. all conditions must match).
+        /// This can for example be used to restrict the returned sections based on their modality (i.e. image or text), or on their metadata.
         filters: list<search-filter>
     }
 
@@ -124,16 +143,27 @@ interface document-index {
         metadata: option<list<u8>>,
     }
 
+    /// A logical combination of filter conditions.
     @since(version = 0.3.0)
     variant search-filter {
+        /// Logical conjunction of negations, i.e. forms the predicate "(NOT filterCondition1) AND (NOT filterCondition2) AND ..."
         without(list<metadata-filter>),
+        /// Logical disjunction, i.e. forms the predicate "filterCondition1 OR filterCondition2 OR ..."
         with-one-of(list<metadata-filter>),
+        /// Logical conjunction, i.e. forms the predicate "filterCondition1 AND filterCondition2 AND ..."
         with-all(list<metadata-filter>),
     }
 
+    /// Matches sections whose metadata fields match the given condition. You must specify the field, and can only specify a single condition.
     @since(version = 0.3.0)
     record metadata-filter {
+        /// The metadata field on which to filter search results.
+        /// Field names must only contain alphanumeric characters, dashes and underscores.
+        /// Nested fields can be specified using dot notation (e.g. 'a.b').
+        /// Array-valued fields can either use a wildcard specifier (e.g. 'a[].b') or a specific index (e.g. 'a[1].b').
+        /// The maximum length of the field name is 1000 characters.
         field: string,
+        /// The condition to filter on.
         condition: metadata-filter-condition
     }
 
@@ -148,6 +178,7 @@ interface document-index {
         before(string),
         at-or-before(string),
         equal-to(metadata-field-value),
+        /// This condition matches all metadata fields with a value of null.
         is-null,
     }
 
