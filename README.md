@@ -12,10 +12,12 @@ Releasing in this repository is automated with [release-plz](https://release-plz
 
 1. For every commit to the `main` branch, release-plz creates a release Pull Request.
 2. Review the release Pull Request and add new changes, if necessary, by amending the commit directly.
-   a. Helm chart version
-      By default, only the patch version is incremented.
-   b. Helm chart changelog date
-      The date is set when the changelog is generated. Update it to the release date if differs.
+   - Helm chart version:
+
+     By default, only the patch version is incremented.
+   - Helm chart changelog date:
+
+     The date is set when the changelog is generated. Update it to the release date if differs.
 3. Merge the release Pull Request and release-plz will release the updated packages.
 
 ### Local Development setup
