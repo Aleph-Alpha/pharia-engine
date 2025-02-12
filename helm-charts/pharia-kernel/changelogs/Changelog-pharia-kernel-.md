@@ -1,10 +1,18 @@
 ## Sub Chart Name - pharia-kernel
-## Sub Chart Version - 0.2.14
+## Sub Chart Application Version - Unreleased
 ## Release Date - 2025-02-12
 
 ### Description of Changes:
 
-- [ ] Set up Helm chart changelog
+- [ ] Update description of changes
+- [ ] Release v0.9.1
+- [ ] Apply git-cliff config when printing context
+- [ ] Add generated changelog
+- [ ] All test no longer utilize skill directory directly (#286)
+- [ ] Publish Helm chart changelog
+- [ ] Generate Helm chart changelog
+- [ ] Configure Helm chart changelog
+- [ ] Bump the minor group with 2 updates
 
 ### Added
 
@@ -12,6 +20,7 @@
 
 ### Changed
 
+- Update description of changes
 - Release v0.9.1
 - Apply git-cliff config when printing context
 - Publish Helm chart changelog
