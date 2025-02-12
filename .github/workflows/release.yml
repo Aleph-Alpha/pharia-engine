@@ -106,9 +106,21 @@ jobs:
           pr_number=${{ fromJSON(steps.release-plz.outputs.pr).number }}
           if [[ -n "$pr_number" ]]; then
             gh pr checkout $pr_number
-            git-cliff --unreleased --context \
-              --config helm-charts/pharia-kernel/changelogs/cliff.toml \
-              | jq '.[0].extra = {"chart_version":"${{ env.CHART_VERSION }}","timestamp":now | strftime("%Y-%m-%d")}' \
+
+            git-cliff --unreleased --context --config helm-charts/pharia-kernel/changelogs/cliff.toml --output context.json
+
+            COMMIT_MESSAGES=$(cat context.json | jq -r '.[] | .commits[] | .raw_message')
+
+            RELEASE_DESCRIPTION=$(curl 'https://pharia-kernel.product.pharia.com/v1/skills/app/summarize_commits/run' \
+              --silent \
+              --request POST \
+              --header 'Content-Type: application/json' \
+              --header "Authorization: Bearer ${{ secrets.PHARIA_AI_TOKEN }}"" \
+              --data '"\"$COMMIT_MESSAGES\""')
+
+            cat context.json \
+              | jq --arg RELEASE_DESCRIPTION "$RELEASE_DESCRIPTION" \
+                '.[0].extra = {"chart_version":"${{ env.CHART_VERSION }}","timestamp":now | strftime("%Y-%m-%d"),"description":$RELEASE_DESCRIPTION}' \
               | git-cliff --verbose --from-context - \
               --config helm-charts/pharia-kernel/changelogs/cliff.toml \
               --output helm-charts/pharia-kernel/changelogs/Changelog-pharia-kernel-${{ env.CHART_VERSION }}.md
