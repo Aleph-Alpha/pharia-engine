@@ -43,7 +43,7 @@ impl CsiRequest {
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await
-                .map(CsiResponse::Chunk),
+                .map(|mut r| CsiResponse::Chunk(r.remove(0))),
             CsiRequest::Complete(completion_request) => drivers
                 .complete(auth, vec![completion_request.into()])
                 .await
@@ -89,7 +89,7 @@ impl CsiRequest {
 #[serde(untagged)]
 enum CsiResponse {
     Chat(ChatResponse),
-    Chunk(Vec<Vec<String>>),
+    Chunk(Vec<String>),
     Complete(Completion),
     CompleteAll(Vec<Completion>),
     Documents(Vec<Document>),
@@ -697,11 +697,11 @@ pub mod tests {
 
     #[test]
     fn chunk_response() {
-        let response = CsiResponse::Chunk(vec![vec!["Hello".to_string()]]);
+        let response = CsiResponse::Chunk(vec!["Hello".to_string()]);
 
         let serialized = serde_json::to_value(response).unwrap();
 
-        assert_eq!(serialized, json!([["Hello"]]));
+        assert_eq!(serialized, json!(["Hello"]));
     }
 
     #[test]
