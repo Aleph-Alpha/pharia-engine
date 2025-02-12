@@ -1,10 +1,16 @@
 use exports::pharia::skill::skill_handler::SkillMetadata;
-use pharia::skill::csi::{
-    ChatParams, ChatRequest, ChatResponse, ChunkParams, ChunkRequest, Completion, CompletionParams,
-    CompletionRequest, Distribution, Document, DocumentPath, FinishReason, Host, IndexPath,
-    Language, Logprob, Logprobs, Message, MetadataFieldValue, MetadataFilter,
-    MetadataFilterCondition, Modality, SearchFilter, SearchRequest, SearchResult,
-    SelectLanguageRequest, TextCursor, TokenUsage,
+use pharia::skill::{
+    chunking::{ChunkParams, ChunkRequest, Host as ChunkingHost},
+    document_index::{
+        Document, DocumentPath, Host as DocumentIndexHost, IndexPath, MetadataFieldValue,
+        MetadataFilter, MetadataFilterCondition, Modality, SearchFilter, SearchRequest,
+        SearchResult, TextCursor,
+    },
+    inference::{
+        ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
+        Distribution, FinishReason, Host as InferenceHost, Logprob, Logprobs, Message, TokenUsage,
+    },
+    language::{Host as LanguageHost, SelectLanguageRequest},
 };
 use serde_json::Value;
 use wasmtime::component::bindgen;
@@ -15,52 +21,15 @@ use super::LinkedCtx;
 
 bindgen!({ world: "skill", path: "./wit/skill@0.3", async: true });
 
-impl Host for LinkedCtx {
-    async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-        self.skill_ctx
-            .chat(requests.into_iter().map(Into::into).collect())
-            .await
-            .into_iter()
-            .map(Into::into)
-            .collect()
-    }
-
+impl ChunkingHost for LinkedCtx {
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
         self.skill_ctx
             .chunk(requests.into_iter().map(Into::into).collect())
             .await
     }
+}
 
-    async fn select_language(
-        &mut self,
-        requests: Vec<SelectLanguageRequest>,
-    ) -> Vec<Option<Language>> {
-        self.skill_ctx
-            .select_language(requests.into_iter().map(Into::into).collect())
-            .await
-            .into_iter()
-            .map(|r| r.map(Into::into))
-            .collect()
-    }
-
-    async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-        self.skill_ctx
-            .complete(requests.into_iter().map(Into::into).collect())
-            .await
-            .into_iter()
-            .map(Into::into)
-            .collect()
-    }
-
-    async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-        self.skill_ctx
-            .search(requests.into_iter().map(Into::into).collect())
-            .await
-            .into_iter()
-            .map(|results| results.into_iter().map(Into::into).collect())
-            .collect()
-    }
-
+impl DocumentIndexHost for LinkedCtx {
     async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
         self.skill_ctx
             .documents(requests.into_iter().map(Into::into).collect())
@@ -80,6 +49,49 @@ impl Host for LinkedCtx {
                     serde_json::to_vec(&v).expect("Value should have valid to_bytes repr.")
                 })
             })
+            .collect()
+    }
+
+    async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+        self.skill_ctx
+            .search(requests.into_iter().map(Into::into).collect())
+            .await
+            .into_iter()
+            .map(|results| results.into_iter().map(Into::into).collect())
+            .collect()
+    }
+}
+
+impl InferenceHost for LinkedCtx {
+    async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+        self.skill_ctx
+            .chat(requests.into_iter().map(Into::into).collect())
+            .await
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    }
+
+    async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+        self.skill_ctx
+            .complete(requests.into_iter().map(Into::into).collect())
+            .await
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    }
+}
+
+impl LanguageHost for LinkedCtx {
+    async fn select_language(
+        &mut self,
+        requests: Vec<SelectLanguageRequest>,
+    ) -> Vec<Option<String>> {
+        self.skill_ctx
+            .select_language(requests.into_iter().map(Into::into).collect())
+            .await
+            .into_iter()
+            .map(|r| r.map(Into::into))
             .collect()
     }
 }
@@ -150,34 +162,6 @@ impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
         }
     }
 }
-
-// Works as long as variant names match exactly
-macro_rules! language_mappings {
-    ($($variant:ident),*) => {
-        impl From<Language> for language_selection::Language {
-            fn from(language: Language) -> Self {
-                match language {
-                    $(Language::$variant => language_selection::Language::$variant),*
-                }
-            }
-        }
-
-        impl From<language_selection::Language> for Language {
-            fn from(language: language_selection::Language) -> Self {
-                match language {
-                    $(language_selection::Language::$variant => Language::$variant),*
-                }
-            }
-        }
-    };
-}
-
-language_mappings!(
-    Afr, Ara, Aze, Bel, Ben, Bos, Bul, Cat, Ces, Cym, Dan, Deu, Ell, Eng, Epo, Est, Eus, Fas, Fin,
-    Fra, Gle, Guj, Heb, Hin, Hrv, Hun, Hye, Ind, Isl, Ita, Jpn, Kat, Kaz, Kor, Lat, Lav, Lit, Lug,
-    Mar, Mkd, Mon, Mri, Msa, Nld, Nno, Nob, Pan, Pol, Por, Ron, Rus, Slk, Slv, Sna, Som, Sot, Spa,
-    Sqi, Srp, Swa, Swe, Tam, Tel, Tgl, Tha, Tsn, Tso, Tur, Ukr, Urd, Vie, Xho, Yor, Zho, Zul
-);
 
 impl From<SearchRequest> for search::SearchRequest {
     fn from(request: SearchRequest) -> Self {

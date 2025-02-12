@@ -168,8 +168,8 @@ impl From<ChunkParams> for chunking::ChunkParams {
 impl From<language_selection::Language> for Language {
     fn from(language: language_selection::Language) -> Self {
         match language {
-            language_selection::Language::Deu => Language::Deu,
-            language_selection::Language::Eng => Language::Eng,
+            language_selection::Language(s) if s == "deu" => Language::Deu,
+            language_selection::Language(s) if s == "eng" => Language::Eng,
             _ => unreachable!("Language not allowed as input"),
         }
     }
@@ -178,8 +178,8 @@ impl From<language_selection::Language> for Language {
 impl From<Language> for language_selection::Language {
     fn from(language: Language) -> Self {
         match language {
-            Language::Eng => language_selection::Language::Eng,
-            Language::Deu => language_selection::Language::Deu,
+            Language::Eng => language_selection::Language::new("eng".to_owned()),
+            Language::Deu => language_selection::Language::new("deu".to_owned()),
         }
     }
 }

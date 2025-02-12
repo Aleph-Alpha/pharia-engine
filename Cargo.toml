@@ -31,7 +31,7 @@ module-name-repetitions = "allow"
 
 [package]
 name = "pharia-kernel"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 exclude = ["helm-charts", "resource_eval"]
 
@@ -108,6 +108,8 @@ derive_more = { version = "2.0.1", features = [
     "constructor",
     "deref",
     "display",
+    "from",
+    "into",
     "into_iterator",
 ] }
 retry-policies = "0.4.0"

@@ -145,7 +145,7 @@ async fn run_skill() {
         .await
         .unwrap();
 
-    eprintln!("{:?}", resp);
+    eprintln!("{resp:?}");
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
     assert!(body.contains("Homer"));

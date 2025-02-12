@@ -521,8 +521,8 @@ mod tests {
     use fake::{Fake, Faker};
     use serde_json::json;
     use test_skills::{
-        given_chat_skill, given_greet_py_v0_2, given_greet_skill_v0_2, given_greet_skill_v0_3,
-        given_search_skill,
+        given_chat_skill, given_greet_py_v0_2, given_greet_py_v0_3, given_greet_skill_v0_2,
+        given_greet_skill_v0_3, given_search_skill,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -710,9 +710,25 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_2_py_module() {
         // Given a skill loaded by our engine
-        let wasm = given_greet_py_v0_2().bytes();
+        let skill = given_greet_py_v0_2();
         let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, wasm).unwrap();
+        let skill = Skill::new(&engine, skill.bytes()).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let input = json!("Homer");
+        let result = skill.run(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string
+        assert_eq!(result, json!("Hello Homer"));
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_v0_3_py_module() {
+        // Given a skill loaded by our engine
+        let skill = given_greet_py_v0_3();
+        let engine = Engine::new(false).unwrap();
+        let skill = Skill::new(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
