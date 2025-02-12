@@ -98,6 +98,8 @@ jobs:
 
       - if: ${{ steps.release-plz.outputs.prs_created }}
         name: Generate Helm chart changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
 
