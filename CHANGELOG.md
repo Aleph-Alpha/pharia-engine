@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.2...v0.9.3)
+
+### Fixes
+
+- Remove wrongly added vec around serialization of csi chunking request - ([751308b](https://github.com/Aleph-Alpha/pharia-kernel/commit/751308b109ec98ab63fb1680acd9d951095f4108))
+
+### Documentation
+
+- Fix listing - ([d21f6dd](https://github.com/Aleph-Alpha/pharia-kernel/commit/d21f6dd205ad28084af974f0cbd6cf12393c76d4))
+- Describe release flow - ([4a90bf6](https://github.com/Aleph-Alpha/pharia-kernel/commit/4a90bf61186846a6c76f77679fa467f45b1ad791))
+
+
 ## [0.9.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.8.0...v0.9.0)
 
 ### Features
