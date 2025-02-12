@@ -106,5 +106,6 @@ jobs:
       - if: ${{ steps.release-plz.outputs.prs_created }}
         name: Amend commit
         run: |
+          git add helm-charts/pharia-kernel/changelogs/Changelog-pharia-kernel-${{ env.CHART_VERSION }}.md
           git commit -a --amend --no-edit
           git push -f
