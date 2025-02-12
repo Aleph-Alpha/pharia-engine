@@ -86,6 +86,8 @@ jobs:
               CHART_VERSION=$(yq ".version" < $PATH_TO_CHART)
               NEW_CHART_VERSION=$(echo "$CHART_VERSION" | awk -F '.' '{print $1"."$2"."($3+1)}')
               yq -i "(.version = \"$NEW_CHART_VERSION\") | (.appVersion = \"$NEW_APP_VERSION\")" $PATH_TO_CHART
+              git commit -a --amend --no-edit
+              git push -f
               echo "CHART_VERSION=$NEW_CHART_VERSION" >> $GITHUB_ENV
             fi
           fi
@@ -97,16 +99,18 @@ jobs:
       - if: ${{ steps.release-plz.outputs.prs_created }}
         name: Generate Helm chart changelog
         run: |
-          git-cliff --unreleased --context \
-            --config helm-charts/pharia-kernel/changelogs/cliff.toml \
-            | jq '.[0].extra = {"chart_version":"${{ env.CHART_VERSION }}","timestamp":now | strftime("%Y-%m-%d")}' \
-            | git-cliff --verbose --from-context - \
-            --config helm-charts/pharia-kernel/changelogs/cliff.toml \
-            --output helm-charts/pharia-kernel/changelogs/Changelog-pharia-kernel-${{ env.CHART_VERSION }}.md
+          set -e
 
-      - if: ${{ steps.release-plz.outputs.prs_created }}
-        name: Amend commit
-        run: |
-          git add helm-charts/pharia-kernel/changelogs/Changelog-pharia-kernel-${{ env.CHART_VERSION }}.md
-          git commit -a --amend --no-edit
-          git push -f
+          pr_number=${{ fromJSON(steps.release-plz.outputs.pr).number }}
+          if [[ -n "$pr_number" ]]; then
+            gh pr checkout $pr_number
+            git-cliff --unreleased --context \
+              --config helm-charts/pharia-kernel/changelogs/cliff.toml \
+              | jq '.[0].extra = {"chart_version":"${{ env.CHART_VERSION }}","timestamp":now | strftime("%Y-%m-%d")}' \
+              | git-cliff --verbose --from-context - \
+              --config helm-charts/pharia-kernel/changelogs/cliff.toml \
+              --output helm-charts/pharia-kernel/changelogs/Changelog-pharia-kernel-${{ env.CHART_VERSION }}.md
+            git add helm-charts/pharia-kernel/changelogs/Changelog-pharia-kernel-${{ env.CHART_VERSION }}.md
+            git commit --amend --no-edit
+            git push -f
+          fi
