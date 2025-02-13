@@ -115,7 +115,7 @@ jobs:
               --silent \
               --request POST \
               --header 'Content-Type: application/json' \
-              --header "Authorization: Bearer ${{ secrets.PHARIA_AI_TOKEN }}"" \
+              --header "Authorization: Bearer ${{ secrets.PHARIA_AI_TOKEN }}" \
               --data '"\"$COMMIT_MESSAGES\""')
 
             cat context.json \
