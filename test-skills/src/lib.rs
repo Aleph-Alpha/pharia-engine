@@ -29,7 +29,7 @@ impl TestSkill {
 
     #[must_use]
     pub fn bytes(&self) -> Vec<u8> {
-        fs::read(format!("./skills/{}.wasm", self.file_name)).unwrap()
+        fs::read(format!("./skill_build_cache/{}.wasm", self.file_name)).unwrap()
     }
 }
 
@@ -116,14 +116,14 @@ pub fn given_csi_from_metadata_skill() -> TestSkill {
 }
 
 fn given_python_skill(package_name: &str, wit_version: &str) {
-    if !Path::new(&format!("./skills/{package_name}.wasm")).exists() {
+    if !Path::new(&format!("./skill_build_cache/{package_name}.wasm")).exists() {
         build_python_skill(package_name, wit_version);
     }
 }
 
 fn given_rust_skill(package_name: &str) {
     let snake_case = change_case::snake_case(package_name);
-    if !Path::new(&format!("./skills/{snake_case}.wasm")).exists() {
+    if !Path::new(&format!("./skill_build_cache/{snake_case}.wasm")).exists() {
         build_rust_skill(package_name);
     }
 }
@@ -132,7 +132,7 @@ fn given_rust_skill(package_name: &str) {
 ///
 /// ```shell
 /// cargo build -p greet-skill-v0_2 --target wasm32-wasip2 --release
-/// wasm-tools strip ./skills/greet_skill_v0_2.wasm -o ./skills/greet_skill_v0_2.wasm
+/// wasm-tools strip ./skill_build_cache/greet_skill_v0_2.wasm -o ./skill_build_cache/greet_skill_v0_2.wasm
 /// ```
 fn build_rust_skill(package_name: &str) {
     let snake_case = change_case::snake_case(package_name);
@@ -155,13 +155,15 @@ fn build_rust_skill(package_name: &str) {
 
     std::fs::copy(
         format!("./target/{WASI_TARGET}/release/{snake_case}.wasm"),
-        format!("./skills/{snake_case}.wasm"),
+        format!("./skill_build_cache/{snake_case}.wasm"),
     )
     .unwrap();
 }
 
 fn build_python_skill(package_name: &str, wit_version: &str) {
     let venv = static_venv();
+
+    let target_path = format!("./skill_build_cache/{package_name}.wasm");
 
     venv.run(&[
         "componentize-py",
@@ -172,19 +174,19 @@ fn build_python_skill(package_name: &str, wit_version: &str) {
         "componentize",
         &format!("{package_name}.app"),
         "-o",
-        &format!("./skills/{package_name}.wasm"),
+        &target_path,
     ])
     .unwrap();
 
     // Make resulting skill component smaller
     //
-    // wasm-tools strip ./skills/greet-py.wasm -o ./skills/greet-py.wasm
+    // wasm-tools strip ./skill_build_cache/greet-py.wasm -o ./skill_build_cache/greet-py.wasm
     Command::new("wasm-tools")
         .args([
             "strip",
-            &format!("./skills/{package_name}.wasm"),
+            &target_path,
             "-o",
-            &format!("./skills/{package_name}.wasm"),
+            &target_path,
         ])
         .status()
         .unwrap();
