@@ -111,7 +111,7 @@ jobs:
 
             COMMIT_MESSAGES=$(cat context.json | jq -r '.[] | .commits[] | .raw_message')
 
-            RELEASE_DESCRIPTION=$(curl 'https://pharia-kernel.product.pharia.com/v1/skills/app/summarize_commits/run' \
+            RELEASE_DESCRIPTION=$(curl 'https://pharia-kernel.product.pharia.com/v1/skills/kernel/summarize_commits/run' \
               --silent \
               --request POST \
               --header 'Content-Type: application/json' \
