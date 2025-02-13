@@ -1,10 +1,9 @@
 use std::{env, str::FromStr};
 
-use opentelemetry::{global, trace::TracerProvider, KeyValue};
+use opentelemetry::{trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::{
-    runtime,
-    trace::{RandomIdGenerator, Sampler, Tracer},
+    trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
     Resource,
 };
 use opentelemetry_semantic_conventions::{
@@ -22,22 +21,40 @@ use crate::AppConfig;
 ///
 /// # Errors
 /// Failed to parse the log level provided by the configuration.
-pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<()> {
+pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<OtelGuard> {
     let env_filter = EnvFilter::from_str(&app_config.log_level)?;
     let registry = tracing_subscriber::registry()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer());
-    if let Some(endpoint) = &app_config.otel_endpoint {
-        let otel_tracer = init_otel_tracer(endpoint)?;
-        registry.with(OpenTelemetryLayer::new(otel_tracer)).init();
+    let tracer_provider = if let Some(endpoint) = &app_config.otel_endpoint {
+        let tracer_provider = init_otel_tracer_provider(endpoint)?;
+        let tracer = tracer_provider.tracer("tracing-otel-subscriber");
+        registry.with(OpenTelemetryLayer::new(tracer)).init();
+        Some(tracer_provider)
     } else {
         registry.init();
-    }
-    Ok(())
+        None
+    };
+
+    Ok(OtelGuard { tracer_provider })
 }
 
-fn init_otel_tracer(endpoint: &str) -> anyhow::Result<Tracer> {
-    let provider = opentelemetry_sdk::trace::TracerProvider::builder() // Customize sampling strategy
+pub struct OtelGuard {
+    tracer_provider: Option<SdkTracerProvider>,
+}
+
+impl Drop for OtelGuard {
+    fn drop(&mut self) {
+        if let Some(tracer_provider) = &mut self.tracer_provider {
+            if let Err(err) = tracer_provider.shutdown() {
+                eprintln!("{err:?}");
+            }
+        }
+    }
+}
+
+fn init_otel_tracer_provider(endpoint: &str) -> anyhow::Result<SdkTracerProvider> {
+    Ok(SdkTracerProvider::builder() // Customize sampling strategy
         .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
             0.1,
         ))))
@@ -49,22 +66,20 @@ fn init_otel_tracer(endpoint: &str) -> anyhow::Result<Tracer> {
                 .with_tonic()
                 .with_endpoint(endpoint)
                 .build()?,
-            runtime::Tokio,
         )
-        .build();
-
-    global::set_tracer_provider(provider.clone());
-    Ok(provider.tracer("tracing-otel-subscriber"))
+        .build())
 }
 
 // Create a Resource that captures information about the entity for which telemetry is recorded.
 fn resource() -> Resource {
-    Resource::from_schema_url(
-        [
-            KeyValue::new(SERVICE_NAME, env!("CARGO_PKG_NAME")),
-            KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION")),
-            KeyValue::new(DEPLOYMENT_ENVIRONMENT_NAME, "develop"),
-        ],
-        SCHEMA_URL,
-    )
+    Resource::builder()
+        .with_schema_url(
+            [
+                KeyValue::new(SERVICE_NAME, env!("CARGO_PKG_NAME")),
+                KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION")),
+                KeyValue::new(DEPLOYMENT_ENVIRONMENT_NAME, "develop"),
+            ],
+            SCHEMA_URL,
+        )
+        .build()
 }
