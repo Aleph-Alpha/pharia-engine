@@ -456,34 +456,21 @@ impl From<Filter> for search::Filter {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
+/// This representation diverges from the wit world 0.3 schema as it
+/// has one more layer of nesting with the metadata filter and calls
+/// the `with-all` variant simply `with`. While we want to keep the
+/// http and wit representations as close as possible, this divergence
+/// happened as a mistake and we do not update it to not break clients.
 pub enum FilterCondition {
-    Modality(ModalityType),
     Metadata(MetadataFilter),
 }
 
 impl From<FilterCondition> for search::FilterCondition {
     fn from(value: FilterCondition) -> Self {
         match value {
-            FilterCondition::Modality(modality_type) => {
-                search::FilterCondition::Modality(modality_type.into())
-            }
             FilterCondition::Metadata(metadata_filter) => {
                 search::FilterCondition::Metadata(metadata_filter.into())
             }
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum ModalityType {
-    Text,
-}
-
-impl From<ModalityType> for search::ModalityType {
-    fn from(value: ModalityType) -> Self {
-        match value {
-            ModalityType::Text => search::ModalityType::Text,
         }
     }
 }
