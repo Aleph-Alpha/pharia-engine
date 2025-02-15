@@ -9,11 +9,18 @@ use std::{
 
 use axum::http;
 use dotenvy::dotenv;
+use futures::StreamExt;
 use pharia_kernel::{AppConfig, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
 use test_skills::{given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill};
+use reqwest::{header, Body};
+use serde_json::{json, Value};
+use tempfile::{tempdir, TempDir};
+use test_skills::{
+    given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill, given_write_skill,
+};
 use tokio::sync::oneshot;
 
 struct TestFileRegistry {
@@ -184,6 +191,51 @@ async fn run_search_skill() {
     assert!(!value.as_array().unwrap().is_empty());
     let first_text = value[0].clone().to_string();
     assert!(first_text.to_ascii_lowercase().contains("kernel"));
+
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn run_stream_skill() {
+    let wasm_bytes = given_write_skill().bytes();
+    let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
+    local_skill_dir.with_skill("stream", wasm_bytes);
+    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let response = req_client
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/stream/run",
+            kernel.port()
+        ))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(json!("What is the Pharia Kernel?").to_string()))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    // Then
+    assert_eq!(response.status(), axum::http::StatusCode::OK);
+    let mut stream = response.bytes_stream();
+    let mut events: Vec<String> = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.unwrap();
+        let text = String::from_utf8_lossy(&chunk);
+        events.push(text.into());
+    }
+    assert_eq!(
+        events,
+        vec![
+            "data: \"Hello 1\"\n\n",
+            "data: \"Error: expected value at line 1 column 1\"\n\n",
+            "data: \"Hello 3\"\n\n",
+        ]
+    );
 
     kernel.shutdown().await;
 }

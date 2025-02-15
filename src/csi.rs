@@ -35,6 +35,7 @@ pub struct CsiDrivers<T> {
 #[async_trait]
 pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
+    async fn write(&mut self, data: Vec<u8>);
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>>;
     async fn select_language(
@@ -676,6 +677,10 @@ pub mod tests {
 
     #[async_trait]
     impl CsiForSkills for CsiCompleteStub {
+        async fn write(&mut self, _data: Vec<u8>) {
+            unimplemented!()
+        }
+
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests
                 .into_iter()
@@ -751,6 +756,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 start: 0,
                 length: 0,
             }])]
+        }
+
+        async fn write(&mut self, _data: Vec<u8>) {
+            unimplemented!()
         }
 
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
@@ -834,6 +843,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
     #[async_trait]
     impl CsiForSkills for CsiCounter {
+        async fn write(&mut self, _data: Vec<u8>) {
+            unimplemented!()
+        }
+
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests
                 .iter()

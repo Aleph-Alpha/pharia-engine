@@ -1,6 +1,8 @@
+use std::convert::Infallible;
 use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
 
 use anyhow::Context;
+use axum::response::sse::{Event, Sse};
 use axum::{
     Json, Router,
     extract::{FromRef, MatchedPath, Path, Request, State},
@@ -13,6 +15,7 @@ use axum_extra::{
     TypedHeader,
     headers::{Authorization, authorization::Bearer},
 };
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::{net::TcpListener, task::JoinHandle};
@@ -39,7 +42,7 @@ use crate::{
     csi::Csi,
     csi_shell::http_csi_handle,
     namespace_watcher::Namespace,
-    skill_runtime::{SkillRuntimeApi, SkillRuntimeError},
+    skill_runtime::{SkillOutput, SkillRuntimeApi, SkillRuntimeError},
     skill_store::SkillStoreApi,
     skills::{SkillMetadata, SkillPath},
 };
@@ -382,30 +385,47 @@ async fn skill_metadata(
         (status = 400, description = "The Skill invocation failed.", body=Value, example = json!("Skill not found."))
     ),
 )]
+
 async fn run_skill(
     State(skill_runtime_api): State<SkillRuntimeApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
-) -> (StatusCode, Json<Value>) {
+) -> impl IntoResponse {
     let skill_path = SkillPath::new(namespace, name);
     let result = skill_runtime_api
         .skill_run(skill_path, input, bearer.token().to_owned())
         .await;
+
     match result {
-        Ok(response) => (StatusCode::OK, Json(response)),
+        Ok(SkillOutput::Stream(stream)) => Sse::new(stream.0.map(|result| {
+            Ok::<_, Infallible>(Event::default().data(match result {
+                Ok(event) => event.to_string(),
+                // If we pass the `Err` variant to the Event stream, we are closing the receiver side of the channel
+                // inside the stream. Depending on how a send error in `SkillInvocationCtx::write` is handled,
+                // this can lead to an unexpected error/panic.
+                // Therefore, we can either ignore the error here, or pass an error message to the client.
+                // Another option would be to stop Skill execution using `SkillInvocationCtx::send_error` inside `write`.
+                Err(e) => json!(format!("Error: {e}")).to_string(),
+            }))
+        }))
+        .into_response(),
+        Ok(SkillOutput::Value(result)) => (StatusCode::OK, Json(result)).into_response(),
         Err(SkillRuntimeError::SkillNotConfigured) => (
             StatusCode::BAD_REQUEST,
             Json(json!(SkillRuntimeError::SkillNotConfigured.to_string())),
-        ),
+        )
+            .into_response(),
         Err(SkillRuntimeError::StoreError(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
-        ),
+        )
+            .into_response(),
         Err(SkillRuntimeError::ExecutionError(err)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!(err.to_string())),
-        ),
+        )
+            .into_response(),
     }
 }
 
@@ -507,7 +527,7 @@ mod tests {
         csi::tests::{DummyCsi, StubCsi},
         inference,
         skill_runtime::{
-            SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg,
+            SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg, SkillStream,
         },
         skill_store::{
             SkillStoreError,
@@ -519,6 +539,7 @@ mod tests {
 
     use super::*;
 
+    use async_stream::stream;
     use axum::{
         body::Body,
         http::{self, Request, header},
@@ -677,7 +698,8 @@ mod tests {
         let bad_namespace = "bad_namespace";
         let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
             SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
-                send.send(Ok(json!("dummy completion"))).unwrap();
+                send.send(Ok(SkillOutput::Value(json!("dummy completion"))))
+                    .unwrap();
             }
             SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
                 panic!("unexpected message in test");
@@ -712,6 +734,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn run_stream_skill() {
+        // Given a skill executor that returns a stream of values
+        let skill_runtime_mock = StubSkillRuntime::new(move |msg| match msg {
+            SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
+                let stream = Box::pin(stream! {
+                    yield Ok(json!({"message": "Hello 1"}));
+                    yield Ok(json!({"message": "Hello 2"}));
+                    yield Ok(json!({"message": "Hello 3"}));
+                });
+                drop(send.send(Ok(SkillOutput::Stream(SkillStream(stream)))));
+            }
+            SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
+                panic!("unexpected message in test");
+            }
+        });
+        let skill_runtime_api = skill_runtime_mock.api();
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
+        let http = http(app_state);
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let response = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+
+        let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, mime::TEXT_EVENT_STREAM.as_ref());
+
+        let mut stream = response.into_body().into_data_stream();
+        let mut events: Vec<String> = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.unwrap();
+            let text = String::from_utf8_lossy(&chunk);
+            events.push(text.into());
+        }
+
+        assert_eq!(
+            events,
+            vec![
+                "data: {\"message\":\"Hello 1\"}\n\n",
+                "data: {\"message\":\"Hello 2\"}\n\n",
+                "data: {\"message\":\"Hello 3\"}\n\n",
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn run_skill() {
         // Given
         let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
@@ -724,7 +807,8 @@ mod tests {
                 assert_eq!(skill_path, SkillPath::local("greet_skill"));
                 assert_eq!(api_token, "dummy auth token");
                 assert_eq!(input, json!("Homer"));
-                send.send(Ok(json!("dummy completion"))).unwrap();
+                send.send(Ok(SkillOutput::Value(json!("dummy completion"))))
+                    .unwrap();
             }
             SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
                 panic!("unexpected message in test");

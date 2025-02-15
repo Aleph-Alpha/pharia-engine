@@ -14,6 +14,7 @@ use pharia::skill::{
         Logprob, Logprobs, Message, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
+    response::Host as ResponseHost,
 };
 use serde_json::Value;
 use wasmtime::component::bindgen;
@@ -23,6 +24,12 @@ use crate::{chunking, inference, language_selection, search};
 use super::LinkedCtx;
 
 bindgen!({ world: "skill", path: "./wit/skill@0.3", async: true });
+
+impl ResponseHost for LinkedCtx {
+    async fn write(&mut self, data: Vec<u8>) {
+        self.skill_ctx.write(data).await;
+    }
+}
 
 impl ChunkingHost for LinkedCtx {
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {

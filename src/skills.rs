@@ -530,7 +530,7 @@ mod tests {
         given_chat_skill, given_greet_py_v0_2, given_greet_py_v0_3, given_greet_skill_v0_2,
         given_greet_skill_v0_3, given_search_skill,
     };
-    use tokio::sync::oneshot;
+    use tokio::sync::{mpsc, oneshot};
     use v0_2::pharia::skill::csi::{Host, Language};
 
     use crate::{
@@ -626,8 +626,10 @@ mod tests {
     async fn language_selection_from_csi() {
         // Given a linked context
         let (send_rt_err, _) = oneshot::channel();
+        let (send_rt_write, _) = mpsc::channel(1);
         let skill_ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
+            send_rt_write,
             DummyCsi,
             api_token().to_owned(),
             None,

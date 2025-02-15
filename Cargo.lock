@@ -4043,6 +4043,7 @@ version = "0.9.9"
 dependencies = [
  "aleph-alpha-client",
  "anyhow",
+ "async-stream",
  "async-trait",
  "axum 0.8.1",
  "axum-extra",

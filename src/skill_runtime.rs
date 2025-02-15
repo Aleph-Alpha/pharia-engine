@@ -1,22 +1,25 @@
 use std::{
     borrow::Cow,
-    future::{Future, pending},
+    fmt,
+    future::{pending, Future},
+    future::{pending, Future},
     pin::Pin,
     sync::Arc,
     time::Instant,
 };
 
 use anyhow::anyhow;
+use async_stream::stream;
 use async_trait::async_trait;
-use futures::{StreamExt, stream::FuturesUnordered};
-use opentelemetry::Context;
+use futures::{stream::FuturesUnordered, StreamExt};
 use serde_json::Value;
+
 use tokio::{
-    select,
+    pin, select,
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{Level, span};
+use tracing::{span, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
@@ -112,12 +115,13 @@ impl SkillRuntimeApi {
         Self { send }
     }
 
+    /// Run a skill and receive either a single value or a stream of intermediate results.
     pub async fn skill_run(
         &self,
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> Result<Value, SkillRuntimeError> {
+    ) -> Result<SkillOutput, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Run(SkillRunRequest {
             skill_path,
@@ -256,11 +260,26 @@ impl SkillMetadataRequest {
     }
 }
 
+/// Running a Skill can result in either receiving a single value or a stream of intermediate results.
 #[derive(Debug)]
+pub enum SkillOutput {
+    Stream(SkillStream),
+    Value(Value),
+}
+
+/// A wrapper struct so we can implement Debug on the Stream
+pub struct SkillStream(pub Pin<Box<dyn Stream<Item = Result<Value, serde_json::Error>> + Send>>);
+
+impl fmt::Debug for SkillStream {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SkillStream")
+    }
+}
+
 pub struct SkillRunRequest {
     pub skill_path: SkillPath,
     pub input: Value,
-    pub send: oneshot::Sender<Result<Value, SkillRuntimeError>>,
+    pub send: oneshot::Sender<Result<SkillOutput, SkillRuntimeError>>,
     pub api_token: String,
 }
 
@@ -281,40 +300,70 @@ impl SkillRunRequest {
         );
         let context = span.context();
         let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let (send_rt_write, mut recv_rt_write) = mpsc::channel(1);
         let ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
+            send_rt_write,
             csi_apis,
             api_token,
             Some(context),
         ));
-        let response = select! {
-            result = runtime.run(&skill_path, input, ctx) => result,
-            // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
+
+        // A future that runs the skill or terminates it on an error of csi drivers.
+        let skill_fut = async {
+            let result = select! {
+                result = runtime.run(&skill_path, input, ctx) => result.map(SkillOutput::Value),
+                Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error)),
+            };
+            let latency = start.elapsed().as_secs_f64();
+            let labels = [
+                ("namespace", Cow::from(skill_path.namespace.to_string())),
+                ("name", Cow::from(skill_path.name)),
+                (
+                    "status",
+                    match result {
+                        Ok(_) => "ok",
+                        Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
+                        Err(
+                            SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_),
+                        ) => "internal_error",
+                    }
+                    .into(),
+                ),
+            ];
+            metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
+            metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
+                .record(latency);
+            result
         };
 
-        let latency = start.elapsed().as_secs_f64();
-        let labels = [
-            ("namespace", Cow::from(skill_path.namespace.to_string())),
-            ("name", Cow::from(skill_path.name)),
-            (
-                "status",
-                match response {
-                    Ok(_) => "ok",
-                    Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
-                    Err(
-                        SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_),
-                    ) => "internal_error",
-                }
-                .into(),
-            ),
-        ];
-        metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
-        metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
-            .record(latency);
+        // A future that waits for messages from the running skill and returns a stream over it.
+        let recv_fut = async {
+            if let Some(first_write) = recv_rt_write.recv().await {
+                let stream = Box::pin(stream! {
+                    yield serde_json::from_slice(&first_write);
+                    while let Some(bytes) = recv_rt_write.recv().await {
+                        yield serde_json::from_slice(&bytes);
+                    }
+                });
+                Ok(SkillOutput::Stream(SkillStream(stream)))
+            } else {
+                pending().await
+            }
+        };
 
-        // Error is expected to happen during shutdown. Ignore result.
-        drop(send.send(response));
+        // Pinning of the future allows borrowing it in the second select branch.
+        pin!(skill_fut);
+        select! {
+            result = &mut skill_fut => {
+                drop(send.send(result));
+            }
+            result = recv_fut => {
+                // In case we receive a stream item, still run the skill future to completion
+                drop(send.send(result));
+                drop(skill_fut.await);
+            }
+        }
     }
 }
 
@@ -326,6 +375,9 @@ pub struct SkillInvocationCtx<C> {
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
     send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
+    /// This is used to enable the skill to send itermediate results. If a value is sent in this
+    /// channel, the [`SkillRunRequest::act`] will return a stream of the values sent.
+    send_rt_write: mpsc::Sender<Vec<u8>>,
     csi_apis: C,
     // How the user authenticates with us
     api_token: String,
@@ -336,12 +388,14 @@ pub struct SkillInvocationCtx<C> {
 impl<C> SkillInvocationCtx<C> {
     pub fn new(
         send_rt_err: oneshot::Sender<anyhow::Error>,
+        send_rt_write: mpsc::Sender<Vec<u8>>,
         csi_apis: C,
         api_token: String,
         parent_context: Option<Context>,
     ) -> Self {
         SkillInvocationCtx {
             send_rt_err: Some(send_rt_err),
+            send_rt_write,
             csi_apis,
             api_token,
             parent_context,
@@ -383,6 +437,10 @@ impl SkillMetadataCtx {
 impl CsiForSkills for SkillMetadataCtx {
     async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
         self.send_error().await
+    }
+
+    async fn write(&mut self, _data: Vec<u8>) {
+        self.send_error::<()>().await;
     }
 
     async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
@@ -435,6 +493,15 @@ where
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
+    }
+
+    async fn write(&mut self, data: Vec<u8>) {
+        self.send_rt_write
+            .send(data)
+            .await
+            // A likely cause is that the consumer (shell) did not handle the
+            // error correctly and caused the stream receiver to be dropped.
+            .expect("The receiver side of the channel must be present");
     }
 
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
@@ -554,6 +621,7 @@ pub mod tests {
     use test_skills::{
         given_csi_from_metadata_skill, given_explain_skill, given_greet_py_v0_3,
         given_greet_skill_v0_2, given_greet_skill_v0_3, given_invalid_output_skill,
+        given_write_skill,
     };
     use tokio::try_join;
 
@@ -565,7 +633,7 @@ pub mod tests {
         chunking::ChunkParams,
         csi::tests::{DummyCsi, StubCsi},
         inference::{
-            ChatRequest, ChatResponse, CompletionRequest, Inference, tests::AssertConcurrentClient,
+            tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
         },
         search::DocumentPath,
         skill_loader::{RegistryConfig, SkillLoader},
@@ -574,6 +642,40 @@ pub mod tests {
     };
 
     use super::*;
+
+    #[tokio::test]
+    async fn skill_runtime_returns_stream() {
+        // Given a skill that writes to the host
+        let test_skill = given_write_skill();
+        let skill_path = SkillPath::local("write");
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+
+        // When running the skill
+        let csi = StubCsi::empty();
+        let runtime = SkillRuntime::new(engine, csi, store.api());
+        let result = runtime
+            .api()
+            .skill_run(skill_path, json!("Hello"), "dummy token".to_owned())
+            .await;
+
+        // Then the result is a stream
+        match result {
+            Ok(SkillOutput::Stream(stream)) => {
+                // collect the stream
+                let mut stream = stream.0;
+                let mut items = Vec::new();
+                while let Some(item) = stream.next().await {
+                    items.push(item);
+                }
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0].as_ref().unwrap(), "Hello 1");
+                assert!(items[1].is_err());
+                assert_eq!(items[2].as_ref().unwrap(), "Hello 3");
+            }
+            _ => panic!("Expected a stream"),
+        }
+    }
 
     #[tokio::test]
     async fn csi_usage_from_metadata_leads_to_suspension() {
@@ -671,6 +773,7 @@ pub mod tests {
         let skill_store =
             SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let (send, _) = oneshot::channel();
+        let (send_rt_write, _) = mpsc::channel(1);
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
@@ -680,6 +783,7 @@ pub mod tests {
         });
         let skill_ctx = Box::new(SkillInvocationCtx::new(
             send,
+            send_rt_write,
             csi,
             "dummy token".to_owned(),
             None,
@@ -783,6 +887,7 @@ pub mod tests {
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
+        let (send_rt_write, _) = mpsc::channel(1);
         let mut csi = StubCsi::empty();
         csi.set_chunking(|r| {
             Ok(r.into_iter()
@@ -796,7 +901,8 @@ pub mod tests {
                 .collect())
         });
 
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), None);
+        let mut invocation_ctx =
+            SkillInvocationCtx::new(send, send_rt_write, csi, "dummy token".to_owned(), None);
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -827,9 +933,11 @@ pub mod tests {
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
         let (send, recv) = oneshot::channel();
+        let (send_rt_write, _) = mpsc::channel(1);
         let mut csi = StubCsi::empty();
         csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), None);
+        let mut invocation_ctx =
+            SkillInvocationCtx::new(send, send_rt_write, csi, "dummy token".to_owned(), None);
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -936,7 +1044,10 @@ pub mod tests {
         store.wait_for_shutdown().await;
 
         // Then
-        assert_eq!(result.unwrap(), "Hello");
+        match result {
+            Ok(SkillOutput::Value(result)) => assert_eq!(result, "Hello"),
+            _ => panic!("Expected a result"),
+        }
     }
 
     #[tokio::test(start_paused = true)]
@@ -955,10 +1066,11 @@ pub mod tests {
         let runtime = SkillRuntime::new(engine, csi, store.api());
         let api = runtime.api();
 
-        // When executing tw tasks in parallel
+        // When executing two tasks in parallel
         let skill_path = SkillPath::local("greet");
         let input = json!("Homer");
         let token = "TOKEN_NOT_REQUIRED";
+
         let result = try_join!(
             api.skill_run(skill_path.clone(), input.clone(), token.to_owned()),
             api.skill_run(skill_path, input, token.to_owned()),
@@ -970,8 +1082,13 @@ pub mod tests {
         store.wait_for_shutdown().await;
 
         // Then they both have completed with the same values
-        let (result1, result2) = result.unwrap();
-        assert_eq!(result1, result2);
+        // Then they both have completed with the same values
+        match result.unwrap() {
+            (SkillOutput::Value(result1), SkillOutput::Value(result2)) => {
+                assert_eq!(result1, result2);
+            }
+            _ => panic!("Expected a result"),
+        }
     }
 
     #[test]
