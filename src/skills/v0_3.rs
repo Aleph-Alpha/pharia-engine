@@ -19,7 +19,7 @@ use pharia::skill::{
     response::Host as ResponseHost,
 };
 use serde_json::Value;
-use wasmtime::component::{bindgen, Resource};
+use wasmtime::component::{Resource, bindgen};
 
 use crate::{chunking, inference, language_selection, search};
 

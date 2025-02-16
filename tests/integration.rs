@@ -14,10 +14,6 @@ use pharia_kernel::{AppConfig, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
-use test_skills::{given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill};
-use reqwest::{header, Body};
-use serde_json::{json, Value};
-use tempfile::{tempdir, TempDir};
 use test_skills::{
     given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill, given_write_skill,
 };

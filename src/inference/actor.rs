@@ -13,7 +13,7 @@ pub struct MessageDelta {
     pub content: String,
 }
 
-use super::client::InferenceClient;
+use super::client::{ChatStream, InferenceClient};
 
 /// Handle to the inference actor. Spin this up in order to use the inference API.
 pub struct Inference {
@@ -105,6 +105,25 @@ impl InferenceApi {
     ) -> anyhow::Result<ChatResponse> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Chat {
+            request,
+            send,
+            api_token,
+        };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv.await
+            .expect("sender must be alive when awaiting for answers")
+    }
+
+    pub async fn stream_chat(
+        &self,
+        request: ChatRequest,
+        api_token: String,
+    ) -> anyhow::Result<ChatStream> {
+        let (send, recv) = oneshot::channel();
+        let msg = InferenceMessage::StreamChat {
             request,
             send,
             api_token,
@@ -355,6 +374,11 @@ pub enum InferenceMessage {
         send: oneshot::Sender<anyhow::Result<Explanation>>,
         api_token: String,
     },
+    StreamChat {
+        request: ChatRequest,
+        send: oneshot::Sender<anyhow::Result<ChatStream>>,
+        api_token: String,
+    },
 }
 
 impl InferenceMessage {
@@ -382,6 +406,14 @@ impl InferenceMessage {
                 api_token,
             } => {
                 let result = client.explain(&request, api_token.clone()).await;
+                drop(send.send(result.map_err(Into::into)));
+            }
+            Self::StreamChat {
+                request,
+                send,
+                api_token,
+            } => {
+                let result = client.stream_chat(&request, api_token.clone()).await;
                 drop(send.send(result.map_err(Into::into)));
             }
         }
@@ -437,6 +469,9 @@ pub mod tests {
                             unimplemented!()
                         }
                         InferenceMessage::Explain { .. } => {
+                            unimplemented!()
+                        }
+                        InferenceMessage::StreamChat { .. } => {
                             unimplemented!()
                         }
                     }
@@ -501,8 +536,14 @@ pub mod tests {
         ) -> Result<ChatResponse, InferenceClientError> {
             unimplemented!()
         }
+        async fn stream_chat(
+            &self,
+            _request: &ChatRequest,
+            _api_token: String,
+        ) -> Result<ChatStream, InferenceClientError> {
+            unimplemented!()
+        }
     }
-
     #[tokio::test]
     async fn recover_from_connection_loss() {
         // given
@@ -574,6 +615,14 @@ pub mod tests {
             _request: &ChatRequest,
             _api_token: String,
         ) -> Result<ChatResponse, InferenceClientError> {
+            unimplemented!()
+        }
+
+        async fn stream_chat(
+            &self,
+            _request: &ChatRequest,
+            _api_token: String,
+        ) -> Result<ChatStream, InferenceClientError> {
             unimplemented!()
         }
     }

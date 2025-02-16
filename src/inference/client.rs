@@ -1,5 +1,7 @@
 use std::{
+    fmt::Debug,
     future::Future,
+    pin::Pin,
     time::{Duration, SystemTime},
 };
 
@@ -7,6 +9,8 @@ use aleph_alpha_client::{
     ChatSampling, Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat,
     TaskCompletion, TaskExplanation,
 };
+use async_stream::stream;
+use futures::{Stream, StreamExt};
 use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 use tracing::{error, warn};
 
@@ -17,6 +21,24 @@ use super::{
     Distribution, Explanation, ExplanationRequest, Granularity, Logprob, Logprobs, Message,
     TextScore, TokenUsage,
 };
+
+// Create a wrapper type so we can implement debug which is needed for multiple tests
+pub struct ChatStream(
+    pub  Pin<
+        Box<
+            dyn Stream<Item = Result<aleph_alpha_client::StreamChatEvent, InferenceClientError>>
+                + Send,
+        >,
+    >,
+);
+
+impl Debug for ChatStream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChatStream")
+            .field("type", &"Stream<Result<ChatStreamChunk, Error>>")
+            .finish()
+    }
+}
 
 pub trait InferenceClient: Send + Sync + 'static {
     fn complete_text(
@@ -34,6 +56,11 @@ pub trait InferenceClient: Send + Sync + 'static {
         request: &ExplanationRequest,
         api_token: String,
     ) -> impl Future<Output = Result<Explanation, InferenceClientError>> + Send;
+    fn stream_chat(
+        &self,
+        request: &ChatRequest,
+        api_token: String,
+    ) -> impl Future<Output = Result<ChatStream, InferenceClientError>> + Send;
 }
 
 impl InferenceClient for Client {
@@ -80,6 +107,31 @@ impl InferenceClient for Client {
             Ok(chat_output) => chat_output.try_into().map_err(InferenceClientError::Other),
             Err(e) => Err(e.into()),
         }
+    }
+
+    async fn stream_chat(
+        &self,
+        request: &ChatRequest,
+        api_token: String,
+    ) -> Result<ChatStream, InferenceClientError> {
+        let task = request.to_task_chat();
+        let how = How {
+            api_token: Some(api_token),
+            ..Default::default()
+        };
+        let mut stream = self
+            .stream_chat(&task, &request.model, &how)
+            .await
+            .map_err(|e| InferenceClientError::Other(e.into()))?;
+
+        Ok(ChatStream(Box::pin(stream! {
+            while let Some(item) = stream.next().await {
+                match item {
+                    Ok(chunk) => yield Ok(chunk.into()),
+                    Err(e) => yield Err(e.into()),
+                }
+            }
+        })))
     }
 
     async fn complete_text(
@@ -404,6 +456,60 @@ mod tests {
             .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
             .unwrap();
         assert_eq!(max_index.start, 3);
+    }
+
+    #[tokio::test]
+    async fn stream_chat() {
+        // Given an inference client
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        let chat_request = ChatRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            params: ChatParams::default(),
+            messages: vec![Message::new("user", "An apple a day")],
+        };
+
+        // When requesting a stream response
+        let mut stream =
+            <Client as InferenceClient>::stream_chat(&client, &chat_request, api_token)
+                .await
+                .unwrap();
+
+        // Then we receive a stream of events
+        let mut events = Vec::new();
+        while let Some(event) = stream.0.next().await {
+            events.push(event);
+        }
+
+        let events = events.into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(events.len(), 4);
+        assert!(matches!(
+            &events[0],
+            aleph_alpha_client::StreamChatEvent::Chunk(aleph_alpha_client::ChatChunk::Delta {
+                delta,
+                ..
+            }) if delta.content == "" && delta.role == Some("assistant".into())
+        ));
+        assert!(matches!(
+            &events[1],
+            aleph_alpha_client::StreamChatEvent::Chunk(aleph_alpha_client::ChatChunk::Delta {
+                delta,
+                ..
+            }) if delta.content == "Keeps the doctor away" && delta.role.is_none()
+        ));
+        assert!(matches!(
+            &events[2],
+            aleph_alpha_client::StreamChatEvent::Chunk(aleph_alpha_client::ChatChunk::Finished {
+                reason,
+                ..
+            }) if reason == "stop"
+        ));
+        assert!(matches!(
+            &events[3],
+            aleph_alpha_client::StreamChatEvent::Usage(usage) if usage.completion_tokens == 6
+        ));
     }
 
     #[tokio::test(start_paused = true)]
