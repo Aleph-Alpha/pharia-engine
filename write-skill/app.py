@@ -14,9 +14,12 @@ from skill.imports.response import write
 
 class SkillHandler(skill.exports.SkillHandler):
     def run(self, input: bytes) -> bytes:
+        data = json.loads(input)
+        content = data["content"]
+        role = data["role"]
         request = ChatRequest(
-            model="llama-3.1-8b-instruct",
-            messages=[Message(role="user", content="Hello, how are you?")],
+            model="pharia-1-llm-7b-control",
+            messages=[Message(role=role, content=content)],
             params=ChatParams(
                 max_tokens=None,
                 temperature=0.0,

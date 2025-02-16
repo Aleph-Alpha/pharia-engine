@@ -1,6 +1,5 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
     fmt,
     future::{Future, pending},
     pin::Pin,
@@ -8,6 +7,7 @@ use std::{
     time::Instant,
 };
 
+use aleph_alpha_client::{ChatChunk, StreamChatEvent, StreamMessage};
 use anyhow::anyhow;
 use async_stream::stream;
 use async_trait::async_trait;
@@ -26,8 +26,8 @@ use crate::{
     chunking::{Chunk, ChunkRequest},
     csi::{Csi, CsiForSkills},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
-        MessageDelta,
+        ChatRequest, ChatResponse, ChatStream, Completion, CompletionRequest, Explanation,
+        ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -385,7 +385,7 @@ pub struct SkillInvocationCtx<C> {
     // For tracing, we wire the skill invocation span context with the CSI spans
     parent_context: Option<Context>,
     // running chat streams
-    running_chat_streams: HashMap<u32, Vec<MessageDelta>>,
+    running_chat_streams: Vec<Option<ChatStream>>,
 }
 
 impl<C> SkillInvocationCtx<C> {
@@ -402,7 +402,7 @@ impl<C> SkillInvocationCtx<C> {
             csi_apis,
             api_token,
             parent_context,
-            running_chat_streams: HashMap::new(),
+            running_chat_streams: Vec::new(),
         }
     }
 
@@ -447,12 +447,12 @@ impl CsiForSkills for SkillMetadataCtx {
         self.send_error().await
     }
 
-    async fn next_chat_stream(&mut self, _id: u32) -> Option<MessageDelta> {
+    async fn next_chat_stream(&mut self, _id: u32) -> Option<StreamMessage> {
         self.send_error().await
     }
 
     async fn drop_chat_stream(&mut self, _id: u32) {
-        self.send_error().await
+        self.send_error::<()>().await;
     }
 
     async fn write(&mut self, _data: Vec<u8>) {
@@ -510,34 +510,45 @@ where
             Err(error) => self.send_error(error).await,
         }
     }
-    async fn new_chat_stream(&mut self, _request: ChatRequest) -> u32 {
-        let messages = vec![
-            MessageDelta {
-                role: None,
-                content: "doctor away.".to_string(),
-            },
-            MessageDelta {
-                role: None,
-                content: "keeps the ".to_string(),
-            },
-            MessageDelta {
-                role: Some("assistant".to_string()),
-                content: "".to_string(),
-            },
-        ];
-        let id = 0;
-        self.running_chat_streams.insert(id, messages);
-        id
+
+    async fn new_chat_stream(&mut self, request: ChatRequest) -> u32 {
+        if let Ok(stream) = self
+            .csi_apis
+            .stream_chat(self.api_token.clone(), request)
+            .await
+        {
+            let id = self.running_chat_streams.len();
+            self.running_chat_streams.push(Some(stream));
+            u32::try_from(id).unwrap()
+        } else {
+            self.send_error(anyhow!("Failed to create chat stream"))
+                .await
+        }
     }
 
-    async fn next_chat_stream(&mut self, id: u32) -> Option<MessageDelta> {
-        self.running_chat_streams
-            .get_mut(&id)
-            .and_then(|messages| messages.pop())
+    async fn next_chat_stream(&mut self, id: u32) -> Option<StreamMessage> {
+        let stream = self.running_chat_streams.get_mut(id as usize);
+        if let Some(Some(stream)) = stream {
+            if let Some(Ok(event)) = stream.0.next().await {
+                match event {
+                    StreamChatEvent::Chunk(ChatChunk::Delta { delta, .. }) => Some(delta),
+                    // Currently only forward message deltas to the skill and ignore the other ones
+                    StreamChatEvent::Chunk(ChatChunk::Finished { .. })
+                    | StreamChatEvent::Usage(_) => None,
+                }
+            } else {
+                // Stop skill execution
+                self.send_error::<()>(anyhow!("Failed to receive chat stream event"))
+                    .await;
+                None
+            }
+        } else {
+            None
+        }
     }
 
     async fn drop_chat_stream(&mut self, id: u32) {
-        self.running_chat_streams.remove(&id);
+        self.running_chat_streams[id as usize] = None;
     }
 
     async fn write(&mut self, data: Vec<u8>) {
@@ -671,7 +682,7 @@ pub mod tests {
     use tokio::try_join;
 
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
-    use crate::inference::{Explanation, ExplanationRequest, TextScore};
+    use crate::inference::{ChatStream, Explanation, ExplanationRequest, TextScore};
     use crate::namespace_watcher::Namespace;
     use crate::skills::SkillMetadata;
     use crate::{
@@ -701,7 +712,11 @@ pub mod tests {
         let runtime = SkillRuntime::new(engine, csi, store.api());
         let result = runtime
             .api()
-            .skill_run(skill_path, json!("Hello"), "dummy token".to_owned())
+            .skill_run(
+                skill_path,
+                json!({"content": "An apple a day", "role": "user"}),
+                "dummy token".to_owned(),
+            )
             .await;
 
         // Then the result is a stream
@@ -713,18 +728,14 @@ pub mod tests {
                 while let Some(item) = stream.next().await {
                     items.push(item);
                 }
-                assert_eq!(items.len(), 3);
+                assert_eq!(items.len(), 2);
                 assert_eq!(
                     items[0].as_ref().unwrap(),
                     &json!({"role": "assistant", "content": ""})
                 );
                 assert_eq!(
                     items[1].as_ref().unwrap(),
-                    &json!({"role": null, "content": "keeps the "})
-                );
-                assert_eq!(
-                    items[2].as_ref().unwrap(),
-                    &json!({"role": null, "content": "doctor away."})
+                    &json!({"role": null, "content": "Keeps the doctor away"})
                 );
             }
             _ => panic!("Expected a stream"),
@@ -1232,6 +1243,14 @@ pub mod tests {
             _auth: String,
             _requests: Vec<ChatRequest>,
         ) -> anyhow::Result<Vec<ChatResponse>> {
+            bail!("Test error")
+        }
+
+        async fn stream_chat(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> anyhow::Result<ChatStream> {
             bail!("Test error")
         }
 

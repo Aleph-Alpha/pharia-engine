@@ -193,9 +193,16 @@ impl From<ExplanationRequest> for inference::ExplanationRequest {
     }
 }
 
-impl From<inference::MessageDelta> for MessageDelta {
-    fn from(delta: inference::MessageDelta) -> Self {
-        let inference::MessageDelta { role, content } = delta;
+// impl From<inference::MessageDelta> for MessageDelta {
+//     fn from(delta: inference::MessageDelta) -> Self {
+//         let inference::MessageDelta { role, content } = delta;
+//         Self { role, content }
+//     }
+// }
+
+impl From<aleph_alpha_client::StreamMessage> for MessageDelta {
+    fn from(delta: aleph_alpha_client::StreamMessage) -> Self {
+        let aleph_alpha_client::StreamMessage { role, content } = delta;
         Self { role, content }
     }
 }

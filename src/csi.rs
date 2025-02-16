@@ -1,3 +1,4 @@
+use aleph_alpha_client::StreamMessage;
 use async_trait::async_trait;
 use futures::future::try_join_all;
 use serde_json::Value;
@@ -7,8 +8,8 @@ use tracing::trace;
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
-        InferenceApi, MessageDelta,
+        ChatRequest, ChatResponse, ChatStream, Completion, CompletionRequest, Explanation,
+        ExplanationRequest, InferenceApi,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     search::{
@@ -36,7 +37,7 @@ pub struct CsiDrivers<T> {
 pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn new_chat_stream(&mut self, request: ChatRequest) -> u32;
-    async fn next_chat_stream(&mut self, id: u32) -> Option<MessageDelta>;
+    async fn next_chat_stream(&mut self, id: u32) -> Option<StreamMessage>;
     async fn drop_chat_stream(&mut self, id: u32);
     async fn write(&mut self, data: Vec<u8>);
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
@@ -62,6 +63,9 @@ pub trait Csi {
         auth: String,
         requests: Vec<ExplanationRequest>,
     ) -> anyhow::Result<Vec<Explanation>>;
+
+    async fn stream_chat(&self, auth: String, requests: ChatRequest) -> anyhow::Result<ChatStream>;
+
     async fn complete(
         &self,
         auth: String,
@@ -174,6 +178,20 @@ where
                 .collect::<Vec<_>>(),
         )
         .await
+    }
+
+    async fn stream_chat(&self, auth: String, request: ChatRequest) -> anyhow::Result<ChatStream> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "stream_chat")])
+            .increment(1);
+        trace!(
+            "stream_chat: request.model={} request.params.max_tokens={}",
+            request.model,
+            request
+                .params
+                .max_tokens
+                .map_or_else(|| "None".to_owned(), |val| val.to_string())
+        );
+        self.inference.stream_chat(request, auth.clone()).await
     }
 
     async fn chat(
@@ -294,7 +312,9 @@ pub mod tests {
 
     use std::sync::{Arc, Mutex};
 
+    use aleph_alpha_client::{ChatChunk, StreamChatEvent};
     use anyhow::bail;
+    use async_stream::stream;
     use serde_json::json;
 
     use crate::{
@@ -504,6 +524,14 @@ pub mod tests {
             panic!("DummyCsi complete called");
         }
 
+        async fn stream_chat(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> anyhow::Result<ChatStream> {
+            panic!("DummyCsi stream_chat called")
+        }
+
         async fn chat(
             &self,
             _auth: String,
@@ -640,6 +668,32 @@ pub mod tests {
                 .collect())
         }
 
+        async fn stream_chat(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> anyhow::Result<ChatStream> {
+            let items = vec![
+                ChatChunk::Delta {
+                    delta: StreamMessage {
+                        role: Some("assistant".to_string()),
+                        content: String::new(),
+                    },
+                },
+                ChatChunk::Delta {
+                    delta: StreamMessage {
+                        role: None,
+                        content: "Keeps the doctor away".to_string(),
+                    },
+                },
+            ];
+            Ok(ChatStream(Box::pin(stream! {
+                for item in items {
+                    yield Ok(StreamChatEvent::Chunk(item));
+                }
+            })))
+        }
+
         async fn search(
             &self,
             _auth: String,
@@ -684,7 +738,7 @@ pub mod tests {
             unimplemented!()
         }
 
-        async fn next_chat_stream(&mut self, _id: u32) -> Option<MessageDelta> {
+        async fn next_chat_stream(&mut self, _id: u32) -> Option<StreamMessage> {
             unimplemented!()
         }
 
@@ -777,7 +831,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             unimplemented!()
         }
 
-        async fn next_chat_stream(&mut self, _id: u32) -> Option<MessageDelta> {
+        async fn next_chat_stream(&mut self, _id: u32) -> Option<StreamMessage> {
             unimplemented!()
         }
 
@@ -874,7 +928,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             unimplemented!()
         }
 
-        async fn next_chat_stream(&mut self, _id: u32) -> Option<MessageDelta> {
+        async fn next_chat_stream(&mut self, _id: u32) -> Option<StreamMessage> {
             unimplemented!()
         }
 

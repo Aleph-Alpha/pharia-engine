@@ -127,7 +127,7 @@ impl InferenceClient for Client {
         Ok(ChatStream(Box::pin(stream! {
             while let Some(item) = stream.next().await {
                 match item {
-                    Ok(chunk) => yield Ok(chunk.into()),
+                    Ok(chunk) => yield Ok(chunk),
                     Err(e) => yield Err(e.into()),
                 }
             }
@@ -490,7 +490,7 @@ mod tests {
             aleph_alpha_client::StreamChatEvent::Chunk(aleph_alpha_client::ChatChunk::Delta {
                 delta,
                 ..
-            }) if delta.content == "" && delta.role == Some("assistant".into())
+            }) if delta.content.is_empty() && delta.role == Some("assistant".into())
         ));
         assert!(matches!(
             &events[1],

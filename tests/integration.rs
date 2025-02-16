@@ -209,7 +209,9 @@ async fn run_stream_skill() {
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
-        .body(Body::from(json!("What is the Pharia Kernel?").to_string()))
+        .body(Body::from(
+            json!({"content":"An apple a day", "role":"user"}).to_string(),
+        ))
         .timeout(Duration::from_secs(30))
         .send()
         .await
@@ -224,15 +226,15 @@ async fn run_stream_skill() {
         let text = String::from_utf8_lossy(&chunk);
         events.push(text.into());
     }
+    assert_eq!(events.len(), 2);
     assert_eq!(
-        events,
-        vec![
-            "data: \"Hello 1\"\n\n",
-            "data: \"Error: expected value at line 1 column 1\"\n\n",
-            "data: \"Hello 3\"\n\n",
-        ]
+        events[0],
+        "data: {\"content\":\"\",\"role\":\"assistant\"}\n\n",
     );
-
+    assert_eq!(
+        events[1],
+        "data: {\"content\":\"Keeps the doctor away\",\"role\":null}\n\n"
+    );
     kernel.shutdown().await;
 }
 
