@@ -552,12 +552,9 @@ where
     }
 
     async fn write(&mut self, data: Vec<u8>) {
-        self.send_rt_write
-            .send(data)
-            .await
-            // A likely cause is that the consumer (shell) did not handle the
-            // error correctly and caused the stream receiver to be dropped.
-            .expect("The receiver side of the channel must be present");
+        // Do not unwrap the send, as we do not know if the receiver is still be alive.
+        // An example is a client who closes the connection while the skill is still running.
+        drop(self.send_rt_write.send(data).await);
     }
 
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
@@ -707,8 +704,30 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
 
+        let mut csi = StubCsi::empty();
+        let stream = |_| {
+            let items = vec![
+                StreamMessage {
+                    role: Some("assistant".to_string()),
+                    content: String::new(),
+                },
+                StreamMessage {
+                    role: None,
+                    content: "Keeps the doctor away".to_string(),
+                },
+            ];
+            Ok(ChatStream(Box::pin(stream! {
+                for item in items {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                    yield Ok(StreamChatEvent::Chunk(ChatChunk::Delta {
+                        delta: item,
+                    }));
+                }
+            })))
+        };
+        csi.set_chat_streaming(stream);
+
         // When running the skill
-        let csi = StubCsi::empty();
         let runtime = SkillRuntime::new(engine, csi, store.api());
         let result = runtime
             .api()
@@ -740,6 +759,64 @@ pub mod tests {
             }
             _ => panic!("Expected a stream"),
         }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn skill_runtime_with_receiver_gone() {
+        // Given a skill request for a streaming skill
+        let test_skill = given_write_skill();
+        let skill_path = SkillPath::local("write");
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+
+        // And a csi with a bit of delay between chat items
+        let mut csi = StubCsi::empty();
+        let stream = |_| {
+            let items = vec![
+                StreamMessage {
+                    role: Some("assistant".to_string()),
+                    content: String::new(),
+                },
+                StreamMessage {
+                    role: None,
+                    content: "Keeps the doctor away".to_string(),
+                },
+            ];
+            Ok(ChatStream(Box::pin(stream! {
+                for item in items {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                    yield Ok(StreamChatEvent::Chunk(ChatChunk::Delta {
+                        delta: item,
+                    }));
+                }
+            })))
+        };
+        csi.set_chat_streaming(stream);
+
+        let runtime = SkillRuntime::new(engine, csi, store.api());
+        let result = runtime
+            .api()
+            .skill_run(
+                skill_path,
+                json!({"content": "An apple a day", "role": "user"}),
+                "dummy token".to_owned(),
+            )
+            .await;
+
+        // When dropping the stream between the first and second item
+        match result {
+            Ok(SkillOutput::Stream(stream)) => {
+                let mut stream = stream.0;
+                let item = stream.next().await.unwrap().unwrap();
+                assert_eq!(item, json!({"role": "assistant", "content": ""}));
+                drop(stream);
+            }
+            _ => panic!("Expected a stream"),
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        // Then the skill runtime should not panic
+        runtime.wait_for_shutdown().await;
     }
 
     #[tokio::test]

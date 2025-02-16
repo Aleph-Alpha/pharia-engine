@@ -312,9 +312,7 @@ pub mod tests {
 
     use std::sync::{Arc, Mutex};
 
-    use aleph_alpha_client::{ChatChunk, StreamChatEvent};
     use anyhow::bail;
-    use async_stream::stream;
     use serde_json::json;
 
     use crate::{
@@ -573,12 +571,14 @@ pub mod tests {
 
     type ExplainFn =
         dyn Fn(ExplanationRequest) -> anyhow::Result<Explanation> + Send + Sync + 'static;
+    type ChatFn = dyn Fn(ChatRequest) -> anyhow::Result<ChatStream> + Send + Sync + 'static;
 
     #[derive(Clone)]
     pub struct StubCsi {
         pub completion: Arc<Box<CompleteFn>>,
         pub chunking: Arc<Box<ChunkFn>>,
         pub explain: Arc<Box<ExplainFn>>,
+        pub chat_streaming: Arc<Box<ChatFn>>,
     }
 
     impl StubCsi {
@@ -587,7 +587,15 @@ pub mod tests {
                 completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
                 chunking: Arc::new(Box::new(|_| bail!("Chunking not set in StubCsi"))),
                 explain: Arc::new(Box::new(|_| bail!("Explain not set in StubCsi"))),
+                chat_streaming: Arc::new(Box::new(|_| bail!("Chat not set in StubCsi"))),
             }
+        }
+
+        pub fn set_chat_streaming(
+            &mut self,
+            f: impl Fn(ChatRequest) -> anyhow::Result<ChatStream> + Send + Sync + 'static,
+        ) {
+            self.chat_streaming = Arc::new(Box::new(f));
         }
 
         pub fn set_chunking(
@@ -673,25 +681,7 @@ pub mod tests {
             _auth: String,
             _request: ChatRequest,
         ) -> anyhow::Result<ChatStream> {
-            let items = vec![
-                ChatChunk::Delta {
-                    delta: StreamMessage {
-                        role: Some("assistant".to_string()),
-                        content: String::new(),
-                    },
-                },
-                ChatChunk::Delta {
-                    delta: StreamMessage {
-                        role: None,
-                        content: "Keeps the doctor away".to_string(),
-                    },
-                },
-            ];
-            Ok(ChatStream(Box::pin(stream! {
-                for item in items {
-                    yield Ok(StreamChatEvent::Chunk(item));
-                }
-            })))
+            (*self.chat_streaming)(_request)
         }
 
         async fn search(
