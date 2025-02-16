@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
 
 use anyhow::Context;
@@ -398,17 +397,11 @@ async fn run_skill(
         .await;
 
     match result {
-        Ok(SkillOutput::Stream(stream)) => Sse::new(stream.0.map(|result| {
-            Ok::<_, Infallible>(Event::default().data(match result {
-                Ok(event) => event.to_string(),
-                // If we pass the `Err` variant to the Event stream, we are closing the receiver side of the channel
-                // inside the stream. Depending on how a send error in `SkillInvocationCtx::write` is handled,
-                // this can lead to an unexpected error/panic.
-                // Therefore, we can either ignore the error here, or pass an error message to the client.
-                // Another option would be to stop Skill execution using `SkillInvocationCtx::send_error` inside `write`.
-                Err(e) => json!(format!("Error: {e}")).to_string(),
-            }))
-        }))
+        Ok(SkillOutput::Stream(stream)) => Sse::new(
+            stream
+                .0
+                .map(|result| result.map(|event| Event::default().data(event.to_string()))),
+        )
         .into_response(),
         Ok(SkillOutput::Value(result)) => (StatusCode::OK, Json(result)).into_response(),
         Err(SkillRuntimeError::SkillNotConfigured) => (
@@ -792,6 +785,51 @@ mod tests {
                 "data: {\"message\":\"Hello 3\"}\n\n",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn run_stream_skill_with_bad_output() {
+        // Given a skill executor that returns a stream of values, one of which is an error
+        let skill_runtime_mock = StubSkillRuntime::new(move |msg| match msg {
+            SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
+                let stream = Box::pin(stream! {
+                    yield Ok(json!({"message": "Hello 1"}));
+                    let err = serde_json::from_str::<Value>("{invalid}").unwrap_err();
+                    yield Err(err);
+                });
+                drop(send.send(Ok(SkillOutput::Stream(SkillStream(stream)))));
+            }
+            SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
+                panic!("unexpected message in test");
+            }
+        });
+        let skill_runtime_api = skill_runtime_mock.api();
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
+        let http = http(app_state);
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let response = http
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the first stream event is a valid JSON object
+        let mut stream = response.into_body().into_data_stream();
+        stream.next().await.unwrap().unwrap();
+
+        // And the second stream event is an error
+        assert!(stream.next().await.unwrap().is_err());
     }
 
     #[tokio::test]

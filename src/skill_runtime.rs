@@ -554,6 +554,8 @@ where
     async fn write(&mut self, data: Vec<u8>) {
         // Do not unwrap the send, as we do not know if the receiver is still be alive.
         // An example is a client who closes the connection while the skill is still running.
+        // Another option would be to stop Skill execution here using `send_error`, as
+        // apparently no one is interested in the result of the skill anymore.
         drop(self.send_rt_write.send(data).await);
     }
 
