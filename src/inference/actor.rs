@@ -8,6 +8,11 @@ use tokio::{
     task::JoinHandle,
 };
 
+pub struct MessageDelta {
+    pub role: Option<String>,
+    pub content: String,
+}
+
 use super::client::InferenceClient;
 
 /// Handle to the inference actor. Spin this up in order to use the inference API.

@@ -8,7 +8,7 @@ use crate::{
     chunking::{self, Chunk, ChunkRequest},
     inference::{
         ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
-        InferenceApi,
+        InferenceApi, MessageDelta,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     search::{
@@ -35,6 +35,9 @@ pub struct CsiDrivers<T> {
 #[async_trait]
 pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
+    async fn new_chat_stream(&mut self, request: ChatRequest) -> u32;
+    async fn next_chat_stream(&mut self, id: u32) -> Option<MessageDelta>;
+    async fn drop_chat_stream(&mut self, id: u32);
     async fn write(&mut self, data: Vec<u8>);
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>>;
@@ -677,6 +680,18 @@ pub mod tests {
 
     #[async_trait]
     impl CsiForSkills for CsiCompleteStub {
+        async fn new_chat_stream(&mut self, _request: ChatRequest) -> u32 {
+            unimplemented!()
+        }
+
+        async fn next_chat_stream(&mut self, _id: u32) -> Option<MessageDelta> {
+            unimplemented!()
+        }
+
+        async fn drop_chat_stream(&mut self, _id: u32) {
+            unimplemented!()
+        }
+
         async fn write(&mut self, _data: Vec<u8>) {
             unimplemented!()
         }
@@ -756,6 +771,18 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 start: 0,
                 length: 0,
             }])]
+        }
+
+        async fn new_chat_stream(&mut self, _request: ChatRequest) -> u32 {
+            unimplemented!()
+        }
+
+        async fn next_chat_stream(&mut self, _id: u32) -> Option<MessageDelta> {
+            unimplemented!()
+        }
+
+        async fn drop_chat_stream(&mut self, _id: u32) {
+            unimplemented!()
         }
 
         async fn write(&mut self, _data: Vec<u8>) {
@@ -843,6 +870,18 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
     #[async_trait]
     impl CsiForSkills for CsiCounter {
+        async fn new_chat_stream(&mut self, _request: ChatRequest) -> u32 {
+            unimplemented!()
+        }
+
+        async fn next_chat_stream(&mut self, _id: u32) -> Option<MessageDelta> {
+            unimplemented!()
+        }
+
+        async fn drop_chat_stream(&mut self, _id: u32) {
+            unimplemented!()
+        }
+
         async fn write(&mut self, _data: Vec<u8>) {
             unimplemented!()
         }

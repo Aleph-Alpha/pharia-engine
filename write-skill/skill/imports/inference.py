@@ -116,6 +116,29 @@ class ChatRequest:
     messages: List[Message]
     params: ChatParams
 
+@dataclass
+class MessageDelta:
+    role: Optional[str]
+    content: str
+
+class ChatStreamRequest:
+    
+    def __init__(self, request: ChatRequest) -> None:
+        raise NotImplementedError
+
+    def next(self) -> Optional[MessageDelta]:
+        raise NotImplementedError
+    def __enter__(self) -> Self:
+        """Returns self"""
+        return self
+                                
+    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> bool | None:
+        """
+        Release this resource.
+        """
+        raise NotImplementedError
+
+
 
 def complete(requests: List[CompletionRequest]) -> List[Completion]:
     raise NotImplementedError

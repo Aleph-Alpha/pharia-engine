@@ -429,6 +429,18 @@ interface inference {
 
     @since(version = 0.3.0)
     chat: func(requests: list<chat-request>) -> list<chat-response>;
+
+    @since(version = 0.3.1)
+    record message-delta {
+        role: option<string>,
+        content: string,
+    }
+
+    @since(version = 0.3.1)
+    resource chat-stream-request {
+        constructor(request:chat-request);
+        next: func() -> option<message-delta>;
+    }
 }
 
 @since(version = 0.3.0)

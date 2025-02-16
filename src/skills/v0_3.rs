@@ -1,3 +1,4 @@
+use crate::Error;
 use exports::pharia::skill::skill_handler::SkillMetadata;
 use pharia::skill::{
     chunking::{
@@ -9,15 +10,16 @@ use pharia::skill::{
         SearchResult, TextCursor,
     },
     inference::{
-        ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
-        Distribution, ExplanationRequest, FinishReason, Granularity, Host as InferenceHost,
-        Logprob, Logprobs, Message, TextScore, TokenUsage,
+        ChatParams, ChatRequest, ChatResponse, ChatStreamRequest, Completion, CompletionParams,
+        CompletionRequest, Distribution, ExplanationRequest, FinishReason, Granularity,
+        Host as InferenceHost, HostChatStreamRequest, Logprob, Logprobs, Message, MessageDelta,
+        TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     response::Host as ResponseHost,
 };
 use serde_json::Value;
-use wasmtime::component::bindgen;
+use wasmtime::component::{bindgen, Resource};
 
 use crate::{chunking, inference, language_selection, search};
 
@@ -84,6 +86,25 @@ impl DocumentIndexHost for LinkedCtx {
             .into_iter()
             .map(|results| results.into_iter().map(Into::into).collect())
             .collect()
+    }
+}
+
+impl HostChatStreamRequest for LinkedCtx {
+    async fn new(&mut self, request: ChatRequest) -> Resource<ChatStreamRequest> {
+        let request = inference::ChatRequest::from(request);
+        let id = self.skill_ctx.new_chat_stream(request).await;
+        Resource::new_own(id)
+    }
+
+    async fn next(&mut self, resource: Resource<ChatStreamRequest>) -> Option<MessageDelta> {
+        let id = resource.rep();
+        let delta = self.skill_ctx.next_chat_stream(id).await;
+        delta.map(Into::into)
+    }
+    async fn drop(&mut self, resource: Resource<ChatStreamRequest>) -> Result<(), Error> {
+        let id = resource.rep();
+        self.skill_ctx.drop_chat_stream(id).await;
+        Ok(())
     }
 }
 
@@ -169,6 +190,13 @@ impl From<ExplanationRequest> for inference::ExplanationRequest {
             model,
             granularity: granularity.into(),
         }
+    }
+}
+
+impl From<inference::MessageDelta> for MessageDelta {
+    fn from(delta: inference::MessageDelta) -> Self {
+        let inference::MessageDelta { role, content } = delta;
+        Self { role, content }
     }
 }
 

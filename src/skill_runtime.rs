@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    collections::HashMap,
     fmt,
     future::{pending, Future},
     future::{pending, Future},
@@ -27,6 +28,7 @@ use crate::{
     csi::{Csi, CsiForSkills},
     inference::{
         ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
+        MessageDelta,
     },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -383,6 +385,8 @@ pub struct SkillInvocationCtx<C> {
     api_token: String,
     // For tracing, we wire the skill invocation span context with the CSI spans
     parent_context: Option<Context>,
+    // running chat streams
+    running_chat_streams: HashMap<u32, Vec<MessageDelta>>,
 }
 
 impl<C> SkillInvocationCtx<C> {
@@ -399,6 +403,7 @@ impl<C> SkillInvocationCtx<C> {
             csi_apis,
             api_token,
             parent_context,
+            running_chat_streams: HashMap::new(),
         }
     }
 
@@ -436,6 +441,18 @@ impl SkillMetadataCtx {
 #[async_trait]
 impl CsiForSkills for SkillMetadataCtx {
     async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+        self.send_error().await
+    }
+
+    async fn new_chat_stream(&mut self, _request: ChatRequest) -> u32 {
+        self.send_error().await
+    }
+
+    async fn next_chat_stream(&mut self, _id: u32) -> Option<MessageDelta> {
+        self.send_error().await
+    }
+
+    async fn drop_chat_stream(&mut self, _id: u32) {
         self.send_error().await
     }
 
@@ -493,6 +510,35 @@ where
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
+    }
+    async fn new_chat_stream(&mut self, _request: ChatRequest) -> u32 {
+        let messages = vec![
+            MessageDelta {
+                role: None,
+                content: "doctor away.".to_string(),
+            },
+            MessageDelta {
+                role: None,
+                content: "keeps the ".to_string(),
+            },
+            MessageDelta {
+                role: Some("assistant".to_string()),
+                content: "".to_string(),
+            },
+        ];
+        let id = 0;
+        self.running_chat_streams.insert(id, messages);
+        id
+    }
+
+    async fn next_chat_stream(&mut self, id: u32) -> Option<MessageDelta> {
+        self.running_chat_streams
+            .get_mut(&id)
+            .and_then(|messages| messages.pop())
+    }
+
+    async fn drop_chat_stream(&mut self, id: u32) {
+        self.running_chat_streams.remove(&id);
     }
 
     async fn write(&mut self, data: Vec<u8>) {
@@ -669,9 +715,18 @@ pub mod tests {
                     items.push(item);
                 }
                 assert_eq!(items.len(), 3);
-                assert_eq!(items[0].as_ref().unwrap(), "Hello 1");
-                assert!(items[1].is_err());
-                assert_eq!(items[2].as_ref().unwrap(), "Hello 3");
+                assert_eq!(
+                    items[0].as_ref().unwrap(),
+                    &json!({"role": "assistant", "content": ""})
+                );
+                assert_eq!(
+                    items[1].as_ref().unwrap(),
+                    &json!({"role": null, "content": "keeps the "})
+                );
+                assert_eq!(
+                    items[2].as_ref().unwrap(),
+                    &json!({"role": null, "content": "doctor away."})
+                );
             }
             _ => panic!("Expected a stream"),
         }
