@@ -182,12 +182,7 @@ fn build_python_skill(package_name: &str, wit_version: &str) {
     //
     // wasm-tools strip ./skill_build_cache/greet-py.wasm -o ./skill_build_cache/greet-py.wasm
     Command::new("wasm-tools")
-        .args([
-            "strip",
-            &target_path,
-            "-o",
-            &target_path,
-        ])
+        .args(["strip", &target_path, "-o", &target_path])
         .status()
         .unwrap();
 }
