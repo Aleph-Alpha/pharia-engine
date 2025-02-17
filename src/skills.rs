@@ -214,6 +214,8 @@ pub enum Skill {
     V0_2(v0_2::SkillPre<LinkedCtx>),
     /// Skills targeting versions 0.3.x of the skill world
     V0_3(v0_3::skill::SkillPre<LinkedCtx>),
+    /// Skills targeting versions 0.3.x of the stream skill world
+    V0_3Streaming(v0_3::stream_skill::StreamSkillPre<LinkedCtx>),
 }
 
 impl Skill {
@@ -234,6 +236,11 @@ impl Skill {
                     .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
                 Ok(Skill::V0_3(skill))
             }
+            SupportedVersion::V0_3Streaming => {
+                let skill = v0_3::stream_skill::StreamSkillPre::new(pre)
+                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
+                Ok(Skill::V0_3Streaming(skill))
+            }
         }
     }
 
@@ -249,6 +256,15 @@ impl Skill {
                 let bindings = skill.instantiate_async(&mut store).await?;
                 let metadata = bindings
                     .pharia_skill_skill_handler()
+                    .call_metadata(store)
+                    .await?;
+                Some(metadata.try_into()).transpose()
+            }
+            Self::V0_3Streaming(skill) => {
+                let mut store = engine.store(LinkedCtx::new(ctx));
+                let bindings = skill.instantiate_async(&mut store).await?;
+                let metadata = bindings
+                    .pharia_skill_stream_skill_handler()
                     .call_metadata(store)
                     .await?;
                 Some(metadata.try_into()).transpose()
@@ -310,6 +326,27 @@ impl Skill {
                 };
                 Ok(serde_json::from_slice(&result)?)
             }
+            Self::V0_3Streaming(skill) => {
+                let input = serde_json::to_vec(&input)?;
+                let bindings = skill.instantiate_async(&mut store).await?;
+                let result = bindings
+                    .pharia_skill_stream_skill_handler()
+                    .call_run(store, &input)
+                    .await?;
+                match result {
+                    Ok(()) => Ok(Value::Null),
+                    Err(e) => match e {
+                        v0_3::stream_skill::exports::pharia::skill::stream_skill_handler::Error::Internal(e) => {
+                            tracing::error!("Failed to run skill, internal skill error:\n{e}");
+                            Err(anyhow!("Internal skill error:\n{e}"))
+                        }
+                        v0_3::stream_skill::exports::pharia::skill::stream_skill_handler::Error::InvalidInput(e) => {
+                            tracing::error!("Failed to run skill, invalid input:\n{e}");
+                            Err(anyhow!("Invalid input:\n{e}"))
+                        }
+                    },
+                }
+            }
         }
     }
 }
@@ -321,6 +358,8 @@ pub enum SupportedVersion {
     V0_2,
     /// Versions 0.3.x of the skill world
     V0_3,
+    /// Version 0.3.x of the stream skill world
+    V0_3Streaming,
 }
 
 impl SupportedVersion {
@@ -333,6 +372,12 @@ impl SupportedVersion {
                 }
                 Self::V0_3 => {
                     v0_3::skill::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
+                }
+                Self::V0_3Streaming => {
+                    v0_3::stream_skill::StreamSkill::add_to_linker(
+                        linker,
+                        |state: &mut LinkedCtx| state,
+                    )?;
                 }
             }
         }
@@ -392,6 +437,15 @@ impl SupportedVersion {
                 &VERSION
             }
             Self::V0_3 => {
+                static VERSION: LazyLock<Version> = LazyLock::new(|| {
+                    SupportedVersion::extract_wit_package_version(
+                        "./wit/skill@0.3/skill.wit",
+                        include_str!("../wit/skill@0.3/skill.wit"),
+                    )
+                });
+                &VERSION
+            }
+            Self::V0_3Streaming => {
                 static VERSION: LazyLock<Version> = LazyLock::new(|| {
                     SupportedVersion::extract_wit_package_version(
                         "./wit/skill@0.3/skill.wit",

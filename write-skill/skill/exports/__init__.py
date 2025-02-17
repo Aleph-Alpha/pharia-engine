@@ -6,19 +6,19 @@ from abc import abstractmethod
 import weakref
 
 from ..types import Result, Ok, Err, Some
-from ..exports import skill_handler
+from ..exports import stream_skill_handler
 
-class SkillHandler(Protocol):
+class StreamSkillHandler(Protocol):
 
     @abstractmethod
-    def run(self, input: bytes) -> bytes:
+    def run(self, input: bytes) -> None:
         """
-        Raises: `wit.types.Err(wit.imports.skill_handler.Error)`
+        Raises: `wit.types.Err(wit.imports.stream_skill_handler.Error)`
         """
         raise NotImplementedError
 
     @abstractmethod
-    def metadata(self) -> skill_handler.SkillMetadata:
+    def metadata(self) -> stream_skill_handler.StreamSkillMetadata:
         raise NotImplementedError
 
 

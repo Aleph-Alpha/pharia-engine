@@ -106,7 +106,7 @@ pub fn given_greet_py_v0_2() -> TestSkill {
 #[must_use]
 pub fn given_write_skill() -> TestSkill {
     static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
-        given_python_skill("write-skill", "0.3");
+        given_python_stream_skill("write-skill", "0.3");
     });
     *WASM_BUILD;
     TestSkill::python_skill("write-skill")
@@ -137,7 +137,13 @@ pub fn given_csi_from_metadata_skill() -> TestSkill {
 
 fn given_python_skill(package_name: &str, wit_version: &str) {
     if !Path::new(&format!("{SKILL_BUILD_CACHE_DIR}/{package_name}.wasm")).exists() {
-        build_python_skill(package_name, wit_version);
+        build_python_skill(package_name, wit_version, "skill");
+    }
+}
+
+fn given_python_stream_skill(package_name: &str, wit_version: &str) {
+    if !Path::new(&format!("{SKILL_BUILD_CACHE_DIR}/{package_name}.wasm")).exists() {
+        build_python_skill(package_name, wit_version, "stream-skill");
     }
 }
 
@@ -182,7 +188,7 @@ fn build_rust_skill(package_name: &str) {
     .unwrap();
 }
 
-fn build_python_skill(package_name: &str, wit_version: &str) {
+fn build_python_skill(package_name: &str, wit_version: &str, world: &str) {
     let venv = static_venv();
 
     fs::create_dir_all(SKILL_BUILD_CACHE_DIR).unwrap();
@@ -193,7 +199,7 @@ fn build_python_skill(package_name: &str, wit_version: &str) {
         "-d",
         &format!("wit/skill@{wit_version}/skill.wit"),
         "-w",
-        "skill",
+        &world,
         "componentize",
         &format!("{package_name}.app"),
         "-o",

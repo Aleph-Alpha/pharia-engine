@@ -4,9 +4,44 @@ package pharia:skill@0.3.4;
 world skill {
     @since(version = 0.3.0)
     include csi;
+
     @since(version = 0.3.0)
     export skill-handler;
 }
+
+@since(version = 0.3.1)
+world stream-skill {
+    @since(version = 0.3.1)
+    include csi;
+
+    import response;
+    @since(version = 0.3.1)
+    export stream-skill-handler;
+}
+
+@since(version = 0.3.1)
+interface stream-skill-handler {
+    /// The set of errors which may be raised by functions in this interface
+    @since(version = 0.3.1)
+    variant error {
+        internal(string),
+        invalid-input(string)
+    }
+
+    @since(version = 0.3.1)
+    run: func(input: list<u8>) -> result<_,error>;
+
+    @since(version = 0.3.1)
+    record stream-skill-metadata {
+        description: option<string>,
+        input-schema: list<u8>,
+        output-schema: list<u8>,
+    }
+
+    @since(version = 0.3.1)
+    metadata: func() -> stream-skill-metadata;
+}
+
 
 @since(version = 0.3.0)
 interface skill-handler {
@@ -38,7 +73,6 @@ world csi {
     import document-index;
     import inference;
     import language;
-    import response;
 }
 
 @since(version = 0.3.4)
