@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.95"
 change-case = "0.2.0"
-tempfile = "3.16.0"
+tempfile = "3.17.0"
 
 [lints]
 workspace = true

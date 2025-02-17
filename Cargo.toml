@@ -36,7 +36,7 @@ edition = "2021"
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-aleph-alpha-client = "0.20.1"
+aleph-alpha-client = "0.21.0"
 anyhow = "1.0.95"
 async-trait = "0.1.86"
 axum = { version = "0.8.1", features = ["macros"] }
@@ -57,7 +57,7 @@ semver = "1.0.25"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 toml = "0.8.20"
-strum = { version = "0.27.0", features = ["derive"] }
+strum = { version = "0.27.1", features = ["derive"] }
 tokio = { version = "1.43.0", features = [
     "macros",
     "rt-multi-thread",
@@ -85,7 +85,7 @@ tokenizers = { version = "0.21.0", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.23.0", features = ["tokenizers"] }
+text-splitter = { version = "0.24.0", features = ["tokenizers"] }
 lingua = { version = "1.6.2" }
 opentelemetry = "0.28.0"
 opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
@@ -135,7 +135,7 @@ test-skills = { path = "./test-skills" }
 fake = { version = "3.1.0", features = ["derive"] }
 http-body-util = "0.1.2"
 mime = "0.3.17"
-tempfile = "3.16.0"
+tempfile = "3.17.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.43.0", features = ["test-util"] }
 tokio-test = "0.4.4"
