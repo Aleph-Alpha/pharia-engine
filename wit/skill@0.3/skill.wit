@@ -1,4 +1,4 @@
-package pharia:skill@0.3.3;
+package pharia:skill@0.3.4;
 
 @since(version = 0.3.0)
 world skill {
@@ -41,7 +41,7 @@ world csi {
     import response;
 }
 
-@since(version = 0.3.1)
+@since(version = 0.3.4)
 interface response {
     write: func(data: list<u8>);
 }
@@ -430,13 +430,13 @@ interface inference {
     @since(version = 0.3.0)
     chat: func(requests: list<chat-request>) -> list<chat-response>;
 
-    @since(version = 0.3.1)
+    @since(version = 0.3.4)
     record message-delta {
         role: option<string>,
         content: string,
     }
 
-    @since(version = 0.3.1)
+    @since(version = 0.3.4)
     resource chat-stream-request {
         constructor(request:chat-request);
         next: func() -> option<message-delta>;

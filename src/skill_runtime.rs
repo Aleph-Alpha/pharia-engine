@@ -11,7 +11,7 @@ use aleph_alpha_client::{ChatChunk, StreamChatEvent, StreamMessage};
 use anyhow::anyhow;
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{stream::FuturesUnordered, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream::FuturesUnordered};
 use opentelemetry::Context;
 use serde_json::Value;
 use tokio::{
