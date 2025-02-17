@@ -9,6 +9,7 @@ use std::{
 use tempfile::{tempdir, TempDir};
 
 const WASI_TARGET: &str = "wasm32-wasip2";
+const SKILL_BUILD_CACHE_DIR: &str = "./skill_build_cache";
 
 pub struct TestSkill {
     file_name: String,
@@ -29,7 +30,7 @@ impl TestSkill {
 
     #[must_use]
     pub fn bytes(&self) -> Vec<u8> {
-        fs::read(format!("./skill_build_cache/{}.wasm", self.file_name)).unwrap()
+        fs::read(format!("{SKILL_BUILD_CACHE_DIR}/{}.wasm", self.file_name)).unwrap()
     }
 }
 
@@ -116,14 +117,14 @@ pub fn given_csi_from_metadata_skill() -> TestSkill {
 }
 
 fn given_python_skill(package_name: &str, wit_version: &str) {
-    if !Path::new(&format!("./skill_build_cache/{package_name}.wasm")).exists() {
+    if !Path::new(&format!("{SKILL_BUILD_CACHE_DIR}/{package_name}.wasm")).exists() {
         build_python_skill(package_name, wit_version);
     }
 }
 
 fn given_rust_skill(package_name: &str) {
     let snake_case = change_case::snake_case(package_name);
-    if !Path::new(&format!("./skill_build_cache/{snake_case}.wasm")).exists() {
+    if !Path::new(&format!("{SKILL_BUILD_CACHE_DIR}/{snake_case}.wasm")).exists() {
         build_rust_skill(package_name);
     }
 }
@@ -153,9 +154,11 @@ fn build_rust_skill(package_name: &str) {
         .unwrap();
     error_on_status("Building web assembly failed.", output).unwrap();
 
+    fs::create_dir_all(SKILL_BUILD_CACHE_DIR).unwrap();
+
     std::fs::copy(
         format!("./target/{WASI_TARGET}/release/{snake_case}.wasm"),
-        format!("./skill_build_cache/{snake_case}.wasm"),
+        format!("{SKILL_BUILD_CACHE_DIR}/{snake_case}.wasm"),
     )
     .unwrap();
 }
@@ -163,7 +166,8 @@ fn build_rust_skill(package_name: &str) {
 fn build_python_skill(package_name: &str, wit_version: &str) {
     let venv = static_venv();
 
-    let target_path = format!("./skill_build_cache/{package_name}.wasm");
+    fs::create_dir_all(SKILL_BUILD_CACHE_DIR).unwrap();
+    let target_path = format!("{SKILL_BUILD_CACHE_DIR}/{package_name}.wasm");
 
     venv.run(&[
         "componentize-py",
