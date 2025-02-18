@@ -28,6 +28,19 @@ Each namespace configuration typically would reside in a Git repository owned by
 
 A [namespace](skill-deployment.md#configuring-namespace) is also associated with a registry to load the Skills from. These Skill registries can either be directories in filesystem (mostly used for a development setup) or point to an OCI registry (recommended for production).
 
+### Namespace with all Skills from Folder
+
+The Kernel provides a `directory` option for namespaces that serves all Skills from a given directory, without the need to configure them in a file.
+You can activate this by setting
+
+```toml
+[namespaces.dev]
+directory = "skills"
+```
+
+This will serve all Skills in the `skills` directory under the namespace `dev`.
+Note that you can also set the environment variable `NAMESPACES__DEV__DIRECTORY=skills` to achieve the same effect.
+
 ### Namespace With Local Config and Local Registry
 
 ```toml
