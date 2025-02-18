@@ -158,6 +158,11 @@ impl Engine {
         });
 
         let mut linker = WasmtimeLinker::new(&engine);
+
+        // Setting this to true allows adding multiple world that import the same interfaces to the linker.
+        // This is necessary if we want to have a skill world and a stream-skill world.
+        linker.allow_shadowing(true);
+
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker)?;
         // Skill world from bindgen
@@ -362,6 +367,12 @@ pub enum SupportedVersion {
     V0_3Streaming,
 }
 
+/// Which world was the component build against?
+pub enum World {
+    Skill,
+    StreamingSkill,
+}
+
 impl SupportedVersion {
     /// Links all currently supported versions of the skill world to the engine
     fn add_all_to_linker(linker: &mut WasmtimeLinker<LinkedCtx>) -> anyhow::Result<()> {
@@ -386,11 +397,13 @@ impl SupportedVersion {
     }
 
     fn extract(wasm: impl AsRef<[u8]>) -> Result<Self, SkillError> {
-        let version = Self::extract_pharia_skill_version(wasm)?;
-        Self::validate_version(version)
+        let (version, world) = Self::extract_pharia_skill_version(wasm)?;
+        Self::validate_version(version, world)
     }
 
-    fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> Result<Option<Version>, SkillError> {
+    fn extract_pharia_skill_version(
+        wasm: impl AsRef<[u8]>,
+    ) -> Result<(Option<Version>, World), SkillError> {
         let decoded =
             decode(wasm.as_ref()).map_err(|e| SkillError::WasmDecodeError(e.to_string()))?;
         if let DecodedWasm::Component(resolve, ..) = decoded {
@@ -399,7 +412,21 @@ impl SupportedVersion {
                 .keys()
                 .find(|k| (k.namespace == "pharia" && k.name == "skill"))
                 .ok_or_else(|| SkillError::NotPhariaSkill)?;
-            Ok(package_name.version.clone())
+
+            // This is very hacky, there surely is a way to extract the world from the component
+            // but iterating the worlds of the component only shows a `root` world.
+            let world = if resolve
+                .interfaces
+                .iter()
+                .filter_map(|(_, value)| value.name.clone())
+                .any(|name| name == "stream-skill-handler")
+            {
+                World::StreamingSkill
+            } else {
+                World::Skill
+            };
+
+            Ok((package_name.version.clone(), world))
         } else {
             Err(SkillError::NotComponent)
         }
@@ -466,7 +493,7 @@ impl SupportedVersion {
     }
 
     /// Check if a given version is valid
-    fn validate_version(version: Option<Version>) -> Result<Self, SkillError> {
+    fn validate_version(version: Option<Version>, world: World) -> Result<Self, SkillError> {
         let Some(version) = version else {
             return Err(SkillError::MissingVersion);
         };
@@ -485,7 +512,10 @@ impl SupportedVersion {
                 major: 0, minor: 3, ..
             } => {
                 if &version <= Self::V0_3.current_supported_version() {
-                    Ok(Self::V0_3)
+                    Ok(match world {
+                        World::Skill => Self::V0_3,
+                        World::StreamingSkill => Self::V0_3Streaming,
+                    })
                 } else {
                     Err(SkillError::NotSupportedYet(version))
                 }
@@ -584,7 +614,7 @@ mod tests {
     use serde_json::json;
     use test_skills::{
         given_chat_skill, given_greet_py_v0_2, given_greet_py_v0_3, given_greet_skill_v0_2,
-        given_greet_skill_v0_3, given_search_skill,
+        given_greet_skill_v0_3, given_search_skill, given_write_skill,
     };
     use tokio::sync::{mpsc, oneshot};
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -635,6 +665,7 @@ mod tests {
         let wasm = given_greet_skill_v0_2().bytes();
         let version = SupportedVersion::extract_pharia_skill_version(wasm)
             .unwrap()
+            .0
             .unwrap();
         assert_eq!(version, Version::new(0, 2, 10));
     }
@@ -804,6 +835,18 @@ mod tests {
     }
 
     #[test]
+    fn supported_version_v0_3_streaming() {
+        // Given a skill component written against the v0.3.x stream skill world
+        let skill = given_write_skill();
+
+        // When extracting the skill version
+        let skill_version = SupportedVersion::extract(skill.bytes()).unwrap();
+
+        // Then the version is v0.3.x stream skill world
+        assert_eq!(skill_version, SupportedVersion::V0_3Streaming);
+    }
+
+    #[test]
     fn can_parse_latest_wit_world_version() {
         assert_eq!(
             SupportedVersion::V0_2.current_supported_version(),
@@ -821,20 +864,21 @@ mod tests {
 
     #[test]
     fn unsupported_unversioned() {
-        let error = SupportedVersion::validate_version(None).unwrap_err();
+        let error = SupportedVersion::validate_version(None, World::Skill).unwrap_err();
         assert!(matches!(error, SkillError::MissingVersion));
     }
 
     #[test]
     fn unsupported_v0_1() {
-        let error = SupportedVersion::validate_version(Some(Version::new(0, 1, 0))).unwrap_err();
+        let error = SupportedVersion::validate_version(Some(Version::new(0, 1, 0)), World::Skill)
+            .unwrap_err();
         assert!(matches!(error, SkillError::NoLongerSupported(..)));
     }
 
     #[test]
     fn valid_0_2_version() -> anyhow::Result<()> {
         let version = Some(Version::new(0, 2, 0));
-        let supported_version = SupportedVersion::validate_version(version)?;
+        let supported_version = SupportedVersion::validate_version(version, World::Skill)?;
         assert_eq!(supported_version, SupportedVersion::V0_2);
         Ok(())
     }
@@ -842,15 +886,18 @@ mod tests {
     #[test]
     fn invalid_0_2_version() {
         let error =
-            SupportedVersion::validate_version(Some(Version::new(0, 2, u64::MAX))).unwrap_err();
+            SupportedVersion::validate_version(Some(Version::new(0, 2, u64::MAX)), World::Skill)
+                .unwrap_err();
         assert!(matches!(error, SkillError::NotSupportedYet(..)));
     }
 
     #[test]
     fn invalid_future_version() {
-        let error =
-            SupportedVersion::validate_version(Some(Version::new(u64::MAX, u64::MAX, u64::MAX)))
-                .unwrap_err();
+        let error = SupportedVersion::validate_version(
+            Some(Version::new(u64::MAX, u64::MAX, u64::MAX)),
+            World::Skill,
+        )
+        .unwrap_err();
         assert!(matches!(error, SkillError::NotSupportedYet(..)));
     }
 

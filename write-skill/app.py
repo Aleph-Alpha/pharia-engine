@@ -1,9 +1,9 @@
 import json
 from typing import Generator
 
-import skill.exports
-from skill.exports.stream_skill_handler import StreamSkillMetadata
-from skill.imports.inference import (
+import stream_skill.exports
+from stream_skill.exports.stream_skill_handler import StreamSkillMetadata
+from stream_skill.imports.inference import (
     ChatParams,
     ChatRequest,
     ChatStreamRequest,
@@ -11,7 +11,7 @@ from skill.imports.inference import (
     Message,
     MessageDelta,
 )
-from skill.imports.response import write
+from stream_skill.imports.response import write
 
 
 def chat_stream(
@@ -31,7 +31,7 @@ def stream_skill_decorator(func):
     Allows for skills to yield bytes.
     """
 
-    class StreamSkillHandler(skill.exports.StreamSkillHandler):
+    class StreamSkillHandler(stream_skill.exports.StreamSkillHandler):
         def run(self, input: bytes) -> bytes:
             for delta in func(input):
                 write(delta)

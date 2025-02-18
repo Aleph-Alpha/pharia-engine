@@ -199,7 +199,7 @@ fn build_python_skill(package_name: &str, wit_version: &str, world: &str) {
         "-d",
         &format!("wit/skill@{wit_version}/skill.wit"),
         "-w",
-        &world,
+        world,
         "componentize",
         &format!("{package_name}.app"),
         "-o",
