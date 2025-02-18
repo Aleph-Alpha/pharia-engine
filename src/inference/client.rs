@@ -5,7 +5,7 @@ use std::{
 
 use aleph_alpha_client::{
     ChatSampling, Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat,
-    TaskCompletion,
+    TaskCompletion, TaskExplanation,
 };
 use retry_policies::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
 use tracing::{error, warn};
@@ -13,8 +13,9 @@ use tracing::{error, warn};
 use thiserror::Error;
 
 use super::{
-    actor::TokenUsage, ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams,
-    CompletionRequest, Distribution, Logprob, Logprobs, Message,
+    ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
+    Distribution, ExplainRequest, Explanation, Granularity, Logprob, Logprobs, Message, TextScore,
+    TokenUsage,
 };
 
 pub trait InferenceClient: Send + Sync + 'static {
@@ -28,9 +29,40 @@ pub trait InferenceClient: Send + Sync + 'static {
         request: &ChatRequest,
         api_token: String,
     ) -> impl Future<Output = Result<ChatResponse, InferenceClientError>> + Send;
+    fn explain_complete(
+        &self,
+        request: &ExplainRequest,
+        api_token: String,
+    ) -> impl Future<Output = Result<Explanation, InferenceClientError>> + Send;
 }
 
 impl InferenceClient for Client {
+    async fn explain_complete(
+        &self,
+        request: &ExplainRequest,
+        api_token: String,
+    ) -> Result<Explanation, InferenceClientError> {
+        let ExplainRequest {
+            prompt,
+            target,
+            model,
+            granularity,
+        } = request;
+        let task = TaskExplanation {
+            prompt: Prompt::from_text(prompt),
+            target,
+            granularity: granularity.into(),
+        };
+        let how = How {
+            api_token: Some(api_token),
+            ..Default::default()
+        };
+        let result = retry(|| self.explanation(&task, model, &how)).await;
+        match result {
+            Ok(explanation) => Ok(explanation.into()),
+            Err(e) => Err(e.into()),
+        }
+    }
     async fn chat(
         &self,
         request: &ChatRequest,
@@ -101,6 +133,34 @@ impl InferenceClient for Client {
     }
 }
 
+impl From<aleph_alpha_client::ExplanationOutput> for Explanation {
+    fn from(mut explanation_output: aleph_alpha_client::ExplanationOutput) -> Self {
+        let aleph_alpha_client::ItemExplanation::Text { scores: text } =
+            explanation_output.items.remove(0)
+        else {
+            unreachable!(
+                "We do not support multi-model prompts, so the first item will always be text."
+            )
+        };
+        Explanation::new(text.into_iter().map(Into::into).collect())
+    }
+}
+
+impl From<aleph_alpha_client::TextScore> for TextScore {
+    fn from(text_score: aleph_alpha_client::TextScore) -> Self {
+        let aleph_alpha_client::TextScore {
+            start,
+            length,
+            score,
+        } = text_score;
+        TextScore {
+            start,
+            length,
+            score,
+        }
+    }
+}
+
 impl TryFrom<CompletionOutput> for Completion {
     type Error = anyhow::Error;
 
@@ -117,6 +177,18 @@ impl TryFrom<CompletionOutput> for Completion {
             logprobs: logprobs.into_iter().map(Into::into).collect(),
             usage: usage.into(),
         })
+    }
+}
+
+impl From<&Granularity> for aleph_alpha_client::Granularity {
+    fn from(granularity: &Granularity) -> Self {
+        let prompt = match granularity {
+            Granularity::Auto => aleph_alpha_client::PromptGranularity::Auto,
+            Granularity::Word => aleph_alpha_client::PromptGranularity::Word,
+            Granularity::Sentence => aleph_alpha_client::PromptGranularity::Sentence,
+            Granularity::Paragraph => aleph_alpha_client::PromptGranularity::Paragraph,
+        };
+        aleph_alpha_client::Granularity::default().with_prompt_granularity(prompt)
     }
 }
 
@@ -293,11 +365,41 @@ mod tests {
     use tokio::time::Instant;
 
     use crate::{
-        inference::ChatParams,
+        inference::{ChatParams, ExplainRequest, Granularity},
         tests::{api_token, inference_url},
     };
 
     use super::*;
+
+    #[tokio::test]
+    async fn explain_complete() {
+        // Given an inference client
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When explaining complete
+        let request = ExplainRequest {
+            prompt: "An apple a day".to_string(),
+            target: " keeps the doctor away".to_string(),
+            model: "pharia-1-llm-7b-control".to_string(),
+            granularity: Granularity::Auto,
+        };
+        let explanation =
+            <Client as InferenceClient>::explain_complete(&client, &request, api_token)
+                .await
+                .unwrap();
+
+        // Then we explanation of five items
+        assert_eq!(explanation.len(), 5);
+
+        // And the score is the highest for the third item (apple)
+        let max_index = explanation
+            .iter()
+            .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
+            .unwrap();
+        assert_eq!(max_index.start, 3);
+    }
 
     #[tokio::test(start_paused = true)]
     async fn future_which_returns_okay_on_first_try() {

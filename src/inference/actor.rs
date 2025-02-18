@@ -1,4 +1,5 @@
 use aleph_alpha_client::Client;
+use derive_more::{Constructor, Deref};
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
@@ -92,6 +93,47 @@ impl InferenceApi {
             .expect("sender must be alive when awaiting for answers")
     }
 }
+
+/// At which granularity should the target be explained in terms of the prompt.
+/// If you choose, for example, [`Granularity::Sentence`] then we report the importance score of each
+/// sentence in the prompt towards generating the target output.
+/// The default is [`Granularity::Auto`] which means we will try to find the granularity that
+/// brings you closest to around 30 explanations. For large prompts, this would likely
+/// be sentences. For short prompts this might be individual words or even tokens.
+pub enum Granularity {
+    /// Let the system decide which granularity is most suitable for the given input.
+    Auto,
+    Word,
+    Sentence,
+    Paragraph,
+}
+
+pub struct ExplainRequest {
+    /// The prompt that typically was the input of a previous completion request
+    pub prompt: String,
+    /// The target string that should be explained. The influence of individual parts
+    /// of the prompt for generating this target string will be indicated in the response.
+    pub target: String,
+    pub model: String,
+    /// The granularity of the parts of the prompt for which a single
+    /// score is computed.
+    pub granularity: Granularity,
+}
+
+#[derive(Debug)]
+pub struct TextScore {
+    pub start: u32,
+    pub length: u32,
+    pub score: f32,
+}
+
+/// While `[aleph_alpha_client::ExplanationOutput]` contains multiple items for `Text`, `Image`, and `Target`,
+/// we do not support multi-modal prompts and do not return any scores for `Image`.
+/// As we also do not support target-granularity as part of the `[crate::ExplainRequest]`, we will get
+/// an empty vector in the target scores, and therefore can ignore these one as well.
+/// Explanation then becomes a wrapper around the `TextScore` vector for the text item.
+#[derive(Deref, Constructor, Debug)]
+pub struct Explanation(Vec<TextScore>);
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub enum Logprobs {
@@ -386,6 +428,13 @@ pub mod tests {
     }
 
     impl InferenceClient for SaboteurClient {
+        async fn explain_complete(
+            &self,
+            _request: &ExplainRequest,
+            _api_token: String,
+        ) -> Result<Explanation, InferenceClientError> {
+            unimplemented!()
+        }
         async fn complete_text(
             &self,
             _params: &super::CompletionRequest,
@@ -455,6 +504,13 @@ pub mod tests {
     }
 
     impl InferenceClient for AssertConcurrentClient {
+        async fn explain_complete(
+            &self,
+            _request: &ExplainRequest,
+            _api_token: String,
+        ) -> Result<Explanation, InferenceClientError> {
+            unimplemented!()
+        }
         async fn complete_text(
             &self,
             request: &CompletionRequest,
