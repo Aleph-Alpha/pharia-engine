@@ -15,6 +15,9 @@ use crate::{chunking, csi::Csi, inference, language_selection, search};
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
 pub enum CsiRequest {
+    Explain {
+        requests: Vec<ExplainRequest>,
+    },
     Chat {
         requests: Vec<ChatRequest>,
     },
@@ -48,6 +51,16 @@ impl CsiRequest {
         C: Csi + Sync,
     {
         let response = match self {
+            CsiRequest::Explain { requests } => drivers
+                .explain(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|v| {
+                    CsiResponse::Explain(
+                        v.into_iter()
+                            .map(|r| r.into_iter().map(Into::into).collect())
+                            .collect(),
+                    )
+                }),
             CsiRequest::Chat { requests } => drivers
                 .chat(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -97,6 +110,7 @@ impl CsiRequest {
 #[derive(Serialize)]
 #[serde(untagged)]
 enum CsiResponse {
+    Explain(Vec<Vec<TextScore>>),
     Chat(Vec<ChatResponse>),
     Complete(Vec<Completion>),
     Chunk(Vec<Vec<String>>),
@@ -106,6 +120,72 @@ enum CsiResponse {
     SelectLanguage(Vec<Option<Language>>),
 }
 
+#[derive(Serialize)]
+struct TextScore {
+    start: u32,
+    length: u32,
+    score: f64,
+}
+
+impl From<inference::TextScore> for TextScore {
+    fn from(value: inference::TextScore) -> Self {
+        let inference::TextScore {
+            start,
+            length,
+            score,
+        } = value;
+        TextScore {
+            start,
+            length,
+            score,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Granularity {
+    Auto,
+    Word,
+    Sentence,
+    Paragraph,
+}
+
+impl From<Granularity> for inference::Granularity {
+    fn from(value: Granularity) -> Self {
+        match value {
+            Granularity::Auto => inference::Granularity::Auto,
+            Granularity::Word => inference::Granularity::Word,
+            Granularity::Sentence => inference::Granularity::Sentence,
+            Granularity::Paragraph => inference::Granularity::Paragraph,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ExplainRequest {
+    pub prompt: String,
+    pub target: String,
+    pub model: String,
+    pub granularity: Granularity,
+}
+
+impl From<ExplainRequest> for inference::ExplanationRequest {
+    fn from(value: ExplainRequest) -> Self {
+        let ExplainRequest {
+            prompt,
+            target,
+            model,
+            granularity,
+        } = value;
+        inference::ExplanationRequest {
+            prompt,
+            target,
+            model,
+            granularity: granularity.into(),
+        }
+    }
+}
 #[derive(Deserialize, Serialize)]
 pub struct DocumentPath {
     pub namespace: String,
@@ -732,6 +812,49 @@ mod tests {
     use super::*;
 
     use crate::csi_shell::VersionedCsiRequest;
+
+    #[test]
+    fn explain_request() {
+        let request = json!({
+            "version": "0.3",
+            "function": "explain",
+            "requests": [
+                {
+                    "prompt": "Hello",
+                    "target": "World",
+                    "model": "pharia-1-llm-7b-control",
+                    "granularity": "word"
+                }
+            ]
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_3(CsiRequest::Explain { requests })) if requests.len() == 1
+        ));
+    }
+
+    #[test]
+    fn explain_response() {
+        let response = CsiResponse::Explain(vec![vec![inference::TextScore {
+            start: 0,
+            length: 5,
+            score: 0.5,
+        }
+        .into()]]);
+        let serialized = serde_json::to_value(response).unwrap();
+        assert_eq!(
+            serialized,
+            json!([[{
+                "start": 0,
+                "length": 5,
+                "score": 0.5
+            }]])
+        );
+    }
 
     #[test]
     fn select_language_response() {
