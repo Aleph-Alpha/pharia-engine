@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.3...v0.9.4)
+
+### Fixes
+
+- Remove unneeded modality filter exposed in csi shell search - ([c0f326e](https://github.com/Aleph-Alpha/pharia-kernel/commit/c0f326ee449e538a805ffa44f6d3e09c2373449e))
+
+### Documentation
+
+- Specify clean up after wit world change in readme - ([04e01a3](https://github.com/Aleph-Alpha/pharia-kernel/commit/04e01a3ede311a0aaeddabc5a7a70bb699ef7186))
+- Specify directory option for namespace - ([ad89c92](https://github.com/Aleph-Alpha/pharia-kernel/commit/ad89c92028d3cc90a758e5da5859e383c12cf811))
+- Add explaining comments to document index wit interface - ([19ae8d3](https://github.com/Aleph-Alpha/pharia-kernel/commit/19ae8d3397130c8234e9278ceb8531ac8e3681fa))
+
+### Builds
+
+- *(deps)* Bump the minor group with 3 updates - ([578238d](https://github.com/Aleph-Alpha/pharia-kernel/commit/578238d84cee8aa85b861837ed8c7d89e85102a0))
+- *(deps)* Bump the minor group with 14 updates - ([4d04a75](https://github.com/Aleph-Alpha/pharia-kernel/commit/4d04a758c62e40fbced8b23a451922ddb9e14886))
+- *(deps)* Bump fake from 3.1.0 to 4.0.0 - ([2a6227e](https://github.com/Aleph-Alpha/pharia-kernel/commit/2a6227ec2d4d1c7920fdd97847eba12c9ab1159e))
+- *(deps)* Bump aleph-alpha-client in the minor group - ([326ad40](https://github.com/Aleph-Alpha/pharia-kernel/commit/326ad4060c80659dd2c78aed0014e1ce6cde24c4))
+
+
 ## [0.9.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.2...v0.9.3)
 
 ### Fixes
