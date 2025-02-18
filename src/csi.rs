@@ -6,7 +6,10 @@ use tracing::trace;
 
 use crate::{
     chunking::{self, ChunkRequest},
-    inference::{ChatRequest, ChatResponse, Completion, CompletionRequest, InferenceApi},
+    inference::{
+        ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
+        InferenceApi,
+    },
     language_selection::{select_language, Language, SelectLanguageRequest},
     search::{
         Document, DocumentIndexMessage, DocumentPath, SearchApi, SearchRequest, SearchResult,
@@ -31,6 +34,7 @@ pub struct CsiDrivers<T> {
 /// This is the CSI as passed to user defined code in WASM.
 #[async_trait]
 pub trait CsiForSkills {
+    async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>>;
     async fn select_language(
@@ -49,6 +53,11 @@ pub trait CsiForSkills {
 /// in order to allow for parallization behind the scenes.
 #[async_trait]
 pub trait Csi {
+    async fn explain(
+        &self,
+        auth: String,
+        requests: Vec<ExplanationRequest>,
+    ) -> anyhow::Result<Vec<Explanation>>;
     async fn complete(
         &self,
         auth: String,
@@ -120,6 +129,24 @@ impl<T> Csi for CsiDrivers<T>
 where
     T: TokenizerApi + Send + Sync,
 {
+    async fn explain(
+        &self,
+        auth: String,
+        requests: Vec<ExplanationRequest>,
+    ) -> anyhow::Result<Vec<Explanation>> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "explain")])
+            .increment(requests.len() as u64);
+        try_join_all(requests.into_iter().map(|r| {
+            trace!(
+                "explain: request.model={} request.granularity={}",
+                r.model,
+                r.granularity,
+            );
+            self.inference.explain(r, auth.clone())
+        }))
+        .await
+    }
+
     async fn complete(
         &self,
         auth: String,
@@ -271,7 +298,8 @@ pub mod tests {
     use crate::{
         chunking::ChunkParams,
         inference::{
-            tests::InferenceStub, ChatParams, CompletionParams, FinishReason, Message, TokenUsage,
+            tests::InferenceStub, ChatParams, CompletionParams, FinishReason, Message, TextScore,
+            TokenUsage,
         },
         search::{tests::SearchStub, TextCursor},
         tests::api_token,
@@ -450,6 +478,13 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for DummyCsi {
+        async fn explain(
+            &self,
+            _auth: String,
+            _requests: Vec<ExplanationRequest>,
+        ) -> anyhow::Result<Vec<Explanation>> {
+            panic!("DummyCsi explain called")
+        }
         async fn complete(
             &self,
             _auth: String,
@@ -505,10 +540,14 @@ pub mod tests {
     type ChunkFn =
         dyn Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<String>>> + Send + Sync + 'static;
 
+    type ExplainFn =
+        dyn Fn(ExplanationRequest) -> anyhow::Result<Explanation> + Send + Sync + 'static;
+
     #[derive(Clone)]
     pub struct StubCsi {
         pub completion: Arc<Box<CompleteFn>>,
         pub chunking: Arc<Box<ChunkFn>>,
+        pub explain: Arc<Box<ExplainFn>>,
     }
 
     impl StubCsi {
@@ -516,6 +555,7 @@ pub mod tests {
             StubCsi {
                 completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
                 chunking: Arc::new(Box::new(|_| bail!("Chunking not set in StubCsi"))),
+                explain: Arc::new(Box::new(|_| bail!("Explain not set in StubCsi"))),
             }
         }
 
@@ -535,6 +575,14 @@ pub mod tests {
             }
         }
 
+        pub fn with_explain(
+            f: impl Fn(ExplanationRequest) -> Explanation + Send + Sync + 'static,
+        ) -> Self {
+            StubCsi {
+                explain: Arc::new(Box::new(move |er| Ok(f(er)))),
+                ..Self::empty()
+            }
+        }
         pub fn with_completion_from_text(text: impl Into<String>) -> Self {
             let text: String = text.into();
             let completion = Completion::from_text(text);
@@ -544,6 +592,13 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for StubCsi {
+        async fn explain(
+            &self,
+            _auth: String,
+            requests: Vec<ExplanationRequest>,
+        ) -> anyhow::Result<Vec<Explanation>> {
+            requests.into_iter().map(|r| (*self.explain)(r)).collect()
+        }
         async fn complete(
             &self,
             _auth: String,
@@ -643,6 +698,10 @@ pub mod tests {
             unimplemented!()
         }
 
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+            unimplemented!()
+        }
+
         async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
             unimplemented!()
         }
@@ -690,6 +749,14 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
     #[async_trait]
     impl CsiForSkills for CsiGreetingMock {
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+            vec![Explanation::new(vec![TextScore {
+                score: 0.0,
+                start: 0,
+                length: 0,
+            }])]
+        }
+
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests.into_iter().map(Self::complete_text).collect()
         }
@@ -812,6 +879,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         }
 
         async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
+            unimplemented!()
+        }
+
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
             unimplemented!()
         }
     }

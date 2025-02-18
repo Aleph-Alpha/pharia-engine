@@ -22,7 +22,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     chunking::ChunkRequest,
     csi::{Csi, CsiForSkills},
-    inference::{ChatRequest, ChatResponse, Completion, CompletionRequest},
+    inference::{
+        ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
+    },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skill_store::{SkillStoreApi, SkillStoreError},
@@ -379,6 +381,10 @@ impl SkillMetadataCtx {
 
 #[async_trait]
 impl CsiForSkills for SkillMetadataCtx {
+    async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+        self.send_error().await
+    }
+
     async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
         self.send_error().await
     }
@@ -416,6 +422,21 @@ impl<C> CsiForSkills for SkillInvocationCtx<C>
 where
     C: Csi + Send + Sync,
 {
+    async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+        let span = span!(Level::DEBUG, "explain", requests_len = requests.len());
+        if let Some(context) = self.parent_context.as_ref() {
+            span.set_parent(context.clone());
+        }
+        match self
+            .csi_apis
+            .explain(self.api_token.clone(), requests)
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
         let span = span!(Level::DEBUG, "complete", requests_len = requests.len());
         if let Some(context) = self.parent_context.as_ref() {
@@ -531,12 +552,13 @@ pub mod tests {
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
     use test_skills::{
-        given_csi_from_metadata_skill, given_greet_py_v0_3, given_greet_skill_v0_2,
-        given_greet_skill_v0_3, given_invalid_output_skill,
+        given_csi_from_metadata_skill, given_explain_skill, given_greet_py_v0_3,
+        given_greet_skill_v0_2, given_greet_skill_v0_3, given_invalid_output_skill,
     };
     use tokio::try_join;
 
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
+    use crate::inference::{Explanation, ExplanationRequest, TextScore};
     use crate::namespace_watcher::Namespace;
     use crate::skills::SkillMetadata;
     use crate::{
@@ -639,6 +661,43 @@ pub mod tests {
 
         // Then the metadata gives an error
         assert!(metadata.is_err());
+    }
+
+    #[tokio::test]
+    async fn explain_skill_component() {
+        let test_skill = given_explain_skill();
+        let skill_path = SkillPath::local("explain");
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let skill_store =
+            SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let (send, _) = oneshot::channel();
+        let csi = StubCsi::with_explain(|_| {
+            Explanation::new(vec![TextScore {
+                score: 0.0,
+                start: 0,
+                length: 2,
+            }])
+        });
+        let skill_ctx = Box::new(SkillInvocationCtx::new(
+            send,
+            csi,
+            "dummy token".to_owned(),
+            None,
+        ));
+
+        let runtime = WasmRuntime::new(engine, skill_store.api());
+        let resp = runtime
+            .run(
+                &skill_path,
+                json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
+                skill_ctx,
+            )
+            .await;
+
+        drop(runtime);
+        skill_store.wait_for_shutdown().await;
+
+        assert_eq!(resp.unwrap(), json!([{"start": 0, "length": 2}]));
     }
 
     #[tokio::test]
@@ -955,6 +1014,13 @@ pub mod tests {
 
     #[async_trait]
     impl Csi for SaboteurCsi {
+        async fn explain(
+            &self,
+            _auth: String,
+            _requests: Vec<ExplanationRequest>,
+        ) -> anyhow::Result<Vec<Explanation>> {
+            bail!("Test error")
+        }
         async fn complete(
             &self,
             _auth: String,

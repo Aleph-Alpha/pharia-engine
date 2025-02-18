@@ -14,8 +14,8 @@ use thiserror::Error;
 
 use super::{
     ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
-    Distribution, ExplainRequest, Explanation, Granularity, Logprob, Logprobs, Message, TextScore,
-    TokenUsage,
+    Distribution, Explanation, ExplanationRequest, Granularity, Logprob, Logprobs, Message,
+    TextScore, TokenUsage,
 };
 
 pub trait InferenceClient: Send + Sync + 'static {
@@ -31,7 +31,7 @@ pub trait InferenceClient: Send + Sync + 'static {
     ) -> impl Future<Output = Result<ChatResponse, InferenceClientError>> + Send;
     fn explain_complete(
         &self,
-        request: &ExplainRequest,
+        request: &ExplanationRequest,
         api_token: String,
     ) -> impl Future<Output = Result<Explanation, InferenceClientError>> + Send;
 }
@@ -39,10 +39,10 @@ pub trait InferenceClient: Send + Sync + 'static {
 impl InferenceClient for Client {
     async fn explain_complete(
         &self,
-        request: &ExplainRequest,
+        request: &ExplanationRequest,
         api_token: String,
     ) -> Result<Explanation, InferenceClientError> {
-        let ExplainRequest {
+        let ExplanationRequest {
             prompt,
             target,
             model,
@@ -156,7 +156,7 @@ impl From<aleph_alpha_client::TextScore> for TextScore {
         TextScore {
             start,
             length,
-            score,
+            score: f64::from(score),
         }
     }
 }
@@ -365,7 +365,7 @@ mod tests {
     use tokio::time::Instant;
 
     use crate::{
-        inference::{ChatParams, ExplainRequest, Granularity},
+        inference::{ChatParams, ExplanationRequest, Granularity},
         tests::{api_token, inference_url},
     };
 
@@ -379,7 +379,7 @@ mod tests {
         let client = Client::new(host, None).unwrap();
 
         // When explaining complete
-        let request = ExplainRequest {
+        let request = ExplanationRequest {
             prompt: "An apple a day".to_string(),
             target: " keeps the doctor away".to_string(),
             model: "pharia-1-llm-7b-control".to_string(),

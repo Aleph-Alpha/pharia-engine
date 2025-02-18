@@ -54,6 +54,16 @@ pub fn given_greet_skill_v0_2() -> TestSkill {
     TestSkill::rust_skill("greet-skill-v0_2")
 }
 
+/// Creates `explain_skill.wasm` in `skills` directory, based on `crates/explain-skill`
+#[must_use]
+pub fn given_explain_skill() -> TestSkill {
+    static WASM_BUILD: LazyLock<()> = LazyLock::new(|| {
+        given_rust_skill("explain-skill");
+    });
+    *WASM_BUILD;
+    TestSkill::rust_skill("explain-skill")
+}
+
 /// Creates `search_skill.wasm` in `skills` directory, based on `crates/search-skill`
 #[must_use]
 pub fn given_search_skill() -> TestSkill {
