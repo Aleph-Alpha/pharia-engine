@@ -135,7 +135,7 @@ test-skills = { path = "./test-skills" }
 fake = { version = "4.0.0", features = ["derive"] }
 http-body-util = "0.1.2"
 mime = "0.3.17"
-tempfile = "3.17.0"
+tempfile = "3.17.1"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.43.0", features = ["test-util"] }
 tokio-test = "0.4.4"
