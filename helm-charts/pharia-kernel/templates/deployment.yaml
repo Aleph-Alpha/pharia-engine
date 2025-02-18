@@ -104,16 +104,36 @@ spec:
                   name: {{ .Values.global.phariaAIConfigMap }}
                   key: DOCUMENT_INDEX_URL
             {{- end }}
-            {{- if and .Values.defaultNamespacesEnabled .Values.global.phariaAIConfigMap }}
-            - name: NAMESPACES__ASSISTANT__CONFIG_URL
+            {{- if .Values.global.phariaAIConfigMap }}
+            {{- range .Values.defaultNamespaces }}
+            - name: NAMESPACES__{{ . | upper }}__CONFIG_URL
               valueFrom:
                 configMapKeyRef:
                   name: {{ .Values.global.phariaAIConfigMap }}
-                  key: PHARIA_ASSISTANT_API_SKILL_CONFIG
-            - name: NAMESPACES__ASSISTANT__REGISTRY
-              value: "alephalpha.jfrog.io"
-            - name: NAMESPACES__ASSISTANT__BASE_REPOSITORY
-              value: "assistant-kernel-skills"
+                  key: NAMESPACES__{{ . | upper }}__CONFIG_URL
+            - name: NAMESPACES__{{ . | upper }}__REGISTRY
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.global.phariaAIConfigMap }}
+                  key: NAMESPACES__{{ . | upper }}__REGISTRY
+            - name: NAMESPACES__{{ . | upper }}__BASE_REPOSITORY
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.global.phariaAIConfigMap }}
+                  key: NAMESPACES__{{ . | upper }}__BASE_REPOSITORY
+            {{- if .Values.global.imagePullOpaqueSecretName }}
+            - name: NAMESPACES__{{ . | upper }}__REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.imagePullOpaqueSecretName }}
+                  key: registryUser
+            - name: NAMESPACES__{{ . | upper }}__REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.imagePullOpaqueSecretName }}
+                  key: registryPassword
+            {{- end }}
+            {{- end }}
             {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
