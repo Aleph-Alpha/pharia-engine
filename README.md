@@ -31,7 +31,7 @@ rustup target add wasm32-wasip2
 cargo install wasm-tools
 ```
 
-Every time we change the example skill we need to delete the `.wasm` file in the `./skills` folder, so it gets rebuild.
+Every time we update the `wit` worlds, we we need to clear the Skill build cache in `./skill_build_cache` which is used by the tests.
 
 ### Building and running the kernel container using Podman
 
