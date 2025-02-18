@@ -46,8 +46,16 @@ service:
   metricsProtocol: TCP
 serviceMonitor:
   enabled: false
-# -- If the default namespaces are enabled, the provided namespaces with existing keys are overwritten
-defaultNamespacesEnabled: false
+# -- Specify the default namespaces for Pharia Kernel, which provide the default skills.
+# If the default namespaces are configured, any duplicate namespaces in `pharia-kernel.namespaces` are ignored
+# because these are backed by environment variables, which have higher precedence.
+# For each default namespace, the following values need to be provided in the Pharia AI ConfigMap:
+# - NAMESPACES__<NAMESPACE>__CONFIG_URL: URL to the namespace configuration
+# - NAMESPACES__<NAMESPACE>__REGISTRY: Skill registry of the namespace
+# - NAMESPACES__<NAMESPACE>__BASE_REPOSITORY: Base repository of the namespace
+# The credentials for accessing the skill registries are retrieved from `registryUser` and `registryPassword` in
+# the Secret configured as `global.imagePullOpaqueSecretName`.
+defaultNamespaces: []
 # -- Active namespaces for Pharia Kernel. e.g.:
 # playground:
 #   configUrl: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
