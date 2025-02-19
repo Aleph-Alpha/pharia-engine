@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.4...v0.9.5)
+
+### Features
+
+- Put explain behind unstable flag in wit world - ([19f0521](https://github.com/Aleph-Alpha/pharia-kernel/commit/19f052143fa15a5b60e64fb0766c694adf752703))
+- Expose explanation via csi shell - ([f84c2dd](https://github.com/Aleph-Alpha/pharia-kernel/commit/f84c2dd8c78764a5054486ae57c9c58a62e545cd))
+- Expose explain in wit world - ([04237ff](https://github.com/Aleph-Alpha/pharia-kernel/commit/04237ffa7c612c0588523a6365afc4a8380a0593))
+
+### Fixes
+
+- Use try from to parse inference explain response - ([b709d13](https://github.com/Aleph-Alpha/pharia-kernel/commit/b709d135449d49143b11558b2ffdbfd1e640ecc6))
+
+
 ## [0.9.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.3...v0.9.4)
 
 ### Fixes
