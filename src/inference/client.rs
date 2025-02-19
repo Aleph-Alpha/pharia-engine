@@ -29,7 +29,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         request: &ChatRequest,
         api_token: String,
     ) -> impl Future<Output = Result<ChatResponse, InferenceClientError>> + Send;
-    fn explain_complete(
+    fn explain(
         &self,
         request: &ExplanationRequest,
         api_token: String,
@@ -37,7 +37,7 @@ pub trait InferenceClient: Send + Sync + 'static {
 }
 
 impl InferenceClient for Client {
-    async fn explain_complete(
+    async fn explain(
         &self,
         request: &ExplanationRequest,
         api_token: String,
@@ -376,7 +376,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn explain_complete() {
+    async fn explain() {
         // Given an inference client
         let api_token = api_token().to_owned();
         let host = inference_url().to_owned();
@@ -389,10 +389,9 @@ mod tests {
             model: "pharia-1-llm-7b-control".to_string(),
             granularity: Granularity::Auto,
         };
-        let explanation =
-            <Client as InferenceClient>::explain_complete(&client, &request, api_token)
-                .await
-                .unwrap();
+        let explanation = <Client as InferenceClient>::explain(&client, &request, api_token)
+            .await
+            .unwrap();
 
         // Then we explanation of five items
         assert_eq!(explanation.len(), 5);

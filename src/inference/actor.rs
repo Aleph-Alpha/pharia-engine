@@ -376,7 +376,7 @@ impl InferenceMessage {
                 send,
                 api_token,
             } => {
-                let result = client.explain_complete(&request, api_token.clone()).await;
+                let result = client.explain(&request, api_token.clone()).await;
                 drop(send.send(result.map_err(Into::into)));
             }
         }
@@ -464,7 +464,7 @@ pub mod tests {
     }
 
     impl InferenceClient for SaboteurClient {
-        async fn explain_complete(
+        async fn explain(
             &self,
             _request: &ExplanationRequest,
             _api_token: String,
@@ -540,7 +540,7 @@ pub mod tests {
     }
 
     impl InferenceClient for AssertConcurrentClient {
-        async fn explain_complete(
+        async fn explain(
             &self,
             _request: &ExplanationRequest,
             _api_token: String,
