@@ -59,7 +59,9 @@ impl InferenceClient for Client {
         };
         let result = retry(|| self.explanation(&task, model, &how)).await;
         match result {
-            Ok(explanation) => Ok(explanation.into()),
+            Ok(explanation) => Ok(explanation
+                .try_into()
+                .map_err(InferenceClientError::Other)?),
             Err(e) => Err(e.into()),
         }
     }
@@ -133,30 +135,32 @@ impl InferenceClient for Client {
     }
 }
 
-impl From<aleph_alpha_client::ExplanationOutput> for Explanation {
-    fn from(mut explanation_output: aleph_alpha_client::ExplanationOutput) -> Self {
-        let aleph_alpha_client::ItemExplanation::Text { scores: text } =
-            explanation_output.items.remove(0)
-        else {
-            unreachable!(
+impl TryFrom<aleph_alpha_client::ExplanationOutput> for Explanation {
+    type Error = anyhow::Error;
+
+    fn try_from(explanation_output: aleph_alpha_client::ExplanationOutput) -> anyhow::Result<Self> {
+        match explanation_output.items.first() {
+            Some(aleph_alpha_client::ItemExplanation::Text { scores: text }) => {
+                Ok(Explanation::new(text.iter().map(Into::into).collect()))
+            }
+            _ => Err(anyhow::anyhow!(
                 "We do not support multi-model prompts, so the first item will always be text."
-            )
-        };
-        Explanation::new(text.into_iter().map(Into::into).collect())
+            )),
+        }
     }
 }
 
-impl From<aleph_alpha_client::TextScore> for TextScore {
-    fn from(text_score: aleph_alpha_client::TextScore) -> Self {
+impl From<&aleph_alpha_client::TextScore> for TextScore {
+    fn from(text_score: &aleph_alpha_client::TextScore) -> Self {
         let aleph_alpha_client::TextScore {
             start,
             length,
             score,
         } = text_score;
         TextScore {
-            start,
-            length,
-            score: f64::from(score),
+            start: *start,
+            length: *length,
+            score: f64::from(*score),
         }
     }
 }
