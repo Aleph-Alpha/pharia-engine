@@ -10,13 +10,12 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
-use semver::VersionReq;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::csi_shell::v0_2::CsiRequest as V0_2CsiRequest;
 use crate::csi_shell::v0_3::CsiRequest as V0_3CsiRequest;
-use crate::{csi::Csi, shell::AppState, skills::SupportedVersion};
+use crate::{csi::Csi, shell::AppState};
 
 #[allow(clippy::too_many_lines)]
 pub async fn http_csi_handle<C>(
@@ -35,7 +34,6 @@ where
         VersionedCsiRequest::V0_3(request) => {
             request.act(&drivers, bearer.token().to_owned()).await
         }
-        VersionedCsiRequest::Unknown(request) => Err(request.into()),
     };
     match result {
         Ok(result) => (StatusCode::OK, Json(result)),
@@ -54,32 +52,18 @@ pub enum VersionedCsiRequest {
     V0_3(V0_3CsiRequest),
     #[serde(rename = "0.2")]
     V0_2(V0_2CsiRequest),
-    #[serde(untagged)]
-    Unknown(UnknownCsiRequest),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum CsiShellError {
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
-    #[error("The CSI function {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
-    UnknownFunction(String),
-    #[error("The specified CSI version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
-    NotSupported,
-    #[error("This CSI version is no longer supported by the Kernel. Try upgrading your SDK.")]
-    NoLongerSupported,
-    #[error("A valid CSI version is required. Try upgrading your SDK.")]
-    InvalidVersion,
 }
 
 impl CsiShellError {
     fn status_code(&self) -> StatusCode {
         match self {
             CsiShellError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            // We use `BAD_REQUEST` (400) for validation error as it is more commonly used.
-            // `UNPROCESSABLE_ENTITY` (422) is an alternative, but it may surprise users as it is less commonly
-            // known
-            _ => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -87,73 +71,5 @@ impl CsiShellError {
 impl From<CsiShellError> for (StatusCode, Json<Value>) {
     fn from(e: CsiShellError) -> Self {
         (e.status_code(), Json(json!(e.to_string())))
-    }
-}
-
-#[derive(Deserialize)]
-pub struct UnknownCsiRequest {
-    version: Option<String>,
-}
-
-impl From<UnknownCsiRequest> for CsiShellError {
-    fn from(e: UnknownCsiRequest) -> Self {
-        match e.version.map(|v| VersionReq::parse(&v)) {
-            Some(Ok(req)) if req.comparators.len() == 1 => {
-                let max_supported_version = SupportedVersion::latest_supported_version();
-                let comp = req.comparators.first().unwrap();
-                // Only applies to unknown versions. If we parse `1.x.x` as `1` then we are only doing a major version check and minor version only applies `0.x`
-                if comp.major > max_supported_version.major
-                    || (comp.major == max_supported_version.major
-                        && comp.minor.is_some_and(|m| m > max_supported_version.minor))
-                {
-                    CsiShellError::NotSupported
-                } else {
-                    CsiShellError::NoLongerSupported
-                }
-            }
-            // If the user passes in a random string, the parse will fail and we will end up down here
-            Some(Ok(_) | Err(_)) | None => CsiShellError::InvalidVersion,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn no_longer_supported_version() {
-        let request = UnknownCsiRequest {
-            version: Some("0.1.0".to_string()),
-        };
-        let error: CsiShellError = request.into();
-        assert!(matches!(error, CsiShellError::NoLongerSupported));
-    }
-
-    #[test]
-    fn not_supported_minor_version() {
-        let request = UnknownCsiRequest {
-            version: Some("0.9.0".to_string()),
-        };
-        let error: CsiShellError = request.into();
-        assert!(matches!(error, CsiShellError::NotSupported));
-    }
-
-    #[test]
-    fn not_supported_major_version() {
-        let request = UnknownCsiRequest {
-            version: Some("1.0.0".to_string()),
-        };
-        let error: CsiShellError = request.into();
-        assert!(matches!(error, CsiShellError::NotSupported));
-    }
-
-    #[test]
-    fn invalid_version() {
-        let request = UnknownCsiRequest {
-            version: Some("invalid".to_string()),
-        };
-        let error: CsiShellError = request.into();
-        assert!(matches!(error, CsiShellError::InvalidVersion));
     }
 }

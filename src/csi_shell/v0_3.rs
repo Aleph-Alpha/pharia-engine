@@ -39,10 +39,6 @@ pub enum CsiRequest {
     SelectLanguage {
         requests: Vec<SelectLanguageRequest>,
     },
-    #[serde(untagged)]
-    Unknown {
-        function: Option<String>,
-    },
 }
 
 impl CsiRequest {
@@ -97,11 +93,6 @@ impl CsiRequest {
                 .map(|r| {
                     CsiResponse::SelectLanguage(r.into_iter().map(|m| m.map(Into::into)).collect())
                 }),
-            CsiRequest::Unknown { function } => {
-                return Err(CsiShellError::UnknownFunction(
-                    function.unwrap_or_else(|| "specified".to_owned()),
-                ));
-            }
         }?;
         Ok(json!(response))
     }
@@ -1280,21 +1271,6 @@ mod tests {
 
         assert!(
             matches!(result, Ok(VersionedCsiRequest::V0_3(CsiRequest::DocumentMetadata { requests })) if requests.len() == 2)
-        );
-    }
-
-    #[test]
-    fn unknown_request() {
-        let request = json!({
-            "version": "0.3",
-            "function": "whatever",
-        });
-
-        let result: Result<VersionedCsiRequest, serde_json::Error> =
-            serde_json::from_value(request);
-
-        assert!(
-            matches!(result, Ok(VersionedCsiRequest::V0_3(CsiRequest::Unknown { function: Some(function) })) if function == "whatever")
         );
     }
 }

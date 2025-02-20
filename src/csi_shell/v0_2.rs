@@ -13,21 +13,11 @@ pub enum CsiRequest {
     Chat(ChatRequest),
     Chunk(ChunkRequest),
     Complete(CompletionRequest),
-    CompleteAll {
-        requests: Vec<CompletionRequest>,
-    },
-    Documents {
-        requests: Vec<DocumentPath>,
-    },
-    DocumentMetadata {
-        document_path: DocumentPath,
-    },
+    CompleteAll { requests: Vec<CompletionRequest> },
+    Documents { requests: Vec<DocumentPath> },
+    DocumentMetadata { document_path: DocumentPath },
     Search(SearchRequest),
     SelectLanguage(SelectLanguageRequest),
-    #[serde(untagged)]
-    Unknown {
-        function: Option<String>,
-    },
 }
 
 impl CsiRequest {
@@ -75,11 +65,6 @@ impl CsiRequest {
                         .transpose()
                         .map(CsiResponse::Language)
                 })?,
-            CsiRequest::Unknown { function } => {
-                return Err(CsiShellError::UnknownFunction(
-                    function.unwrap_or_else(|| "specified".to_owned()),
-                ));
-            }
         }?;
         Ok(json!(response))
     }
@@ -912,22 +897,6 @@ pub mod tests {
         assert!(matches!(
             result,
             Ok(VersionedCsiRequest::V0_2(CsiRequest::DocumentMetadata { document_path })) if document_path.namespace == "Kernel" && document_path.collection == "test" && document_path.name == "kernel/docs"
-        ));
-    }
-
-    #[test]
-    fn unknown_request() {
-        let request = json!({
-            "version": "0.2",
-            "function": "not-implemented"
-        });
-
-        let result: Result<VersionedCsiRequest, serde_json::Error> =
-            serde_json::from_value(request);
-
-        assert!(matches!(
-            result,
-            Ok(VersionedCsiRequest::V0_2(CsiRequest::Unknown { function: Some(function) })) if function == "not-implemented"
         ));
     }
 }
