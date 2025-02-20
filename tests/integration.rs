@@ -229,11 +229,11 @@ async fn run_stream_skill() {
     assert_eq!(events.len(), 2);
     assert_eq!(
         events[0],
-        "data: {\"content\":\"\",\"role\":\"assistant\"}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"\",\"role\":\"assistant\"}}]}\n\n",
     );
     assert_eq!(
         events[1],
-        "data: {\"content\":\"Keeps the doctor away\",\"role\":null}\n\n"
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Keeps the doctor away\",\"role\":null}}]}\n\n"
     );
     kernel.shutdown().await;
 }

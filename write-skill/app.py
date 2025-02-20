@@ -77,4 +77,6 @@ def my_skill(input: bytes) -> Generator[bytes, None, None]:
         logprobs=Logprobs_No(),
     )
     for delta in chat_stream(model, messages, params):
-        yield json.dumps({"role": delta.role, "content": delta.content}).encode()
+        yield json.dumps(
+            {"choices": [{"delta": {"role": delta.role, "content": delta.content}}]}
+        ).encode()

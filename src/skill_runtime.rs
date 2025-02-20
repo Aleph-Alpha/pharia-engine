@@ -752,11 +752,12 @@ pub mod tests {
                 assert_eq!(items.len(), 2);
                 assert_eq!(
                     items[0].as_ref().unwrap(),
-                    &json!({"role": "assistant", "content": ""})
+                    &json!({"choices": [{"delta": {"role": "assistant", "content": ""}}]})
                 );
                 assert_eq!(
                     items[1].as_ref().unwrap(),
-                    &json!({"role": null, "content": "Keeps the doctor away"})
+                    &json!({"choices": [{"delta": {"role": null, "content": "Keeps the doctor away"}}]}
+                    )
                 );
             }
             _ => panic!("Expected a stream"),
@@ -810,7 +811,10 @@ pub mod tests {
             Ok(SkillOutput::Stream(stream)) => {
                 let mut stream = stream.0;
                 let item = stream.next().await.unwrap().unwrap();
-                assert_eq!(item, json!({"role": "assistant", "content": ""}));
+                assert_eq!(
+                    item,
+                    json!({"choices": [{"delta": {"role": "assistant", "content": ""}}]})
+                );
                 drop(stream);
             }
             _ => panic!("Expected a stream"),
