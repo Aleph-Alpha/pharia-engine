@@ -21,7 +21,10 @@ use wasmtime::{
     component::{Component, InstancePre, Linker as WasmtimeLinker},
 };
 use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
-use wit_parser::decoding::{DecodedWasm, decode};
+use wit_parser::{
+    WorldItem,
+    decoding::{DecodedWasm, decode},
+};
 
 use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
 
@@ -106,6 +109,10 @@ pub enum SkillError {
     NotComponent,
     #[error("Wasm component isn't using Pharia Skill.")]
     NotPhariaSkill,
+    #[error("Wasm component must have exactly one world.")]
+    NotOneWorld,
+    #[error("Unknown skill world.")]
+    UnknownWorld,
 }
 
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
@@ -413,17 +420,35 @@ impl SupportedVersion {
                 .find(|k| (k.namespace == "pharia" && k.name == "skill"))
                 .ok_or_else(|| SkillError::NotPhariaSkill)?;
 
-            // This is very hacky, there surely is a way to extract the world from the component
-            // but iterating the worlds of the component only shows a `root` world.
-            let world = if resolve
+            // A resolved component should only contain one world
+            if resolve.worlds.len() != 1 {
+                return Err(SkillError::NotOneWorld);
+            }
+            let (_, world) = resolve.worlds.iter().next().unwrap();
+
+            let exported_interfaces = world
+                .exports
+                .values()
+                .filter_map(|e| match e {
+                    WorldItem::Interface { id, .. } => Some(id),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+
+            // We only got the IDs in the previous step, now another lookup to get the names
+            let exported_interface_names = resolve
                 .interfaces
                 .iter()
+                .filter(|(id, _)| exported_interfaces.contains(&id))
                 .filter_map(|(_, value)| value.name.clone())
-                .any(|name| name == "stream-skill-handler")
-            {
+                .collect::<Vec<_>>();
+
+            let world = if exported_interface_names.contains(&"stream-skill-handler".to_string()) {
                 World::StreamingSkill
-            } else {
+            } else if exported_interface_names.contains(&"skill-handler".to_string()) {
                 World::Skill
+            } else {
+                return Err(SkillError::UnknownWorld);
             };
 
             Ok((package_name.version.clone(), world))

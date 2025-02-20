@@ -9,36 +9,36 @@ world skill {
     export skill-handler;
 }
 
-@since(version = 0.3.1)
+@since(version = 0.3.4)
 world stream-skill {
-    @since(version = 0.3.1)
+    @since(version = 0.3.4)
     include csi;
 
     import response;
-    @since(version = 0.3.1)
+    @since(version = 0.3.4)
     export stream-skill-handler;
 }
 
-@since(version = 0.3.1)
+@since(version = 0.3.4)
 interface stream-skill-handler {
     /// The set of errors which may be raised by functions in this interface
-    @since(version = 0.3.1)
+    @since(version = 0.3.4)
     variant error {
         internal(string),
         invalid-input(string)
     }
 
-    @since(version = 0.3.1)
+    @since(version = 0.3.4)
     run: func(input: list<u8>) -> result<_,error>;
 
-    @since(version = 0.3.1)
+    @since(version = 0.3.4)
     record stream-skill-metadata {
         description: option<string>,
         input-schema: list<u8>,
         output-schema: list<u8>,
     }
 
-    @since(version = 0.3.1)
+    @since(version = 0.3.4)
     metadata: func() -> stream-skill-metadata;
 }
 
