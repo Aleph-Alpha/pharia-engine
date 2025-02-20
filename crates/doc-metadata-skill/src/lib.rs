@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest};
 use pharia::skill::csi::{document_metadata, DocumentPath};
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill", features: ["document-metadata"]});
+wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill" });
 
 struct Skill;
 

@@ -5,11 +5,7 @@ use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::inference::{explain, ExplanationRequest, Granularity, TextScore};
 use serde::{Deserialize, Serialize};
 
-wit_bindgen::generate!({
-    path: "../../wit/skill@0.3",
-    world: "skill",
-    features: ["explain"],
-});
+wit_bindgen::generate!({path: "../../wit/skill@0.3", world: "skill"});
 
 struct Skill;
 
