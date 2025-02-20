@@ -735,7 +735,7 @@ pub mod tests {
             .api()
             .skill_run(
                 skill_path,
-                json!({"content": "An apple a day", "role": "user"}),
+                json!({"messages": [{"content": "An apple a day", "role": "user"}]}),
                 "dummy token".to_owned(),
             )
             .await;
@@ -801,7 +801,7 @@ pub mod tests {
             .api()
             .skill_run(
                 skill_path,
-                json!({"content": "An apple a day", "role": "user"}),
+                json!({"messages": [{"content": "An apple a day", "role": "user"}]}),
                 "dummy token".to_owned(),
             )
             .await;

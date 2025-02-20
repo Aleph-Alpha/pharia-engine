@@ -210,7 +210,7 @@ async fn run_stream_skill() {
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
         .body(Body::from(
-            json!({"content":"An apple a day", "role":"user"}).to_string(),
+            json!({"messages": [{"content":"An apple a day", "role":"user"}]}).to_string(),
         ))
         .timeout(Duration::from_secs(30))
         .send()

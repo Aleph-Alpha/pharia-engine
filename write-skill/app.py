@@ -64,10 +64,11 @@ def my_skill(input: bytes) -> Generator[bytes, None, None]:
     about the `write` function.
     """
     data = json.loads(input)
-    content = data["content"]
-    role = data["role"]
     model = "pharia-1-llm-7b-control"
-    messages = [Message(role=role, content=content)]
+    messages = [
+        Message(role=message["role"], content=message["content"])
+        for message in data["messages"]
+    ]
     params = ChatParams(
         max_tokens=None,
         temperature=0.0,
