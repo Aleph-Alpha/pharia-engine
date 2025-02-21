@@ -469,7 +469,10 @@ where
             span.set_parent(context.clone());
         }
         match self.csi_apis.chunk(self.api_token.clone(), requests).await {
-            Ok(chunks) => chunks,
+            Ok(chunks) => chunks
+                .into_iter()
+                .map(|c| c.into_iter().map(|chunk| chunk.text).collect())
+                .collect(),
             Err(error) => self.send_error(error).await,
         }
     }
@@ -784,7 +787,17 @@ pub mod tests {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
         let mut csi = StubCsi::empty();
-        csi.set_chunking(|r| Ok(r.into_iter().map(|_| vec!["my_chunk".to_owned()]).collect()));
+        csi.set_chunking(|r| {
+            Ok(r.into_iter()
+                .map(|_| {
+                    vec![Chunk {
+                        text: "my_chunk".to_owned(),
+                        byte_offset: 0,
+                        character_offset: None,
+                    }]
+                })
+                .collect())
+        });
 
         let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), None);
 
@@ -1035,7 +1048,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<ChunkRequest>,
-        ) -> anyhow::Result<Vec<Vec<String>>> {
+        ) -> anyhow::Result<Vec<Vec<Chunk>>> {
             bail!("Test error")
         }
 

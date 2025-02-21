@@ -74,7 +74,7 @@ pub trait Csi {
         &self,
         auth: String,
         requests: Vec<ChunkRequest>,
-    ) -> anyhow::Result<Vec<Vec<String>>>;
+    ) -> anyhow::Result<Vec<Vec<Chunk>>>;
 
     // While the implementation might not be async, we want the interface to be asynchronous.
     // It is up to the implementer whether the actual implementation is async.
@@ -204,7 +204,7 @@ where
         &self,
         auth: String,
         requests: Vec<ChunkRequest>,
-    ) -> anyhow::Result<Vec<Vec<String>>> {
+    ) -> anyhow::Result<Vec<Vec<Chunk>>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chunk")])
             .increment(requests.len() as u64);
 
@@ -213,11 +213,7 @@ where
             let text_len = request.text.len();
             let max_tokens = request.params.max_tokens;
 
-            let chunks = chunking::chunking(request, &self.tokenizers, auth.clone())
-                .await?
-                .into_iter()
-                .map(|c| c.text)
-                .collect::<Vec<_>>();
+            let chunks = chunking::chunking(request, &self.tokenizers, auth.clone()).await?;
 
             trace!(
                 "chunk: text_len={} max_tokens={} -> chunks.len()={}",
@@ -502,7 +498,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<ChunkRequest>,
-        ) -> anyhow::Result<Vec<Vec<String>>> {
+        ) -> anyhow::Result<Vec<Vec<Chunk>>> {
             panic!("DummyCsi complete called");
         }
 
@@ -543,7 +539,7 @@ pub mod tests {
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
     type ChunkFn =
-        dyn Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<String>>> + Send + Sync + 'static;
+        dyn Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> + Send + Sync + 'static;
 
     type ExplainFn =
         dyn Fn(ExplanationRequest) -> anyhow::Result<Explanation> + Send + Sync + 'static;
@@ -566,7 +562,7 @@ pub mod tests {
 
         pub fn set_chunking(
             &mut self,
-            f: impl Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<String>>> + Send + Sync + 'static,
+            f: impl Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> + Send + Sync + 'static,
         ) {
             self.chunking = Arc::new(Box::new(f));
         }
@@ -619,7 +615,7 @@ pub mod tests {
             &self,
             _auth: String,
             requests: Vec<ChunkRequest>,
-        ) -> anyhow::Result<Vec<Vec<String>>> {
+        ) -> anyhow::Result<Vec<Vec<Chunk>>> {
             (*self.chunking)(requests)
         }
 
