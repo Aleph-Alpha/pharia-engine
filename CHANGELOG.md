@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.5...v0.9.6)
+
+### Features
+
+- Stabilize explain in wit world - ([c79d007](https://github.com/Aleph-Alpha/pharia-kernel/commit/c79d00726e227379d54b513aa78281c67fcc48b0))
+
+### Builds
+
+- *(deps)* Bump the wasmtime group with 16 updates - ([50cd082](https://github.com/Aleph-Alpha/pharia-kernel/commit/50cd082531f08f6204e45fa822fc467cda26337a))
+- *(deps)* Bump the minor group with 8 updates - ([3c166b5](https://github.com/Aleph-Alpha/pharia-kernel/commit/3c166b5b3caa6a3bd8dcb9d65575a8212268f98c))
+- *(deps)* Bump the minor group with 7 updates - ([fa8c199](https://github.com/Aleph-Alpha/pharia-kernel/commit/fa8c19903d9d3392a3e504554f564486135863e8))
+
+
 ## [0.9.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.4...v0.9.5)
 
 ### Features
