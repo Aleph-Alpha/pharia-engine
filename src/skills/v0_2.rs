@@ -83,7 +83,13 @@ impl Host for LinkedCtx {
             params: params.into(),
             character_offsets: false,
         };
-        self.skill_ctx.chunk(vec![request]).await.remove(0)
+        self.skill_ctx
+            .chunk(vec![request])
+            .await
+            .remove(0)
+            .into_iter()
+            .map(|chunk| chunk.text)
+            .collect()
     }
 
     async fn select_language(
