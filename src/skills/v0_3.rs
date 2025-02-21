@@ -1,6 +1,8 @@
 use exports::pharia::skill::skill_handler::SkillMetadata;
 use pharia::skill::{
-    chunking::{ChunkParams, ChunkRequest, Host as ChunkingHost},
+    chunking::{
+        ChunkParams, ChunkRequest, ChunkWithOffset, ChunkWithOffsetRequest, Host as ChunkingHost,
+    },
     document_index::{
         Document, DocumentPath, Host as DocumentIndexHost, IndexPath, MetadataFieldValue,
         MetadataFilter, MetadataFilterCondition, Modality, SearchFilter, SearchRequest,
@@ -27,6 +29,13 @@ impl ChunkingHost for LinkedCtx {
         self.skill_ctx
             .chunk(requests.into_iter().map(Into::into).collect())
             .await
+    }
+
+    async fn chunks_with_offsets(
+        &mut self,
+        request: Vec<ChunkWithOffsetRequest>,
+    ) -> Vec<Vec<ChunkWithOffset>> {
+        todo!()
     }
 }
 
