@@ -20,7 +20,7 @@ use wasmtime::{
     Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType, OptLevel,
     Store, UpdateDeadline,
 };
-use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
+use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::decoding::{decode, DecodedWasm};
 
 use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
@@ -463,12 +463,14 @@ impl LinkedCtx {
 }
 
 impl WasiView for LinkedCtx {
-    fn table(&mut self) -> &mut ResourceTable {
-        &mut self.resource_table
-    }
-
     fn ctx(&mut self) -> &mut WasiCtx {
         &mut self.wasi_ctx
+    }
+}
+
+impl IoView for LinkedCtx {
+    fn table(&mut self) -> &mut ResourceTable {
+        &mut self.resource_table
     }
 }
 
