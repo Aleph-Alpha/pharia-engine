@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tracing::trace;
 
 use crate::{
-    chunking::{self, ChunkRequest, ChunkWithOffset, ChunkWithOffsetRequest},
+    chunking::{self, Chunk, ChunkRequest},
     inference::{
         ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
         InferenceApi,
@@ -37,13 +37,6 @@ pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>>;
-    async fn chunks_with_offset(
-        &mut self,
-        requests: Vec<ChunkWithOffsetRequest>,
-    ) -> Vec<Vec<ChunkWithOffset>> {
-        todo!()
-    }
-
     async fn select_language(
         &mut self,
         requests: Vec<SelectLanguageRequest>,
@@ -220,7 +213,11 @@ where
             let text_len = request.text.len();
             let max_tokens = request.params.max_tokens;
 
-            let chunks = chunking::chunking(request, &self.tokenizers, auth.clone()).await?;
+            let chunks = chunking::chunking(request, &self.tokenizers, auth.clone())
+                .await?
+                .into_iter()
+                .map(|c| c.text)
+                .collect::<Vec<_>>();
 
             trace!(
                 "chunk: text_len={} max_tokens={} -> chunks.len()={}",
@@ -354,6 +351,7 @@ pub mod tests {
                 max_tokens,
                 overlap: 0,
             },
+            character_offsets: false,
         };
         let chunks = csi_apis
             .chunk("dummy_token".to_owned(), vec![request])

@@ -305,6 +305,7 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
         Self {
             text,
             params: params.into(),
+            character_offsets: false,
         }
     }
 }

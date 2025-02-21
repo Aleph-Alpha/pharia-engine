@@ -35,12 +35,13 @@ impl ChunkingHost for LinkedCtx {
         &mut self,
         request: Vec<ChunkWithOffsetRequest>,
     ) -> Vec<Vec<ChunkWithOffset>> {
-        self.skill_ctx
-            .chunks_with_offset(request.into_iter().map(Into::into).collect())
-            .await
-            .into_iter()
-            .map(|response| response.into_iter().map(Into::into).collect())
-            .collect()
+        // self.skill_ctx
+        //     .chunk(request.into_iter().map(Into::into).collect())
+        //     .await
+        //     .into_iter()
+        //     .map(|response| response.into_iter().map(Into::into).collect())
+        //     .collect()
+        todo!()
     }
 }
 
@@ -215,11 +216,12 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
         Self {
             text,
             params: params.into(),
+            character_offsets: false,
         }
     }
 }
 
-impl From<ChunkWithOffsetRequest> for chunking::ChunkWithOffsetRequest {
+impl From<ChunkWithOffsetRequest> for chunking::ChunkRequest {
     fn from(request: ChunkWithOffsetRequest) -> Self {
         let ChunkWithOffsetRequest {
             text,
@@ -234,9 +236,9 @@ impl From<ChunkWithOffsetRequest> for chunking::ChunkWithOffsetRequest {
     }
 }
 
-impl From<chunking::ChunkWithOffset> for ChunkWithOffset {
-    fn from(source: chunking::ChunkWithOffset) -> Self {
-        let chunking::ChunkWithOffset {
+impl From<chunking::Chunk> for ChunkWithOffset {
+    fn from(source: chunking::Chunk) -> Self {
+        let chunking::Chunk {
             text,
             byte_offset,
             character_offset,
@@ -658,6 +660,7 @@ mod tests {
                     max_tokens,
                     overlap,
                 },
+                character_offsets: false,
             }
         );
     }

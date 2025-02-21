@@ -81,6 +81,7 @@ impl Host for LinkedCtx {
         let request = chunking::ChunkRequest {
             text,
             params: params.into(),
+            character_offsets: false,
         };
         self.skill_ctx.chunk(vec![request]).await.remove(0)
     }
