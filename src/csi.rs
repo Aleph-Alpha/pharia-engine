@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tracing::trace;
 
 use crate::{
-    chunking::{self, ChunkRequest},
+    chunking::{self, ChunkRequest, ChunkWithOffset, ChunkWithOffsetRequest},
     inference::{
         ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
         InferenceApi,
@@ -37,6 +37,13 @@ pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>>;
+    async fn chunks_with_offset(
+        &mut self,
+        requests: Vec<ChunkWithOffsetRequest>,
+    ) -> Vec<Vec<ChunkWithOffset>> {
+        todo!()
+    }
+
     async fn select_language(
         &mut self,
         requests: Vec<SelectLanguageRequest>,
