@@ -35,7 +35,12 @@ impl ChunkingHost for LinkedCtx {
         &mut self,
         request: Vec<ChunkWithOffsetRequest>,
     ) -> Vec<Vec<ChunkWithOffset>> {
-        todo!()
+        self.skill_ctx
+            .chunks_with_offset(request.into_iter().map(Into::into).collect())
+            .await
+            .into_iter()
+            .map(|response| response.into_iter().map(Into::into).collect())
+            .collect()
     }
 }
 
@@ -210,6 +215,36 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
         Self {
             text,
             params: params.into(),
+        }
+    }
+}
+
+impl From<ChunkWithOffsetRequest> for chunking::ChunkWithOffsetRequest {
+    fn from(request: ChunkWithOffsetRequest) -> Self {
+        let ChunkWithOffsetRequest {
+            text,
+            params,
+            character_offsets,
+        } = request;
+        Self {
+            text,
+            params: params.into(),
+            character_offsets,
+        }
+    }
+}
+
+impl From<chunking::ChunkWithOffset> for ChunkWithOffset {
+    fn from(source: chunking::ChunkWithOffset) -> Self {
+        let chunking::ChunkWithOffset {
+            text,
+            byte_offset,
+            character_offset,
+        } = source;
+        Self {
+            text,
+            byte_offset,
+            character_offset,
         }
     }
 }

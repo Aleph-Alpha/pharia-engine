@@ -10,6 +10,20 @@ pub struct ChunkRequest {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub struct ChunkWithOffsetRequest {
+    pub text: String,
+    pub params: ChunkParams,
+    pub character_offsets: bool,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ChunkWithOffset {
+    pub text: String,
+    pub byte_offset: u64,
+    pub character_offset: Option<u64>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct ChunkParams {
     pub model: String,
     pub max_tokens: u32,
