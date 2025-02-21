@@ -20,7 +20,7 @@ use tracing::{span, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    chunking::ChunkRequest,
+    chunking::{Chunk, ChunkRequest},
     csi::{Csi, CsiForSkills},
     inference::{
         ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
@@ -798,6 +798,7 @@ pub mod tests {
                 max_tokens,
                 overlap: 0,
             },
+            character_offsets: false,
         };
         let chunks = invocation_ctx.chunk(vec![request]).await;
 
@@ -823,6 +824,7 @@ pub mod tests {
                 max_tokens,
                 overlap: 0,
             },
+            character_offsets: false,
         };
         let error = select! {
             error = recv => error.unwrap(),

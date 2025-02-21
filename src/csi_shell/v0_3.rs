@@ -666,6 +666,7 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
         chunking::ChunkRequest {
             text,
             params: params.into(),
+            character_offsets: false,
         }
     }
 }
