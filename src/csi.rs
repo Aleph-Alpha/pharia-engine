@@ -36,7 +36,7 @@ pub struct CsiDrivers<T> {
 pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
-    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>>;
+    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>>;
     async fn select_language(
         &mut self,
         requests: Vec<SelectLanguageRequest>,
@@ -685,11 +685,8 @@ pub mod tests {
                 .collect()
         }
 
-        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
-            requests
-                .into_iter()
-                .map(|request| vec![request.text])
-                .collect()
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            unimplemented!()
         }
 
         async fn select_language(
@@ -762,11 +759,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             requests.into_iter().map(Self::complete_text).collect()
         }
 
-        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
-            requests
-                .into_iter()
-                .map(|request| vec![request.text])
-                .collect()
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            unimplemented!()
         }
 
         async fn select_language(
@@ -853,11 +847,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 .collect()
         }
 
-        async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
-            requests
-                .into_iter()
-                .map(|request| vec![request.text])
-                .collect()
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            unimplemented!()
         }
 
         async fn select_language(

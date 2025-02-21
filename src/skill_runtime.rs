@@ -389,7 +389,7 @@ impl CsiForSkills for SkillMetadataCtx {
         self.send_error().await
     }
 
-    async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+    async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
         self.send_error().await
     }
 
@@ -463,16 +463,13 @@ where
         }
     }
 
-    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
+    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
         let span = span!(Level::DEBUG, "chunk", requests_len = requests.len());
         if let Some(context) = self.parent_context.as_ref() {
             span.set_parent(context.clone());
         }
         match self.csi_apis.chunk(self.api_token.clone(), requests).await {
-            Ok(chunks) => chunks
-                .into_iter()
-                .map(|c| c.into_iter().map(|chunk| chunk.text).collect())
-                .collect(),
+            Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
         }
     }
@@ -816,7 +813,14 @@ pub mod tests {
         let chunks = invocation_ctx.chunk(vec![request]).await;
 
         // Then a single chunk is returned
-        assert_eq!(chunks[0], vec!["my_chunk".to_owned()]);
+        assert_eq!(
+            chunks[0],
+            vec![Chunk {
+                text: "my_chunk".to_owned(),
+                byte_offset: 0,
+                character_offset: None,
+            }]
+        );
     }
 
     #[tokio::test]

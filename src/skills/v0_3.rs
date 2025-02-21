@@ -29,19 +29,21 @@ impl ChunkingHost for LinkedCtx {
         self.skill_ctx
             .chunk(requests.into_iter().map(Into::into).collect())
             .await
+            .into_iter()
+            .map(|response| response.into_iter().map(|chunk| chunk.text).collect())
+            .collect()
     }
 
     async fn chunks_with_offsets(
         &mut self,
-        request: Vec<ChunkWithOffsetRequest>,
+        requests: Vec<ChunkWithOffsetRequest>,
     ) -> Vec<Vec<ChunkWithOffset>> {
-        // self.skill_ctx
-        //     .chunk(request.into_iter().map(Into::into).collect())
-        //     .await
-        //     .into_iter()
-        //     .map(|response| response.into_iter().map(Into::into).collect())
-        //     .collect()
-        todo!()
+        self.skill_ctx
+            .chunk(requests.into_iter().map(Into::into).collect())
+            .await
+            .into_iter()
+            .map(|response| response.into_iter().map(Into::into).collect())
+            .collect()
     }
 }
 
