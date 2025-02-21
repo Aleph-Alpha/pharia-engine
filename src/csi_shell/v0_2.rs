@@ -43,7 +43,7 @@ impl CsiRequest {
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await
-                .map(|mut r| CsiResponse::Chunk(r.remove(0))),
+                .map(|mut r| CsiResponse::Chunk(r.remove(0).into_iter().map(|c| c.text).collect())),
             CsiRequest::Complete(completion_request) => drivers
                 .complete(auth, vec![completion_request.into()])
                 .await
