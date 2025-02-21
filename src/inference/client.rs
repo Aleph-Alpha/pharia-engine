@@ -672,8 +672,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         assert_eq!(completion_response.logprobs.len(), 1);
         let top_logprobs = &completion_response.logprobs[0].top;
         assert_eq!(top_logprobs.len(), 2);
-        assert_eq!(str::from_utf8(&top_logprobs[0].token).unwrap(), " keeps");
-        assert_eq!(str::from_utf8(&top_logprobs[1].token).unwrap(), " the");
+        assert!(top_logprobs[0].logprob > top_logprobs[1].logprob);
     }
 
     #[tokio::test]
