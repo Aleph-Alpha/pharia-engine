@@ -165,7 +165,7 @@ mod tests {
         // When we build the source from the environment variables
         let config = AppConfig::from_sources(file_source, env_source)?;
 
-        // Then the debug log level is only applied for Pharia Kernel
+        // Then the debug log level is only applied for PhariaKernel
         assert_eq!(config.log_level, "info,pharia_kernel=debug");
         Ok(())
     }

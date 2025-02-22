@@ -1,6 +1,6 @@
-# Pharia Kernel
+# PhariaKernel
 
-Pharia Kernel allows you to execute Cognitive Business Units called skills. These Skill can be written in any language which compiles to web assembly. Yet we provide a SDK and dedicated support for Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the cognitive system interface. This enables to deploy RAG usecases serverless. Writing skills for the kernel is more constrained then shipping an end to end use case in a custom docker container. Yet these constrains allow us to make opinionated decisions for the skill developer. We strive to take away only the decisions and responsibilities a skill developer may find "boring" (such as authentication, parallelization of inference calls). In more technical terms we aim to reduce the accidental complexity the skill developer has to engage with.
+PhariaKernel allows you to execute Cognitive Business Units called skills. These Skill can be written in any language which compiles to web assembly. Yet we provide a SDK and dedicated support for Python. The kernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the cognitive system interface. This enables to deploy RAG usecases serverless. Writing skills for the kernel is more constrained then shipping an end to end use case in a custom docker container. Yet these constrains allow us to make opinionated decisions for the skill developer. We strive to take away only the decisions and responsibilities a skill developer may find "boring" (such as authentication, parallelization of inference calls). In more technical terms we aim to reduce the accidental complexity the skill developer has to engage with.
 
 ## Contributing
 
@@ -52,7 +52,7 @@ If not configured it defaults to "0.0.0.0:8081", which is necessary in the conta
 
 #### MacOS
 
-Podman on MacOS requires a separate virtual machine run by the user. To compile Pharia Kernel, at least 4 GiB of RAM are needed and 8 GiB are recommended. You set this up with
+Podman on MacOS requires a separate virtual machine run by the user. To compile PhariaKernel, at least 4 GiB of RAM are needed and 8 GiB are recommended. You set this up with
 
 ```shell
 podman machine init
@@ -92,9 +92,9 @@ curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill \
 -d '"Homer"'
 ```
 
-## Deploying Pharia Kernel on Customer side
+## Deploying PhariaKernel on Customer side
 
-**Pharia Kernel** is intended to be installed **on premise** by the customer it. It is deployed, as are all other modules of the **Pharia OS**, to the JFrog Artifactory. Our colleagues at the Pharia OS Team are going to develop tooling for deploying tooling for rolling it out. Until they come up with a name it is here called "Pharia Up".
+**PhariaKernel** is intended to be installed **on premise** by the customer it. It is deployed, as are all other modules of the **PhariaOS**, to the JFrog Artifactory. Our colleagues at the PhariaOS Team are going to develop tooling for deploying tooling for rolling it out. Until they come up with a name it is here called "Pharia Up".
 
 ![Block Diagram Pharia OS deploy][deployment]
 

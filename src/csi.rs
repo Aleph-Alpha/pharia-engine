@@ -47,7 +47,7 @@ pub trait CsiForSkills {
     async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
 }
 
-/// Cognitive System Interface (CSI) as consumed internally by Pharia Kernel, before the CSI is
+/// Cognitive System Interface (CSI) as consumed internally by PhariaKernel, before the CSI is
 /// passed to the end user in Skill code we further strip away some of the accidental complexity.
 /// See its sibling trait `CsiForSkills`. These methods take `Vec`s rather than individual requests
 /// in order to allow for parallization behind the scenes.
