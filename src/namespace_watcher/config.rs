@@ -134,7 +134,7 @@ pub enum Registry {
 pub enum NamespaceConfig {
     /// Namespaces are our way to enable teams to deploy skills in self service via Git Ops. This
     /// implies that the skills in team owned namespaces are configured by a team rather than the
-    /// operators of Pharia Kernel, which in turn means we only refer the teams documentation here.
+    /// operators of `PhariaKernel`, which in turn means we only refer the teams documentation here.
     #[serde(rename_all = "kebab-case")]
     TeamOwned {
         config_url: String,

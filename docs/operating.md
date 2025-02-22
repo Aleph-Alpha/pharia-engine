@@ -1,10 +1,10 @@
-# Operating Pharia Kernel
+# Operating PhariaKernel
 
-This manual is for Operators running Pharia Kernel for their business or department. In case you are more interested in developing Skills or interfacing with Pharia Kernel in order to invoke deployed Skills you should consider the developer or user manual instead.
+This manual is for Operators running PhariaKernel for their business or department. In case you are more interested in developing Skills or interfacing with PhariaKernel in order to invoke deployed Skills you should consider the developer or user manual instead.
 
 ## How To Get The Image
 
-We deploy Pharia Kernel as a container image to JFrog. You can fetch them like this:
+We deploy PhariaKernel as a container image to JFrog. You can fetch them like this:
 
 ```shell
 podman login alephalpha.jfrog.io/pharia-kernel-images
@@ -22,7 +22,7 @@ podman run -p 8081:8081 pharia-kernel
 
 ## Deploying Skills
 
-Pharia Kernel wants to enable teams outside of the Pharia Kernel Operators to deploy Skills in self service. To achieve this, Skills are organized into namespaces. The Pharia Kernel Operators maintain the list of namespaces and associate each one with a configuration file, which in turn is owned by a team.
+PhariaKernel wants to enable teams outside of the PhariaKernel Operators to deploy Skills in self service. To achieve this, Skills are organized into namespaces. The PhariaKernel Operators maintain the list of namespaces and associate each one with a configuration file, which in turn is owned by a team.
 
 Each namespace configuration typically would reside in a Git repository owned by the Team which owns the namespace. Changes in this file will be automatically detected by the Kernel.
 
@@ -53,7 +53,7 @@ config-url = "file://namespace.toml"
 path = "skills"
 ```
 
-With the local configuration above, Pharia Kernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace `my-team`. This is mostly intended for local development of Skills without a remote instance of Pharia Kernel. To deploy Skills in production it is recommended to use a remote namespace.
+With the local configuration above, PhariaKernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace `my-team`. This is mostly intended for local development of Skills without a remote instance of PhariaKernel. To deploy Skills in production it is recommended to use a remote namespace.
 
 ### Namespace With Remote Config and Remote Registry
 
@@ -61,11 +61,11 @@ With the local configuration above, Pharia Kernel will serve any skill deployed 
 # `my-team` is the name of this namespace
 [namespaces.my-team]
 # The URL to the configuration listing the Skills of this namespace
-# Pharia kernel will use the contents of the `NAMESPACES__MY_TEAM__CONFIG_ACCESS_TOKEN` environment variable to access (authorize) the config
+# PhariaKernel will use the contents of the `NAMESPACES__MY_TEAM__CONFIG_ACCESS_TOKEN` environment variable to access (authorize) the config
 config-url = "https://github.com/Aleph-Alpha/my-team/blob/main/config.toml"
 
 # OCI Registry to load Skills from
-# Pharia kernel will use the contents of the `NAMESPACES__MY_TEAM__REGISTRY_USER` and `NAMESPACES__MY_TEAM__REGISTRY_PASSWORD` environment variables to access (authorize) the registry
+# PhariaKernel will use the contents of the `NAMESPACES__MY_TEAM__REGISTRY_USER` and `NAMESPACES__MY_TEAM__REGISTRY_PASSWORD` environment variables to access (authorize) the registry
 registry = "registry.acme.com"
 
 # This is the common prefix added to the skill name when composing the OCI repository.
@@ -73,11 +73,11 @@ registry = "registry.acme.com"
 base-repository = "my-org/my-team/skills"
 ```
 
-With the remote configuration above, Pharia Kernel will serve any skill deployed on the specified OCI registry under the namespace `my-team`.
+With the remote configuration above, PhariaKernel will serve any skill deployed on the specified OCI registry under the namespace `my-team`.
 
 ### Authentication Against OCI Registries
 
-You can provide each namespace in Pharia Kernel with credentials to authenticate against the specified OCI registry. Set the environment variables that are expected from the operator config:
+You can provide each namespace in PhariaKernel with credentials to authenticate against the specified OCI registry. Set the environment variables that are expected from the operator config:
 
 ```shell
 NAMESPACES__MY_TEAM__REGISTRY_USER=Joe.Plumber
@@ -102,7 +102,7 @@ LOG_LEVEL=info
 
 ## Observability
 
-Pharia Kernel can be configured to use an OpenTelemetry Collector endpoint by setting the `OTEL_ENDPOINT` environment variable.
+PhariaKernel can be configured to use an OpenTelemetry Collector endpoint by setting the `OTEL_ENDPOINT` environment variable.
 
 ```shell
 OTEL_ENDPOINT=http://127.0.0.1:4317
@@ -114,9 +114,9 @@ For local testing, a supported collector like the Jaeger [All in One](https://ww
 podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
-## Local Pharia Kernel Setup
+## Local PhariaKernel Setup
 
-### Get Pharia Kernel Image
+### Get PhariaKernel Image
 
 1. Access JFrog Artifactory via token:
 
@@ -124,7 +124,7 @@ podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
    - Click on 'Edit Profile'
    - Click on 'Generate an Identity Token'
 
-2. Pull Pharia Kernel image
+2. Pull PhariaKernel image
 
 ```shell
 # login in interactive mode
@@ -136,9 +136,9 @@ podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest
 podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest pharia-kernel
 ```
 
-### Start Pharia Kernel Container
+### Start PhariaKernel Container
 
-In order to run Pharia Kernel, you need to provide a namespace configuration:
+In order to run PhariaKernel, you need to provide a namespace configuration:
 
 1. Create a `skills` folder
 
@@ -150,7 +150,7 @@ In order to run Pharia Kernel, you need to provide a namespace configuration:
    ```
 
    All Skills in this folder are exposed in the namespace "dev" with the environment variable `NAMESPACES__DEV__DIRECTORY`.
-   Any changes in this folder will be picked up by the Pharia Kernel automatically. The `config.toml` and `namespace.toml` should not be provided.
+   Any changes in this folder will be picked up by the PhariaKernel automatically. The `config.toml` and `namespace.toml` should not be provided.
 
 2. Start the container:
 
@@ -168,7 +168,7 @@ In order to run Pharia Kernel, you need to provide a namespace configuration:
 
 ### Monitoring Local Skill Execution
 
-You can monitor your Skill by connecting the Pharia Kernel to an OpenTelemetry collector, e.g. Jaeger:
+You can monitor your Skill by connecting the PhariaKernel to an OpenTelemetry collector, e.g. Jaeger:
 
 ```shell
     podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
