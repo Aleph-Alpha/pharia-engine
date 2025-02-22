@@ -302,19 +302,19 @@ async fn serve_docs() -> Json<openapi::OpenApi> {
 
 #[derive(Deserialize, Serialize, ToSchema)]
 struct ExecuteSkillArgs {
-    /// The qualified name of the skill to invoke. The qualified name consists of a namespace and
-    /// a skill name (e.g. "acme/summarize").
+    /// The qualified name of the Skill to invoke. The qualified name consists of a namespace and
+    /// a Skill name (e.g. "acme/summarize").
     ///
     skill: String,
-    /// The expected input for the skill in JSON format. Examples:
+    /// The expected input for the Skill in JSON format. Examples:
     /// * "input": "Hello"
     /// * "input": {"text": "some text to be summarized", "length": "short"}
     input: Value,
 }
 
-/// skill_metadata
+/// Metadata
 ///
-/// Get the metadata for the skill.
+/// Get the metadata (input schema, output schema, description) for a Skill.
 #[utoipa::path(
     get,
     operation_id = "skill metadata",
@@ -364,9 +364,9 @@ async fn skill_metadata(
     }
 }
 
-/// run_skill
+/// Run
 ///
-/// Run a skill in the kernel from one of the available repositories.
+/// Run a Skill in the Kernel from one of the available repositories.
 #[utoipa::path(
     post,
     operation_id = "run skill",
@@ -406,9 +406,9 @@ async fn run_skill(
     }
 }
 
-/// skills
+/// List
 ///
-/// List of all configured skills.
+/// List of configured Skills.
 #[utoipa::path(
     get,
     operation_id = "skills",
@@ -427,9 +427,9 @@ async fn skills(State(skill_store_api): State<SkillStoreApi>) -> (StatusCode, Js
 
 /// cached_skills
 ///
-/// List of all cached skills. These are skills that are already compiled
+/// List of all cached Skills. These are Skills that are already compiled
 /// and are faster because they do not have to be transpiled to machine code.
-/// When executing a skill which is not loaded yet, it will be cached.
+/// When executing a Skill which is not loaded yet, it will be cached.
 #[utoipa::path(
     get,
     operation_id = "cached_skills",
@@ -450,10 +450,10 @@ async fn cached_skills(
 
 /// drop_cached_skill
 ///
-/// Remove a loaded skill from the runtime. With a first invocation, skills are loaded to
-/// the runtime. This leads to faster execution on the second invocation. If a skill is
+/// Remove a loaded Skill from the runtime. With a first invocation, Skills are loaded to
+/// the runtime. This leads to faster execution on the second invocation. If a Skill is
 /// updated in the repository, it needs to be removed from the cache so that the new version
-/// becomes available in the kernel.
+/// becomes available in the Kernel.
 #[utoipa::path(
     delete,
     operation_id = "drop_cached_skill",
@@ -481,9 +481,7 @@ async fn drop_cached_skill(
 
 /// WIT (WebAssembly Interface Types) of Skills
 ///
-/// Skills are web assembly components build against a wit world. This route returns this wit world.
-/// This allows you to build your own skill in many languages. We hope to provide higher level
-/// tooling for selected languages in the future though.
+/// Skills are WebAssembly components built against a WIT world. This route returns this WIT world.
 #[utoipa::path(
     get,
     operation_id = "get_skill_wit",
