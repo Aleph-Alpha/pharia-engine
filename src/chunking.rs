@@ -45,24 +45,31 @@ pub async fn chunking(
     // Push into the blocking thread pool because this can be expensive for long documents
     let (send, recv) = oneshot::channel();
     rayon::spawn(move || {
-        let result = ChunkConfig::new(max_tokens as usize)
-            .with_sizer(tokenizer.as_ref())
-            .with_overlap(overlap as usize)
-            .map(|config| {
-                TextSplitter::new(config)
-                    .chunks(&text)
-                    .map(|text| Chunk {
-                        text: text.to_owned(),
-                        byte_offset: 0,
-                        character_offset: None,
-                    })
-                    .collect()
-            });
-
+        let result = generate_chunks(&text, max_tokens, overlap, &tokenizer);
         drop(send.send(result));
     });
 
     Ok(recv.await??)
+}
+
+fn generate_chunks(
+    text: &str,
+    max_tokens: u32,
+    overlap: u32,
+    tokenizer: &tokenizers::Tokenizer,
+) -> Result<Vec<Chunk>, text_splitter::ChunkConfigError> {
+    let config = ChunkConfig::new(max_tokens as usize)
+        .with_sizer(tokenizer)
+        .with_overlap(overlap as usize)?;
+
+    Ok(TextSplitter::new(config)
+        .chunk_indices(text)
+        .map(|(byte_offset, text)| Chunk {
+            text: text.to_owned(),
+            byte_offset: byte_offset as u64,
+            character_offset: None,
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -128,17 +135,17 @@ mod tests {
                 },
                 Chunk {
                     text: "23".to_owned(),
-                    byte_offset: 0,
+                    byte_offset: 1,
                     character_offset: None
                 },
                 Chunk {
                     text: "34".to_owned(),
-                    byte_offset: 0,
+                    byte_offset: 2,
                     character_offset: None
                 },
                 Chunk {
                     text: "456".to_owned(),
-                    byte_offset: 0,
+                    byte_offset: 3,
                     character_offset: None
                 }
             ]
