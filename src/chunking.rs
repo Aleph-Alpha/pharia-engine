@@ -1,4 +1,4 @@
-use text_splitter::{ChunkConfig, TextSplitter};
+use text_splitter::{ChunkCharIndex, ChunkConfig, TextSplitter};
 use tokio::sync::oneshot;
 
 use crate::tokenizers::TokenizerApi;
@@ -37,7 +37,7 @@ pub async fn chunking(
                 max_tokens,
                 overlap,
             },
-        character_offsets: _,
+        character_offsets,
     } = request;
 
     let tokenizer = tokenizers.tokenizer_by_model(auth, model).await?;
@@ -45,7 +45,7 @@ pub async fn chunking(
     // Push into the blocking thread pool because this can be expensive for long documents
     let (send, recv) = oneshot::channel();
     rayon::spawn(move || {
-        let result = generate_chunks(&text, max_tokens, overlap, &tokenizer);
+        let result = generate_chunks(&text, max_tokens, overlap, character_offsets, &tokenizer);
         drop(send.send(result));
     });
 
@@ -56,20 +56,40 @@ fn generate_chunks(
     text: &str,
     max_tokens: u32,
     overlap: u32,
+    character_offsets: bool,
     tokenizer: &tokenizers::Tokenizer,
 ) -> Result<Vec<Chunk>, text_splitter::ChunkConfigError> {
     let config = ChunkConfig::new(max_tokens as usize)
         .with_sizer(tokenizer)
         .with_overlap(overlap as usize)?;
 
-    Ok(TextSplitter::new(config)
-        .chunk_indices(text)
-        .map(|(byte_offset, text)| Chunk {
-            text: text.to_owned(),
-            byte_offset: byte_offset as u64,
-            character_offset: None,
-        })
-        .collect())
+    let splitter = TextSplitter::new(config);
+    let result = if character_offsets {
+        splitter
+            .chunk_char_indices(text)
+            .map(
+                |ChunkCharIndex {
+                     chunk,
+                     byte_offset,
+                     char_offset,
+                 }| Chunk {
+                    text: chunk.to_owned(),
+                    byte_offset: byte_offset as u64,
+                    character_offset: Some(char_offset as u64),
+                },
+            )
+            .collect()
+    } else {
+        splitter
+            .chunk_indices(text)
+            .map(|(byte_offset, text)| Chunk {
+                text: text.to_owned(),
+                byte_offset: byte_offset as u64,
+                character_offset: None,
+            })
+            .collect()
+    };
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -148,6 +168,50 @@ mod tests {
                     byte_offset: 3,
                     character_offset: None
                 }
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn chunking_multi_byte_character() {
+        // Given some text containing multi-byte characters and a tokenizer
+        let request = ChunkRequest {
+            text: "Döner macht schöner ☝🏾! Remember that.".to_owned(),
+            params: ChunkParams {
+                model: "Pharia-1-LLM-7B-control".to_owned(),
+                max_tokens: 7,
+                overlap: 2,
+            },
+            character_offsets: true,
+        };
+
+        // When we chunk the text
+        let chunks = chunking(request, &FakeTokenizers, "dummy".to_owned())
+            .await
+            .unwrap();
+        assert_eq!(
+            chunks,
+            [
+                Chunk {
+                    text: "Döner macht".to_owned(),
+                    byte_offset: 0,
+                    character_offset: Some(0)
+                },
+                Chunk {
+                    text: "macht schöner".to_owned(),
+                    byte_offset: 7,
+                    character_offset: Some(6)
+                },
+                Chunk {
+                    text: "☝🏾".to_owned(),
+                    byte_offset: 22,
+                    character_offset: Some(20)
+                },
+                Chunk {
+                    text: "! Remember that.".to_owned(),
+                    byte_offset: 29,
+                    character_offset: Some(22)
+                },
             ]
         );
     }
