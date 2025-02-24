@@ -1,7 +1,7 @@
 use anyhow::Error;
 use tokio::signal;
 
-use pharia_kernel::{initialize_metrics, initialize_tracing, AppConfig, Kernel};
+use pharia_kernel::{AppConfig, Kernel, initialize_metrics, initialize_tracing};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {

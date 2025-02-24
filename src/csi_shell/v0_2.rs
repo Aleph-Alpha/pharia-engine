@@ -3,7 +3,7 @@
 /// See [v0_3.rs](v0_3.rs) for a more detailed explanation on the reasoning for introducing
 /// serializable/user-facing structs in here and for not serializing our "internal" representations.
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::{chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection, search};
 
@@ -600,20 +600,22 @@ pub mod tests {
     }
     #[test]
     fn search_response() {
-        let response = CsiResponse::Search(vec![search::SearchResult {
-            document_path: search::DocumentPath::new("Kernel", "test", "kernel-docs"),
-            content: "Hello".to_string(),
-            score: 0.5,
-            start: search::TextCursor {
-                item: 0,
-                position: 0,
-            },
-            end: search::TextCursor {
-                item: 0,
-                position: 5,
-            },
-        }
-        .into()]);
+        let response = CsiResponse::Search(vec![
+            search::SearchResult {
+                document_path: search::DocumentPath::new("Kernel", "test", "kernel-docs"),
+                content: "Hello".to_string(),
+                score: 0.5,
+                start: search::TextCursor {
+                    item: 0,
+                    position: 0,
+                },
+                end: search::TextCursor {
+                    item: 0,
+                    position: 5,
+                },
+            }
+            .into(),
+        ]);
 
         let serialized = serde_json::to_value(response).unwrap();
 
@@ -672,16 +674,18 @@ pub mod tests {
 
     #[test]
     fn complete_all_response() {
-        let response = CsiResponse::CompleteAll(vec![inference::Completion {
-            text: "Hello".to_string(),
-            finish_reason: inference::FinishReason::Stop,
-            logprobs: vec![],
-            usage: inference::TokenUsage {
-                prompt: 0,
-                completion: 0,
-            },
-        }
-        .into()]);
+        let response = CsiResponse::CompleteAll(vec![
+            inference::Completion {
+                text: "Hello".to_string(),
+                finish_reason: inference::FinishReason::Stop,
+                logprobs: vec![],
+                usage: inference::TokenUsage {
+                    prompt: 0,
+                    completion: 0,
+                },
+            }
+            .into(),
+        ]);
 
         let serialized = serde_json::to_value(response).unwrap();
 

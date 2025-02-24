@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest};
-use pharia::skill::csi::{chat, ChatParams, Message, Role};
+use pharia::skill::csi::{ChatParams, Message, Role, chat};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill" });

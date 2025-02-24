@@ -9,10 +9,10 @@ use utoipa::ToSchema;
 use crate::skill_loader::RegistryConfig;
 
 use super::{
+    NamespaceDescriptionLoader,
     namespace_description::{
         FileLoader, HttpLoader, NamespaceDescription, SkillDescription, WatchLoader,
     },
-    NamespaceDescriptionLoader,
 };
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Deref, derive_more::Display, ToSchema)]
@@ -29,7 +29,9 @@ impl Namespace {
         if Self::is_valid(&input) {
             Ok(Self(input))
         } else {
-            Err(anyhow!(format!("Invalid namespace `{input}`. Namespaces must be between 1 and 64 characters long and must follow the pattern `^[a-z0-9]+(-[a-z0-9]+)*$`")))
+            Err(anyhow!(format!(
+                "Invalid namespace `{input}`. Namespaces must be between 1 and 64 characters long and must follow the pattern `^[a-z0-9]+(-[a-z0-9]+)*$`"
+            )))
         }
     }
 

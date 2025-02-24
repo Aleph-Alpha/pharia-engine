@@ -16,12 +16,12 @@ use strum::{EnumIter, IntoEnumIterator};
 use tracing::info;
 use utoipa::ToSchema;
 use wasmtime::{
-    component::{Component, InstancePre, Linker as WasmtimeLinker},
     Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType, OptLevel,
     Store, UpdateDeadline,
+    component::{Component, InstancePre, Linker as WasmtimeLinker},
 };
 use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
-use wit_parser::decoding::{decode, DecodedWasm};
+use wit_parser::decoding::{DecodedWasm, decode};
 
 use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
 
@@ -96,7 +96,9 @@ pub enum SkillError {
     MissingVersion,
     #[error("Skill version {0} is no longer supported by the Kernel. Try upgrading your SDK.")]
     NoLongerSupported(Version),
-    #[error("Skill version {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
+    #[error(
+        "Skill version {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK."
+    )]
     NotSupportedYet(Version),
     #[error("Error decoding Wasm component: {0}")]
     WasmDecodeError(String),
@@ -508,7 +510,9 @@ fn pooling_allocator_is_supported() -> bool {
         config.wasm_memory64(true);
         config.memory_reservation(1 << BITS_TO_TEST);
         let Ok(engine) = WasmtimeEngine::new(&config) else {
-            info!("unable to create an engine to test the pooling allocator, disabling pooling allocation");
+            info!(
+                "unable to create an engine to test the pooling allocator, disabling pooling allocation"
+            );
             return false;
         };
         let mut store = Store::new(&engine, ());

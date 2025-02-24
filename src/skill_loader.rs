@@ -3,15 +3,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
-use tokio::task::{spawn_blocking, JoinHandle};
+use tokio::task::{JoinHandle, spawn_blocking};
 
 use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
 use crate::skills::{Engine, Skill, SkillError};
-use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
 use std::{future::Future, pin::Pin};
 
@@ -252,7 +252,7 @@ impl SkillLoaderActor {
 
 #[cfg(test)]
 pub mod tests {
-    use tokio::time::{sleep, timeout, Duration};
+    use tokio::time::{Duration, sleep, timeout};
 
     use crate::{
         namespace_watcher::Registry,

@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    future::{pending, Future},
+    future::{Future, pending},
     pin::Pin,
     sync::Arc,
     time::Instant,
@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 use opentelemetry::Context;
 use serde_json::Value;
 use tokio::{
@@ -16,7 +16,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{span, Level};
+use tracing::{Level, span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
@@ -565,7 +565,7 @@ pub mod tests {
         chunking::ChunkParams,
         csi::tests::{DummyCsi, StubCsi},
         inference::{
-            tests::AssertConcurrentClient, ChatRequest, ChatResponse, CompletionRequest, Inference,
+            ChatRequest, ChatResponse, CompletionRequest, Inference, tests::AssertConcurrentClient,
         },
         search::DocumentPath,
         skill_loader::{RegistryConfig, SkillLoader},

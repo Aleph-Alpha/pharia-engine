@@ -8,10 +8,10 @@ use axum::{
     response::{ErrorResponse, Response},
 };
 use axum_extra::{
-    headers::{self, authorization::Bearer},
     TypedHeader,
+    headers::{self, authorization::Bearer},
 };
-use futures::{channel::oneshot, stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 use tokio::{select, sync::mpsc, task::JoinHandle};

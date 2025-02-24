@@ -7,7 +7,7 @@ use derive_more::{From, Into};
 /// Imagine we introduce a new version (0.4) with breaking changes in the api (e.g. a new field in `CompletionParams`).
 /// If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::csi_shell::CsiShellError;
 use crate::{chunking, csi::Csi, inference, language_selection, search};
@@ -846,12 +846,14 @@ mod tests {
 
     #[test]
     fn explain_response() {
-        let response = CsiResponse::Explain(vec![vec![inference::TextScore {
-            start: 0,
-            length: 5,
-            score: 0.5,
-        }
-        .into()]]);
+        let response = CsiResponse::Explain(vec![vec![
+            inference::TextScore {
+                start: 0,
+                length: 5,
+                score: 0.5,
+            }
+            .into(),
+        ]]);
         let serialized = serde_json::to_value(response).unwrap();
         assert_eq!(
             serialized,
@@ -874,24 +876,26 @@ mod tests {
 
     #[test]
     fn search_result_response() {
-        let response = CsiResponse::SearchResult(vec![vec![search::SearchResult {
-            document_path: search::DocumentPath {
-                namespace: "Kernel".to_string(),
-                collection: "test".to_string(),
-                name: "kernel-docs".to_string(),
-            },
-            content: "Hello".to_string(),
-            score: 0.5,
-            start: search::TextCursor {
-                item: 0,
-                position: 0,
-            },
-            end: search::TextCursor {
-                item: 0,
-                position: 0,
-            },
-        }
-        .into()]]);
+        let response = CsiResponse::SearchResult(vec![vec![
+            search::SearchResult {
+                document_path: search::DocumentPath {
+                    namespace: "Kernel".to_string(),
+                    collection: "test".to_string(),
+                    name: "kernel-docs".to_string(),
+                },
+                content: "Hello".to_string(),
+                score: 0.5,
+                start: search::TextCursor {
+                    item: 0,
+                    position: 0,
+                },
+                end: search::TextCursor {
+                    item: 0,
+                    position: 0,
+                },
+            }
+            .into(),
+        ]]);
 
         let serialized = serde_json::to_value(response).unwrap();
 
@@ -919,18 +923,20 @@ mod tests {
 
     #[test]
     fn document_response() {
-        let response = CsiResponse::Documents(vec![search::Document {
-            path: search::DocumentPath {
-                namespace: "Kernel".to_string(),
-                collection: "test".to_string(),
-                name: "kernel-docs".to_string(),
-            },
-            contents: vec![search::Modality::Text {
-                text: "Hello".to_string(),
-            }],
-            metadata: Some(json!({ "created": "1970-07-01T14:10:11Z" })),
-        }
-        .into()]);
+        let response = CsiResponse::Documents(vec![
+            search::Document {
+                path: search::DocumentPath {
+                    namespace: "Kernel".to_string(),
+                    collection: "test".to_string(),
+                    name: "kernel-docs".to_string(),
+                },
+                contents: vec![search::Modality::Text {
+                    text: "Hello".to_string(),
+                }],
+                metadata: Some(json!({ "created": "1970-07-01T14:10:11Z" })),
+            }
+            .into(),
+        ]);
 
         let serialized = serde_json::to_value(response).unwrap();
 
@@ -957,22 +963,24 @@ mod tests {
 
     #[test]
     fn complete_response() {
-        let response = CsiResponse::Complete(vec![inference::Completion {
-            text: "Hello".to_string(),
-            finish_reason: inference::FinishReason::Stop,
-            logprobs: vec![inference::Distribution {
-                sampled: inference::Logprob {
-                    token: vec![],
-                    logprob: 0.0,
+        let response = CsiResponse::Complete(vec![
+            inference::Completion {
+                text: "Hello".to_string(),
+                finish_reason: inference::FinishReason::Stop,
+                logprobs: vec![inference::Distribution {
+                    sampled: inference::Logprob {
+                        token: vec![],
+                        logprob: 0.0,
+                    },
+                    top: vec![],
+                }],
+                usage: inference::TokenUsage {
+                    prompt: 0,
+                    completion: 0,
                 },
-                top: vec![],
-            }],
-            usage: inference::TokenUsage {
-                prompt: 0,
-                completion: 0,
-            },
-        }
-        .into()]);
+            }
+            .into(),
+        ]);
 
         let serialized = serde_json::to_value(response).unwrap();
 
@@ -999,25 +1007,27 @@ mod tests {
     }
     #[test]
     fn chat_response() {
-        let response = CsiResponse::Chat(vec![inference::ChatResponse {
-            message: inference::Message {
-                role: "user".to_string(),
-                content: "Hello".to_string(),
-            },
-            finish_reason: inference::FinishReason::Stop,
-            logprobs: vec![inference::Distribution {
-                sampled: inference::Logprob {
-                    token: vec![],
-                    logprob: 0.0,
+        let response = CsiResponse::Chat(vec![
+            inference::ChatResponse {
+                message: inference::Message {
+                    role: "user".to_string(),
+                    content: "Hello".to_string(),
                 },
-                top: vec![],
-            }],
-            usage: inference::TokenUsage {
-                prompt: 0,
-                completion: 0,
-            },
-        }
-        .into()]);
+                finish_reason: inference::FinishReason::Stop,
+                logprobs: vec![inference::Distribution {
+                    sampled: inference::Logprob {
+                        token: vec![],
+                        logprob: 0.0,
+                    },
+                    top: vec![],
+                }],
+                usage: inference::TokenUsage {
+                    prompt: 0,
+                    completion: 0,
+                },
+            }
+            .into(),
+        ]);
 
         let serialized = serde_json::to_value(response).unwrap();
 

@@ -1,5 +1,9 @@
 [workspace]
 members = ["crates/*", "resource_eval/sample_rs", "test-skills"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
 
 [workspace.lints.rust]
 future-incompatible = "warn"
@@ -32,7 +36,7 @@ module-name-repetitions = "allow"
 [package]
 name = "pharia-kernel"
 version = "0.9.6"
-edition = "2021"
+edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]

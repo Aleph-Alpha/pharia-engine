@@ -1,7 +1,7 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use async_trait::async_trait;
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 use serde_json::value::Value;
 use tokio::{
     select,
@@ -478,11 +478,13 @@ pub mod tests {
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
-        assert!(results[0]
-            .document_path
-            .name
-            .to_lowercase()
-            .contains("kernel"));
+        assert!(
+            results[0]
+                .document_path
+                .name
+                .to_lowercase()
+                .contains("kernel")
+        );
         assert!(results[0].content.contains("Kernel"));
     }
 

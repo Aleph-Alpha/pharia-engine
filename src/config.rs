@@ -259,10 +259,12 @@ mod tests {
         let error = AppConfig::from_sources(file_source, env_source).unwrap_err();
 
         // Then we receive an error
-        assert!(error
-            .to_string()
-            .to_lowercase()
-            .contains("invalid namespace"));
+        assert!(
+            error
+                .to_string()
+                .to_lowercase()
+                .contains("invalid namespace")
+        );
         Ok(())
     }
 
@@ -284,10 +286,12 @@ mod tests {
         let error = AppConfig::from_sources(file_source, env_source).unwrap_err();
 
         // Then we receive an error
-        assert!(error
-            .to_string()
-            .to_lowercase()
-            .contains("invalid namespace"));
+        assert!(
+            error
+                .to_string()
+                .to_lowercase()
+                .contains("invalid namespace")
+        );
         Ok(())
     }
 

@@ -2,19 +2,19 @@ use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
 
 use anyhow::Context;
 use axum::{
+    Json, Router,
     extract::{FromRef, MatchedPath, Path, Request, State},
-    http::{header::AUTHORIZATION, StatusCode},
+    http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
     response::{Html, IntoResponse},
     routing::{delete, get, post},
-    Json, Router,
 };
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
     TypedHeader,
+    headers::{Authorization, authorization::Bearer},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -24,18 +24,18 @@ use tower_http::{
     sensitive_headers::SetSensitiveRequestHeadersLayer,
     trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
-use tracing::{error, info, info_span, Level};
+use tracing::{Level, error, info, info_span};
 use utoipa::{
+    Modify, OpenApi, ToSchema,
     openapi::{
         self,
         security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
     },
-    Modify, OpenApi, ToSchema,
 };
 use utoipa_scalar::Scalar;
 
 use crate::{
-    authorization::{authorization_middleware, AuthorizationApi},
+    authorization::{AuthorizationApi, authorization_middleware},
     csi::Csi,
     csi_shell::http_csi_handle,
     namespace_watcher::Namespace,
@@ -507,8 +507,8 @@ mod tests {
             SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg,
         },
         skill_store::{
-            tests::{dummy_skill_store_api, SkillStoreMessage},
             SkillStoreError,
+            tests::{SkillStoreMessage, dummy_skill_store_api},
         },
         skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
@@ -518,7 +518,7 @@ mod tests {
 
     use axum::{
         body::Body,
-        http::{self, header, Request},
+        http::{self, Request, header},
     };
     use http_body_util::BodyExt;
     use serde_json::json;

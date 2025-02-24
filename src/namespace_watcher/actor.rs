@@ -8,8 +8,8 @@ use tracing::error;
 use crate::{skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::SkillPath};
 
 use super::{
-    namespace_description::{NamespaceDescriptionError, SkillDescription},
     Namespace, NamespaceConfigs, NamespaceDescriptionLoader,
+    namespace_description::{NamespaceDescriptionError, SkillDescription},
 };
 
 #[async_trait]
@@ -272,7 +272,7 @@ pub mod tests {
 
     use futures::executor::block_on;
     use tempfile::tempdir;
-    use tokio::sync::{mpsc, Mutex};
+    use tokio::sync::{Mutex, mpsc};
     use tokio::time::timeout;
 
     use crate::{
@@ -458,9 +458,11 @@ pub mod tests {
         assert_eq!(namespaces.len(), 1);
         let skills = loaders.skills(&namespaces[0]).await.unwrap();
         assert_eq!(skills.len(), 2);
-        assert!(skills
-            .iter()
-            .all(|s| s.name == "skill_1" || s.name == "skill_2"));
+        assert!(
+            skills
+                .iter()
+                .all(|s| s.name == "skill_1" || s.name == "skill_2")
+        );
     }
 
     #[tokio::test]

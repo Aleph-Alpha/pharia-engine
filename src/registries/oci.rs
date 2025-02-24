@@ -1,8 +1,8 @@
 use oci_client::{
+    Client, Reference,
     client::ClientConfig,
     errors::{OciDistributionError, OciErrorCode},
     secrets::RegistryAuth,
-    Client, Reference,
 };
 use oci_wasm::WasmClient;
 use tracing::{error, warn};
@@ -143,10 +143,10 @@ mod tests {
     use std::env;
 
     use dotenvy::dotenv;
-    use oci_client::{secrets::RegistryAuth, Reference};
+    use oci_client::{Reference, secrets::RegistryAuth};
     use oci_wasm::WasmConfig;
     use test_skills::given_greet_skill_v0_2;
-    use wasmtime::{component::Component, Config, Engine};
+    use wasmtime::{Config, Engine, component::Component};
 
     use super::OciRegistry;
 

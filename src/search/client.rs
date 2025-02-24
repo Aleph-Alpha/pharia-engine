@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::http::HttpClient;
 
@@ -443,11 +443,13 @@ pub mod tests {
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
-        assert!(results[0]
-            .document_path
-            .name
-            .to_lowercase()
-            .contains("kernel"));
+        assert!(
+            results[0]
+                .document_path
+                .name
+                .to_lowercase()
+                .contains("kernel")
+        );
         let Modality::Text { text } = &results[0].section[0] else {
             panic!("invalid entry");
         };
