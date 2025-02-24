@@ -8,6 +8,36 @@ import weakref
 from ..types import Result, Ok, Err, Some
 
 
+@dataclass
+class TextScore:
+    """
+    A score for a text segment.
+    """
+    start: int
+    length: int
+    score: float
+
+class Granularity(Enum):
+    """
+    At which granularity should the target be explained in terms of the prompt.
+    If you choose, for example, [`granularity.sentence`] then we report the importance score of each
+    sentence in the prompt towards generating the target output.
+    The default is [`granularity.auto`] which means we will try to find the granularity that
+    brings you closest to around 30 explanations. For large prompts, this would likely
+    be sentences. For short prompts this might be individual words or even tokens.
+    """
+    AUTO = 0
+    WORD = 1
+    SENTENCE = 2
+    PARAGRAPH = 3
+
+@dataclass
+class ExplanationRequest:
+    prompt: str
+    target: str
+    model: str
+    granularity: Granularity
+
 class FinishReason(Enum):
     """
     The reason the model finished generating
@@ -116,6 +146,35 @@ class ChatRequest:
     messages: List[Message]
     params: ChatParams
 
+@dataclass
+class MessageDelta:
+    role: Optional[str]
+    content: str
+
+class ChatStreamRequest:
+    
+    def __init__(self, request: ChatRequest) -> None:
+        raise NotImplementedError
+
+    def next(self) -> Optional[MessageDelta]:
+        raise NotImplementedError
+    def __enter__(self) -> Self:
+        """Returns self"""
+        return self
+                                
+    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> bool | None:
+        """
+        Release this resource.
+        """
+        raise NotImplementedError
+
+
+
+def explain(request: List[ExplanationRequest]) -> List[List[TextScore]]:
+    """
+    Better understand the source of a completion, specifically on how much each section of a prompt impacts each token of the completion.
+    """
+    raise NotImplementedError
 
 def complete(requests: List[CompletionRequest]) -> List[Completion]:
     raise NotImplementedError

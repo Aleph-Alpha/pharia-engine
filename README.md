@@ -86,7 +86,7 @@ run a skill:
 
 ```shell
 set -a; source .env
-curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill \
+curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill/run \
 -H "Authorization: Bearer $PHARIA_AI_TOKEN" \
 -H 'Content-Type: application/json' \
 -d '"Homer"'
@@ -107,3 +107,12 @@ The status page for uptime robot is found at: <https://stats.uptimerobot.com/gjX
 The secrets for the deployment can be added to the [Vault](https://vault.management-prod01.stackit.run/ui/vault/secrets/c-aa01/list/projects/pharia-kernel/)
 
 [deployment]: ./tam/deployment.drawio.svg
+
+## Adding Python Bindings After Updating the WIT World
+
+For testing, we have multiple Python skills with bindings to the WIT world.
+If you have updated the WIT world and want to create new bindings run the following command (assuming you are in the folder of the skill):
+
+```sh
+componentize-py --all-features -d ../wit/skill@0.3/skill.wit -w skill bindings --world-module skill .
+```

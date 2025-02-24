@@ -32,14 +32,9 @@ def stream_skill_decorator(func):
     """
 
     class StreamSkillHandler(stream_skill.exports.StreamSkillHandler):
-        def run(self, input: bytes) -> bytes:
+        def run(self, input: bytes):
             for delta in func(input):
                 write(delta)
-
-            # For now skills still need to return a value.
-            # This requirement might go once we introduce a separate
-            # stream skill type in the wit world.
-            return b'""'
 
         def metadata(self) -> StreamSkillMetadata:
             return StreamSkillMetadata(
