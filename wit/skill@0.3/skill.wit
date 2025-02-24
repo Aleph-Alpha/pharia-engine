@@ -83,7 +83,7 @@ interface chunking {
     }
 
     @unstable(feature = chunk-offsets)
-    chunks-with-offsets: func(request: list<chunk-with-offset-request>) -> list<list<chunk-with-offset>>;
+    chunk-with-offsets: func(request: list<chunk-with-offset-request>) -> list<list<chunk-with-offset>>;
 }
 
 @since(version = 0.3.0)
