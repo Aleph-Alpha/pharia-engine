@@ -76,8 +76,8 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.3.0" }
-wasmtime = "30.0.0"
-wasmtime-wasi = "30.0.0"
+wasmtime = "30.0.1"
+wasmtime-wasi = "30.0.1"
 wit-parser = "0.226.0"
 url = "2.5.4"
 thiserror = "2.0.11"
