@@ -24,6 +24,9 @@ pub enum CsiRequest {
     Chunk {
         requests: Vec<ChunkRequest>,
     },
+    ChunkWithOffsets {
+        requests: Vec<ChunkWithOffsetRequest>,
+    },
     Complete {
         requests: Vec<CompletionRequest>,
     },
@@ -75,6 +78,16 @@ impl CsiRequest {
                             .collect(),
                     )
                 }),
+            CsiRequest::ChunkWithOffsets { requests } => drivers
+                .chunk(auth, requests.into_iter().map(Into::into).collect())
+                .await
+                .map(|c| {
+                    CsiResponse::ChunkWithOffsets(
+                        c.into_iter()
+                            .map(|c| c.into_iter().map(Into::into).collect())
+                            .collect(),
+                    )
+                }),
             CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -120,6 +133,7 @@ enum CsiResponse {
     Chat(Vec<ChatResponse>),
     Complete(Vec<Completion>),
     Chunk(Vec<Vec<String>>),
+    ChunkWithOffsets(Vec<Vec<ChunkWithOffset>>),
     Documents(Vec<Document>),
     DocumentMetadata(Vec<Option<Value>>),
     SearchResult(Vec<Vec<SearchResult>>),
@@ -677,6 +691,50 @@ impl From<ChunkRequest> for chunking::ChunkRequest {
     }
 }
 
+#[derive(Deserialize)]
+pub struct ChunkWithOffsetRequest {
+    pub text: String,
+    pub params: ChunkParams,
+    pub character_offsets: bool,
+}
+
+impl From<ChunkWithOffsetRequest> for chunking::ChunkRequest {
+    fn from(value: ChunkWithOffsetRequest) -> Self {
+        let ChunkWithOffsetRequest {
+            text,
+            params,
+            character_offsets,
+        } = value;
+        chunking::ChunkRequest {
+            text,
+            params: params.into(),
+            character_offsets,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ChunkWithOffset {
+    text: String,
+    byte_offset: u64,
+    character_offset: Option<u64>,
+}
+
+impl From<chunking::Chunk> for ChunkWithOffset {
+    fn from(value: chunking::Chunk) -> Self {
+        let chunking::Chunk {
+            text,
+            byte_offset,
+            character_offset,
+        } = value;
+        ChunkWithOffset {
+            text,
+            byte_offset,
+            character_offset,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, From, Into)]
 #[serde(transparent)]
 pub struct Language(String);
@@ -1088,6 +1146,75 @@ mod tests {
             result,
             Ok(VersionedCsiRequest::V0_3(CsiRequest::Chunk { requests })) if requests.len() == 2
         ));
+    }
+
+    #[test]
+    fn chunk_with_offset_request() {
+        let request = json!({
+            "version": "0.3",
+            "function": "chunk_with_offsets",
+            "requests": [
+                {
+                    "text": "Hello",
+                    "params": {
+                        "model": "pharia-1-llm-7b-control",
+                        "max_tokens": 128,
+                        "overlap": 10
+                    },
+                    "character_offsets": true
+                },
+                {
+                    "text": "Hello",
+                    "params": {
+                        "model": "pharia-1-llm-7b-control",
+                        "max_tokens": 128,
+                        "overlap": 10
+                    },
+                    "character_offsets": false
+                }
+            ]
+        });
+
+        let result: Result<VersionedCsiRequest, serde_json::Error> =
+            serde_json::from_value(request);
+
+        assert!(matches!(
+            result,
+            Ok(VersionedCsiRequest::V0_3(CsiRequest::ChunkWithOffsets { requests })) if requests.len() == 2
+        ));
+    }
+
+    #[test]
+    fn chunk_with_offset_response() {
+        let response = CsiResponse::ChunkWithOffsets(vec![vec![
+            chunking::Chunk {
+                text: "Hello".to_string(),
+                byte_offset: 0,
+                character_offset: Some(10),
+            }
+            .into(),
+            chunking::Chunk {
+                text: "Hello".to_string(),
+                byte_offset: 5,
+                character_offset: None,
+            }
+            .into(),
+        ]]);
+
+        let serialized = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!([[{
+                "text": "Hello",
+                "byte_offset": 0,
+                "character_offset": 10
+            },{
+                "text": "Hello",
+                "byte_offset": 5,
+                "character_offset": None::<u64>
+            }]])
+        );
     }
 
     #[test]
