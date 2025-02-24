@@ -34,7 +34,7 @@ impl ChunkingHost for LinkedCtx {
             .collect()
     }
 
-    async fn chunks_with_offsets(
+    async fn chunk_with_offsets(
         &mut self,
         requests: Vec<ChunkWithOffsetRequest>,
     ) -> Vec<Vec<ChunkWithOffset>> {
