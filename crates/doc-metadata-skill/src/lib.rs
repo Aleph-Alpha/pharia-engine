@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest};
-use pharia::skill::csi::{document_metadata, DocumentPath};
+use pharia::skill::csi::{DocumentPath, document_metadata};
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill" });
 

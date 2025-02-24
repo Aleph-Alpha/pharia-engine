@@ -10,9 +10,9 @@ use std::{
 use axum::http;
 use dotenvy::dotenv;
 use pharia_kernel::{AppConfig, Kernel, NamespaceConfigs};
-use reqwest::{header, Body};
-use serde_json::{json, Value};
-use tempfile::{tempdir, TempDir};
+use reqwest::{Body, header};
+use serde_json::{Value, json};
+use tempfile::{TempDir, tempdir};
 use test_skills::{given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill};
 use tokio::sync::oneshot;
 
@@ -302,10 +302,12 @@ async fn chat_v0_2_via_remote_csi() {
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.bytes().await.unwrap();
     let completion = serde_json::from_slice::<Value>(&body).unwrap();
-    assert!(completion["message"]["role"]
-        .as_str()
-        .unwrap()
-        .contains("assistant"));
+    assert!(
+        completion["message"]["role"]
+            .as_str()
+            .unwrap()
+            .contains("assistant")
+    );
     assert!(matches!(
         completion["finish_reason"].as_str().unwrap(),
         "stop"
@@ -521,10 +523,12 @@ async fn metadata_via_remote_csi() {
         .unwrap();
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body: Value = resp.json().await.unwrap();
-    assert!(body["url"]
-        .as_str()
-        .unwrap()
-        .starts_with("https://pharia-kernel"));
+    assert!(
+        body["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("https://pharia-kernel")
+    );
 
     kernel.shutdown().await;
 }

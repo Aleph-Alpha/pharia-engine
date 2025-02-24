@@ -10,7 +10,7 @@ use crate::{
         ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
         InferenceApi,
     },
-    language_selection::{select_language, Language, SelectLanguageRequest},
+    language_selection::{Language, SelectLanguageRequest, select_language},
     search::{
         Document, DocumentIndexMessage, DocumentPath, SearchApi, SearchRequest, SearchResult,
     },
@@ -139,8 +139,7 @@ where
         try_join_all(requests.into_iter().map(|r| {
             trace!(
                 "explain: request.model={} request.granularity={}",
-                r.model,
-                r.granularity,
+                r.model, r.granularity,
             );
             self.inference.explain(r, auth.clone())
         }))
@@ -298,10 +297,10 @@ pub mod tests {
     use crate::{
         chunking::ChunkParams,
         inference::{
-            tests::InferenceStub, ChatParams, CompletionParams, FinishReason, Message, TextScore,
-            TokenUsage,
+            ChatParams, CompletionParams, FinishReason, Message, TextScore, TokenUsage,
+            tests::InferenceStub,
         },
-        search::{tests::SearchStub, TextCursor},
+        search::{TextCursor, tests::SearchStub},
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
     };

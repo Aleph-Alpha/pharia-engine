@@ -5,14 +5,14 @@
 mod v0_2;
 mod v0_3;
 
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
     TypedHeader,
+    headers::{Authorization, authorization::Bearer},
 };
 use semver::VersionReq;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::csi_shell::v0_2::CsiRequest as V0_2CsiRequest;
 use crate::csi_shell::v0_3::CsiRequest as V0_3CsiRequest;
@@ -62,9 +62,13 @@ pub enum VersionedCsiRequest {
 pub enum CsiShellError {
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
-    #[error("The CSI function {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
+    #[error(
+        "The CSI function {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK."
+    )]
     UnknownFunction(String),
-    #[error("The specified CSI version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK.")]
+    #[error(
+        "The specified CSI version is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK."
+    )]
     NotSupported,
     #[error("This CSI version is no longer supported by the Kernel. Try upgrading your SDK.")]
     NoLongerSupported,

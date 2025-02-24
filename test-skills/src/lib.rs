@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context as _, Error};
+use anyhow::{Context as _, Error, anyhow, bail};
 use change_case::snake_case;
 use std::{
     fs,
@@ -6,7 +6,7 @@ use std::{
     process::{Command, Output},
     sync::{LazyLock, OnceLock},
 };
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 const WASI_TARGET: &str = "wasm32-wasip2";
 const SKILL_BUILD_CACHE_DIR: &str = "./skill_build_cache";

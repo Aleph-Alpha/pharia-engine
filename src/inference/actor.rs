@@ -1,6 +1,6 @@
 use aleph_alpha_client::Client;
 use derive_more::{Constructor, Deref, Display, IntoIterator};
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,

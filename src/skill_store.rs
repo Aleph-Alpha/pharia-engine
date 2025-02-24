@@ -7,14 +7,14 @@ use crate::{
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
-use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use itertools::Itertools;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
     task::JoinHandle,
-    time::{sleep_until, Instant},
+    time::{Instant, sleep_until},
 };
 use tracing::{error, info};
 
@@ -585,18 +585,22 @@ pub mod tests {
         requests.select_next_some().await.unwrap_err();
 
         // Then both have been answered by the first response
-        assert!(first_recv
-            .await
-            .unwrap()
-            .unwrap_err()
-            .to_string()
-            .contains("first_skill"));
-        assert!(second_recv
-            .await
-            .unwrap()
-            .unwrap_err()
-            .to_string()
-            .contains("first_skill"));
+        assert!(
+            first_recv
+                .await
+                .unwrap()
+                .unwrap_err()
+                .to_string()
+                .contains("first_skill")
+        );
+        assert!(
+            second_recv
+                .await
+                .unwrap()
+                .unwrap_err()
+                .to_string()
+                .contains("first_skill")
+        );
 
         // And the cache is empty
         assert!(requests.recipients.is_empty());
@@ -640,18 +644,22 @@ pub mod tests {
         cache.select_next_some().await.unwrap_err();
 
         // Then the first request has been answered by the first response
-        assert!(first_recv
-            .await
-            .unwrap()
-            .unwrap_err()
-            .to_string()
-            .contains("first_skill"));
-        assert!(second_recv
-            .await
-            .unwrap()
-            .unwrap_err()
-            .to_string()
-            .contains("second_skill"));
+        assert!(
+            first_recv
+                .await
+                .unwrap()
+                .unwrap_err()
+                .to_string()
+                .contains("first_skill")
+        );
+        assert!(
+            second_recv
+                .await
+                .unwrap()
+                .unwrap_err()
+                .to_string()
+                .contains("second_skill")
+        );
 
         // And the cache is empty
         assert!(cache.requests.is_empty());
@@ -688,12 +696,16 @@ pub mod tests {
         }
 
         // Then both requests have answered with the error response
-        assert!(timeout(Duration::from_millis(10), first_request)
-            .await
-            .is_ok());
-        assert!(timeout(Duration::from_millis(10), second_request)
-            .await
-            .is_ok());
+        assert!(
+            timeout(Duration::from_millis(10), first_request)
+                .await
+                .is_ok()
+        );
+        assert!(
+            timeout(Duration::from_millis(10), second_request)
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]

@@ -7,7 +7,7 @@ use aleph_alpha_client::{
     ChatSampling, Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat,
     TaskCompletion, TaskExplanation,
 };
-use retry_policies::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
+use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 use tracing::{error, warn};
 
 use thiserror::Error;
@@ -320,7 +320,9 @@ where
                     let duration = execute_after
                         .duration_since(SystemTime::now())
                         .unwrap_or_else(|_| Duration::default());
-                    warn!("Retrying operation: {e} attempt #{n_past_retries}. Sleeping {duration:?} before the next attempt");
+                    warn!(
+                        "Retrying operation: {e} attempt #{n_past_retries}. Sleeping {duration:?} before the next attempt"
+                    );
                     tokio::time::sleep(duration).await;
                     n_past_retries += 1;
                 }
