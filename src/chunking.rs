@@ -37,7 +37,7 @@ pub async fn chunking(
                 max_tokens,
                 overlap,
             },
-        character_offsets,
+        character_offsets: _,
     } = request;
 
     let tokenizer = tokenizers.tokenizer_by_model(auth, model).await?;
