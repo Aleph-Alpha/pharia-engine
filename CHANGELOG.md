@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.6...v0.9.7)
+
+### Features
+
+- Update text splitter to 0.24.1 and support char offset - ([5aded3c](https://github.com/Aleph-Alpha/pharia-kernel/commit/5aded3c0a85cd883aedcd5bb7d13b258c84ad311))
+- Add chunk with offsets support - ([1e99b34](https://github.com/Aleph-Alpha/pharia-kernel/commit/1e99b3455d69352b923838b4b48ce67a7d70f138))
+- Add unstable WIT interfaces for chunking with offsets - ([c7f2bd0](https://github.com/Aleph-Alpha/pharia-kernel/commit/c7f2bd05145757e0fb4d08ceb40e6a727dcbcbab))
+
+### Documentation
+
+- Update Pharia Kernel to PhariaKernel - ([0798857](https://github.com/Aleph-Alpha/pharia-kernel/commit/079885736e5fbaafdb7a98067bbd95b20996e01f))
+- Streamline names of endpoints and skill case - ([7c7deeb](https://github.com/Aleph-Alpha/pharia-kernel/commit/7c7deebd5f273e77e5365acad89e011642fd7a3a))
+- Add skill-metadata endpoint to openapi description - ([ce30ba8](https://github.com/Aleph-Alpha/pharia-kernel/commit/ce30ba8c1fe535903ddcbdcded33e50542d33778))
+
+### Builds
+
+- *(deps)* Bump the minor group with 40 updates - ([d36df6d](https://github.com/Aleph-Alpha/pharia-kernel/commit/d36df6d512d25c38527b85ee5c0c316f374cf00d))
+
+
 ## [0.9.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.5...v0.9.6)
 
 ### Features
