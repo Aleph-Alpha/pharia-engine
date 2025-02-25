@@ -262,6 +262,9 @@ impl SkillMetadataRequest {
 }
 
 /// Running a Skill can result in either receiving a single value or a stream of intermediate results.
+/// TODO this decision is linked to how we expose skills on the shell. If we expose on the same endpoint,
+/// we need to model it this way, because we don't know the skill type outside of the runtime.
+/// Is a `StreamingSkill` a similar concept/entity to a `Skill`?
 #[derive(Debug)]
 pub enum SkillOutput {
     Stream(SkillStream),
@@ -512,6 +515,7 @@ where
     }
 
     async fn new_chat_stream(&mut self, request: ChatRequest) -> u32 {
+        // Here we should return the actual stream, not an ID.
         if let Ok(stream) = self
             .csi_apis
             .stream_chat(self.api_token.clone(), request)
@@ -527,6 +531,7 @@ where
     }
 
     async fn next_chat_stream(&mut self, id: u32) -> Option<StreamMessage> {
+        // This one becomes obsolete when ownership of the stream moves to the LinkedCtx
         let stream = self.running_chat_streams.get_mut(id as usize);
         if let Some(Some(stream)) = stream {
             if let Some(Ok(event)) = stream.0.next().await {
@@ -548,6 +553,7 @@ where
     }
 
     async fn drop_chat_stream(&mut self, id: u32) {
+        // This one becomes obsolete when ownership of the stream moves to the LinkedCtx
         self.running_chat_streams[id as usize] = None;
     }
 

@@ -85,17 +85,24 @@ impl DocumentIndexHost for LinkedCtx {
 impl HostChatStreamRequest for LinkedCtx {
     async fn new(&mut self, request: ChatRequest) -> Resource<ChatStreamRequest> {
         let request = inference::ChatRequest::from(request);
+        // Instead of creating the ID ourselves and keeping track of running streams
+        // inside the `SkillInvocationCtx`, `skill_ctx.new_chat_stream` could return
+        // the stream and we could store it inside the Ressource table inside the
+        // LinkedCtx.
         let id = self.skill_ctx.new_chat_stream(request).await;
         Resource::new_own(id)
     }
 
     async fn next(&mut self, resource: Resource<ChatStreamRequest>) -> Option<MessageDelta> {
         let id = resource.rep();
+        // See comment from above, here we would get_mut it from the Ressource table and would
+        // only need to talk to the skill ctx if we have an error.
         let delta = self.skill_ctx.next_chat_stream(id).await;
         delta.map(Into::into)
     }
     async fn drop(&mut self, resource: Resource<ChatStreamRequest>) -> Result<(), Error> {
         let id = resource.rep();
+        // Here we could call drop of the resource table directly.
         self.skill_ctx.drop_chat_stream(id).await;
         Ok(())
     }

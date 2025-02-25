@@ -290,6 +290,7 @@ impl Skill {
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
     ) -> anyhow::Result<Value> {
+        // Run should either return a valur or a pinned future with a stream
         let mut store = engine.store(LinkedCtx::new(ctx));
         match self {
             Self::V0_2(skill) => {
@@ -345,6 +346,7 @@ impl Skill {
                     .pharia_skill_stream_skill_handler()
                     .call_run(store, &input)
                     .await?;
+                // construct a future where the skill moves in
                 match result {
                     Ok(()) => Ok(Value::Null),
                     Err(e) => match e {
