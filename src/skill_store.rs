@@ -525,7 +525,7 @@ pub mod tests {
     use async_trait::async_trait;
     use std::hash::{DefaultHasher, Hasher};
 
-    use test_skills::given_greet_skill_v0_2;
+    use test_skills::given_rust_skill_greet_v0_2;
     use tokio::time::{sleep, timeout};
 
     use crate::{
@@ -806,7 +806,7 @@ pub mod tests {
     #[tokio::test]
     async fn cached_skill_removed() {
         // Given one cached skill
-        let test_skills = given_greet_skill_v0_2();
+        let test_skills = given_rust_skill_greet_v0_2();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
@@ -840,7 +840,7 @@ pub mod tests {
     async fn should_only_cache_skills_that_have_been_fetched() {
         // Given local is a configured namespace, backed by a file repository with first_skill and
         // second_skill
-        let skill_bytes = given_greet_skill_v0_2().bytes(); // Any skill bytes will do for this test
+        let skill_bytes = given_rust_skill_greet_v0_2().bytes(); // Any skill bytes will do for this test
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut skill_loader = SkillLoaderStub::new(engine.clone());
         let first_skill_path = SkillPath::local("first_skill");
@@ -905,7 +905,7 @@ pub mod tests {
     #[tokio::test]
     async fn should_remove_invalidated_skill_from_cache() {
         // Given one cached "greet_skill"
-        let skill_bytes = given_greet_skill_v0_2().bytes();
+        let skill_bytes = given_rust_skill_greet_v0_2().bytes();
         let skill_path = SkillPath::local("greet");
         let skill = ConfiguredSkill::from_path(&skill_path);
         let engine = Arc::new(Engine::new(false).unwrap());
@@ -955,7 +955,7 @@ pub mod tests {
     #[tokio::test]
     async fn invalidate_cache_skills_after_digest_change() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
-        let any_skill = given_greet_skill_v0_2().bytes();
+        let any_skill = given_rust_skill_greet_v0_2().bytes();
         let engine = Arc::new(Engine::new(false)?);
         let mut skill_loader = SkillLoaderStub::new(engine.clone());
         let skill_path = SkillPath::local("greet");
@@ -997,7 +997,7 @@ pub mod tests {
     #[tokio::test]
     async fn does_not_invalidate_unchanged_digests() -> anyhow::Result<()> {
         // Given one cached "greet_skill"
-        let skill_bytes = given_greet_skill_v0_2().bytes();
+        let skill_bytes = given_rust_skill_greet_v0_2().bytes();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false)?);
         let configured_skill = ConfiguredSkill::from_path(&skill_path);

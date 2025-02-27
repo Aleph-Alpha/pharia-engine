@@ -697,7 +697,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "chat-skill"
+name = "chat"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1207,7 +1207,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "doc-metadata-skill"
+name = "doc-metadata"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1301,7 +1301,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "explain-skill"
+name = "explain"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1663,7 +1663,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
-name = "greet-skill-v0_2"
+name = "greet-v0_2"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1672,7 +1672,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "greet-skill-v0_3"
+name = "greet-v0_3"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2251,7 +2251,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "invalid-output-skill"
+name = "invalid-output"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -4936,7 +4936,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
-name = "search-skill"
+name = "search"
 version = "0.1.0"
 dependencies = [
  "anyhow",

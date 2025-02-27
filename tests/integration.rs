@@ -15,7 +15,8 @@ use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
 use test_skills::{
-    given_doc_metadata_skill, given_greet_skill_v0_2, given_search_skill, given_write_skill,
+    given_python_skill_stream, given_rust_skill_doc_metadata, given_rust_skill_greet_v0_2,
+    given_rust_skill_search,
 };
 use tokio::sync::oneshot;
 
@@ -126,7 +127,7 @@ fn namespace_config(dir_path: &Path, skills: &[&str]) -> NamespaceConfigs {
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn run_skill() {
-    let greet_skill_wasm = given_greet_skill_v0_2().bytes();
+    let greet_skill_wasm = given_rust_skill_greet_v0_2().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("greet", greet_skill_wasm);
     let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
@@ -159,7 +160,7 @@ async fn run_skill() {
 #[cfg_attr(not(feature = "test_document_index"), ignore)]
 #[tokio::test]
 async fn run_search_skill() {
-    let wasm_bytes = given_search_skill().bytes();
+    let wasm_bytes = given_rust_skill_search().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("search", wasm_bytes);
     let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
@@ -193,7 +194,7 @@ async fn run_search_skill() {
 
 #[tokio::test]
 async fn run_stream_skill() {
-    let wasm_bytes = given_write_skill().bytes();
+    let wasm_bytes = given_python_skill_stream().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("stream", wasm_bytes);
     let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
@@ -240,7 +241,7 @@ async fn run_stream_skill() {
 
 #[tokio::test]
 async fn run_doc_metadata_skill() {
-    let wasm_bytes = given_doc_metadata_skill().bytes();
+    let wasm_bytes = given_rust_skill_doc_metadata().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("doc_metadata", wasm_bytes);
     let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;

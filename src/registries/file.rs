@@ -78,14 +78,14 @@ mod test {
 
     use super::*;
     use tempfile::tempdir;
-    use test_skills::{given_greet_skill_v0_2, given_greet_skill_v0_3};
+    use test_skills::{given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3};
 
     #[tokio::test]
     async fn change_digest_if_file_is_modified() {
         // Given a file `my_skill.wasm` containing a skill in a directory
-        let any_skill_bytes = given_greet_skill_v0_2().bytes();
+        let any_skill_bytes = given_rust_skill_greet_v0_2().bytes();
         // Any skill bytes do, as long as they are different
-        let different_skill_bytes = given_greet_skill_v0_3().bytes();
+        let different_skill_bytes = given_rust_skill_greet_v0_3().bytes();
         let skill_dir = tempdir().unwrap();
         let file_path = skill_dir.path().join("my_skill.wasm");
         fs::write(&file_path, &any_skill_bytes).unwrap();
@@ -128,7 +128,7 @@ mod test {
     #[tokio::test]
     async fn load_skill() {
         // Given a file `my_skill.wasm` containing a skill in a directory
-        let any_skill_bytes = given_greet_skill_v0_3().bytes();
+        let any_skill_bytes = given_rust_skill_greet_v0_3().bytes();
         let skill_dir = tempdir().unwrap();
         fs::write(skill_dir.path().join("my_skill.wasm"), &any_skill_bytes).unwrap();
 
@@ -147,7 +147,7 @@ mod test {
     #[tokio::test]
     async fn fetch_digest_yields_same_digest_as_skill_image() {
         // Given a file `my_skill.wasm` containing a skill in a directory
-        let any_skill_bytes = given_greet_skill_v0_3().bytes();
+        let any_skill_bytes = given_rust_skill_greet_v0_3().bytes();
         let skill_dir = tempdir().unwrap();
         fs::write(skill_dir.path().join("my_skill.wasm"), &any_skill_bytes).unwrap();
 

@@ -681,9 +681,9 @@ pub mod tests {
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
     use test_skills::{
-        given_csi_from_metadata_skill, given_explain_skill, given_greet_py_v0_3,
-        given_greet_skill_v0_2, given_greet_skill_v0_3, given_invalid_output_skill,
-        given_write_skill,
+        given_csi_from_metadata_skill, given_invalid_output_skill, given_python_skill_greet_v0_3,
+        given_python_skill_stream, given_rust_skill_explain, given_rust_skill_greet_v0_2,
+        given_rust_skill_greet_v0_3,
     };
     use tokio::try_join;
 
@@ -708,7 +708,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_runtime_returns_stream() {
         // Given a skill that writes to the host
-        let test_skill = given_write_skill();
+        let test_skill = given_python_skill_stream();
         let skill_path = SkillPath::local("write");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
@@ -774,7 +774,7 @@ pub mod tests {
     #[tokio::test(start_paused = true)]
     async fn skill_runtime_with_receiver_gone() {
         // Given a skill request for a streaming skill
-        let test_skill = given_write_skill();
+        let test_skill = given_python_skill_stream();
         let skill_path = SkillPath::local("write");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
@@ -855,7 +855,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_metadata_v0_2_is_none() {
         // Given a skill runtime that always returns a v0.2 skill
-        let test_skill = given_greet_skill_v0_2();
+        let test_skill = given_rust_skill_greet_v0_2();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
@@ -872,7 +872,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_metadata_v0_3() {
         // Given a skill runtime api that always returns a v0.3 skill
-        let test_skill = given_greet_skill_v0_3();
+        let test_skill = given_rust_skill_greet_v0_3();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
@@ -922,7 +922,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn explain_skill_component() {
-        let test_skill = given_explain_skill();
+        let test_skill = given_rust_skill_explain();
         let skill_path = SkillPath::local("explain");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
@@ -962,7 +962,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn greet_skill_component() {
-        let test_skill = given_greet_skill_v0_2();
+        let test_skill = given_rust_skill_greet_v0_2();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
@@ -1001,7 +1001,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn rust_greeting_skill() {
-        let test_skill = given_greet_skill_v0_2();
+        let test_skill = given_rust_skill_greet_v0_2();
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
@@ -1022,7 +1022,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn python_greeting_skill() {
-        let test_skill = given_greet_py_v0_3();
+        let test_skill = given_python_skill_greet_v0_3();
         let skill_ctx = Box::new(CsiGreetingMock);
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
@@ -1151,7 +1151,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_runtime_forwards_csi_errors() {
         // Given csi which emits errors for completion request
-        let test_skill = given_greet_skill_v0_3();
+        let test_skill = given_rust_skill_greet_v0_3();
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::new(
             engine.clone(),
@@ -1180,7 +1180,7 @@ pub mod tests {
     #[tokio::test]
     async fn greeting_skill() {
         // Given
-        let test_skill = given_greet_skill_v0_3();
+        let test_skill = given_rust_skill_greet_v0_3();
         let csi = StubCsi::with_completion_from_text("Hello");
         let engine = Arc::new(Engine::new(false).unwrap());
         let store = SkillStoreStub::new(
@@ -1212,7 +1212,7 @@ pub mod tests {
     #[tokio::test(start_paused = true)]
     async fn concurrent_skill_execution() {
         // Given
-        let test_skill = given_greet_skill_v0_3();
+        let test_skill = given_rust_skill_greet_v0_3();
         let engine = Arc::new(Engine::new(false).unwrap());
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
@@ -1252,7 +1252,7 @@ pub mod tests {
 
     #[test]
     fn skill_runtime_metrics_emitted() {
-        let test_skill = given_greet_skill_v0_3();
+        let test_skill = given_rust_skill_greet_v0_3();
         let engine = Arc::new(Engine::new(false).unwrap());
         let csi = StubCsi::with_completion_from_text("Hello");
         let (send, _) = oneshot::channel();
