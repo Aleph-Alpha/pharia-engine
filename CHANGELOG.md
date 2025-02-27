@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.8...v0.9.9)
+
+### Features
+
+- Stabilize chunk with offsets in 0.3 wit world - ([3e9ba6e](https://github.com/Aleph-Alpha/pharia-kernel/commit/3e9ba6e92b71811ea5a2685a6f6d311427efe05f))
+
+
 ## [0.9.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.6...v0.9.7)
 
 ### Features
