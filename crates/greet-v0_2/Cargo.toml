@@ -1,5 +1,5 @@
 [package]
-name = "greet-skill-v0_2"
+name = "greet-v0_2"
 version = "0.1.0"
 edition.workspace = true
 
