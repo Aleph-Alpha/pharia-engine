@@ -1,5 +1,5 @@
 [package]
-name = "invalid-output-skill"
+name = "greet-v0_3"
 version = "0.1.0"
 edition.workspace = true
 

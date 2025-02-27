@@ -1,1 +1,1 @@
-skills = [{ name = "greet_skill_v0_2" }, { name = "greet-py-v0_2" }]
+skills = [{ name = "greet-v0_2-rs" }, { name = "greet-v0_2-py" }]

@@ -527,8 +527,8 @@ mod tests {
     use fake::{Fake, Faker};
     use serde_json::json;
     use test_skills::{
-        given_chat_skill, given_greet_py_v0_2, given_greet_py_v0_3, given_greet_skill_v0_2,
-        given_greet_skill_v0_3, given_search_skill,
+        given_python_skill_greet_v0_2, given_python_skill_greet_v0_3, given_rust_skill_chat,
+        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -576,7 +576,7 @@ mod tests {
 
     #[test]
     fn can_parse_module() {
-        let wasm = given_greet_skill_v0_2().bytes();
+        let wasm = given_rust_skill_greet_v0_2().bytes();
         let version = SupportedVersion::extract_pharia_skill_version(wasm)
             .unwrap()
             .unwrap();
@@ -648,7 +648,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_3_module() {
         // Given a skill loaded by our engine
-        let test_skill = given_greet_skill_v0_3();
+        let test_skill = given_rust_skill_greet_v0_3();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
@@ -665,7 +665,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_2_module() {
         // Given a skill loaded by our engine
-        let test_skills = given_greet_skill_v0_2();
+        let test_skills = given_rust_skill_greet_v0_2();
         let wasm = test_skills.bytes();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
@@ -682,7 +682,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_search_skill() {
         // Given a skill loaded by our engine
-        let wasm = given_search_skill().bytes();
+        let wasm = given_rust_skill_search().bytes();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
@@ -699,7 +699,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_chat_skill() {
         // Given a skill loaded by our engine
-        let wasm = given_chat_skill().bytes();
+        let wasm = given_rust_skill_chat().bytes();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
@@ -716,7 +716,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_2_py_module() {
         // Given a skill loaded by our engine
-        let skill = given_greet_py_v0_2();
+        let skill = given_python_skill_greet_v0_2();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
@@ -732,7 +732,7 @@ mod tests {
     #[tokio::test]
     async fn can_load_and_run_v0_3_py_module() {
         // Given a skill loaded by our engine
-        let skill = given_greet_py_v0_3();
+        let skill = given_python_skill_greet_v0_3();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
@@ -799,7 +799,7 @@ mod tests {
     /// Learning test to verify nothing strange happens if a instantiated skill is invoked multiple times.
     #[tokio::test]
     async fn can_call_pre_instantiated_multiple_times() {
-        let test_skill = given_greet_skill_v0_2();
+        let test_skill = given_rust_skill_greet_v0_2();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
         let skill = Skill::new(&engine, wasm).unwrap();
