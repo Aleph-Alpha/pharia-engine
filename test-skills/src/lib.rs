@@ -201,7 +201,7 @@ fn build_python_skill(package_name: &str, wit_version: &str, world: &str) {
         "-w",
         world,
         "componentize",
-        &format!("{package_name}.app"),
+        &format!("python-skills.{package_name}.app"),
         "-o",
         &target_path,
     ])
