@@ -29,18 +29,24 @@ where
 {
     let drivers = app_state.csi_drivers;
     let result = match args {
-        VersionedCsiRequest::V0_2(request) => {
-            request.act(&drivers, bearer.token().to_owned()).await
-        }
+        VersionedCsiRequest::V0_2(request) => request
+            .act(&drivers, bearer.token().to_owned())
+            .await
+            .map(CsiResponse::Value),
         VersionedCsiRequest::V0_3(request) => {
             request.act(&drivers, bearer.token().to_owned()).await
         }
         VersionedCsiRequest::Unknown(request) => Err(request.into()),
     };
     match result {
-        Ok(result) => (StatusCode::OK, Json(result)),
+        Ok(CsiResponse::Value(result)) => (StatusCode::OK, Json(result)),
         Err(e) => (e.status_code(), Json(json!(e.to_string()))),
     }
+}
+
+/// Return a single json value or a stream of events
+pub enum CsiResponse {
+    Value(Value),
 }
 
 /// This represents the versioned interactions with the CSI.

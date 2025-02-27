@@ -9,6 +9,7 @@ use derive_more::{From, Into};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::csi_shell::CsiResponse as Response;
 use crate::csi_shell::CsiShellError;
 use crate::{chunking, csi::Csi, inference, language_selection, search};
 
@@ -49,7 +50,7 @@ pub enum CsiRequest {
 }
 
 impl CsiRequest {
-    pub async fn act<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
+    pub async fn act<C>(self, drivers: &C, auth: String) -> Result<Response, CsiShellError>
     where
         C: Csi + Sync,
     {
@@ -122,7 +123,7 @@ impl CsiRequest {
                 ));
             }
         }?;
-        Ok(json!(response))
+        Ok(Response::Value(json!(response)))
     }
 }
 
