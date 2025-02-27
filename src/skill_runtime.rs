@@ -523,7 +523,8 @@ where
         {
             let id = self.running_chat_streams.len();
             self.running_chat_streams.push(Some(stream));
-            u32::try_from(id).unwrap()
+            u32::try_from(id)
+                .expect("There must not be more than 2^32 chat streams in one skill invocation.")
         } else {
             self.send_error(anyhow!("Failed to create chat stream"))
                 .await
@@ -969,7 +970,10 @@ pub mod tests {
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
-        let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await.unwrap();
+        let resp = runtime
+            .run(&skill_path, json!("name"), skill_ctx)
+            .await
+            .unwrap();
 
         drop(runtime);
         skill_store.wait_for_shutdown().await;
