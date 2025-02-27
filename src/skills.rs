@@ -289,7 +289,7 @@ impl Skill {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<Option<Value>> {
         // Run should either return a valur or a pinned future with a stream
         let mut store = engine.store(LinkedCtx::new(ctx));
         match self {
@@ -313,7 +313,7 @@ impl Skill {
                         }
                     },
                 };
-                Ok(serde_json::from_slice(&result)?)
+                Ok(Some(serde_json::from_slice(&result)?))
             }
             Self::V0_3(skill) => {
                 let input = serde_json::to_vec(&input)?;
@@ -337,7 +337,7 @@ impl Skill {
                         }
                     },
                 };
-                Ok(serde_json::from_slice(&result)?)
+                Ok(Some(serde_json::from_slice(&result)?))
             }
             Self::V0_3Streaming(skill) => {
                 let input = serde_json::to_vec(&input)?;
@@ -348,7 +348,7 @@ impl Skill {
                     .await?;
                 // construct a future where the skill moves in
                 match result {
-                    Ok(()) => Ok(Value::Null),
+                    Ok(()) => Ok(None),
                     Err(e) => match e {
                         v0_3::stream_skill::exports::pharia::skill::stream_skill_handler::Error::Internal(e) => {
                             tracing::error!("Failed to run skill, internal skill error:\n{e}");
@@ -772,7 +772,7 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run(&engine, ctx, input).await.unwrap().unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -789,7 +789,7 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run(&engine, ctx, input).await.unwrap().unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -806,7 +806,7 @@ mod tests {
         // When invoked with a json string
         let content = "42";
         let input = json!(content);
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run(&engine, ctx, input).await.unwrap().unwrap();
 
         // Then it returns a json string array
         assert_eq!(result, json!([content]));
@@ -823,7 +823,7 @@ mod tests {
         // When invoked with a json string
         let content = "Hello, how are you?";
         let input = json!(content);
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run(&engine, ctx, input).await.unwrap().unwrap();
 
         // Then it returns a json string array
         assert_eq!(result["content"], "dummy-content");
@@ -839,7 +839,7 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run(&engine, ctx, input).await.unwrap().unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -855,7 +855,7 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run(&engine, ctx, input).await.unwrap().unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -950,8 +950,8 @@ mod tests {
         let third_result = skill.run(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
-        assert_eq!(first_result, json!("Hello Homer"));
-        assert_eq!(second_result, json!("Hello Homer"));
-        assert_eq!(third_result, json!("Hello Homer"));
+        assert_eq!(first_result, Some(json!("Hello Homer")));
+        assert_eq!(second_result, Some(json!("Hello Homer")));
+        assert_eq!(third_result, Some(json!("Hello Homer")));
     }
 }

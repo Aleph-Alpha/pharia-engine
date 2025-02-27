@@ -55,7 +55,7 @@ impl WasmRuntime {
         skill_path: &SkillPath,
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<Value, SkillRuntimeError> {
+    ) -> Result<Option<Value>, SkillRuntimeError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillRuntimeError::SkillNotConfigured)?;
@@ -268,7 +268,7 @@ impl SkillMetadataRequest {
 #[derive(Debug)]
 pub enum SkillOutput {
     Stream(SkillStream),
-    Value(Value),
+    Value(Option<Value>),
 }
 
 /// A wrapper struct so we can implement Debug on the Stream
@@ -950,12 +950,13 @@ pub mod tests {
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
                 skill_ctx,
             )
-            .await;
+            .await
+            .unwrap();
 
         drop(runtime);
         skill_store.wait_for_shutdown().await;
 
-        assert_eq!(resp.unwrap(), json!([{"start": 0, "length": 2}]));
+        assert_eq!(resp, Some(json!([{"start": 0, "length": 2}])));
     }
 
     #[tokio::test]
@@ -968,12 +969,12 @@ pub mod tests {
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
-        let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
+        let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await.unwrap();
 
         drop(runtime);
         skill_store.wait_for_shutdown().await;
 
-        assert_eq!(resp.unwrap(), "Hello");
+        assert_eq!(resp, Some(json!("Hello")));
     }
 
     #[tokio::test]
@@ -1012,7 +1013,7 @@ pub mod tests {
         drop(runtime);
         skill_store.wait_for_shutdown().await;
 
-        assert_eq!(actual, "Hello Homer");
+        assert_eq!(actual, Some(json!("Hello Homer")));
     }
 
     #[tokio::test]
@@ -1034,7 +1035,7 @@ pub mod tests {
         drop(runtime);
         skill_store.wait_for_shutdown().await;
 
-        assert_eq!(actual, "Hello Homer");
+        assert_eq!(actual, Some(json!("Hello Homer")));
     }
 
     #[tokio::test]
@@ -1199,7 +1200,7 @@ pub mod tests {
 
         // Then
         match result {
-            Ok(SkillOutput::Value(result)) => assert_eq!(result, "Hello"),
+            Ok(SkillOutput::Value(result)) => assert_eq!(result, Some(json!("Hello"))),
             _ => panic!("Expected a result"),
         }
     }

@@ -691,7 +691,7 @@ mod tests {
         let bad_namespace = "bad_namespace";
         let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
             SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
-                send.send(Ok(SkillOutput::Value(json!("dummy completion"))))
+                send.send(Ok(SkillOutput::Value(Some(json!("dummy completion")))))
                     .unwrap();
             }
             SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
@@ -845,7 +845,7 @@ mod tests {
                 assert_eq!(skill_path, SkillPath::local("greet_skill"));
                 assert_eq!(api_token, "dummy auth token");
                 assert_eq!(input, json!("Homer"));
-                send.send(Ok(SkillOutput::Value(json!("dummy completion"))))
+                send.send(Ok(SkillOutput::Value(Some(json!("dummy completion")))))
                     .unwrap();
             }
             SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
