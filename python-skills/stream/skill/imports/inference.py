@@ -157,6 +157,9 @@ class ChatStreamRequest:
         raise NotImplementedError
 
     def next(self) -> Optional[MessageDelta]:
+        """
+        TODO expose all three variants here, even if we filter in the SDK.
+        """
         raise NotImplementedError
     def __enter__(self) -> Self:
         """Returns self"""

@@ -14,7 +14,7 @@ world stream-skill {
     @since(version = 0.3.4)
     include csi;
 
-    import response;
+    import chat-response;
     @since(version = 0.3.4)
     export stream-skill-handler;
 }
@@ -76,7 +76,7 @@ world csi {
 }
 
 @since(version = 0.3.4)
-interface response {
+interface chat-response {
     write: func(data: list<u8>);
 }
 

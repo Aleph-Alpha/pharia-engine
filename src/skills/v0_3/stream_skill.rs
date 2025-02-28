@@ -1,6 +1,6 @@
 use crate::skills::v0_3::csi;
 use exports::pharia::skill::stream_skill_handler::StreamSkillMetadata;
-use pharia::skill::response::Host as ResponseHost;
+use pharia::skill::chat_response::Host as ChatResponseHost;
 use serde_json::Value;
 use wasmtime::component::bindgen;
 
@@ -35,7 +35,7 @@ impl TryFrom<StreamSkillMetadata> for skills::SkillMetadata {
     }
 }
 
-impl ResponseHost for skills::LinkedCtx {
+impl ChatResponseHost for skills::LinkedCtx {
     async fn write(&mut self, data: Vec<u8>) {
         self.skill_ctx.write(data).await;
     }
