@@ -80,8 +80,8 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.3.0" }
-wasmtime = "30.0.1"
-wasmtime-wasi = "30.0.1"
+wasmtime = "30.0.2"
+wasmtime-wasi = "30.0.2"
 wit-parser = "0.226.0"
 url = "2.5.4"
 thiserror = "2.0.11"
@@ -122,13 +122,13 @@ derive_more = { version = "2.0.1", features = [
     "into_iterator",
 ] }
 retry-policies = "0.4.0"
-reqwest-middleware = { version = "0.4.0", features = [
+reqwest-middleware = { version = "0.4.1", features = [
     "charset",
     "http2",
     "json",
     "rustls-tls",
 ] }
-reqwest-tracing = { version = "0.5.5", features = ["opentelemetry_0_27"] }
+reqwest-tracing = { version = "0.5.6", features = ["opentelemetry_0_27"] }
 reqwest-retry = "0.7.0"
 jsonschema = "0.29.0"
 rayon = "1.10.0"
