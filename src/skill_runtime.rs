@@ -988,7 +988,7 @@ pub mod tests {
             api_token: "dummy".to_owned(),
         };
         // Metrics requires sync, so all of the async parts are moved into this closure.
-        let snapshot = metrics_snapshot(|| async move {
+        let snapshot = metrics_snapshot(async || {
             let store = SkillStoreStub::new(
                 engine.clone(),
                 test_skill.bytes(),

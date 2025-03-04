@@ -476,11 +476,14 @@ where
                             tag,
                         );
                         let cloned_skill_path = skill_path.clone();
-                        let fut = async move {
-                            let result = skill_loader.fetch(skill).await;
-                            (cloned_skill_path, result)
-                        };
-                        self.skill_requests.push(skill_path, Box::pin(fut), send);
+                        self.skill_requests.push(
+                            skill_path,
+                            Box::pin(async move {
+                                let result = skill_loader.fetch(skill).await;
+                                (cloned_skill_path, result)
+                            }),
+                            send,
+                        );
                     }
                     Ok(None) => {
                         drop(send.send(Ok(None)));
@@ -573,13 +576,19 @@ pub mod tests {
         // When pushing two requests for the same skill to the cache (but their futures return different errors)
         let first_skill_clone = first_skill.clone();
         let first_skill_clone_2 = first_skill.clone();
-        let fut = async move { (first_skill_clone, Err(first_error)) };
         let (first_send, first_recv) = oneshot::channel();
-        requests.push(first_skill.clone(), Box::pin(fut), first_send);
+        requests.push(
+            first_skill.clone(),
+            Box::pin(async move { (first_skill_clone, Err(first_error)) }),
+            first_send,
+        );
 
-        let fut = async move { (first_skill_clone_2, Err(second_error)) };
         let (second_send, second_recv) = oneshot::channel();
-        requests.push(first_skill, Box::pin(fut), second_send);
+        requests.push(
+            first_skill,
+            Box::pin(async move { (first_skill_clone_2, Err(second_error)) }),
+            second_send,
+        );
 
         // And awaiting the next skill request
         requests.select_next_some().await.unwrap_err();
@@ -616,28 +625,34 @@ pub mod tests {
 
         // When pushing two requests for different skills to the cache
         let first_skill_clone = first_skill.clone();
-        let fut = async move {
-            (
-                first_skill_clone.clone(),
-                Err(SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(
-                    &first_skill_clone,
-                ))),
-            )
-        };
         let (first_send, first_recv) = oneshot::channel();
-        cache.push(first_skill, Box::pin(fut), first_send);
+        cache.push(
+            first_skill,
+            Box::pin(async move {
+                (
+                    first_skill_clone.clone(),
+                    Err(SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(
+                        &first_skill_clone,
+                    ))),
+                )
+            }),
+            first_send,
+        );
 
         let second_skill_clone = second_skill.clone();
-        let fut = async move {
-            (
-                second_skill_clone.clone(),
-                Err(SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(
-                    &second_skill_clone,
-                ))),
-            )
-        };
         let (second_send, second_recv) = oneshot::channel();
-        cache.push(second_skill, Box::pin(fut), second_send);
+        cache.push(
+            second_skill,
+            Box::pin(async move {
+                (
+                    second_skill_clone.clone(),
+                    Err(SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(
+                        &second_skill_clone,
+                    ))),
+                )
+            }),
+            second_send,
+        );
 
         // And awaiting the next skill request
         cache.select_next_some().await.unwrap_err();

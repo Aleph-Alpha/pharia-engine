@@ -232,19 +232,17 @@ impl SkillLoaderActor {
             SkillLoaderMsg::Fetch { skill, send } => {
                 let registry = self.registry(&skill.namespace);
                 let engine = self.engine.clone();
-                let fut = async move {
+                self.running_requests.push(Box::pin(async move {
                     let result = Self::fetch(registry.as_ref(), engine, &skill).await;
                     drop(send.send(result));
-                };
-                self.running_requests.push(Box::pin(fut));
+                }));
             }
             SkillLoaderMsg::FetchDigest { skill, send } => {
                 let registry = self.registry(&skill.namespace);
-                let fut = async move {
+                self.running_requests.push(Box::pin(async move {
                     let result = registry.fetch_digest(&skill.name, &skill.tag).await;
                     drop(send.send(result));
-                };
-                self.running_requests.push(Box::pin(fut));
+                }));
             }
         }
     }

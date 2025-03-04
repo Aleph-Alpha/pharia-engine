@@ -40,7 +40,7 @@ impl SkillRegistry for FileRegistry {
         name: &'a str,
         _tag: &'a str,
     ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
-        let fut = async move {
+        Box::pin(async move {
             let skill_path = self.skill_path(name);
             if skill_path.exists() {
                 let binary = fs::read(&skill_path)
@@ -51,8 +51,7 @@ impl SkillRegistry for FileRegistry {
             } else {
                 Ok(None)
             }
-        };
-        Box::pin(fut)
+        })
     }
 
     fn fetch_digest<'a>(

@@ -75,10 +75,9 @@ impl<C: AuthorizationClient> AuthorizationActor<C> {
     }
     fn act(&mut self, msg: AuthorizationMsg) {
         let client = self.client.clone();
-        let fut = async move {
+        self.running_authorizations.push(Box::pin(async move {
             msg.act(client.as_ref()).await;
-        };
-        self.running_authorizations.push(Box::pin(fut));
+        }));
     }
 }
 
