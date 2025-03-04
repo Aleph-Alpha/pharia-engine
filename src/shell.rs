@@ -175,12 +175,12 @@ where
         .route("/skill.wit", get(skill_wit()))
         .route(
             "/api-docs",
-            get(|| async { Html(Scalar::new(ApiDoc::openapi()).to_html()) }),
+            get(async || Html(Scalar::new(ApiDoc::openapi()).to_html())),
         )
         .route("/openapi.json", get(serve_docs))
         // maintaining `healthcheck` route for backward compatibility
-        .route("/healthcheck", get(|| async { "ok" }))
-        .route("/health", get(|| async { "ok" }))
+        .route("/healthcheck", get(async || "ok"))
+        .route("/health", get(async || "ok"))
         .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
             ServiceBuilder::new()

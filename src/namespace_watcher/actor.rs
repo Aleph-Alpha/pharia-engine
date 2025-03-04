@@ -198,9 +198,8 @@ impl NamespaceWatcherActor {
     }
 
     async fn report_all_changes(&mut self) {
-        let config = &self.config;
-        let futures = config.namespaces().into_iter().map(|namespace| async {
-            let skills = config.skills(&namespace).await;
+        let futures = self.config.namespaces().into_iter().map(async |namespace| {
+            let skills = self.config.skills(&namespace).await;
             (namespace, skills)
         });
         // While it would be nice to use a stream and update the state after each future has finished,

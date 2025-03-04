@@ -207,8 +207,7 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chunk")])
             .increment(requests.len() as u64);
 
-        let auth = &auth;
-        try_join_all(requests.into_iter().map(|request| async move {
+        try_join_all(requests.into_iter().map(async |request| {
             let text_len = request.text.len();
             let max_tokens = request.params.max_tokens;
 
