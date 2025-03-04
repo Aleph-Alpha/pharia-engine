@@ -138,7 +138,9 @@ impl NamespaceDescriptionLoader for HttpLoader {
     async fn description(&self) -> NamespaceDescriptionResult {
         let mut req_builder = self.client.get(&self.url);
         if let Some(token) = &self.token {
-            let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}")).unwrap();
+            let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}"))
+                .with_context(|| format!("Invalid token configured for accessing '{}'.", self.url))
+                .map_err(NamespaceDescriptionError::Unrecoverable)?;
             auth_value.set_sensitive(true);
             req_builder = req_builder.header(AUTHORIZATION, auth_value);
         }
