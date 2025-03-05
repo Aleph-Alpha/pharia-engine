@@ -13,7 +13,7 @@ class StreamSkillHandler(Protocol):
     @abstractmethod
     def run(self, input: bytes) -> None:
         """
-        Raises: `skill.types.Err(skill.imports.stream_skill_handler.Error)`
+        Raises: `stream_skill.types.Err(stream_skill.imports.stream_skill_handler.Error)`
         """
         raise NotImplementedError
 

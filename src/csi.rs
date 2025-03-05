@@ -1,6 +1,7 @@
 use aleph_alpha_client::StreamMessage;
 use async_trait::async_trait;
 use futures::future::try_join_all;
+use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::trace;
@@ -29,6 +30,12 @@ pub struct CsiDrivers<T> {
     pub tokenizers: T,
 }
 
+#[derive(PartialEq, Eq, Debug, Serialize)]
+pub struct MessageDelta {
+    pub role: Option<String>,
+    pub content: String,
+}
+
 /// Cognitive System Interface (CSI) as consumed by Skill developers. In particular some accidental
 /// complexity has been stripped away, by implementations due to removing accidental errors from the
 /// interface. It also assumes all authentication and authorization is handled behind the scenes.
@@ -39,7 +46,7 @@ pub trait CsiForSkills {
     async fn new_chat_stream(&mut self, request: ChatRequest) -> u32;
     async fn next_chat_stream(&mut self, id: u32) -> Option<StreamMessage>;
     async fn drop_chat_stream(&mut self, id: u32);
-    async fn write(&mut self, data: Vec<u8>);
+    async fn write_stream_event(&mut self, event: MessageDelta);
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>>;
     async fn select_language(
@@ -736,7 +743,7 @@ pub mod tests {
             unimplemented!()
         }
 
-        async fn write(&mut self, _data: Vec<u8>) {
+        async fn write_stream_event(&mut self, _event: MessageDelta) {
             unimplemented!()
         }
 
@@ -829,7 +836,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             unimplemented!()
         }
 
-        async fn write(&mut self, _data: Vec<u8>) {
+        async fn write_stream_event(&mut self, _event: MessageDelta) {
             unimplemented!()
         }
 
@@ -926,7 +933,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             unimplemented!()
         }
 
-        async fn write(&mut self, _data: Vec<u8>) {
+        async fn write_stream_event(&mut self, _event: MessageDelta) {
             unimplemented!()
         }
 

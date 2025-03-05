@@ -24,7 +24,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
-    csi::{Csi, CsiForSkills},
+    csi::{Csi, CsiForSkills, MessageDelta},
     inference::{
         ChatRequest, ChatResponse, ChatStream, Completion, CompletionRequest, Explanation,
         ExplanationRequest,
@@ -271,8 +271,18 @@ pub enum SkillOutput {
     Value(Option<Value>),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum StreamSkillError {
+    #[error("Recoverable error")]
+    Recoverable,
+    #[error("Unrecoverable error")]
+    Unrecoverable,
+}
+
 /// A wrapper struct so we can implement Debug on the Stream
-pub struct SkillStream(pub Pin<Box<dyn Stream<Item = Result<Value, serde_json::Error>> + Send>>);
+pub struct SkillStream(
+    pub Pin<Box<dyn Stream<Item = Result<MessageDelta, StreamSkillError>> + Send>>,
+);
 
 impl fmt::Debug for SkillStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -345,9 +355,9 @@ impl SkillRunRequest {
         let recv_fut = async {
             if let Some(first_write) = recv_rt_write.recv().await {
                 let stream = Box::pin(stream! {
-                    yield serde_json::from_slice(&first_write);
-                    while let Some(bytes) = recv_rt_write.recv().await {
-                        yield serde_json::from_slice(&bytes);
+                    yield Ok(first_write);
+                    while let Some(event) = recv_rt_write.recv().await {
+                        yield Ok(event);
                     }
                 });
                 Ok(SkillOutput::Stream(SkillStream(stream)))
@@ -381,7 +391,7 @@ pub struct SkillInvocationCtx<C> {
     send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
     /// This is used to enable the skill to send itermediate results. If a value is sent in this
     /// channel, the [`SkillRunRequest::act`] will return a stream of the values sent.
-    send_rt_write: mpsc::Sender<Vec<u8>>,
+    send_rt_write: mpsc::Sender<MessageDelta>,
     csi_apis: C,
     // How the user authenticates with us
     api_token: String,
@@ -394,7 +404,7 @@ pub struct SkillInvocationCtx<C> {
 impl<C> SkillInvocationCtx<C> {
     pub fn new(
         send_rt_err: oneshot::Sender<anyhow::Error>,
-        send_rt_write: mpsc::Sender<Vec<u8>>,
+        send_rt_write: mpsc::Sender<MessageDelta>,
         csi_apis: C,
         api_token: String,
         parent_context: Option<Context>,
@@ -458,7 +468,7 @@ impl CsiForSkills for SkillMetadataCtx {
         self.send_error::<()>().await;
     }
 
-    async fn write(&mut self, _data: Vec<u8>) {
+    async fn write_stream_event(&mut self, _event: MessageDelta) {
         self.send_error::<()>().await;
     }
 
@@ -558,12 +568,12 @@ where
         self.running_chat_streams[id as usize] = None;
     }
 
-    async fn write(&mut self, data: Vec<u8>) {
+    async fn write_stream_event(&mut self, event: MessageDelta) {
         // Do not unwrap the send, as we do not know if the receiver is still be alive.
         // An example is a client who closes the connection while the skill is still running.
         // Another option would be to stop Skill execution here using `send_error`, as
         // apparently no one is interested in the result of the skill anymore.
-        drop(self.send_rt_write.send(data).await);
+        drop(self.send_rt_write.send(event).await);
     }
 
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
@@ -759,12 +769,17 @@ pub mod tests {
                 assert_eq!(items.len(), 2);
                 assert_eq!(
                     items[0].as_ref().unwrap(),
-                    &json!({"choices": [{"delta": {"role": "assistant", "content": ""}}]})
+                    &MessageDelta {
+                        role: Some("assistant".to_string()),
+                        content: String::new(),
+                    }
                 );
                 assert_eq!(
                     items[1].as_ref().unwrap(),
-                    &json!({"choices": [{"delta": {"role": null, "content": "Keeps the doctor away"}}]}
-                    )
+                    &MessageDelta {
+                        role: None,
+                        content: "Keeps the doctor away".to_string(),
+                    }
                 );
             }
             _ => panic!("Expected a stream"),
@@ -820,7 +835,10 @@ pub mod tests {
                 let item = stream.next().await.unwrap().unwrap();
                 assert_eq!(
                     item,
-                    json!({"choices": [{"delta": {"role": "assistant", "content": ""}}]})
+                    MessageDelta {
+                        role: Some("assistant".to_string()),
+                        content: String::new(),
+                    }
                 );
                 drop(stream);
             }

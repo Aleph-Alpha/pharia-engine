@@ -111,8 +111,9 @@ The secrets for the deployment can be added to the [Vault](https://vault.managem
 ## Adding Python Bindings After Updating the WIT World
 
 For testing, we have multiple Python skills with bindings to the WIT world.
-If you have updated the WIT world and want to create new bindings run the following command (assuming you are in the folder of the skill):
+If you have updated the WIT world and want to create new bindings run the following command (assuming you are in the folder of the skill).
+Make sure to use the correct world for the skill.
 
 ```sh
-componentize-py --all-features -d ../../wit/skill@0.3/skill.wit -w skill bindings --world-module skill .
+componentize-py --all-features -d ../../wit/skill@0.3/skill.wit -w skill bindings .
 ```

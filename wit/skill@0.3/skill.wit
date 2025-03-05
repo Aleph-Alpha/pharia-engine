@@ -77,7 +77,12 @@ world csi {
 
 @since(version = 0.3.4)
 interface chat-response {
-    write: func(data: list<u8>);
+    record message-delta {
+        role: option<string>,
+        content: string,
+    }
+
+    write-stream-event: func(event: message-delta);
 }
 
 @since(version = 0.3.0)

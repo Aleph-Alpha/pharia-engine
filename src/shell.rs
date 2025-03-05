@@ -397,11 +397,23 @@ async fn run_skill(
         .await;
 
     match result {
-        Ok(SkillOutput::Stream(stream)) => Sse::new(
-            stream
-                .0
-                .map(|result| result.map(|event| Event::default().data(event.to_string()))),
-        )
+        Ok(SkillOutput::Stream(stream)) => Sse::new(stream.0.map(|result| {
+            result.map(|event| {
+                Event::default().data(
+                    json!({
+                        "choices": [
+                            {
+                                "delta": {
+                                    "role": event.role,
+                                    "content": event.content,
+                                }
+                            }
+                        ]
+                    })
+                    .to_string(),
+                )
+            })
+        }))
         .into_response(),
         Ok(SkillOutput::Value(result)) => (StatusCode::OK, Json(result)).into_response(),
         Err(SkillRuntimeError::SkillNotConfigured) => (
@@ -517,10 +529,14 @@ mod tests {
 
     use crate::{
         authorization::{self, tests::StubAuthorization},
-        csi::tests::{DummyCsi, StubCsi},
+        csi::{
+            MessageDelta,
+            tests::{DummyCsi, StubCsi},
+        },
         inference,
         skill_runtime::{
             SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg, SkillStream,
+            StreamSkillError,
         },
         skill_store::{
             SkillStoreError,
@@ -732,9 +748,9 @@ mod tests {
         let skill_runtime_mock = StubSkillRuntime::new(move |msg| match msg {
             SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
                 let stream = Box::pin(stream! {
-                    yield Ok(json!({"message": "Hello 1"}));
-                    yield Ok(json!({"message": "Hello 2"}));
-                    yield Ok(json!({"message": "Hello 3"}));
+                    yield Ok(MessageDelta {role: None, content: "Hello 1".to_string()});
+                    yield Ok(MessageDelta {role: None, content: "Hello 2".to_string()});
+                    yield Ok(MessageDelta {role: None, content: "Hello 3".to_string()});
                 });
                 drop(send.send(Ok(SkillOutput::Stream(SkillStream(stream)))));
             }
@@ -780,9 +796,9 @@ mod tests {
         assert_eq!(
             events,
             vec![
-                "data: {\"message\":\"Hello 1\"}\n\n",
-                "data: {\"message\":\"Hello 2\"}\n\n",
-                "data: {\"message\":\"Hello 3\"}\n\n",
+                "data: {\"choices\":[{\"delta\":{\"content\":\"Hello 1\",\"role\":null}}]}\n\n",
+                "data: {\"choices\":[{\"delta\":{\"content\":\"Hello 2\",\"role\":null}}]}\n\n",
+                "data: {\"choices\":[{\"delta\":{\"content\":\"Hello 3\",\"role\":null}}]}\n\n",
             ]
         );
     }
@@ -793,9 +809,8 @@ mod tests {
         let skill_runtime_mock = StubSkillRuntime::new(move |msg| match msg {
             SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
                 let stream = Box::pin(stream! {
-                    yield Ok(json!({"message": "Hello 1"}));
-                    let err = serde_json::from_str::<Value>("{invalid}").unwrap_err();
-                    yield Err(err);
+                    yield Ok(MessageDelta {role: None, content: "Hello 1".to_string()});
+                    yield Err(StreamSkillError::Unrecoverable);
                 });
                 drop(send.send(Ok(SkillOutput::Stream(SkillStream(stream)))));
             }

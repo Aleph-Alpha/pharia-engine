@@ -8,7 +8,12 @@ import weakref
 from ..types import Result, Ok, Err, Some
 
 
+@dataclass
+class MessageDelta:
+    role: Optional[str]
+    content: str
 
-def write(data: bytes) -> None:
+
+def write_stream_event(event: MessageDelta) -> None:
     raise NotImplementedError
 

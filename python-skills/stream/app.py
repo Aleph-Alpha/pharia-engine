@@ -1,9 +1,11 @@
 import json
 from typing import Generator
 
-import skill.exports
-from skill.exports.stream_skill_handler import StreamSkillMetadata
-from skill.imports.inference import (
+import stream_skill.exports
+from stream_skill.exports.stream_skill_handler import StreamSkillMetadata
+from stream_skill.imports.chat_response import MessageDelta as OutputMessageDelta
+from stream_skill.imports.chat_response import write_stream_event
+from stream_skill.imports.inference import (
     ChatParams,
     ChatRequest,
     ChatStreamRequest,
@@ -11,10 +13,9 @@ from skill.imports.inference import (
     Message,
     MessageDelta,
 )
-from skill.imports.chat_response import write
 
 
-def chat_stream(
+def csi_chat_stream(
     model: str, messages: list[Message], params: ChatParams
 ) -> Generator[MessageDelta, None, None]:
     """Stream chat responses as a generator function.
@@ -25,16 +26,19 @@ def chat_stream(
         yield item
 
 
-def stream_skill_decorator(func):
+def chat_skill(func):
     """A decorator that could be exposed similarly in the SDK.
 
     Allows for skills to yield bytes.
     """
 
-    class StreamSkillHandler(skill.exports.StreamSkillHandler):
+    class StreamSkillHandler(stream_skill.exports.StreamSkillHandler):
         def run(self, input: bytes):
             for delta in func(input):
-                write(delta)
+                output_delta = OutputMessageDelta(
+                    role=delta.role, content=delta.content
+                )
+                write_stream_event(output_delta)
 
         def metadata(self) -> StreamSkillMetadata:
             return StreamSkillMetadata(
@@ -51,8 +55,8 @@ def stream_skill_decorator(func):
     return func
 
 
-@stream_skill_decorator
-def my_skill(input: bytes) -> Generator[bytes, None, None]:
+@chat_skill
+def my_skill(input: bytes) -> Generator[MessageDelta, None, None]:
     """An example skill that can yield bytes.
 
     This skill can use Python native yield and does never need to know
@@ -72,7 +76,5 @@ def my_skill(input: bytes) -> Generator[bytes, None, None]:
         presence_penalty=0.0,
         logprobs=Logprobs_No(),
     )
-    for delta in chat_stream(model, messages, params):
-        yield json.dumps(
-            {"choices": [{"delta": {"role": delta.role, "content": delta.content}}]}
-        ).encode()
+    # A user may either return the generator directly, or loop through it and yield individual outputs himself.
+    return csi_chat_stream(model, messages, params)
