@@ -30,7 +30,7 @@ impl FileRegistry {
             .duration_since(SystemTime::UNIX_EPOCH)?
             .as_millis()
             .to_string();
-        Ok(Digest(digest))
+        Ok(Digest::new(digest))
     }
 }
 

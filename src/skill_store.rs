@@ -810,7 +810,7 @@ pub mod tests {
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
-        let digest = Digest("dummy".to_owned());
+        let digest = Digest::new("dummy");
         let skill = Skill::new(&engine, test_skills.bytes()).unwrap();
         provider.insert(skill_path.clone(), Arc::new(skill), digest);
 
@@ -963,7 +963,7 @@ pub mod tests {
         skill_loader.add_with_digest(
             configured_skill.clone(),
             any_skill,
-            Digest("originals-digest".to_owned()),
+            Digest::new("originals-digest"),
         );
         let mut skill_store_state = SkillStoreState::new(skill_loader.api());
         skill_store_state.upsert_skill(configured_skill.clone());
@@ -978,7 +978,7 @@ pub mod tests {
         );
 
         // When we update the digest of the "greet" skill and we clear out expired skills
-        skill_loader.change_digest(configured_skill, Digest("different-digest".to_owned()));
+        skill_loader.change_digest(configured_skill, Digest::new("different-digest"));
         skill_store_state
             .validate_digest(skill_path.clone())
             .await?;
@@ -1049,7 +1049,7 @@ pub mod tests {
         /// default hasher.
         pub fn add(&mut self, configured_skill: ConfiguredSkill, skill_bytes: Vec<u8>) {
             self.hasher.write(&skill_bytes);
-            let digest = Digest(self.hasher.finish().to_string());
+            let digest = Digest::new(self.hasher.finish().to_string());
             let skill = Skill::new(&self.engine, skill_bytes).unwrap();
             let mut guard = self.skills.lock().unwrap();
             guard.insert(configured_skill, (skill, digest));
