@@ -40,7 +40,7 @@ impl CachedSkill {
 }
 
 struct SkillStoreState<L> {
-    known_skills: HashMap<SkillPath, String>,
+    known_skills: HashMap<SkillPath, ConfiguredSkill>,
     cached_skills: HashMap<SkillPath, CachedSkill>,
     invalid_namespaces: HashMap<Namespace, anyhow::Error>,
     skill_loader: L,
@@ -64,7 +64,7 @@ where
         let skill_path = skill.path();
         if self
             .known_skills
-            .insert(skill_path.clone(), skill.tag)
+            .insert(skill_path.clone(), skill)
             .is_some()
         {
             self.invalidate(&skill_path);
@@ -123,7 +123,7 @@ where
                 error.to_string(),
             ));
         }
-        Ok(self.known_skills.get(skill_path).map(String::as_str))
+        Ok(self.known_skills.get(skill_path).map(|s| s.tag.as_str()))
     }
 
     /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
