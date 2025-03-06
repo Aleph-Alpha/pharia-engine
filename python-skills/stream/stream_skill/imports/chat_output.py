@@ -1,3 +1,6 @@
+"""
+Allows to send multiple message delta events
+"""
 from typing import TypeVar, Generic, Union, Optional, Protocol, Tuple, List, Any, Self
 from types import TracebackType
 from enum import Flag, Enum, auto

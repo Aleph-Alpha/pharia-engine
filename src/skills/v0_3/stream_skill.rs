@@ -1,7 +1,7 @@
 use crate::csi::MessageDelta as CsiMessageDelta;
 use crate::skills::v0_3::csi;
 use exports::pharia::skill::stream_skill_handler::StreamSkillMetadata;
-use pharia::skill::chat_response::{Host as ChatResponseHost, MessageDelta};
+use pharia::skill::chat_output::{Host as ChatOutputHost, MessageDelta};
 use serde_json::Value;
 use wasmtime::component::bindgen;
 
@@ -36,7 +36,7 @@ impl TryFrom<StreamSkillMetadata> for skills::SkillMetadata {
     }
 }
 
-impl ChatResponseHost for skills::LinkedCtx {
+impl ChatOutputHost for skills::LinkedCtx {
     async fn write_stream_event(&mut self, event: MessageDelta) {
         let MessageDelta { role, content } = event;
         self.skill_ctx

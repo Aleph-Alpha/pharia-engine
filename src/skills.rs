@@ -391,11 +391,16 @@ impl SupportedVersion {
                     v0_2::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
                 Self::V0_3 => {
-                    v0_3::skill::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
+                    v0_3::skill::Skill::add_to_linker(
+                        linker,
+                        // &v0_3::skill::LinkOptions::default(),
+                        |state: &mut LinkedCtx| state,
+                    )?;
                 }
                 Self::V0_3Streaming => {
                     v0_3::stream_skill::StreamSkill::add_to_linker(
                         linker,
+                        v0_3::stream_skill::LinkOptions::default().streaming(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }

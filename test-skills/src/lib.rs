@@ -70,7 +70,7 @@ pub fn given_rust_skill_chat() -> TestSkill {
 #[must_use]
 pub fn given_python_skill_greet_v0_2() -> TestSkill {
     static WASM_BUILD: LazyLock<String> =
-        LazyLock::new(|| given_python_skill("greet-v0_2", "0.2", "skill"));
+        LazyLock::new(|| given_python_skill("greet-v0_2", "0.2", "skill", false));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
@@ -78,7 +78,7 @@ pub fn given_python_skill_greet_v0_2() -> TestSkill {
 #[must_use]
 pub fn given_python_skill_greet_v0_3() -> TestSkill {
     static WASM_BUILD: LazyLock<String> =
-        LazyLock::new(|| given_python_skill("greet-v0_3", "0.3", "skill"));
+        LazyLock::new(|| given_python_skill("greet-v0_3", "0.3", "skill", false));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
@@ -86,7 +86,7 @@ pub fn given_python_skill_greet_v0_3() -> TestSkill {
 #[must_use]
 pub fn given_python_skill_stream() -> TestSkill {
     static WASM_BUILD: LazyLock<String> =
-        LazyLock::new(|| given_python_skill("stream", "0.3", "stream-skill"));
+        LazyLock::new(|| given_python_skill("stream", "0.3", "stream-skill", true));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
@@ -106,10 +106,15 @@ pub fn given_csi_from_metadata_skill() -> TestSkill {
 }
 
 /// Creates `{package-name}-py.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `python-skills/{package-name}`
-fn given_python_skill(package_name: &str, wit_version: &str, world: &str) -> String {
+fn given_python_skill(
+    package_name: &str,
+    wit_version: &str,
+    world: &str,
+    unstable: bool,
+) -> String {
     let target_path = format!("{SKILL_BUILD_CACHE_DIR}/{package_name}-py.wasm");
     if !Path::new(&target_path).exists() {
-        build_python_skill(package_name, &target_path, wit_version, world);
+        build_python_skill(package_name, &target_path, wit_version, world, unstable);
     }
     target_path
 }
@@ -156,23 +161,37 @@ fn build_rust_skill(package_name: &str) {
     .unwrap();
 }
 
-fn build_python_skill(package_name: &str, target_path: &str, wit_version: &str, world: &str) {
+fn build_python_skill(
+    package_name: &str,
+    target_path: &str,
+    wit_version: &str,
+    world: &str,
+    unstable: bool,
+) {
     let venv = static_venv();
 
     fs::create_dir_all(SKILL_BUILD_CACHE_DIR).unwrap();
 
-    venv.run(&[
+    let wit_path = format!("wit/skill@{wit_version}/skill.wit");
+    let app_path = format!("python-skills.{package_name}.app");
+
+    let mut args = vec![
         "componentize-py",
         "-d",
-        &format!("wit/skill@{wit_version}/skill.wit"),
+        &wit_path,
         "-w",
         world,
         "componentize",
-        &format!("python-skills.{package_name}.app"),
+        &app_path,
         "-o",
         target_path,
-    ])
-    .unwrap();
+    ];
+
+    if unstable {
+        args.insert(1, "--all-features");
+    }
+
+    venv.run(&args).unwrap();
 
     // Make resulting skill component smaller
     //

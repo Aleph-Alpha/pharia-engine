@@ -9,26 +9,28 @@ world skill {
     export skill-handler;
 }
 
-@since(version = 0.3.4)
+@unstable(feature = streaming)
 world stream-skill {
     @since(version = 0.3.4)
     include csi;
 
-    import chat-response;
-    @since(version = 0.3.4)
+    @unstable(feature = streaming)
+    import chat-output;
+
+    @unstable(feature = streaming)
     export stream-skill-handler;
 }
 
 @since(version = 0.3.4)
 interface stream-skill-handler {
     /// The set of errors which may be raised by functions in this interface
-    @since(version = 0.3.4)
+    @unstable(feature = streaming)
     variant error {
         internal(string),
         invalid-input(string)
     }
 
-    @since(version = 0.3.4)
+    @unstable(feature = streaming)
     run: func(input: list<u8>) -> result<_,error>;
 
     @since(version = 0.3.4)
@@ -38,7 +40,7 @@ interface stream-skill-handler {
         output-schema: list<u8>,
     }
 
-    @since(version = 0.3.4)
+    @unstable(feature = streaming)
     metadata: func() -> stream-skill-metadata;
 }
 
@@ -75,13 +77,16 @@ world csi {
     import language;
 }
 
-@since(version = 0.3.4)
-interface chat-response {
+/// Allows to send multiple message delta events
+@unstable(feature = streaming)
+interface chat-output {
+    @unstable(feature = streaming)
     record message-delta {
         role: option<string>,
         content: string,
     }
 
+    @unstable(feature = streaming)
     write-stream-event: func(event: message-delta);
 }
 
@@ -393,7 +398,7 @@ interface inference {
         /// a token is mentioned in the completion, the more its probability will decrease.
         /// A negative value will increase the likelihood of repeating tokens.
         frequency-penalty: option<f64>,
-        /// The presence penaltscheint ein behaviour change von poetry 2.0 zu 2.1 zu sein :D y reduces the probability of generating tokens that are already
+        /// The presence penalty reduces the probability of generating tokens that are already
         /// present in the generated text respectively prompt. Presence penalty is independent of the
         /// number of occurrences. Increase the value to reduce the probability of repeating text.
         presence-penalty: option<f64>,

@@ -3,8 +3,8 @@ from typing import Generator
 
 import stream_skill.exports
 from stream_skill.exports.stream_skill_handler import StreamSkillMetadata
-from stream_skill.imports.chat_response import MessageDelta as OutputMessageDelta
-from stream_skill.imports.chat_response import write_stream_event
+from stream_skill.imports.chat_output import MessageDelta as OutputMessageDelta
+from stream_skill.imports.chat_output import write_stream_event
 from stream_skill.imports.inference import (
     ChatParams,
     ChatRequest,
