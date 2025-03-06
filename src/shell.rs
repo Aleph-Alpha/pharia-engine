@@ -162,6 +162,7 @@ where
         .route("/csi", post(http_csi_handle::<C>))
         // Keep for backwards compatibility
         .route("/skills", get(skills))
+        // Hidden routes for cache for internal use
         .route("/cached_skills", get(cached_skills))
         .route(
             "/cached_skills/{namespace}/{name}",
