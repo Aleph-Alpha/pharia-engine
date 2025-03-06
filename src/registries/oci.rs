@@ -67,7 +67,7 @@ impl SkillRegistry for OciRegistry {
                 Ok(image) => {
                     let binary = image.layers.into_iter().next().unwrap().data;
                     let digest = if let Some(digest) = image.digest {
-                        Digest(digest)
+                        Digest::new(digest)
                     } else {
                         warn!("Registry doesn't return digests. Fetching manually.");
                         self.fetch_digest(name, tag).await?.ok_or_else(|| {
@@ -104,7 +104,7 @@ impl SkillRegistry for OciRegistry {
                 .fetch_manifest_digest(&self.reference(name, tag), &self.auth())
                 .await;
             match result {
-                Ok(digest) => Ok(Some(Digest(digest))),
+                Ok(digest) => Ok(Some(Digest::new(digest))),
                 // We want to distinguish between a skill that is not there and runtime errors
                 Err(e) => {
                     if is_skill_not_found(&e) {

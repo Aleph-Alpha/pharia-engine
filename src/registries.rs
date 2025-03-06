@@ -10,7 +10,13 @@ type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Used to check if a skill image has changed
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Digest(pub String);
+pub struct Digest(String);
+
+impl Digest {
+    pub fn new(digest: impl Into<String>) -> Self {
+        Self(digest.into())
+    }
+}
 
 /// Contains the bytes necessary to instantiate a Skill, as well as the
 /// digest at the time of the pull associated with these bytes.
@@ -93,9 +99,7 @@ pub mod tests {
             tag: &'a str,
         ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
             if let Some(bytes) = self.get(name) {
-                Box::pin(
-                    async move { Ok(Some(SkillImage::new(bytes.clone(), Digest(tag.to_owned())))) },
-                )
+                Box::pin(async move { Ok(Some(SkillImage::new(bytes.clone(), Digest::new(tag)))) })
             } else {
                 Box::pin(async { Ok(None) })
             }
@@ -106,7 +110,7 @@ pub mod tests {
             _name: &'a str,
             tag: &'a str,
         ) -> DynFuture<'a, Result<Option<Digest>, RegistryError>> {
-            Box::pin(async { Ok(Some(Digest(tag.to_owned()))) })
+            Box::pin(async { Ok(Some(Digest::new(tag.to_owned()))) })
         }
     }
 
