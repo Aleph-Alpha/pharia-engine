@@ -61,7 +61,7 @@ where
 
     pub fn upsert_skill(&mut self, skill: ConfiguredSkill) {
         info!("New or changed skill: {skill}");
-        let skill_path = SkillPath::new(skill.namespace, &skill.name);
+        let skill_path = skill.path();
         if self
             .known_skills
             .insert(skill_path.clone(), skill.tag)
