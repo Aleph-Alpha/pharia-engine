@@ -153,12 +153,14 @@ where
 {
     Router::new()
         // Authenticated routes
+        .route("/v1/skills", get(skills))
         .route(
             "/v1/skills/{namespace}/{name}/metadata",
             get(skill_metadata),
         )
         .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
         .route("/csi", post(http_csi_handle::<C>))
+        // Keep for backwards compatibility
         .route("/skills", get(skills))
         .route("/cached_skills", get(cached_skills))
         .route(
@@ -412,7 +414,7 @@ async fn run_skill(
 #[utoipa::path(
     get,
     operation_id = "skills",
-    path = "/skills",
+    path = "/v1/skills",
     tag = "skills",
     security(("api_token" = [])),
     responses(
