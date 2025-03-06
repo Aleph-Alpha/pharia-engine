@@ -9,7 +9,7 @@ use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
-use crate::skills::{Engine, Skill, SkillError};
+use crate::skills::{Engine, Skill, SkillError, SkillPath};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
@@ -36,6 +36,10 @@ impl ConfiguredSkill {
             name: name.into(),
             tag: tag.into(),
         }
+    }
+
+    pub fn path(&self) -> SkillPath {
+        SkillPath::new(self.namespace.clone(), &self.name)
     }
 }
 
