@@ -1,12 +1,5 @@
-use std::{
-    convert::Infallible,
-    future::Future,
-    iter::once,
-    net::SocketAddr,
-    time::{Duration, Instant},
-};
-
 use anyhow::Context;
+use async_stream::{stream, try_stream};
 use axum::{
     Json, Router,
     extract::{FromRef, MatchedPath, Path, Request, State},
@@ -25,6 +18,13 @@ use axum_extra::{
 use futures::{self, Stream, StreamExt, stream};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::{
+    convert::Infallible,
+    future::Future,
+    iter::once,
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -427,12 +427,13 @@ async fn run_skill(
     post,
     operation_id = "chat_skill",
     path = "/v1/skills/{namespace}/{name}/chat",
-    request_body(content_type = "application/json", description = "The expected input for the skill in JSON format.", example = json!({"text": "some text to be summarized", "length": "short"})),
+    request_body(content_type = "application/json", description = "The expected input for the skill in JSON format.", example = json!({})),
     security(("api_token" = [])),
     tag = "skills",
     responses(
-        (status = 200, description = "The event stream is initialized successfully.", body=Value, example = json!("")),
-        (status = 400, description = "The Skill invocation failed.", body=Value, example = json!("Skill not found."))
+        (status = 200, description = "A stream of substrings composing a message in response to a chat history",  body=Value,
+            content(("text/event-stream", example = ""))),
+        (status = 400, description = "Invalid Request", body=Value, example = "")
     ),
 )]
 async fn chat_skill(
@@ -441,11 +442,11 @@ async fn chat_skill(
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let stream = stream::once(async { Ok::<_, Infallible>(Event::default().data("H")) })
-        .chain(stream::once(async { Ok(Event::default().data("e")) }))
-        .chain(stream::once(async { Ok(Event::default().data("l")) }))
-        .chain(stream::once(async { Ok(Event::default().data("l")) }))
-        .chain(stream::once(async { Ok(Event::default().data("o")) }));
+    let stream = try_stream! {
+        for c in "Hello".chars() {
+            yield Event::default().data(c.to_string());
+        }
+    };
 
     Sse::new(stream)
 }
