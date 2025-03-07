@@ -3,6 +3,7 @@ mod chunking;
 mod config;
 mod csi;
 mod csi_shell;
+mod feature_set;
 mod http;
 mod inference;
 mod language_selection;
@@ -100,6 +101,7 @@ impl Kernel {
         let authorization = Authorization::new(app_config.authorization_url);
 
         let shell = match Shell::new(
+            app_config.pharia_ai_feature_set,
             app_config.kernel_address,
             authorization.api(),
             skill_runtime.api(),

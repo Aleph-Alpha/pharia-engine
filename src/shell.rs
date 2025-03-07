@@ -1,30 +1,21 @@
 use anyhow::Context;
-use async_stream::{stream, try_stream};
+use async_stream::try_stream;
 use axum::{
     Json, Router,
     extract::{FromRef, MatchedPath, Path, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
-    response::{
-        Html, IntoResponse, Sse,
-        sse::{Event, KeepAlive},
-    },
+    response::{Html, IntoResponse, Sse, sse::Event},
     routing::{delete, get, post},
 };
 use axum_extra::{
     TypedHeader,
-    headers::{Authorization, UserAgent, authorization::Bearer},
+    headers::{Authorization, authorization::Bearer},
 };
-use futures::{self, Stream, StreamExt, stream};
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    convert::Infallible,
-    future::Future,
-    iter::once,
-    net::SocketAddr,
-    time::{Duration, Instant},
-};
+use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time::Instant};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -48,6 +39,7 @@ use crate::{
     authorization::{AuthorizationApi, authorization_middleware},
     csi::Csi,
     csi_shell::http_csi_handle,
+    feature_set::FeatureSet,
     namespace_watcher::Namespace,
     skill_runtime::{SkillRuntimeApi, SkillRuntimeError},
     skill_store::SkillStoreApi,
@@ -62,6 +54,7 @@ impl Shell {
     /// Start a shell listening to incoming requests at the given address. Successful construction
     /// implies that the listener is bound to the endpoint.
     pub async fn new(
+        feature_set: FeatureSet,
         addr: impl Into<SocketAddr>,
         authorization_api: AuthorizationApi,
         skill_runtime_api: SkillRuntimeApi,
@@ -84,7 +77,7 @@ impl Shell {
             csi_drivers,
         );
         let handle = tokio::spawn(async {
-            let res = axum::serve(listener, http(app_state))
+            let res = axum::serve(listener, http(feature_set, app_state))
                 .with_graceful_shutdown(shutdown_signal)
                 .await;
             if let Err(e) = res {
@@ -157,10 +150,15 @@ where
     }
 }
 #[allow(deprecated)]
-pub fn http<C>(app_state: AppState<C>) -> Router
+pub fn http<C>(feature_set: FeatureSet, app_state: AppState<C>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
 {
+    let api_doc = if feature_set == FeatureSet::Beta {
+        ApiDocBeta::openapi()
+    } else {
+        ApiDoc::openapi()
+    };
     Router::new()
         // Authenticated routes
         .route("/v1/skills", get(skills))
@@ -189,7 +187,7 @@ where
         .route("/skill.wit", get(skill_wit()))
         .route(
             "/api-docs",
-            get(async || Html(Scalar::new(ApiDoc::openapi()).to_html())),
+            get(async || Html(Scalar::new(api_doc).to_html())),
         )
         .route("/openapi.json", get(serve_docs))
         // maintaining `healthcheck` route for backward compatibility
@@ -276,6 +274,19 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
     )
 )]
 struct ApiDoc;
+
+#[derive(OpenApi)]
+#[openapi(
+    info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
+    paths(serve_docs, skills, run_skill, chat_skill, skill_wit, skill_metadata),
+    modifiers(&SecurityAddon),
+    components(schemas(ExecuteSkillArgs, Namespace)),
+    tags(
+        (name = "skills"),
+        (name = "docs"),
+    )
+)]
+struct ApiDocBeta;
 
 struct SecurityAddon;
 
@@ -437,10 +448,10 @@ async fn run_skill(
     ),
 )]
 async fn chat_skill(
-    State(skill_runtime_api): State<SkillRuntimeApi>,
-    bearer: TypedHeader<Authorization<Bearer>>,
-    Path((namespace, name)): Path<(Namespace, String)>,
-    Json(input): Json<Value>,
+    State(_skill_runtime_api): State<SkillRuntimeApi>,
+    _bearer: TypedHeader<Authorization<Bearer>>,
+    Path((_namespace, _namee)): Path<(Namespace, String)>,
+    Json(_input): Json<Value>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let stream = try_stream! {
         for c in "Hello".chars() {
@@ -547,6 +558,7 @@ mod tests {
     use crate::{
         authorization::{self, tests::StubAuthorization},
         csi::tests::{DummyCsi, StubCsi},
+        feature_set::PRODUCTION_FEATURE_SET,
         inference,
         skill_runtime::{
             SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg,
@@ -647,7 +659,7 @@ mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
 
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
                 Request::builder()
@@ -695,7 +707,7 @@ mod tests {
         auth_value.set_sensitive(true);
         let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
         let app_state = AppState::dummy().with_csi_drivers(csi);
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
             .oneshot(
@@ -729,7 +741,7 @@ mod tests {
         });
         let skill_runtime_api = skill_executer_mock.api();
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
         let api_token = "dummy auth token";
@@ -776,7 +788,7 @@ mod tests {
         });
         let skill_runtime_api = skill_executer_mock.api();
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
         let api_token = "dummy auth token";
@@ -807,7 +819,7 @@ mod tests {
     async fn chat_endpoint_should_send_individual_message_deltas() {
         // Given
         let app_state = AppState::dummy();
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When asking for a chat message
         let api_token = "dummy auth token";
@@ -862,7 +874,7 @@ mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
 
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
                 Request::builder()
@@ -892,7 +904,7 @@ mod tests {
         let app_state = AppState::dummy().with_skill_runtime_api(saboteur_skill_executer.api());
 
         // When
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
                 Request::builder()
@@ -934,7 +946,7 @@ mod tests {
         let app_state = AppState::dummy()
             .with_skill_store_api(skill_store_api.clone())
             .with_skill_runtime_api(saboteur_skill_executer.api());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
         let api_token = api_token();
@@ -983,7 +995,7 @@ mod tests {
         let app_state = AppState::dummy()
             .with_skill_store_api(skill_store_api.clone())
             .with_skill_runtime_api(saboteur_skill_executer.api());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When the skill is deleted
         let api_token = api_token();
@@ -1040,7 +1052,7 @@ mod tests {
         let app_state = AppState::dummy()
             .with_skill_store_api(skill_store_api.clone())
             .with_skill_runtime_api(saboteur_skill_executer.api());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When the skill is deleted
         let api_token = api_token();
@@ -1073,7 +1085,7 @@ mod tests {
     #[tokio::test]
     async fn healthcheck() {
         let app_state = AppState::dummy();
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
                 Request::builder()
@@ -1097,7 +1109,7 @@ mod tests {
             };
         });
         let app_state = AppState::dummy().with_authorization_api(saboteur_authorization.api());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
                 Request::builder()
@@ -1114,7 +1126,7 @@ mod tests {
     #[tokio::test]
     async fn skill_wit_route_should_return_current_wit_world() {
         let app_state = AppState::dummy();
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
                 Request::builder()
@@ -1150,7 +1162,7 @@ mod tests {
         let app_state = AppState::dummy()
             .with_skill_store_api(skill_store_api)
             .with_skill_runtime_api(saboteur_skill_executer.api());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
         let api_token = api_token();
@@ -1186,7 +1198,7 @@ mod tests {
             };
         });
         let app_state = AppState::dummy().with_authorization_api(saboteur_authorization.api());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
         let api_token = api_token();
@@ -1231,7 +1243,7 @@ mod tests {
             }
         });
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.api());
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When executing a skill in the namespace
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
@@ -1271,7 +1283,7 @@ mod tests {
         let app_state = AppState::dummy().with_skill_runtime_api(skill_executer_dummy.api());
 
         // When executing a skill
-        let http = http(app_state);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
                 Request::builder()

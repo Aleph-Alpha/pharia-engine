@@ -3,10 +3,16 @@ use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use serde::Deserialize;
 use std::{net::SocketAddr, time::Duration};
 
-use crate::namespace_watcher::NamespaceConfigs;
+use crate::{feature_set::FeatureSet, namespace_watcher::NamespaceConfigs};
 
 mod defaults {
     use std::{net::SocketAddr, time::Duration};
+
+    use crate::feature_set::FeatureSet;
+
+    pub fn pharia_ai_feature_set() -> FeatureSet {
+        FeatureSet::Beta
+    }
 
     pub fn kernel_address() -> SocketAddr {
         "0.0.0.0:8081".parse().unwrap()
@@ -40,6 +46,8 @@ mod defaults {
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct AppConfig {
+    #[serde(default = "defaults::pharia_ai_feature_set")]
+    pub pharia_ai_feature_set: FeatureSet,
     #[serde(default = "defaults::kernel_address")]
     pub kernel_address: SocketAddr,
     /// Address to expose metrics on
@@ -125,6 +133,7 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            pharia_ai_feature_set: defaults::pharia_ai_feature_set(),
             kernel_address: defaults::kernel_address(),
             metrics_address: defaults::metrics_address(),
             inference_url: defaults::inference_url(),
@@ -174,6 +183,7 @@ mod tests {
     fn load_app_config_from_one_source() -> anyhow::Result<()> {
         // Given a hashmap with variables
         let env_vars = HashMap::from([
+            ("PHARIA_AI_FEATURE_SET".to_owned(), "42".to_owned()),
             ("KERNEL_ADDRESS".to_owned(), "192.123.1.1:8081".to_owned()),
             ("METRICS_ADDRESS".to_owned(), "0.0.0.0:9000".to_owned()),
             (
@@ -203,6 +213,7 @@ mod tests {
         // When we build the source from the environment variables
         let config = AppConfig::from_sources(file_source, env_source)?;
 
+        assert_eq!(config.pharia_ai_feature_set, FeatureSet::Stable(42));
         assert_eq!(config.kernel_address, "192.123.1.1:8081".parse().unwrap());
         assert_eq!(config.log_level, "dummy");
         assert_eq!(config.namespaces.len(), 1);
@@ -219,6 +230,7 @@ mod tests {
         let config = config.try_deserialize::<AppConfig>()?;
 
         // Then the config contains the default values
+        assert_eq!(config.pharia_ai_feature_set, FeatureSet::Beta);
         assert_eq!(config.kernel_address, "0.0.0.0:8081".parse().unwrap());
         assert_eq!(config.metrics_address, "0.0.0.0:9000".parse().unwrap());
         assert_eq!(
