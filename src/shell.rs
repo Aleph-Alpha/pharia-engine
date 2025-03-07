@@ -1,4 +1,10 @@
-use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
+use std::{
+    convert::Infallible,
+    future::Future,
+    iter::once,
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 use anyhow::Context;
 use axum::{
@@ -6,13 +12,17 @@ use axum::{
     extract::{FromRef, MatchedPath, Path, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
-    response::{Html, IntoResponse},
+    response::{
+        Html, IntoResponse, Sse,
+        sse::{Event, KeepAlive},
+    },
     routing::{delete, get, post},
 };
 use axum_extra::{
     TypedHeader,
-    headers::{Authorization, authorization::Bearer},
+    headers::{Authorization, UserAgent, authorization::Bearer},
 };
+use futures::{self, Stream, StreamExt, stream};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::{net::TcpListener, task::JoinHandle};
@@ -159,6 +169,7 @@ where
             get(skill_metadata),
         )
         .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
+        .route("/v1/skills/{namespace}/{name}/chat", post(chat_skill))
         .route("/csi", post(http_csi_handle::<C>))
         // Keep for backwards compatibility
         .route("/skills", get(skills))
@@ -409,6 +420,36 @@ async fn run_skill(
     }
 }
 
+/// Chat
+///
+/// Chat with a Skill in the Kernel from one of the available repositories.
+#[utoipa::path(
+    post,
+    operation_id = "chat_skill",
+    path = "/v1/skills/{namespace}/{name}/chat",
+    request_body(content_type = "application/json", description = "The expected input for the skill in JSON format.", example = json!({"text": "some text to be summarized", "length": "short"})),
+    security(("api_token" = [])),
+    tag = "skills",
+    responses(
+        (status = 200, description = "The event stream is initialized successfully.", body=Value, example = json!("")),
+        (status = 400, description = "The Skill invocation failed.", body=Value, example = json!("Skill not found."))
+    ),
+)]
+async fn chat_skill(
+    State(skill_runtime_api): State<SkillRuntimeApi>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Path((namespace, name)): Path<(Namespace, String)>,
+    Json(input): Json<Value>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let stream = stream::once(async { Ok::<_, Infallible>(Event::default().data("H")) })
+        .chain(stream::once(async { Ok(Event::default().data("e")) }))
+        .chain(stream::once(async { Ok(Event::default().data("l")) }))
+        .chain(stream::once(async { Ok(Event::default().data("l")) }))
+        .chain(stream::once(async { Ok(Event::default().data("o")) }));
+
+    Sse::new(stream)
+}
+
 /// List
 ///
 /// List of configured Skills.
@@ -524,7 +565,7 @@ mod tests {
         http::{Method, Request, header},
     };
     use http_body_util::BodyExt;
-    use mime::APPLICATION_JSON;
+    use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
     use tokio::{sync::mpsc, task::JoinHandle};
@@ -759,6 +800,45 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = serde_json::from_slice::<String>(&body).unwrap();
         assert_eq!(answer, "dummy completion");
+    }
+
+    #[tokio::test]
+    async fn chat_endpoint_should_send_individual_message_deltas() {
+        // Given
+        let app_state = AppState::dummy();
+        let http = http(app_state);
+
+        // When asking for a chat message
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/greet_skill/chat")
+                    .body(Body::from(serde_json::to_string(&json!("Hello")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get separate events for each letter in "Hello"
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = "\
+            data: H\n\n\
+            data: e\n\n\
+            data: l\n\n\
+            data: l\n\n\
+            data: o\n\n";
+        assert_eq!(body_text, expected_body);
     }
 
     #[tokio::test]
