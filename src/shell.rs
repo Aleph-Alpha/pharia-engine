@@ -320,7 +320,7 @@ struct ExecuteSkillArgs {
 /// Get the metadata (input schema, output schema, description) for a Skill.
 #[utoipa::path(
     get,
-    operation_id = "skill metadata",
+    operation_id = "skill_metadata",
     path = "/v1/skills/{namespace}/{name}/metadata",
     security(("api_token" = [])),
     tag = "skills",
@@ -372,7 +372,7 @@ async fn skill_metadata(
 /// Run a Skill in the Kernel from one of the available repositories.
 #[utoipa::path(
     post,
-    operation_id = "run skill",
+    operation_id = "run_skill",
     path = "/v1/skills/{namespace}/{name}/run",
     request_body(content_type = "application/json", description = "The expected input for the skill in JSON format.", example = json!({"text": "some text to be summarized", "length": "short"})),
     security(("api_token" = [])),
