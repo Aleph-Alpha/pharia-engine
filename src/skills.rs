@@ -213,7 +213,7 @@ pub enum Skill {
     /// Skills targeting versions 0.2.x of the skill world
     V0_2(v0_2::SkillPre<LinkedCtx>),
     /// Skills targeting versions 0.3.x of the skill world
-    V0_3(v0_3::SkillPre<LinkedCtx>),
+    V0_3(v0_3::skill::SkillPre<LinkedCtx>),
 }
 
 impl Skill {
@@ -230,7 +230,7 @@ impl Skill {
                 Ok(Skill::V0_2(skill))
             }
             SupportedVersion::V0_3 => {
-                let skill = v0_3::SkillPre::new(pre)
+                let skill = v0_3::skill::SkillPre::new(pre)
                     .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
                 Ok(Skill::V0_3(skill))
             }
@@ -296,11 +296,13 @@ impl Skill {
                 let result = match result {
                     Ok(result) => result,
                     Err(e) => match e {
-                        v0_3::exports::pharia::skill::skill_handler::Error::Internal(e) => {
+                        v0_3::skill::exports::pharia::skill::skill_handler::Error::Internal(e) => {
                             tracing::error!("Failed to run skill, internal skill error:\n{e}");
                             return Err(anyhow!("Internal skill error:\n{e}"));
                         }
-                        v0_3::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                        v0_3::skill::exports::pharia::skill::skill_handler::Error::InvalidInput(
+                            e,
+                        ) => {
                             tracing::error!("Failed to run skill, invalid input:\n{e}");
                             return Err(anyhow!("Invalid input:\n{e}"));
                         }
@@ -330,7 +332,7 @@ impl SupportedVersion {
                     v0_2::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
                 Self::V0_3 => {
-                    v0_3::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
+                    v0_3::skill::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
             }
         }
