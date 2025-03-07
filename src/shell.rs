@@ -521,9 +521,11 @@ mod tests {
 
     use axum::{
         body::Body,
-        http::{self, Request, header},
+        http::{Method, Request, header},
     };
     use http_body_util::BodyExt;
+    use mime::APPLICATION_JSON;
+    use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
     use tokio::{sync::mpsc, task::JoinHandle};
     use tower::util::ServiceExt;
@@ -607,7 +609,7 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::GET)
+                    .method(Method::GET)
                     .header(header::AUTHORIZATION, auth_value)
                     .uri("/v1/skills/local/greet_skill/metadata")
                     .body(Body::empty())
@@ -656,8 +658,8 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(header::AUTHORIZATION, auth_value)
                     .uri("/csi")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
@@ -695,9 +697,9 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
                     .uri(format!("/v1/skills/{bad_namespace}/greet_skill/run"))
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -742,15 +744,17 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
                     .uri("/v1/skills/local/greet_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
             )
             .await
             .unwrap();
+
+        // Then
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = serde_json::from_slice::<String>(&body).unwrap();
@@ -781,9 +785,9 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
                     .uri("/v1/skills/local/greet_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -811,8 +815,8 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .uri("/v1/skills/local/greet_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -859,9 +863,9 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::GET)
+                    .method(Method::GET)
                     .uri("/cached_skills")
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -908,7 +912,7 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::DELETE)
+                    .method(Method::DELETE)
                     .uri(format!("/cached_skills/{namespace}/haiku_skill"))
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
@@ -965,9 +969,9 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::DELETE)
+                    .method(Method::DELETE)
                     .uri(format!("/cached_skills/{namespace}/haiku_skill"))
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -1153,9 +1157,9 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
                     .uri("/v1/skills/any-namespace/any_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -1190,9 +1194,9 @@ mod tests {
         let resp = http
             .oneshot(
                 Request::builder()
-                    .method(http::Method::POST)
-                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
                     .uri("/v1/skills/any-namespace/any_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
