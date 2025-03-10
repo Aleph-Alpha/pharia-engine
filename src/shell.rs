@@ -443,8 +443,7 @@ async fn run_skill(
     tag = "skills",
     responses(
         (status = 200, description = "A stream of substrings composing a message in response to a chat history",  body=Value,
-            content(("text/event-stream", example = ""))),
-        (status = 400, description = "Invalid Request", body=Value, example = "")
+            content(("text/event-stream", example = "")))
     ),
 )]
 async fn chat_skill(
