@@ -517,10 +517,10 @@ struct SseErrorEvent {
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
 )]
-async fn skills(State(skill_store_api): State<SkillStoreApi>) -> (StatusCode, Json<Vec<String>>) {
+async fn skills(State(skill_store_api): State<SkillStoreApi>) -> Json<Vec<String>> {
     let response = skill_store_api.list().await;
     let response = response.iter().map(ToString::to_string).collect();
-    (StatusCode::OK, Json(response))
+    Json(response)
 }
 
 /// cached_skills
@@ -538,12 +538,10 @@ async fn skills(State(skill_store_api): State<SkillStoreApi>) -> (StatusCode, Js
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
 )]
-async fn cached_skills(
-    State(skill_store_api): State<SkillStoreApi>,
-) -> (StatusCode, Json<Vec<String>>) {
+async fn cached_skills(State(skill_store_api): State<SkillStoreApi>) -> Json<Vec<String>> {
     let response = skill_store_api.list_cached().await;
     let response = response.iter().map(ToString::to_string).collect();
-    (StatusCode::OK, Json(response))
+    Json(response)
 }
 
 /// drop_cached_skill
@@ -566,7 +564,7 @@ async fn cached_skills(
 async fn drop_cached_skill(
     State(skill_store_api): State<SkillStoreApi>,
     Path((namespace, name)): Path<(Namespace, String)>,
-) -> (StatusCode, Json<String>) {
+) -> Json<String> {
     let skill_path = SkillPath::new(namespace, name);
     let skill_was_cached = skill_store_api.invalidate_cache(skill_path).await;
     let msg = if skill_was_cached {
@@ -574,7 +572,7 @@ async fn drop_cached_skill(
     } else {
         "Skill was not present in cache".to_string()
     };
-    (StatusCode::OK, Json(msg))
+    Json(msg)
 }
 
 /// WIT (WebAssembly Interface Types) of Skills
