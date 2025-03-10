@@ -103,7 +103,7 @@ impl SkillRuntime {
 }
 
 /// The skill runtime API is used to interact with the skill runtime actor.
-/// 
+///
 /// Using a trait rather than an mpsc allows for easier and more ergonomic testing, since the
 /// implementation of the test double is not required to be an actor.
 pub trait SkillRuntimeApi {
@@ -141,8 +141,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             send,
             api_token,
         });
-        self
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
@@ -163,8 +162,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             _api_token: api_token,
         };
 
-        self
-            .send(SkillRuntimeMsg::Chat(msg))
+        self.send(SkillRuntimeMsg::Chat(msg))
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
@@ -176,8 +174,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Metadata(MetadataRequest { skill_path, send });
-        self
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()

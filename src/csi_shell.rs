@@ -17,20 +17,19 @@ use serde_json::{Value, json};
 use crate::{
     csi::Csi,
     csi_shell::{v0_2::CsiRequest as V0_2CsiRequest, v0_3::CsiRequest as V0_3CsiRequest},
-    shell::AppState,
-    skill_runtime::SkillRuntimeApiImpl,
+    shell::CsiState,
     skills::SupportedVersion,
 };
 
 pub async fn http_csi_handle<C>(
-    State(app_state): State<AppState<C, SkillRuntimeApiImpl>>,
+    State(CsiState(csi)): State<CsiState<C>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<VersionedCsiRequest>,
 ) -> (StatusCode, Json<Value>)
 where
     C: Csi + Clone + Sync,
 {
-    let drivers = app_state.csi_drivers;
+    let drivers = csi;
     let result = match args {
         VersionedCsiRequest::V0_2(request) => {
             request.act(&drivers, bearer.token().to_owned()).await

@@ -36,12 +36,12 @@ use utoipa::{
 use utoipa_scalar::Scalar;
 
 use crate::{
-    authorization::{authorization_middleware, AuthorizationApi},
+    authorization::{AuthorizationApi, authorization_middleware},
     csi::Csi,
     csi_shell::http_csi_handle,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
-    skill_runtime::{ChatEvent, SkillRuntimeApiImpl, SkillRuntimeApi, SkillRuntimeError},
+    skill_runtime::{ChatEvent, SkillRuntimeApi, SkillRuntimeApiImpl, SkillRuntimeError},
     skill_store::SkillStoreApi,
     skills::{SkillMetadata, SkillPath},
 };
@@ -94,7 +94,7 @@ impl Shell {
 
 /// State shared between routes
 #[derive(Clone)]
-pub struct AppState<C, R>
+struct AppState<C, R>
 where
     C: Clone,
     R: Clone,
@@ -102,13 +102,13 @@ where
     authorization_api: AuthorizationApi,
     skill_store_api: SkillStoreApi,
     skill_runtime_api: R,
-    pub csi_drivers: C,
+    csi_drivers: C,
 }
 
 impl<C, R> AppState<C, R>
 where
     C: Csi + Clone + Sync + Send + 'static,
-    R: SkillRuntimeApi + Clone
+    R: SkillRuntimeApi + Clone,
 {
     pub fn new(
         authorization_api: AuthorizationApi,
@@ -127,7 +127,8 @@ where
 
 impl<C, R> FromRef<AppState<C, R>> for AuthorizationApi
 where
-    C: Clone, R: Clone
+    C: Clone,
+    R: Clone,
 {
     fn from_ref(app_state: &AppState<C, R>) -> AuthorizationApi {
         app_state.authorization_api.clone()
@@ -136,12 +137,30 @@ where
 
 impl<C, R> FromRef<AppState<C, R>> for SkillStoreApi
 where
-    C: Clone, R: Clone
+    C: Clone,
+    R: Clone,
 {
     fn from_ref(app_state: &AppState<C, R>) -> SkillStoreApi {
         app_state.skill_store_api.clone()
     }
 }
+
+/// Wrapper used to extract [`Csi`] api from the [`AppState`] using a [`FromRef`] implementation.
+pub struct CsiState<C>(pub C);
+
+impl<C, R> FromRef<AppState<C, R>> for CsiState<C>
+where
+    C: Clone,
+    R: Clone,
+{
+    fn from_ref(app_state: &AppState<C, R>) -> CsiState<C> {
+        CsiState(app_state.csi_drivers.clone())
+    }
+}
+
+/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
+/// reference from the [`AppState`] using a [`FromRef`] implementation.
+struct SkillRuntimeState<R>(pub R);
 
 impl<C, R> FromRef<AppState<C, R>> for SkillRuntimeState<R>
 where
@@ -153,12 +172,7 @@ where
     }
 }
 
-/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
-/// reference from the [`Self::AppState`] using a [`FromRef`] implementation.
-struct SkillRuntimeState<R>(pub R);
-
-#[allow(deprecated)]
-pub fn http<C>(feature_set: FeatureSet, app_state: AppState<C, SkillRuntimeApiImpl>) -> Router
+fn http<C>(feature_set: FeatureSet, app_state: AppState<C, SkillRuntimeApiImpl>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
 {
