@@ -41,10 +41,12 @@ impl TestFileRegistry {
     fn to_namespace_config(&self) -> NamespaceConfigs {
         let skills = self.skills.join("\"},{\"name\"=\"");
         let dir_path = self.directory.path().to_str().unwrap();
+        // Mask directory path. It could contain characters which represent escape sequences
+        let json_masked_string_with_quotes = serde_json::to_string(dir_path).unwrap();
         toml::from_str(&format!(
             r#"
             [local]
-            path = "{dir_path}"
+            path = {json_masked_string_with_quotes}
             skills = [{{"name"="{skills}"}}]"#,
         ))
         .unwrap()
