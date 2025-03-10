@@ -102,17 +102,33 @@ impl SkillRuntime {
     }
 }
 
-#[derive(Clone)]
-pub struct SkillRuntimeApi {
-    send: mpsc::Sender<SkillRuntimeMsg>,
+/// The skill runtime API is used to interact with the skill runtime actor.
+/// 
+/// Using a trait rather than an mpsc allows for easier and more ergonomic testing, since the
+/// implementation of the test double is not required to be an actor.
+pub trait SkillRuntimeApi2 {
+    async fn run_function(
+        &self,
+        skill_path: SkillPath,
+        input: Value,
+        api_token: String,
+    ) -> Result<Value, SkillRuntimeError>;
+
+    async fn run_chat(
+        &self,
+        skill_path: SkillPath,
+        input: Value,
+        api_token: String,
+    ) -> mpsc::Receiver<ChatEvent>;
+
+    async fn skill_metadata(
+        &self,
+        skill_path: SkillPath,
+    ) -> Result<Option<SkillMetadata>, SkillRuntimeError>;
 }
 
-impl SkillRuntimeApi {
-    pub fn new(send: mpsc::Sender<SkillRuntimeMsg>) -> Self {
-        Self { send }
-    }
-
-    pub async fn run_function(
+impl SkillRuntimeApi2 for mpsc::Sender<SkillRuntimeMsg> {
+    async fn run_function(
         &self,
         skill_path: SkillPath,
         input: Value,
@@ -125,20 +141,20 @@ impl SkillRuntimeApi {
             send,
             api_token,
         });
-        self.send
+        self
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
 
-    pub async fn run_chat(
+    async fn run_chat(
         &self,
         skill_path: SkillPath,
         input: Value,
         api_token: String,
     ) -> mpsc::Receiver<ChatEvent> {
-        let (send, recv) = mpsc::channel::<ChatEvent>(100);
+        let (send, recv) = mpsc::channel::<ChatEvent>(1);
 
         let msg = RunChat {
             skill_path,
@@ -147,24 +163,62 @@ impl SkillRuntimeApi {
             _api_token: api_token,
         };
 
-        self.send
+        self
             .send(SkillRuntimeMsg::Chat(msg))
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
     }
 
-    pub async fn skill_metadata(
+    async fn skill_metadata(
         &self,
         skill_path: SkillPath,
     ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Metadata(MetadataRequest { skill_path, send });
-        self.send
+        self
             .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
+    }
+}
+
+impl SkillRuntimeApi2 for SkillRuntimeApi {
+    async fn run_function(
+        &self,
+        skill_path: SkillPath,
+        input: Value,
+        api_token: String,
+    ) -> Result<Value, SkillRuntimeError> {
+        self.send.run_function(skill_path, input, api_token).await
+    }
+
+    async fn run_chat(
+        &self,
+        skill_path: SkillPath,
+        input: Value,
+        api_token: String,
+    ) -> mpsc::Receiver<ChatEvent> {
+        self.send.run_chat(skill_path, input, api_token).await
+    }
+
+    async fn skill_metadata(
+        &self,
+        skill_path: SkillPath,
+    ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
+        self.send.skill_metadata(skill_path).await
+    }
+}
+
+#[derive(Clone)]
+pub struct SkillRuntimeApi {
+    send: mpsc::Sender<SkillRuntimeMsg>,
+}
+
+impl SkillRuntimeApi {
+    pub fn new(send: mpsc::Sender<SkillRuntimeMsg>) -> Self {
+        Self { send }
     }
 }
 
