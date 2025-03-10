@@ -225,6 +225,26 @@ where
         )
 }
 
+struct HttpError {
+    message: String,
+    status_code: StatusCode,
+}
+
+impl HttpError {
+    fn new(message: String, status_code: StatusCode) -> Self {
+        Self {
+            message,
+            status_code,
+        }
+    }
+}
+
+impl IntoResponse for HttpError {
+    fn into_response(self) -> axum::response::Response {
+        (self.status_code, Json(json!(self.message))).into_response()
+    }
+}
+
 pub enum ShellMetrics {
     HttpRequestsTotal,
     HttpRequestsDurationSeconds,
@@ -449,16 +469,24 @@ async fn run_skill(
 async fn chat_skill(
     State(_skill_runtime_api): State<SkillRuntimeApi>,
     _bearer: TypedHeader<Authorization<Bearer>>,
-    Path((_namespace, _namee)): Path<(Namespace, String)>,
+    Path((namespace, name)): Path<(Namespace, String)>,
     Json(_input): Json<Value>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let stream = try_stream! {
-        for c in "Hello".chars() {
-            yield Event::default().data(c.to_string());
-        }
-    };
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, HttpError> {
+    if name.eq_ignore_ascii_case("hello") {
+        let stream = try_stream! {
+            for c in "Hello".chars() {
+                yield Event::default().data(c.to_string());
+            }
+        };
 
-    Sse::new(stream)
+        Ok(Sse::new(stream))
+    } else {
+        let skill_path = SkillPath::new(namespace, name);
+        Err(HttpError::new(
+            format!("{skill_path} not found."),
+            StatusCode::NOT_FOUND,
+        ))
+    }
 }
 
 /// List
@@ -818,7 +846,7 @@ mod tests {
     async fn chat_endpoint_should_send_individual_message_deltas() {
         // Given
         let app_state = AppState::dummy();
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
+        let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a chat message
         let api_token = "dummy auth token";
@@ -831,8 +859,8 @@ mod tests {
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .header(AUTHORIZATION, auth_value)
-                    .uri("/v1/skills/local/greet_skill/chat")
-                    .body(Body::from(serde_json::to_string(&json!("Hello")).unwrap()))
+                    .uri("/v1/skills/local/hello/chat")
+                    .body(Body::from("\"\""))
                     .unwrap(),
             )
             .await
@@ -851,6 +879,34 @@ mod tests {
             data: l\n\n\
             data: o\n\n";
         assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
+    async fn chat_endpoint_for_skill_does_not_exist() {
+        // Given
+        let app_state = AppState::dummy();
+        let http = http(FeatureSet::Beta, app_state);
+
+        // When asking for a chat message from a skill that does not exist
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/not_exist/chat")
+                    .body(Body::from("\"\""))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get a response that the skill is not found
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
