@@ -16,7 +16,7 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time::Instant};
-use tokio::{net::TcpListener, task::JoinHandle};
+use tokio::{net::TcpListener, sync::mpsc, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -469,23 +469,51 @@ async fn chat_skill(
     Path((_namespace, name)): Path<(Namespace, String)>,
     Json(_input): Json<Value>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, HttpError> {
-    if name.eq_ignore_ascii_case("hello") || name.eq_ignore_ascii_case("saboteur") {
-        let stream = try_stream! {
-            if name.eq_ignore_ascii_case("saboteur") {
-                yield Event::default().event("error").json_data(SseErrorEvent {
-                    message: "Skill is a saboteur".to_string(),
-                }).unwrap();
-                return; // Short circuit after error
-            }
+    if !name.eq_ignore_ascii_case("hello") && !name.eq_ignore_ascii_case("saboteur") {
+        return Err(SkillRuntimeError::SkillNotConfigured.into());
+    };
 
-            for c in "Hello".chars() {
-                yield Event::default().data(c.to_string());
-            }
-        };
+    let (send, mut recv) = mpsc::channel::<ChatEvent>(100);
 
-        Ok(Sse::new(stream))
-    } else {
-        Err(SkillRuntimeError::SkillNotConfigured.into())
+    if name.eq_ignore_ascii_case("saboteur") {
+        send.send(ChatEvent::Error("Skill is a saboteur".to_string()))
+            .await
+            .unwrap();
+    } else if name.eq_ignore_ascii_case("hello") {
+        for c in "Hello".chars() {
+            send.send(ChatEvent::Append(c.to_string())).await.unwrap();
+        }
+    }
+
+    drop(send);
+
+    // We need to use `try_stream!` instead of `stream!`, because `stream!` does not implement the
+    // traits required to be converted into an http body for the response. Since we do wanna rely on
+    // the implementation provided by axum for this, we use `try_stream!` with an infallible error
+    // type. Please note, that we report the actual errors as "normal" events in the stream.
+    let stream = try_stream! {
+        while let Some(event) = recv.recv().await {
+            yield event.into();
+        }
+    };
+
+    Ok(Sse::new(stream))
+}
+
+enum ChatEvent {
+    Append(String),
+    Error(String),
+}
+
+impl From<ChatEvent> for Event {
+    fn from(value: ChatEvent) -> Self {
+        match value {
+            ChatEvent::Append(delta) => Self::default().data(delta),
+            ChatEvent::Error(message) => Self::default()
+                .event("error")
+                .json_data(SseErrorEvent { message })
+                .expect("`json_data` must only be called once."),
+        }
     }
 }
 
