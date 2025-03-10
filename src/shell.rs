@@ -460,20 +460,18 @@ async fn run_skill(
     tag = "skills",
     responses(
         (status = 200, description = "A stream of substrings composing a message in response to a chat history",  body=Value,
-            content(("text/event-stream", example = ""))),
-        (status = 400, description = "The Skill invocation failed.", body=Value, example = json!("Skill not found."))
-    ),
+            content(("text/event-stream", example = ""))),    ),
 )]
 async fn chat_skill(
     State(skill_runtime_api): State<SkillRuntimeApi>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, HttpError> {
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let path = SkillPath::new(namespace, name);
     let mut chat_events = skill_runtime_api
         .run_chat(path, input, bearer.token().to_owned())
-        .await?;
+        .await;
 
     // We need to use `try_stream!` instead of `stream!`, because `stream!` does not implement the
     // traits required to be converted into an http body for the response. Since we do wanna rely on
@@ -486,7 +484,7 @@ async fn chat_skill(
         }
     };
 
-    Ok(Sse::new(stream))
+    Sse::new(stream)
 }
 
 impl From<ChatEvent> for Event {
@@ -597,14 +595,19 @@ fn skill_wit() -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::{
+        panic,
+        sync::{Arc, Mutex},
+    };
 
     use crate::{
         authorization::{self, tests::StubAuthorization},
         csi::tests::{DummyCsi, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
-        skill_runtime::{MetadataRequest, RunFunction, SkillRuntimeError, SkillRuntimeMsg},
+        skill_runtime::{
+            MetadataRequest, RunChat, RunFunction, SkillRuntimeError, SkillRuntimeMsg,
+        },
         skill_store::{
             SkillStoreError,
             tests::{SkillStoreMessage, dummy_skill_store_api},
@@ -690,7 +693,7 @@ mod tests {
                 }))))
                 .unwrap();
             }
-            SkillRuntimeMsg::Run(RunFunction { .. }) => {
+            _ => {
                 panic!("unexpected message in test");
             }
         });
@@ -777,7 +780,7 @@ mod tests {
             SkillRuntimeMsg::Run(RunFunction { send, .. }) => {
                 send.send(Ok(json!("dummy completion"))).unwrap();
             }
-            SkillRuntimeMsg::Metadata(MetadataRequest { .. }) => {
+            _ => {
                 panic!("unexpected message in test");
             }
         });
@@ -824,7 +827,7 @@ mod tests {
                 assert_eq!(input, json!("Homer"));
                 send.send(Ok(json!("dummy completion"))).unwrap();
             }
-            SkillRuntimeMsg::Metadata(MetadataRequest { .. }) => {
+            _ => {
                 panic!("unexpected message in test");
             }
         });
@@ -860,7 +863,14 @@ mod tests {
     #[tokio::test]
     async fn chat_endpoint_should_send_individual_message_deltas() {
         // Given
-        let app_state = AppState::dummy();
+        let skill_executer_mock = StubSkillRuntime::answer_with_chat_events(
+            "Hello"
+                .chars()
+                .map(|c| ChatEvent::Append(c.to_string()))
+                .collect(),
+        );
+        let skill_runtime_api = skill_executer_mock.api();
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a chat message
@@ -897,37 +907,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn chat_endpoint_for_skill_does_not_exist() {
-        // Given
-        let app_state = AppState::dummy();
-        let http = http(FeatureSet::Beta, app_state);
-
-        // When asking for a chat message from a skill that does not exist
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, auth_value)
-                    .uri("/v1/skills/local/not_exist/chat")
-                    .body(Body::from("\"\""))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then we get a response that the skill is not found
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    #[tokio::test]
     async fn chat_endpoint_for_saboteur_skill() {
         // Given
-        let app_state = AppState::dummy();
+        let skill_executer_mock =
+            StubSkillRuntime::answer_with_chat_events(vec![ChatEvent::Error(
+                "Skill is a saboteur".to_string(),
+            )]);
+        let skill_runtime_api = skill_executer_mock.api();
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a chat message from a skill that does not exist
@@ -1345,7 +1332,7 @@ mod tests {
                 )))
                 .unwrap();
             }
-            SkillRuntimeMsg::Metadata(MetadataRequest { .. }) => {
+            _ => {
                 panic!("unexpected message in test");
             }
         });
@@ -1382,7 +1369,7 @@ mod tests {
                 send.send(Err(SkillRuntimeError::SkillNotConfigured))
                     .unwrap();
             }
-            SkillRuntimeMsg::Metadata(MetadataRequest { .. }) => {
+            _ => {
                 panic!("unexpected message in test");
             }
         });
@@ -1431,6 +1418,20 @@ mod tests {
                     handle(msg);
                 }
             });
+            Self { send, handle }
+        }
+
+        pub fn answer_with_chat_events(chat_events: Vec<ChatEvent>) -> Self {
+            let (send, mut recv) = mpsc::channel(1);
+            let handle = tokio::spawn(async move {
+                let Some(SkillRuntimeMsg::Chat(RunChat { send, .. })) = recv.recv().await else {
+                    panic!("Stub runtime expected a run chat command");
+                };
+                for ce in chat_events {
+                    send.send(ce).await.unwrap();
+                }
+            });
+
             Self { send, handle }
         }
 
