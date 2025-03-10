@@ -175,6 +175,7 @@ where
 fn http<C>(feature_set: FeatureSet, app_state: AppState<C, SkillRuntimeApiImpl>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
+    // R: Clone + Send + Sync,
 {
     let api_doc = if feature_set == FeatureSet::Beta {
         ApiDocBeta::openapi()
@@ -432,11 +433,14 @@ struct ExecuteSkillArgs {
         (status = 400, description = "Failed to get skill metadata.", body=Value, example = json!("Invalid skill input schema."))
     ),
 )]
-async fn skill_metadata(
-    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<SkillRuntimeApiImpl>>,
+async fn skill_metadata<R>(
+    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
     _bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
-) -> Result<Json<Value>, HttpError> {
+) -> Result<Json<Value>, HttpError>
+where
+    R: SkillRuntimeApi,
+{
     let skill_path = SkillPath::new(namespace, name);
     let response = skill_runtime_api.skill_metadata(skill_path).await?;
     Ok(Json(json!(response)))
@@ -457,12 +461,15 @@ async fn skill_metadata(
         (status = 400, description = "The Skill invocation failed.", body=Value, example = json!("Skill not found."))
     ),
 )]
-async fn run_skill(
-    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<SkillRuntimeApiImpl>>,
+async fn run_skill<R>(
+    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
-) -> Result<Json<Value>, HttpError> {
+) -> Result<Json<Value>, HttpError>
+where
+    R: SkillRuntimeApi,
+{
     let skill_path = SkillPath::new(namespace, name);
     let response = skill_runtime_api
         .run_function(skill_path, input, bearer.token().to_owned())
@@ -484,12 +491,12 @@ async fn run_skill(
         (status = 200, description = "A stream of substrings composing a message in response to a chat history",  body=Value,
             content(("text/event-stream", example = ""))),    ),
 )]
-async fn chat_skill(
-    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<SkillRuntimeApiImpl>>,
+async fn chat_skill<R>(
+    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> where R: SkillRuntimeApi{
     let path = SkillPath::new(namespace, name);
     let mut chat_events = skill_runtime_api
         .run_chat(path, input, bearer.token().to_owned())
