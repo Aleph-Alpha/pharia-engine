@@ -18,13 +18,12 @@ use crate::{
     csi::Csi,
     csi_shell::{v0_2::CsiRequest as V0_2CsiRequest, v0_3::CsiRequest as V0_3CsiRequest},
     shell::AppState,
-    skill_runtime::SkillRuntimeApi,
+    skill_runtime::SkillRuntimeApiImpl,
     skills::SupportedVersion,
 };
 
-// #[allow(clippy::too_many_lines)]
 pub async fn http_csi_handle<C>(
-    State(app_state): State<AppState<C, SkillRuntimeApi>>,
+    State(app_state): State<AppState<C, SkillRuntimeApiImpl>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<VersionedCsiRequest>,
 ) -> (StatusCode, Json<Value>)
