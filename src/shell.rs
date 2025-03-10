@@ -36,12 +36,12 @@ use utoipa::{
 use utoipa_scalar::Scalar;
 
 use crate::{
-    authorization::{AuthorizationApi, authorization_middleware},
+    authorization::{authorization_middleware, AuthorizationApi},
     csi::Csi,
     csi_shell::http_csi_handle,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
-    skill_runtime::{ChatEvent, SkillRuntimeApi, SkillRuntimeError},
+    skill_runtime::{ChatEvent, SkillRuntimeApi, SkillRuntimeApi2, SkillRuntimeError},
     skill_store::SkillStoreApi,
     skills::{SkillMetadata, SkillPath},
 };
@@ -94,24 +94,26 @@ impl Shell {
 
 /// State shared between routes
 #[derive(Clone)]
-pub struct AppState<C>
+pub struct AppState<C, R>
 where
     C: Clone,
+    R: Clone,
 {
     authorization_api: AuthorizationApi,
     skill_store_api: SkillStoreApi,
-    skill_runtime_api: SkillRuntimeApi,
+    skill_runtime_api: R,
     pub csi_drivers: C,
 }
 
-impl<C> AppState<C>
+impl<C, R> AppState<C, R>
 where
     C: Csi + Clone + Sync + Send + 'static,
+    R: SkillRuntimeApi2 + Clone
 {
     pub fn new(
         authorization_api: AuthorizationApi,
         skill_store_api: SkillStoreApi,
-        skill_runtime_api: SkillRuntimeApi,
+        skill_runtime_api: R,
         csi_drivers: C,
     ) -> Self {
         Self {
@@ -123,34 +125,35 @@ where
     }
 }
 
-impl<C> FromRef<AppState<C>> for AuthorizationApi
+impl<C, R> FromRef<AppState<C, R>> for AuthorizationApi
 where
-    C: Clone,
+    C: Clone, R: Clone
 {
-    fn from_ref(app_state: &AppState<C>) -> AuthorizationApi {
+    fn from_ref(app_state: &AppState<C, R>) -> AuthorizationApi {
         app_state.authorization_api.clone()
     }
 }
 
-impl<C> FromRef<AppState<C>> for SkillStoreApi
+impl<C, R> FromRef<AppState<C, R>> for SkillStoreApi
 where
-    C: Clone,
+    C: Clone, R: Clone
 {
-    fn from_ref(app_state: &AppState<C>) -> SkillStoreApi {
+    fn from_ref(app_state: &AppState<C, R>) -> SkillStoreApi {
         app_state.skill_store_api.clone()
     }
 }
 
-impl<C> FromRef<AppState<C>> for SkillRuntimeApi
+impl<C> FromRef<AppState<C, SkillRuntimeApi>> for SkillRuntimeApi
 where
-    C: Clone,
+    C: Clone
 {
-    fn from_ref(app_state: &AppState<C>) -> SkillRuntimeApi {
+    fn from_ref(app_state: &AppState<C, SkillRuntimeApi>) -> SkillRuntimeApi {
         app_state.skill_runtime_api.clone()
     }
 }
+
 #[allow(deprecated)]
-pub fn http<C>(feature_set: FeatureSet, app_state: AppState<C>) -> Router
+pub fn http<C>(feature_set: FeatureSet, app_state: AppState<C, SkillRuntimeApi>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
 {
@@ -627,7 +630,7 @@ mod tests {
     use tokio::{sync::mpsc, task::JoinHandle};
     use tower::util::ServiceExt;
 
-    impl AppState<DummyCsi> {
+    impl AppState<DummyCsi, SkillRuntimeApi> {
         pub fn dummy() -> Self {
             let dummy_authorization = StubAuthorization::new(|msg| {
                 match msg {
@@ -646,7 +649,7 @@ mod tests {
         }
     }
 
-    impl<C> AppState<C>
+    impl<C> AppState<C, SkillRuntimeApi>
     where
         C: Csi + Clone + Sync + Send + 'static,
     {
@@ -665,7 +668,7 @@ mod tests {
             self
         }
 
-        pub fn with_csi_drivers<D>(self, csi_drivers: D) -> AppState<D>
+        pub fn with_csi_drivers<D>(self, csi_drivers: D) -> AppState<D, SkillRuntimeApi>
         where
             D: Csi + Clone + Sync + Send + 'static,
         {

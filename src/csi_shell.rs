@@ -14,13 +14,17 @@ use semver::VersionReq;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::csi_shell::v0_2::CsiRequest as V0_2CsiRequest;
-use crate::csi_shell::v0_3::CsiRequest as V0_3CsiRequest;
-use crate::{csi::Csi, shell::AppState, skills::SupportedVersion};
+use crate::{
+    csi::Csi,
+    csi_shell::{v0_2::CsiRequest as V0_2CsiRequest, v0_3::CsiRequest as V0_3CsiRequest},
+    shell::AppState,
+    skill_runtime::SkillRuntimeApi,
+    skills::SupportedVersion,
+};
 
-#[allow(clippy::too_many_lines)]
+// #[allow(clippy::too_many_lines)]
 pub async fn http_csi_handle<C>(
-    State(app_state): State<AppState<C>>,
+    State(app_state): State<AppState<C, SkillRuntimeApi>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(args): Json<VersionedCsiRequest>,
 ) -> (StatusCode, Json<Value>)
