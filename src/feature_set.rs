@@ -1,4 +1,4 @@
-use serde::{Deserialize, Deserializer, de::Visitor};
+use std::{convert::Infallible, str::FromStr};
 use tracing::warn;
 
 #[allow(dead_code)] // currently only referenced in shell test
@@ -18,47 +18,18 @@ pub enum FeatureSet {
     Stable(u32),
 }
 
-struct FeatureSetVisitor;
+impl FromStr for FeatureSet {
+    type Err = Infallible;
 
-impl Visitor<'_> for FeatureSetVisitor {
-    type Value = FeatureSet;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("the string \"BETA\" or an integer indicates the stable version")
-    }
-
-    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        let version = u32::try_from(v).map_err(E::custom)?;
-        Ok(FeatureSet::Stable(version))
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        if v.eq_ignore_ascii_case("BETA") {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.eq_ignore_ascii_case("BETA") {
             Ok(FeatureSet::Beta)
-        } else if let Ok(v) = v.parse() {
-            self.visit_u32(v)
+        } else if let Ok(n) = s.parse() {
+            Ok(FeatureSet::Stable(n))
         } else {
-            warn!(
-                "Failed to parse feature set: '{}'. Falling back to BETA.",
-                v
-            );
+            warn!("Failed to parse feature set: '{}. Falling back to BETA.", s);
             Ok(FeatureSet::Beta)
         }
-    }
-}
-
-impl<'de> Deserialize<'de> for FeatureSet {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_any(FeatureSetVisitor)
     }
 }
 
@@ -68,7 +39,7 @@ mod tests {
 
     #[test]
     fn deserialize_feature_set() {
-        let feature_set = serde_json::from_str::<FeatureSet>("42").unwrap();
+        let feature_set = FeatureSet::from_str("42").unwrap();
         assert_eq!(feature_set, FeatureSet::Stable(42));
     }
 }
