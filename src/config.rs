@@ -1,7 +1,7 @@
 use anyhow::Ok;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
-use serde::Deserialize;
-use std::{net::SocketAddr, time::Duration};
+use serde::{Deserialize, Deserializer};
+use std::{net::SocketAddr, str::FromStr, time::Duration};
 
 use crate::{feature_set::FeatureSet, namespace_watcher::NamespaceConfigs};
 
@@ -43,10 +43,22 @@ mod defaults {
     }
 }
 
+fn deserialize_feature_set<'de, D>(deserializer: D) -> Result<FeatureSet, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let buf = String::deserialize(deserializer)?;
+
+    FeatureSet::from_str(&buf).map_err(serde::de::Error::custom)
+}
+
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct AppConfig {
-    #[serde(default = "defaults::pharia_ai_feature_set")]
+    #[serde(
+        default = "defaults::pharia_ai_feature_set",
+        deserialize_with = "deserialize_feature_set"
+    )]
     pub pharia_ai_feature_set: FeatureSet,
     #[serde(default = "defaults::kernel_address")]
     pub kernel_address: SocketAddr,
