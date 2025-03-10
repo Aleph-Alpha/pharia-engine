@@ -137,26 +137,21 @@ impl SkillRuntimeApi {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> Result<mpsc::Receiver<ChatEvent>, SkillRuntimeError> {
-        let name = skill_path.name.clone();
-        if !name.eq_ignore_ascii_case("hello") && !name.eq_ignore_ascii_case("saboteur") {
-            return Err(SkillRuntimeError::SkillNotConfigured.into());
-        };
-
+    ) -> mpsc::Receiver<ChatEvent> {
         let (send, recv) = mpsc::channel::<ChatEvent>(100);
 
-        if name.eq_ignore_ascii_case("saboteur") {
-            send.send(ChatEvent::Error("Skill is a saboteur".to_string()))
-                .await
-                .unwrap();
-        } else if name.eq_ignore_ascii_case("hello") {
-            for c in "Hello".chars() {
-                send.send(ChatEvent::Append(c.to_string())).await.unwrap();
-            }
-        }
+        let msg = RunChat {
+            skill_path,
+            _input: input,
+            send,
+            _api_token: api_token,
+        };
 
-        drop(send);
-        Ok(recv)
+        self.send
+            .send(SkillRuntimeMsg::Chat(msg))
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv
     }
 
     pub async fn skill_metadata(
@@ -248,8 +243,9 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
     }
 }
 
+#[derive(Debug)]
 pub enum SkillRuntimeMsg {
-    // Chat(RunChat),
+    Chat(RunChat),
     Run(RunFunction),
     Metadata(MetadataRequest),
 }
@@ -257,15 +253,20 @@ pub enum SkillRuntimeMsg {
 impl SkillRuntimeMsg {
     async fn act(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         match self {
-            SkillRuntimeMsg::Run(skill_run_request) => {
-                skill_run_request.act(csi_apis, runtime).await;
+            SkillRuntimeMsg::Chat(msg) => {
+                msg.act(csi_apis, runtime).await;
             }
-            SkillRuntimeMsg::Metadata(skill_metadata_request) => {
-                skill_metadata_request.act(runtime).await;
+            SkillRuntimeMsg::Run(msg) => {
+                msg.act(csi_apis, runtime).await;
+            }
+            SkillRuntimeMsg::Metadata(msg) => {
+                msg.act(runtime).await;
             }
         }
     }
 }
+
+#[derive(Debug)]
 pub struct MetadataRequest {
     pub skill_path: SkillPath,
     pub send: oneshot::Sender<Result<Option<SkillMetadata>, SkillRuntimeError>>,
@@ -287,9 +288,88 @@ impl MetadataRequest {
 #[derive(Debug)]
 pub struct RunChat {
     pub skill_path: SkillPath,
-    pub input: Value,
+    pub _input: Value,
     pub send: mpsc::Sender<ChatEvent>,
-    pub api_token: String,
+    pub _api_token: String,
+}
+
+impl RunChat {
+    async fn act(self, _csi_apis: impl Csi + Send + Sync + 'static, _runtime: &WasmRuntime) {
+        let name = self.skill_path.name.clone();
+        if !name.eq_ignore_ascii_case("hello") && !name.eq_ignore_ascii_case("saboteur") {
+            self.send
+                .send(ChatEvent::Error(
+                    SkillRuntimeError::SkillNotConfigured.to_string(),
+                ))
+                .await
+                .unwrap();
+            return;
+        };
+
+        if name.eq_ignore_ascii_case("saboteur") {
+            self.send
+                .send(ChatEvent::Error("Skill is a saboteur".to_string()))
+                .await
+                .unwrap();
+        } else if name.eq_ignore_ascii_case("hello") {
+            for c in "Hello".chars() {
+                self.send
+                    .send(ChatEvent::Append(c.to_string()))
+                    .await
+                    .unwrap();
+            }
+        }
+
+        // let start = Instant::now();
+        // let RunFunction {
+        //     skill_path,
+        //     input,
+        //     send,
+        //     api_token,
+        // } = self;
+
+        // let span = span!(
+        //     Level::DEBUG,
+        //     "skill_run",
+        //     skill_path = skill_path.to_string(),
+        // );
+        // let context = span.context();
+        // let (send_rt_err, recv_rt_err) = oneshot::channel();
+        // let ctx = Box::new(SkillInvocationCtx::new(
+        //     send_rt_err,
+        //     csi_apis,
+        //     api_token,
+        //     Some(context),
+        // ));
+        // let response = select! {
+        //     result = runtime.run(&skill_path, input, ctx) => result,
+        //     // An error occurred during skill execution.
+        //     Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
+        // };
+
+        // let latency = start.elapsed().as_secs_f64();
+        // let labels = [
+        //     ("namespace", Cow::from(skill_path.namespace.to_string())),
+        //     ("name", Cow::from(skill_path.name)),
+        //     (
+        //         "status",
+        //         match response {
+        //             Ok(_) => "ok",
+        //             Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
+        //             Err(
+        //                 SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_),
+        //             ) => "internal_error",
+        //         }
+        //         .into(),
+        //     ),
+        // ];
+        // metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
+        // metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
+        //     .record(latency);
+
+        // // Error is expected to happen during shutdown. Ignore result.
+        // drop(send.send(response));
+    }
 }
 
 /// An event emitted by a chat skill
@@ -297,7 +377,8 @@ pub struct RunChat {
 pub enum ChatEvent {
     /// Append the internal string to the current message
     Append(String),
-    /// An error occurred during skill execution
+    /// An error occurred during skill execution. This kind of error can happen after streaming has
+    /// started
     Error(String),
 }
 
