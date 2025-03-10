@@ -245,6 +245,23 @@ impl IntoResponse for HttpError {
     }
 }
 
+impl From<SkillRuntimeError> for HttpError {
+    fn from(value: SkillRuntimeError) -> Self {
+        match value {
+            SkillRuntimeError::SkillNotConfigured => HttpError::new(
+                SkillRuntimeError::SkillNotConfigured.to_string(),
+                StatusCode::BAD_REQUEST,
+            ),
+            SkillRuntimeError::StoreError(err) => {
+                HttpError::new(err.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
+            }
+            SkillRuntimeError::ExecutionError(err) => {
+                HttpError::new(err.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+}
+
 pub enum ShellMetrics {
     HttpRequestsTotal,
     HttpRequestsDurationSeconds,
@@ -397,16 +414,10 @@ async fn skill_metadata(
     State(skill_runtime_api): State<SkillRuntimeApi>,
     _bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
-) -> (StatusCode, Json<Value>) {
+) -> Result<Json<Value>, HttpError> {
     let skill_path = SkillPath::new(namespace, name);
-    let result = skill_runtime_api.skill_metadata(skill_path).await;
-    match result {
-        Ok(response) => (StatusCode::OK, Json(json!(response))),
-        Err(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!(err.to_string())),
-        ),
-    }
+    let response = skill_runtime_api.skill_metadata(skill_path).await?;
+    Ok(Json(json!(response)))
 }
 
 /// Run
@@ -429,26 +440,12 @@ async fn run_skill(
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
-) -> (StatusCode, Json<Value>) {
+) -> Result<Json<Value>, HttpError> {
     let skill_path = SkillPath::new(namespace, name);
-    let result = skill_runtime_api
+    let response = skill_runtime_api
         .skill_run(skill_path, input, bearer.token().to_owned())
-        .await;
-    match result {
-        Ok(response) => (StatusCode::OK, Json(response)),
-        Err(SkillRuntimeError::SkillNotConfigured) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!(SkillRuntimeError::SkillNotConfigured.to_string())),
-        ),
-        Err(SkillRuntimeError::StoreError(err)) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!(err.to_string())),
-        ),
-        Err(SkillRuntimeError::ExecutionError(err)) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!(err.to_string())),
-        ),
-    }
+        .await?;
+    Ok(Json(response))
 }
 
 /// Chat
@@ -469,7 +466,7 @@ async fn run_skill(
 async fn chat_skill(
     State(_skill_runtime_api): State<SkillRuntimeApi>,
     _bearer: TypedHeader<Authorization<Bearer>>,
-    Path((namespace, name)): Path<(Namespace, String)>,
+    Path((_namespace, name)): Path<(Namespace, String)>,
     Json(_input): Json<Value>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, HttpError> {
     if name.eq_ignore_ascii_case("hello") {
@@ -481,11 +478,7 @@ async fn chat_skill(
 
         Ok(Sse::new(stream))
     } else {
-        let skill_path = SkillPath::new(namespace, name);
-        Err(HttpError::new(
-            format!("{skill_path} not found."),
-            StatusCode::NOT_FOUND,
-        ))
+        Err(SkillRuntimeError::SkillNotConfigured.into())
     }
 }
 
@@ -906,7 +899,7 @@ mod tests {
             .unwrap();
 
         // Then we get a response that the skill is not found
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
