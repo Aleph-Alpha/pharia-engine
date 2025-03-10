@@ -92,8 +92,8 @@ impl SkillRuntime {
 
     /// Retrieve a handle in order to interact with skills. All handles have to be dropped in order
     /// for [`Self::wait_for_shutdown`] to complete.
-    pub fn api(&self) -> SkillRuntimeApi {
-        SkillRuntimeApi::new(self.send.clone())
+    pub fn api(&self) -> SkillRuntimeApiImpl {
+        SkillRuntimeApiImpl::new(self.send.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -106,7 +106,7 @@ impl SkillRuntime {
 /// 
 /// Using a trait rather than an mpsc allows for easier and more ergonomic testing, since the
 /// implementation of the test double is not required to be an actor.
-pub trait SkillRuntimeApi2 {
+pub trait SkillRuntimeApi {
     async fn run_function(
         &self,
         skill_path: SkillPath,
@@ -127,7 +127,7 @@ pub trait SkillRuntimeApi2 {
     ) -> Result<Option<SkillMetadata>, SkillRuntimeError>;
 }
 
-impl SkillRuntimeApi2 for mpsc::Sender<SkillRuntimeMsg> {
+impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn run_function(
         &self,
         skill_path: SkillPath,
@@ -184,7 +184,7 @@ impl SkillRuntimeApi2 for mpsc::Sender<SkillRuntimeMsg> {
     }
 }
 
-impl SkillRuntimeApi2 for SkillRuntimeApi {
+impl SkillRuntimeApi for SkillRuntimeApiImpl {
     async fn run_function(
         &self,
         skill_path: SkillPath,
@@ -212,11 +212,11 @@ impl SkillRuntimeApi2 for SkillRuntimeApi {
 }
 
 #[derive(Clone)]
-pub struct SkillRuntimeApi {
+pub struct SkillRuntimeApiImpl {
     send: mpsc::Sender<SkillRuntimeMsg>,
 }
 
-impl SkillRuntimeApi {
+impl SkillRuntimeApiImpl {
     pub fn new(send: mpsc::Sender<SkillRuntimeMsg>) -> Self {
         Self { send }
     }

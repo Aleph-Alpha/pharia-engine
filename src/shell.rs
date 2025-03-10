@@ -41,7 +41,7 @@ use crate::{
     csi_shell::http_csi_handle,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
-    skill_runtime::{ChatEvent, SkillRuntimeApi, SkillRuntimeApi2, SkillRuntimeError},
+    skill_runtime::{ChatEvent, SkillRuntimeApiImpl, SkillRuntimeApi, SkillRuntimeError},
     skill_store::SkillStoreApi,
     skills::{SkillMetadata, SkillPath},
 };
@@ -57,7 +57,7 @@ impl Shell {
         feature_set: FeatureSet,
         addr: impl Into<SocketAddr>,
         authorization_api: AuthorizationApi,
-        skill_runtime_api: SkillRuntimeApi,
+        skill_runtime_api: SkillRuntimeApiImpl,
         skill_store_api: SkillStoreApi,
         csi_drivers: impl Csi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
@@ -108,7 +108,7 @@ where
 impl<C, R> AppState<C, R>
 where
     C: Csi + Clone + Sync + Send + 'static,
-    R: SkillRuntimeApi2 + Clone
+    R: SkillRuntimeApi + Clone
 {
     pub fn new(
         authorization_api: AuthorizationApi,
@@ -143,17 +143,22 @@ where
     }
 }
 
-impl<C> FromRef<AppState<C, SkillRuntimeApi>> for SkillRuntimeApi
+impl<C, R> FromRef<AppState<C, R>> for SkillRuntimeState<R>
 where
-    C: Clone
+    C: Clone,
+    R: Clone,
 {
-    fn from_ref(app_state: &AppState<C, SkillRuntimeApi>) -> SkillRuntimeApi {
-        app_state.skill_runtime_api.clone()
+    fn from_ref(app_state: &AppState<C, R>) -> SkillRuntimeState<R> {
+        SkillRuntimeState(app_state.skill_runtime_api.clone())
     }
 }
 
+/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
+/// reference from the [`Self::AppState`] using a [`FromRef`] implementation.
+struct SkillRuntimeState<R>(pub R);
+
 #[allow(deprecated)]
-pub fn http<C>(feature_set: FeatureSet, app_state: AppState<C, SkillRuntimeApi>) -> Router
+pub fn http<C>(feature_set: FeatureSet, app_state: AppState<C, SkillRuntimeApiImpl>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
 {
@@ -414,7 +419,7 @@ struct ExecuteSkillArgs {
     ),
 )]
 async fn skill_metadata(
-    State(skill_runtime_api): State<SkillRuntimeApi>,
+    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<SkillRuntimeApiImpl>>,
     _bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
 ) -> Result<Json<Value>, HttpError> {
@@ -439,7 +444,7 @@ async fn skill_metadata(
     ),
 )]
 async fn run_skill(
-    State(skill_runtime_api): State<SkillRuntimeApi>,
+    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<SkillRuntimeApiImpl>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
@@ -466,7 +471,7 @@ async fn run_skill(
             content(("text/event-stream", example = ""))),    ),
 )]
 async fn chat_skill(
-    State(skill_runtime_api): State<SkillRuntimeApi>,
+    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<SkillRuntimeApiImpl>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
@@ -630,7 +635,7 @@ mod tests {
     use tokio::{sync::mpsc, task::JoinHandle};
     use tower::util::ServiceExt;
 
-    impl AppState<DummyCsi, SkillRuntimeApi> {
+    impl AppState<DummyCsi, SkillRuntimeApiImpl> {
         pub fn dummy() -> Self {
             let dummy_authorization = StubAuthorization::new(|msg| {
                 match msg {
@@ -649,7 +654,7 @@ mod tests {
         }
     }
 
-    impl<C> AppState<C, SkillRuntimeApi>
+    impl<C> AppState<C, SkillRuntimeApiImpl>
     where
         C: Csi + Clone + Sync + Send + 'static,
     {
@@ -663,12 +668,12 @@ mod tests {
             self
         }
 
-        pub fn with_skill_runtime_api(mut self, skill_runtime_api: SkillRuntimeApi) -> Self {
+        pub fn with_skill_runtime_api(mut self, skill_runtime_api: SkillRuntimeApiImpl) -> Self {
             self.skill_runtime_api = skill_runtime_api;
             self
         }
 
-        pub fn with_csi_drivers<D>(self, csi_drivers: D) -> AppState<D, SkillRuntimeApi>
+        pub fn with_csi_drivers<D>(self, csi_drivers: D) -> AppState<D, SkillRuntimeApiImpl>
         where
             D: Csi + Clone + Sync + Send + 'static,
         {
@@ -1436,8 +1441,8 @@ mod tests {
             Self { send, handle }
         }
 
-        pub fn api(&self) -> SkillRuntimeApi {
-            SkillRuntimeApi::new(self.send.clone())
+        pub fn api(&self) -> SkillRuntimeApiImpl {
+            SkillRuntimeApiImpl::new(self.send.clone())
         }
 
         pub async fn shutdown(self) {
