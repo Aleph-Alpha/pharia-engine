@@ -112,14 +112,14 @@ impl SkillRuntimeApi {
         Self { send }
     }
 
-    pub async fn skill_run(
+    pub async fn run_function(
         &self,
         skill_path: SkillPath,
         input: Value,
         api_token: String,
     ) -> Result<Value, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillRuntimeMsg::Run(SkillRunRequest {
+        let msg = SkillRuntimeMsg::Run(RunFunction {
             skill_path,
             input,
             send,
@@ -132,12 +132,39 @@ impl SkillRuntimeApi {
         recv.await.unwrap()
     }
 
+    pub async fn run_chat(
+        &self,
+        skill_path: SkillPath,
+        input: Value,
+        api_token: String,
+    ) -> Result<mpsc::Receiver<ChatEvent>, SkillRuntimeError> {
+        let name = skill_path.name.clone();
+        if !name.eq_ignore_ascii_case("hello") && !name.eq_ignore_ascii_case("saboteur") {
+            return Err(SkillRuntimeError::SkillNotConfigured.into());
+        };
+
+        let (send, recv) = mpsc::channel::<ChatEvent>(100);
+
+        if name.eq_ignore_ascii_case("saboteur") {
+            send.send(ChatEvent::Error("Skill is a saboteur".to_string()))
+                .await
+                .unwrap();
+        } else if name.eq_ignore_ascii_case("hello") {
+            for c in "Hello".chars() {
+                send.send(ChatEvent::Append(c.to_string())).await.unwrap();
+            }
+        }
+
+        drop(send);
+        Ok(recv)
+    }
+
     pub async fn skill_metadata(
         &self,
         skill_path: SkillPath,
     ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillRuntimeMsg::Metadata(SkillMetadataRequest { skill_path, send });
+        let msg = SkillRuntimeMsg::Metadata(MetadataRequest { skill_path, send });
         self.send
             .send(msg)
             .await
@@ -222,8 +249,9 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
 }
 
 pub enum SkillRuntimeMsg {
-    Run(SkillRunRequest),
-    Metadata(SkillMetadataRequest),
+    // Chat(RunChat),
+    Run(RunFunction),
+    Metadata(MetadataRequest),
 }
 
 impl SkillRuntimeMsg {
@@ -238,12 +266,12 @@ impl SkillRuntimeMsg {
         }
     }
 }
-pub struct SkillMetadataRequest {
+pub struct MetadataRequest {
     pub skill_path: SkillPath,
     pub send: oneshot::Sender<Result<Option<SkillMetadata>, SkillRuntimeError>>,
 }
 
-impl SkillMetadataRequest {
+impl MetadataRequest {
     pub async fn act(self, runtime: &WasmRuntime) {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillMetadataCtx::new(send_rt_err));
@@ -257,17 +285,35 @@ impl SkillMetadataRequest {
 }
 
 #[derive(Debug)]
-pub struct SkillRunRequest {
+pub struct RunChat {
+    pub skill_path: SkillPath,
+    pub input: Value,
+    pub send: mpsc::Sender<ChatEvent>,
+    pub api_token: String,
+}
+
+/// An event emitted by a chat skill
+#[derive(Debug)]
+pub enum ChatEvent {
+    /// Append the internal string to the current message
+    Append(String),
+    /// An error occurred during skill execution
+    Error(String),
+}
+
+/// Message type used to transfer the input and output of a function skill execution
+#[derive(Debug)]
+pub struct RunFunction {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: oneshot::Sender<Result<Value, SkillRuntimeError>>,
     pub api_token: String,
 }
 
-impl SkillRunRequest {
+impl RunFunction {
     async fn act(self, csi_apis: impl Csi + Send + Sync + 'static, runtime: &WasmRuntime) {
         let start = Instant::now();
-        let SkillRunRequest {
+        let RunFunction {
             skill_path,
             input,
             send,
@@ -866,7 +912,7 @@ pub mod tests {
 
         // When a skill is requested, but it is not listed in the namespace
         let result = api
-            .skill_run(
+            .run_function(
                 SkillPath::local("my_skill"),
                 json!("Any input"),
                 "Dummy api token".to_owned(),
@@ -896,7 +942,7 @@ pub mod tests {
         // When trying to generate a greeting for Homer using the greet skill
         let result = runtime
             .api()
-            .skill_run(
+            .run_function(
                 SkillPath::local("greet"),
                 json!("Homer"),
                 "TOKEN_NOT_REQUIRED".to_owned(),
@@ -926,7 +972,7 @@ pub mod tests {
         let runtime = SkillRuntime::new(engine, csi, store.api());
         let result = runtime
             .api()
-            .skill_run(
+            .run_function(
                 SkillPath::local("greet"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
@@ -960,8 +1006,8 @@ pub mod tests {
         let input = json!("Homer");
         let token = "TOKEN_NOT_REQUIRED";
         let result = try_join!(
-            api.skill_run(skill_path.clone(), input.clone(), token.to_owned()),
-            api.skill_run(skill_path, input, token.to_owned()),
+            api.run_function(skill_path.clone(), input.clone(), token.to_owned()),
+            api.run_function(skill_path, input, token.to_owned()),
         );
 
         drop(api);
@@ -981,7 +1027,7 @@ pub mod tests {
         let csi = StubCsi::with_completion_from_text("Hello");
         let (send, _) = oneshot::channel();
         let skill_path = SkillPath::local("greet");
-        let msg = SkillRunRequest {
+        let msg = RunFunction {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
             send,

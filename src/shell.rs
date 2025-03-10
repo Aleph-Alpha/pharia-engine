@@ -16,7 +16,7 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time::Instant};
-use tokio::{net::TcpListener, sync::mpsc, task::JoinHandle};
+use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -41,7 +41,7 @@ use crate::{
     csi_shell::http_csi_handle,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
-    skill_runtime::{SkillRuntimeApi, SkillRuntimeError},
+    skill_runtime::{ChatEvent, SkillRuntimeApi, SkillRuntimeError},
     skill_store::SkillStoreApi,
     skills::{SkillMetadata, SkillPath},
 };
@@ -443,7 +443,7 @@ async fn run_skill(
 ) -> Result<Json<Value>, HttpError> {
     let skill_path = SkillPath::new(namespace, name);
     let response = skill_runtime_api
-        .skill_run(skill_path, input, bearer.token().to_owned())
+        .run_function(skill_path, input, bearer.token().to_owned())
         .await?;
     Ok(Json(response))
 }
@@ -460,49 +460,33 @@ async fn run_skill(
     tag = "skills",
     responses(
         (status = 200, description = "A stream of substrings composing a message in response to a chat history",  body=Value,
-            content(("text/event-stream", example = "")))
+            content(("text/event-stream", example = ""))),
+        (status = 400, description = "The Skill invocation failed.", body=Value, example = json!("Skill not found."))
     ),
 )]
 async fn chat_skill(
-    State(_skill_runtime_api): State<SkillRuntimeApi>,
-    _bearer: TypedHeader<Authorization<Bearer>>,
-    Path((_namespace, name)): Path<(Namespace, String)>,
-    Json(_input): Json<Value>,
+    State(skill_runtime_api): State<SkillRuntimeApi>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Path((namespace, name)): Path<(Namespace, String)>,
+    Json(input): Json<Value>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, HttpError> {
-    if !name.eq_ignore_ascii_case("hello") && !name.eq_ignore_ascii_case("saboteur") {
-        return Err(SkillRuntimeError::SkillNotConfigured.into());
-    };
-
-    let (send, mut recv) = mpsc::channel::<ChatEvent>(100);
-
-    if name.eq_ignore_ascii_case("saboteur") {
-        send.send(ChatEvent::Error("Skill is a saboteur".to_string()))
-            .await
-            .unwrap();
-    } else if name.eq_ignore_ascii_case("hello") {
-        for c in "Hello".chars() {
-            send.send(ChatEvent::Append(c.to_string())).await.unwrap();
-        }
-    }
-
-    drop(send);
+    let path = SkillPath::new(namespace, name);
+    let mut chat_events = skill_runtime_api
+        .run_chat(path, input, bearer.token().to_owned())
+        .await?;
 
     // We need to use `try_stream!` instead of `stream!`, because `stream!` does not implement the
     // traits required to be converted into an http body for the response. Since we do wanna rely on
     // the implementation provided by axum for this, we use `try_stream!` with an infallible error
     // type. Please note, that we report the actual errors as "normal" events in the stream.
     let stream = try_stream! {
-        while let Some(event) = recv.recv().await {
+        while let Some(event) = chat_events.recv().await {
+            // Convert Chat events to Server Side Events
             yield event.into();
         }
     };
 
     Ok(Sse::new(stream))
-}
-
-enum ChatEvent {
-    Append(String),
-    Error(String),
 }
 
 impl From<ChatEvent> for Event {
@@ -620,9 +604,7 @@ mod tests {
         csi::tests::{DummyCsi, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
-        skill_runtime::{
-            SkillMetadataRequest, SkillRunRequest, SkillRuntimeError, SkillRuntimeMsg,
-        },
+        skill_runtime::{MetadataRequest, RunFunction, SkillRuntimeError, SkillRuntimeMsg},
         skill_store::{
             SkillStoreError,
             tests::{SkillStoreMessage, dummy_skill_store_api},
@@ -699,7 +681,7 @@ mod tests {
     async fn skill_metadata() {
         // Given
         let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Metadata(SkillMetadataRequest { skill_path, send }) => {
+            SkillRuntimeMsg::Metadata(MetadataRequest { skill_path, send }) => {
                 assert_eq!(skill_path, SkillPath::local("greet_skill"));
                 send.send(Ok(Some(SkillMetadata::V1(SkillMetadataV1 {
                     description: Some("dummy description".to_owned()),
@@ -708,7 +690,7 @@ mod tests {
                 }))))
                 .unwrap();
             }
-            SkillRuntimeMsg::Run(SkillRunRequest { .. }) => {
+            SkillRuntimeMsg::Run(RunFunction { .. }) => {
                 panic!("unexpected message in test");
             }
         });
@@ -792,10 +774,10 @@ mod tests {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";
         let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
+            SkillRuntimeMsg::Run(RunFunction { send, .. }) => {
                 send.send(Ok(json!("dummy completion"))).unwrap();
             }
-            SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
+            SkillRuntimeMsg::Metadata(MetadataRequest { .. }) => {
                 panic!("unexpected message in test");
             }
         });
@@ -831,7 +813,7 @@ mod tests {
     async fn run_skill() {
         // Given
         let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Run(SkillRunRequest {
+            SkillRuntimeMsg::Run(RunFunction {
                 skill_path,
                 send,
                 api_token,
@@ -842,7 +824,7 @@ mod tests {
                 assert_eq!(input, json!("Homer"));
                 send.send(Ok(json!("dummy completion"))).unwrap();
             }
-            SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
+            SkillRuntimeMsg::Metadata(MetadataRequest { .. }) => {
                 panic!("unexpected message in test");
             }
         });
@@ -1354,7 +1336,7 @@ mod tests {
     async fn invalid_namespace_config_is_500_error() {
         // Given a skill runtime which has an invalid namespace
         let skill_runtime = StubSkillRuntime::new(|msg| match msg {
-            SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
+            SkillRuntimeMsg::Run(RunFunction { send, .. }) => {
                 send.send(Err(SkillRuntimeError::StoreError(
                     SkillStoreError::InvalidNamespaceError(
                         Namespace::new("playground").unwrap(),
@@ -1363,7 +1345,7 @@ mod tests {
                 )))
                 .unwrap();
             }
-            SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
+            SkillRuntimeMsg::Metadata(MetadataRequest { .. }) => {
                 panic!("unexpected message in test");
             }
         });
@@ -1396,11 +1378,11 @@ mod tests {
     async fn not_existing_skill_is_400_error() {
         // Given a skill executer which always replies Skill does not exist
         let skill_executer_dummy = StubSkillRuntime::new(|msg| match msg {
-            SkillRuntimeMsg::Run(SkillRunRequest { send, .. }) => {
+            SkillRuntimeMsg::Run(RunFunction { send, .. }) => {
                 send.send(Err(SkillRuntimeError::SkillNotConfigured))
                     .unwrap();
             }
-            SkillRuntimeMsg::Metadata(SkillMetadataRequest { .. }) => {
+            SkillRuntimeMsg::Metadata(MetadataRequest { .. }) => {
                 panic!("unexpected message in test");
             }
         });
