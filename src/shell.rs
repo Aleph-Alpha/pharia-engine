@@ -469,8 +469,15 @@ async fn chat_skill(
     Path((_namespace, name)): Path<(Namespace, String)>,
     Json(_input): Json<Value>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, HttpError> {
-    if name.eq_ignore_ascii_case("hello") {
+    if name.eq_ignore_ascii_case("hello") || name.eq_ignore_ascii_case("saboteur") {
         let stream = try_stream! {
+            if name.eq_ignore_ascii_case("saboteur") {
+                yield Event::default().event("error").json_data(SseErrorEvent {
+                    message: "Skill is a saboteur".to_string(),
+                }).unwrap();
+                return; // Short circuit after error
+            }
+
             for c in "Hello".chars() {
                 yield Event::default().data(c.to_string());
             }
@@ -480,6 +487,11 @@ async fn chat_skill(
     } else {
         Err(SkillRuntimeError::SkillNotConfigured.into())
     }
+}
+
+#[derive(Serialize)]
+struct SseErrorEvent {
+    message: String,
 }
 
 /// List
@@ -900,6 +912,43 @@ mod tests {
 
         // Then we get a response that the skill is not found
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn chat_endpoint_for_saboteur_skill() {
+        // Given
+        let app_state = AppState::dummy();
+        let http = http(FeatureSet::Beta, app_state);
+
+        // When asking for a chat message from a skill that does not exist
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/saboteur/chat")
+                    .body(Body::from("\"\""))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get a OK response that contains an error
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = "\
+            event: error\n\
+            data: {\"message\":\"Skill is a saboteur\"}\
+            \n\n";
+        assert_eq!(body_text, expected_body);
     }
 
     #[tokio::test]
