@@ -388,7 +388,7 @@ impl RunChat {
 }
 
 /// An event emitted by a chat skill
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ChatEvent {
     /// Append the internal string to the current message
     Append(String),
@@ -705,7 +705,7 @@ pub mod tests {
     use crate::skills::SkillMetadata;
     use crate::{
         chunking::ChunkParams,
-        csi::tests::{DummyCsi, StubCsi},
+        csi::tests::{CsiDummy, StubCsi},
         inference::{
             ChatRequest, ChatResponse, CompletionRequest, Inference, tests::AssertConcurrentClient,
         },
@@ -1002,7 +1002,7 @@ pub mod tests {
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config).api();
 
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
-        let csi_apis = DummyCsi;
+        let csi_apis = CsiDummy;
         let executer = SkillRuntime::new(engine, csi_apis, skill_store.api());
         let api = executer.api();
 

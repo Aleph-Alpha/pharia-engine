@@ -536,7 +536,7 @@ mod tests {
     use v0_2::pharia::skill::csi::{Host, Language};
 
     use crate::{
-        csi::tests::{CsiGreetingMock, DummyCsi},
+        csi::tests::{CsiDummy, CsiGreetingMock},
         skill_runtime::SkillInvocationCtx,
         tests::api_token,
     };
@@ -630,7 +630,7 @@ mod tests {
         let (send_rt_err, _) = oneshot::channel();
         let skill_ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
-            DummyCsi,
+            CsiDummy,
             api_token().to_owned(),
             None,
         ));
