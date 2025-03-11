@@ -46,7 +46,7 @@ impl WasmRuntime {
         }
     }
 
-    pub async fn run(
+    pub async fn run_function(
         &self,
         skill_path: &SkillPath,
         input: Value,
@@ -430,7 +430,7 @@ impl RunFunction {
             Some(context),
         ));
         let response = select! {
-            result = runtime.run(&skill_path, input, ctx) => result,
+            result = runtime.run_function(&skill_path, input, ctx) => result,
             // An error occurred during skill execution.
             Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
         };
@@ -829,7 +829,7 @@ pub mod tests {
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let resp = runtime
-            .run(
+            .run_function(
                 &skill_path,
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
                 skill_ctx,
@@ -852,7 +852,7 @@ pub mod tests {
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
-        let resp = runtime.run(&skill_path, json!("name"), skill_ctx).await;
+        let resp = runtime.run_function(&skill_path, json!("name"), skill_ctx).await;
 
         drop(runtime);
         skill_store.wait_for_shutdown().await;
@@ -869,7 +869,7 @@ pub mod tests {
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
-            .run(&SkillPath::dummy(), json!("name"), skill_ctx)
+            .run_function(&SkillPath::dummy(), json!("name"), skill_ctx)
             .await;
 
         drop(runtime);
@@ -889,7 +889,7 @@ pub mod tests {
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let actual = runtime
-            .run(&skill_path, json!("Homer"), skill_ctx)
+            .run_function(&skill_path, json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
@@ -911,7 +911,7 @@ pub mod tests {
         let runtime = WasmRuntime::new(engine, skill_store.api());
 
         let actual = runtime
-            .run(&skill_path, json!("Homer"), skill_ctx)
+            .run_function(&skill_path, json!("Homer"), skill_ctx)
             .await
             .unwrap();
 
