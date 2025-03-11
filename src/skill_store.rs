@@ -7,6 +7,7 @@ use crate::{
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
+use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
@@ -209,8 +210,8 @@ impl SkillStore {
         SkillStore { sender, handle }
     }
 
-    pub fn api(&self) -> SkillStoreApi {
-        SkillStoreApi::new(self.sender.clone())
+    pub fn api(&self) -> SkillStoreApiImpl {
+        SkillStoreApiImpl::new(self.sender.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -220,17 +221,45 @@ impl SkillStore {
     }
 }
 
+#[async_trait]
+pub trait SkillStoreApi {
+    async fn remove(&self, skill_path: SkillPath);
+
+    async fn upsert(&self, skill: ConfiguredSkill);
+
+    /// Report a namespace as erroneous (e.g. in case its configuration is messed up). Set `None`
+    /// to communicate that a namespace is no longer erroneous.
+    async fn set_namespace_error(&self, namespace: Namespace, error: Option<anyhow::Error>);
+
+    /// Fetch an executable skill
+    async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, SkillStoreError>;
+
+    /// List all skills which are currently cached and can be executed without fetching the wasm
+    /// component from an OCI
+    async fn list_cached(&self) -> Vec<SkillPath>;
+
+    /// List all skills from all namespaces
+    async fn list(&self) -> Vec<SkillPath>;
+
+    /// Drops a skill from the cache in case it has been cached before. `true` if the skill has been
+    /// in the cache before, `false` otherwise .
+    async fn invalidate_cache(&self, skill_path: SkillPath) -> bool;
+}
+
 #[derive(Clone)]
-pub struct SkillStoreApi {
+pub struct SkillStoreApiImpl {
     sender: mpsc::Sender<SkillStoreMessage>,
 }
 
-impl SkillStoreApi {
+impl SkillStoreApiImpl {
     pub fn new(sender: mpsc::Sender<SkillStoreMessage>) -> Self {
-        SkillStoreApi { sender }
+        SkillStoreApiImpl { sender }
     }
+}
 
-    pub async fn remove(&self, skill_path: SkillPath) {
+#[async_trait]
+impl SkillStoreApi for SkillStoreApiImpl {
+    async fn remove(&self, skill_path: SkillPath) {
         let msg = SkillStoreMessage::Remove { skill_path };
         self.sender
             .send(msg)
@@ -238,7 +267,7 @@ impl SkillStoreApi {
             .expect("all api handlers must be shutdown before actors");
     }
 
-    pub async fn upsert(&self, skill: ConfiguredSkill) {
+    async fn upsert(&self, skill: ConfiguredSkill) {
         let msg = SkillStoreMessage::Upsert { skill };
         self.sender
             .send(msg)
@@ -248,7 +277,7 @@ impl SkillStoreApi {
 
     /// Report a namespace as erroneous (e.g. in case its configuration is messed up). Set `None`
     /// to communicate that a namespace is no longer erroneous.
-    pub async fn set_namespace_error(&self, namespace: Namespace, error: Option<anyhow::Error>) {
+    async fn set_namespace_error(&self, namespace: Namespace, error: Option<anyhow::Error>) {
         let msg = SkillStoreMessage::SetNamespaceError { namespace, error };
         self.sender
             .send(msg)
@@ -257,10 +286,7 @@ impl SkillStoreApi {
     }
 
     /// Fetch an executable skill
-    pub async fn fetch(
-        &self,
-        skill_path: SkillPath,
-    ) -> Result<Option<Arc<Skill>>, SkillStoreError> {
+    async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, SkillStoreError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::Fetch { skill_path, send };
         self.sender
@@ -272,7 +298,7 @@ impl SkillStoreApi {
 
     /// List all skills which are currently cached and can be executed without fetching the wasm
     /// component from an OCI
-    pub async fn list_cached(&self) -> Vec<SkillPath> {
+    async fn list_cached(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::ListCached { send };
         self.sender
@@ -283,7 +309,7 @@ impl SkillStoreApi {
     }
 
     /// List all skills from all namespaces
-    pub async fn list(&self) -> Vec<SkillPath> {
+    async fn list(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::List { send };
         self.sender
@@ -295,7 +321,7 @@ impl SkillStoreApi {
 
     /// Drops a skill from the cache in case it has been cached before. `true` if the skill has been
     /// in the cache before, `false` otherwise .
-    pub async fn invalidate_cache(&self, skill_path: SkillPath) -> bool {
+    async fn invalidate_cache(&self, skill_path: SkillPath) -> bool {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::InvalidateCache { skill_path, send };
         self.sender
@@ -539,9 +565,9 @@ pub mod tests {
 
     pub use super::SkillStoreMessage;
 
-    pub fn dummy_skill_store_api() -> SkillStoreApi {
+    pub fn dummy_skill_store_api() -> SkillStoreApiImpl {
         let (send, _recv) = mpsc::channel(1);
-        SkillStoreApi::new(send)
+        SkillStoreApiImpl::new(send)
     }
 
     impl SkillStoreState<mpsc::Sender<SkillLoaderMsg>> {
