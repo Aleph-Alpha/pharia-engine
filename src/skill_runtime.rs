@@ -1291,6 +1291,7 @@ pub mod tests {
         }
     }
 
+    /// Maybe we can use the `SkillStoreStub` from `SkillStore::test` instead?
     pub struct SkillStoreStub {
         send: mpsc::Sender<SkillStoreMessage>,
         join_handle: JoinHandle<()>,

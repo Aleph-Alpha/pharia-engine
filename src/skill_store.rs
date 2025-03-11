@@ -547,6 +547,7 @@ pub mod tests {
 
     pub use super::SkillStoreMessage;
 
+    #[derive(Debug, Clone)]
     pub struct SkillStoreDummy;
 
     #[async_trait]
@@ -583,9 +584,63 @@ pub mod tests {
         }
     }
 
-    pub fn dummy_skill_store_api() -> mpsc::Sender<SkillStoreMessage> {
-        let (send, _recv) = mpsc::channel(1);
-        send
+    #[derive(Debug, Clone)]
+    pub struct SkillStoreStub {
+        list_response: Vec<SkillPath>,
+        list_cached_response: Vec<SkillPath>,
+    }
+
+    impl SkillStoreStub {
+        pub fn new() -> Self {
+            SkillStoreStub {
+                list_response: vec![],
+                list_cached_response: vec![],
+            }
+        }
+
+        pub fn with_list_response(&mut self, list_response: Vec<SkillPath>) -> &mut Self {
+            self.list_response = list_response;
+            self
+        }
+
+        pub fn with_list_cached_response(&mut self, list_response: Vec<SkillPath>) -> &mut Self {
+            self.list_cached_response = list_response;
+            self
+        }
+    }
+
+    #[async_trait]
+    impl SkillStoreApi for SkillStoreStub {
+        async fn remove(&self, _skill_path: SkillPath) {
+            panic!("Skill store stub called.")
+        }
+
+        async fn upsert(&self, _skill: ConfiguredSkill) {
+            panic!("Skill store stub called.")
+        }
+
+        async fn set_namespace_error(&self, _namespace: Namespace, _error: Option<anyhow::Error>) {
+            panic!("Skill store stub called.")
+        }
+
+        async fn fetch(
+            &self,
+            _skill_path: SkillPath,
+        ) -> Result<Option<Arc<Skill>>, SkillStoreError> {
+            panic!("Skill store stub called.")
+        }
+
+        async fn list_cached(&self) -> Vec<SkillPath> {
+            self.list_cached_response.clone()
+        }
+
+        async fn list(&self) -> Vec<SkillPath> {
+            self.list_response.clone()
+        }
+
+        async fn invalidate_cache(&self, _skill_path: SkillPath) -> bool {
+            panic!("Skill store stub called.")
+        }
     }
 
     impl SkillStoreState<mpsc::Sender<SkillLoaderMsg>> {
