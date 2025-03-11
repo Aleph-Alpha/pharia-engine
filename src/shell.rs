@@ -94,25 +94,27 @@ impl Shell {
 
 /// State shared between routes
 #[derive(Clone)]
-struct AppState<C, R>
+struct AppState<C, R, S>
 where
     C: Clone,
     R: Clone,
+    S: Clone,
 {
     authorization_api: AuthorizationApi,
-    skill_store_api: mpsc::Sender<SkillStoreMessage>,
+    skill_store_api: S,
     skill_runtime_api: R,
     csi_drivers: C,
 }
 
-impl<C, R> AppState<C, R>
+impl<C, R, S> AppState<C, R, S>
 where
     C: Csi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone,
+    S: SkillStoreApi + Clone,
 {
     pub fn new(
         authorization_api: AuthorizationApi,
-        skill_store_api: mpsc::Sender<SkillStoreMessage>,
+        skill_store_api: S,
         skill_runtime_api: R,
         csi_drivers: C,
     ) -> Self {
@@ -125,35 +127,27 @@ where
     }
 }
 
-impl<C, R> FromRef<AppState<C, R>> for AuthorizationApi
+impl<C, R, S> FromRef<AppState<C, R, S>> for AuthorizationApi
 where
     C: Clone,
     R: Clone,
+    S: Clone,
 {
-    fn from_ref(app_state: &AppState<C, R>) -> AuthorizationApi {
+    fn from_ref(app_state: &AppState<C, R, S>) -> AuthorizationApi {
         app_state.authorization_api.clone()
-    }
-}
-
-impl<C, R> FromRef<AppState<C, R>> for mpsc::Sender<SkillStoreMessage>
-where
-    C: Clone,
-    R: Clone,
-{
-    fn from_ref(app_state: &AppState<C, R>) -> mpsc::Sender<SkillStoreMessage> {
-        app_state.skill_store_api.clone()
     }
 }
 
 /// Wrapper used to extract [`Csi`] api from the [`AppState`] using a [`FromRef`] implementation.
 pub struct CsiState<C>(pub C);
 
-impl<C, R> FromRef<AppState<C, R>> for CsiState<C>
+impl<C, R, S> FromRef<AppState<C, R, S>> for CsiState<C>
 where
     C: Clone,
     R: Clone,
+    S: Clone,
 {
-    fn from_ref(app_state: &AppState<C, R>) -> CsiState<C> {
+    fn from_ref(app_state: &AppState<C, R, S>) -> CsiState<C> {
         CsiState(app_state.csi_drivers.clone())
     }
 }
@@ -162,20 +156,37 @@ where
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct SkillRuntimeState<R>(pub R);
 
-impl<C, R> FromRef<AppState<C, R>> for SkillRuntimeState<R>
+impl<C, R, S> FromRef<AppState<C, R, S>> for SkillRuntimeState<R>
 where
     C: Clone,
     R: Clone,
+    S: Clone,
 {
-    fn from_ref(app_state: &AppState<C, R>) -> SkillRuntimeState<R> {
+    fn from_ref(app_state: &AppState<C, R, S>) -> SkillRuntimeState<R> {
         SkillRuntimeState(app_state.skill_runtime_api.clone())
     }
 }
 
-fn http<C, R>(feature_set: FeatureSet, app_state: AppState<C, R>) -> Router
+/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
+/// reference from the [`AppState`] using a [`FromRef`] implementation.
+struct SkillStoreState<S>(pub S);
+
+impl<C, R, S> FromRef<AppState<C, R, S>> for SkillStoreState<S>
+where
+    C: Clone,
+    R: Clone,
+    S: Clone,
+{
+    fn from_ref(app_state: &AppState<C, R, S>) -> SkillStoreState<S> {
+        SkillStoreState(app_state.skill_store_api.clone())
+    }
+}
+
+fn http<C, R, S>(feature_set: FeatureSet, app_state: AppState<C, R, S>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
+    S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
     let api_doc = if feature_set == FeatureSet::Beta {
         ApiDocBeta::openapi()
@@ -557,9 +568,12 @@ struct SseErrorEvent {
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
 )]
-async fn skills(
-    State(skill_store_api): State<mpsc::Sender<SkillStoreMessage>>,
-) -> Json<Vec<String>> {
+async fn skills<S>(
+    State(SkillStoreState(skill_store_api)): State<SkillStoreState<S>>,
+) -> Json<Vec<String>>
+where
+    S: SkillStoreApi,
+{
     let response = skill_store_api.list().await;
     let response = response.iter().map(ToString::to_string).collect();
     Json(response)
@@ -580,9 +594,12 @@ async fn skills(
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
 )]
-async fn cached_skills(
-    State(skill_store_api): State<mpsc::Sender<SkillStoreMessage>>,
-) -> Json<Vec<String>> {
+async fn cached_skills<S>(
+    State(SkillStoreState(skill_store_api)): State<SkillStoreState<S>>,
+) -> Json<Vec<String>>
+where
+    S: SkillStoreApi,
+{
     let response = skill_store_api.list_cached().await;
     let response = response.iter().map(ToString::to_string).collect();
     Json(response)
@@ -605,10 +622,13 @@ async fn cached_skills(
         (status = 200, body=String, example = json!("Skill was not present in cache.")),
     ),
 )]
-async fn drop_cached_skill(
-    State(skill_store_api): State<mpsc::Sender<SkillStoreMessage>>,
+async fn drop_cached_skill<S>(
+    State(SkillStoreState(skill_store_api)): State<SkillStoreState<S>>,
     Path((namespace, name)): Path<(Namespace, String)>,
-) -> Json<String> {
+) -> Json<String>
+where
+    S: SkillStoreApi,
+{
     let skill_path = SkillPath::new(namespace, name);
     let skill_was_cached = skill_store_api.invalidate_cache(skill_path).await;
     let msg = if skill_was_cached {
@@ -650,7 +670,7 @@ mod tests {
         skill_runtime::{MetadataRequest, RunFunction, SkillRuntimeError, SkillRuntimeMsg},
         skill_store::{
             SkillStoreError,
-            tests::{SkillStoreMessage, dummy_skill_store_api},
+            tests::{SkillStoreDummy, SkillStoreMessage, SkillStoreStub},
         },
         skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
@@ -670,7 +690,7 @@ mod tests {
     use tokio::{sync::mpsc, task::JoinHandle};
     use tower::util::ServiceExt;
 
-    impl AppState<CsiDummy, SkillRuntimeDummy> {
+    impl AppState<CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
         pub fn dummy() -> Self {
             let dummy_authorization = StubAuthorization::new(|msg| {
                 match msg {
@@ -681,32 +701,37 @@ mod tests {
             });
             Self::new(
                 dummy_authorization.api(),
-                dummy_skill_store_api(),
+                SkillStoreDummy,
                 SkillRuntimeDummy,
                 CsiDummy,
             )
         }
     }
 
-    impl<C, R> AppState<C, R>
+    impl<C, R, S> AppState<C, R, S>
     where
         C: Csi + Clone + Sync + Send + 'static,
         R: SkillRuntimeApi + Clone + Send + Sync + 'static,
+        S: SkillStoreApi + Clone + Send + Sync + 'static,
     {
         pub fn with_authorization_api(mut self, authorization_api: AuthorizationApi) -> Self {
             self.authorization_api = authorization_api;
             self
         }
 
-        pub fn with_skill_store_api(
-            mut self,
-            skill_store_api: mpsc::Sender<SkillStoreMessage>,
-        ) -> Self {
-            self.skill_store_api = skill_store_api;
-            self
+        pub fn with_skill_store_api<S2>(self, skill_store_api: S2) -> AppState<C, R, S2>
+        where
+            S2: SkillStoreApi + Clone + Send + Sync + 'static,
+        {
+            AppState::new(
+                self.authorization_api,
+                skill_store_api,
+                self.skill_runtime_api,
+                self.csi_drivers,
+            )
         }
 
-        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppState<C, R2>
+        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppState<C, R2, S>
         where
             R2: SkillRuntimeApi + Clone + Send + Sync + 'static,
         {
@@ -718,7 +743,7 @@ mod tests {
             )
         }
 
-        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<C2, R>
+        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<C2, R, S>
         where
             C2: Csi + Clone + Sync + Send + 'static,
         {
@@ -1075,20 +1100,13 @@ mod tests {
     async fn list_cached_skills_for_user() {
         // Given
         let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
-        let (send, mut recv) = mpsc::channel(1);
-        let namespace = Namespace::new("ns").unwrap();
-        tokio::spawn(async move {
-            if let SkillStoreMessage::ListCached { send } = recv.recv().await.unwrap() {
-                send.send(vec![
-                    SkillPath::new(namespace.clone(), "first"),
-                    SkillPath::new(namespace, "second"),
-                ])
-            } else {
-                panic!("unexpected message in test")
-            }
-        });
+        let mut skill_store = SkillStoreStub::new();
+        skill_store.with_list_cached_response(vec![
+            SkillPath::new(Namespace::new("ns").unwrap(), "first"),
+            SkillPath::new(Namespace::new("ns").unwrap(), "second"),
+        ]);
         let app_state = AppState::dummy()
-            .with_skill_store_api(send)
+            .with_skill_store_api(skill_store)
             .with_skill_runtime_api(saboteur_skill_executer.api());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
@@ -1288,20 +1306,13 @@ mod tests {
     async fn list_skills() {
         // Given we can provide two skills "ns-one/one" and "ns-two/two"
         let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
-        let (send, mut recv) = mpsc::channel(1);
-        tokio::spawn(async move {
-            if let SkillStoreMessage::List { send } = recv.recv().await.unwrap() {
-                send.send(vec![
-                    SkillPath::new(Namespace::new("ns-one").unwrap(), "one"),
-                    SkillPath::new(Namespace::new("ns-two").unwrap(), "two"),
-                ])
-                .unwrap();
-            } else {
-                panic!("Unexpected message in test")
-            }
-        });
+        let mut skill_store = SkillStoreStub::new();
+        skill_store.with_list_response(vec![
+            SkillPath::new(Namespace::new("ns-one").unwrap(), "one"),
+            SkillPath::new(Namespace::new("ns-two").unwrap(), "two"),
+        ]);
         let app_state = AppState::dummy()
-            .with_skill_store_api(send)
+            .with_skill_store_api(skill_store)
             .with_skill_runtime_api(saboteur_skill_executer.api());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
