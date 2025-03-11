@@ -632,12 +632,10 @@ mod tests {
 
     use crate::{
         authorization::{self, tests::StubAuthorization},
-        csi::tests::{DummyCsi, StubCsi},
+        csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
-        skill_runtime::{
-            MetadataRequest, RunChat, RunFunction, SkillRuntimeError, SkillRuntimeMsg,
-        },
+        skill_runtime::{MetadataRequest, RunFunction, SkillRuntimeError, SkillRuntimeMsg},
         skill_store::{
             SkillStoreError,
             tests::{SkillStoreMessage, dummy_skill_store_api},
@@ -648,6 +646,7 @@ mod tests {
 
     use super::*;
 
+    use async_trait::async_trait;
     use axum::{
         body::Body,
         http::{Method, Request, header},
@@ -659,7 +658,7 @@ mod tests {
     use tokio::{sync::mpsc, task::JoinHandle};
     use tower::util::ServiceExt;
 
-    impl AppState<DummyCsi, mpsc::Sender<SkillRuntimeMsg>> {
+    impl AppState<CsiDummy, SkillRuntimeDummy> {
         pub fn dummy() -> Self {
             let dummy_authorization = StubAuthorization::new(|msg| {
                 match msg {
@@ -668,19 +667,19 @@ mod tests {
                     }
                 };
             });
-            let skill_runtime = StubSkillRuntime::new(|_| {});
             Self::new(
                 dummy_authorization.api(),
                 dummy_skill_store_api(),
-                skill_runtime.api(),
-                DummyCsi,
+                SkillRuntimeDummy,
+                CsiDummy,
             )
         }
     }
 
-    impl<C> AppState<C, mpsc::Sender<SkillRuntimeMsg>>
+    impl<C, R> AppState<C, R>
     where
         C: Csi + Clone + Sync + Send + 'static,
+        R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     {
         pub fn with_authorization_api(mut self, authorization_api: AuthorizationApi) -> Self {
             self.authorization_api = authorization_api;
@@ -692,14 +691,21 @@ mod tests {
             self
         }
 
-        pub fn with_skill_runtime_api(mut self, skill_runtime_api: mpsc::Sender<SkillRuntimeMsg>) -> Self {
-            self.skill_runtime_api = skill_runtime_api;
-            self
+        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppState<C, R2>
+        where
+            R2: SkillRuntimeApi + Clone + Send + Sync + 'static,
+        {
+            AppState::new(
+                self.authorization_api,
+                self.skill_store_api,
+                skill_runtime_api,
+                self.csi_drivers,
+            )
         }
 
-        pub fn with_csi_drivers<D>(self, csi_drivers: D) -> AppState<D, mpsc::Sender<SkillRuntimeMsg>>
+        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<C2, R>
         where
-            D: Csi + Clone + Sync + Send + 'static,
+            C2: Csi + Clone + Sync + Send + 'static,
         {
             AppState::new(
                 self.authorization_api,
@@ -893,14 +899,12 @@ mod tests {
     #[tokio::test]
     async fn chat_endpoint_should_send_individual_message_deltas() {
         // Given
-        let skill_executer_mock = StubSkillRuntime::answer_with_chat_events(
-            "Hello"
-                .chars()
-                .map(|c| ChatEvent::Append(c.to_string()))
-                .collect(),
-        );
-        let skill_runtime_api = skill_executer_mock.api();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
+        let chat_events = "Hello"
+            .chars()
+            .map(|c| ChatEvent::Append(c.to_string()))
+            .collect();
+        let skill_executer_mock = ChatEventSourceStub::new(chat_events);
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_executer_mock);
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a chat message
@@ -939,12 +943,9 @@ mod tests {
     #[tokio::test]
     async fn chat_endpoint_for_saboteur_skill() {
         // Given
-        let skill_executer_mock =
-            StubSkillRuntime::answer_with_chat_events(vec![ChatEvent::Error(
-                "Skill is a saboteur".to_string(),
-            )]);
-        let skill_runtime_api = skill_executer_mock.api();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
+        let chat_events = vec![ChatEvent::Error("Skill is a saboteur".to_string())];
+        let skill_runtime = ChatEventSourceStub::new(chat_events);
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a chat message from a skill that does not exist
@@ -1451,19 +1452,19 @@ mod tests {
             Self { send, handle }
         }
 
-        pub fn answer_with_chat_events(chat_events: Vec<ChatEvent>) -> Self {
-            let (send, mut recv) = mpsc::channel(1);
-            let handle = tokio::spawn(async move {
-                let Some(SkillRuntimeMsg::Chat(RunChat { send, .. })) = recv.recv().await else {
-                    panic!("Stub runtime expected a run chat command");
-                };
-                for ce in chat_events {
-                    send.send(ce).await.unwrap();
-                }
-            });
+        // pub fn answer_with_chat_events(chat_events: Vec<ChatEvent>) -> Self {
+        //     let (send, mut recv) = mpsc::channel(1);
+        //     let handle = tokio::spawn(async move {
+        //         let Some(SkillRuntimeMsg::Chat(RunChat { send, .. })) = recv.recv().await else {
+        //             panic!("Stub runtime expected a run chat command");
+        //         };
+        //         for ce in chat_events {
+        //             send.send(ce).await.unwrap();
+        //         }
+        //     });
 
-            Self { send, handle }
-        }
+        //     Self { send, handle }
+        // }
 
         pub fn api(&self) -> mpsc::Sender<SkillRuntimeMsg> {
             self.send.clone()
@@ -1472,6 +1473,81 @@ mod tests {
         pub async fn shutdown(self) {
             drop(self.send);
             self.handle.await.unwrap();
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct SkillRuntimeDummy;
+
+    #[async_trait]
+    impl SkillRuntimeApi for SkillRuntimeDummy {
+        async fn run_function(
+            &self,
+            _skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+        ) -> Result<Value, SkillRuntimeError> {
+            panic!("Skill runtime dummy called")
+        }
+
+        async fn run_chat(
+            &self,
+            _skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+        ) -> mpsc::Receiver<ChatEvent> {
+            panic!("Skill runtime dummy called")
+        }
+
+        async fn skill_metadata(
+            &self,
+            _skill_path: SkillPath,
+        ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
+            panic!("Skill runtime dummy called")
+        }
+    }
+
+    /// Stub Skill Runtime which emits predifined chat events
+    #[derive(Debug, Clone)]
+    struct ChatEventSourceStub {
+        chat_events: Vec<ChatEvent>,
+    }
+
+    impl ChatEventSourceStub {
+        pub fn new(chat_events: Vec<ChatEvent>) -> Self {
+            Self { chat_events }
+        }
+    }
+
+    #[async_trait]
+    impl SkillRuntimeApi for ChatEventSourceStub {
+        async fn run_function(
+            &self,
+            _skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+        ) -> Result<Value, SkillRuntimeError> {
+            panic!("Chat Event source stub called")
+        }
+
+        async fn run_chat(
+            &self,
+            _skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+        ) -> mpsc::Receiver<ChatEvent> {
+            let (send, recv) = mpsc::channel(self.chat_events.len());
+            for ce in &self.chat_events {
+                send.send(ce.clone()).await.unwrap();
+            }
+            recv
+        }
+
+        async fn skill_metadata(
+            &self,
+            _skill_path: SkillPath,
+        ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
+            panic!("Chat Event source stub called")
         }
     }
 }

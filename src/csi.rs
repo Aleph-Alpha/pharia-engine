@@ -473,10 +473,10 @@ pub mod tests {
     }
 
     #[derive(Clone)]
-    pub struct DummyCsi;
+    pub struct CsiDummy;
 
     #[async_trait]
-    impl Csi for DummyCsi {
+    impl Csi for CsiDummy {
         async fn explain(
             &self,
             _auth: String,
