@@ -42,7 +42,7 @@ use crate::{
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
     skill_runtime::{ChatEvent, SkillRuntimeApi, SkillRuntimeError},
-    skill_store::SkillStoreApi,
+    skill_store::{SkillStoreApi, SkillStoreApiImpl},
     skills::{SkillMetadata, SkillPath},
 };
 
@@ -58,7 +58,7 @@ impl Shell {
         addr: impl Into<SocketAddr>,
         authorization_api: AuthorizationApi,
         skill_runtime_api: impl SkillRuntimeApi + Clone + Send + Sync + 'static,
-        skill_store_api: SkillStoreApi,
+        skill_store_api: SkillStoreApiImpl,
         csi_drivers: impl Csi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> anyhow::Result<Self> {
@@ -100,7 +100,7 @@ where
     R: Clone,
 {
     authorization_api: AuthorizationApi,
-    skill_store_api: SkillStoreApi,
+    skill_store_api: SkillStoreApiImpl,
     skill_runtime_api: R,
     csi_drivers: C,
 }
@@ -112,7 +112,7 @@ where
 {
     pub fn new(
         authorization_api: AuthorizationApi,
-        skill_store_api: SkillStoreApi,
+        skill_store_api: SkillStoreApiImpl,
         skill_runtime_api: R,
         csi_drivers: C,
     ) -> Self {
@@ -135,12 +135,12 @@ where
     }
 }
 
-impl<C, R> FromRef<AppState<C, R>> for SkillStoreApi
+impl<C, R> FromRef<AppState<C, R>> for SkillStoreApiImpl
 where
     C: Clone,
     R: Clone,
 {
-    fn from_ref(app_state: &AppState<C, R>) -> SkillStoreApi {
+    fn from_ref(app_state: &AppState<C, R>) -> SkillStoreApiImpl {
         app_state.skill_store_api.clone()
     }
 }
@@ -549,7 +549,7 @@ struct SseErrorEvent {
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
 )]
-async fn skills(State(skill_store_api): State<SkillStoreApi>) -> Json<Vec<String>> {
+async fn skills(State(skill_store_api): State<SkillStoreApiImpl>) -> Json<Vec<String>> {
     let response = skill_store_api.list().await;
     let response = response.iter().map(ToString::to_string).collect();
     Json(response)
@@ -570,7 +570,7 @@ async fn skills(State(skill_store_api): State<SkillStoreApi>) -> Json<Vec<String
         (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
     ),
 )]
-async fn cached_skills(State(skill_store_api): State<SkillStoreApi>) -> Json<Vec<String>> {
+async fn cached_skills(State(skill_store_api): State<SkillStoreApiImpl>) -> Json<Vec<String>> {
     let response = skill_store_api.list_cached().await;
     let response = response.iter().map(ToString::to_string).collect();
     Json(response)
@@ -594,7 +594,7 @@ async fn cached_skills(State(skill_store_api): State<SkillStoreApi>) -> Json<Vec
     ),
 )]
 async fn drop_cached_skill(
-    State(skill_store_api): State<SkillStoreApi>,
+    State(skill_store_api): State<SkillStoreApiImpl>,
     Path((namespace, name)): Path<(Namespace, String)>,
 ) -> Json<String> {
     let skill_path = SkillPath::new(namespace, name);
@@ -686,7 +686,7 @@ mod tests {
             self
         }
 
-        pub fn with_skill_store_api(mut self, skill_store_api: SkillStoreApi) -> Self {
+        pub fn with_skill_store_api(mut self, skill_store_api: SkillStoreApiImpl) -> Self {
             self.skill_store_api = skill_store_api;
             self
         }
@@ -1056,7 +1056,7 @@ mod tests {
         // Given
         let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
-        let skill_store_api = SkillStoreApi::new(send);
+        let skill_store_api = SkillStoreApiImpl::new(send);
         let namespace = Namespace::new("ns").unwrap();
         tokio::spawn(async move {
             if let SkillStoreMessage::ListCached { send } = recv.recv().await.unwrap() {
@@ -1106,7 +1106,7 @@ mod tests {
         let skill_path = Arc::new(Mutex::new(None));
         let skill_path_clone = skill_path.clone();
         let (send, mut recv) = mpsc::channel(1);
-        let skill_store_api = SkillStoreApi::new(send);
+        let skill_store_api = SkillStoreApiImpl::new(send);
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
         tokio::spawn(async move {
             if let SkillStoreMessage::InvalidateCache { skill_path, send } =
@@ -1163,7 +1163,7 @@ mod tests {
         let skill_path = Arc::new(Mutex::new(None));
         let skill_path_clone = skill_path.clone();
         let (send, mut recv) = mpsc::channel(1);
-        let skill_store_api = SkillStoreApi::new(send);
+        let skill_store_api = SkillStoreApiImpl::new(send);
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
         tokio::spawn(async move {
             if let SkillStoreMessage::InvalidateCache { skill_path, send } =
@@ -1272,7 +1272,7 @@ mod tests {
         // Given we can provide two skills "ns-one/one" and "ns-two/two"
         let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
         let (send, mut recv) = mpsc::channel(1);
-        let skill_store_api = SkillStoreApi::new(send);
+        let skill_store_api = SkillStoreApiImpl::new(send);
         tokio::spawn(async move {
             if let SkillStoreMessage::List { send } = recv.recv().await.unwrap() {
                 send.send(vec![
