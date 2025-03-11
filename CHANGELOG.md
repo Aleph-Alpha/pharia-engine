@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.9...v0.10.0)
+
+### Features
+
+- Add metrics for chat runtime metrics - ([458d5ae](https://github.com/Aleph-Alpha/pharia-kernel/commit/458d5aec90883ce2ccd1f2cb53edc0bfa65a7aa2))
+- Send message delta in JSON format - ([1c22f35](https://github.com/Aleph-Alpha/pharia-kernel/commit/1c22f35b6c0300153acb33dbe743183962d98a6b))
+- Handle saboteur chat skill - ([1a33eb3](https://github.com/Aleph-Alpha/pharia-kernel/commit/1a33eb3be7d94c9e6fa0995f5f24bbc9577fe1ae))
+- Handle chat skill not found - ([693919b](https://github.com/Aleph-Alpha/pharia-kernel/commit/693919b694d702da6c3ac3ab4fbdecf556073a2c))
+- Handle string values only for feature set - ([d490787](https://github.com/Aleph-Alpha/pharia-kernel/commit/d4907876ab73b26303d72c979641f5ee8dfbd869))
+- Separate OpenAPI docs for beta - ([cdb1016](https://github.com/Aleph-Alpha/pharia-kernel/commit/cdb10167a1bbba5db80a7640304b261a867a29a5))
+- Init chat skill endpoint - ([cd98950](https://github.com/Aleph-Alpha/pharia-kernel/commit/cd989503ffa4bc8547dcf20fbd5bfc464c1f8031))
+- Add skills to /v1/ api - ([db59b9b](https://github.com/Aleph-Alpha/pharia-kernel/commit/db59b9b847ad9d26a840d29c59b0c42855677a9d))
+
+### Fixes
+
+- Handle invalid config access token - ([4513bdd](https://github.com/Aleph-Alpha/pharia-kernel/commit/4513bdd1aa503f8b49c84816f7305b8f4acb0c01))
+
+### Documentation
+
+- Remove invalid request response - ([fff801e](https://github.com/Aleph-Alpha/pharia-kernel/commit/fff801ee263e080d7c7d6515b882bf77100c8e18))
+
+### Builds
+
+- *(deps)* Bump the minor group with 3 updates - ([b7c721f](https://github.com/Aleph-Alpha/pharia-kernel/commit/b7c721f58ddf9613c1c98a51c7e2addfa8ef2d5f))
+- *(deps)* Bump the minor group with 11 updates - ([2ee4d97](https://github.com/Aleph-Alpha/pharia-kernel/commit/2ee4d97abf628f175b0dac46bf7c05733f75daef))
+- *(deps)* Bump the minor group with 14 updates - ([7aa855e](https://github.com/Aleph-Alpha/pharia-kernel/commit/7aa855eca0a1ab6919a8b17fb72681acd2f9e94a))
+- *(deps)* Bump the minor group with 24 updates - ([4c640e7](https://github.com/Aleph-Alpha/pharia-kernel/commit/4c640e74ecf843ad984b71fde6314e7911abd0c8))
+- *(deps)* Bump the minor group with 48 updates - ([93da08b](https://github.com/Aleph-Alpha/pharia-kernel/commit/93da08b0ed19e2d058cb49f07487a8406524f322))
+- Standardize operation ID in OpenAPI - ([22b1fd7](https://github.com/Aleph-Alpha/pharia-kernel/commit/22b1fd7b3529927593ecc3a2cff2bc8ef794bec4))
+
+
 ## [0.9.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.8...v0.9.9)
 
 ### Features
