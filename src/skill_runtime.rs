@@ -10,7 +10,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{StreamExt, stream::FuturesUnordered};
 use opentelemetry::Context;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -326,81 +326,58 @@ impl RunChat {
         _csi_apis: impl Csi + Send + Sync + 'static,
         _runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
-        let name = self.skill_path.name.clone();
-        if !name.eq_ignore_ascii_case("hello") && !name.eq_ignore_ascii_case("saboteur") {
-            self.send
-                .send(ChatEvent::Error(
-                    SkillRuntimeError::SkillNotConfigured.to_string(),
-                ))
-                .await
-                .unwrap();
-            return;
-        };
+        let start = Instant::now();
+        let RunChat {
+            skill_path,
+            _input,
+            send,
+            _api_token,
+        } = self;
 
+        let name = skill_path.name.clone();
+        let result;
         if name.eq_ignore_ascii_case("saboteur") {
-            self.send
-                .send(ChatEvent::Error("Skill is a saboteur".to_string()))
+            send.send(ChatEvent::Error("Skill is a saboteur".to_string()))
                 .await
                 .unwrap();
+            result = Err(SkillRuntimeError::ExecutionError(anyhow!(
+                "Skill is a saboteur"
+            )));
         } else if name.eq_ignore_ascii_case("hello") {
             for c in "Hello".chars() {
-                self.send
-                    .send(ChatEvent::Append(c.to_string()))
-                    .await
-                    .unwrap();
+                send.send(ChatEvent::Append(c.to_string())).await.unwrap();
             }
+            result = Ok(json!(""));
+        } else {
+            send.send(ChatEvent::Error(
+                SkillRuntimeError::SkillNotConfigured.to_string(),
+            ))
+            .await
+            .unwrap();
+            result = Err(SkillRuntimeError::SkillNotConfigured);
         }
 
-        // let start = Instant::now();
-        // let RunFunction {
-        //     skill_path,
-        //     input,
-        //     send,
-        //     api_token,
-        // } = self;
-
-        // let span = span!(
-        //     Level::DEBUG,
-        //     "skill_run",
-        //     skill_path = skill_path.to_string(),
-        // );
-        // let context = span.context();
-        // let (send_rt_err, recv_rt_err) = oneshot::channel();
-        // let ctx = Box::new(SkillInvocationCtx::new(
-        //     send_rt_err,
-        //     csi_apis,
-        //     api_token,
-        //     Some(context),
-        // ));
-        // let response = select! {
-        //     result = runtime.run(&skill_path, input, ctx) => result,
-        //     // An error occurred during skill execution.
-        //     Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
-        // };
-
-        // let latency = start.elapsed().as_secs_f64();
-        // let labels = [
-        //     ("namespace", Cow::from(skill_path.namespace.to_string())),
-        //     ("name", Cow::from(skill_path.name)),
-        //     (
-        //         "status",
-        //         match response {
-        //             Ok(_) => "ok",
-        //             Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
-        //             Err(
-        //                 SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_),
-        //             ) => "internal_error",
-        //         }
-        //         .into(),
-        //     ),
-        // ];
-        // metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
-        // metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
-        //     .record(latency);
-
-        // // Error is expected to happen during shutdown. Ignore result.
-        // drop(send.send(response));
+        let latency = start.elapsed().as_secs_f64();
+        let labels = [
+            ("namespace", Cow::from(skill_path.namespace.to_string())),
+            ("name", Cow::from(skill_path.name)),
+            ("status", status_label(&result).into()),
+        ];
+        metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
+        metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
+            .record(latency);
     }
+}
+
+fn status_label(result: &Result<Value, SkillRuntimeError>) -> String {
+    match result {
+        Ok(_) => "ok",
+        Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
+        Err(SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_)) => {
+            "internal_error"
+        }
+    }
+    .to_owned()
 }
 
 /// An event emitted by a chat skill
@@ -459,17 +436,7 @@ impl RunFunction {
         let labels = [
             ("namespace", Cow::from(skill_path.namespace.to_string())),
             ("name", Cow::from(skill_path.name)),
-            (
-                "status",
-                match response {
-                    Ok(_) => "ok",
-                    Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
-                    Err(
-                        SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_),
-                    ) => "internal_error",
-                }
-                .into(),
-            ),
+            ("status", status_label(&response).into()),
         ];
         metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
         metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
