@@ -547,6 +547,42 @@ pub mod tests {
 
     pub use super::SkillStoreMessage;
 
+    pub struct SkillStoreDummy;
+
+    #[async_trait]
+    impl SkillStoreApi for SkillStoreDummy {
+        async fn remove(&self, _skill_path: SkillPath) {
+            panic!("Skill store dummy called.");
+        }
+
+        async fn upsert(&self, _skill: ConfiguredSkill) {
+            panic!("Skill store dummy called.");
+        }
+
+        async fn set_namespace_error(&self, _namespace: Namespace, _error: Option<anyhow::Error>) {
+            panic!("Skill store dummy called.");
+        }
+
+        async fn fetch(
+            &self,
+            _skill_path: SkillPath,
+        ) -> Result<Option<Arc<Skill>>, SkillStoreError> {
+            panic!("Skill store dummy called.")
+        }
+
+        async fn list_cached(&self) -> Vec<SkillPath> {
+            panic!("Skill store dummy called.")
+        }
+
+        async fn list(&self) -> Vec<SkillPath> {
+            panic!("Skill store dummy called.")
+        }
+
+        async fn invalidate_cache(&self, _skill_path: SkillPath) -> bool {
+            panic!("Skill store dummy called.")
+        }
+    }
+
     pub fn dummy_skill_store_api() -> mpsc::Sender<SkillStoreMessage> {
         let (send, _recv) = mpsc::channel(1);
         send

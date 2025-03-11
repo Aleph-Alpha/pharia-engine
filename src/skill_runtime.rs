@@ -722,7 +722,7 @@ pub mod tests {
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
     use crate::inference::{Explanation, ExplanationRequest, TextScore};
     use crate::namespace_watcher::Namespace;
-    use crate::skill_loader::ConfiguredSkill;
+    use crate::skill_store::tests::SkillStoreDummy;
     use crate::skills::SkillMetadata;
     use crate::{
         chunking::ChunkParams,
@@ -1321,42 +1321,6 @@ pub mod tests {
             _document_paths: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Option<Value>>> {
             bail!("Test error")
-        }
-    }
-
-    struct SkillStoreDummy;
-
-    #[async_trait]
-    impl SkillStoreApi for SkillStoreDummy {
-        async fn remove(&self, _skill_path: SkillPath) {
-            panic!("Skill store dummy called.");
-        }
-
-        async fn upsert(&self, _skill: ConfiguredSkill) {
-            panic!("Skill store dummy called.");
-        }
-
-        async fn set_namespace_error(&self, _namespace: Namespace, _error: Option<anyhow::Error>) {
-            panic!("Skill store dummy called.");
-        }
-
-        async fn fetch(
-            &self,
-            _skill_path: SkillPath,
-        ) -> Result<Option<Arc<Skill>>, SkillStoreError> {
-            panic!("Skill store dummy called.")
-        }
-
-        async fn list_cached(&self) -> Vec<SkillPath> {
-            panic!("Skill store dummy called.")
-        }
-
-        async fn list(&self) -> Vec<SkillPath> {
-            panic!("Skill store dummy called.")
-        }
-
-        async fn invalidate_cache(&self, _skill_path: SkillPath) -> bool {
-            panic!("Skill store dummy called.")
         }
     }
 
