@@ -1,5 +1,6 @@
 use anyhow::Ok;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
+use jiff::SignedDuration;
 use serde::{Deserialize, Deserializer};
 use std::{net::SocketAddr, str::FromStr, time::Duration};
 
@@ -78,7 +79,7 @@ pub struct AppConfig {
     #[serde(default)]
     pub namespaces: NamespaceConfigs,
     #[serde(
-        with = "humantime_serde",
+        deserialize_with = "positive_duration_from_str",
         default = "defaults::namespace_update_interval"
     )]
     pub namespace_update_interval: Duration,
@@ -87,6 +88,17 @@ pub struct AppConfig {
     pub otel_endpoint: Option<String>,
     #[serde(default)]
     pub use_pooling_allocator: bool,
+}
+
+/// `jiff::SignedDuration` can parse human readable strings like `1h30m` into `SignedDuration`.
+/// However, we want to ensure for this config that the duration is positive.
+fn positive_duration_from_str<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let duration_str = String::deserialize(deserializer)?;
+    let duration: SignedDuration = duration_str.parse().map_err(serde::de::Error::custom)?;
+    Duration::try_from(duration).map_err(serde::de::Error::custom)
 }
 
 impl AppConfig {
