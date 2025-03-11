@@ -210,8 +210,8 @@ impl SkillStore {
         SkillStore { sender, handle }
     }
 
-    pub fn api(&self) -> SkillStoreApiImpl {
-        SkillStoreApiImpl::new(self.sender.clone())
+    pub fn api(&self) -> mpsc::Sender<SkillStoreMessage> {
+        self.sender.clone()
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -246,31 +246,18 @@ pub trait SkillStoreApi {
     async fn invalidate_cache(&self, skill_path: SkillPath) -> bool;
 }
 
-#[derive(Clone)]
-pub struct SkillStoreApiImpl {
-    sender: mpsc::Sender<SkillStoreMessage>,
-}
-
-impl SkillStoreApiImpl {
-    pub fn new(sender: mpsc::Sender<SkillStoreMessage>) -> Self {
-        SkillStoreApiImpl { sender }
-    }
-}
-
 #[async_trait]
-impl SkillStoreApi for SkillStoreApiImpl {
+impl SkillStoreApi for mpsc::Sender<SkillStoreMessage> {
     async fn remove(&self, skill_path: SkillPath) {
         let msg = SkillStoreMessage::Remove { skill_path };
-        self.sender
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
     }
 
     async fn upsert(&self, skill: ConfiguredSkill) {
         let msg = SkillStoreMessage::Upsert { skill };
-        self.sender
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
     }
@@ -279,8 +266,7 @@ impl SkillStoreApi for SkillStoreApiImpl {
     /// to communicate that a namespace is no longer erroneous.
     async fn set_namespace_error(&self, namespace: Namespace, error: Option<anyhow::Error>) {
         let msg = SkillStoreMessage::SetNamespaceError { namespace, error };
-        self.sender
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
     }
@@ -289,8 +275,7 @@ impl SkillStoreApi for SkillStoreApiImpl {
     async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, SkillStoreError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::Fetch { skill_path, send };
-        self.sender
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
@@ -301,8 +286,7 @@ impl SkillStoreApi for SkillStoreApiImpl {
     async fn list_cached(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::ListCached { send };
-        self.sender
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
@@ -312,8 +296,7 @@ impl SkillStoreApi for SkillStoreApiImpl {
     async fn list(&self) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::List { send };
-        self.sender
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
@@ -324,8 +307,7 @@ impl SkillStoreApi for SkillStoreApiImpl {
     async fn invalidate_cache(&self, skill_path: SkillPath) -> bool {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMessage::InvalidateCache { skill_path, send };
-        self.sender
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
@@ -565,9 +547,9 @@ pub mod tests {
 
     pub use super::SkillStoreMessage;
 
-    pub fn dummy_skill_store_api() -> SkillStoreApiImpl {
+    pub fn dummy_skill_store_api() -> mpsc::Sender<SkillStoreMessage> {
         let (send, _recv) = mpsc::channel(1);
-        SkillStoreApiImpl::new(send)
+        send
     }
 
     impl SkillStoreState<mpsc::Sender<SkillLoaderMsg>> {
