@@ -404,7 +404,7 @@ impl RunChat {
 }
 
 /// An event emitted by a chat skill
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ChatEvent {
     /// Append the internal string to the current message
     Append(String),
@@ -722,6 +722,7 @@ pub mod tests {
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
     use crate::inference::{Explanation, ExplanationRequest, TextScore};
     use crate::namespace_watcher::Namespace;
+    use crate::skill_loader::ConfiguredSkill;
     use crate::skills::SkillMetadata;
     use crate::{
         chunking::ChunkParams,
@@ -1138,33 +1139,76 @@ pub mod tests {
         assert_eq!(result1, result2);
     }
 
-    // #[test]
-    // fn chat_hello_test() {
-    //     // Given
-    //     let csi = StubCsi::with_completion_from_text("Hello");
-    //     let engine = Arc::new(Engine::new(false).unwrap());
-    //     let store = SkillStoreStub::new(
-    //         engine.clone(),
-    //         test_skill.bytes(),
-    //         SkillPath::local("greet"),
-    //     );
+    #[tokio::test]
+    async fn chat_hello_test() {
+        // Given
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let runtime = SkillRuntime::new(engine, CsiDummy, SkillStoreDummy);
 
-    //     // When
-    //     let runtime = SkillRuntime::new(engine, csi, store.api());
-    //     let result = runtime
-    //         .api()
-    //         .run_function(
-    //             SkillPath::local("greet"),
-    //             json!(""),
-    //             "TOKEN_NOT_REQUIRED".to_owned(),
-    //         )
-    //         .await;
-    //     runtime.wait_for_shutdown().await;
-    //     store.wait_for_shutdown().await;
+        // When
+        let mut recv = runtime
+            .api()
+            .run_chat(
+                SkillPath::local("hello"),
+                json!(""),
+                "TOKEN_NOT_REQUIRED".to_owned(),
+            )
+            .await;
 
-    //     // Then
-    //     assert_eq!(result.unwrap(), "Hello");
-    // }
+        // Then
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            ChatEvent::Append("H".to_string())
+        );
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            ChatEvent::Append("e".to_string())
+        );
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            ChatEvent::Append("l".to_string())
+        );
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            ChatEvent::Append("l".to_string())
+        );
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            ChatEvent::Append("o".to_string())
+        );
+        assert!(recv.recv().await.is_none());
+
+        // Cleanup
+        runtime.wait_for_shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn chat_saboteur_test() {
+        // Given
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let runtime = SkillRuntime::new(engine, CsiDummy, SkillStoreDummy);
+
+        // When
+        let mut recv = runtime
+            .api()
+            .run_chat(
+                SkillPath::local("saboteur"),
+                json!(""),
+                "TOKEN_NOT_REQUIRED".to_owned(),
+            )
+            .await;
+
+        // Then
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            ChatEvent::Error("Skill is a saboteur".to_string())
+        );
+        assert!(recv.recv().await.is_none());
+
+        // Cleanup
+        runtime.wait_for_shutdown().await;
+    }
+
     #[test]
     fn skill_runtime_metrics_emitted() {
         let test_skill = given_rust_skill_greet_v0_3();
@@ -1279,6 +1323,43 @@ pub mod tests {
             bail!("Test error")
         }
     }
+
+    struct SkillStoreDummy;
+
+    #[async_trait]
+    impl SkillStoreApi for SkillStoreDummy {
+        async fn remove(&self, _skill_path: SkillPath) {
+            panic!("Skill store dummy called.");
+        }
+
+        async fn upsert(&self, _skill: ConfiguredSkill) {
+            panic!("Skill store dummy called.");
+        }
+
+        async fn set_namespace_error(&self, _namespace: Namespace, _error: Option<anyhow::Error>) {
+            panic!("Skill store dummy called.");
+        }
+
+        async fn fetch(
+            &self,
+            _skill_path: SkillPath,
+        ) -> Result<Option<Arc<Skill>>, SkillStoreError> {
+            panic!("Skill store dummy called.")
+        }
+
+        async fn list_cached(&self) -> Vec<SkillPath> {
+            panic!("Skill store dummy called.")
+        }
+
+        async fn list(&self) -> Vec<SkillPath> {
+            panic!("Skill store dummy called.")
+        }
+
+        async fn invalidate_cache(&self, _skill_path: SkillPath) -> bool {
+            panic!("Skill store dummy called.")
+        }
+    }
+
     pub struct SkillStoreStub {
         send: mpsc::Sender<SkillStoreMessage>,
         join_handle: JoinHandle<()>,
