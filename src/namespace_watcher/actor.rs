@@ -274,6 +274,7 @@ pub mod tests {
     use tokio::sync::{Mutex, mpsc};
     use tokio::time::timeout;
 
+    use crate::skill_store::tests::SkillStoreDummy;
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill_store::tests::SkillStoreMessage,
@@ -402,10 +403,9 @@ pub mod tests {
     #[tokio::test]
     async fn load_config_during_first_pass() {
         // Given a config that take forever to load
-        let (sender, _) = mpsc::channel::<SkillStoreMessage>(1);
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
-        let mut observer = NamespaceWatcher::with_config(sender, config, update_interval);
+        let mut observer = NamespaceWatcher::with_config(SkillStoreDummy, config, update_interval);
 
         // When waiting for the first pass
         let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
