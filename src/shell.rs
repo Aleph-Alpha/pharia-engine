@@ -496,7 +496,10 @@ async fn chat_skill<R>(
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> where R: SkillRuntimeApi{
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
+where
+    R: SkillRuntimeApi,
+{
     let path = SkillPath::new(namespace, name);
     let mut chat_events = skill_runtime_api
         .run_chat(path, input, bearer.token().to_owned())
