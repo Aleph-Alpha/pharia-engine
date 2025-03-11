@@ -522,13 +522,21 @@ where
 impl From<ChatEvent> for Event {
     fn from(value: ChatEvent) -> Self {
         match value {
-            ChatEvent::Append(delta) => Self::default().data(delta),
+            ChatEvent::Append(text) => Self::default()
+                .event("message_delta")
+                .json_data(MessageDelta { text })
+                .expect("`json_data` must only be called once."),
             ChatEvent::Error(message) => Self::default()
                 .event("error")
                 .json_data(SseErrorEvent { message })
                 .expect("`json_data` must only be called once."),
         }
     }
+}
+
+#[derive(Serialize)]
+struct MessageDelta {
+    text: String,
 }
 
 #[derive(Serialize)]
@@ -939,11 +947,16 @@ mod tests {
 
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
         let expected_body = "\
-            data: H\n\n\
-            data: e\n\n\
-            data: l\n\n\
-            data: l\n\n\
-            data: o\n\n";
+            event: message_delta\n\
+            data: {\"text\":\"H\"}\n\n\
+            event: message_delta\n\
+            data: {\"text\":\"e\"}\n\n\
+            event: message_delta\n\
+            data: {\"text\":\"l\"}\n\n\
+            event: message_delta\n\
+            data: {\"text\":\"l\"}\n\n\
+            event: message_delta\n\
+            data: {\"text\":\"o\"}\n\n";
         assert_eq!(body_text, expected_body);
     }
 
@@ -1454,20 +1467,6 @@ mod tests {
             });
             Self { send, handle }
         }
-
-        // pub fn answer_with_chat_events(chat_events: Vec<ChatEvent>) -> Self {
-        //     let (send, mut recv) = mpsc::channel(1);
-        //     let handle = tokio::spawn(async move {
-        //         let Some(SkillRuntimeMsg::Chat(RunChat { send, .. })) = recv.recv().await else {
-        //             panic!("Stub runtime expected a run chat command");
-        //         };
-        //         for ce in chat_events {
-        //             send.send(ce).await.unwrap();
-        //         }
-        //     });
-
-        //     Self { send, handle }
-        // }
 
         pub fn api(&self) -> mpsc::Sender<SkillRuntimeMsg> {
             self.send.clone()
