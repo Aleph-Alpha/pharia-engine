@@ -92,8 +92,8 @@ impl SkillRuntime {
 
     /// Retrieve a handle in order to interact with skills. All handles have to be dropped in order
     /// for [`Self::wait_for_shutdown`] to complete.
-    pub fn api(&self) -> SkillRuntimeApiImpl {
-        SkillRuntimeApiImpl::new(self.send.clone())
+    pub fn api(&self) -> mpsc::Sender<SkillRuntimeMsg> {
+        self.send.clone()
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -106,6 +106,7 @@ impl SkillRuntime {
 ///
 /// Using a trait rather than an mpsc allows for easier and more ergonomic testing, since the
 /// implementation of the test double is not required to be an actor.
+#[async_trait]
 pub trait SkillRuntimeApi {
     async fn run_function(
         &self,
@@ -127,6 +128,7 @@ pub trait SkillRuntimeApi {
     ) -> Result<Option<SkillMetadata>, SkillRuntimeError>;
 }
 
+#[async_trait]
 impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn run_function(
         &self,
@@ -178,44 +180,6 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
-    }
-}
-
-impl SkillRuntimeApi for SkillRuntimeApiImpl {
-    async fn run_function(
-        &self,
-        skill_path: SkillPath,
-        input: Value,
-        api_token: String,
-    ) -> Result<Value, SkillRuntimeError> {
-        self.send.run_function(skill_path, input, api_token).await
-    }
-
-    async fn run_chat(
-        &self,
-        skill_path: SkillPath,
-        input: Value,
-        api_token: String,
-    ) -> mpsc::Receiver<ChatEvent> {
-        self.send.run_chat(skill_path, input, api_token).await
-    }
-
-    async fn skill_metadata(
-        &self,
-        skill_path: SkillPath,
-    ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
-        self.send.skill_metadata(skill_path).await
-    }
-}
-
-#[derive(Clone)]
-pub struct SkillRuntimeApiImpl {
-    send: mpsc::Sender<SkillRuntimeMsg>,
-}
-
-impl SkillRuntimeApiImpl {
-    pub fn new(send: mpsc::Sender<SkillRuntimeMsg>) -> Self {
-        Self { send }
     }
 }
 
