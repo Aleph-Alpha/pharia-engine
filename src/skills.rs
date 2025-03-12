@@ -256,7 +256,7 @@ impl Skill {
         }
     }
 
-    pub async fn run(
+    pub async fn run_as_funcion(
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
@@ -657,7 +657,7 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -674,7 +674,7 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -691,7 +691,7 @@ mod tests {
         // When invoked with a json string
         let content = "42";
         let input = json!(content);
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string array
         assert_eq!(result, json!([content]));
@@ -708,7 +708,7 @@ mod tests {
         // When invoked with a json string
         let content = "Hello, how are you?";
         let input = json!(content);
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string array
         assert_eq!(result["content"], "dummy-content");
@@ -724,7 +724,7 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -740,7 +740,7 @@ mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -809,14 +809,14 @@ mod tests {
         // When invoked with a json string
         let input = json!("Homer");
         let first_result = skill
-            .run(&engine, ctx.clone(), input.clone())
+            .run_as_funcion(&engine, ctx.clone(), input.clone())
             .await
             .unwrap();
         let second_result = skill
-            .run(&engine, ctx.clone(), input.clone())
+            .run_as_funcion(&engine, ctx.clone(), input.clone())
             .await
             .unwrap();
-        let third_result = skill.run(&engine, ctx, input).await.unwrap();
+        let third_result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(first_result, json!("Hello Homer"));
