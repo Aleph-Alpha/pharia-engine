@@ -495,12 +495,19 @@ where
     post,
     operation_id = "chat_skill",
     path = "/v1/skills/{namespace}/{name}/chat",
-    request_body(content_type = "application/json", description = "The expected input for the skill in JSON format.", example = json!({})),
+    request_body(
+        content_type = "application/json",
+        description = "The expected input for the skill in JSON format.",
+        example = json!({})
+    ),
     security(("api_token" = [])),
     tag = "skills",
     responses(
-        (status = 200, description = "A stream of substrings composing a message in response to a chat history",  body=Value,
-            content(("text/event-stream", example = ""))),    ),
+        (status = 200,
+            description = "A stream of substrings composing a message in response to a chat history",
+            body=Value,
+            content(("text/event-stream", example = ""))),
+        ),
 )]
 async fn chat_skill<R>(
     State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
@@ -667,7 +674,7 @@ mod tests {
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
-        skill_runtime::{MetadataRequest, RunFunction, SkillRuntimeError, SkillRuntimeMsg},
+        skill_runtime::{MetadataRequest, RunFunctionMsg, SkillRuntimeError, SkillRuntimeMsg},
         skill_store::{
             SkillStoreError,
             tests::{SkillStoreDummy, SkillStoreMessage, SkillStoreStub},
@@ -853,7 +860,7 @@ mod tests {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";
         let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Run(RunFunction { send, .. }) => {
+            SkillRuntimeMsg::Function(RunFunctionMsg { send, .. }) => {
                 send.send(Ok(json!("dummy completion"))).unwrap();
             }
             _ => {
@@ -892,7 +899,7 @@ mod tests {
     async fn run_skill() {
         // Given
         let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Run(RunFunction {
+            SkillRuntimeMsg::Function(RunFunctionMsg {
                 skill_path,
                 send,
                 api_token,
@@ -1381,7 +1388,7 @@ mod tests {
     async fn invalid_namespace_config_is_500_error() {
         // Given a skill runtime which has an invalid namespace
         let skill_runtime = StubSkillRuntime::new(|msg| match msg {
-            SkillRuntimeMsg::Run(RunFunction { send, .. }) => {
+            SkillRuntimeMsg::Function(RunFunctionMsg { send, .. }) => {
                 send.send(Err(SkillRuntimeError::StoreError(
                     SkillStoreError::InvalidNamespaceError(
                         Namespace::new("playground").unwrap(),
@@ -1423,7 +1430,7 @@ mod tests {
     async fn not_existing_skill_is_400_error() {
         // Given a skill executer which always replies Skill does not exist
         let skill_executer_dummy = StubSkillRuntime::new(|msg| match msg {
-            SkillRuntimeMsg::Run(RunFunction { send, .. }) => {
+            SkillRuntimeMsg::Function(RunFunctionMsg { send, .. }) => {
                 send.send(Err(SkillRuntimeError::SkillNotConfigured))
                     .unwrap();
             }
