@@ -42,7 +42,7 @@ use crate::{
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
     skill_runtime::{ChatEvent, SkillExecutionError, SkillRuntimeApi},
-    skill_store::{SkillStoreApi, SkillStoreMessage},
+    skill_store::{SkillStoreApi, SkillStoreMsg},
     skills::{SkillMetadata, SkillPath},
 };
 
@@ -58,7 +58,7 @@ impl Shell {
         addr: impl Into<SocketAddr>,
         authorization_api: AuthorizationApi,
         skill_runtime_api: impl SkillRuntimeApi + Clone + Send + Sync + 'static,
-        skill_store_api: mpsc::Sender<SkillStoreMessage>,
+        skill_store_api: mpsc::Sender<SkillStoreMsg>,
         csi_drivers: impl Csi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> anyhow::Result<Self> {
@@ -672,7 +672,7 @@ mod tests {
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
         skill_runtime::SkillExecutionError,
-        skill_store::tests::{SkillStoreDummy, SkillStoreMessage, SkillStoreStub},
+        skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
         skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
     };
@@ -1136,8 +1136,7 @@ mod tests {
         let (send, mut recv) = mpsc::channel(1);
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
         tokio::spawn(async move {
-            if let SkillStoreMessage::InvalidateCache { skill_path, send } =
-                recv.recv().await.unwrap()
+            if let SkillStoreMsg::InvalidateCache { skill_path, send } = recv.recv().await.unwrap()
             {
                 skill_path_clone.lock().unwrap().replace(skill_path);
                 // `true` means it we actually deleted a skill
@@ -1189,8 +1188,7 @@ mod tests {
         // rather than a mutex, but we do not have async closures yet.
         // Given a runtime with one installed skill
         tokio::spawn(async move {
-            if let SkillStoreMessage::InvalidateCache { skill_path, send } =
-                recv.recv().await.unwrap()
+            if let SkillStoreMsg::InvalidateCache { skill_path, send } = recv.recv().await.unwrap()
             {
                 skill_path_clone.lock().unwrap().replace(skill_path);
                 // `false` means the skill has not been there before

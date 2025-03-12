@@ -56,6 +56,10 @@ where
         mut ctx: Box<dyn CsiForSkills + Send>,
         sender: mpsc::Sender<ChatEvent>,
     ) -> Result<(), SkillExecutionError> {
+        if skill_path.namespace != Namespace::new("test-beta").unwrap() {
+            return Err(SkillExecutionError::SkillNotConfigured);
+        }
+
         let name = skill_path.name.clone();
         // Hardcoded domain logic-----------------------------
         if name.eq_ignore_ascii_case("saboteur") {
@@ -456,14 +460,14 @@ impl RunChatMsg {
         runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
         let start = Instant::now();
-        
+
         let RunChatMsg {
             skill_path,
             input,
             send,
             api_token,
         } = self;
-        
+
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
@@ -767,7 +771,7 @@ pub mod tests {
         },
         search::DocumentPath,
         skill_loader::{RegistryConfig, SkillLoader},
-        skill_store::{SkillStore, SkillStoreMessage},
+        skill_store::{SkillStore, SkillStoreMsg},
         skills::Skill,
     };
 
@@ -1389,7 +1393,7 @@ pub mod tests {
 
     /// Maybe we can use the `SkillStoreStub` from `SkillStore::test` instead?
     pub struct SkillStoreStub {
-        send: mpsc::Sender<SkillStoreMessage>,
+        send: mpsc::Sender<SkillStoreMsg>,
         join_handle: JoinHandle<()>,
     }
 
@@ -1398,11 +1402,11 @@ pub mod tests {
             let skill = Skill::new(&engine, bytes).unwrap();
             let skill = Arc::new(skill);
 
-            let (send, mut recv) = mpsc::channel::<SkillStoreMessage>(1);
+            let (send, mut recv) = mpsc::channel::<SkillStoreMsg>(1);
             let join_handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
                     match msg {
-                        SkillStoreMessage::Fetch { skill_path, send } => {
+                        SkillStoreMsg::Fetch { skill_path, send } => {
                             let skill = if skill_path == path {
                                 Some(skill.clone())
                             } else {
@@ -1423,7 +1427,7 @@ pub mod tests {
             self.join_handle.await.unwrap();
         }
 
-        pub fn api(&self) -> mpsc::Sender<SkillStoreMessage> {
+        pub fn api(&self) -> mpsc::Sender<SkillStoreMsg> {
             self.send.clone()
         }
     }
