@@ -52,10 +52,10 @@ where
         skill_path: &SkillPath,
         input: Value,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<Value, SkillRuntimeError> {
+    ) -> Result<Value, SkillExecutionError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
-        let skill = skill.ok_or(SkillRuntimeError::SkillNotConfigured)?;
+        let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
         Ok(skill.run(&self.engine, ctx, input).await?)
     }
 
@@ -63,10 +63,10 @@ where
         &self,
         skill_path: &SkillPath,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
+    ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
-        let skill = skill.ok_or(SkillRuntimeError::SkillNotConfigured)?;
+        let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
         Ok(skill.metadata(self.engine.as_ref(), ctx).await?)
     }
 }
@@ -118,7 +118,7 @@ pub trait SkillRuntimeApi {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> Result<Value, SkillRuntimeError>;
+    ) -> Result<Value, SkillExecutionError>;
 
     async fn run_chat(
         &self,
@@ -130,7 +130,7 @@ pub trait SkillRuntimeApi {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<Option<SkillMetadata>, SkillRuntimeError>;
+    ) -> Result<Option<SkillMetadata>, SkillExecutionError>;
 }
 
 #[async_trait]
@@ -140,7 +140,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> Result<Value, SkillRuntimeError> {
+    ) -> Result<Value, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Function(RunFunctionMsg {
             skill_path,
@@ -178,7 +178,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
+    ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Metadata(MetadataRequest { skill_path, send });
         self.send(msg)
@@ -188,8 +188,9 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     }
 }
 
+/// Errors which may prevent a skill from executing to completion successfully.
 #[derive(Debug, thiserror::Error)]
-pub enum SkillRuntimeError {
+pub enum SkillExecutionError {
     #[error(
         "The requested skill does not exist. Make sure it is configured in the configuration \
         associated with the namespace."
@@ -197,8 +198,18 @@ pub enum SkillRuntimeError {
     SkillNotConfigured,
     #[error(transparent)]
     StoreError(#[from] SkillStoreError),
+    /// A runtime error is caused by the runtime, i.e. the dependencies and resources we need to be
+    /// available in order execute skills. For us this are mostly the drivers behind the CSI. This
+    /// does not mean that all CSI errors are runtime errors, because the Inference may e.g. be
+    /// available, but the prompt exceeds the maximum length, etc. Yet any error caused by spurious
+    /// network errors, inference being to busy, etc. will fall in this category. For runtime errors
+    /// it is most important to report them to the operator, so they can take action.
+    /// 
+    /// For our other **users** we should not forward them transparently, but either just tell them
+    /// something went wrong, or give appropriate context. E.g. whether it was inference or document
+    /// index which caused the error.
     #[error(transparent)]
-    ExecutionError(#[from] anyhow::Error),
+    RuntimeError(#[from] anyhow::Error),
 }
 
 struct SkillRuntimeActor<C, S> {
@@ -294,7 +305,7 @@ impl SkillRuntimeMsg {
 #[derive(Debug)]
 pub struct MetadataRequest {
     pub skill_path: SkillPath,
-    pub send: oneshot::Sender<Result<Option<SkillMetadata>, SkillRuntimeError>>,
+    pub send: oneshot::Sender<Result<Option<SkillMetadata>, SkillExecutionError>>,
 }
 
 impl MetadataRequest {
@@ -304,7 +315,7 @@ impl MetadataRequest {
         let response = select! {
             result = runtime.metadata(&self.skill_path, ctx) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
+            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
         drop(self.send.send(response));
     }
@@ -341,7 +352,7 @@ impl RunChatMsg {
         // Hardcoded domain logic-----------------------------
         let skill_logic = async move {
             if name.eq_ignore_ascii_case("saboteur") {
-                Err(SkillRuntimeError::ExecutionError(anyhow!(
+                Err(SkillExecutionError::RuntimeError(anyhow!(
                     "Skill is a saboteur"
                 )))
             } else if name.eq_ignore_ascii_case("hello") {
@@ -384,7 +395,7 @@ impl RunChatMsg {
                 }
                 Ok(json!(""))
             } else {
-                Err(SkillRuntimeError::SkillNotConfigured)
+                Err(SkillExecutionError::SkillNotConfigured)
             }
         };
         // ---------------------------------------------------
@@ -392,7 +403,7 @@ impl RunChatMsg {
         let response = select! {
             result = skill_logic => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
+            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
 
         let label = status_label(&response);
@@ -416,11 +427,11 @@ impl RunChatMsg {
     }
 }
 
-fn status_label(result: &Result<Value, SkillRuntimeError>) -> String {
+fn status_label(result: &Result<Value, SkillExecutionError>) -> String {
     match result {
         Ok(_) => "ok",
-        Err(SkillRuntimeError::SkillNotConfigured) => "logic_error",
-        Err(SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_)) => {
+        Err(SkillExecutionError::SkillNotConfigured) => "logic_error",
+        Err(SkillExecutionError::StoreError(_) | SkillExecutionError::RuntimeError(_)) => {
             "runtime_error"
         }
     }
@@ -442,7 +453,7 @@ pub enum ChatEvent {
 pub struct RunFunctionMsg {
     pub skill_path: SkillPath,
     pub input: Value,
-    pub send: oneshot::Sender<Result<Value, SkillRuntimeError>>,
+    pub send: oneshot::Sender<Result<Value, SkillExecutionError>>,
     pub api_token: String,
 }
 
@@ -465,7 +476,7 @@ impl RunFunctionMsg {
         let response = select! {
             result = runtime.run_function(&skill_path, input, ctx) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
+            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
 
         let latency = start.elapsed().as_secs_f64();
@@ -994,7 +1005,7 @@ pub mod tests {
         skill_store.wait_for_shutdown().await;
 
         // Then result indicates that the skill is missing
-        assert!(matches!(result, Err(SkillRuntimeError::SkillNotConfigured)));
+        assert!(matches!(result, Err(SkillExecutionError::SkillNotConfigured)));
     }
 
     #[tokio::test]

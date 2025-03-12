@@ -41,7 +41,7 @@ use crate::{
     csi_shell::http_csi_handle,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
-    skill_runtime::{ChatEvent, SkillRuntimeApi, SkillRuntimeError},
+    skill_runtime::{ChatEvent, SkillRuntimeApi, SkillExecutionError},
     skill_store::{SkillStoreApi, SkillStoreMessage},
     skills::{SkillMetadata, SkillPath},
 };
@@ -279,17 +279,17 @@ impl IntoResponse for HttpError {
     }
 }
 
-impl From<SkillRuntimeError> for HttpError {
-    fn from(value: SkillRuntimeError) -> Self {
+impl From<SkillExecutionError> for HttpError {
+    fn from(value: SkillExecutionError) -> Self {
         match value {
-            SkillRuntimeError::SkillNotConfigured => HttpError::new(
-                SkillRuntimeError::SkillNotConfigured.to_string(),
+            SkillExecutionError::SkillNotConfigured => HttpError::new(
+                SkillExecutionError::SkillNotConfigured.to_string(),
                 StatusCode::BAD_REQUEST,
             ),
-            SkillRuntimeError::StoreError(err) => {
+            SkillExecutionError::StoreError(err) => {
                 HttpError::new(err.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
             }
-            SkillRuntimeError::ExecutionError(err) => {
+            SkillExecutionError::RuntimeError(err) => {
                 HttpError::new(err.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
             }
         }
@@ -674,7 +674,7 @@ mod tests {
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
-        skill_runtime::{MetadataRequest, RunFunctionMsg, SkillRuntimeError, SkillRuntimeMsg},
+        skill_runtime::{MetadataRequest, RunFunctionMsg, SkillExecutionError, SkillRuntimeMsg},
         skill_store::{
             SkillStoreError,
             tests::{SkillStoreDummy, SkillStoreMessage, SkillStoreStub},
@@ -1389,7 +1389,7 @@ mod tests {
         // Given a skill runtime which has an invalid namespace
         let skill_runtime = StubSkillRuntime::new(|msg| match msg {
             SkillRuntimeMsg::Function(RunFunctionMsg { send, .. }) => {
-                send.send(Err(SkillRuntimeError::StoreError(
+                send.send(Err(SkillExecutionError::StoreError(
                     SkillStoreError::InvalidNamespaceError(
                         Namespace::new("playground").unwrap(),
                         "error msg".to_owned(),
@@ -1431,7 +1431,7 @@ mod tests {
         // Given a skill executer which always replies Skill does not exist
         let skill_executer_dummy = StubSkillRuntime::new(|msg| match msg {
             SkillRuntimeMsg::Function(RunFunctionMsg { send, .. }) => {
-                send.send(Err(SkillRuntimeError::SkillNotConfigured))
+                send.send(Err(SkillExecutionError::SkillNotConfigured))
                     .unwrap();
             }
             _ => {
@@ -1506,7 +1506,7 @@ mod tests {
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-        ) -> Result<Value, SkillRuntimeError> {
+        ) -> Result<Value, SkillExecutionError> {
             panic!("Skill runtime dummy called")
         }
 
@@ -1522,7 +1522,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
+        ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
             panic!("Skill runtime dummy called")
         }
     }
@@ -1546,7 +1546,7 @@ mod tests {
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-        ) -> Result<Value, SkillRuntimeError> {
+        ) -> Result<Value, SkillExecutionError> {
             panic!("Chat Event source stub called")
         }
 
@@ -1566,7 +1566,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<Option<SkillMetadata>, SkillRuntimeError> {
+        ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
             panic!("Chat Event source stub called")
         }
     }
