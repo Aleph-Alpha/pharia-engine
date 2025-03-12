@@ -115,7 +115,7 @@ where
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
         skill
-            .run(&self.engine, ctx, input)
+            .run_as_funcion(&self.engine, ctx, input)
             .await
             .map_err(SkillExecutionError::SkillLogicError)
     }
