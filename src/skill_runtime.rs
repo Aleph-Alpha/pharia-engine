@@ -1191,7 +1191,7 @@ pub mod tests {
         let mut recv = runtime
             .api()
             .run_chat(
-                SkillPath::local("hello"),
+                SkillPath::new(Namespace::new("test-beta").unwrap(), "hello"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
@@ -1234,7 +1234,7 @@ pub mod tests {
         let mut recv = runtime
             .api()
             .run_chat(
-                SkillPath::local("saboteur"),
+                SkillPath::new(Namespace::new("test-beta").unwrap(), "saboteur"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
             )
@@ -1305,7 +1305,7 @@ pub mod tests {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, SkillStoreDummy);
-        let skill_path = SkillPath::local("tell_me_a_joke");
+        let skill_path = SkillPath::new(Namespace::new("test-beta").unwrap(), "tell_me_a_joke");
 
         // When
         let mut recv = runtime
