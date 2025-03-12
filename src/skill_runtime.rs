@@ -9,7 +9,7 @@ use std::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{StreamExt, stream::FuturesUnordered};
-use serde_json::{Value, json};
+use serde_json::Value;
 use thiserror::Error;
 use tokio::{
     select,
@@ -47,6 +47,58 @@ where
             engine,
             skill_store_api,
         }
+    }
+
+    pub async fn run_chat(
+        &self,
+        skill_path: &SkillPath,
+        _input: Value,
+        mut ctx: Box<dyn CsiForSkills + Send>,
+        sender: mpsc::Sender<ChatEvent>,
+    ) -> Result<(), SkillExecutionError> {
+        let name = skill_path.name.clone();
+        // Hardcoded domain logic-----------------------------
+        if name.eq_ignore_ascii_case("saboteur") {
+            Err(SkillExecutionError::SkillLogicError(anyhow!(
+                "Skill is a saboteur"
+            )))
+        } else if name.eq_ignore_ascii_case("hello") {
+            for c in "Hello".chars() {
+                sender.send(ChatEvent::Append(c.to_string())).await.unwrap();
+            }
+            Ok(())
+        } else if name.eq_ignore_ascii_case("tell_me_a_joke") {
+            let prompt = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\
+                            \n\
+                        Tell me a joke!<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\
+                        "
+            .to_owned();
+            let params = CompletionParams {
+                return_special_tokens: false,
+                max_tokens: Some(300),
+                temperature: Some(0.3),
+                top_k: None,
+                top_p: None,
+                stop: vec![],
+                frequency_penalty: None,
+                presence_penalty: None,
+                logprobs: crate::inference::Logprobs::No,
+            };
+            let request = CompletionRequest {
+                prompt,
+                model: "llama-3.1-8b-instruct".to_owned(),
+                params,
+            };
+            let mut completion = ctx.complete(vec![request]).await;
+            sender
+                .send(ChatEvent::Append(completion.drain(..).next().unwrap().text))
+                .await
+                .unwrap();
+            Ok(())
+        } else {
+            Err(SkillExecutionError::SkillNotConfigured)
+        }
+        // ---------------------------------------------------
     }
 
     pub async fn run_function(
@@ -191,7 +243,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
 
         let msg = RunChatMsg {
             skill_path,
-            _input: input,
+            input,
             send,
             api_token,
         };
@@ -392,7 +444,7 @@ impl MetadataMsg {
 #[derive(Debug)]
 pub struct RunChatMsg {
     pub skill_path: SkillPath,
-    pub _input: Value,
+    pub input: Value,
     pub send: mpsc::Sender<ChatEvent>,
     pub api_token: String,
 }
@@ -401,84 +453,29 @@ impl RunChatMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        _runtime: &WasmRuntime<impl SkillStoreApi>,
+        runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
         let start = Instant::now();
         let RunChatMsg {
             skill_path,
-            _input,
+            input,
             send,
             api_token,
         } = self;
 
-        let name = skill_path.name.clone();
-
         let (send_rt_err, recv_rt_err) = oneshot::channel();
 
-        let send_copy = send.clone();
-
-        // Hardcoded domain logic-----------------------------
-        let skill_logic = async move {
-            if name.eq_ignore_ascii_case("saboteur") {
-                Err(SkillExecutionError::SkillLogicError(anyhow!(
-                    "Skill is a saboteur"
-                )))
-            } else if name.eq_ignore_ascii_case("hello") {
-                for c in "Hello".chars() {
-                    send.send(ChatEvent::Append(c.to_string())).await.unwrap();
-                }
-                Ok(json!(""))
-            } else if name.eq_ignore_ascii_case("tell_me_a_joke") {
-                let prompt = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\
-                            \n\
-                        Tell me a joke!<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\
-                        "
-                .to_owned();
-                let params = CompletionParams {
-                    return_special_tokens: false,
-                    max_tokens: Some(300),
-                    temperature: Some(0.3),
-                    top_k: None,
-                    top_p: None,
-                    stop: vec![],
-                    frequency_penalty: None,
-                    presence_penalty: None,
-                    logprobs: crate::inference::Logprobs::No,
-                };
-                let request = CompletionRequest {
-                    prompt,
-                    model: "llama-3.1-8b-instruct".to_owned(),
-                    params,
-                };
-                match csi_apis.complete(api_token, vec![request]).await {
-                    Ok(mut completion) => {
-                        send.send(ChatEvent::Append(completion.drain(..).next().unwrap().text))
-                            .await
-                            .unwrap();
-                    }
-                    Err(err) => {
-                        send_rt_err.send(err).unwrap();
-                        pending::<()>().await;
-                    }
-                }
-                Ok(json!(""))
-            } else {
-                Err(SkillExecutionError::SkillNotConfigured)
-            }
-        };
-        // ---------------------------------------------------
-
+        let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
-            result = skill_logic => result,
+            result = runtime.run_chat(&skill_path, input, ctx, send.clone()) => result,
             // An error occurred during skill execution.
             Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
 
-        let label = status_label(&response);
+        let label = status_label(response.as_ref().map(|&()| ()));
 
         if let Err(error) = response {
-            send_copy
-                .send(ChatEvent::Error(error.to_string()))
+            send.send(ChatEvent::Error(error.to_string()))
                 .await
                 .unwrap();
         };
@@ -495,9 +492,9 @@ impl RunChatMsg {
     }
 }
 
-fn status_label(result: &Result<Value, SkillExecutionError>) -> String {
+fn status_label(result: Result<(), &SkillExecutionError>) -> String {
     match result {
-        Ok(_) => "ok",
+        Ok(()) => "ok",
         Err(
             SkillExecutionError::SkillLogicError(_)
             | SkillExecutionError::CsiUseFromMetadata
@@ -554,7 +551,7 @@ impl RunFunctionMsg {
         let labels = [
             ("namespace", Cow::from(skill_path.namespace.to_string())),
             ("name", Cow::from(skill_path.name)),
-            ("status", status_label(&response).into()),
+            ("status", status_label(response.as_ref().map(|_| ())).into()),
         ];
         metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
         metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
