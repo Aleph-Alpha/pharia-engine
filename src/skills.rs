@@ -47,7 +47,7 @@ impl fmt::Display for SkillPath {
     }
 }
 
-#[derive(ToSchema, Serialize, Debug)]
+#[derive(ToSchema, Serialize, Debug, Clone)]
 #[serde(tag = "version")]
 pub enum SkillMetadata {
     #[serde(rename = "1")]
@@ -61,7 +61,7 @@ pub enum MetadataError {
 }
 
 /// Validated to be valid JSON Schema
-#[derive(ToSchema, Serialize, Debug, PartialEq, Eq)]
+#[derive(ToSchema, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(transparent)]
 pub struct JsonSchema(Value);
 
@@ -77,7 +77,7 @@ impl TryFrom<Value> for JsonSchema {
     }
 }
 
-#[derive(ToSchema, Serialize, Debug)]
+#[derive(ToSchema, Serialize, Debug, Clone)]
 pub struct SkillMetadataV1 {
     pub description: Option<String>,
     pub input_schema: JsonSchema,
