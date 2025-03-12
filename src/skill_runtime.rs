@@ -20,7 +20,8 @@ use crate::{
     chunking::{Chunk, ChunkRequest},
     csi::{Csi, CsiForSkills},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
+        ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Explanation,
+        ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -165,7 +166,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             skill_path,
             _input: input,
             send,
-            _api_token: api_token,
+            api_token,
         };
 
         self.send(SkillRuntimeMsg::Chat(msg))
@@ -314,13 +315,13 @@ pub struct RunChatMsg {
     pub skill_path: SkillPath,
     pub _input: Value,
     pub send: mpsc::Sender<ChatEvent>,
-    pub _api_token: String,
+    pub api_token: String,
 }
 
 impl RunChatMsg {
     async fn act(
         self,
-        _csi_apis: impl Csi + Send + Sync + 'static,
+        csi_apis: impl Csi + Send + Sync + 'static,
         _runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
         let start = Instant::now();
@@ -328,7 +329,7 @@ impl RunChatMsg {
             skill_path,
             _input,
             send,
-            _api_token,
+            api_token,
         } = self;
 
         let name = skill_path.name.clone();
@@ -346,6 +347,33 @@ impl RunChatMsg {
             for c in "Hello".chars() {
                 send.send(ChatEvent::Append(c.to_string())).await.unwrap();
             }
+            result = Ok(json!(""));
+        } else if name.eq_ignore_ascii_case("tell_me_a_joke") {
+            let prompt = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\
+                            \n\
+                        Tell me a joke!<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\
+                        "
+            .to_owned();
+            let params = CompletionParams {
+                return_special_tokens: false,
+                max_tokens: Some(300),
+                temperature: Some(0.3),
+                top_k: None,
+                top_p: None,
+                stop: vec![],
+                frequency_penalty: None,
+                presence_penalty: None,
+                logprobs: crate::inference::Logprobs::No,
+            };
+            let request = CompletionRequest {
+                prompt,
+                model: "llama-3.1-8b-instruct".to_owned(),
+                params,
+            };
+            let mut completion = csi_apis.complete(api_token, vec![request]).await.unwrap();
+            send.send(ChatEvent::Append(completion.drain(..).next().unwrap().text))
+                .await
+                .unwrap();
             result = Ok(json!(""));
         } else {
             send.send(ChatEvent::Error(
@@ -1157,6 +1185,22 @@ pub mod tests {
             let labels = key.labels().collect::<Vec<_>>();
             key.name() == "kernel_skill_execution_duration_seconds" && labels == expected_labels
         }));
+    }
+
+    #[tokio::test]
+    #[ignore = "Not implement yet"]
+    async fn chat_skill_should_emit_error_in_case_of_runtime_error_in_csi() {
+        // Given
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let runtime = SkillRuntime::new(engine, SaboteurCsi, SkillStoreDummy);
+        let skill_path = SkillPath::local("tell_me_a_joke");
+
+        // When
+        let mut recv = runtime.api().run_chat(skill_path, json!({}), "dumm_token".to_owned()).await;
+
+        // Then
+        let event = recv.recv().await.unwrap();
+        assert_eq!(event, ChatEvent::Error("Test error".to_string()));
     }
 
     fn metrics_snapshot<F: Future<Output = ()>>(f: impl FnOnce() -> F) -> Snapshot {
