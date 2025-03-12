@@ -9,15 +9,12 @@ use std::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{StreamExt, stream::FuturesUnordered};
-use opentelemetry::Context;
 use serde_json::{Value, json};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{Level, span};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
@@ -144,7 +141,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         api_token: String,
     ) -> Result<Value, SkillRuntimeError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillRuntimeMsg::Run(RunFunction {
+        let msg = SkillRuntimeMsg::Function(RunFunctionMsg {
             skill_path,
             input,
             send,
@@ -164,7 +161,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     ) -> mpsc::Receiver<ChatEvent> {
         let (send, recv) = mpsc::channel::<ChatEvent>(1);
 
-        let msg = RunChat {
+        let msg = RunChatMsg {
             skill_path,
             _input: input,
             send,
@@ -268,8 +265,8 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
 
 #[derive(Debug)]
 pub enum SkillRuntimeMsg {
-    Chat(RunChat),
-    Run(RunFunction),
+    Chat(RunChatMsg),
+    Function(RunFunctionMsg),
     Metadata(MetadataRequest),
 }
 
@@ -283,7 +280,7 @@ impl SkillRuntimeMsg {
             SkillRuntimeMsg::Chat(msg) => {
                 msg.act(csi_apis, runtime).await;
             }
-            SkillRuntimeMsg::Run(msg) => {
+            SkillRuntimeMsg::Function(msg) => {
                 msg.act(csi_apis, runtime).await;
             }
             SkillRuntimeMsg::Metadata(msg) => {
@@ -313,21 +310,21 @@ impl MetadataRequest {
 }
 
 #[derive(Debug)]
-pub struct RunChat {
+pub struct RunChatMsg {
     pub skill_path: SkillPath,
     pub _input: Value,
     pub send: mpsc::Sender<ChatEvent>,
     pub _api_token: String,
 }
 
-impl RunChat {
+impl RunChatMsg {
     async fn act(
         self,
         _csi_apis: impl Csi + Send + Sync + 'static,
         _runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
         let start = Instant::now();
-        let RunChat {
+        let RunChatMsg {
             skill_path,
             _input,
             send,
@@ -336,6 +333,8 @@ impl RunChat {
 
         let name = skill_path.name.clone();
         let result;
+
+        // Hardcoded domain logic-----------------------------
         if name.eq_ignore_ascii_case("saboteur") {
             send.send(ChatEvent::Error("Skill is a saboteur".to_string()))
                 .await
@@ -356,6 +355,7 @@ impl RunChat {
             .unwrap();
             result = Err(SkillRuntimeError::SkillNotConfigured);
         }
+        // ---------------------------------------------------
 
         let latency = start.elapsed().as_secs_f64();
         let labels = [
@@ -392,40 +392,29 @@ pub enum ChatEvent {
 
 /// Message type used to transfer the input and output of a function skill execution
 #[derive(Debug)]
-pub struct RunFunction {
+pub struct RunFunctionMsg {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: oneshot::Sender<Result<Value, SkillRuntimeError>>,
     pub api_token: String,
 }
 
-impl RunFunction {
+impl RunFunctionMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
         runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
         let start = Instant::now();
-        let RunFunction {
+        let RunFunctionMsg {
             skill_path,
             input,
             send,
             api_token,
         } = self;
 
-        let span = span!(
-            Level::DEBUG,
-            "skill_run",
-            skill_path = skill_path.to_string(),
-        );
-        let context = span.context();
         let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let ctx = Box::new(SkillInvocationCtx::new(
-            send_rt_err,
-            csi_apis,
-            api_token,
-            Some(context),
-        ));
+        let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
             result = runtime.run_function(&skill_path, input, ctx) => result,
             // An error occurred during skill execution.
@@ -458,8 +447,6 @@ pub struct SkillInvocationCtx<C> {
     csi_apis: C,
     // How the user authenticates with us
     api_token: String,
-    // For tracing, we wire the skill invocation span context with the CSI spans
-    parent_context: Option<Context>,
 }
 
 impl<C> SkillInvocationCtx<C> {
@@ -467,13 +454,11 @@ impl<C> SkillInvocationCtx<C> {
         send_rt_err: oneshot::Sender<anyhow::Error>,
         csi_apis: C,
         api_token: String,
-        parent_context: Option<Context>,
     ) -> Self {
         SkillInvocationCtx {
             send_rt_err: Some(send_rt_err),
             csi_apis,
             api_token,
-            parent_context,
         }
     }
 
@@ -552,10 +537,6 @@ where
     C: Csi + Send + Sync,
 {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-        let span = span!(Level::DEBUG, "explain", requests_len = requests.len());
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
         match self
             .csi_apis
             .explain(self.api_token.clone(), requests)
@@ -567,10 +548,6 @@ where
     }
 
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-        let span = span!(Level::DEBUG, "complete", requests_len = requests.len());
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
         match self
             .csi_apis
             .complete(self.api_token.clone(), requests)
@@ -582,10 +559,6 @@ where
     }
 
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-        let span = span!(Level::DEBUG, "chat", requests_len = requests.len());
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
         match self.csi_apis.chat(self.api_token.clone(), requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
@@ -593,10 +566,6 @@ where
     }
 
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-        let span = span!(Level::DEBUG, "chunk", requests_len = requests.len());
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
         match self.csi_apis.chunk(self.api_token.clone(), requests).await {
             Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
@@ -607,14 +576,6 @@ where
         &mut self,
         requests: Vec<SelectLanguageRequest>,
     ) -> Vec<Option<Language>> {
-        let span = span!(
-            Level::DEBUG,
-            "select_language",
-            requests_len = requests.len()
-        );
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
         match self.csi_apis.select_language(requests).await {
             Ok(language) => language,
             Err(error) => self.send_error(error).await,
@@ -622,10 +583,6 @@ where
     }
 
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-        let span = span!(Level::DEBUG, "search", requests_len = requests.len());
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
         match self.csi_apis.search(self.api_token.clone(), requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
@@ -633,10 +590,6 @@ where
     }
 
     async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
-        let span = span!(Level::DEBUG, "documents", requests_len = requests.len());
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
         match self
             .csi_apis
             .documents(self.api_token.clone(), requests)
@@ -648,17 +601,6 @@ where
     }
 
     async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
-        let span = span!(
-            Level::DEBUG,
-            "document_metadata",
-            requests_len = requests.len()
-        );
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
-        if let Some(context) = self.parent_context.as_ref() {
-            span.set_parent(context.clone());
-        }
         match self
             .csi_apis
             .document_metadata(self.api_token.clone(), requests)
@@ -808,12 +750,7 @@ pub mod tests {
                 length: 2,
             }])
         });
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            send,
-            csi,
-            "dummy token".to_owned(),
-            None,
-        ));
+        let skill_ctx = Box::new(SkillInvocationCtx::new(send, csi, "dummy token".to_owned()));
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let resp = runtime
@@ -928,7 +865,7 @@ pub mod tests {
                 .collect())
         });
 
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), None);
+        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned());
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -961,7 +898,7 @@ pub mod tests {
         let (send, recv) = oneshot::channel();
         let mut csi = StubCsi::empty();
         csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), None);
+        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned());
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -1183,7 +1120,7 @@ pub mod tests {
         let csi = StubCsi::with_completion_from_text("Hello");
         let (send, _) = oneshot::channel();
         let skill_path = SkillPath::local("greet");
-        let msg = RunFunction {
+        let msg = RunFunctionMsg {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
             send,

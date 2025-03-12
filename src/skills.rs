@@ -632,7 +632,6 @@ mod tests {
             send_rt_err,
             CsiDummy,
             api_token().to_owned(),
-            None,
         ));
         let mut ctx = LinkedCtx::new(skill_ctx);
 
