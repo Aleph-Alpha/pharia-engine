@@ -456,15 +456,15 @@ impl RunChatMsg {
         runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
         let start = Instant::now();
+        
         let RunChatMsg {
             skill_path,
             input,
             send,
             api_token,
         } = self;
-
+        
         let (send_rt_err, recv_rt_err) = oneshot::channel();
-
         let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
             result = runtime.run_chat(&skill_path, input, ctx, send.clone()) => result,
@@ -474,22 +474,28 @@ impl RunChatMsg {
 
         let label = status_label(response.as_ref().map(|&()| ()));
 
+        // We do not bubble up the error, instead we insert it into the event stream, as the last
+        // event.
         if let Err(error) = response {
             send.send(ChatEvent::Error(error.to_string()))
                 .await
                 .unwrap();
         };
 
-        let latency = start.elapsed().as_secs_f64();
-        let labels = [
-            ("namespace", Cow::from(skill_path.namespace.to_string())),
-            ("name", Cow::from(skill_path.name)),
-            ("status", label.into()),
-        ];
-        metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
-        metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
-            .record(latency);
+        record_skill_metrics(start, skill_path, label);
     }
+}
+
+fn record_skill_metrics(start: Instant, skill_path: SkillPath, status: String) {
+    let latency = start.elapsed().as_secs_f64();
+    let labels = [
+        ("namespace", Cow::from(skill_path.namespace.to_string())),
+        ("name", Cow::from(skill_path.name)),
+        ("status", status.into()),
+    ];
+    metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
+    metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
+        .record(latency);
 }
 
 fn status_label(result: Result<(), &SkillExecutionError>) -> String {
@@ -547,18 +553,10 @@ impl RunFunctionMsg {
             Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
 
-        let latency = start.elapsed().as_secs_f64();
-        let labels = [
-            ("namespace", Cow::from(skill_path.namespace.to_string())),
-            ("name", Cow::from(skill_path.name)),
-            ("status", status_label(response.as_ref().map(|_| ())).into()),
-        ];
-        metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
-        metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
-            .record(latency);
-
+        let status = status_label(response.as_ref().map(|_| ()));
         // Error is expected to happen during shutdown. Ignore result.
         drop(send.send(response));
+        record_skill_metrics(start, skill_path, status);
     }
 }
 
