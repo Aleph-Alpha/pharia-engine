@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.10.0...v0.10.1)
+
+### Features
+
+- Handling of runtime errors for chat skills - ([54babdf](https://github.com/Aleph-Alpha/pharia-kernel/commit/54babdf781c9c34ee647712b2c9034108dced541))
+- Do not send useless spans - ([fc86dfc](https://github.com/Aleph-Alpha/pharia-kernel/commit/fc86dfce565575f7af4368dc2834c5aff5f51864))
+
+### Documentation
+
+- Tam for how inference is invoked from a skill - ([b9201de](https://github.com/Aleph-Alpha/pharia-kernel/commit/b9201de9d627fad301d6515ffa730583e7ad1afb))
+
+
 ## [0.10.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.9...v0.10.0)
 
 ### Features
