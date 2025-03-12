@@ -10,6 +10,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde_json::{Value, json};
+use thiserror::Error;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -24,6 +25,7 @@ use crate::{
         ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
+    namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skill_store::{SkillStoreApi, SkillStoreError},
     skills::{Engine, SkillMetadata, SkillPath},
@@ -56,7 +58,10 @@ where
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
-        Ok(skill.run(&self.engine, ctx, input).await?)
+        skill
+            .run(&self.engine, ctx, input)
+            .await
+            .map_err(SkillExecutionError::SkillLogicError)
     }
 
     pub async fn metadata(
@@ -67,7 +72,29 @@ where
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
-        Ok(skill.metadata(self.engine.as_ref(), ctx).await?)
+        skill
+            .metadata(self.engine.as_ref(), ctx)
+            .await
+            .map_err(SkillExecutionError::SkillLogicError)
+    }
+}
+
+impl From<SkillStoreError> for SkillExecutionError {
+    fn from(source: SkillStoreError) -> Self {
+        match source {
+            SkillStoreError::SkillLoaderError(skill_loader_error) => {
+                SkillExecutionError::RuntimeError(anyhow!(
+                    "Error loading skill: {}",
+                    skill_loader_error
+                ))
+            }
+            SkillStoreError::InvalidNamespaceError(namespace, original_syntax_error) => {
+                SkillExecutionError::MisconfiguredNamespace {
+                    namespace,
+                    original_syntax_error,
+                }
+            }
+        }
     }
 }
 
@@ -180,7 +207,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         skill_path: SkillPath,
     ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillRuntimeMsg::Metadata(MetadataRequest { skill_path, send });
+        let msg = SkillRuntimeMsg::Metadata(MetadataMsg { skill_path, send });
         self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
@@ -189,27 +216,68 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
 }
 
 /// Errors which may prevent a skill from executing to completion successfully.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub enum SkillExecutionError {
     #[error(
-        "The requested skill does not exist. Make sure it is configured in the configuration \
-        associated with the namespace."
+        "The metadata function of the invoked skill is bugged. It is forbidden to invoke any CSI \
+        functions from the metadata function, yet the skill does precisely this."
+    )]
+    CsiUseFromMetadata,
+    /// A skill name is not mentioned in the namespace and therfore it is not served. This is a
+    /// logic error. Yet it does not originate in the skill code itself. It could be an error in the
+    /// request by the user, or a missing configuration at the side of the skill developer.
+    #[error(
+        "Sorry, We could not find the skill you requested in its namespace. This can have three \
+        causes:\n\n\
+        1. You send the wrong skill name.\n\
+        2. You send the wrong namespace.\n\
+        3. The skill is not configured in the namespace you requested. You may want to check the \
+        namespace configuration."
     )]
     SkillNotConfigured,
-    #[error(transparent)]
-    StoreError(#[from] SkillStoreError),
+    /// Skill Logic errors are logic errors which are reported by the skill code itself. These may
+    /// be due to bugs in the skill code, or invalid user input, we will not be able to tell. For
+    /// the operater these are both user errors. The skill user and developer are often the same
+    /// person so in either case we do well to report it in our answer.
+    #[error(
+        "The skill you called responded with an error. Maybe you should check your input, if it \
+        seems to be correct you may want to contact the skill developer. Error reported by Skill:\n\
+        \n{0}"
+    )]
+    SkillLogicError(#[source] anyhow::Error),
     /// A runtime error is caused by the runtime, i.e. the dependencies and resources we need to be
     /// available in order execute skills. For us this are mostly the drivers behind the CSI. This
     /// does not mean that all CSI errors are runtime errors, because the Inference may e.g. be
     /// available, but the prompt exceeds the maximum length, etc. Yet any error caused by spurious
     /// network errors, inference being to busy, etc. will fall in this category. For runtime errors
     /// it is most important to report them to the operator, so they can take action.
-    /// 
+    ///
     /// For our other **users** we should not forward them transparently, but either just tell them
     /// something went wrong, or give appropriate context. E.g. whether it was inference or document
     /// index which caused the error.
-    #[error(transparent)]
-    RuntimeError(#[from] anyhow::Error),
+    #[error(
+        "The skill could not be executed to completion, something in our runtime is currently \n\
+        unavailable or misconfigured. You should try again later, if the situation persists you \n\
+        may want to contact the operaters. Original error:\n\n{0}"
+    )]
+    RuntimeError(#[source] anyhow::Error),
+    /// This happens if a configuration for an individual namespace is broken. For the user calling
+    /// the route to execute a skill, we treat this as a runtime, but make sure he gets all the
+    /// context, because it very likely might be the skill developer who misconfigured the
+    /// namespace. For the operater team, operating all of Pharia Kernel we treat this as a logic
+    /// error, because there is nothing wrong about the kernel installion or inference, or network
+    /// or other stuff, which they would be able to fix.
+    #[error(
+        "The skill could not be executed to completion, the namespace '{namespace}' is \
+        misconfigured. If you are the developer who configured the skill, you should probably fix \
+        this error. If you are not, there is nothing you can do, until the developer who maintains \
+        the list of skills to be served, fixes this. Original Syntax error:\n\n\
+        {original_syntax_error}"
+    )]
+    MisconfiguredNamespace {
+        namespace: Namespace,
+        original_syntax_error: String,
+    },
 }
 
 struct SkillRuntimeActor<C, S> {
@@ -279,7 +347,7 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
 pub enum SkillRuntimeMsg {
     Chat(RunChatMsg),
     Function(RunFunctionMsg),
-    Metadata(MetadataRequest),
+    Metadata(MetadataMsg),
 }
 
 impl SkillRuntimeMsg {
@@ -303,19 +371,19 @@ impl SkillRuntimeMsg {
 }
 
 #[derive(Debug)]
-pub struct MetadataRequest {
+pub struct MetadataMsg {
     pub skill_path: SkillPath,
     pub send: oneshot::Sender<Result<Option<SkillMetadata>, SkillExecutionError>>,
 }
 
-impl MetadataRequest {
+impl MetadataMsg {
     pub async fn act(self, runtime: &WasmRuntime<impl SkillStoreApi>) {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillMetadataCtx::new(send_rt_err));
         let response = select! {
             result = runtime.metadata(&self.skill_path, ctx) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
+            Ok(_error) = recv_rt_err => Err(SkillExecutionError::CsiUseFromMetadata)
         };
         drop(self.send.send(response));
     }
@@ -352,7 +420,7 @@ impl RunChatMsg {
         // Hardcoded domain logic-----------------------------
         let skill_logic = async move {
             if name.eq_ignore_ascii_case("saboteur") {
-                Err(SkillExecutionError::RuntimeError(anyhow!(
+                Err(SkillExecutionError::SkillLogicError(anyhow!(
                     "Skill is a saboteur"
                 )))
             } else if name.eq_ignore_ascii_case("hello") {
@@ -430,10 +498,13 @@ impl RunChatMsg {
 fn status_label(result: &Result<Value, SkillExecutionError>) -> String {
     match result {
         Ok(_) => "ok",
-        Err(SkillExecutionError::SkillNotConfigured) => "logic_error",
-        Err(SkillExecutionError::StoreError(_) | SkillExecutionError::RuntimeError(_)) => {
-            "runtime_error"
-        }
+        Err(
+            SkillExecutionError::SkillLogicError(_)
+            | SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::MisconfiguredNamespace { .. },
+        ) => "logic_error",
+        Err(SkillExecutionError::RuntimeError(_)) => "runtime_error",
     }
     .to_owned()
 }
@@ -545,7 +616,9 @@ impl SkillMetadataCtx {
         self.0
             .take()
             .expect("Only one error must be send during skill invocation")
-            .send(anyhow!("CSI usage from metadata is not allowed"))
+            .send(anyhow!(
+                "This message will be translated and thus never seen by a user"
+            ))
             .unwrap();
         pending().await
     }
@@ -721,7 +794,8 @@ pub mod tests {
         // Then the metadata is None
         assert_eq!(
             metadata.unwrap_err().to_string(),
-            "CSI usage from metadata is not allowed"
+            "The metadata function of the invoked skill is bugged. It is forbidden to invoke any \
+            CSI functions from the metadata function, yet the skill does precisely this."
         );
     }
 
@@ -1005,7 +1079,10 @@ pub mod tests {
         skill_store.wait_for_shutdown().await;
 
         // Then result indicates that the skill is missing
-        assert!(matches!(result, Err(SkillExecutionError::SkillNotConfigured)));
+        assert!(matches!(
+            result,
+            Err(SkillExecutionError::SkillNotConfigured)
+        ));
     }
 
     #[tokio::test]
@@ -1034,7 +1111,11 @@ pub mod tests {
         store.wait_for_shutdown().await;
 
         // Then
-        assert_eq!(result.unwrap_err().to_string(), "Test error");
+        let expectet_error_msg = "The skill could not be executed to completion, something in our \
+            runtime is currently \nunavailable or misconfigured. You should try again later, if \
+            the situation persists you \nmay want to contact the operaters. Original error:\n\n\
+            Test error";
+        assert_eq!(result.unwrap_err().to_string(), expectet_error_msg);
     }
 
     #[tokio::test]
@@ -1161,9 +1242,12 @@ pub mod tests {
             .await;
 
         // Then
+        let expected_error_msg = "The skill you called responded with an error. Maybe you should \
+            check your input, if it seems to be correct you may want to contact the skill \
+            developer. Error reported by Skill:\n\nSkill is a saboteur";
         assert_eq!(
             recv.recv().await.unwrap(),
-            ChatEvent::Error("Skill is a saboteur".to_string())
+            ChatEvent::Error(expected_error_msg.to_string())
         );
         assert!(recv.recv().await.is_none());
 
@@ -1232,7 +1316,11 @@ pub mod tests {
 
         // Then
         let event = recv.recv().await.unwrap();
-        assert_eq!(event, ChatEvent::Error("Test error".to_string()));
+        let expected_error_msg = "The skill could not be executed to completion, something in our \
+            runtime is currently \nunavailable or misconfigured. You should try again later, if \
+            the situation persists you \nmay want to contact the operaters. Original error:\n\n\
+            Test error";
+        assert_eq!(event, ChatEvent::Error(expected_error_msg.to_string()));
     }
 
     fn metrics_snapshot<F: Future<Output = ()>>(f: impl FnOnce() -> F) -> Snapshot {

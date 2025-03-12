@@ -41,7 +41,7 @@ use crate::{
     csi_shell::http_csi_handle,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
-    skill_runtime::{ChatEvent, SkillRuntimeApi, SkillExecutionError},
+    skill_runtime::{ChatEvent, SkillExecutionError, SkillRuntimeApi},
     skill_store::{SkillStoreApi, SkillStoreMessage},
     skills::{SkillMetadata, SkillPath},
 };
@@ -281,18 +281,15 @@ impl IntoResponse for HttpError {
 
 impl From<SkillExecutionError> for HttpError {
     fn from(value: SkillExecutionError) -> Self {
-        match value {
-            SkillExecutionError::SkillNotConfigured => HttpError::new(
-                SkillExecutionError::SkillNotConfigured.to_string(),
-                StatusCode::BAD_REQUEST,
-            ),
-            SkillExecutionError::StoreError(err) => {
-                HttpError::new(err.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
+        let status_code = match &value {
+            SkillExecutionError::MisconfiguredNamespace { .. }
+            | SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::RuntimeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SkillExecutionError::SkillLogicError(_) | SkillExecutionError::SkillNotConfigured => {
+                StatusCode::BAD_REQUEST
             }
-            SkillExecutionError::RuntimeError(err) => {
-                HttpError::new(err.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
-            }
-        }
+        };
+        HttpError::new(value.to_string(), status_code)
     }
 }
 
@@ -674,11 +671,8 @@ mod tests {
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
-        skill_runtime::{MetadataRequest, RunFunctionMsg, SkillExecutionError, SkillRuntimeMsg},
-        skill_store::{
-            SkillStoreError,
-            tests::{SkillStoreDummy, SkillStoreMessage, SkillStoreStub},
-        },
+        skill_runtime::SkillExecutionError,
+        skill_store::tests::{SkillStoreDummy, SkillStoreMessage, SkillStoreStub},
         skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
         tests::api_token,
     };
@@ -694,7 +688,7 @@ mod tests {
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
-    use tokio::{sync::mpsc, task::JoinHandle};
+    use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
     impl AppState<CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
@@ -766,22 +760,13 @@ mod tests {
     #[tokio::test]
     async fn skill_metadata() {
         // Given
-        let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Metadata(MetadataRequest { skill_path, send }) => {
-                assert_eq!(skill_path, SkillPath::local("greet_skill"));
-                send.send(Ok(Some(SkillMetadata::V1(SkillMetadataV1 {
-                    description: Some("dummy description".to_owned()),
-                    input_schema: JsonSchema::dummy(),
-                    output_schema: JsonSchema::dummy(),
-                }))))
-                .unwrap();
-            }
-            _ => {
-                panic!("unexpected message in test");
-            }
+        let metadata = SkillMetadata::V1(SkillMetadataV1 {
+            description: Some("dummy description".to_owned()),
+            input_schema: JsonSchema::dummy(),
+            output_schema: JsonSchema::dummy(),
         });
-        let skill_runtime_api = skill_executer_mock.api();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
+        let runtime = SkillRuntimeStub::with_metadata(Some(metadata));
+        let app_state = AppState::dummy().with_skill_runtime_api(runtime);
 
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -859,16 +844,7 @@ mod tests {
     async fn run_skill_with_bad_namespace() {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";
-        let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Function(RunFunctionMsg { send, .. }) => {
-                send.send(Ok(json!("dummy completion"))).unwrap();
-            }
-            _ => {
-                panic!("unexpected message in test");
-            }
-        });
-        let skill_runtime_api = skill_executer_mock.api();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
+        let app_state = AppState::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -889,33 +865,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let error = String::from_utf8(body.to_vec()).unwrap();
         assert!(error.to_lowercase().contains("invalid namespace"));
     }
 
     #[tokio::test]
-    async fn run_skill() {
+    async fn answer_of_succesfull_run_skill_function() {
         // Given
-        let skill_executer_mock = StubSkillRuntime::new(move |msg| match msg {
-            SkillRuntimeMsg::Function(RunFunctionMsg {
-                skill_path,
-                send,
-                api_token,
-                input,
-            }) => {
-                assert_eq!(skill_path, SkillPath::local("greet_skill"));
-                assert_eq!(api_token, "dummy auth token");
-                assert_eq!(input, json!("Homer"));
-                send.send(Ok(json!("dummy completion"))).unwrap();
-            }
-            _ => {
-                panic!("unexpected message in test");
-            }
-        });
-        let skill_runtime_api = skill_executer_mock.api();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime_api.clone());
+        let runtime = SkillRuntimeStub::with_function_ok(json!("Result from Skill"));
+        let app_state = AppState::dummy().with_skill_runtime_api(runtime);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -937,10 +897,41 @@ mod tests {
             .unwrap();
 
         // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        assert_eq!(resp.status(), StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = serde_json::from_slice::<String>(&body).unwrap();
-        assert_eq!(answer, "dummy completion");
+        assert_eq!(answer, "Result from Skill");
+    }
+
+    #[tokio::test]
+    async fn should_forward_function_input_to_skill_runtime() {
+        // Given
+        let runtime_spy = SkillRuntimeSpy::new();
+        let app_state = AppState::dummy().with_skill_runtime_api(runtime_spy.clone());
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let _resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
+                    .uri("/v1/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(runtime_spy.api_token(), "dummy auth token");
+        assert_eq!(runtime_spy.skill_path(), SkillPath::local("greet_skill"));
+        assert_eq!(runtime_spy.input(), json!("Homer"));
     }
 
     #[tokio::test]
@@ -950,7 +941,7 @@ mod tests {
             .chars()
             .map(|c| ChatEvent::Append(c.to_string()))
             .collect();
-        let skill_executer_mock = ChatEventSourceStub::new(chat_events);
+        let skill_executer_mock = SkillRuntimeStub::with_chat_events(chat_events);
         let app_state = AppState::dummy().with_skill_runtime_api(skill_executer_mock);
         let http = http(FeatureSet::Beta, app_state);
 
@@ -996,7 +987,7 @@ mod tests {
     async fn chat_endpoint_for_saboteur_skill() {
         // Given
         let chat_events = vec![ChatEvent::Error("Skill is a saboteur".to_string())];
-        let skill_runtime = ChatEventSourceStub::new(chat_events);
+        let skill_runtime = SkillRuntimeStub::with_chat_events(chat_events);
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(FeatureSet::Beta, app_state);
 
@@ -1034,7 +1025,6 @@ mod tests {
     #[tokio::test]
     async fn api_token_missing_permission() {
         // Given
-        let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
         let stub_authorization = StubAuthorization::new(|msg| {
             match msg {
                 authorization::AuthorizationMsg::Auth { api_token: _, send } => {
@@ -1042,9 +1032,7 @@ mod tests {
                 }
             };
         });
-        let app_state = AppState::dummy()
-            .with_skill_runtime_api(saboteur_skill_executer.api())
-            .with_authorization_api(stub_authorization.api());
+        let app_state = AppState::dummy().with_authorization_api(stub_authorization.api());
 
         // When we want to access an endpoint that requires authentication
         let api_token = api_token();
@@ -1077,8 +1065,7 @@ mod tests {
     #[tokio::test]
     async fn api_token_missing_in_run_skill() {
         // Given
-        let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
-        let app_state = AppState::dummy().with_skill_runtime_api(saboteur_skill_executer.api());
+        let app_state = AppState::dummy();
 
         // When
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -1106,15 +1093,12 @@ mod tests {
     #[tokio::test]
     async fn list_cached_skills_for_user() {
         // Given
-        let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
         let mut skill_store = SkillStoreStub::new();
         skill_store.with_list_cached_response(vec![
             SkillPath::new(Namespace::new("ns").unwrap(), "first"),
             SkillPath::new(Namespace::new("ns").unwrap(), "second"),
         ]);
-        let app_state = AppState::dummy()
-            .with_skill_store_api(skill_store)
-            .with_skill_runtime_api(saboteur_skill_executer.api());
+        let app_state = AppState::dummy().with_skill_store_api(skill_store);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -1144,7 +1128,7 @@ mod tests {
     #[tokio::test]
     async fn drop_cached_skill() {
         // Given a provider which answers invalidate cache with `true`
-        let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
+
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.
         let skill_path = Arc::new(Mutex::new(None));
@@ -1160,9 +1144,7 @@ mod tests {
                 send.send(true).unwrap();
             }
         });
-        let app_state = AppState::dummy()
-            .with_skill_store_api(send)
-            .with_skill_runtime_api(saboteur_skill_executer.api());
+        let app_state = AppState::dummy().with_skill_store_api(send);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When the skill is deleted
@@ -1199,14 +1181,13 @@ mod tests {
 
         // We use this to spy on the path send to the skill executer. Better to use a channel,
         // rather than a mutex, but we do not have async closures yet.
-        // Given a runtime with one installed skill
-        let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
-        // We use this to spy on the path send to the skill executer. Better to use a channel,
-        // rather than a mutex, but we do not have async closures yet.
         let skill_path = Arc::new(Mutex::new(None));
         let skill_path_clone = skill_path.clone();
         let (send, mut recv) = mpsc::channel(1);
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
+        // We use this to spy on the path send to the skill executer. Better to use a channel,
+        // rather than a mutex, but we do not have async closures yet.
+        // Given a runtime with one installed skill
         tokio::spawn(async move {
             if let SkillStoreMessage::InvalidateCache { skill_path, send } =
                 recv.recv().await.unwrap()
@@ -1216,9 +1197,7 @@ mod tests {
                 send.send(false).unwrap();
             }
         });
-        let app_state = AppState::dummy()
-            .with_skill_store_api(send)
-            .with_skill_runtime_api(saboteur_skill_executer.api());
+        let app_state = AppState::dummy().with_skill_store_api(send);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When the skill is deleted
@@ -1312,15 +1291,12 @@ mod tests {
     #[tokio::test]
     async fn list_skills() {
         // Given we can provide two skills "ns-one/one" and "ns-two/two"
-        let saboteur_skill_executer = StubSkillRuntime::new(|_| panic!());
         let mut skill_store = SkillStoreStub::new();
         skill_store.with_list_response(vec![
             SkillPath::new(Namespace::new("ns-one").unwrap(), "one"),
             SkillPath::new(Namespace::new("ns-two").unwrap(), "two"),
         ]);
-        let app_state = AppState::dummy()
-            .with_skill_store_api(skill_store)
-            .with_skill_runtime_api(saboteur_skill_executer.api());
+        let app_state = AppState::dummy().with_skill_store_api(skill_store);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -1387,21 +1363,12 @@ mod tests {
     #[tokio::test]
     async fn invalid_namespace_config_is_500_error() {
         // Given a skill runtime which has an invalid namespace
-        let skill_runtime = StubSkillRuntime::new(|msg| match msg {
-            SkillRuntimeMsg::Function(RunFunctionMsg { send, .. }) => {
-                send.send(Err(SkillExecutionError::StoreError(
-                    SkillStoreError::InvalidNamespaceError(
-                        Namespace::new("playground").unwrap(),
-                        "error msg".to_owned(),
-                    ),
-                )))
-                .unwrap();
-            }
-            _ => {
-                panic!("unexpected message in test");
-            }
-        });
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.api());
+        let skill_runtime =
+            SkillRuntimeSaboteur::new(|| SkillExecutionError::MisconfiguredNamespace {
+                namespace: Namespace::new("playground").unwrap(),
+                original_syntax_error: "error msg".to_owned(),
+            });
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When executing a skill in the namespace
@@ -1420,26 +1387,25 @@ mod tests {
             .unwrap();
 
         // Then the response is 500 about invalid namespace
-        assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let response = serde_json::from_slice::<String>(&body).unwrap();
-        assert_eq!(response, "Namespace playground is invalid: error msg");
+        assert_eq!(
+            response,
+            "The skill could not be executed to completion, the namespace 'playground' is \
+            misconfigured. If you are the developer who configured the skill, you should probably \
+            fix this error. If you are not, there is nothing you can do, until the developer who \
+            maintains the list of skills to be served, fixes this. Original Syntax error:\n\n\
+            error msg"
+        );
     }
 
     #[tokio::test]
     async fn not_existing_skill_is_400_error() {
         // Given a skill executer which always replies Skill does not exist
-        let skill_executer_dummy = StubSkillRuntime::new(|msg| match msg {
-            SkillRuntimeMsg::Function(RunFunctionMsg { send, .. }) => {
-                send.send(Err(SkillExecutionError::SkillNotConfigured))
-                    .unwrap();
-            }
-            _ => {
-                panic!("unexpected message in test");
-            }
-        });
+        let skill_runtime = SkillRuntimeSaboteur::new(|| SkillExecutionError::SkillNotConfigured);
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_executer_dummy.api());
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
 
         // When executing a skill
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -1455,45 +1421,18 @@ mod tests {
             )
             .await
             .unwrap();
-        // Cleanup
-        skill_executer_dummy.shutdown().await;
 
         // Then answer is 400 skill does not exist
         assert_eq!(StatusCode::BAD_REQUEST, resp.status());
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let body_str = String::from_utf8(body.to_vec()).unwrap();
         assert_eq!(
-            "\"The requested skill does not exist. Make sure it is configured in the configuration \
-            associated with the namespace.\"",
+            "\"Sorry, We could not find the skill you requested in its namespace. This can have \
+            three causes:\\n\\n1. You send the wrong skill name.\\n2. You send the wrong namespace.\
+            \\n3. The skill is not configured in the namespace you requested. You may want to \
+            check the namespace configuration.\"",
             body_str
         );
-    }
-
-    /// A skill executer double, loaded up with predefined answers.
-    struct StubSkillRuntime {
-        send: mpsc::Sender<SkillRuntimeMsg>,
-        handle: JoinHandle<()>,
-    }
-
-    impl StubSkillRuntime {
-        pub fn new(mut handle: impl FnMut(SkillRuntimeMsg) + Send + 'static) -> StubSkillRuntime {
-            let (send, mut recv) = mpsc::channel(1);
-            let handle = tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    handle(msg);
-                }
-            });
-            Self { send, handle }
-        }
-
-        pub fn api(&self) -> mpsc::Sender<SkillRuntimeMsg> {
-            self.send.clone()
-        }
-
-        pub async fn shutdown(self) {
-            drop(self.send);
-            self.handle.await.unwrap();
-        }
     }
 
     #[derive(Debug, Clone)]
@@ -1527,27 +1466,94 @@ mod tests {
         }
     }
 
-    /// Stub Skill Runtime which emits predifined chat events
-    #[derive(Debug, Clone)]
-    struct ChatEventSourceStub {
-        chat_events: Vec<ChatEvent>,
+    /// A test helper answering each request with a predefined error
+    #[derive(Clone)]
+    struct SkillRuntimeSaboteur {
+        make_error: Arc<dyn Fn() -> SkillExecutionError + Send + Sync>,
     }
 
-    impl ChatEventSourceStub {
-        pub fn new(chat_events: Vec<ChatEvent>) -> Self {
-            Self { chat_events }
+    impl SkillRuntimeSaboteur {
+        pub fn new(error: impl Fn() -> SkillExecutionError + Send + Sync + 'static) -> Self {
+            Self {
+                make_error: Arc::new(error),
+            }
         }
     }
 
     #[async_trait]
-    impl SkillRuntimeApi for ChatEventSourceStub {
+    impl SkillRuntimeApi for SkillRuntimeSaboteur {
         async fn run_function(
             &self,
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
         ) -> Result<Value, SkillExecutionError> {
-            panic!("Chat Event source stub called")
+            Err((*self.make_error)())
+        }
+
+        async fn run_chat(
+            &self,
+            _skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+        ) -> mpsc::Receiver<ChatEvent> {
+            panic!(
+                "Use the `SkillRuntimeStub`, to simulate errors during chat instead of the \
+                `SkillRuntimeSaboteur`."
+            )
+        }
+
+        async fn skill_metadata(
+            &self,
+            _skill_path: SkillPath,
+        ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
+            Err((*self.make_error)())
+        }
+    }
+
+    /// Stub Skill Runtime which emits predifined chat events
+    #[derive(Debug, Clone)]
+    struct SkillRuntimeStub {
+        function_result: Value,
+        metadata: Option<SkillMetadata>,
+        chat_events: Vec<ChatEvent>,
+    }
+
+    impl SkillRuntimeStub {
+        pub fn with_function_ok(value: Value) -> Self {
+            Self {
+                function_result: value,
+                chat_events: Vec::new(),
+                metadata: None,
+            }
+        }
+
+        pub fn with_chat_events(chat_events: Vec<ChatEvent>) -> Self {
+            Self {
+                function_result: Value::default(),
+                chat_events,
+                metadata: None,
+            }
+        }
+
+        pub fn with_metadata(metadata: Option<SkillMetadata>) -> Self {
+            Self {
+                function_result: Value::default(),
+                chat_events: Vec::new(),
+                metadata,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl SkillRuntimeApi for SkillRuntimeStub {
+        async fn run_function(
+            &self,
+            _skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+        ) -> Result<Value, SkillExecutionError> {
+            Ok(self.function_result.clone())
         }
 
         async fn run_chat(
@@ -1567,7 +1573,80 @@ mod tests {
             &self,
             _skill_path: SkillPath,
         ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
-            panic!("Chat Event source stub called")
+            Ok(self.metadata.clone())
+        }
+    }
+
+    /// A test helper to snoop on parameters send to the skill runtime
+    #[derive(Clone)]
+    struct SkillRuntimeSpy {
+        inner: Arc<Mutex<SkillRuntimeSpyInner>>,
+    }
+
+    struct SkillRuntimeSpyInner {
+        api_token: String,
+        input: Value,
+        skill_path: SkillPath,
+    }
+
+    impl SkillRuntimeSpy {
+        pub fn new() -> Self {
+            Self {
+                inner: Arc::new(Mutex::new(SkillRuntimeSpyInner {
+                    api_token: String::new(),
+                    input: Value::default(),
+                    skill_path: SkillPath::local("SKILL HAS NOT BEEN SEND"),
+                })),
+            }
+        }
+
+        pub fn api_token(&self) -> String {
+            self.inner.lock().unwrap().api_token.clone()
+        }
+
+        pub fn input(&self) -> Value {
+            self.inner.lock().unwrap().input.clone()
+        }
+
+        pub fn skill_path(&self) -> SkillPath {
+            self.inner.lock().unwrap().skill_path.clone()
+        }
+    }
+
+    #[async_trait]
+    impl SkillRuntimeApi for SkillRuntimeSpy {
+        async fn run_function(
+            &self,
+            skill_path: SkillPath,
+            input: Value,
+            api_token: String,
+        ) -> Result<Value, SkillExecutionError> {
+            let mut inner = self.inner.lock().unwrap();
+            inner.api_token = api_token;
+            inner.input = input;
+            inner.skill_path = skill_path;
+            Ok(Value::default())
+        }
+
+        async fn run_chat(
+            &self,
+            skill_path: SkillPath,
+            input: Value,
+            api_token: String,
+        ) -> mpsc::Receiver<ChatEvent> {
+            let mut inner = self.inner.lock().unwrap();
+            inner.api_token = api_token;
+            inner.input = input;
+            inner.skill_path = skill_path;
+            let (_send, recv) = mpsc::channel(1);
+            recv
+        }
+
+        async fn skill_metadata(
+            &self,
+            _skill_path: SkillPath,
+        ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
+            unimplemented!("Not needed in any test for now")
         }
     }
 }
