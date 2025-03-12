@@ -389,7 +389,6 @@ impl RunChatMsg {
         };
         // ---------------------------------------------------
 
-
         let response = select! {
             result = skill_logic => result,
             // An error occurred during skill execution.
@@ -399,7 +398,10 @@ impl RunChatMsg {
         let label = status_label(&response);
 
         if let Err(error) = response {
-            send_copy.send(ChatEvent::Error(error.to_string())).await.unwrap();
+            send_copy
+                .send(ChatEvent::Error(error.to_string()))
+                .await
+                .unwrap();
         };
 
         let latency = start.elapsed().as_secs_f64();
