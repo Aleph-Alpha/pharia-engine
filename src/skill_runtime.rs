@@ -333,63 +333,80 @@ impl RunChatMsg {
         } = self;
 
         let name = skill_path.name.clone();
-        let result;
+
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
+
+        let send_copy = send.clone();
 
         // Hardcoded domain logic-----------------------------
-        if name.eq_ignore_ascii_case("saboteur") {
-            send.send(ChatEvent::Error("Skill is a saboteur".to_string()))
-                .await
-                .unwrap();
-            result = Err(SkillRuntimeError::ExecutionError(anyhow!(
-                "Skill is a saboteur"
-            )));
-        } else if name.eq_ignore_ascii_case("hello") {
-            for c in "Hello".chars() {
-                send.send(ChatEvent::Append(c.to_string())).await.unwrap();
-            }
-            result = Ok(json!(""));
-        } else if name.eq_ignore_ascii_case("tell_me_a_joke") {
-            let prompt = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\
+        let skill_logic = async move {
+            if name.eq_ignore_ascii_case("saboteur") {
+                Err(SkillRuntimeError::ExecutionError(anyhow!(
+                    "Skill is a saboteur"
+                )))
+            } else if name.eq_ignore_ascii_case("hello") {
+                for c in "Hello".chars() {
+                    send.send(ChatEvent::Append(c.to_string())).await.unwrap();
+                }
+                Ok(json!(""))
+            } else if name.eq_ignore_ascii_case("tell_me_a_joke") {
+                let prompt = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\
                             \n\
                         Tell me a joke!<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\
                         "
-            .to_owned();
-            let params = CompletionParams {
-                return_special_tokens: false,
-                max_tokens: Some(300),
-                temperature: Some(0.3),
-                top_k: None,
-                top_p: None,
-                stop: vec![],
-                frequency_penalty: None,
-                presence_penalty: None,
-                logprobs: crate::inference::Logprobs::No,
-            };
-            let request = CompletionRequest {
-                prompt,
-                model: "llama-3.1-8b-instruct".to_owned(),
-                params,
-            };
-            let mut completion = csi_apis.complete(api_token, vec![request]).await.unwrap();
-            send.send(ChatEvent::Append(completion.drain(..).next().unwrap().text))
-                .await
-                .unwrap();
-            result = Ok(json!(""));
-        } else {
-            send.send(ChatEvent::Error(
-                SkillRuntimeError::SkillNotConfigured.to_string(),
-            ))
-            .await
-            .unwrap();
-            result = Err(SkillRuntimeError::SkillNotConfigured);
-        }
+                .to_owned();
+                let params = CompletionParams {
+                    return_special_tokens: false,
+                    max_tokens: Some(300),
+                    temperature: Some(0.3),
+                    top_k: None,
+                    top_p: None,
+                    stop: vec![],
+                    frequency_penalty: None,
+                    presence_penalty: None,
+                    logprobs: crate::inference::Logprobs::No,
+                };
+                let request = CompletionRequest {
+                    prompt,
+                    model: "llama-3.1-8b-instruct".to_owned(),
+                    params,
+                };
+                match csi_apis.complete(api_token, vec![request]).await {
+                    Ok(mut completion) => {
+                        send.send(ChatEvent::Append(completion.drain(..).next().unwrap().text))
+                            .await
+                            .unwrap();
+                    }
+                    Err(err) => {
+                        send_rt_err.send(err).unwrap();
+                        pending::<()>().await;
+                    }
+                }
+                Ok(json!(""))
+            } else {
+                Err(SkillRuntimeError::SkillNotConfigured)
+            }
+        };
         // ---------------------------------------------------
+
+
+        let response = select! {
+            result = skill_logic => result,
+            // An error occurred during skill execution.
+            Ok(error) = recv_rt_err => Err(SkillRuntimeError::ExecutionError(error))
+        };
+
+        let label = status_label(&response);
+
+        if let Err(error) = response {
+            send_copy.send(ChatEvent::Error(error.to_string())).await.unwrap();
+        };
 
         let latency = start.elapsed().as_secs_f64();
         let labels = [
             ("namespace", Cow::from(skill_path.namespace.to_string())),
             ("name", Cow::from(skill_path.name)),
-            ("status", status_label(&result).into()),
+            ("status", label.into()),
         ];
         metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
         metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
@@ -1188,7 +1205,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "Not implement yet"]
     async fn chat_skill_should_emit_error_in_case_of_runtime_error_in_csi() {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
@@ -1196,7 +1212,10 @@ pub mod tests {
         let skill_path = SkillPath::local("tell_me_a_joke");
 
         // When
-        let mut recv = runtime.api().run_chat(skill_path, json!({}), "dumm_token".to_owned()).await;
+        let mut recv = runtime
+            .api()
+            .run_chat(skill_path, json!({}), "dumm_token".to_owned())
+            .await;
 
         // Then
         let event = recv.recv().await.unwrap();
