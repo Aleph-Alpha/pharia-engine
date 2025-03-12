@@ -419,9 +419,9 @@ impl RunChatMsg {
 fn status_label(result: &Result<Value, SkillRuntimeError>) -> String {
     match result {
         Ok(_) => "ok",
-        Err(SkillRuntimeError::SkillNotConfigured) => "not_found",
+        Err(SkillRuntimeError::SkillNotConfigured) => "logic_error",
         Err(SkillRuntimeError::StoreError(_) | SkillRuntimeError::ExecutionError(_)) => {
-            "internal_error"
+            "runtime_error"
         }
     }
     .to_owned()
