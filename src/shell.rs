@@ -188,6 +188,7 @@ where
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
+    // Show documentation for unstable features only in beta systems.
     let api_doc = if feature_set == FeatureSet::Beta {
         ApiDocBeta::openapi()
     } else {
@@ -333,7 +334,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, skills, run_skill, skill_wit, skill_metadata),
+    paths(serve_docs, skills, run_skill, skill_wit),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
