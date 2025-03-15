@@ -276,7 +276,7 @@ impl HttpError {
 
 impl IntoResponse for HttpError {
     fn into_response(self) -> axum::response::Response {
-        (self.status_code, Json(json!(self.message))).into_response()
+        (self.status_code, self.message).into_response()
     }
 }
 
@@ -439,7 +439,7 @@ struct ExecuteSkillArgs {
                     "type": "object",
                 }
             })),
-        (status = 400, description = "Failed to get skill metadata.", body=Value, example = json!("Invalid skill input schema."))
+        (status = 400, description = "Failed to get skill metadata.", body=String, example = "Invalid skill input schema.")
     ),
 )]
 async fn skill_metadata<R>(
@@ -467,7 +467,7 @@ where
     tag = "skills",
     responses(
         (status = 200, description = "The Skill was executed.", body=Value, example = json!({"summary": "The summary of the text."})),
-        (status = 400, description = "The Skill invocation failed.", body=Value, example = json!("Skill not found."))
+        (status = 400, description = "The Skill invocation failed.", body=String, example = "Skill not found.")
     ),
 )]
 async fn run_skill<R>(
@@ -1388,7 +1388,7 @@ mod tests {
         // Then the response is 500 about invalid namespace
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let response = serde_json::from_slice::<String>(&body).unwrap();
+        let response = String::from_utf8(&body).unwrap();
         assert_eq!(
             response,
             "The skill could not be executed to completion, the namespace 'playground' is \
