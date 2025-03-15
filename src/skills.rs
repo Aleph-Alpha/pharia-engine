@@ -47,13 +47,11 @@ impl fmt::Display for SkillPath {
     }
 }
 
-#[derive(ToSchema, Serialize, Debug, Clone)]
-#[serde(tag = "version")]
+#[derive(Debug, Clone)]
 pub enum SkillMetadata {
     /// Earliest skill versions do not contain metadata
     V0,
-    #[serde(rename = "1")]
-    V1(SkillMetadataV1),
+    V0_3(SkillMetadataV1),
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -23,7 +23,7 @@ impl TryFrom<SkillMetadata> for super::super::SkillMetadata {
             input_schema,
             output_schema,
         } = metadata;
-        Ok(Self::V1(super::super::SkillMetadataV1 {
+        Ok(Self::V0_3(super::super::SkillMetadataV1 {
             description,
             input_schema: serde_json::from_slice::<Value>(&input_schema)?.try_into()?,
             output_schema: serde_json::from_slice::<Value>(&output_schema)?.try_into()?,

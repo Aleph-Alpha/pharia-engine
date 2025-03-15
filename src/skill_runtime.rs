@@ -830,7 +830,7 @@ pub mod tests {
 
         // Then the metadata is returned
         match metadata {
-            SkillMetadata::V1(metadata) => {
+            SkillMetadata::V0_3(metadata) => {
                 assert_eq!(metadata.description.unwrap(), "A friendly greeting skill");
                 assert_eq!(
                     metadata.input_schema,
