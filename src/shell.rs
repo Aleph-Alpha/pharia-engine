@@ -14,7 +14,7 @@ use axum_extra::{
 };
 use futures::Stream;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time::Instant};
 use tokio::{net::TcpListener, sync::mpsc, task::JoinHandle};
 use tower::ServiceBuilder;
@@ -43,7 +43,7 @@ use crate::{
     namespace_watcher::Namespace,
     skill_runtime::{ChatEvent, SkillExecutionError, SkillRuntimeApi},
     skill_store::{SkillStoreApi, SkillStoreMsg},
-    skills::{SkillMetadata, SkillPath},
+    skills::{JsonSchema, SkillMetadata, SkillPath},
 };
 
 pub struct Shell {
@@ -417,7 +417,7 @@ struct ExecuteSkillArgs {
     tag = "skills",
     responses(
         (status = 200, description = "Description, input schema, and output schema of the skill if specified",
-            body=Option<SkillMetadata>, example = json!({
+            body=SkillMetadataV1Representation, example = json!({
                 "description": "The summary of the text.",
                 "input_schema": {
                     "properties": {
@@ -446,13 +446,40 @@ async fn skill_metadata<R>(
     State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
     _bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
-) -> Result<Json<Value>, HttpError>
+) -> Result<Json<SkillMetadataV1Representation>, HttpError>
 where
     R: SkillRuntimeApi,
 {
     let skill_path = SkillPath::new(namespace, name);
     let response = skill_runtime_api.skill_metadata(skill_path).await?;
-    Ok(Json(json!(response)))
+    Ok(Json(response.into()))
+}
+
+#[derive(ToSchema, Serialize, Debug, Clone)]
+struct SkillMetadataV1Representation {
+    description: Option<String>,
+    input_schema: Option<JsonSchema>,
+    output_schema: Option<JsonSchema>,
+    version: Option<&'static str>,
+}
+
+impl From<SkillMetadata> for SkillMetadataV1Representation {
+    fn from(metadata: SkillMetadata) -> Self {
+        match metadata {
+            SkillMetadata::V0 => SkillMetadataV1Representation {
+                description: None,
+                input_schema: None,
+                output_schema: None,
+                version: None,
+            },
+            SkillMetadata::V0_3(metadata) => SkillMetadataV1Representation {
+                description: metadata.description,
+                input_schema: Some(metadata.input_schema),
+                output_schema: Some(metadata.output_schema),
+                version: Some("0.3"),
+            },
+        }
+    }
 }
 
 /// Run
@@ -761,15 +788,16 @@ mod tests {
     #[tokio::test]
     async fn skill_metadata() {
         // Given
-        let metadata = SkillMetadata::V1(SkillMetadataV1 {
+        let metadata = SkillMetadata::V0_3(SkillMetadataV1 {
             description: Some("dummy description".to_owned()),
             input_schema: JsonSchema::dummy(),
             output_schema: JsonSchema::dummy(),
         });
         let runtime = SkillRuntimeStub::with_metadata(metadata);
         let app_state = AppState::dummy().with_skill_runtime_api(runtime);
-
         let api_token = "dummy auth token";
+
+        // When
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
 
@@ -785,6 +813,8 @@ mod tests {
             )
             .await
             .unwrap();
+
+        // Then
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let metadata = serde_json::from_slice::<Value>(&body).unwrap();
@@ -792,7 +822,7 @@ mod tests {
             "description": "dummy description",
             "input_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
             "output_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
-            "version": "1",
+            "version": "0.3",
         });
         assert_eq!(metadata, expected);
     }
