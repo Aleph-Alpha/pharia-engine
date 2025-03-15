@@ -25,6 +25,8 @@ use wit_parser::decoding::{DecodedWasm, decode};
 
 use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
 
+pub use self::v0_3::SkillMetadataV0_3;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct SkillPath {
@@ -48,10 +50,40 @@ impl fmt::Display for SkillPath {
 }
 
 #[derive(Debug, Clone)]
-pub enum SkillMetadata {
+pub enum AnySkillMetadata {
     /// Earliest skill versions do not contain metadata
     V0,
-    V0_3(SkillMetadataV1),
+    V0_3(SkillMetadataV0_3),
+}
+
+impl AnySkillMetadata {
+    pub fn description(&self) -> Option<&str> {
+        match self {
+            Self::V0 => None,
+            Self::V0_3(metadata) => metadata.description.as_deref(),
+        }
+    }
+
+    pub fn signature(&self) -> Option<&Signature> {
+        match self {
+            Self::V0 => None,
+            Self::V0_3(metadata) => Some(&metadata.signature),
+        }
+    }
+
+    pub fn version(&self) -> Option<&'static str> {
+        match self {
+            Self::V0 => None,
+            Self::V0_3(_) => Some("0.3"),
+        }
+    }
+
+    pub fn skill_type_name(&self) -> &'static str {
+        match self {
+            Self::V0 => "function",
+            Self::V0_3(metadata) => metadata.signature.skill_type_name(),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -77,11 +109,40 @@ impl TryFrom<Value> for JsonSchema {
     }
 }
 
-#[derive(ToSchema, Serialize, Debug, Clone)]
-pub struct SkillMetadataV1 {
-    pub description: Option<String>,
-    pub input_schema: JsonSchema,
-    pub output_schema: JsonSchema,
+/// Describes the signature of a skill. The signature is the contract of how the skill can be
+/// invoked and what its result are.
+#[allow(dead_code)] // Chat currently under construction
+#[derive(Debug, Clone)]
+pub enum Signature {
+    Function {
+        input_schema: JsonSchema,
+        output_schema: JsonSchema,
+    },
+    Chat {
+        input_schema: JsonSchema,
+    },
+}
+
+impl Signature {
+    pub fn input_schema(&self) -> &JsonSchema {
+        match self {
+            Self::Chat { input_schema } | Self::Function { input_schema, .. } => input_schema,
+        }
+    }
+
+    pub fn output_schema(&self) -> Option<&JsonSchema> {
+        match self {
+            Self::Function { output_schema, .. } => Some(output_schema),
+            Self::Chat { .. } => None,
+        }
+    }
+
+    pub fn skill_type_name(&self) -> &'static str {
+        match self {
+            Self::Function { .. } => "function",
+            Self::Chat { .. } => "generator",
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error, Clone)]
@@ -241,9 +302,9 @@ impl Skill {
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<SkillMetadata> {
+    ) -> anyhow::Result<AnySkillMetadata> {
         match self {
-            Self::V0_2(_) => Ok(SkillMetadata::V0),
+            Self::V0_2(_) => Ok(AnySkillMetadata::V0),
             Self::V0_3(skill) => {
                 let mut store = engine.store(LinkedCtx::new(ctx));
                 let bindings = skill.instantiate_async(&mut store).await?;
@@ -251,7 +312,7 @@ impl Skill {
                     .pharia_skill_skill_handler()
                     .call_metadata(store)
                     .await?;
-                metadata.try_into()
+                metadata.try_into().map(AnySkillMetadata::V0_3)
             }
         }
     }

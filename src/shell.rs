@@ -43,7 +43,7 @@ use crate::{
     namespace_watcher::Namespace,
     skill_runtime::{ChatEvent, SkillExecutionError, SkillRuntimeApi},
     skill_store::{SkillStoreApi, SkillStoreMsg},
-    skills::{JsonSchema, SkillMetadata, SkillPath},
+    skills::{AnySkillMetadata, JsonSchema, Signature, SkillPath},
 };
 
 pub struct Shell {
@@ -458,26 +458,21 @@ where
 #[derive(ToSchema, Serialize, Debug, Clone)]
 struct SkillMetadataV1Representation {
     description: Option<String>,
+    version: Option<&'static str>,
+    skill_type: &'static str,
     input_schema: Option<JsonSchema>,
     output_schema: Option<JsonSchema>,
-    version: Option<&'static str>,
 }
 
-impl From<SkillMetadata> for SkillMetadataV1Representation {
-    fn from(metadata: SkillMetadata) -> Self {
-        match metadata {
-            SkillMetadata::V0 => SkillMetadataV1Representation {
-                description: None,
-                input_schema: None,
-                output_schema: None,
-                version: None,
-            },
-            SkillMetadata::V0_3(metadata) => SkillMetadataV1Representation {
-                description: metadata.description,
-                input_schema: Some(metadata.input_schema),
-                output_schema: Some(metadata.output_schema),
-                version: Some("0.3"),
-            },
+impl From<AnySkillMetadata> for SkillMetadataV1Representation {
+    fn from(metadata: AnySkillMetadata) -> Self {
+        let signature = metadata.signature();
+        SkillMetadataV1Representation {
+            description: metadata.description().map(ToOwned::to_owned),
+            version: metadata.version(),
+            skill_type: metadata.skill_type_name(),
+            input_schema: signature.map(Signature::input_schema).cloned(),
+            output_schema: signature.and_then(Signature::output_schema).cloned(),
         }
     }
 }
@@ -701,7 +696,7 @@ mod tests {
         inference,
         skill_runtime::SkillExecutionError,
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
-        skills::{JsonSchema, SkillMetadata, SkillMetadataV1, SkillPath},
+        skills::{AnySkillMetadata, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
     };
 
@@ -788,10 +783,12 @@ mod tests {
     #[tokio::test]
     async fn skill_metadata() {
         // Given
-        let metadata = SkillMetadata::V0_3(SkillMetadataV1 {
+        let metadata = AnySkillMetadata::V0_3(SkillMetadataV0_3 {
             description: Some("dummy description".to_owned()),
-            input_schema: JsonSchema::dummy(),
-            output_schema: JsonSchema::dummy(),
+            signature: Signature::Function {
+                input_schema: JsonSchema::dummy(),
+                output_schema: JsonSchema::dummy(),
+            },
         });
         let runtime = SkillRuntimeStub::with_metadata(metadata);
         let app_state = AppState::dummy().with_skill_runtime_api(runtime);
@@ -820,6 +817,7 @@ mod tests {
         let metadata = serde_json::from_slice::<Value>(&body).unwrap();
         let expected = json!({
             "description": "dummy description",
+            "skill_type": "function",
             "input_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
             "output_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
             "version": "0.3",
@@ -1490,7 +1488,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<SkillMetadata, SkillExecutionError> {
+        ) -> Result<AnySkillMetadata, SkillExecutionError> {
             panic!("Skill runtime dummy called")
         }
     }
@@ -1535,7 +1533,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<SkillMetadata, SkillExecutionError> {
+        ) -> Result<AnySkillMetadata, SkillExecutionError> {
             Err((*self.make_error)())
         }
     }
@@ -1544,7 +1542,7 @@ mod tests {
     #[derive(Debug, Clone)]
     struct SkillRuntimeStub {
         function_result: Value,
-        metadata: SkillMetadata,
+        metadata: AnySkillMetadata,
         chat_events: Vec<ChatEvent>,
     }
 
@@ -1553,7 +1551,7 @@ mod tests {
             Self {
                 function_result: value,
                 chat_events: Vec::new(),
-                metadata: SkillMetadata::V0,
+                metadata: AnySkillMetadata::V0,
             }
         }
 
@@ -1561,11 +1559,11 @@ mod tests {
             Self {
                 function_result: Value::default(),
                 chat_events,
-                metadata: SkillMetadata::V0,
+                metadata: AnySkillMetadata::V0,
             }
         }
 
-        pub fn with_metadata(metadata: SkillMetadata) -> Self {
+        pub fn with_metadata(metadata: AnySkillMetadata) -> Self {
             Self {
                 function_result: Value::default(),
                 chat_events: Vec::new(),
@@ -1601,7 +1599,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<SkillMetadata, SkillExecutionError> {
+        ) -> Result<AnySkillMetadata, SkillExecutionError> {
             Ok(self.metadata.clone())
         }
     }
@@ -1674,7 +1672,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<SkillMetadata, SkillExecutionError> {
+        ) -> Result<AnySkillMetadata, SkillExecutionError> {
             unimplemented!("Not needed in any test for now")
         }
     }

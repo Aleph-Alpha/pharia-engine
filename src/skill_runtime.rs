@@ -28,7 +28,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skill_store::{SkillStoreApi, SkillStoreError},
-    skills::{Engine, SkillMetadata, SkillPath},
+    skills::{AnySkillMetadata, Engine, SkillPath},
 };
 
 pub struct WasmRuntime<S> {
@@ -124,7 +124,7 @@ where
         &self,
         skill_path: &SkillPath,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<SkillMetadata, SkillExecutionError> {
+    ) -> Result<AnySkillMetadata, SkillExecutionError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
@@ -213,7 +213,7 @@ pub trait SkillRuntimeApi {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<SkillMetadata, SkillExecutionError>;
+    ) -> Result<AnySkillMetadata, SkillExecutionError>;
 }
 
 #[async_trait]
@@ -261,7 +261,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<SkillMetadata, SkillExecutionError> {
+    ) -> Result<AnySkillMetadata, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Metadata(MetadataMsg { skill_path, send });
         self.send(msg)
@@ -429,7 +429,7 @@ impl SkillRuntimeMsg {
 #[derive(Debug)]
 pub struct MetadataMsg {
     pub skill_path: SkillPath,
-    pub send: oneshot::Sender<Result<SkillMetadata, SkillExecutionError>>,
+    pub send: oneshot::Sender<Result<AnySkillMetadata, SkillExecutionError>>,
 }
 
 impl MetadataMsg {
@@ -762,7 +762,7 @@ pub mod tests {
     use crate::inference::{Explanation, ExplanationRequest, TextScore};
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::SkillStoreDummy;
-    use crate::skills::SkillMetadata;
+    use crate::skills::AnySkillMetadata;
     use crate::{
         chunking::ChunkParams,
         csi::tests::{CsiDummy, StubCsi},
@@ -812,7 +812,7 @@ pub mod tests {
         runtime.wait_for_shutdown().await;
 
         // Then the metadata is None
-        assert!(matches!(metadata, SkillMetadata::V0));
+        assert!(matches!(metadata, AnySkillMetadata::V0));
     }
 
     #[tokio::test]
@@ -829,24 +829,19 @@ pub mod tests {
         runtime.wait_for_shutdown().await;
 
         // Then the metadata is returned
-        match metadata {
-            SkillMetadata::V0_3(metadata) => {
-                assert_eq!(metadata.description.unwrap(), "A friendly greeting skill");
-                assert_eq!(
-                    metadata.input_schema,
-                    json!({"type": "string", "description": "The name of the person to greet"})
-                        .try_into()
-                        .unwrap()
-                );
-                assert_eq!(
-                    metadata.output_schema,
-                    json!({"type": "string", "description": "A friendly greeting message"})
-                        .try_into()
-                        .unwrap()
-                );
-            }
-            SkillMetadata::V0 => panic!("Expected SkillMetadata::V1"),
-        }
+        assert_eq!(metadata.description().unwrap(), "A friendly greeting skill");
+        assert_eq!(
+            metadata.signature().unwrap().input_schema(),
+            &json!({"type": "string", "description": "The name of the person to greet"})
+                .try_into()
+                .unwrap()
+        );
+        assert_eq!(
+            metadata.signature().unwrap().output_schema().unwrap(),
+            &json!({"type": "string", "description": "A friendly greeting message"})
+                .try_into()
+                .unwrap()
+        );
     }
 
     #[tokio::test]
