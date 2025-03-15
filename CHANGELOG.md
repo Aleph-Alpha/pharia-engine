@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.10.1...v0.10.2)
+
+### Features
+
+- Return text instead of Json Errors - ([4af08ad](https://github.com/Aleph-Alpha/pharia-kernel/commit/4af08ade838355facf00c9b826953e0826443005))
+- Hide metadata open-api doc in production - ([81c08e1](https://github.com/Aleph-Alpha/pharia-kernel/commit/81c08e1cc424dc2f6975d4097882a6f00a507375))
+- Only allow "test-beta" namespace to access hardcoded skills - ([e026d51](https://github.com/Aleph-Alpha/pharia-kernel/commit/e026d517afe870d0b2d660c03ca3147417080c08))
+- Better error messages - ([cfaf812](https://github.com/Aleph-Alpha/pharia-kernel/commit/cfaf812a5784aa4db3a6736219f830a9f1d77bfb))
+- Label logic and runtime errors in metrics - ([c016dfa](https://github.com/Aleph-Alpha/pharia-kernel/commit/c016dfae481c2c4f9236953208d2951a54c15665))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 11 updates - ([be6d7f0](https://github.com/Aleph-Alpha/pharia-kernel/commit/be6d7f0bc604279aa697c95041b994a12eba9057))
+
+
 ## [0.10.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.10.0...v0.10.1)
 
 ### Features
