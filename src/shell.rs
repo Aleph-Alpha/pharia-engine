@@ -1388,7 +1388,7 @@ mod tests {
         // Then the response is 500 about invalid namespace
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let response = String::from_utf8(&body).unwrap();
+        let response = String::from_utf8(body.to_vec()).unwrap();
         assert_eq!(
             response,
             "The skill could not be executed to completion, the namespace 'playground' is \
@@ -1426,10 +1426,10 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let body_str = String::from_utf8(body.to_vec()).unwrap();
         assert_eq!(
-            "\"Sorry, We could not find the skill you requested in its namespace. This can have \
-            three causes:\\n\\n1. You send the wrong skill name.\\n2. You send the wrong namespace.\
-            \\n3. The skill is not configured in the namespace you requested. You may want to \
-            check the namespace configuration.\"",
+            "Sorry, We could not find the skill you requested in its namespace. This can have \
+            three causes:\n\n1. You send the wrong skill name.\n2. You send the wrong namespace.\
+            \n3. The skill is not configured in the namespace you requested. You may want to \
+            check the namespace configuration.",
             body_str
         );
     }
