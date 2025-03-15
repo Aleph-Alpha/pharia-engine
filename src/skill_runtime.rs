@@ -124,7 +124,7 @@ where
         &self,
         skill_path: &SkillPath,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
+    ) -> Result<SkillMetadata, SkillExecutionError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
@@ -213,7 +213,7 @@ pub trait SkillRuntimeApi {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<Option<SkillMetadata>, SkillExecutionError>;
+    ) -> Result<SkillMetadata, SkillExecutionError>;
 }
 
 #[async_trait]
@@ -261,7 +261,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
+    ) -> Result<SkillMetadata, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Metadata(MetadataMsg { skill_path, send });
         self.send(msg)
@@ -429,7 +429,7 @@ impl SkillRuntimeMsg {
 #[derive(Debug)]
 pub struct MetadataMsg {
     pub skill_path: SkillPath,
-    pub send: oneshot::Sender<Result<Option<SkillMetadata>, SkillExecutionError>>,
+    pub send: oneshot::Sender<Result<SkillMetadata, SkillExecutionError>>,
 }
 
 impl MetadataMsg {
@@ -799,7 +799,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn skill_metadata_v0_2_is_none() {
+    async fn skill_metadata_v0_2_is_empty() {
         // Given a skill runtime that always returns a v0.2 skill
         let test_skill = given_rust_skill_greet_v0_2();
         let skill_path = SkillPath::local("greet");
@@ -812,7 +812,7 @@ pub mod tests {
         runtime.wait_for_shutdown().await;
 
         // Then the metadata is None
-        assert!(metadata.is_none());
+        assert!(matches!(metadata, SkillMetadata::V0));
     }
 
     #[tokio::test]
@@ -830,7 +830,7 @@ pub mod tests {
 
         // Then the metadata is returned
         match metadata {
-            Some(SkillMetadata::V1(metadata)) => {
+            SkillMetadata::V1(metadata) => {
                 assert_eq!(metadata.description.unwrap(), "A friendly greeting skill");
                 assert_eq!(
                     metadata.input_schema,
@@ -845,7 +845,7 @@ pub mod tests {
                         .unwrap()
                 );
             }
-            _ => panic!("Expected SkillMetadata::V1"),
+            SkillMetadata::V0 => panic!("Expected SkillMetadata::V1"),
         }
     }
 

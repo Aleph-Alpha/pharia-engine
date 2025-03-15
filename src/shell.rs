@@ -766,7 +766,7 @@ mod tests {
             input_schema: JsonSchema::dummy(),
             output_schema: JsonSchema::dummy(),
         });
-        let runtime = SkillRuntimeStub::with_metadata(Some(metadata));
+        let runtime = SkillRuntimeStub::with_metadata(metadata);
         let app_state = AppState::dummy().with_skill_runtime_api(runtime);
 
         let api_token = "dummy auth token";
@@ -1460,7 +1460,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
+        ) -> Result<SkillMetadata, SkillExecutionError> {
             panic!("Skill runtime dummy called")
         }
     }
@@ -1505,7 +1505,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
+        ) -> Result<SkillMetadata, SkillExecutionError> {
             Err((*self.make_error)())
         }
     }
@@ -1514,7 +1514,7 @@ mod tests {
     #[derive(Debug, Clone)]
     struct SkillRuntimeStub {
         function_result: Value,
-        metadata: Option<SkillMetadata>,
+        metadata: SkillMetadata,
         chat_events: Vec<ChatEvent>,
     }
 
@@ -1523,7 +1523,7 @@ mod tests {
             Self {
                 function_result: value,
                 chat_events: Vec::new(),
-                metadata: None,
+                metadata: SkillMetadata::V0,
             }
         }
 
@@ -1531,11 +1531,11 @@ mod tests {
             Self {
                 function_result: Value::default(),
                 chat_events,
-                metadata: None,
+                metadata: SkillMetadata::V0,
             }
         }
 
-        pub fn with_metadata(metadata: Option<SkillMetadata>) -> Self {
+        pub fn with_metadata(metadata: SkillMetadata) -> Self {
             Self {
                 function_result: Value::default(),
                 chat_events: Vec::new(),
@@ -1571,7 +1571,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
+        ) -> Result<SkillMetadata, SkillExecutionError> {
             Ok(self.metadata.clone())
         }
     }
@@ -1644,7 +1644,7 @@ mod tests {
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<Option<SkillMetadata>, SkillExecutionError> {
+        ) -> Result<SkillMetadata, SkillExecutionError> {
             unimplemented!("Not needed in any test for now")
         }
     }
