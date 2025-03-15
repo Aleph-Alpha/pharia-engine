@@ -50,6 +50,8 @@ impl fmt::Display for SkillPath {
 #[derive(ToSchema, Serialize, Debug, Clone)]
 #[serde(tag = "version")]
 pub enum SkillMetadata {
+    /// Earliest skill versions do not contain metadata
+    V0,
     #[serde(rename = "1")]
     V1(SkillMetadataV1),
 }
@@ -241,9 +243,9 @@ impl Skill {
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<Option<SkillMetadata>> {
+    ) -> anyhow::Result<SkillMetadata> {
         match self {
-            Self::V0_2(_) => Ok(None),
+            Self::V0_2(_) => Ok(SkillMetadata::V0),
             Self::V0_3(skill) => {
                 let mut store = engine.store(LinkedCtx::new(ctx));
                 let bindings = skill.instantiate_async(&mut store).await?;
@@ -251,7 +253,7 @@ impl Skill {
                     .pharia_skill_skill_handler()
                     .call_metadata(store)
                     .await?;
-                Some(metadata.try_into()).transpose()
+                metadata.try_into()
             }
         }
     }
