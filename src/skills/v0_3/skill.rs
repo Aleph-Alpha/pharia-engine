@@ -2,6 +2,8 @@ use exports::pharia::skill::skill_handler::SkillMetadata;
 use serde_json::Value;
 use wasmtime::component::bindgen;
 
+use crate::skills::Signature;
+
 bindgen!({
     world: "skill",
     path: "./wit/skill@0.3",
@@ -14,7 +16,14 @@ bindgen!({
     },
 });
 
-impl TryFrom<SkillMetadata> for super::super::SkillMetadata {
+/// Metadata for a skill at wit version 0.3
+#[derive(Debug, Clone)]
+pub struct SkillMetadataV0_3 {
+    pub description: Option<String>,
+    pub signature: Signature,
+}
+
+impl TryFrom<SkillMetadata> for SkillMetadataV0_3 {
     type Error = anyhow::Error;
 
     fn try_from(metadata: SkillMetadata) -> Result<Self, Self::Error> {
@@ -23,10 +32,13 @@ impl TryFrom<SkillMetadata> for super::super::SkillMetadata {
             input_schema,
             output_schema,
         } = metadata;
-        Ok(Self::V0_3(super::super::SkillMetadataV1 {
-            description,
+        let signature = Signature::Function {
             input_schema: serde_json::from_slice::<Value>(&input_schema)?.try_into()?,
             output_schema: serde_json::from_slice::<Value>(&output_schema)?.try_into()?,
-        }))
+        };
+        Ok(SkillMetadataV0_3 {
+            description,
+            signature,
+        })
     }
 }
