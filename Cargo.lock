@@ -1025,15 +1025,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "csi-from-metadata"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde_json",
- "wit-bindgen",
-]
-
-[[package]]
 name = "darling"
 version = "0.20.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"

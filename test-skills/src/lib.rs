@@ -90,13 +90,6 @@ pub fn given_invalid_output_skill() -> TestSkill {
     TestSkill::new(target_path)
 }
 
-#[must_use]
-pub fn given_csi_from_metadata_skill() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("csi-from-metadata"));
-    let target_path = WASM_BUILD.clone();
-    TestSkill::new(target_path)
-}
-
 /// Creates `{package-name}-py.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `python-skills/{package-name}`
 fn given_python_skill(package_name: &str, wit_version: &str, world: &str) -> String {
     let target_path = format!("{SKILL_BUILD_CACHE_DIR}/{package_name}-py.wasm");
