@@ -1127,11 +1127,10 @@ pub mod tests {
         Ok(())
     }
 
+    type SkillFactory = Box<dyn FnMut() -> (Box<dyn Skill>, Digest) + Send>;
     #[derive(Clone)]
     struct SkillLoaderStub {
-        skills: Arc<
-            Mutex<HashMap<ConfiguredSkill, Box<dyn FnMut() -> (Box<dyn Skill>, Digest) + Send>>>,
-        >,
+        skills: Arc<Mutex<HashMap<ConfiguredSkill, SkillFactory>>>,
     }
 
     impl SkillLoaderStub {
