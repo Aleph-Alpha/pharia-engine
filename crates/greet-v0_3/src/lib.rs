@@ -1,6 +1,3 @@
-// Allow because it is part of the bindgen generated code
-#![expect(unsafe_op_in_unsafe_fn)]
-
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::inference::{CompletionParams, CompletionRequest, Logprobs, complete};
