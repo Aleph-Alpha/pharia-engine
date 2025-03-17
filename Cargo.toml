@@ -40,7 +40,7 @@ edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-aleph-alpha-client = "0.22.0"
+aleph-alpha-client = "0.23.0"
 anyhow = "1.0.97"
 async-trait = "0.1.88"
 axum = { version = "0.8.1", features = ["macros"] }
