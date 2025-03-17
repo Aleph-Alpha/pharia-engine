@@ -23,7 +23,7 @@ use tracing::{error, info};
 /// digest was loaded last and when it was last checked.
 struct CachedSkill {
     /// Compiled and pre-initialized skill
-    skill: Arc<Skill>,
+    skill: Arc<dyn Skill>,
     /// Digest of the skill when it was last loaded from the registry
     digest: Digest,
     /// When we last checked the digest
@@ -31,7 +31,7 @@ struct CachedSkill {
 }
 
 impl CachedSkill {
-    fn new(skill: Arc<Skill>, digest: Digest) -> Self {
+    fn new(skill: Arc<dyn Skill>, digest: Digest) -> Self {
         Self {
             skill,
             digest,
@@ -104,14 +104,14 @@ where
     }
 
     /// `Some` if the skill is present in the cache, `None` if not
-    pub fn cached_skill(&self, skill_path: &SkillPath) -> Option<Arc<Skill>> {
+    pub fn cached_skill(&self, skill_path: &SkillPath) -> Option<Arc<dyn Skill>> {
         self.cached_skills
             .get(skill_path)
             .map(|skill| skill.skill.clone())
     }
 
     /// Insert a skill into the cache.
-    pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<Skill>, digest: Digest) {
+    pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<dyn Skill>, digest: Digest) {
         self.cached_skills
             .insert(skill_path, CachedSkill::new(skill.clone(), digest));
     }
@@ -232,7 +232,8 @@ pub trait SkillStoreApi {
     async fn set_namespace_error(&self, namespace: Namespace, error: Option<anyhow::Error>);
 
     /// Fetch an executable skill
-    async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, SkillStoreError>;
+    async fn fetch(&self, skill_path: SkillPath)
+    -> Result<Option<Arc<dyn Skill>>, SkillStoreError>;
 
     /// List all skills which are currently cached and can be executed without fetching the wasm
     /// component from an OCI
@@ -272,7 +273,10 @@ impl SkillStoreApi for mpsc::Sender<SkillStoreMsg> {
     }
 
     /// Fetch an executable skill
-    async fn fetch(&self, skill_path: SkillPath) -> Result<Option<Arc<Skill>>, SkillStoreError> {
+    async fn fetch(
+        &self,
+        skill_path: SkillPath,
+    ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillStoreMsg::Fetch { skill_path, send };
         self.send(msg)
@@ -317,7 +321,7 @@ impl SkillStoreApi for mpsc::Sender<SkillStoreMsg> {
 pub enum SkillStoreMsg {
     Fetch {
         skill_path: SkillPath,
-        send: oneshot::Sender<Result<Option<Arc<Skill>>, SkillStoreError>>,
+        send: oneshot::Sender<Result<Option<Arc<dyn Skill>>, SkillStoreError>>,
     },
     List {
         send: oneshot::Sender<Vec<SkillPath>>,
@@ -356,10 +360,18 @@ struct SkillStoreActor<L> {
     skill_requests: SkillRequests,
 }
 
-type SkillRequest =
-    Pin<Box<dyn Future<Output = (SkillPath, Result<(Skill, Digest), SkillLoaderError>)> + Send>>;
+type SkillRequest = Pin<
+    Box<
+        dyn Future<
+                Output = (
+                    SkillPath,
+                    Result<(Arc<dyn Skill>, Digest), SkillLoaderError>,
+                ),
+            > + Send,
+    >,
+>;
 
-type Recipient = oneshot::Sender<Result<Option<Arc<Skill>>, SkillStoreError>>;
+type Recipient = oneshot::Sender<Result<Option<Arc<dyn Skill>>, SkillStoreError>>;
 struct SkillRequests {
     requests: FuturesUnordered<SkillRequest>,
     recipients: HashMap<SkillPath, Vec<Recipient>>,
@@ -400,12 +412,11 @@ impl SkillRequests {
     /// Return the skill path and result.
     pub async fn select_next_some(
         &mut self,
-    ) -> Result<(SkillPath, (Arc<Skill>, Digest)), SkillLoaderError> {
+    ) -> Result<(SkillPath, (Arc<dyn Skill>, Digest)), SkillLoaderError> {
         let (skill_path, result) = self.requests.select_next_some().await;
         let senders = self.recipients.remove(&skill_path).unwrap();
         match result {
             Ok((skill, digest)) => {
-                let skill = Arc::new(skill);
                 for sender in senders {
                     drop(sender.send(Ok(Some(skill.clone()))));
                 }
@@ -487,7 +498,11 @@ where
                         self.skill_requests.push(
                             skill_path,
                             Box::pin(async move {
-                                let result = skill_loader.fetch(skill).await;
+                                let result =
+                                    skill_loader.fetch(skill).await.map(|(skill, digest)| {
+                                        let skill: Arc<dyn Skill> = Arc::new(skill);
+                                        (skill, digest)
+                                    });
                                 (cloned_skill_path, result)
                             }),
                             send,
@@ -540,7 +555,7 @@ pub mod tests {
         namespace_watcher::Namespace,
         registries::RegistryError,
         skill_loader::{SkillLoader, SkillLoaderMsg},
-        skills::{Engine, SkillPath},
+        skills::{AnySkill, Engine, SkillPath},
     };
 
     use super::*;
@@ -567,7 +582,7 @@ pub mod tests {
         async fn fetch(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<Option<Arc<Skill>>, SkillStoreError> {
+        ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
             panic!("Skill store dummy called.")
         }
 
@@ -626,7 +641,7 @@ pub mod tests {
         async fn fetch(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<Option<Arc<Skill>>, SkillStoreError> {
+        ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
             panic!("Skill store stub called.")
         }
 
@@ -652,13 +667,6 @@ pub mod tests {
             let skill = ConfiguredSkill::from_path(skill_path);
             provider.upsert_skill(skill);
             provider
-        }
-    }
-
-    // Needed for unwrapping the error in the test
-    impl std::fmt::Debug for Skill {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "Skill")
         }
     }
 
@@ -690,13 +698,14 @@ pub mod tests {
         );
 
         // And awaiting the next skill request
-        requests.select_next_some().await.unwrap_err();
+        let _error = requests.select_next_some().await;
 
         // Then both have been answered by the first response
         assert!(
             first_recv
                 .await
                 .unwrap()
+                .map(|_| ())
                 .unwrap_err()
                 .to_string()
                 .contains("first_skill")
@@ -705,6 +714,7 @@ pub mod tests {
             second_recv
                 .await
                 .unwrap()
+                .map(|_| ())
                 .unwrap_err()
                 .to_string()
                 .contains("first_skill")
@@ -754,14 +764,15 @@ pub mod tests {
         );
 
         // And awaiting the next skill request
-        cache.select_next_some().await.unwrap_err();
-        cache.select_next_some().await.unwrap_err();
+        let _error = cache.select_next_some().await;
+        let _error = cache.select_next_some().await;
 
         // Then the first request has been answered by the first response
         assert!(
             first_recv
                 .await
                 .unwrap()
+                .map(|_| ())
                 .unwrap_err()
                 .to_string()
                 .contains("first_skill")
@@ -770,6 +781,7 @@ pub mod tests {
             second_recv
                 .await
                 .unwrap()
+                .map(|_| ())
                 .unwrap_err()
                 .to_string()
                 .contains("second_skill")
@@ -873,7 +885,13 @@ pub mod tests {
         let result = skill_store.fetch(skill_path).await;
 
         // Then a good error message is returned
-        assert!(result.unwrap_err().to_string().contains("not found"));
+        assert!(
+            result
+                .map(|_| ())
+                .unwrap_err()
+                .to_string()
+                .contains("not found")
+        );
     }
 
     #[tokio::test]
@@ -910,7 +928,7 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
         let digest = Digest::new("dummy");
-        let skill = Skill::new(&engine, test_skills.bytes()).unwrap();
+        let skill = AnySkill::new(&engine, test_skills.bytes()).unwrap();
         provider.insert(skill_path.clone(), Arc::new(skill), digest);
 
         // When we remove the skill
@@ -1132,7 +1150,7 @@ pub mod tests {
         // * Arc: so we can clone it for the api
         // * Mutex: so we can mutate the state of the hash map, even after we have passed the api to
         //   the skill store.
-        skills: Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>>,
+        skills: Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (AnySkill, Digest)>>>,
     }
 
     impl SkillLoaderStub {
@@ -1149,7 +1167,7 @@ pub mod tests {
         pub fn add(&mut self, configured_skill: ConfiguredSkill, skill_bytes: Vec<u8>) {
             self.hasher.write(&skill_bytes);
             let digest = Digest::new(self.hasher.finish().to_string());
-            let skill = Skill::new(&self.engine, skill_bytes).unwrap();
+            let skill = AnySkill::new(&self.engine, skill_bytes).unwrap();
             let mut guard = self.skills.lock().unwrap();
             guard.insert(configured_skill, (skill, digest));
         }
@@ -1162,7 +1180,7 @@ pub mod tests {
             digest: Digest,
         ) {
             self.hasher.write(&skill_bytes);
-            let skill = Skill::new(&self.engine, skill_bytes).unwrap();
+            let skill = AnySkill::new(&self.engine, skill_bytes).unwrap();
             let mut guard = self.skills.lock().unwrap();
             guard.insert(configured_skill, (skill, digest));
         }
@@ -1173,14 +1191,17 @@ pub mod tests {
             *digest = new_digest;
         }
 
-        pub fn api(&self) -> Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>> {
+        pub fn api(&self) -> Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (AnySkill, Digest)>>> {
             self.skills.clone()
         }
     }
 
     #[async_trait]
-    impl SkillLoaderApi for Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (Skill, Digest)>>> {
-        async fn fetch(&self, skill: ConfiguredSkill) -> Result<(Skill, Digest), SkillLoaderError> {
+    impl SkillLoaderApi for Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (AnySkill, Digest)>>> {
+        async fn fetch(
+            &self,
+            skill: ConfiguredSkill,
+        ) -> Result<(AnySkill, Digest), SkillLoaderError> {
             self.lock()
                 .unwrap()
                 .get(&skill)
