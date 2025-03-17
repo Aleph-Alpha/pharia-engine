@@ -9,6 +9,7 @@ use std::{
 };
 
 use anyhow::anyhow;
+use async_trait::async_trait;
 use semver::Version;
 use serde::Serialize;
 use serde_json::Value;
@@ -266,39 +267,25 @@ impl Engine {
     }
 }
 
-/// Pre-initialized skills already attached to their corresponding linker.
-/// Allows for as much initialization work to be done at load time as possible,
-/// which can be cached across multiple invocations.
-#[derive(Clone)]
-pub enum Skill {
-    /// Skills targeting versions 0.2.x of the skill world
-    V0_2(v0_2::SkillPre<LinkedCtx>),
-    /// Skills targeting versions 0.3.x of the skill world
-    V0_3(v0_3::skill::SkillPre<LinkedCtx>),
+#[async_trait]
+pub trait Skill: Send + Sync {
+    async fn metadata(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+    ) -> anyhow::Result<AnySkillMetadata>;
+
+    async fn run_as_function(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+        input: Value,
+    ) -> anyhow::Result<Value>;
 }
 
-impl Skill {
-    /// Extracts the version of the skill WIT world from the provided bytes,
-    /// and links it to the appropriate version in the linker.
-    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> Result<Self, SkillError> {
-        let skill_version = SupportedVersion::extract(&bytes)?;
-        let pre = engine.instantiate_pre(&bytes)?;
-
-        match skill_version {
-            SupportedVersion::V0_2 => {
-                let skill = v0_2::SkillPre::new(pre)
-                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
-                Ok(Skill::V0_2(skill))
-            }
-            SupportedVersion::V0_3 => {
-                let skill = v0_3::skill::SkillPre::new(pre)
-                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
-                Ok(Skill::V0_3(skill))
-            }
-        }
-    }
-
-    pub async fn metadata(
+#[async_trait]
+impl Skill for AnySkill {
+    async fn metadata(
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
@@ -317,7 +304,7 @@ impl Skill {
         }
     }
 
-    pub async fn run_as_funcion(
+    async fn run_as_function(
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
@@ -370,6 +357,39 @@ impl Skill {
                     },
                 };
                 Ok(serde_json::from_slice(&result)?)
+            }
+        }
+    }
+}
+
+/// Pre-initialized skills already attached to their corresponding linker.
+/// Allows for as much initialization work to be done at load time as possible,
+/// which can be cached across multiple invocations.
+#[derive(Clone)]
+pub enum AnySkill {
+    /// Skills targeting versions 0.2.x of the skill world
+    V0_2(v0_2::SkillPre<LinkedCtx>),
+    /// Skills targeting versions 0.3.x of the skill world
+    V0_3(v0_3::skill::SkillPre<LinkedCtx>),
+}
+
+impl AnySkill {
+    /// Extracts the version of the skill WIT world from the provided bytes,
+    /// and links it to the appropriate version in the linker.
+    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> Result<Self, SkillError> {
+        let skill_version = SupportedVersion::extract(&bytes)?;
+        let pre = engine.instantiate_pre(&bytes)?;
+
+        match skill_version {
+            SupportedVersion::V0_2 => {
+                let skill = v0_2::SkillPre::new(pre)
+                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
+                Ok(AnySkill::V0_2(skill))
+            }
+            SupportedVersion::V0_3 => {
+                let skill = v0_3::skill::SkillPre::new(pre)
+                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
+                Ok(AnySkill::V0_3(skill))
             }
         }
     }
@@ -713,12 +733,12 @@ mod tests {
         let test_skill = given_rust_skill_greet_v0_3();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, wasm).unwrap();
+        let skill = AnySkill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -730,12 +750,12 @@ mod tests {
         let test_skills = given_rust_skill_greet_v0_2();
         let wasm = test_skills.bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, wasm).unwrap();
+        let skill = AnySkill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -746,13 +766,13 @@ mod tests {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_search().bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, wasm).unwrap();
+        let skill = AnySkill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
         let content = "42";
         let input = json!(content);
-        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string array
         assert_eq!(result, json!([content]));
@@ -763,13 +783,13 @@ mod tests {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_chat().bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, wasm).unwrap();
+        let skill = AnySkill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
         let content = "Hello, how are you?";
         let input = json!(content);
-        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string array
         assert_eq!(result["content"], "dummy-content");
@@ -780,12 +800,12 @@ mod tests {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_2();
         let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, skill.bytes()).unwrap();
+        let skill = AnySkill::new(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -796,12 +816,12 @@ mod tests {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_3();
         let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, skill.bytes()).unwrap();
+        let skill = AnySkill::new(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
+        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -864,20 +884,20 @@ mod tests {
         let test_skill = given_rust_skill_greet_v0_2();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = Skill::new(&engine, wasm).unwrap();
+        let skill = AnySkill::new(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
         let input = json!("Homer");
         let first_result = skill
-            .run_as_funcion(&engine, ctx.clone(), input.clone())
+            .run_as_function(&engine, ctx.clone(), input.clone())
             .await
             .unwrap();
         let second_result = skill
-            .run_as_funcion(&engine, ctx.clone(), input.clone())
+            .run_as_function(&engine, ctx.clone(), input.clone())
             .await
             .unwrap();
-        let third_result = skill.run_as_funcion(&engine, ctx, input).await.unwrap();
+        let third_result = skill.run_as_function(&engine, ctx, input).await.unwrap();
 
         // Then it returns a json string
         assert_eq!(first_result, json!("Hello Homer"));

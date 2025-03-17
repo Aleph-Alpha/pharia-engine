@@ -115,7 +115,7 @@ where
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
         skill
-            .run_as_funcion(&self.engine, ctx, input)
+            .run_as_function(&self.engine, ctx, input)
             .await
             .map_err(SkillExecutionError::SkillLogicError)
     }
@@ -762,7 +762,7 @@ pub mod tests {
     use crate::inference::{Explanation, ExplanationRequest, TextScore};
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::SkillStoreDummy;
-    use crate::skills::AnySkillMetadata;
+    use crate::skills::{AnySkillMetadata, Skill};
     use crate::{
         chunking::ChunkParams,
         csi::tests::{CsiDummy, StubCsi},
@@ -772,7 +772,7 @@ pub mod tests {
         search::DocumentPath,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, SkillStoreMsg},
-        skills::Skill,
+        skills::AnySkill,
     };
 
     use super::*;
@@ -1394,8 +1394,8 @@ pub mod tests {
 
     impl SkillStoreStub {
         pub fn new(engine: Arc<Engine>, bytes: Vec<u8>, path: SkillPath) -> Self {
-            let skill = Skill::new(&engine, bytes).unwrap();
-            let skill = Arc::new(skill);
+            let skill = AnySkill::new(&engine, bytes).unwrap();
+            let skill: Arc<dyn Skill> = Arc::new(skill);
 
             let (send, mut recv) = mpsc::channel::<SkillStoreMsg>(1);
             let join_handle = tokio::spawn(async move {
