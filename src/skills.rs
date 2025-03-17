@@ -606,7 +606,7 @@ fn pooling_allocator_is_supported() -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use fake::{Fake, Faker};
     use serde_json::json;
     use test_skills::{
@@ -903,5 +903,27 @@ mod tests {
         assert_eq!(first_result, json!("Hello Homer"));
         assert_eq!(second_result, json!("Hello Homer"));
         assert_eq!(third_result, json!("Hello Homer"));
+    }
+
+    pub struct SkillDummy;
+
+    #[async_trait]
+    impl Skill for SkillDummy {
+        async fn metadata(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+        ) -> anyhow::Result<AnySkillMetadata> {
+            panic!("I am a dummy Skill")
+        }
+
+        async fn run_as_function(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> anyhow::Result<Value> {
+            panic!("I am a dummy Skill")
+        }
     }
 }
