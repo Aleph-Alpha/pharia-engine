@@ -111,7 +111,7 @@ impl TryFrom<Value> for JsonSchema {
 
 /// Describes the signature of a skill. The signature is the contract of how the skill can be
 /// invoked and what its result are.
-#[allow(dead_code)] // Chat currently under construction
+#[expect(dead_code)] // Chat currently under construction
 #[derive(Debug, Clone)]
 pub enum Signature {
     Function {
