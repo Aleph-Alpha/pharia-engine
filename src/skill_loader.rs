@@ -9,7 +9,7 @@ use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
-use crate::skills::{AnySkill, Engine, SkillError, SkillPath};
+use crate::skills::{AnySkill, Engine, Skill, SkillError, SkillPath};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
@@ -56,7 +56,7 @@ pub enum SkillLoaderError {
 pub enum SkillLoaderMsg {
     Fetch {
         skill: ConfiguredSkill,
-        send: oneshot::Sender<Result<(AnySkill, Digest), SkillLoaderError>>,
+        send: oneshot::Sender<Result<(Box<dyn Skill>, Digest), SkillLoaderError>>,
     },
     FetchDigest {
         skill: ConfiguredSkill,
@@ -142,14 +142,20 @@ impl SkillLoader {
 
 #[async_trait]
 pub trait SkillLoaderApi {
-    async fn fetch(&self, skill: ConfiguredSkill) -> Result<(AnySkill, Digest), SkillLoaderError>;
+    async fn fetch(
+        &self,
+        skill: ConfiguredSkill,
+    ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError>;
 
     async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError>;
 }
 
 #[async_trait]
 impl SkillLoaderApi for mpsc::Sender<SkillLoaderMsg> {
-    async fn fetch(&self, skill: ConfiguredSkill) -> Result<(AnySkill, Digest), SkillLoaderError> {
+    async fn fetch(
+        &self,
+        skill: ConfiguredSkill,
+    ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError> {
         let (send, recv) = oneshot::channel();
         self.send(SkillLoaderMsg::Fetch { skill, send })
             .await
@@ -237,7 +243,12 @@ impl SkillLoaderActor {
                 let registry = self.registry(&skill.namespace);
                 let engine = self.engine.clone();
                 self.running_requests.push(Box::pin(async move {
-                    let result = Self::fetch(registry.as_ref(), engine, &skill).await;
+                    let result = Self::fetch(registry.as_ref(), engine, &skill).await.map(
+                        |(skill, digest)| {
+                            let skill: Box<dyn Skill> = Box::new(skill);
+                            (skill, digest)
+                        },
+                    );
                     drop(send.send(result));
                 }));
             }
