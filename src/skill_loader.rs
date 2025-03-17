@@ -53,10 +53,12 @@ pub enum SkillLoaderError {
     SkillNotFound(ConfiguredSkill),
 }
 
+type SkillAndDigest = (Box<dyn Skill>, Digest);
+
 pub enum SkillLoaderMsg {
     Fetch {
         skill: ConfiguredSkill,
-        send: oneshot::Sender<Result<(Box<dyn Skill>, Digest), SkillLoaderError>>,
+        send: oneshot::Sender<Result<SkillAndDigest, SkillLoaderError>>,
     },
     FetchDigest {
         skill: ConfiguredSkill,
