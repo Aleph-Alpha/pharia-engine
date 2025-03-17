@@ -500,7 +500,7 @@ where
                             Box::pin(async move {
                                 let result =
                                     skill_loader.fetch(skill).await.map(|(skill, digest)| {
-                                        let skill: Arc<dyn Skill> = Arc::new(skill);
+                                        let skill: Arc<dyn Skill> = skill.into();
                                         (skill, digest)
                                     });
                                 (cloned_skill_path, result)
@@ -1088,7 +1088,7 @@ pub mod tests {
             .skill_loader
             .fetch(configured_skill.clone())
             .await?;
-        skill_store_state.insert(skill_path.clone(), Arc::new(skill), digest);
+        skill_store_state.insert(skill_path.clone(), skill.into(), digest);
         assert_eq!(
             skill_store_state.list_cached_skills().collect::<Vec<_>>(),
             vec![&skill_path]
@@ -1127,7 +1127,7 @@ pub mod tests {
             .skill_loader
             .fetch(configured_skill)
             .await?;
-        skill_store_state.insert(skill_path.clone(), Arc::new(skill), digest);
+        skill_store_state.insert(skill_path.clone(), skill.into(), digest);
 
         // When we check it with no changes
         skill_store_state.validate_digest(skill_path).await?;
@@ -1201,11 +1201,15 @@ pub mod tests {
         async fn fetch(
             &self,
             skill: ConfiguredSkill,
-        ) -> Result<(AnySkill, Digest), SkillLoaderError> {
+        ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError> {
             self.lock()
                 .unwrap()
                 .get(&skill)
                 .cloned()
+                .map(|(skill, digest)| {
+                    let skill: Box<dyn Skill> = Box::new(skill);
+                    (skill, digest)
+                })
                 .ok_or(SkillLoaderError::SkillNotFound(skill))
         }
 
