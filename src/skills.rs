@@ -607,6 +607,7 @@ fn pooling_allocator_is_supported() -> bool {
 
 #[cfg(test)]
 pub mod tests {
+    use async_trait::async_trait;
     use fake::{Fake, Faker};
     use serde_json::json;
     use test_skills::{
@@ -617,7 +618,14 @@ pub mod tests {
     use v0_2::pharia::skill::csi::{Host, Language};
 
     use crate::{
+        chunking::{Chunk, ChunkRequest},
         csi::tests::{CsiDummy, CsiGreetingMock},
+        inference::{
+            ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation,
+            ExplanationRequest,
+        },
+        language_selection::{self, SelectLanguageRequest},
+        search::{Document, DocumentPath, SearchRequest, SearchResult},
         skill_runtime::SkillInvocationCtx,
         tests::api_token,
     };
@@ -655,6 +663,23 @@ pub mod tests {
             );
             Self(schema)
         }
+    }
+
+    #[tokio::test]
+    async fn skill_metadata_v0_2_is_empty() {
+        // Given a skill is linked againts skill package v0.2
+        let test_skill = given_rust_skill_greet_v0_2();
+        let engine = Engine::new(false).unwrap();
+        let skill = AnySkill::new(&engine, test_skill.bytes()).unwrap();
+
+        // When metadata for a skill is requested
+        let metadata = skill
+            .metadata(&engine, Box::new(CsiForSkillsDummy))
+            .await
+            .unwrap();
+
+        // Then the metadata is the empty V0, because v0.2 had no metadata
+        assert!(matches!(metadata, AnySkillMetadata::V0));
     }
 
     #[test]
@@ -924,6 +949,42 @@ pub mod tests {
             _input: Value,
         ) -> anyhow::Result<Value> {
             panic!("I am a dummy Skill")
+        }
+    }
+
+    struct CsiForSkillsDummy;
+
+    #[async_trait]
+    impl CsiForSkills for CsiForSkillsDummy {
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<language_selection::Language>> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn document_metadata(
+            &mut self,
+            _document_paths: Vec<DocumentPath>,
+        ) -> Vec<Option<Value>> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
+            panic!("I am a dummy CsiForSkills")
         }
     }
 }

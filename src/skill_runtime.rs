@@ -747,7 +747,7 @@ where
 pub mod tests {
     use std::time::Duration;
 
-    use anyhow::{anyhow, bail};
+    use anyhow::anyhow;
     use metrics::Label;
     use metrics_util::debugging::DebugValue;
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
@@ -758,18 +758,16 @@ pub mod tests {
     };
     use tokio::try_join;
 
+    use crate::csi::tests::CsiSaboteur;
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
-    use crate::inference::{Explanation, ExplanationRequest, TextScore};
+    use crate::inference::{Explanation, TextScore};
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::{SkillStoreDummy, SkillStoreStub};
     use crate::skills::{AnySkillMetadata, Skill};
     use crate::{
         chunking::ChunkParams,
         csi::tests::{CsiDummy, StubCsi},
-        inference::{
-            ChatRequest, ChatResponse, CompletionRequest, Inference, tests::AssertConcurrentClient,
-        },
-        search::DocumentPath,
+        inference::{Inference, tests::AssertConcurrentClient},
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, SkillStoreMsg},
         skills::AnySkill,
@@ -813,7 +811,7 @@ pub mod tests {
 
         let skill_path = SkillPath::local("invoke_csi_from_metadata");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let runtime = SkillRuntime::new(engine, SaboteurCsi, store);
+        let runtime = SkillRuntime::new(engine, CsiSaboteur, store);
 
         // When metadata for a skill is requested
         let metadata = runtime.api().skill_metadata(skill_path).await;
@@ -835,7 +833,7 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let store =
             SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, CsiSaboteur, store.api());
 
         // When metadata for a skill is requested
         let metadata = runtime.api().skill_metadata(skill_path).await.unwrap();
@@ -853,7 +851,7 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let store =
             SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, CsiSaboteur, store.api());
 
         // When metadata for a skill is requested
         let metadata = runtime.api().skill_metadata(skill_path).await.unwrap();
@@ -883,7 +881,7 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let store =
             SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, CsiSaboteur, store.api());
 
         // When metadata for a skill is requested
         let metadata = runtime.api().skill_metadata(skill_path).await;
@@ -1121,7 +1119,7 @@ pub mod tests {
             test_skill.bytes(),
             SkillPath::local("greet"),
         );
-        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, CsiSaboteur, store.api());
 
         // When trying to generate a greeting for Homer using the greet skill
         let result = runtime
@@ -1331,7 +1329,7 @@ pub mod tests {
     async fn chat_skill_should_emit_error_in_case_of_runtime_error_in_csi() {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
-        let runtime = SkillRuntime::new(engine, SaboteurCsi, SkillStoreDummy);
+        let runtime = SkillRuntime::new(engine, CsiSaboteur, SkillStoreDummy);
         let skill_path = SkillPath::new(Namespace::new("test-beta").unwrap(), "tell_me_a_joke");
 
         // When
@@ -1355,67 +1353,6 @@ pub mod tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         metrics::with_local_recorder(&recorder, || runtime.block_on(f()));
         snapshotter.snapshot()
-    }
-
-    #[derive(Clone)]
-    struct SaboteurCsi;
-
-    #[async_trait]
-    impl Csi for SaboteurCsi {
-        async fn explain(
-            &self,
-            _auth: String,
-            _requests: Vec<ExplanationRequest>,
-        ) -> anyhow::Result<Vec<Explanation>> {
-            bail!("Test error")
-        }
-        async fn complete(
-            &self,
-            _auth: String,
-            _requests: Vec<CompletionRequest>,
-        ) -> anyhow::Result<Vec<Completion>> {
-            bail!("Test error")
-        }
-
-        async fn chunk(
-            &self,
-            _auth: String,
-            _requests: Vec<ChunkRequest>,
-        ) -> anyhow::Result<Vec<Vec<Chunk>>> {
-            bail!("Test error")
-        }
-
-        async fn chat(
-            &self,
-            _auth: String,
-            _requests: Vec<ChatRequest>,
-        ) -> anyhow::Result<Vec<ChatResponse>> {
-            bail!("Test error")
-        }
-
-        async fn search(
-            &self,
-            _auth: String,
-            _requests: Vec<SearchRequest>,
-        ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
-            bail!("Test error")
-        }
-
-        async fn documents(
-            &self,
-            _auth: String,
-            _requests: Vec<DocumentPath>,
-        ) -> anyhow::Result<Vec<Document>> {
-            bail!("Test error")
-        }
-
-        async fn document_metadata(
-            &self,
-            _auth: String,
-            _document_paths: Vec<DocumentPath>,
-        ) -> anyhow::Result<Vec<Option<Value>>> {
-            bail!("Test error")
-        }
     }
 
     /// Maybe we can use the `SkillStoreStub` from `SkillStore::test` instead?

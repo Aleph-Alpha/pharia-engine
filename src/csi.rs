@@ -306,6 +306,67 @@ pub mod tests {
 
     use super::*;
 
+    #[derive(Clone)]
+    pub struct CsiSaboteur;
+
+    #[async_trait]
+    impl Csi for CsiSaboteur {
+        async fn explain(
+            &self,
+            _auth: String,
+            _requests: Vec<ExplanationRequest>,
+        ) -> anyhow::Result<Vec<Explanation>> {
+            bail!("Test error")
+        }
+        async fn complete(
+            &self,
+            _auth: String,
+            _requests: Vec<CompletionRequest>,
+        ) -> anyhow::Result<Vec<Completion>> {
+            bail!("Test error")
+        }
+
+        async fn chunk(
+            &self,
+            _auth: String,
+            _requests: Vec<ChunkRequest>,
+        ) -> anyhow::Result<Vec<Vec<Chunk>>> {
+            bail!("Test error")
+        }
+
+        async fn chat(
+            &self,
+            _auth: String,
+            _requests: Vec<ChatRequest>,
+        ) -> anyhow::Result<Vec<ChatResponse>> {
+            bail!("Test error")
+        }
+
+        async fn search(
+            &self,
+            _auth: String,
+            _requests: Vec<SearchRequest>,
+        ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
+            bail!("Test error")
+        }
+
+        async fn documents(
+            &self,
+            _auth: String,
+            _requests: Vec<DocumentPath>,
+        ) -> anyhow::Result<Vec<Document>> {
+            bail!("Test error")
+        }
+
+        async fn document_metadata(
+            &self,
+            _auth: String,
+            _document_paths: Vec<DocumentPath>,
+        ) -> anyhow::Result<Vec<Option<Value>>> {
+            bail!("Test error")
+        }
+    }
+
     #[tokio::test]
     async fn chat() {
         // Given a chat request
