@@ -8,13 +8,14 @@ use pharia::skill::{
         SearchResult, TextCursor,
     },
     inference::{
-        ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
-        Distribution, ExplanationRequest, FinishReason, Granularity, Host as InferenceHost,
-        Logprob, Logprobs, Message, TextScore, TokenUsage,
+        ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
+        CompletionRequest, CompletionStream, Distribution, ExplanationRequest, FinishReason,
+        Granularity, Host as InferenceHost, HostCompletionStream, Logprob, Logprobs, Message,
+        TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
 };
-use wasmtime::component::bindgen;
+use wasmtime::component::{Resource, bindgen};
 
 use crate::{chunking, inference, language_selection, search};
 
@@ -348,6 +349,20 @@ impl InferenceHost for LinkedCtx {
             .into_iter()
             .map(Into::into)
             .collect()
+    }
+}
+
+impl HostCompletionStream for LinkedCtx {
+    async fn new(&mut self, init: CompletionRequest) -> Resource<CompletionStream> {
+        todo!()
+    }
+
+    async fn next(&mut self, stream: Resource<CompletionStream>) -> Option<CompletionEvent> {
+        todo!()
+    }
+
+    async fn drop(&mut self, stream: Resource<CompletionStream>) -> anyhow::Result<()> {
+        todo!()
     }
 }
 
