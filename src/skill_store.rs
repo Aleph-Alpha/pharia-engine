@@ -1072,6 +1072,11 @@ pub mod tests {
             (Box::new(SkillDummy), Digest::new("original-digest"))
         });
         skill_store_state.upsert_skill(ConfiguredSkill::from_path(&skill_path));
+        skill_store_state.insert(
+            skill_path.clone(),
+            Arc::new(SkillDummy),
+            Digest::new("original-digest"),
+        );
 
         // When we update the digest of the "greet" skill and we clear out expired skills
         skill_loader.add(&skill_path, || {
