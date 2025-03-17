@@ -22,11 +22,11 @@ use crate::AppConfig;
 /// # Errors
 /// Failed to parse the log level provided by the configuration.
 pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<OtelGuard> {
-    let env_filter = EnvFilter::from_str(&app_config.log_level)?;
+    let env_filter = EnvFilter::from_str(app_config.log_level())?;
     let registry = tracing_subscriber::registry()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer());
-    let tracer_provider = if let Some(endpoint) = &app_config.otel_endpoint {
+    let tracer_provider = if let Some(endpoint) = app_config.otel_endpoint() {
         let tracer_provider = init_otel_tracer_provider(endpoint)?;
         let tracer = tracer_provider.tracer("tracing-otel-subscriber");
         registry.with(OpenTelemetryLayer::new(tracer)).init();

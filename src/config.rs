@@ -60,34 +60,34 @@ pub struct AppConfig {
         default = "defaults::pharia_ai_feature_set",
         deserialize_with = "deserialize_feature_set"
     )]
-    pub pharia_ai_feature_set: FeatureSet,
+    pharia_ai_feature_set: FeatureSet,
     #[serde(default = "defaults::kernel_address")]
-    pub kernel_address: SocketAddr,
+    kernel_address: SocketAddr,
     /// Address to expose metrics on
     #[serde(default = "defaults::metrics_address")]
-    pub metrics_address: SocketAddr,
+    metrics_address: SocketAddr,
     /// This base URL is used to do inference against models hosted by the Aleph Alpha inference
     /// stack, as well as used to fetch Tokenizers for said models.
     #[serde(default = "defaults::inference_url")]
-    pub inference_url: String,
+    inference_url: String,
     /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
     #[serde(default = "defaults::document_index_url")]
-    pub document_index_url: String,
+    document_index_url: String,
     /// This base URL is used to authorize an `PHARIA_AI_TOKEN` for use by the kernel
     #[serde(default = "defaults::authorization_url")]
-    pub authorization_url: String,
+    authorization_url: String,
     #[serde(default)]
-    pub namespaces: NamespaceConfigs,
+    namespaces: NamespaceConfigs,
     #[serde(
         deserialize_with = "positive_duration_from_str",
         default = "defaults::namespace_update_interval"
     )]
-    pub namespace_update_interval: Duration,
+    namespace_update_interval: Duration,
     #[serde(default = "defaults::log_level")]
-    pub log_level: String,
-    pub otel_endpoint: Option<String>,
+    log_level: String,
+    otel_endpoint: Option<String>,
     #[serde(default)]
-    pub use_pooling_allocator: bool,
+    use_pooling_allocator: bool,
 }
 
 /// `jiff::SignedDuration` can parse human readable strings like `1h30m` into `SignedDuration`.
@@ -152,6 +152,127 @@ impl AppConfig {
     fn environment() -> Environment {
         Environment::with_convert_case(Case::Kebab).separator("__")
     }
+
+    #[must_use]
+    pub fn pharia_ai_feature_set(&self) -> FeatureSet {
+        self.pharia_ai_feature_set
+    }
+
+    #[must_use]
+    pub fn with_pharia_ai_feature_set(mut self, feature_set: FeatureSet) -> Self {
+        self.pharia_ai_feature_set = feature_set;
+        self
+    }
+
+    #[must_use]
+    pub fn kernel_address(&self) -> SocketAddr {
+        self.kernel_address
+    }
+
+    #[must_use]
+    pub fn with_kernel_address(mut self, addr: SocketAddr) -> Self {
+        self.kernel_address = addr;
+        self
+    }
+
+    #[must_use]
+    pub fn metrics_address(&self) -> SocketAddr {
+        self.metrics_address
+    }
+
+    #[must_use]
+    pub fn with_metrics_address(mut self, addr: SocketAddr) -> Self {
+        self.metrics_address = addr;
+        self
+    }
+
+    #[must_use]
+    pub fn inference_url(&self) -> &str {
+        &self.inference_url
+    }
+
+    #[must_use]
+    pub fn with_inference_url(mut self, url: String) -> Self {
+        self.inference_url = url;
+        self
+    }
+
+    #[must_use]
+    pub fn document_index_url(&self) -> &str {
+        &self.document_index_url
+    }
+
+    #[must_use]
+    pub fn with_document_index_url(mut self, url: String) -> Self {
+        self.document_index_url = url;
+        self
+    }
+
+    #[must_use]
+    pub fn authorization_url(&self) -> &str {
+        &self.authorization_url
+    }
+
+    #[must_use]
+    pub fn with_authorization_url(mut self, url: String) -> Self {
+        self.authorization_url = url;
+        self
+    }
+
+    #[must_use]
+    pub fn namespaces(&self) -> &NamespaceConfigs {
+        &self.namespaces
+    }
+
+    #[must_use]
+    pub fn with_namespaces(mut self, namespaces: NamespaceConfigs) -> Self {
+        self.namespaces = namespaces;
+        self
+    }
+
+    #[must_use]
+    pub fn namespace_update_interval(&self) -> Duration {
+        self.namespace_update_interval
+    }
+
+    #[must_use]
+    pub fn with_namespace_update_interval(mut self, interval: Duration) -> Self {
+        self.namespace_update_interval = interval;
+        self
+    }
+
+    #[must_use]
+    pub fn log_level(&self) -> &str {
+        &self.log_level
+    }
+
+    #[must_use]
+    pub fn with_log_level(mut self, level: String) -> Self {
+        self.log_level = level;
+        self
+    }
+
+    #[must_use]
+    pub fn otel_endpoint(&self) -> Option<&str> {
+        self.otel_endpoint.as_deref()
+    }
+
+    #[must_use]
+    pub fn with_otel_endpoint(mut self, endpoint: Option<String>) -> Self {
+        self.otel_endpoint = endpoint;
+        self
+    }
+
+    #[must_use]
+    pub fn use_pooling_allocator(&self) -> bool {
+        self.use_pooling_allocator
+    }
+
+    #[must_use]
+    pub fn with_pooling_allocator(mut self, use_pooling: bool) -> Self {
+        self.use_pooling_allocator = use_pooling;
+        self
+    }
 }
 
 impl Default for AppConfig {
@@ -199,7 +320,7 @@ mod tests {
         let config = AppConfig::from_sources(file_source, env_source)?;
 
         // Then the debug log level is only applied for PhariaKernel
-        assert_eq!(config.log_level, "info,pharia_kernel=debug");
+        assert_eq!(config.log_level(), "info,pharia_kernel=debug");
         Ok(())
     }
 
@@ -237,11 +358,11 @@ mod tests {
         // When we build the source from the environment variables
         let config = AppConfig::from_sources(file_source, env_source)?;
 
-        assert_eq!(config.pharia_ai_feature_set, FeatureSet::Stable(42));
-        assert_eq!(config.kernel_address, "192.123.1.1:8081".parse().unwrap());
-        assert_eq!(config.log_level, "dummy");
-        assert_eq!(config.namespaces.len(), 1);
-        assert_eq!(config.namespace_update_interval, Duration::from_secs(10));
+        assert_eq!(config.pharia_ai_feature_set(), FeatureSet::Stable(42));
+        assert_eq!(config.kernel_address(), "192.123.1.1:8081".parse().unwrap());
+        assert_eq!(config.log_level(), "dummy");
+        assert_eq!(config.namespaces().len(), 1);
+        assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
         Ok(())
     }
 
@@ -254,26 +375,26 @@ mod tests {
         let config = config.try_deserialize::<AppConfig>()?;
 
         // Then the config contains the default values
-        assert_eq!(config.pharia_ai_feature_set, FeatureSet::Beta);
-        assert_eq!(config.kernel_address, "0.0.0.0:8081".parse().unwrap());
-        assert_eq!(config.metrics_address, "0.0.0.0:9000".parse().unwrap());
+        assert_eq!(config.pharia_ai_feature_set(), FeatureSet::Beta);
+        assert_eq!(config.kernel_address(), "0.0.0.0:8081".parse().unwrap());
+        assert_eq!(config.metrics_address(), "0.0.0.0:9000".parse().unwrap());
         assert_eq!(
-            config.inference_url,
+            config.inference_url(),
             "https://inference-api.product.pharia.com"
         );
         assert_eq!(
-            config.document_index_url,
+            config.document_index_url(),
             "https://document-index.product.pharia.com"
         );
         assert_eq!(
-            config.authorization_url,
+            config.authorization_url(),
             "https://pharia-iam.product.pharia.com"
         );
-        assert_eq!(config.namespace_update_interval, Duration::from_secs(10));
-        assert_eq!(config.log_level, "info");
-        assert!(config.otel_endpoint.is_none());
-        assert!(!config.use_pooling_allocator);
-        assert!(config.namespaces.is_empty());
+        assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
+        assert_eq!(config.log_level(), "info");
+        assert!(config.otel_endpoint().is_none());
+        assert!(!config.use_pooling_allocator());
+        assert!(config.namespaces().is_empty());
         Ok(())
     }
 
@@ -345,7 +466,7 @@ mod tests {
         let config = AppConfig::from_sources(file_source, env_source)?;
 
         // Then both sources are applied, with the values from environment variables having precedence
-        assert_eq!(config.namespaces.len(), 0);
+        assert_eq!(config.namespaces().len(), 0);
         Ok(())
     }
 
@@ -386,11 +507,11 @@ registry-password =  "a""#
         let config = AppConfig::from_sources(file_source, env_source)?;
 
         // Then both namespaces are loaded
-        assert_eq!(config.namespaces.len(), 2);
+        assert_eq!(config.namespaces().len(), 2);
         let namespace_a = Namespace::new("a").unwrap();
-        assert!(config.namespaces.contains_key(&namespace_a));
+        assert!(config.namespaces().contains_key(&namespace_a));
         let namespace_b = Namespace::new("b").unwrap();
-        assert!(config.namespaces.contains_key(&namespace_b));
+        assert!(config.namespaces().contains_key(&namespace_b));
         Ok(())
     }
 
@@ -432,7 +553,7 @@ registry-password =  \"{password}\"
         let config = AppConfig::from_sources(file_source, env_source)?;
 
         // Then both sources are applied, with the values from environment variables having higher precedence
-        assert_eq!(config.namespaces.len(), 1);
+        assert_eq!(config.namespaces().len(), 1);
         let namespace_config = NamespaceConfig::TeamOwned {
             config_url: config_url.to_owned(),
             config_access_token: Some(config_access_token.to_owned()),
@@ -445,7 +566,7 @@ registry-password =  \"{password}\"
         };
         let namespace = Namespace::new("acme").unwrap();
         assert_eq!(
-            config.namespaces.get(&namespace).unwrap(),
+            config.namespaces().get(&namespace).unwrap(),
             &namespace_config
         );
         Ok(())
@@ -456,6 +577,6 @@ registry-password =  \"{password}\"
         drop(dotenvy::dotenv());
         let config = AppConfig::new().unwrap();
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
-        assert!(config.namespaces.contains_key(&namespace));
+        assert!(config.namespaces().contains_key(&namespace));
     }
 }

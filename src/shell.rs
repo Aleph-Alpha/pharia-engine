@@ -76,7 +76,7 @@ impl Shell {
             skill_runtime_api,
             csi_drivers,
         );
-        let handle = tokio::spawn(async {
+        let handle = tokio::spawn(async move {
             let res = axum::serve(listener, http(feature_set, app_state))
                 .with_graceful_shutdown(shutdown_signal)
                 .await;

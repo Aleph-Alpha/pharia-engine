@@ -8,7 +8,7 @@ async fn main() -> Result<(), Error> {
     drop(dotenvy::dotenv());
     let app_config = AppConfig::new()?;
     initialize_tracing(&app_config)?;
-    initialize_metrics(app_config.metrics_address)?;
+    initialize_metrics(app_config.metrics_address())?;
 
     let kernel = Kernel::new(app_config, shutdown_signal()).await?;
     kernel.wait_for_shutdown().await;

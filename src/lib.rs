@@ -65,26 +65,27 @@ impl Kernel {
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, Error> {
         let loaders = Box::new(
-            NamespaceDescriptionLoaders::new(app_config.namespaces.clone())
+            NamespaceDescriptionLoaders::new(app_config.namespaces().clone())
                 .context("Unable to read the configuration for namespaces")?,
         );
         let engine = Arc::new(
-            Engine::new(app_config.use_pooling_allocator).context("engine creation failed")?,
+            Engine::new(app_config.use_pooling_allocator()).context("engine creation failed")?,
         );
 
         // Boot up the drivers which power the CSI.
-        let tokenizers = Tokenizers::new(app_config.inference_url.clone()).unwrap();
-        let inference = Inference::new(app_config.inference_url.clone());
-        let search = Search::new(app_config.document_index_url.clone());
+        let tokenizers = Tokenizers::new(app_config.inference_url().to_owned()).unwrap();
+        let inference = Inference::new(app_config.inference_url().to_owned());
+        let search = Search::new(app_config.document_index_url().to_owned());
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
             search: search.api(),
             tokenizers: tokenizers.api(),
         };
 
-        let registry_config = app_config.namespaces.registry_config();
+        let registry_config = app_config.namespaces().registry_config();
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config);
-        let skill_store = SkillStore::new(skill_loader.api(), app_config.namespace_update_interval);
+        let skill_store =
+            SkillStore::new(skill_loader.api(), app_config.namespace_update_interval());
 
         // Boot up the runtime we need to execute Skills
         let skill_runtime = SkillRuntime::new(engine, csi_drivers.clone(), skill_store.api());
@@ -92,17 +93,17 @@ impl Kernel {
         let mut namespace_watcher = NamespaceWatcher::with_config(
             skill_store.api(),
             loaders,
-            app_config.namespace_update_interval,
+            app_config.namespace_update_interval(),
         );
 
         // Wait for the first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        let authorization = Authorization::new(app_config.authorization_url);
+        let authorization = Authorization::new(app_config.authorization_url().to_owned());
 
         let shell = match Shell::new(
-            app_config.pharia_ai_feature_set,
-            app_config.kernel_address,
+            app_config.pharia_ai_feature_set(),
+            app_config.kernel_address(),
             authorization.api(),
             skill_runtime.api(),
             skill_store.api(),
@@ -213,11 +214,9 @@ mod tests {
     // tests if the shutdown procedure is executed properly (not blocking)
     #[tokio::test]
     async fn shutdown() {
-        let config = AppConfig {
-            kernel_address: "127.0.0.1:8888".parse().unwrap(),
-            metrics_address: "127.0.0.1:0".parse().unwrap(),
-            ..AppConfig::default()
-        };
+        let config = AppConfig::default()
+            .with_kernel_address("127.0.0.1:8888".parse().unwrap())
+            .with_metrics_address("127.0.0.1:0".parse().unwrap());
         let kernel = Kernel::new(config, ready(())).await.unwrap();
 
         let shutdown_completed = kernel.wait_for_shutdown();
