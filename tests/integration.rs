@@ -65,7 +65,7 @@ impl TestKernel {
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
-        let port = app_config.kernel_address.port();
+        let port = app_config.kernel_address().port();
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
 
@@ -79,26 +79,25 @@ impl TestKernel {
     async fn with_namespace_config(namespaces: NamespaceConfigs) -> Self {
         let port = free_test_port();
         let metrics_port = free_test_port();
-        let app_config = AppConfig {
-            kernel_address: format!("127.0.0.1:{port}").parse().unwrap(),
-            metrics_address: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
-            namespaces,
-            use_pooling_allocator: true,
-            ..AppConfig::default()
-        };
+        let app_config = AppConfig::default()
+            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
+            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
+            .with_namespaces(namespaces)
+            .with_pooling_allocator(true);
         Self::new(app_config).await
     }
 
     async fn with_skills(skills: &[&str]) -> Self {
         let port = free_test_port();
         let metrics_port = free_test_port();
-        let app_config = AppConfig {
-            kernel_address: format!("127.0.0.1:{port}").parse().unwrap(),
-            metrics_address: format!("127.0.0.1:{metrics_port}").parse().unwrap(),
-            namespaces: namespace_config(&PathBuf::from_str("./skills").unwrap(), skills),
-            use_pooling_allocator: true,
-            ..AppConfig::default()
-        };
+        let app_config = AppConfig::default()
+            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
+            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
+            .with_namespaces(namespace_config(
+                &PathBuf::from_str("./skills").unwrap(),
+                skills,
+            ))
+            .with_pooling_allocator(true);
         Self::new(app_config).await
     }
 

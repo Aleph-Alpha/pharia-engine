@@ -7,7 +7,7 @@ pub const PRODUCTION_FEATURE_SET: FeatureSet = FeatureSet::Stable(1);
 /// Pharia AI feature set as derived from the environment. It is used to hide features under
 /// development from users in stable environments. It is also used to synchronize feature releases
 /// across teams in Pharia AI
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FeatureSet {
     /// We use beta environments to demo unstable features to our stakeholders.
     Beta,
