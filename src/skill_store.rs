@@ -553,7 +553,7 @@ pub mod tests {
         namespace_watcher::Namespace,
         registries::RegistryError,
         skill_loader::{SkillLoader, SkillLoaderMsg},
-        skills::{AnySkill, Engine, SkillPath, tests::SkillDummy},
+        skills::{Engine, SkillPath, tests::SkillDummy},
     };
 
     use super::*;
@@ -581,7 +581,7 @@ pub mod tests {
             &self,
             _skill_path: SkillPath,
         ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
-            panic!("Skill store dummy called.")
+            panic!("Skill store dummy called.");
         }
 
         async fn list_cached(&self) -> Vec<SkillPath> {
@@ -597,10 +597,11 @@ pub mod tests {
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Clone)]
     pub struct SkillStoreStub {
         list_response: Vec<SkillPath>,
         list_cached_response: Vec<SkillPath>,
+        fetch_response: Option<Arc<dyn Skill>>,
     }
 
     impl SkillStoreStub {
@@ -608,7 +609,13 @@ pub mod tests {
             SkillStoreStub {
                 list_response: vec![],
                 list_cached_response: vec![],
+                fetch_response: None,
             }
+        }
+
+        pub fn with_fetch_response(&mut self, fetch_response: Option<Arc<dyn Skill>>) -> &mut Self {
+            self.fetch_response = fetch_response;
+            self
         }
 
         pub fn with_list_response(&mut self, list_response: Vec<SkillPath>) -> &mut Self {
@@ -640,7 +647,7 @@ pub mod tests {
             &self,
             _skill_path: SkillPath,
         ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
-            panic!("Skill store stub called.")
+            Ok(self.fetch_response.clone())
         }
 
         async fn list_cached(&self) -> Vec<SkillPath> {
@@ -1041,9 +1048,10 @@ pub mod tests {
     async fn invalidation_of_an_uncached_skill() {
         // Given one "greet_skill" which is not in cache
         let greet_skill = SkillPath::local("greet_skill");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_loader =
-            SkillLoader::with_file_registry(engine, greet_skill.namespace.clone()).api();
+        let skill_loader = SkillLoaderStub::new();
+        skill_loader.add(&greet_skill, || {
+            (Box::new(SkillDummy), Digest::new("dummy digest"))
+        });
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let api = skill_store.api();
 
@@ -1172,36 +1180,6 @@ pub mod tests {
             skill: ConfiguredSkill,
         ) -> Result<Option<Digest>, RegistryError> {
             let maybe_digest = self.skills.lock().unwrap().get_mut(&skill).map(|f| f().1);
-            Ok(maybe_digest)
-        }
-    }
-
-    #[async_trait]
-    impl SkillLoaderApi for Arc<std::sync::Mutex<HashMap<ConfiguredSkill, (AnySkill, Digest)>>> {
-        async fn fetch(
-            &self,
-            skill: ConfiguredSkill,
-        ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError> {
-            self.lock()
-                .unwrap()
-                .get(&skill)
-                .cloned()
-                .map(|(skill, digest)| {
-                    let skill: Box<dyn Skill> = Box::new(skill);
-                    (skill, digest)
-                })
-                .ok_or(SkillLoaderError::SkillNotFound(skill))
-        }
-
-        async fn fetch_digest(
-            &self,
-            skill: ConfiguredSkill,
-        ) -> Result<Option<Digest>, RegistryError> {
-            let maybe_digest = self
-                .lock()
-                .unwrap()
-                .get(&skill)
-                .map(|(_, digest)| digest.clone());
             Ok(maybe_digest)
         }
     }

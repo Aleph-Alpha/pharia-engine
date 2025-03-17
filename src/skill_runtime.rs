@@ -753,15 +753,15 @@ pub mod tests {
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
     use test_skills::{
-        given_csi_from_metadata_skill, given_invalid_output_skill, given_python_skill_greet_v0_3,
-        given_rust_skill_explain, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
+        given_invalid_output_skill, given_python_skill_greet_v0_3, given_rust_skill_explain,
+        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
     };
     use tokio::try_join;
 
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
     use crate::inference::{Explanation, ExplanationRequest, TextScore};
     use crate::namespace_watcher::Namespace;
-    use crate::skill_store::tests::SkillStoreDummy;
+    use crate::skill_store::tests::{SkillStoreDummy, SkillStoreStub};
     use crate::skills::{AnySkillMetadata, Skill};
     use crate::{
         chunking::ChunkParams,
@@ -780,11 +780,40 @@ pub mod tests {
     #[tokio::test]
     async fn csi_usage_from_metadata_leads_to_suspension() {
         // Given a skill runtime that always returns a skill that uses the csi from the metadata function
-        let test_skills = given_csi_from_metadata_skill();
+        struct CsiFromMetadataSkill;
+        #[async_trait]
+        impl Skill for CsiFromMetadataSkill {
+            async fn metadata(
+                &self,
+                _engine: &Engine,
+                mut ctx: Box<dyn CsiForSkills + Send>,
+            ) -> Result<AnySkillMetadata, anyhow::Error> {
+                ctx.select_language(vec![SelectLanguageRequest {
+                    text: "Hello, good sir!".to_owned(),
+                    languages: Vec::new(),
+                }])
+                .await;
+                unreachable!(
+                    "The test should never reach this point, as its execution shoud be suspendend"
+                )
+            }
+
+            async fn run_as_function(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<Value, anyhow::Error> {
+                unreachable!("This won't be invoked during the test")
+            }
+        }
+
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(Some(Arc::new(CsiFromMetadataSkill)));
+
         let skill_path = SkillPath::local("invoke_csi_from_metadata");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::new(engine.clone(), test_skills.bytes(), skill_path.clone());
-        let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
+        let runtime = SkillRuntime::new(engine, SaboteurCsi, store);
 
         // When metadata for a skill is requested
         let metadata = runtime.api().skill_metadata(skill_path).await;
@@ -804,7 +833,8 @@ pub mod tests {
         let test_skill = given_rust_skill_greet_v0_2();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let store =
+            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -821,7 +851,8 @@ pub mod tests {
         let test_skill = given_rust_skill_greet_v0_3();
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let store =
+            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -850,7 +881,8 @@ pub mod tests {
         let test_skill = given_invalid_output_skill();
         let skill_path = SkillPath::local("invalid_output_skill");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let store =
+            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let runtime = SkillRuntime::new(engine, SaboteurCsi, store.api());
 
         // When metadata for a skill is requested
@@ -867,7 +899,7 @@ pub mod tests {
         let skill_path = SkillPath::local("explain");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
-            SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let (send, _) = oneshot::channel();
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
@@ -899,7 +931,7 @@ pub mod tests {
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
-            SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
         let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
@@ -937,7 +969,7 @@ pub mod tests {
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
-            SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
         let skill_ctx = Box::new(CsiGreetingMock);
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
@@ -959,7 +991,7 @@ pub mod tests {
         let skill_path = SkillPath::local("greet");
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
-            SkillStoreStub::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
 
         let runtime = WasmRuntime::new(engine, skill_store.api());
 
@@ -1084,7 +1116,7 @@ pub mod tests {
         // Given csi which emits errors for completion request
         let test_skill = given_rust_skill_greet_v0_3();
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::new(
+        let store = SkillStoreStubLegacy::new(
             engine.clone(),
             test_skill.bytes(),
             SkillPath::local("greet"),
@@ -1118,7 +1150,7 @@ pub mod tests {
         let test_skill = given_rust_skill_greet_v0_3();
         let csi = StubCsi::with_completion_from_text("Hello");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::new(
+        let store = SkillStoreStubLegacy::new(
             engine.clone(),
             test_skill.bytes(),
             SkillPath::local("greet"),
@@ -1149,7 +1181,7 @@ pub mod tests {
         let client = AssertConcurrentClient::new(2);
         let inference = Inference::with_client(client);
         let csi = StubCsi::with_completion_from_text("Hello, Homer!");
-        let store = SkillStoreStub::new(
+        let store = SkillStoreStubLegacy::new(
             engine.clone(),
             test_skill.bytes(),
             SkillPath::local("greet"),
@@ -1264,7 +1296,7 @@ pub mod tests {
         };
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(async || {
-            let store = SkillStoreStub::new(
+            let store = SkillStoreStubLegacy::new(
                 engine.clone(),
                 test_skill.bytes(),
                 SkillPath::local("greet"),
@@ -1387,12 +1419,12 @@ pub mod tests {
     }
 
     /// Maybe we can use the `SkillStoreStub` from `SkillStore::test` instead?
-    pub struct SkillStoreStub {
+    pub struct SkillStoreStubLegacy {
         send: mpsc::Sender<SkillStoreMsg>,
         join_handle: JoinHandle<()>,
     }
 
-    impl SkillStoreStub {
+    impl SkillStoreStubLegacy {
         pub fn new(engine: Arc<Engine>, bytes: Vec<u8>, path: SkillPath) -> Self {
             let skill = AnySkill::new(&engine, bytes).unwrap();
             let skill: Arc<dyn Skill> = Arc::new(skill);
