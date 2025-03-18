@@ -666,6 +666,21 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn python_greeting_skill() {
+        let skill = given_python_skill_greet_v0_3();
+        let skill_ctx = Box::new(CsiGreetingMock);
+        let engine = Engine::new(false).unwrap();
+
+        let skill = AnySkill::new(&engine, skill.bytes()).unwrap();
+        let actual = skill
+            .run_as_function(&engine, skill_ctx, json!("Homer"))
+            .await
+            .unwrap();
+
+        assert_eq!(actual, "Hello Homer");
+    }
+
+    #[tokio::test]
     async fn skill_metadata_v0_2_is_empty() {
         // Given a skill is linked againts skill package v0.2
         let test_skill = given_rust_skill_greet_v0_2();

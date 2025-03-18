@@ -749,7 +749,7 @@ pub mod tests {
 
     use crate::csi::tests::CsiSaboteur;
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
-    use crate::inference::{Explanation, TextScore};
+    use crate::inference::{Explanation, Logprobs, TextScore};
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::{SkillStoreDummy, SkillStoreStub};
     use crate::skills::{AnySkillMetadata, Skill};
@@ -766,8 +766,8 @@ pub mod tests {
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
     use test_skills::{
-        given_invalid_output_skill, given_python_skill_greet_v0_3, given_rust_skill_explain,
-        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
+        given_invalid_output_skill, given_rust_skill_explain, given_rust_skill_greet_v0_2,
+        given_rust_skill_greet_v0_3,
     };
     use tokio::sync::broadcast;
 
@@ -981,28 +981,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn python_greeting_skill() {
-        let test_skill = given_python_skill_greet_v0_3();
-        let skill_ctx = Box::new(CsiGreetingMock);
-        let skill_path = SkillPath::local("greet");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store =
-            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-
-        let runtime = WasmRuntime::new(engine, skill_store.api());
-
-        let actual = runtime
-            .run_function(&skill_path, json!("Homer"), skill_ctx)
-            .await
-            .unwrap();
-
-        drop(runtime);
-        skill_store.wait_for_shutdown().await;
-
-        assert_eq!(actual, "Hello Homer");
-    }
-
-    #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
@@ -1109,15 +1087,12 @@ pub mod tests {
 
     #[tokio::test]
     async fn skill_runtime_forwards_csi_errors() {
-        // Given csi which emits errors for completion request
-        let test_skill = given_rust_skill_greet_v0_3();
+        // Given a skill using csi and a csi that fails
+        let mut store = SkillStoreStub::new();
+        // Note we are using a skill which actually invokes the csi
+        store.with_fetch_response(Some(Arc::new(SkillGreetCompletion)));
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStubLegacy::new(
-            engine.clone(),
-            test_skill.bytes(),
-            SkillPath::local("greet"),
-        );
-        let runtime = SkillRuntime::new(engine, CsiSaboteur, store.api());
+        let runtime = SkillRuntime::new(engine, CsiSaboteur, store);
 
         // When trying to generate a greeting for Homer using the greet skill
         let result = runtime
@@ -1130,7 +1105,6 @@ pub mod tests {
             .await;
 
         runtime.wait_for_shutdown().await;
-        store.wait_for_shutdown().await;
 
         // Then
         let expectet_error_msg = "The skill could not be executed to completion, something in our \
@@ -1395,6 +1369,47 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<AnySkillMetadata, anyhow::Error> {
             panic!("Dummy metadata implementation of Greet Skill")
+        }
+    }
+
+    /// A test double for a skill. It invokes the csi with a prompt and returns the result.
+    struct SkillGreetCompletion;
+
+    #[async_trait]
+    impl Skill for SkillGreetCompletion {
+        async fn run_as_function(
+            &self,
+            _engine: &Engine,
+            mut ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> Result<Value, anyhow::Error> {
+            let mut completions = ctx
+                .complete(vec![CompletionRequest {
+                    prompt: "Hello".to_owned(),
+                    model: "test-model-name".to_owned(),
+                    params: CompletionParams {
+                        max_tokens: Some(10),
+                        temperature: Some(0.5),
+                        top_p: Some(1.0),
+                        presence_penalty: Some(0.0),
+                        frequency_penalty: Some(0.0),
+                        stop: Vec::new(),
+                        return_special_tokens: true,
+                        top_k: None,
+                        logprobs: Logprobs::No,
+                    },
+                }])
+                .await;
+            let completion = completions.pop().unwrap().text;
+            Ok(json!(completion))
+        }
+
+        async fn metadata(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+        ) -> Result<AnySkillMetadata, anyhow::Error> {
+            panic!("Dummy metadata implementation of Skill Greet Completion")
         }
     }
 
