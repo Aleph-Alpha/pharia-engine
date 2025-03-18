@@ -198,7 +198,7 @@ where
         )
         .increment(1);
 
-        todo!()
+        self.inference.completion_stream(request, auth).await
     }
 
     async fn chat(
@@ -481,6 +481,41 @@ pub mod tests {
 
         // Then a single document is returned
         assert_eq!(documents.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn completion_stream_events() {
+        // Given a CSI drivers with stub completion
+        let inference_stub = InferenceStub::new(|r| Ok(Completion::from_text(r.prompt)));
+        let csi_apis = CsiDrivers {
+            inference: inference_stub.api(),
+            ..dummy_csi_drivers()
+        };
+
+        // When requesting a streamed completion
+        let completion_req = CompletionRequest {
+            model: "dummy_model".to_owned(),
+            prompt: "request".to_owned(),
+            params: CompletionParams::default(),
+        };
+
+        let mut completion = csi_apis
+            .completion_stream(api_token().to_owned(), completion_req)
+            .await;
+
+        let mut events = vec![];
+        while let Some(Ok(event)) = completion.recv().await {
+            events.push(event);
+        }
+
+        drop(csi_apis);
+        inference_stub.wait_for_shutdown().await;
+
+        // Then the completion must have the same order as the respective requests
+        assert_eq!(events.len(), 3);
+        assert!(matches!(events[0], CompletionEvent::Delta { .. }));
+        assert!(matches!(events[1], CompletionEvent::Finished { .. }));
+        assert!(matches!(events[2], CompletionEvent::Usage { .. }));
     }
 
     #[tokio::test]
