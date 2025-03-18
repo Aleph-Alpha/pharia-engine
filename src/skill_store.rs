@@ -599,32 +599,32 @@ pub mod tests {
 
     #[derive(Clone)]
     pub struct SkillStoreStub {
-        list_response: Vec<SkillPath>,
-        list_cached_response: Vec<SkillPath>,
-        fetch_response: Option<Arc<dyn Skill>>,
+        list: Vec<SkillPath>,
+        list_cached: Vec<SkillPath>,
+        fetch: Option<Arc<dyn Skill>>,
     }
 
     impl SkillStoreStub {
         pub fn new() -> Self {
             SkillStoreStub {
-                list_response: vec![],
-                list_cached_response: vec![],
-                fetch_response: None,
+                list: vec![],
+                list_cached: vec![],
+                fetch: None,
             }
         }
 
         pub fn with_fetch_response(&mut self, fetch_response: Option<Arc<dyn Skill>>) -> &mut Self {
-            self.fetch_response = fetch_response;
+            self.fetch = fetch_response;
             self
         }
 
         pub fn with_list_response(&mut self, list_response: Vec<SkillPath>) -> &mut Self {
-            self.list_response = list_response;
+            self.list = list_response;
             self
         }
 
         pub fn with_list_cached_response(&mut self, list_response: Vec<SkillPath>) -> &mut Self {
-            self.list_cached_response = list_response;
+            self.list_cached = list_response;
             self
         }
     }
@@ -647,15 +647,15 @@ pub mod tests {
             &self,
             _skill_path: SkillPath,
         ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
-            Ok(self.fetch_response.clone())
+            Ok(self.fetch.clone())
         }
 
         async fn list_cached(&self) -> Vec<SkillPath> {
-            self.list_cached_response.clone()
+            self.list_cached.clone()
         }
 
         async fn list(&self) -> Vec<SkillPath> {
-            self.list_response.clone()
+            self.list.clone()
         }
 
         async fn invalidate_cache(&self, _skill_path: SkillPath) -> bool {
