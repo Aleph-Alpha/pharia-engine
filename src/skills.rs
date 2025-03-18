@@ -619,7 +619,7 @@ pub mod tests {
         given_rust_skill_chat, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
         given_rust_skill_search,
     };
-    use tokio::sync::mpsc;
+    use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
 
     use crate::{
@@ -756,7 +756,7 @@ pub mod tests {
     #[tokio::test]
     async fn language_selection_from_csi() {
         // Given a linked context
-        let (send_rt_err, _) = mpsc::channel(1);
+        let (send_rt_err, _) = oneshot::channel();
         let skill_ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
             CsiDummy,
