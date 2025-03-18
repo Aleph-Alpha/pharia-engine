@@ -7,15 +7,17 @@ use aleph_alpha_client::{
     ChatSampling, Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat,
     TaskCompletion, TaskExplanation,
 };
+use futures::StreamExt;
 use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
+use tokio::sync::mpsc;
 use tracing::{error, warn};
 
 use thiserror::Error;
 
 use super::{
-    ChatParams, ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
-    Distribution, Explanation, ExplanationRequest, Granularity, Logprob, Logprobs, Message,
-    TextScore, TokenUsage,
+    ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
+    CompletionRequest, Distribution, Explanation, ExplanationRequest, Granularity, Logprob,
+    Logprobs, Message, TextScore, TokenUsage,
 };
 
 pub trait InferenceClient: Send + Sync + 'static {
@@ -24,6 +26,12 @@ pub trait InferenceClient: Send + Sync + 'static {
         request: &CompletionRequest,
         api_token: String,
     ) -> impl Future<Output = Result<Completion, InferenceClientError>> + Send;
+    fn stream_completion(
+        &self,
+        request: &CompletionRequest,
+        api_token: String,
+        send: mpsc::Sender<Result<CompletionEvent, InferenceClientError>>,
+    ) -> impl Future<Output = Result<(), InferenceClientError>>;
     fn chat(
         &self,
         request: &ChatRequest,
@@ -132,6 +140,84 @@ impl InferenceClient for Client {
                 .map_err(InferenceClientError::Other),
             Err(e) => Err(e.into()),
         }
+    }
+
+    async fn stream_completion(
+        &self,
+        request: &CompletionRequest,
+        api_token: String,
+        send: mpsc::Sender<Result<CompletionEvent, InferenceClientError>>,
+    ) -> Result<(), InferenceClientError> {
+        let CompletionRequest {
+            model,
+            prompt,
+            params:
+                CompletionParams {
+                    return_special_tokens,
+                    max_tokens,
+                    temperature,
+                    top_k,
+                    top_p,
+                    stop,
+                    frequency_penalty,
+                    presence_penalty,
+                    logprobs,
+                },
+        } = &request;
+
+        let task = TaskCompletion {
+            prompt: Prompt::from_text(prompt),
+            stopping: Stopping {
+                maximum_tokens: *max_tokens,
+                stop_sequences: &stop.iter().map(String::as_str).collect::<Vec<_>>(),
+            },
+            sampling: Sampling {
+                temperature: *temperature,
+                top_k: *top_k,
+                top_p: *top_p,
+                frequency_penalty: *frequency_penalty,
+                presence_penalty: *presence_penalty,
+            },
+            special_tokens: *return_special_tokens,
+            logprobs: (*logprobs).into(),
+        };
+        let how = How {
+            api_token: Some(api_token),
+            ..Default::default()
+        };
+
+        let mut stream = self.stream_completion(&task, model, &how).await?;
+
+        while let Some(event) = stream.next().await {
+            let event = match event {
+                Ok(event) => CompletionEvent::try_from(event).map_err(InferenceClientError::Other),
+                Err(e) => Err(e.into()),
+            };
+            drop(send.send(event).await);
+        }
+        Ok(())
+    }
+}
+
+impl TryFrom<aleph_alpha_client::CompletionEvent> for CompletionEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(value: aleph_alpha_client::CompletionEvent) -> Result<Self, Self::Error> {
+        Ok(match value {
+            aleph_alpha_client::CompletionEvent::Delta {
+                completion,
+                logprobs,
+            } => CompletionEvent::Delta {
+                text: completion,
+                logprobs: logprobs.into_iter().map(Into::into).collect(),
+            },
+            aleph_alpha_client::CompletionEvent::Finished { reason } => CompletionEvent::Finished {
+                finish_reason: reason.parse()?,
+            },
+            aleph_alpha_client::CompletionEvent::Summary { usage } => CompletionEvent::Usage {
+                usage: usage.into(),
+            },
+        })
     }
 }
 
@@ -368,10 +454,10 @@ impl From<aleph_alpha_client::Error> for InferenceClientError {
 mod tests {
     use core::str;
 
-    use tokio::time::Instant;
+    use tokio::{sync::mpsc, time::Instant};
 
     use crate::{
-        inference::{ChatParams, ExplanationRequest, Granularity},
+        inference::{ChatParams, ExplanationRequest, FinishReason, Granularity},
         tests::{api_token, inference_url},
     };
 
@@ -726,5 +812,51 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         // Then
         assert_eq!(chat_response.usage.prompt, 20);
         assert_eq!(chat_response.usage.completion, 1);
+    }
+
+    #[tokio::test]
+    async fn completion_stream() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let completion_request = CompletionRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            prompt: "An apple a day".to_owned(),
+            params: CompletionParams {
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        };
+        let (send, mut recv) = mpsc::channel(1);
+
+        tokio::spawn(async move {
+            <Client as InferenceClient>::stream_completion(
+                &client,
+                &completion_request,
+                api_token,
+                send,
+            )
+            .await
+            .unwrap();
+        });
+
+        let mut events = vec![];
+        while let Some(Ok(event)) = recv.recv().await {
+            events.push(event);
+        }
+
+        // Then
+        assert_eq!(events.len(), 3);
+        assert!(matches!(events[0], CompletionEvent::Delta { .. }));
+        assert_eq!(
+            events[1],
+            CompletionEvent::Finished {
+                finish_reason: FinishReason::Length
+            }
+        );
+        assert!(matches!(events[2], CompletionEvent::Usage { .. }));
     }
 }
