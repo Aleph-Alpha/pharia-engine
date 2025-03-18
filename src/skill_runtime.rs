@@ -470,12 +470,12 @@ impl RunChatMsg {
             api_token,
         } = self;
 
-        let (send_rt_err, mut recv_rt_err) = mpsc::channel(1);
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
             result = runtime.run_chat(&skill_path, input, ctx, send.clone()) => result,
             // An error occurred during skill execution.
-            Some(error) = recv_rt_err.recv() => Err(SkillExecutionError::RuntimeError(error))
+            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
 
         let label = status_label(response.as_ref().map(|&()| ()));
@@ -551,12 +551,12 @@ impl RunFunctionMsg {
             api_token,
         } = self;
 
-        let (send_rt_err, mut recv_rt_err) = mpsc::channel(1);
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
             result = runtime.run_function(&skill_path, input, ctx) => result,
             // An error occurred during skill execution.
-            Some(error) = recv_rt_err.recv() => Err(SkillExecutionError::RuntimeError(error))
+            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
 
         let status = status_label(response.as_ref().map(|_| ()));
@@ -573,24 +573,32 @@ pub struct SkillInvocationCtx<C> {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
-    send_rt_err: mpsc::Sender<anyhow::Error>,
+    send_rt_error: Option<oneshot::Sender<anyhow::Error>>,
     csi_apis: C,
     // How the user authenticates with us
     api_token: String,
 }
 
 impl<C> SkillInvocationCtx<C> {
-    pub fn new(send_rt_err: mpsc::Sender<anyhow::Error>, csi_apis: C, api_token: String) -> Self {
+    pub fn new(
+        send_rt_err: oneshot::Sender<anyhow::Error>,
+        csi_apis: C,
+        api_token: String,
+    ) -> Self {
         SkillInvocationCtx {
-            send_rt_err,
+            send_rt_error: Some(send_rt_err),
             csi_apis,
             api_token,
         }
     }
 
     /// Never return, we did report the error via the send error channel.
-    async fn send_error<T>(&self, error: anyhow::Error) -> T {
-        drop(self.send_rt_err.send(error).await);
+    async fn send_error<T>(&mut self, error: anyhow::Error) -> T {
+        self.send_rt_error
+            .take()
+            .expect("Only one error must be send during skill invocation")
+            .send(error)
+            .unwrap();
         pending().await
     }
 }
@@ -921,7 +929,7 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
             SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let (send, _) = mpsc::channel(1);
+        let (send, _) = oneshot::channel();
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
@@ -1008,7 +1016,7 @@ pub mod tests {
     #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
-        let (send, _) = mpsc::channel(1);
+        let (send, _) = oneshot::channel();
         let mut csi = StubCsi::empty();
         csi.set_chunking(|r| {
             Ok(r.into_iter()
@@ -1052,7 +1060,7 @@ pub mod tests {
     #[tokio::test]
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
-        let (send, mut recv) = mpsc::channel(1);
+        let (send, recv) = oneshot::channel();
         let mut csi = StubCsi::empty();
         csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
         let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned());
@@ -1070,7 +1078,7 @@ pub mod tests {
             character_offsets: false,
         };
         let error = select! {
-            error = recv.recv() => error.unwrap(),
+            error = recv => error.unwrap(),
             _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
         };
 
