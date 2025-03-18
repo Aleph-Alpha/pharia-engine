@@ -18,7 +18,7 @@ use pharia::skill::{
 use tracing::error;
 use wasmtime::component::{Resource, bindgen};
 
-use crate::{chunking, inference, language_selection, search};
+use crate::{chunking, csi, inference, language_selection, search};
 
 use super::super::LinkedCtx;
 
@@ -27,7 +27,7 @@ bindgen!({
     path: "./wit/skill@0.3",
     async: true,
     with: {
-        "pharia:skill/inference/completion-stream": inference::CompletionStream
+        "pharia:skill/inference/completion-stream": csi::CompletionStreamId
     },
 });
 
@@ -363,29 +363,34 @@ impl InferenceHost for LinkedCtx {
 /// This manages our completion stream within the resource table, allowing us to link to the Resource in the WIT World.
 impl HostCompletionStream for LinkedCtx {
     async fn new(&mut self, init: CompletionRequest) -> Resource<CompletionStream> {
-        let stream = self.skill_ctx.completion_stream(init.into()).await;
+        let stream_id = self.skill_ctx.completion_stream_new(init.into()).await;
         self.resource_table
-            .push(stream)
+            .push(stream_id)
             .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
             .expect("Failed to push stream to resource table")
     }
 
     async fn next(&mut self, stream: Resource<CompletionStream>) -> Option<CompletionEvent> {
         debug_assert!(!stream.owned());
-        let stream = self
+        let stream_id = self
             .resource_table
-            .get_mut(&stream)
+            .get(&stream)
             .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
             .expect("Failed to get stream from resource table");
-        stream.recv().await.map(Into::into)
+        self.skill_ctx
+            .completion_stream_next(stream_id)
+            .await
+            .map(Into::into)
     }
 
     async fn drop(&mut self, stream: Resource<CompletionStream>) -> anyhow::Result<()> {
         debug_assert!(stream.owned());
-        self.resource_table
+        let stream_id = self
+            .resource_table
             .delete(stream)
             .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
             .expect("Failed to delete stream from resource table");
+        self.skill_ctx.completion_stream_drop(stream_id).await;
         Ok(())
     }
 }

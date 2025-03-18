@@ -624,10 +624,13 @@ pub mod tests {
 
     use crate::{
         chunking::{Chunk, ChunkRequest},
-        csi::tests::{CsiCompleteStreamStub, CsiDummy, CsiGreetingMock},
+        csi::{
+            CompletionStreamId,
+            tests::{CsiCompleteStreamStub, CsiDummy, CsiGreetingMock},
+        },
         inference::{
-            ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-            CompletionStream, Explanation, ExplanationRequest, FinishReason, TokenUsage,
+            ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest, Explanation,
+            ExplanationRequest, FinishReason, TokenUsage,
         },
         language_selection::{self, SelectLanguageRequest},
         search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -1017,7 +1020,19 @@ pub mod tests {
         async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
             panic!("I am a dummy CsiForSkills")
         }
-        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn completion_stream_next(
+            &mut self,
+            _id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
             panic!("I am a dummy CsiForSkills")
         }
         async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
