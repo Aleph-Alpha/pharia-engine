@@ -218,10 +218,10 @@ pub struct ChatRequest {
 }
 
 impl CompletionRequest {
-    pub fn new(prompt: String, model: String) -> Self {
+    pub fn new(prompt: impl Into<String>, model: impl Into<String>) -> Self {
         Self {
-            prompt,
-            model,
+            prompt: prompt.into(),
+            model: model.into(),
             params: CompletionParams::default(),
         }
     }
@@ -232,7 +232,7 @@ impl CompletionRequest {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FinishReason {
     Stop,
     Length,
@@ -252,7 +252,7 @@ impl FromStr for FinishReason {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenUsage {
     pub prompt: u32,
     pub completion: u32,
@@ -268,7 +268,7 @@ pub struct Completion {
     pub usage: TokenUsage,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CompletionEvent {
     Delta {
         text: String,
@@ -292,7 +292,7 @@ pub struct ChatResponse {
     pub usage: TokenUsage,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Distribution {
     // Logarithmic probability of the token returned in the completion
     pub sampled: Logprob,
@@ -300,7 +300,7 @@ pub struct Distribution {
     pub top: Vec<Logprob>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Logprob {
     pub token: Vec<u8>,
     pub logprob: f64,
