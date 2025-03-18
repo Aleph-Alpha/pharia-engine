@@ -21,8 +21,8 @@ use crate::{
     chunking::{Chunk, ChunkRequest},
     csi::{Csi, CsiForSkills},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
-        CompletionStream, Explanation, ExplanationRequest,
+        ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
+        CompletionRequest, CompletionStream, Explanation, ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
     namespace_watcher::Namespace,
@@ -93,11 +93,12 @@ where
                 model: "llama-3.1-8b-instruct".to_owned(),
                 params,
             };
-            let mut completion = ctx.complete(vec![request]).await;
-            sender
-                .send(ChatEvent::Append(completion.drain(..).next().unwrap().text))
-                .await
-                .unwrap();
+            let mut stream = ctx.completion_stream(request).await;
+            while let Some(event) = stream.recv().await {
+                if let CompletionEvent::Delta { text, .. } = event {
+                    sender.send(ChatEvent::Append(text)).await.unwrap();
+                }
+            }
             Ok(())
         } else {
             Err(SkillExecutionError::SkillNotConfigured)
@@ -468,12 +469,12 @@ impl RunChatMsg {
             api_token,
         } = self;
 
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let (send_rt_err, mut recv_rt_err) = mpsc::channel(1);
         let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
             result = runtime.run_chat(&skill_path, input, ctx, send.clone()) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
+            Some(error) = recv_rt_err.recv() => Err(SkillExecutionError::RuntimeError(error))
         };
 
         let label = status_label(response.as_ref().map(|&()| ()));
@@ -549,12 +550,12 @@ impl RunFunctionMsg {
             api_token,
         } = self;
 
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let (send_rt_err, mut recv_rt_err) = mpsc::channel(1);
         let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
             result = runtime.run_function(&skill_path, input, ctx) => result,
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
+            Some(error) = recv_rt_err.recv() => Err(SkillExecutionError::RuntimeError(error))
         };
 
         let status = status_label(response.as_ref().map(|_| ()));
@@ -571,32 +572,24 @@ pub struct SkillInvocationCtx<C> {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
-    send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
+    send_rt_err: mpsc::Sender<anyhow::Error>,
     csi_apis: C,
     // How the user authenticates with us
     api_token: String,
 }
 
 impl<C> SkillInvocationCtx<C> {
-    pub fn new(
-        send_rt_err: oneshot::Sender<anyhow::Error>,
-        csi_apis: C,
-        api_token: String,
-    ) -> Self {
+    pub fn new(send_rt_err: mpsc::Sender<anyhow::Error>, csi_apis: C, api_token: String) -> Self {
         SkillInvocationCtx {
-            send_rt_err: Some(send_rt_err),
+            send_rt_err,
             csi_apis,
             api_token,
         }
     }
 
     /// Never return, we did report the error via the send error channel.
-    async fn send_error<T>(&mut self, error: anyhow::Error) -> T {
-        self.send_rt_err
-            .take()
-            .expect("Only one error must be send during skill invocation")
-            .send(error)
-            .unwrap();
+    async fn send_error<T>(&self, error: anyhow::Error) -> T {
+        drop(self.send_rt_err.send(error).await);
         pending().await
     }
 }
@@ -604,15 +597,19 @@ impl<C> SkillInvocationCtx<C> {
 /// We know that skill metadata will not invoke any csi functions, but still need to provide an implementation of `CsiForSkills`
 /// We do not want to panic, as someone could build a component that uses the csi functions inside the metadata function.
 /// Therefore, we always send a runtime error which will lead to skill suspension.
-struct SkillMetadataCtx(Option<oneshot::Sender<anyhow::Error>>);
+struct SkillMetadataCtx {
+    send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
+}
 
 impl SkillMetadataCtx {
     pub fn new(send_rt_err: oneshot::Sender<anyhow::Error>) -> Self {
-        Self(Some(send_rt_err))
+        Self {
+            send_rt_err: Some(send_rt_err),
+        }
     }
 
     async fn send_error<T>(&mut self) -> T {
-        self.0
+        self.send_rt_err
             .take()
             .expect("Only one error must be send during skill invocation")
             .send(anyhow!(
@@ -693,7 +690,33 @@ where
     }
 
     async fn completion_stream(&mut self, request: CompletionRequest) -> CompletionStream {
-        todo!()
+        let mut stream = match self
+            .csi_apis
+            .completion_stream(self.api_token.clone(), request)
+            .await
+        {
+            Ok(stream) => stream,
+            Err(error) => self.send_error(error).await,
+        };
+
+        let send_rt_err = self.send_rt_err.clone();
+        let (send, recv) = mpsc::channel(1);
+
+        // Translate from one receiver to another
+        tokio::spawn(async move {
+            while let Some(event) = stream.recv().await {
+                match event {
+                    Ok(event) => drop(send.send(event).await),
+                    Err(error) => {
+                        drop(send_rt_err.send(error).await);
+                        // No pending.await so that this task can be dropped
+                        break;
+                    }
+                }
+            }
+        });
+
+        recv
     }
 
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
@@ -904,7 +927,7 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let skill_store =
             SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let (send, _) = oneshot::channel();
+        let (send, _) = mpsc::channel(1);
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
@@ -991,7 +1014,7 @@ pub mod tests {
     #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
-        let (send, _) = oneshot::channel();
+        let (send, _) = mpsc::channel(1);
         let mut csi = StubCsi::empty();
         csi.set_chunking(|r| {
             Ok(r.into_iter()
@@ -1035,7 +1058,7 @@ pub mod tests {
     #[tokio::test]
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
-        let (send, recv) = oneshot::channel();
+        let (send, mut recv) = mpsc::channel(1);
         let mut csi = StubCsi::empty();
         csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
         let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned());
@@ -1053,7 +1076,7 @@ pub mod tests {
             character_offsets: false,
         };
         let error = select! {
-            error = recv => error.unwrap(),
+            error = recv.recv() => error.unwrap(),
             _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
         };
 

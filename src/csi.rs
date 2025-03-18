@@ -7,8 +7,8 @@ use tracing::trace;
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionRequest, CompletionStream, Explanation,
-        ExplanationRequest, InferenceApi,
+        ChatRequest, ChatResponse, Completion, CompletionRequest, CompletionStream,
+        CompletionTryStream, Explanation, ExplanationRequest, InferenceApi,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     search::{
@@ -65,6 +65,12 @@ pub trait Csi {
         auth: String,
         requests: Vec<CompletionRequest>,
     ) -> anyhow::Result<Vec<Completion>>;
+
+    async fn completion_stream(
+        &self,
+        auth: String,
+        request: CompletionRequest,
+    ) -> anyhow::Result<CompletionTryStream>;
 
     async fn chat(
         &self,
@@ -172,6 +178,14 @@ where
                 .collect::<Vec<_>>(),
         )
         .await
+    }
+
+    async fn completion_stream(
+        &self,
+        auth: String,
+        request: CompletionRequest,
+    ) -> anyhow::Result<CompletionTryStream> {
+        todo!()
     }
 
     async fn chat(
@@ -293,7 +307,6 @@ pub mod tests {
     use std::sync::{Arc, Mutex};
 
     use anyhow::bail;
-    use async_stream::stream;
     use serde_json::json;
 
     use crate::{
@@ -326,6 +339,14 @@ pub mod tests {
             _auth: String,
             _requests: Vec<CompletionRequest>,
         ) -> anyhow::Result<Vec<Completion>> {
+            bail!("Test error")
+        }
+
+        async fn completion_stream(
+            &self,
+            _auth: String,
+            _request: CompletionRequest,
+        ) -> anyhow::Result<CompletionTryStream> {
             bail!("Test error")
         }
 
@@ -556,6 +577,14 @@ pub mod tests {
             panic!("DummyCsi complete called")
         }
 
+        async fn completion_stream(
+            &self,
+            _auth: String,
+            _request: CompletionRequest,
+        ) -> anyhow::Result<CompletionTryStream> {
+            panic!("DummyCsi completion_stream called")
+        }
+
         async fn chunk(
             &self,
             _auth: String,
@@ -666,6 +695,14 @@ pub mod tests {
                 .into_iter()
                 .map(|r| (*self.completion)(r))
                 .collect()
+        }
+
+        async fn completion_stream(
+            &self,
+            _auth: String,
+            _request: CompletionRequest,
+        ) -> anyhow::Result<CompletionTryStream> {
+            unimplemented!()
         }
 
         async fn chunk(
@@ -793,12 +830,13 @@ pub mod tests {
     impl CsiForSkills for CsiCompleteStreamStub {
         async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
             let mut events = self.events.clone();
-            let stream = stream! {
+            let (send, recv) = mpsc::channel(1);
+            tokio::spawn(async move {
                 while let Some(event) = events.pop() {
-                    yield event;
+                    send.send(event).await.unwrap();
                 }
-            };
-            CompletionStream::new(Box::pin(stream))
+            });
+            recv
         }
 
         async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {

@@ -1,6 +1,6 @@
 use aleph_alpha_client::Client;
 use derive_more::{Constructor, Deref, DerefMut, Display, IntoIterator};
-use futures::{Stream, StreamExt, stream::FuturesUnordered};
+use futures::{StreamExt, stream::FuturesUnordered};
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
@@ -268,13 +268,10 @@ pub struct Completion {
     pub usage: TokenUsage,
 }
 
-#[derive(Constructor, Deref, DerefMut)]
-pub struct CompletionStream(Pin<Box<dyn Stream<Item = CompletionEvent> + Send>>);
+pub type CompletionStream = mpsc::Receiver<CompletionEvent>;
 
 #[derive(Constructor, Deref, DerefMut)]
-pub struct CompletionStreamWithErrors(
-    Pin<Box<dyn Stream<Item = anyhow::Result<CompletionEvent>> + Send>>,
-);
+pub struct CompletionTryStream(mpsc::Receiver<anyhow::Result<CompletionEvent>>);
 
 #[derive(Clone, Debug)]
 pub enum CompletionEvent {
