@@ -526,7 +526,7 @@ pub mod tests {
 
     /// This Client will only resolve a completion once the correct number of
     /// requests have been reached.
-    pub struct AssertConcurrentClient {
+    struct AssertConcurrentClient {
         /// Number of requests we are still waiting on
         expected_concurrent_requests: AtomicUsize,
     }

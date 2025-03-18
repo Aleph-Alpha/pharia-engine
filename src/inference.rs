@@ -9,5 +9,5 @@ pub use actor::{
 
 #[cfg(test)]
 pub mod tests {
-    pub use super::actor::tests::{AssertConcurrentClient, InferenceStub};
+    pub use super::actor::tests::InferenceStub;
 }
