@@ -8,20 +8,43 @@ use pharia::skill::{
         SearchResult, TextCursor,
     },
     inference::{
-        ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
-        CompletionRequest, CompletionStream, Distribution, ExplanationRequest, FinishReason,
-        Granularity, Host as InferenceHost, HostCompletionStream, Logprob, Logprobs, Message,
-        TextScore, TokenUsage,
+        ChatParams, ChatRequest, ChatResponse, Completion, CompletionDelta, CompletionEvent,
+        CompletionParams, CompletionRequest, CompletionStream, Distribution, ExplanationRequest,
+        FinishReason, Granularity, Host as InferenceHost, HostCompletionStream, Logprob, Logprobs,
+        Message, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
 };
+use tracing::error;
 use wasmtime::component::{Resource, bindgen};
 
 use crate::{chunking, inference, language_selection, search};
 
 use super::super::LinkedCtx;
 
-bindgen!({ world: "csi", path: "./wit/skill@0.3", async: true });
+pub struct DummyCompletionStream {
+    events: Vec<CompletionEvent>,
+}
+
+impl DummyCompletionStream {
+    fn new(mut events: Vec<CompletionEvent>) -> Self {
+        events.reverse();
+        Self { events }
+    }
+
+    fn next(&mut self) -> Option<CompletionEvent> {
+        self.events.pop()
+    }
+}
+
+bindgen!({
+    world: "csi",
+    path: "./wit/skill@0.3",
+    async: true,
+    with: {
+        "pharia:skill/inference/completion-stream": DummyCompletionStream
+    },
+});
 
 impl ChunkingHost for LinkedCtx {
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
@@ -352,17 +375,43 @@ impl InferenceHost for LinkedCtx {
     }
 }
 
+/// This manages our completion stream within the resource table, allowing us to link to the Resource in the WIT World.
 impl HostCompletionStream for LinkedCtx {
     async fn new(&mut self, init: CompletionRequest) -> Resource<CompletionStream> {
-        todo!()
+        let events = vec![
+            CompletionEvent::Delta(CompletionDelta {
+                text: "Homer".to_owned(),
+                logprobs: vec![],
+            }),
+            CompletionEvent::Finished(FinishReason::Stop),
+            CompletionEvent::Usage(TokenUsage {
+                prompt: 1,
+                completion: 2,
+            }),
+        ];
+        self.resource_table
+            .push(DummyCompletionStream::new(events))
+            .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
+            .expect("Failed to push stream to resource table")
     }
 
     async fn next(&mut self, stream: Resource<CompletionStream>) -> Option<CompletionEvent> {
-        todo!()
+        debug_assert!(!stream.owned());
+        let stream = self
+            .resource_table
+            .get_mut(&stream)
+            .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
+            .expect("Failed to get stream from resource table");
+        stream.next()
     }
 
     async fn drop(&mut self, stream: Resource<CompletionStream>) -> anyhow::Result<()> {
-        todo!()
+        debug_assert!(stream.owned());
+        self.resource_table
+            .delete(stream)
+            .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
+            .expect("Failed to delete stream from resource table");
+        Ok(())
     }
 }
 

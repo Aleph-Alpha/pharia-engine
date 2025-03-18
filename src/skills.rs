@@ -615,8 +615,9 @@ pub mod tests {
     use fake::{Fake, Faker};
     use serde_json::json;
     use test_skills::{
-        given_python_skill_greet_v0_2, given_python_skill_greet_v0_3, given_rust_skill_chat,
-        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
+        given_complete_stream_skill, given_python_skill_greet_v0_2, given_python_skill_greet_v0_3,
+        given_rust_skill_chat, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
+        given_rust_skill_search,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -820,6 +821,26 @@ pub mod tests {
 
         // Then it returns a json string array
         assert_eq!(result, json!([content]));
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_chat_stream_module() {
+        // Given a skill loaded by our engine
+        let test_skill = given_complete_stream_skill();
+        let wasm = test_skill.bytes();
+        let engine = Engine::new(false).unwrap();
+        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let ctx = Box::new(CsiGreetingMock);
+
+        // When invoked with a json string
+        let input = json!("Homer");
+        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+
+        // Then it returns a json string
+        assert_eq!(
+            result,
+            json!(["Homer", "FinishReason::Stop", "prompt: 1, completion: 2"])
+        );
     }
 
     #[tokio::test]
