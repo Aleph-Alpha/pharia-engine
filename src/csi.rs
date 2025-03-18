@@ -7,8 +7,8 @@ use tracing::trace;
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation, ExplanationRequest,
-        InferenceApi,
+        ChatRequest, ChatResponse, Completion, CompletionRequest, CompletionStream, Explanation,
+        ExplanationRequest, InferenceApi,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     search::{
@@ -36,6 +36,7 @@ pub struct CsiDrivers<T> {
 pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
+    async fn completion_stream(&mut self, request: CompletionRequest) -> CompletionStream;
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>>;
     async fn select_language(
         &mut self,
@@ -58,6 +59,7 @@ pub trait Csi {
         auth: String,
         requests: Vec<ExplanationRequest>,
     ) -> anyhow::Result<Vec<Explanation>>;
+
     async fn complete(
         &self,
         auth: String,
@@ -291,13 +293,14 @@ pub mod tests {
     use std::sync::{Arc, Mutex};
 
     use anyhow::bail;
+    use async_stream::stream;
     use serde_json::json;
 
     use crate::{
         chunking::ChunkParams,
         inference::{
-            ChatParams, CompletionParams, FinishReason, Message, TextScore, TokenUsage,
-            tests::InferenceStub,
+            ChatParams, CompletionEvent, CompletionParams, FinishReason, Message, TextScore,
+            TokenUsage, tests::InferenceStub,
         },
         search::{TextCursor, tests::SearchStub},
         tests::api_token,
@@ -739,6 +742,10 @@ pub mod tests {
                 .collect()
         }
 
+        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+            unimplemented!()
+        }
+
         async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
             unimplemented!()
         }
@@ -770,6 +777,62 @@ pub mod tests {
             unimplemented!()
         }
     }
+
+    pub struct CsiCompleteStreamStub {
+        events: Vec<CompletionEvent>,
+    }
+
+    impl CsiCompleteStreamStub {
+        pub fn new(mut events: Vec<CompletionEvent>) -> Self {
+            events.reverse();
+            Self { events }
+        }
+    }
+
+    #[async_trait]
+    impl CsiForSkills for CsiCompleteStreamStub {
+        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+            let mut events = self.events.clone();
+            let stream = stream! {
+                while let Some(event) = events.pop() {
+                    yield event;
+                }
+            };
+            CompletionStream::new(Box::pin(stream))
+        }
+
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+            unimplemented!()
+        }
+        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            unimplemented!()
+        }
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            unimplemented!()
+        }
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            unimplemented!()
+        }
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            unimplemented!()
+        }
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            unimplemented!()
+        }
+        async fn document_metadata(
+            &mut self,
+            _document_paths: Vec<DocumentPath>,
+        ) -> Vec<Option<Value>> {
+            unimplemented!()
+        }
+        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
+            unimplemented!()
+        }
+    }
+
     /// Asserts a specific prompt and model and returns a greeting message
     #[derive(Clone)]
     pub struct CsiGreetingMock;
@@ -811,6 +874,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests.into_iter().map(Self::complete_text).collect()
+        }
+
+        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+            unimplemented!()
         }
 
         async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
@@ -899,6 +966,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                     Completion::from_text(counter.to_string())
                 })
                 .collect()
+        }
+
+        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+            unimplemented!()
         }
 
         async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {

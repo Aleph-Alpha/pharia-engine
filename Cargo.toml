@@ -114,6 +114,7 @@ heck = "0.5.0"
 derive_more = { version = "2.0.1", features = [
     "constructor",
     "deref",
+    "deref_mut",
     "display",
     "from",
     "into",

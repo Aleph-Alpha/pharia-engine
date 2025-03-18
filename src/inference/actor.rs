@@ -1,6 +1,6 @@
 use aleph_alpha_client::Client;
-use derive_more::{Constructor, Deref, Display, IntoIterator};
-use futures::{StreamExt, stream::FuturesUnordered};
+use derive_more::{Constructor, Deref, DerefMut, Display, IntoIterator};
+use futures::{Stream, StreamExt, stream::FuturesUnordered};
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
@@ -266,6 +266,28 @@ pub struct Completion {
     /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
     pub logprobs: Vec<Distribution>,
     pub usage: TokenUsage,
+}
+
+#[derive(Constructor, Deref, DerefMut)]
+pub struct CompletionStream(Pin<Box<dyn Stream<Item = CompletionEvent> + Send>>);
+
+#[derive(Constructor, Deref, DerefMut)]
+pub struct CompletionStreamWithErrors(
+    Pin<Box<dyn Stream<Item = anyhow::Result<CompletionEvent>> + Send>>,
+);
+
+#[derive(Clone, Debug)]
+pub enum CompletionEvent {
+    Delta {
+        text: String,
+        logprobs: Vec<Distribution>,
+    },
+    Finished {
+        finish_reason: FinishReason,
+    },
+    Usage {
+        usage: TokenUsage,
+    },
 }
 
 #[derive(Debug)]
