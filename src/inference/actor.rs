@@ -554,6 +554,14 @@ pub mod tests {
                 Ok(Completion::from_text("Completion succeeded"))
             }
         }
+        async fn stream_completion(
+            &self,
+            _request: &CompletionRequest,
+            _api_token: String,
+            _send: mpsc::Sender<Result<CompletionEvent, InferenceClientError>>,
+        ) -> Result<(), InferenceClientError> {
+            unimplemented!()
+        }
         async fn chat(
             &self,
             _request: &ChatRequest,
@@ -627,6 +635,15 @@ pub mod tests {
                 sleep(Duration::from_millis(1)).await;
             }
             Ok(Completion::from_text(&request.prompt))
+        }
+
+        async fn stream_completion(
+            &self,
+            _request: &CompletionRequest,
+            _api_token: String,
+            _send: mpsc::Sender<Result<CompletionEvent, InferenceClientError>>,
+        ) -> Result<(), InferenceClientError> {
+            unimplemented!()
         }
 
         async fn chat(
