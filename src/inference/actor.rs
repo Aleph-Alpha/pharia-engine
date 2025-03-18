@@ -404,7 +404,14 @@ impl InferenceMessage {
                 request,
                 send,
                 api_token,
-            } => {}
+            } => {
+                if let Err(err) = client
+                    .stream_completion(&request, api_token, send.clone())
+                    .await
+                {
+                    drop(send.send(Err(err.into())).await);
+                }
+            }
             Self::Chat {
                 request,
                 send,
@@ -558,7 +565,7 @@ pub mod tests {
             &self,
             _request: &CompletionRequest,
             _api_token: String,
-            _send: mpsc::Sender<Result<CompletionEvent, InferenceClientError>>,
+            _send: mpsc::Sender<anyhow::Result<CompletionEvent>>,
         ) -> Result<(), InferenceClientError> {
             unimplemented!()
         }
@@ -641,7 +648,7 @@ pub mod tests {
             &self,
             _request: &CompletionRequest,
             _api_token: String,
-            _send: mpsc::Sender<Result<CompletionEvent, InferenceClientError>>,
+            _send: mpsc::Sender<anyhow::Result<CompletionEvent>>,
         ) -> Result<(), InferenceClientError> {
             unimplemented!()
         }
