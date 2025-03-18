@@ -581,7 +581,7 @@ pub struct SkillInvocationCtx<C> {
     /// ID counter for stored streams.
     current_stream_id: usize,
     /// Stream receivers for currently running streams.
-    current_streams: HashMap<CompletionStreamId, mpsc::Receiver<CompletionEvent>>,
+    current_streams: HashMap<CompletionStreamId, mpsc::Receiver<anyhow::Result<CompletionEvent>>>,
 }
 
 impl<C> SkillInvocationCtx<C> {
@@ -643,25 +643,27 @@ where
     }
 
     async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId {
-        let recv = match self
+        let id = self.next_stream_id();
+        let recv = self
             .csi_apis
             .completion_stream(self.api_token.clone(), request)
-            .await
-        {
-            Ok(recv) => recv,
-            Err(error) => self.send_error(error).await,
-        };
-        let id = self.next_stream_id();
+            .await;
         self.current_streams.insert(id, recv);
         id
     }
 
     async fn completion_stream_next(&mut self, id: &CompletionStreamId) -> Option<CompletionEvent> {
-        self.current_streams
+        let event = self
+            .current_streams
             .get_mut(id)
             .expect("Stream not found")
             .recv()
             .await
+            .transpose();
+        match event {
+            Ok(event) => event,
+            Err(error) => self.send_error(error).await,
+        }
     }
 
     async fn completion_stream_drop(&mut self, id: CompletionStreamId) {
