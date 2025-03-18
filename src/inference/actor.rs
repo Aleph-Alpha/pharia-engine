@@ -1,12 +1,7 @@
 use aleph_alpha_client::Client;
 use derive_more::{Constructor, Deref, Display, IntoIterator};
 use futures::{StreamExt, stream::FuturesUnordered};
-use std::{
-    future::{Future, pending},
-    pin::Pin,
-    str::FromStr,
-    sync::Arc,
-};
+use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -417,10 +412,9 @@ impl InferenceMessage {
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
                     select! {
-                        msg = recv.recv() => match msg {
-                            Some(msg) => drop(send.send(Ok(msg)).await),
-                            // Wait for stream to finish
-                            None => pending().await
+                        // Pull from receiver as long as there are still senders
+                        Some(msg) = recv.recv(), if !recv.is_closed() =>  {
+                            drop(send.send(Ok(msg)).await);
                         },
                         result = &mut stream =>  {
                             // Break out of the loopp once the stream is done
