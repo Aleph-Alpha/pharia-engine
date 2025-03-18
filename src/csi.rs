@@ -643,11 +643,6 @@ pub mod tests {
                 ..Self::empty()
             }
         }
-        pub fn with_completion_from_text(text: impl Into<String>) -> Self {
-            let text: String = text.into();
-            let completion = Completion::from_text(text);
-            StubCsi::with_completion(move |_| completion.clone())
-        }
     }
 
     #[async_trait]

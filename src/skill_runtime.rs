@@ -747,17 +747,6 @@ where
 pub mod tests {
     use std::time::Duration;
 
-    use anyhow::anyhow;
-    use metrics::Label;
-    use metrics_util::debugging::DebugValue;
-    use metrics_util::debugging::{DebuggingRecorder, Snapshot};
-    use serde_json::json;
-    use test_skills::{
-        given_invalid_output_skill, given_python_skill_greet_v0_3, given_rust_skill_explain,
-        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
-    };
-    use tokio::try_join;
-
     use crate::csi::tests::CsiSaboteur;
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
     use crate::inference::{Explanation, TextScore};
@@ -767,11 +756,20 @@ pub mod tests {
     use crate::{
         chunking::ChunkParams,
         csi::tests::{CsiDummy, StubCsi},
-        inference::{Inference, tests::AssertConcurrentClient},
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, SkillStoreMsg},
         skills::AnySkill,
     };
+    use anyhow::anyhow;
+    use metrics::Label;
+    use metrics_util::debugging::DebugValue;
+    use metrics_util::debugging::{DebuggingRecorder, Snapshot};
+    use serde_json::json;
+    use test_skills::{
+        given_invalid_output_skill, given_python_skill_greet_v0_3, given_rust_skill_explain,
+        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
+    };
+    use tokio::sync::broadcast;
 
     use super::*;
 
@@ -1167,39 +1165,70 @@ pub mod tests {
         assert_eq!(result.unwrap(), "Hello");
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn concurrent_skill_execution() {
         // Given
-        let test_skill = given_rust_skill_greet_v0_3();
+        struct SkillAssertConcurrent {
+            send: broadcast::Sender<()>,
+        }
+
+        #[async_trait]
+        impl Skill for SkillAssertConcurrent {
+            async fn run_as_function(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<Value, anyhow::Error> {
+                let mut recv = self.send.subscribe();
+                self.send.send(()).unwrap();
+                // Send once await two responses. This way we can only finish any skill if we
+                // actually execute them concurrently. Two for the two invocations in this test
+                recv.recv().await.unwrap();
+                recv.recv().await.unwrap();
+                // We finished, lets unblock our counterpart, in case it missed a broadcast
+                self.send.send(()).unwrap();
+                Ok(json!("Hello"))
+            }
+
+            async fn metadata(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+            ) -> Result<AnySkillMetadata, anyhow::Error> {
+                panic!("Dummy metadata implementation of Assert concurrency skill")
+            }
+        }
+
+        let (send, _recv) = broadcast::channel(2);
+        let skill = SkillAssertConcurrent { send: send.clone() };
         let engine = Arc::new(Engine::new(false).unwrap());
-        let client = AssertConcurrentClient::new(2);
-        let inference = Inference::with_client(client);
-        let csi = StubCsi::with_completion_from_text("Hello, Homer!");
-        let store = SkillStoreStubLegacy::new(
-            engine.clone(),
-            test_skill.bytes(),
-            SkillPath::local("greet"),
-        );
-        let runtime = SkillRuntime::new(engine, csi, store.api());
-        let api = runtime.api();
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(Some(Arc::new(skill)));
+        let runtime = SkillRuntime::new(engine, CsiDummy, store);
 
-        // When executing tw tasks in parallel
-        let skill_path = SkillPath::local("greet");
-        let input = json!("Homer");
+        // When invoking two skills in parallel
         let token = "TOKEN_NOT_REQUIRED";
-        let result = try_join!(
-            api.run_function(skill_path.clone(), input.clone(), token.to_owned()),
-            api.run_function(skill_path, input, token.to_owned()),
-        );
 
-        drop(api);
+        let api_first = runtime.api();
+        let first = tokio::spawn(async move {
+            api_first
+                .run_function(SkillPath::local("any_path"), json!({}), token.to_owned())
+                .await
+        });
+        let api_second = runtime.api();
+        let second = tokio::spawn(async move {
+            api_second
+                .run_function(SkillPath::local("any_path"), json!({}), token.to_owned())
+                .await
+        });
+        let result_first = tokio::time::timeout(Duration::from_secs(1), first).await;
+        let result_second = tokio::time::timeout(Duration::from_secs(1), second).await;
+
+        assert!(result_first.is_ok());
+        assert!(result_second.is_ok());
+
         runtime.wait_for_shutdown().await;
-        inference.wait_for_shutdown().await;
-        store.wait_for_shutdown().await;
-
-        // Then they both have completed with the same values
-        let (result1, result2) = result.unwrap();
-        assert_eq!(result1, result2);
     }
 
     #[tokio::test]
