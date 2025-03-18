@@ -1143,19 +1143,16 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn greeting_skill() {
+    async fn greeting_skill_should_output_hello() {
         // Given
-        let test_skill = given_rust_skill_greet_v0_3();
-        let csi = StubCsi::with_completion_from_text("Hello");
+        let skill = GreetSkill;
+        let csi = CsiDummy;
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStubLegacy::new(
-            engine.clone(),
-            test_skill.bytes(),
-            SkillPath::local("greet"),
-        );
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(Some(Arc::new(skill)));
 
         // When
-        let runtime = SkillRuntime::new(engine, csi, store.api());
+        let runtime = SkillRuntime::new(engine, csi, store);
         let result = runtime
             .api()
             .run_function(
@@ -1165,7 +1162,6 @@ pub mod tests {
             )
             .await;
         runtime.wait_for_shutdown().await;
-        store.wait_for_shutdown().await;
 
         // Then
         assert_eq!(result.unwrap(), "Hello");
@@ -1281,28 +1277,23 @@ pub mod tests {
 
     #[test]
     fn skill_runtime_metrics_emitted() {
-        let test_skill = given_rust_skill_greet_v0_3();
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let csi = StubCsi::with_completion_from_text("Hello");
-        let (send, _) = oneshot::channel();
         let skill_path = SkillPath::local("greet");
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(Some(Arc::new(GreetSkill)));
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let (send, _) = oneshot::channel();
         let msg = RunFunctionMsg {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
             send,
             api_token: "dummy".to_owned(),
         };
+
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(async || {
-            let store = SkillStoreStubLegacy::new(
-                engine.clone(),
-                test_skill.bytes(),
-                SkillPath::local("greet"),
-            );
-            let runtime = WasmRuntime::new(engine, store.api());
-            msg.act(csi, &runtime).await;
+            let runtime = WasmRuntime::new(engine, store);
+            msg.act(CsiDummy, &runtime).await;
             drop(runtime);
-            store.wait_for_shutdown().await;
         });
 
         let metrics = snapshot.into_vec();
@@ -1353,6 +1344,29 @@ pub mod tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         metrics::with_local_recorder(&recorder, || runtime.block_on(f()));
         snapshotter.snapshot()
+    }
+
+    /// A skill implementation for testing purposes. It sends a greeting to the user.
+    struct GreetSkill;
+
+    #[async_trait]
+    impl Skill for GreetSkill {
+        async fn run_as_function(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> Result<Value, anyhow::Error> {
+            Ok(json!("Hello"))
+        }
+
+        async fn metadata(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+        ) -> Result<AnySkillMetadata, anyhow::Error> {
+            panic!("Dummy metadata implementation of Greet Skill")
+        }
     }
 
     /// Maybe we can use the `SkillStoreStub` from `SkillStore::test` instead?
