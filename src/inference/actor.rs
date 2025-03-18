@@ -1,5 +1,5 @@
 use aleph_alpha_client::Client;
-use derive_more::{Constructor, Deref, DerefMut, Display, IntoIterator};
+use derive_more::{Constructor, Deref, Display, IntoIterator};
 use futures::{StreamExt, stream::FuturesUnordered};
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
@@ -267,11 +267,6 @@ pub struct Completion {
     pub logprobs: Vec<Distribution>,
     pub usage: TokenUsage,
 }
-
-pub type CompletionStream = mpsc::Receiver<CompletionEvent>;
-
-#[derive(Constructor, Deref, DerefMut)]
-pub struct CompletionTryStream(mpsc::Receiver<anyhow::Result<CompletionEvent>>);
 
 #[derive(Clone, Debug)]
 pub enum CompletionEvent {

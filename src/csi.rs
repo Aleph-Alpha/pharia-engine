@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use derive_more::Constructor;
 use futures::future::try_join_all;
 use serde_json::Value;
 use tokio::sync::mpsc;
@@ -7,8 +8,8 @@ use tracing::trace;
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionRequest, CompletionStream,
-        CompletionTryStream, Explanation, ExplanationRequest, InferenceApi,
+        ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest, Explanation,
+        ExplanationRequest, InferenceApi,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     search::{
@@ -16,6 +17,10 @@ use crate::{
     },
     tokenizers::TokenizerApi,
 };
+
+/// `CompletionStreamId` is a unique identifier for a completion stream.
+#[derive(Debug, Clone, Constructor, Copy, PartialEq, Eq, Hash)]
+pub struct CompletionStreamId(usize);
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
 ///
@@ -36,7 +41,9 @@ pub struct CsiDrivers<T> {
 pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
-    async fn completion_stream(&mut self, request: CompletionRequest) -> CompletionStream;
+    async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId;
+    async fn completion_stream_next(&mut self, id: &CompletionStreamId) -> Option<CompletionEvent>;
+    async fn completion_stream_drop(&mut self, id: CompletionStreamId);
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>>;
     async fn select_language(
         &mut self,
@@ -65,12 +72,6 @@ pub trait Csi {
         auth: String,
         requests: Vec<CompletionRequest>,
     ) -> anyhow::Result<Vec<Completion>>;
-
-    async fn completion_stream(
-        &self,
-        auth: String,
-        request: CompletionRequest,
-    ) -> anyhow::Result<CompletionTryStream>;
 
     async fn chat(
         &self,
@@ -178,14 +179,6 @@ where
                 .collect::<Vec<_>>(),
         )
         .await
-    }
-
-    async fn completion_stream(
-        &self,
-        auth: String,
-        request: CompletionRequest,
-    ) -> anyhow::Result<CompletionTryStream> {
-        todo!()
     }
 
     async fn chat(
@@ -304,7 +297,10 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use std::sync::{Arc, Mutex};
+    use std::{
+        collections::HashMap,
+        sync::{Arc, Mutex},
+    };
 
     use anyhow::bail;
     use serde_json::json;
@@ -339,14 +335,6 @@ pub mod tests {
             _auth: String,
             _requests: Vec<CompletionRequest>,
         ) -> anyhow::Result<Vec<Completion>> {
-            bail!("Test error")
-        }
-
-        async fn completion_stream(
-            &self,
-            _auth: String,
-            _request: CompletionRequest,
-        ) -> anyhow::Result<CompletionTryStream> {
             bail!("Test error")
         }
 
@@ -577,14 +565,6 @@ pub mod tests {
             panic!("DummyCsi complete called")
         }
 
-        async fn completion_stream(
-            &self,
-            _auth: String,
-            _request: CompletionRequest,
-        ) -> anyhow::Result<CompletionTryStream> {
-            panic!("DummyCsi completion_stream called")
-        }
-
         async fn chunk(
             &self,
             _auth: String,
@@ -697,14 +677,6 @@ pub mod tests {
                 .collect()
         }
 
-        async fn completion_stream(
-            &self,
-            _auth: String,
-            _request: CompletionRequest,
-        ) -> anyhow::Result<CompletionTryStream> {
-            unimplemented!()
-        }
-
         async fn chunk(
             &self,
             _auth: String,
@@ -779,7 +751,21 @@ pub mod tests {
                 .collect()
         }
 
-        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            unimplemented!()
+        }
+
+        async fn completion_stream_next(
+            &mut self,
+            _id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            unimplemented!()
+        }
+
+        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
             unimplemented!()
         }
 
@@ -816,27 +802,43 @@ pub mod tests {
     }
 
     pub struct CsiCompleteStreamStub {
+        current_id: usize,
         events: Vec<CompletionEvent>,
+        streams: HashMap<CompletionStreamId, Vec<CompletionEvent>>,
     }
 
     impl CsiCompleteStreamStub {
         pub fn new(mut events: Vec<CompletionEvent>) -> Self {
             events.reverse();
-            Self { events }
+            Self {
+                current_id: 0,
+                events,
+                streams: HashMap::new(),
+            }
         }
     }
 
     #[async_trait]
     impl CsiForSkills for CsiCompleteStreamStub {
-        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
-            let mut events = self.events.clone();
-            let (send, recv) = mpsc::channel(1);
-            tokio::spawn(async move {
-                while let Some(event) = events.pop() {
-                    send.send(event).await.unwrap();
-                }
-            });
-            recv
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            let id = CompletionStreamId::new(self.current_id);
+            self.streams.insert(id, self.events.clone());
+            self.current_id += 1;
+            id
+        }
+
+        async fn completion_stream_next(
+            &mut self,
+            id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            self.streams.get_mut(id)?.pop()
+        }
+
+        async fn completion_stream_drop(&mut self, id: CompletionStreamId) {
+            self.streams.remove(&id);
         }
 
         async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
@@ -914,7 +916,21 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             requests.into_iter().map(Self::complete_text).collect()
         }
 
-        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            unimplemented!()
+        }
+
+        async fn completion_stream_next(
+            &mut self,
+            _id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            unimplemented!()
+        }
+
+        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
             unimplemented!()
         }
 
@@ -1006,7 +1022,21 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 .collect()
         }
 
-        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            unimplemented!()
+        }
+
+        async fn completion_stream_next(
+            &mut self,
+            _id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            unimplemented!()
+        }
+
+        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
             unimplemented!()
         }
 

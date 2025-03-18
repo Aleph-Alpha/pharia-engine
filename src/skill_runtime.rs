@@ -19,10 +19,10 @@ use tokio::{
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
-    csi::{Csi, CsiForSkills},
+    csi::{CompletionStreamId, Csi, CsiForSkills},
     inference::{
         ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
-        CompletionRequest, CompletionStream, Explanation, ExplanationRequest,
+        CompletionRequest, Explanation, ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
     namespace_watcher::Namespace,
@@ -93,12 +93,13 @@ where
                 model: "llama-3.1-8b-instruct".to_owned(),
                 params,
             };
-            let mut stream = ctx.completion_stream(request).await;
-            while let Some(event) = stream.recv().await {
+            let stream_id = ctx.completion_stream_new(request).await;
+            while let Some(event) = ctx.completion_stream_next(&stream_id).await {
                 if let CompletionEvent::Delta { text, .. } = event {
                     sender.send(ChatEvent::Append(text)).await.unwrap();
                 }
             }
+            ctx.completion_stream_drop(stream_id).await;
             Ok(())
         } else {
             Err(SkillExecutionError::SkillNotConfigured)
@@ -630,8 +631,19 @@ impl CsiForSkills for SkillMetadataCtx {
         self.send_error().await
     }
 
-    async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+    async fn completion_stream_new(&mut self, _request: CompletionRequest) -> CompletionStreamId {
         self.send_error().await
+    }
+
+    async fn completion_stream_next(
+        &mut self,
+        _id: &CompletionStreamId,
+    ) -> Option<CompletionEvent> {
+        self.send_error().await
+    }
+
+    async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
+        self.send_error::<()>().await;
     }
 
     async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
@@ -689,34 +701,16 @@ where
         }
     }
 
-    async fn completion_stream(&mut self, request: CompletionRequest) -> CompletionStream {
-        let mut stream = match self
-            .csi_apis
-            .completion_stream(self.api_token.clone(), request)
-            .await
-        {
-            Ok(stream) => stream,
-            Err(error) => self.send_error(error).await,
-        };
+    async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId {
+        todo!()
+    }
 
-        let send_rt_err = self.send_rt_err.clone();
-        let (send, recv) = mpsc::channel(1);
+    async fn completion_stream_next(&mut self, id: &CompletionStreamId) -> Option<CompletionEvent> {
+        todo!()
+    }
 
-        // Translate from one receiver to another
-        tokio::spawn(async move {
-            while let Some(event) = stream.recv().await {
-                match event {
-                    Ok(event) => drop(send.send(event).await),
-                    Err(error) => {
-                        drop(send_rt_err.send(error).await);
-                        // No pending.await so that this task can be dropped
-                        break;
-                    }
-                }
-            }
-        });
-
-        recv
+    async fn completion_stream_drop(&mut self, id: CompletionStreamId) {
+        todo!()
     }
 
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
