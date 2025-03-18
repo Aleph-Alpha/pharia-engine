@@ -30,7 +30,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &CompletionRequest,
         api_token: String,
-        send: mpsc::Sender<anyhow::Result<CompletionEvent>>,
+        send: mpsc::Sender<CompletionEvent>,
     ) -> impl Future<Output = Result<(), InferenceClientError>> + Send;
     fn chat(
         &self,
@@ -139,7 +139,7 @@ impl InferenceClient for Client {
         &self,
         request: &CompletionRequest,
         api_token: String,
-        send: mpsc::Sender<anyhow::Result<CompletionEvent>>,
+        send: mpsc::Sender<CompletionEvent>,
     ) -> Result<(), InferenceClientError> {
         let CompletionRequest {
             model,
@@ -182,11 +182,7 @@ impl InferenceClient for Client {
         let mut stream = retry(|| self.stream_completion(&task, model, &how)).await?;
 
         while let Some(event) = stream.next().await {
-            let event = match event {
-                Ok(event) => CompletionEvent::try_from(event),
-                Err(e) => Err(e.into()),
-            };
-            drop(send.send(event).await);
+            drop(send.send(CompletionEvent::try_from(event?)?).await);
         }
         Ok(())
     }
@@ -837,7 +833,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         });
 
         let mut events = vec![];
-        while let Some(Ok(event)) = recv.recv().await {
+        while let Some(event) = recv.recv().await {
             events.push(event);
         }
 
