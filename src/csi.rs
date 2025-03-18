@@ -77,7 +77,7 @@ pub trait Csi {
         &self,
         auth: String,
         request: CompletionRequest,
-    ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>>;
+    ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>>;
 
     async fn chat(
         &self,
@@ -191,7 +191,7 @@ where
         &self,
         auth: String,
         request: CompletionRequest,
-    ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>> {
+    ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
         metrics::counter!(
             CsiMetrics::CsiRequestsTotal,
             &[("function", "completion_stream")]
@@ -362,8 +362,10 @@ pub mod tests {
             &self,
             _auth: String,
             _request: CompletionRequest,
-        ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>> {
-            bail!("Test error")
+        ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+            let (send, recv) = mpsc::channel(1);
+            send.send(Err(anyhow::anyhow!("Test error"))).await.unwrap();
+            recv
         }
 
         async fn chunk(
@@ -597,7 +599,7 @@ pub mod tests {
             &self,
             _auth: String,
             _request: CompletionRequest,
-        ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>> {
+        ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
             panic!("DummyCsi completion_stream called")
         }
 
@@ -717,26 +719,29 @@ pub mod tests {
             &self,
             _auth: String,
             request: CompletionRequest,
-        ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>> {
+        ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
             let (sender, receiver) = mpsc::channel(100);
             let Completion {
                 text,
                 finish_reason,
                 logprobs,
                 usage,
-            } = (*self.completion)(request)?;
+            } = (*self.completion)(request).unwrap();
             tokio::spawn(async move {
                 sender
-                    .send(CompletionEvent::Delta { text, logprobs })
+                    .send(Ok(CompletionEvent::Delta { text, logprobs }))
                     .await
                     .unwrap();
                 sender
-                    .send(CompletionEvent::Finished { finish_reason })
+                    .send(Ok(CompletionEvent::Finished { finish_reason }))
                     .await
                     .unwrap();
-                sender.send(CompletionEvent::Usage { usage }).await.unwrap();
+                sender
+                    .send(Ok(CompletionEvent::Usage { usage }))
+                    .await
+                    .unwrap();
             });
-            Ok(receiver)
+            receiver
         }
 
         async fn chunk(
