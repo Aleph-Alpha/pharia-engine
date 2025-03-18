@@ -21,8 +21,8 @@ use crate::{
     chunking::{Chunk, ChunkRequest},
     csi::{Csi, CsiForSkills},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest, Explanation,
-        ExplanationRequest,
+        ChatRequest, ChatResponse, Completion, CompletionParams, CompletionRequest,
+        CompletionStream, Explanation, ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
     namespace_watcher::Namespace,
@@ -633,6 +633,10 @@ impl CsiForSkills for SkillMetadataCtx {
         self.send_error().await
     }
 
+    async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
+        self.send_error().await
+    }
+
     async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
         self.send_error().await
     }
@@ -686,6 +690,10 @@ where
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
+    }
+
+    async fn completion_stream(&mut self, request: CompletionRequest) -> CompletionStream {
+        todo!()
     }
 
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {

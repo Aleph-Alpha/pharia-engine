@@ -624,10 +624,10 @@ pub mod tests {
 
     use crate::{
         chunking::{Chunk, ChunkRequest},
-        csi::tests::{CsiDummy, CsiGreetingMock},
+        csi::tests::{CsiCompleteStreamStub, CsiDummy, CsiGreetingMock},
         inference::{
-            ChatRequest, ChatResponse, Completion, CompletionRequest, Explanation,
-            ExplanationRequest,
+            ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
+            CompletionStream, Explanation, ExplanationRequest, FinishReason, TokenUsage,
         },
         language_selection::{self, SelectLanguageRequest},
         search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -824,13 +824,28 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn can_load_and_run_chat_stream_module() {
+    async fn can_load_and_run_completion_stream_module() {
         // Given a skill loaded by our engine
+        let events = vec![
+            CompletionEvent::Delta {
+                text: "Homer".to_owned(),
+                logprobs: vec![],
+            },
+            CompletionEvent::Finished {
+                finish_reason: FinishReason::Stop,
+            },
+            CompletionEvent::Usage {
+                usage: TokenUsage {
+                    prompt: 1,
+                    completion: 2,
+                },
+            },
+        ];
         let test_skill = given_complete_stream_skill();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
         let skill = AnySkill::new(&engine, wasm).unwrap();
-        let ctx = Box::new(CsiGreetingMock);
+        let ctx = Box::new(CsiCompleteStreamStub::new(events));
 
         // When invoked with a json string
         let input = json!("Homer");
@@ -1000,6 +1015,9 @@ pub mod tests {
             panic!("I am a dummy CsiForSkills")
         }
         async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn completion_stream(&mut self, _request: CompletionRequest) -> CompletionStream {
             panic!("I am a dummy CsiForSkills")
         }
         async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {

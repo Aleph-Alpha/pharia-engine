@@ -1,3 +1,4 @@
+use futures::StreamExt;
 use pharia::skill::{
     chunking::{
         ChunkParams, ChunkRequest, ChunkWithOffset, ChunkWithOffsetRequest, Host as ChunkingHost,
@@ -22,27 +23,12 @@ use crate::{chunking, inference, language_selection, search};
 
 use super::super::LinkedCtx;
 
-pub struct DummyCompletionStream {
-    events: Vec<CompletionEvent>,
-}
-
-impl DummyCompletionStream {
-    fn new(mut events: Vec<CompletionEvent>) -> Self {
-        events.reverse();
-        Self { events }
-    }
-
-    fn next(&mut self) -> Option<CompletionEvent> {
-        self.events.pop()
-    }
-}
-
 bindgen!({
     world: "csi",
     path: "./wit/skill@0.3",
     async: true,
     with: {
-        "pharia:skill/inference/completion-stream": DummyCompletionStream
+        "pharia:skill/inference/completion-stream": inference::CompletionStream
     },
 });
 
@@ -378,19 +364,9 @@ impl InferenceHost for LinkedCtx {
 /// This manages our completion stream within the resource table, allowing us to link to the Resource in the WIT World.
 impl HostCompletionStream for LinkedCtx {
     async fn new(&mut self, init: CompletionRequest) -> Resource<CompletionStream> {
-        let events = vec![
-            CompletionEvent::Delta(CompletionDelta {
-                text: "Homer".to_owned(),
-                logprobs: vec![],
-            }),
-            CompletionEvent::Finished(FinishReason::Stop),
-            CompletionEvent::Usage(TokenUsage {
-                prompt: 1,
-                completion: 2,
-            }),
-        ];
+        let stream = self.skill_ctx.completion_stream(init.into()).await;
         self.resource_table
-            .push(DummyCompletionStream::new(events))
+            .push(stream)
             .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
             .expect("Failed to push stream to resource table")
     }
@@ -402,7 +378,7 @@ impl HostCompletionStream for LinkedCtx {
             .get_mut(&stream)
             .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
             .expect("Failed to get stream from resource table");
-        stream.next()
+        stream.next().await.map(Into::into)
     }
 
     async fn drop(&mut self, stream: Resource<CompletionStream>) -> anyhow::Result<()> {
@@ -412,6 +388,23 @@ impl HostCompletionStream for LinkedCtx {
             .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
             .expect("Failed to delete stream from resource table");
         Ok(())
+    }
+}
+
+impl From<inference::CompletionEvent> for CompletionEvent {
+    fn from(value: inference::CompletionEvent) -> Self {
+        match value {
+            inference::CompletionEvent::Delta { text, logprobs } => {
+                CompletionEvent::Delta(CompletionDelta {
+                    text,
+                    logprobs: logprobs.into_iter().map(Into::into).collect(),
+                })
+            }
+            inference::CompletionEvent::Finished { finish_reason } => {
+                CompletionEvent::Finished(finish_reason.into())
+            }
+            inference::CompletionEvent::Usage { usage } => CompletionEvent::Usage(usage.into()),
+        }
     }
 }
 
