@@ -80,7 +80,7 @@ impl InferenceApi {
         api_token: String,
     ) -> anyhow::Result<Completion> {
         let (send, recv) = oneshot::channel();
-        let msg = InferenceMessage::CompleteText {
+        let msg = InferenceMessage::Complete {
             request,
             send,
             api_token,
@@ -349,7 +349,7 @@ impl<C: InferenceClient> InferenceActor<C> {
 }
 
 pub enum InferenceMessage {
-    CompleteText {
+    Complete {
         request: CompletionRequest,
         send: oneshot::Sender<anyhow::Result<Completion>>,
         api_token: String,
@@ -369,7 +369,7 @@ pub enum InferenceMessage {
 impl InferenceMessage {
     async fn act(self, client: &impl InferenceClient) {
         match self {
-            Self::CompleteText {
+            Self::Complete {
                 request,
                 send,
                 api_token,
@@ -439,7 +439,7 @@ pub mod tests {
             let join_handle = tokio::spawn(async move {
                 while let Some(msg) = recv.recv().await {
                     match msg {
-                        InferenceMessage::CompleteText { request, send, .. } => {
+                        InferenceMessage::Complete { request, send, .. } => {
                             send.send(result(request)).unwrap();
                         }
                         InferenceMessage::Chat { .. } => {
