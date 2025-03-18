@@ -19,7 +19,7 @@ use super::{
 };
 
 pub trait InferenceClient: Send + Sync + 'static {
-    fn complete_text(
+    fn complete(
         &self,
         request: &CompletionRequest,
         api_token: String,
@@ -82,7 +82,7 @@ impl InferenceClient for Client {
         }
     }
 
-    async fn complete_text(
+    async fn complete(
         &self,
         request: &CompletionRequest,
         api_token: String,
@@ -537,7 +537,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
 
         // When completing text with inference client
         let completion_response =
-            <Client as InferenceClient>::complete_text(&client, &completion_request, api_token)
+            <Client as InferenceClient>::complete(&client, &completion_request, api_token)
                 .await
                 .unwrap();
 
@@ -604,7 +604,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             },
         };
         let completion_response =
-            <Client as InferenceClient>::complete_text(&client, &completion_request, api_token)
+            <Client as InferenceClient>::complete(&client, &completion_request, api_token)
                 .await
                 .unwrap();
 
@@ -666,7 +666,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             },
         };
         let completion_response =
-            <Client as InferenceClient>::complete_text(&client, &completion_request, api_token)
+            <Client as InferenceClient>::complete(&client, &completion_request, api_token)
                 .await
                 .unwrap();
 
@@ -694,7 +694,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             },
         };
         let completion_response =
-            <Client as InferenceClient>::complete_text(&client, &completion_request, api_token)
+            <Client as InferenceClient>::complete(&client, &completion_request, api_token)
                 .await
                 .unwrap();
 

@@ -93,6 +93,24 @@ impl InferenceApi {
             .expect("sender must be alive when awaiting for answers")
     }
 
+    pub async fn completion_stream(
+        &self,
+        request: CompletionRequest,
+        api_token: String,
+    ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+        let (send, recv) = mpsc::channel(1);
+        let msg = InferenceMessage::CompletionStream {
+            request,
+            send,
+            api_token,
+        };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv
+    }
+
     pub async fn chat(
         &self,
         request: ChatRequest,
@@ -354,6 +372,11 @@ pub enum InferenceMessage {
         send: oneshot::Sender<anyhow::Result<Completion>>,
         api_token: String,
     },
+    CompletionStream {
+        request: CompletionRequest,
+        send: mpsc::Sender<anyhow::Result<CompletionEvent>>,
+        api_token: String,
+    },
     Chat {
         request: ChatRequest,
         send: oneshot::Sender<anyhow::Result<ChatResponse>>,
@@ -374,9 +397,14 @@ impl InferenceMessage {
                 send,
                 api_token,
             } => {
-                let result = client.complete_text(&request, api_token.clone()).await;
+                let result = client.complete(&request, api_token.clone()).await;
                 drop(send.send(result.map_err(Into::into)));
             }
+            Self::CompletionStream {
+                request,
+                send,
+                api_token,
+            } => {}
             Self::Chat {
                 request,
                 send,
@@ -442,6 +470,29 @@ pub mod tests {
                         InferenceMessage::Complete { request, send, .. } => {
                             send.send(result(request)).unwrap();
                         }
+                        InferenceMessage::CompletionStream { request, send, .. } => {
+                            match result(request) {
+                                Ok(Completion {
+                                    text,
+                                    finish_reason,
+                                    logprobs,
+                                    usage,
+                                }) => {
+                                    send.send(Ok(CompletionEvent::Delta { text, logprobs }))
+                                        .await
+                                        .unwrap();
+                                    send.send(Ok(CompletionEvent::Finished { finish_reason }))
+                                        .await
+                                        .unwrap();
+                                    send.send(Ok(CompletionEvent::Usage { usage }))
+                                        .await
+                                        .unwrap();
+                                }
+                                Err(e) => {
+                                    send.send(Err(e)).await.unwrap();
+                                }
+                            }
+                        }
                         InferenceMessage::Chat { .. } => {
                             unimplemented!()
                         }
@@ -485,7 +536,7 @@ pub mod tests {
         ) -> Result<Explanation, InferenceClientError> {
             unimplemented!()
         }
-        async fn complete_text(
+        async fn complete(
             &self,
             _params: &super::CompletionRequest,
             _api_token: String,
@@ -561,7 +612,7 @@ pub mod tests {
         ) -> Result<Explanation, InferenceClientError> {
             unimplemented!()
         }
-        async fn complete_text(
+        async fn complete(
             &self,
             request: &CompletionRequest,
             _api_token: String,
