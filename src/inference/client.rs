@@ -30,8 +30,8 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &CompletionRequest,
         api_token: String,
-        send: mpsc::Sender<Result<CompletionEvent, InferenceClientError>>,
-    ) -> impl Future<Output = Result<(), InferenceClientError>>;
+        send: mpsc::Sender<anyhow::Result<CompletionEvent>>,
+    ) -> impl Future<Output = Result<(), InferenceClientError>> + Send;
     fn chat(
         &self,
         request: &ChatRequest,
@@ -65,13 +65,10 @@ impl InferenceClient for Client {
             api_token: Some(api_token),
             ..Default::default()
         };
-        let result = retry(|| self.explanation(&task, model, &how)).await;
-        match result {
-            Ok(explanation) => Ok(explanation
-                .try_into()
-                .map_err(InferenceClientError::Other)?),
-            Err(e) => Err(e.into()),
-        }
+        retry(|| self.explanation(&task, model, &how))
+            .await?
+            .try_into()
+            .map_err(InferenceClientError::Other)
     }
     async fn chat(
         &self,
@@ -83,11 +80,10 @@ impl InferenceClient for Client {
             api_token: Some(api_token),
             ..Default::default()
         };
-        let chat_result = retry(|| self.chat(&task, &request.model, &how)).await;
-        match chat_result {
-            Ok(chat_output) => chat_output.try_into().map_err(InferenceClientError::Other),
-            Err(e) => Err(e.into()),
-        }
+        retry(|| self.chat(&task, &request.model, &how))
+            .await?
+            .try_into()
+            .map_err(InferenceClientError::Other)
     }
 
     async fn complete(
@@ -133,20 +129,17 @@ impl InferenceClient for Client {
             ..Default::default()
         };
 
-        let completion_result = retry(|| self.completion(&task, model, &how)).await;
-        match completion_result {
-            Ok(completion_output) => completion_output
-                .try_into()
-                .map_err(InferenceClientError::Other),
-            Err(e) => Err(e.into()),
-        }
+        retry(|| self.completion(&task, model, &how))
+            .await?
+            .try_into()
+            .map_err(InferenceClientError::Other)
     }
 
     async fn stream_completion(
         &self,
         request: &CompletionRequest,
         api_token: String,
-        send: mpsc::Sender<Result<CompletionEvent, InferenceClientError>>,
+        send: mpsc::Sender<anyhow::Result<CompletionEvent>>,
     ) -> Result<(), InferenceClientError> {
         let CompletionRequest {
             model,
@@ -186,11 +179,11 @@ impl InferenceClient for Client {
             ..Default::default()
         };
 
-        let mut stream = self.stream_completion(&task, model, &how).await?;
+        let mut stream = retry(|| self.stream_completion(&task, model, &how)).await?;
 
         while let Some(event) = stream.next().await {
             let event = match event {
-                Ok(event) => CompletionEvent::try_from(event).map_err(InferenceClientError::Other),
+                Ok(event) => CompletionEvent::try_from(event),
                 Err(e) => Err(e.into()),
             };
             drop(send.send(event).await);
