@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use derive_more::Constructor;
+use derive_more::{Constructor, From};
 use futures::future::try_join_all;
 use serde_json::Value;
 use tokio::sync::mpsc;
@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// `CompletionStreamId` is a unique identifier for a completion stream.
-#[derive(Debug, Clone, Constructor, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Constructor, Copy, From, PartialEq, Eq, Hash)]
 pub struct CompletionStreamId(usize);
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
@@ -72,6 +72,12 @@ pub trait Csi {
         auth: String,
         requests: Vec<CompletionRequest>,
     ) -> anyhow::Result<Vec<Completion>>;
+
+    async fn completion_stream(
+        &self,
+        auth: String,
+        request: CompletionRequest,
+    ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>>;
 
     async fn chat(
         &self,
@@ -179,6 +185,20 @@ where
                 .collect::<Vec<_>>(),
         )
         .await
+    }
+
+    async fn completion_stream(
+        &self,
+        auth: String,
+        request: CompletionRequest,
+    ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>> {
+        metrics::counter!(
+            CsiMetrics::CsiRequestsTotal,
+            &[("function", "completion_stream")]
+        )
+        .increment(1);
+
+        todo!()
     }
 
     async fn chat(
@@ -335,6 +355,14 @@ pub mod tests {
             _auth: String,
             _requests: Vec<CompletionRequest>,
         ) -> anyhow::Result<Vec<Completion>> {
+            bail!("Test error")
+        }
+
+        async fn completion_stream(
+            &self,
+            _auth: String,
+            _request: CompletionRequest,
+        ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>> {
             bail!("Test error")
         }
 
@@ -565,6 +593,14 @@ pub mod tests {
             panic!("DummyCsi complete called")
         }
 
+        async fn completion_stream(
+            &self,
+            _auth: String,
+            _request: CompletionRequest,
+        ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>> {
+            panic!("DummyCsi completion_stream called")
+        }
+
         async fn chunk(
             &self,
             _auth: String,
@@ -675,6 +711,32 @@ pub mod tests {
                 .into_iter()
                 .map(|r| (*self.completion)(r))
                 .collect()
+        }
+
+        async fn completion_stream(
+            &self,
+            _auth: String,
+            request: CompletionRequest,
+        ) -> anyhow::Result<mpsc::Receiver<CompletionEvent>> {
+            let (sender, receiver) = mpsc::channel(100);
+            let Completion {
+                text,
+                finish_reason,
+                logprobs,
+                usage,
+            } = (*self.completion)(request)?;
+            tokio::spawn(async move {
+                sender
+                    .send(CompletionEvent::Delta { text, logprobs })
+                    .await
+                    .unwrap();
+                sender
+                    .send(CompletionEvent::Finished { finish_reason })
+                    .await
+                    .unwrap();
+                sender.send(CompletionEvent::Usage { usage }).await.unwrap();
+            });
+            Ok(receiver)
         }
 
         async fn chunk(

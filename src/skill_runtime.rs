@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    collections::HashMap,
     future::{Future, pending},
     pin::Pin,
     sync::Arc,
@@ -577,6 +578,10 @@ pub struct SkillInvocationCtx<C> {
     csi_apis: C,
     // How the user authenticates with us
     api_token: String,
+    /// ID counter for stored streams.
+    current_stream_id: usize,
+    /// Stream receivers for currently running streams.
+    current_streams: HashMap<CompletionStreamId, mpsc::Receiver<CompletionEvent>>,
 }
 
 impl<C> SkillInvocationCtx<C> {
@@ -589,7 +594,14 @@ impl<C> SkillInvocationCtx<C> {
             send_rt_error: Some(send_rt_err),
             csi_apis,
             api_token,
+            current_stream_id: 0,
+            current_streams: HashMap::new(),
         }
+    }
+
+    fn next_stream_id(&mut self) -> CompletionStreamId {
+        self.current_stream_id += 1;
+        self.current_stream_id.into()
     }
 
     /// Never return, we did report the error via the send error channel.
@@ -600,6 +612,114 @@ impl<C> SkillInvocationCtx<C> {
             .send(error)
             .unwrap();
         pending().await
+    }
+}
+
+#[async_trait]
+impl<C> CsiForSkills for SkillInvocationCtx<C>
+where
+    C: Csi + Send + Sync,
+{
+    async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+        match self
+            .csi_apis
+            .explain(self.api_token.clone(), requests)
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
+    async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+        match self
+            .csi_apis
+            .complete(self.api_token.clone(), requests)
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
+    async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId {
+        let recv = match self
+            .csi_apis
+            .completion_stream(self.api_token.clone(), request)
+            .await
+        {
+            Ok(recv) => recv,
+            Err(error) => self.send_error(error).await,
+        };
+        let id = self.next_stream_id();
+        self.current_streams.insert(id, recv);
+        id
+    }
+
+    async fn completion_stream_next(&mut self, id: &CompletionStreamId) -> Option<CompletionEvent> {
+        self.current_streams
+            .get_mut(id)
+            .expect("Stream not found")
+            .recv()
+            .await
+    }
+
+    async fn completion_stream_drop(&mut self, id: CompletionStreamId) {
+        self.current_streams.remove(&id);
+    }
+
+    async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+        match self.csi_apis.chat(self.api_token.clone(), requests).await {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
+    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+        match self.csi_apis.chunk(self.api_token.clone(), requests).await {
+            Ok(chunks) => chunks,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
+    async fn select_language(
+        &mut self,
+        requests: Vec<SelectLanguageRequest>,
+    ) -> Vec<Option<Language>> {
+        match self.csi_apis.select_language(requests).await {
+            Ok(language) => language,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
+    async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+        match self.csi_apis.search(self.api_token.clone(), requests).await {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
+    async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
+        match self
+            .csi_apis
+            .documents(self.api_token.clone(), requests)
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
+    async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
+        match self
+            .csi_apis
+            .document_metadata(self.api_token.clone(), requests)
+            .await
+        {
+            // We know there will always be exactly one element in the vector
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
     }
 }
 
@@ -682,107 +802,13 @@ impl CsiForSkills for SkillMetadataCtx {
     }
 }
 
-#[async_trait]
-impl<C> CsiForSkills for SkillInvocationCtx<C>
-where
-    C: Csi + Send + Sync,
-{
-    async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-        match self
-            .csi_apis
-            .explain(self.api_token.clone(), requests)
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-        match self
-            .csi_apis
-            .complete(self.api_token.clone(), requests)
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId {
-        todo!()
-    }
-
-    async fn completion_stream_next(&mut self, id: &CompletionStreamId) -> Option<CompletionEvent> {
-        todo!()
-    }
-
-    async fn completion_stream_drop(&mut self, id: CompletionStreamId) {
-        todo!()
-    }
-
-    async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-        match self.csi_apis.chat(self.api_token.clone(), requests).await {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-        match self.csi_apis.chunk(self.api_token.clone(), requests).await {
-            Ok(chunks) => chunks,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn select_language(
-        &mut self,
-        requests: Vec<SelectLanguageRequest>,
-    ) -> Vec<Option<Language>> {
-        match self.csi_apis.select_language(requests).await {
-            Ok(language) => language,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-        match self.csi_apis.search(self.api_token.clone(), requests).await {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
-        match self
-            .csi_apis
-            .documents(self.api_token.clone(), requests)
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
-        match self
-            .csi_apis
-            .document_metadata(self.api_token.clone(), requests)
-            .await
-        {
-            // We know there will always be exactly one element in the vector
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use std::time::Duration;
 
     use crate::csi::tests::CsiSaboteur;
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
-    use crate::inference::{Explanation, Logprobs, TextScore};
+    use crate::inference::{Explanation, FinishReason, Logprobs, TextScore, TokenUsage};
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::{SkillStoreDummy, SkillStoreStub};
     use crate::skills::{AnySkillMetadata, Skill};
@@ -1372,6 +1398,48 @@ pub mod tests {
             the situation persists you \nmay want to contact the operaters. Original error:\n\n\
             Test error";
         assert_eq!(event, ChatEvent::Error(expected_error_msg.to_string()));
+    }
+
+    #[tokio::test]
+    async fn skill_invocation_ctx_stream_management() {
+        let (send, _) = oneshot::channel();
+        let completion = Completion {
+            text: "text".to_owned(),
+            finish_reason: FinishReason::Stop,
+            logprobs: vec![],
+            usage: TokenUsage {
+                prompt: 2,
+                completion: 2,
+            },
+        };
+        let resp = completion.clone();
+        let csi = StubCsi::with_completion(move |_| resp.clone());
+        let mut ctx = SkillInvocationCtx::new(send, csi, "dummy".to_owned());
+        let request = CompletionRequest::new("prompt", "model");
+
+        let stream_id = ctx.completion_stream_new(request).await;
+        let mut events = vec![];
+        while let Some(event) = ctx.completion_stream_next(&stream_id).await {
+            events.push(event);
+        }
+        ctx.completion_stream_drop(stream_id).await;
+
+        assert_eq!(
+            events,
+            vec![
+                CompletionEvent::Delta {
+                    text: completion.text,
+                    logprobs: completion.logprobs
+                },
+                CompletionEvent::Finished {
+                    finish_reason: completion.finish_reason
+                },
+                CompletionEvent::Usage {
+                    usage: completion.usage
+                }
+            ]
+        );
+        assert!(ctx.current_streams.is_empty());
     }
 
     fn metrics_snapshot<F: Future<Output = ()>>(f: impl FnOnce() -> F) -> Snapshot {
