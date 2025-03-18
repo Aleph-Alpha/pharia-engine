@@ -3,7 +3,7 @@ mod client;
 
 pub use actor::{
     ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
-    CompletionRequest, CompletionStream, CompletionStreamWithErrors, Distribution, Explanation,
+    CompletionRequest, CompletionStream, CompletionTryStream, Distribution, Explanation,
     ExplanationRequest, FinishReason, Granularity, Inference, InferenceApi, Logprob, Logprobs,
     Message, TextScore, TokenUsage,
 };

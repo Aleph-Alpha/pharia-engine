@@ -1,4 +1,3 @@
-use futures::StreamExt;
 use pharia::skill::{
     chunking::{
         ChunkParams, ChunkRequest, ChunkWithOffset, ChunkWithOffsetRequest, Host as ChunkingHost,
@@ -378,7 +377,7 @@ impl HostCompletionStream for LinkedCtx {
             .get_mut(&stream)
             .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
             .expect("Failed to get stream from resource table");
-        stream.next().await.map(Into::into)
+        stream.recv().await.map(Into::into)
     }
 
     async fn drop(&mut self, stream: Resource<CompletionStream>) -> anyhow::Result<()> {
