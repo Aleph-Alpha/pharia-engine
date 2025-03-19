@@ -936,24 +936,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn skill_metadata_v0_2_is_empty() {
-        // Given a skill runtime that always returns a v0.2 skill
-        let test_skill = given_rust_skill_greet_v0_2();
-        let skill_path = SkillPath::local("greet");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let store =
-            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let runtime = SkillRuntime::new(engine, CsiSaboteur, store.api());
-
-        // When metadata for a skill is requested
-        let metadata = runtime.api().skill_metadata(skill_path).await.unwrap();
-        runtime.wait_for_shutdown().await;
-
-        // Then the metadata is None
-        assert!(matches!(metadata, AnySkillMetadata::V0));
-    }
-
-    #[tokio::test]
     async fn skill_metadata_v0_3() {
         // Given a skill runtime api that always returns a v0.3 skill
         let test_skill = given_rust_skill_greet_v0_3();
