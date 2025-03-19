@@ -9,7 +9,7 @@ use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
-use crate::skills::{AnySkill, Engine, Skill, SkillError, SkillPath};
+use crate::skills::{Engine, Skill, SkillError, SkillPath, load_skill_from_wasm_bytes};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
@@ -226,11 +226,11 @@ impl SkillLoaderActor {
         registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
         skill: &ConfiguredSkill,
-    ) -> Result<(AnySkill, Digest), SkillLoaderError> {
+    ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError> {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
             skill_bytes.ok_or_else(|| SkillLoaderError::SkillNotFound(skill.clone()))?;
-        let skill = spawn_blocking(move || AnySkill::new(engine.as_ref(), bytes))
+        let skill = spawn_blocking(move || load_skill_from_wasm_bytes(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")?;
         Ok((skill, digest))
@@ -245,12 +245,7 @@ impl SkillLoaderActor {
                 let registry = self.registry(&skill.namespace);
                 let engine = self.engine.clone();
                 self.running_requests.push(Box::pin(async move {
-                    let result = Self::fetch(registry.as_ref(), engine, &skill).await.map(
-                        |(skill, digest)| {
-                            let skill: Box<dyn Skill> = Box::new(skill);
-                            (skill, digest)
-                        },
-                    );
+                    let result = Self::fetch(registry.as_ref(), engine, &skill).await;
                     drop(send.send(result));
                 }));
             }
