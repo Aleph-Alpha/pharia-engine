@@ -898,7 +898,7 @@ mod tests {
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .header(header::AUTHORIZATION, auth_value)
-                    .uri("/csi/v0_3/completion_stream")
+                    .uri("/csi/v1/completion_stream")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
             )
