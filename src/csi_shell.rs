@@ -32,10 +32,10 @@ where
     let drivers = csi;
     let result = match args {
         VersionedCsiRequest::V0_2(request) => {
-            request.act(&drivers, bearer.token().to_owned()).await
+            request.respond(&drivers, bearer.token().to_owned()).await
         }
         VersionedCsiRequest::V0_3(request) => {
-            request.act(&drivers, bearer.token().to_owned()).await
+            request.respond(&drivers, bearer.token().to_owned()).await
         }
         VersionedCsiRequest::Unknown(request) => Err(request.into()),
     };

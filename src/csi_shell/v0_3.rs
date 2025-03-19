@@ -49,7 +49,7 @@ pub enum CsiRequest {
 }
 
 impl CsiRequest {
-    pub async fn act<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
+    pub async fn respond<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
     where
         C: Csi + Sync,
     {
