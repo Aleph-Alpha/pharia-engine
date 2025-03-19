@@ -878,10 +878,9 @@ mod tests {
             "prompt": prompt,
             "params": {
                 "max_tokens": 1,
-                "temperature": null,
-                "top_k": null,
-                "top_p": null,
                 "stop": [],
+                "return_special_tokens": true,
+                "logprobs": "no",
             },
         });
 
