@@ -721,6 +721,14 @@ pub mod tests {
         ) -> Result<ChatResponse, InferenceClientError> {
             unimplemented!()
         }
+        async fn stream_chat(
+            &self,
+            _request: &ChatRequest,
+            _api_token: String,
+            _send: mpsc::Sender<ChatEvent>,
+        ) -> Result<(), InferenceClientError> {
+            unimplemented!()
+        }
     }
 
     #[tokio::test]
@@ -803,6 +811,15 @@ pub mod tests {
             _request: &ChatRequest,
             _api_token: String,
         ) -> Result<ChatResponse, InferenceClientError> {
+            unimplemented!()
+        }
+
+        async fn stream_chat(
+            &self,
+            _request: &ChatRequest,
+            _api_token: String,
+            _send: mpsc::Sender<ChatEvent>,
+        ) -> Result<(), InferenceClientError> {
             unimplemented!()
         }
     }
