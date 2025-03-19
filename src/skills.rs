@@ -283,85 +283,6 @@ pub trait Skill: Send + Sync {
     ) -> anyhow::Result<Value>;
 }
 
-#[async_trait]
-impl Skill for AnySkill {
-    async fn metadata(
-        &self,
-        engine: &Engine,
-        ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<AnySkillMetadata> {
-        match self {
-            Self::V0_2(_) => Ok(AnySkillMetadata::V0),
-            Self::V0_3(skill) => {
-                let mut store = engine.store(LinkedCtx::new(ctx));
-                let bindings = skill.instantiate_async(&mut store).await?;
-                let metadata = bindings
-                    .pharia_skill_skill_handler()
-                    .call_metadata(store)
-                    .await?;
-                metadata.try_into().map(AnySkillMetadata::V0_3)
-            }
-        }
-    }
-
-    async fn run_as_function(
-        &self,
-        engine: &Engine,
-        ctx: Box<dyn CsiForSkills + Send>,
-        input: Value,
-    ) -> anyhow::Result<Value> {
-        let mut store = engine.store(LinkedCtx::new(ctx));
-        match self {
-            Self::V0_2(skill) => {
-                let input = serde_json::to_vec(&input)?;
-                let bindings = skill.instantiate_async(&mut store).await?;
-                let result = bindings
-                    .pharia_skill_skill_handler()
-                    .call_run(store, &input)
-                    .await?;
-                let result = match result {
-                    Ok(result) => result,
-                    Err(e) => match e {
-                        v0_2::exports::pharia::skill::skill_handler::Error::Internal(e) => {
-                            tracing::error!("Failed to run skill, internal skill error:\n{e}");
-                            return Err(anyhow!("Internal skill error:\n{e}"));
-                        }
-                        v0_2::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
-                            tracing::error!("Failed to run skill, invalid input:\n{e}");
-                            return Err(anyhow!("Invalid input:\n{e}"));
-                        }
-                    },
-                };
-                Ok(serde_json::from_slice(&result)?)
-            }
-            Self::V0_3(skill) => {
-                let input = serde_json::to_vec(&input)?;
-                let bindings = skill.instantiate_async(&mut store).await?;
-                let result = bindings
-                    .pharia_skill_skill_handler()
-                    .call_run(store, &input)
-                    .await?;
-                let result = match result {
-                    Ok(result) => result,
-                    Err(e) => match e {
-                        v0_3::skill::exports::pharia::skill::skill_handler::Error::Internal(e) => {
-                            tracing::error!("Failed to run skill, internal skill error:\n{e}");
-                            return Err(anyhow!("Internal skill error:\n{e}"));
-                        }
-                        v0_3::skill::exports::pharia::skill::skill_handler::Error::InvalidInput(
-                            e,
-                        ) => {
-                            tracing::error!("Failed to run skill, invalid input:\n{e}");
-                            return Err(anyhow!("Invalid input:\n{e}"));
-                        }
-                    },
-                };
-                Ok(serde_json::from_slice(&result)?)
-            }
-        }
-    }
-}
-
 /// Factory for creating skills. Responsible for inspecting the skill bytes, and instantiatnig the
 /// right Skill type. The skill is pre-initialized i.e. already attached to their corresponding
 /// linker. This allows for as much initialization work to be done at load time as possible, which
@@ -470,39 +391,6 @@ impl Skill for v0_2::SkillPre<LinkedCtx> {
             },
         };
         Ok(serde_json::from_slice(&result)?)
-    }
-}
-
-/// Pre-initialized skills already attached to their corresponding linker.
-/// Allows for as much initialization work to be done at load time as possible,
-/// which can be cached across multiple invocations.
-#[derive(Clone)]
-enum AnySkill {
-    /// Skills targeting versions 0.2.x of the skill world
-    V0_2(v0_2::SkillPre<LinkedCtx>),
-    /// Skills targeting versions 0.3.x of the skill world
-    V0_3(v0_3::skill::SkillPre<LinkedCtx>),
-}
-
-impl AnySkill {
-    /// Extracts the version of the skill WIT world from the provided bytes,
-    /// and links it to the appropriate version in the linker.
-    fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> Result<Self, SkillError> {
-        let skill_version = SupportedVersion::extract(&bytes)?;
-        let pre = engine.instantiate_pre(&bytes)?;
-
-        match skill_version {
-            SupportedVersion::V0_2 => {
-                let skill = v0_2::SkillPre::new(pre)
-                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
-                Ok(AnySkill::V0_2(skill))
-            }
-            SupportedVersion::V0_3 => {
-                let skill = v0_3::skill::SkillPre::new(pre)
-                    .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
-                Ok(AnySkill::V0_3(skill))
-            }
-        }
     }
 }
 
@@ -947,7 +835,7 @@ pub mod tests {
         let test_skill = given_rust_skill_greet_v0_3();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -964,7 +852,7 @@ pub mod tests {
         let test_skills = given_rust_skill_greet_v0_2();
         let wasm = test_skills.bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -980,7 +868,7 @@ pub mod tests {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_search().bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1013,7 +901,7 @@ pub mod tests {
         let test_skill = given_complete_stream_skill();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiCompleteStreamStub::new(events));
 
         // When invoked with a json string
@@ -1051,7 +939,7 @@ pub mod tests {
         let test_skill = given_chat_stream_skill();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiChatStreamStub::new(events));
 
         // When invoked with a json string
@@ -1077,7 +965,7 @@ pub mod tests {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_chat().bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1094,7 +982,7 @@ pub mod tests {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_2();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, skill.bytes()).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1110,7 +998,7 @@ pub mod tests {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_3();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, skill.bytes()).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1178,7 +1066,7 @@ pub mod tests {
         let test_skill = given_rust_skill_greet_v0_2();
         let wasm = test_skill.bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1204,7 +1092,7 @@ pub mod tests {
         // Given a skill runtime api that always returns a v0.3 skill
         let skill_bytes = given_rust_skill_greet_v0_3().bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, skill_bytes).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
 
         // When metadata for a skill is requested
         let metadata = skill
