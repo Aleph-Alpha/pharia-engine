@@ -615,9 +615,10 @@ pub mod tests {
     use fake::{Fake, Faker};
     use serde_json::json;
     use test_skills::{
-        given_chat_stream_skill, given_complete_stream_skill, given_python_skill_greet_v0_2,
-        given_python_skill_greet_v0_3, given_rust_skill_chat, given_rust_skill_explain,
-        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
+        given_chat_stream_skill, given_complete_stream_skill, given_invalid_output_skill,
+        given_python_skill_greet_v0_2, given_python_skill_greet_v0_3, given_rust_skill_chat,
+        given_rust_skill_explain, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
+        given_rust_skill_search,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -743,6 +744,20 @@ pub mod tests {
 
         // Then the metadata is the empty V0, because v0.2 had no metadata
         assert!(matches!(metadata, AnySkillMetadata::V0));
+    }
+
+    #[tokio::test]
+    async fn skill_metadata_invalid_output() {
+        // Given a skill runtime that always returns an invalid output skill
+        let skill_bytes = given_invalid_output_skill().bytes();
+        let engine = Engine::new(false).unwrap();
+        let skill = AnySkill::new(&engine, skill_bytes).unwrap();
+
+        // When metadata for a skill is requested
+        let metadata_result = skill.metadata(&engine, Box::new(CsiForSkillsDummy)).await;
+
+        // Then the metadata gives an error
+        assert!(metadata_result.is_err());
     }
 
     #[test]
