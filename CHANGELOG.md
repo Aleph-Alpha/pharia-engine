@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.10.2...v0.11.0)
+
+### Features
+
+- Add chat streaming endpoint to CSI shell - ([e7e0c94](https://github.com/Aleph-Alpha/pharia-kernel/commit/e7e0c941462efe84a3184d7a93fb16280c8d0cd4))
+- Connect unstable chat streaming into skills - ([ef294ea](https://github.com/Aleph-Alpha/pharia-kernel/commit/ef294ea20eb590e7e72eb59af843ad3e8ffef9be))
+- Add completion stream to dev csi - ([e70e654](https://github.com/Aleph-Alpha/pharia-kernel/commit/e70e654c51ab4fe4dd97ffc2f87679f6717a6534))
+- Hook up unstable completion streaming - ([5308977](https://github.com/Aleph-Alpha/pharia-kernel/commit/53089777565babd4203442a47e47e570ba72047a))
+- Convert AppConfig to builder lite pattern - ([ef9b72d](https://github.com/Aleph-Alpha/pharia-kernel/commit/ef9b72df65611467c6b11362d4c0cfeac73d67bf))
+- Add skill_type to metadata - ([347c92e](https://github.com/Aleph-Alpha/pharia-kernel/commit/347c92ec9421f433e48bd86e3ea96533b4323683))
+
+### Builds
+
+- *(deps)* Bump the minor group with 5 updates - ([2e0ebc8](https://github.com/Aleph-Alpha/pharia-kernel/commit/2e0ebc81b8907f2329ad4dc00024d8b2bc0e48d2))
+- *(deps)* Bump rustls from 0.23.24 to 0.23.25 in the minor group - ([0e2ad64](https://github.com/Aleph-Alpha/pharia-kernel/commit/0e2ad64a6b2776a09384c554238ab3611d87cd13))
+- *(deps)* Bump the minor group across 1 directory with 16 updates - ([3522689](https://github.com/Aleph-Alpha/pharia-kernel/commit/352268918c28fbf9025858744a98be72c816a5de))
+
+
 ## [0.10.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.10.1...v0.10.2)
 
 ### Features
