@@ -30,7 +30,7 @@ where
 {
     Router::new()
         .route(
-            "/csi/v0_3/completion_stream",
+            "/csi/v1/completion_stream",
             post(v0_3::completion_streaming),
         )
         .route("/csi", post(http_csi_handle::<C>))
