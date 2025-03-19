@@ -38,7 +38,7 @@ use utoipa_scalar::Scalar;
 use crate::{
     authorization::{AuthorizationApi, authorization_middleware},
     csi::Csi,
-    csi_shell::http_csi_handle,
+    csi_shell,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
     skill_runtime::{ChatEvent, SkillExecutionError, SkillRuntimeApi},
@@ -94,7 +94,7 @@ impl Shell {
 
 /// State shared between routes
 #[derive(Clone)]
-struct AppState<C, R, S>
+pub struct AppState<C, R, S>
 where
     C: Clone,
     R: Clone,
@@ -203,7 +203,7 @@ where
         )
         .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
         .route("/v1/skills/{namespace}/{name}/chat", post(chat_skill))
-        .route("/csi", post(http_csi_handle::<C>))
+        .merge(csi_shell::http())
         // Keep for backwards compatibility
         .route("/skills", get(skills))
         // Hidden routes for cache for internal use
