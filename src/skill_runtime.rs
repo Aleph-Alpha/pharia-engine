@@ -857,10 +857,11 @@ impl CsiForSkills for SkillMetadataCtx {
 pub mod tests {
     use std::time::Duration;
 
+    use crate::csi::tests::CsiCompleteStub;
     use crate::csi::tests::CsiSaboteur;
-    use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
     use crate::inference::{
-        ChatParams, Explanation, FinishReason, Logprobs, Message, TextScore, TokenUsage,
+        ChatParams, Explanation, FinishReason, Granularity, Logprobs, Message, TextScore,
+        TokenUsage,
     };
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::{SkillStoreDummy, SkillStoreStub};
@@ -878,8 +879,7 @@ pub mod tests {
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
     use test_skills::{
-        given_invalid_output_skill, given_rust_skill_explain, given_rust_skill_greet_v0_2,
-        given_rust_skill_greet_v0_3,
+        given_invalid_output_skill, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
     };
     use tokio::sync::broadcast;
 
@@ -1002,12 +1002,47 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn explain_skill_component() {
-        let test_skill = given_rust_skill_explain();
+    async fn forward_explain_response_from_csi() {
+        struct SkillDoubleUsingExplain;
+
+        #[async_trait]
+        impl Skill for SkillDoubleUsingExplain {
+            async fn run_as_function(
+                &self,
+                _engine: &Engine,
+                mut ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<Value, anyhow::Error> {
+                let explanation = ctx
+                    .explain(vec![ExplanationRequest {
+                        prompt: "An apple a day".to_owned(),
+                        target: " keeps the doctor away".to_owned(),
+                        model: "test-model-name".to_owned(),
+                        granularity: Granularity::Auto,
+                    }])
+                    .await
+                    .pop()
+                    .unwrap();
+                let output = explanation
+                    .into_iter()
+                    .map(|text_score| json!({"start": text_score.start, "length": text_score.length}))
+                    .collect::<Vec<_>>();
+                Ok(json!(output))
+            }
+
+            async fn metadata(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+            ) -> Result<AnySkillMetadata, anyhow::Error> {
+                panic!("Dummy metadata implementation of SkillDoubleUsingExplain")
+            }
+        }
+
         let skill_path = SkillPath::local("explain");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store =
-            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(Some(Arc::new(SkillDoubleUsingExplain)));
         let (send, _) = oneshot::channel();
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
@@ -1018,7 +1053,7 @@ pub mod tests {
         });
         let skill_ctx = Box::new(SkillInvocationCtx::new(send, csi, "dummy token".to_owned()));
 
-        let runtime = WasmRuntime::new(engine, skill_store.api());
+        let runtime = WasmRuntime::new(engine, store);
         let resp = runtime
             .run_function(
                 &skill_path,
@@ -1028,7 +1063,6 @@ pub mod tests {
             .await;
 
         drop(runtime);
-        skill_store.wait_for_shutdown().await;
 
         assert_eq!(resp.unwrap(), json!([{"start": 0, "length": 2}]));
     }
