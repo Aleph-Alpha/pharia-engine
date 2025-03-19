@@ -428,6 +428,11 @@ impl InferenceMessage {
                         }
                     };
                 }
+
+                // Finish sending through any remaining messages
+                while let Some(msg) = event_recv.recv().await {
+                    drop(send.send(Ok(msg)).await);
+                }
             }
             Self::Chat {
                 request,

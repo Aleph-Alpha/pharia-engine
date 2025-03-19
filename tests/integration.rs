@@ -14,7 +14,8 @@ use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
 use test_skills::{
-    given_rust_skill_doc_metadata, given_rust_skill_greet_v0_2, given_rust_skill_search,
+    given_complete_stream_skill, given_rust_skill_doc_metadata, given_rust_skill_greet_v0_2,
+    given_rust_skill_search,
 };
 use tokio::sync::oneshot;
 
@@ -219,6 +220,44 @@ async fn run_doc_metadata_skill() {
     assert_eq!(status, axum::http::StatusCode::OK);
     let first_text = value["url"].as_str().unwrap();
     assert!(first_text.starts_with("https://pharia-kernel"));
+
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn run_complete_stream_skill() {
+    let wasm_bytes = given_complete_stream_skill().bytes();
+    let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
+    local_skill_dir.with_skill("complete_stream", wasm_bytes);
+    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/complete_stream/run",
+            kernel.port()
+        ))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(json!("ignore for now").to_string()))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+    let status = resp.status();
+    let value: Value = resp.json().await.unwrap();
+    assert_eq!(status, axum::http::StatusCode::OK);
+    assert_eq!(
+        value,
+        json!([
+            " \n\n Hello there! How are you doing today?<|endoftext|>",
+            "FinishReason::Stop",
+            "prompt: 64, completion: 13",
+        ])
+    );
 
     kernel.shutdown().await;
 }
