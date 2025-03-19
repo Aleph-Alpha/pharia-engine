@@ -27,8 +27,8 @@ impl FromStr for FeatureSet {
         } else if let Ok(n) = s.parse() {
             Ok(FeatureSet::Stable(n))
         } else {
-            warn!("Failed to parse feature set: '{}. Falling back to BETA.", s);
-            Ok(FeatureSet::Beta)
+            warn!("Failed to parse feature set: '{}. Falling back to stable feature set.", s);
+            Ok(PRODUCTION_FEATURE_SET)
         }
     }
 }
