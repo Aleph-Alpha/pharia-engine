@@ -911,7 +911,16 @@ mod tests {
         assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
 
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
-        let expected_body = "";
+        let expected_body = "event: delta
+data: {\"text\":\"Say hello to Homer\",\"logprobs\":[]}
+
+event: finished
+data: {\"finish_reason\":\"stop\"}
+
+event: usage
+data: {\"usage\":{\"prompt\":0,\"completion\":0}}
+
+";
         assert_eq!(body_text, expected_body);
     }
 
