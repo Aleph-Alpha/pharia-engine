@@ -580,8 +580,13 @@ pub struct SkillInvocationCtx<C> {
     api_token: String,
     /// ID counter for stored streams.
     current_stream_id: usize,
-    /// Stream receivers for currently running streams.
-    current_streams: HashMap<CompletionStreamId, mpsc::Receiver<anyhow::Result<CompletionEvent>>>,
+    /// Currently running chat streams. We store them here so that we can easier cancel the running
+    /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
+    chat_streams: HashMap<ChatStreamId, mpsc::Receiver<anyhow::Result<inference::ChatEvent>>>,
+    /// Currently running completion streams. We store them here so that we can easier cancel the running
+    /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
+    completion_streams:
+        HashMap<CompletionStreamId, mpsc::Receiver<anyhow::Result<CompletionEvent>>>,
 }
 
 impl<C> SkillInvocationCtx<C> {
@@ -595,11 +600,15 @@ impl<C> SkillInvocationCtx<C> {
             csi_apis,
             api_token,
             current_stream_id: 0,
-            current_streams: HashMap::new(),
+            chat_streams: HashMap::new(),
+            completion_streams: HashMap::new(),
         }
     }
 
-    fn next_stream_id(&mut self) -> CompletionStreamId {
+    fn next_stream_id<Id>(&mut self) -> Id
+    where
+        Id: From<usize>,
+    {
         self.current_stream_id += 1;
         self.current_stream_id.into()
     }
@@ -648,13 +657,13 @@ where
             .csi_apis
             .completion_stream(self.api_token.clone(), request)
             .await;
-        self.current_streams.insert(id, recv);
+        self.completion_streams.insert(id, recv);
         id
     }
 
     async fn completion_stream_next(&mut self, id: &CompletionStreamId) -> Option<CompletionEvent> {
         let event = self
-            .current_streams
+            .completion_streams
             .get_mut(id)
             .expect("Stream not found")
             .recv()
@@ -667,7 +676,7 @@ where
     }
 
     async fn completion_stream_drop(&mut self, id: CompletionStreamId) {
-        self.current_streams.remove(&id);
+        self.completion_streams.remove(&id);
     }
 
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
@@ -678,15 +687,31 @@ where
     }
 
     async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId {
-        todo!()
+        let id = self.next_stream_id();
+        let recv = self
+            .csi_apis
+            .chat_stream(self.api_token.clone(), request)
+            .await;
+        self.chat_streams.insert(id, recv);
+        id
     }
 
     async fn chat_stream_next(&mut self, id: &ChatStreamId) -> Option<inference::ChatEvent> {
-        todo!()
+        let event = self
+            .chat_streams
+            .get_mut(id)
+            .expect("Stream not found")
+            .recv()
+            .await
+            .transpose();
+        match event {
+            Ok(event) => event,
+            Err(error) => self.send_error(error).await,
+        }
     }
 
     async fn chat_stream_drop(&mut self, id: ChatStreamId) {
-        todo!()
+        self.chat_streams.remove(&id);
     }
 
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
@@ -834,7 +859,9 @@ pub mod tests {
 
     use crate::csi::tests::CsiSaboteur;
     use crate::csi::tests::{CsiCompleteStub, CsiGreetingMock};
-    use crate::inference::{Explanation, FinishReason, Logprobs, TextScore, TokenUsage};
+    use crate::inference::{
+        ChatParams, Explanation, FinishReason, Logprobs, Message, TextScore, TokenUsage,
+    };
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::{SkillStoreDummy, SkillStoreStub};
     use crate::skills::{AnySkillMetadata, Skill};
@@ -1465,7 +1492,59 @@ pub mod tests {
                 }
             ]
         );
-        assert!(ctx.current_streams.is_empty());
+        assert!(ctx.completion_streams.is_empty());
+    }
+
+    #[tokio::test]
+    async fn skill_invocation_ctx_chat_stream_management() {
+        let (send, _) = oneshot::channel();
+        let response = ChatResponse {
+            message: Message {
+                role: "assistant".to_owned(),
+                content: "Hello".to_owned(),
+            },
+            finish_reason: FinishReason::Stop,
+            logprobs: vec![],
+            usage: TokenUsage {
+                prompt: 1,
+                completion: 1,
+            },
+        };
+        let stub_response = response.clone();
+        let csi = StubCsi::with_chat(move |_| stub_response.clone());
+        let mut ctx = SkillInvocationCtx::new(send, csi, "dummy".to_owned());
+        let request = ChatRequest {
+            model: "model".to_owned(),
+            messages: vec![],
+            params: ChatParams::default(),
+        };
+
+        let stream_id = ctx.chat_stream_new(request).await;
+        let mut events = vec![];
+        while let Some(event) = ctx.chat_stream_next(&stream_id).await {
+            events.push(event);
+        }
+        ctx.chat_stream_drop(stream_id).await;
+
+        assert_eq!(
+            events,
+            vec![
+                inference::ChatEvent::MessageStart {
+                    role: response.message.role,
+                },
+                inference::ChatEvent::MessageDelta {
+                    content: response.message.content,
+                    logprobs: response.logprobs,
+                },
+                inference::ChatEvent::MessageEnd {
+                    finish_reason: response.finish_reason
+                },
+                inference::ChatEvent::Usage {
+                    usage: response.usage
+                }
+            ]
+        );
+        assert!(ctx.completion_streams.is_empty());
     }
 
     fn metrics_snapshot<F: Future<Output = ()>>(f: impl FnOnce() -> F) -> Snapshot {

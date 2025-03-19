@@ -91,6 +91,12 @@ pub trait Csi {
         requests: Vec<ChatRequest>,
     ) -> anyhow::Result<Vec<ChatResponse>>;
 
+    async fn chat_stream(
+        &self,
+        auth: String,
+        request: ChatRequest,
+    ) -> mpsc::Receiver<anyhow::Result<ChatEvent>>;
+
     async fn chunk(
         &self,
         auth: String,
@@ -232,6 +238,17 @@ where
                 .collect::<Vec<_>>(),
         )
         .await
+    }
+
+    async fn chat_stream(
+        &self,
+        auth: String,
+        request: ChatRequest,
+    ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
+            .increment(1);
+
+        todo!()
     }
 
     async fn chunk(
@@ -388,6 +405,16 @@ pub mod tests {
             _requests: Vec<ChatRequest>,
         ) -> anyhow::Result<Vec<ChatResponse>> {
             bail!("Test error")
+        }
+
+        async fn chat_stream(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+            let (send, recv) = mpsc::channel(1);
+            send.send(Err(anyhow::anyhow!("Test error"))).await.unwrap();
+            recv
         }
 
         async fn search(
@@ -671,6 +698,14 @@ pub mod tests {
             panic!("DummyCsi chat called")
         }
 
+        async fn chat_stream(
+            &self,
+            _auth: String,
+            _request: ChatRequest,
+        ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+            panic!("DummyCsi chat_stream called")
+        }
+
         async fn search(
             &self,
             _auth: String,
@@ -783,7 +818,7 @@ pub mod tests {
             _auth: String,
             request: CompletionRequest,
         ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
-            let (sender, receiver) = mpsc::channel(100);
+            let (sender, receiver) = mpsc::channel(1);
             let Completion {
                 text,
                 finish_reason,
@@ -821,6 +856,39 @@ pub mod tests {
             requests: Vec<ChatRequest>,
         ) -> anyhow::Result<Vec<ChatResponse>> {
             requests.into_iter().map(|r| (*self.chat)(r)).collect()
+        }
+
+        async fn chat_stream(
+            &self,
+            _auth: String,
+            request: ChatRequest,
+        ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+            let (sender, receiver) = mpsc::channel(1);
+            let ChatResponse {
+                message,
+                finish_reason,
+                logprobs,
+                usage,
+            } = (*self.chat)(request).unwrap();
+            tokio::spawn(async move {
+                sender
+                    .send(Ok(ChatEvent::MessageStart { role: message.role }))
+                    .await
+                    .unwrap();
+                sender
+                    .send(Ok(ChatEvent::MessageDelta {
+                        content: message.content,
+                        logprobs,
+                    }))
+                    .await
+                    .unwrap();
+                sender
+                    .send(Ok(ChatEvent::MessageEnd { finish_reason }))
+                    .await
+                    .unwrap();
+                sender.send(Ok(ChatEvent::Usage { usage })).await.unwrap();
+            });
+            receiver
         }
 
         async fn search(
