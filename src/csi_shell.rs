@@ -28,7 +28,9 @@ where
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
-    Router::new().route("/csi", post(http_csi_handle::<C>))
+    Router::new()
+        .route("/csi/v0_3/completion_stream", post(async || "hi"))
+        .route("/csi", post(http_csi_handle::<C>))
 }
 
 async fn http_csi_handle<C>(
