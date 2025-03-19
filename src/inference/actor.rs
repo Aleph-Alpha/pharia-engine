@@ -129,6 +129,24 @@ impl InferenceApi {
         recv.await
             .expect("sender must be alive when awaiting for answers")
     }
+
+    pub async fn chat_stream(
+        &self,
+        request: ChatRequest,
+        api_token: String,
+    ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+        let (send, recv) = mpsc::channel(1);
+        let msg = InferenceMessage::ChatStream {
+            request,
+            send,
+            api_token,
+        };
+        self.send
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv
+    }
 }
 
 /// At which granularity should the target be explained in terms of the prompt.
@@ -405,6 +423,11 @@ pub enum InferenceMessage {
         send: oneshot::Sender<anyhow::Result<ChatResponse>>,
         api_token: String,
     },
+    ChatStream {
+        request: ChatRequest,
+        send: mpsc::Sender<anyhow::Result<ChatEvent>>,
+        api_token: String,
+    },
     Explain {
         request: ExplanationRequest,
         send: oneshot::Sender<anyhow::Result<Explanation>>,
@@ -465,6 +488,40 @@ impl InferenceMessage {
                 let result = client.chat(&request, api_token.clone()).await;
                 drop(send.send(result.map_err(Into::into)));
             }
+            Self::ChatStream {
+                request,
+                send,
+                api_token,
+            } => {
+                // let (event_send, mut event_recv) = mpsc::channel(1);
+                // let mut stream =
+                //     Box::pin(client.stream_completion(&request, api_token, event_send));
+
+                // loop {
+                //     // Pass along messages that we get from the stream while also checking if we get an error
+                //     select! {
+                //         // Pull from receiver as long as there are still senders
+                //         Some(msg) = event_recv.recv(), if !event_recv.is_closed() =>  {
+                //             let Ok(()) = send.send(Ok(msg)).await else {
+                //                 // The receiver is dropped so we can stop polling the stream.
+                //                 break;
+                //             };
+                //         },
+                //         result = &mut stream =>  {
+                //             if let Err(err) = result {
+                //                 drop(send.send(Err(err.into())).await);
+                //             }
+                //             // Break out of the loop once the stream is done
+                //             break;
+                //         }
+                //     };
+                // }
+
+                // // Finish sending through any remaining messages
+                // while let Some(msg) = event_recv.recv().await {
+                //     drop(send.send(Ok(msg)).await);
+                // }
+            }
             Self::Explain {
                 request,
                 send,
@@ -512,7 +569,7 @@ pub mod tests {
     }
 
     impl InferenceStub {
-        pub fn new(
+        pub fn with_completion(
             result: impl Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + 'static,
         ) -> Self {
             let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
@@ -545,10 +602,53 @@ pub mod tests {
                                 }
                             }
                         }
-                        InferenceMessage::Chat { .. } => {
+                        _ => {
                             unimplemented!()
                         }
-                        InferenceMessage::Explain { .. } => {
+                    }
+                }
+            });
+
+            Self { send, join_handle }
+        }
+
+        pub fn with_chat(
+            result: impl Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + 'static,
+        ) -> Self {
+            let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
+            let join_handle = tokio::spawn(async move {
+                while let Some(msg) = recv.recv().await {
+                    match msg {
+                        InferenceMessage::Chat { request, send, .. } => {
+                            send.send(result(request)).unwrap();
+                        }
+                        InferenceMessage::ChatStream { request, send, .. } => match result(request)
+                        {
+                            Ok(ChatResponse {
+                                message,
+                                finish_reason,
+                                logprobs,
+                                usage,
+                            }) => {
+                                send.send(Ok(ChatEvent::MessageStart { role: message.role }))
+                                    .await
+                                    .unwrap();
+                                send.send(Ok(ChatEvent::MessageDelta {
+                                    content: message.content,
+                                    logprobs,
+                                }))
+                                .await
+                                .unwrap();
+                                send.send(Ok(ChatEvent::MessageEnd { finish_reason }))
+                                    .await
+                                    .unwrap();
+                                send.send(Ok(ChatEvent::Usage { usage })).await.unwrap();
+                            }
+                            Err(e) => {
+                                send.send(Err(e)).await.unwrap();
+                            }
+                        },
+                        _ => {
                             unimplemented!()
                         }
                     }
