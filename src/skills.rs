@@ -616,8 +616,8 @@ pub mod tests {
     use serde_json::json;
     use test_skills::{
         given_chat_stream_skill, given_complete_stream_skill, given_python_skill_greet_v0_2,
-        given_python_skill_greet_v0_3, given_rust_skill_chat, given_rust_skill_greet_v0_2,
-        given_rust_skill_greet_v0_3, given_rust_skill_search,
+        given_python_skill_greet_v0_3, given_rust_skill_chat, given_rust_skill_explain,
+        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -626,11 +626,11 @@ pub mod tests {
         chunking::{Chunk, ChunkRequest},
         csi::{
             ChatStreamId, CompletionStreamId,
-            tests::{CsiChatStreamStub, CsiCompleteStreamStub, CsiDummy, CsiGreetingMock},
+            tests::{CsiChatStreamStub, CsiCompleteStreamStub, CsiDummy, CsiGreetingMock, StubCsi},
         },
         inference::{
             ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-            Explanation, ExplanationRequest, FinishReason, TokenUsage,
+            Explanation, ExplanationRequest, FinishReason, TextScore, TokenUsage,
         },
         language_selection::{self, SelectLanguageRequest},
         search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -691,7 +691,6 @@ pub mod tests {
     #[tokio::test]
     async fn rust_greeting_skill() {
         let skill_bytes = given_rust_skill_greet_v0_2().bytes();
-        let skill_path = SkillPath::local("greet_skill_v0_2");
         let engine = Engine::new(false).unwrap();
 
         let skill = AnySkill::new(&engine, skill_bytes).unwrap();
@@ -701,6 +700,32 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(actual, "Hello Homer");
+    }
+
+    #[tokio::test]
+    async fn explain_skill_component() {
+        let skill_bytes = given_rust_skill_explain().bytes();
+        let engine = Engine::new(false).unwrap();
+        let (send, _) = oneshot::channel();
+        let csi = StubCsi::with_explain(|_| {
+            Explanation::new(vec![TextScore {
+                score: 0.0,
+                start: 0,
+                length: 2,
+            }])
+        });
+        let ctx = Box::new(SkillInvocationCtx::new(send, csi, "dummy token".to_owned()));
+        let skill = AnySkill::new(&engine, skill_bytes).unwrap();
+        let actual = skill
+            .run_as_function(
+                &engine,
+                ctx,
+                json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(actual, json!([{"start": 0, "length": 2}]));
     }
 
     #[tokio::test]
