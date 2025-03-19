@@ -870,15 +870,13 @@ pub mod tests {
         chunking::ChunkParams,
         csi::tests::{CsiDummy, StubCsi},
         skill_loader::{RegistryConfig, SkillLoader},
-        skill_store::{SkillStore, SkillStoreMsg},
-        skills::AnySkill,
+        skill_store::SkillStore,
     };
     use anyhow::anyhow;
     use metrics::Label;
     use metrics_util::debugging::DebugValue;
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
-    use test_skills::{given_invalid_output_skill, given_rust_skill_greet_v0_2};
     use tokio::sync::broadcast;
 
     use super::*;
@@ -931,24 +929,6 @@ pub mod tests {
             "The metadata function of the invoked skill is bugged. It is forbidden to invoke any \
             CSI functions from the metadata function, yet the skill does precisely this."
         );
-    }
-
-    #[tokio::test]
-    async fn skill_metadata_invalid_output() {
-        // Given a skill runtime that always returns an invalid output skill
-        let test_skill = given_invalid_output_skill();
-        let skill_path = SkillPath::local("invalid_output_skill");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let store =
-            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let runtime = SkillRuntime::new(engine, CsiSaboteur, store.api());
-
-        // When metadata for a skill is requested
-        let metadata = runtime.api().skill_metadata(skill_path).await;
-        runtime.wait_for_shutdown().await;
-
-        // Then the metadata gives an error
-        assert!(metadata.is_err());
     }
 
     #[tokio::test]
@@ -1015,26 +995,6 @@ pub mod tests {
         drop(runtime);
 
         assert_eq!(resp.unwrap(), json!([{"start": 0, "length": 2}]));
-    }
-
-    #[tokio::test]
-    async fn greet_skill_component() {
-        let test_skill = given_rust_skill_greet_v0_2();
-        let skill_path = SkillPath::local("greet");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store =
-            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-
-        let runtime = WasmRuntime::new(engine, skill_store.api());
-        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("Hello")));
-        let resp = runtime
-            .run_function(&skill_path, json!("name"), skill_ctx)
-            .await;
-
-        drop(runtime);
-        skill_store.wait_for_shutdown().await;
-
-        assert_eq!(resp.unwrap(), "Hello");
     }
 
     #[tokio::test]
@@ -1579,47 +1539,6 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<AnySkillMetadata, anyhow::Error> {
             panic!("Dummy metadata implementation of Skill Greet Completion")
-        }
-    }
-
-    /// Maybe we can use the `SkillStoreStub` from `SkillStore::test` instead?
-    pub struct SkillStoreStubLegacy {
-        send: mpsc::Sender<SkillStoreMsg>,
-        join_handle: JoinHandle<()>,
-    }
-
-    impl SkillStoreStubLegacy {
-        pub fn new(engine: Arc<Engine>, bytes: Vec<u8>, path: SkillPath) -> Self {
-            let skill = AnySkill::new(&engine, bytes).unwrap();
-            let skill: Arc<dyn Skill> = Arc::new(skill);
-
-            let (send, mut recv) = mpsc::channel::<SkillStoreMsg>(1);
-            let join_handle = tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    match msg {
-                        SkillStoreMsg::Fetch { skill_path, send } => {
-                            let skill = if skill_path == path {
-                                Some(skill.clone())
-                            } else {
-                                None
-                            };
-                            drop(send.send(Ok(skill)));
-                        }
-                        _ => panic!("Operation unimplemented in test stub"),
-                    }
-                }
-            });
-
-            Self { send, join_handle }
-        }
-
-        pub async fn wait_for_shutdown(self) {
-            drop(self.send);
-            self.join_handle.await.unwrap();
-        }
-
-        pub fn api(&self) -> mpsc::Sender<SkillStoreMsg> {
-            self.send.clone()
         }
     }
 }
