@@ -689,6 +689,21 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn rust_greeting_skill() {
+        let skill_bytes = given_rust_skill_greet_v0_2().bytes();
+        let skill_path = SkillPath::local("greet_skill_v0_2");
+        let engine = Engine::new(false).unwrap();
+
+        let skill = AnySkill::new(&engine, skill_bytes).unwrap();
+        let actual = skill
+            .run_as_function(&engine, Box::new(CsiGreetingMock), json!("Homer"))
+            .await
+            .unwrap();
+
+        assert_eq!(actual, "Hello Homer");
+    }
+
+    #[tokio::test]
     async fn skill_metadata_v0_2_is_empty() {
         // Given a skill is linked againts skill package v0.2
         let test_skill = given_rust_skill_greet_v0_2();
