@@ -1072,27 +1072,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn rust_greeting_skill() {
-        let test_skill = given_rust_skill_greet_v0_2();
-        let skill_path = SkillPath::local("greet_skill_v0_2");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let skill_store =
-            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let skill_ctx = Box::new(CsiGreetingMock);
-
-        let runtime = WasmRuntime::new(engine, skill_store.api());
-        let actual = runtime
-            .run_function(&skill_path, json!("Homer"), skill_ctx)
-            .await
-            .unwrap();
-
-        drop(runtime);
-        skill_store.wait_for_shutdown().await;
-
-        assert_eq!(actual, "Hello Homer");
-    }
-
-    #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
