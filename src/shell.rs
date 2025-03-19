@@ -925,6 +925,76 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
+    async fn http_csi_handle_returns_chat_stream() {
+        // Given a versioned csi request
+        let message = "Say hello to Homer";
+        let body = json!({
+            "model": "pharia-1-llm-7b-control",
+            "messages": [
+                {"role": "user", "content": message}
+            ],
+            "params": {
+                "max_tokens": 1,
+                "stop": [],
+                "logprobs": "no",
+            },
+        });
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let csi = StubCsi::with_chat(|_| inference::ChatResponse {
+            message: inference::Message {
+                role: "assistant".to_owned(),
+                content: message.to_owned(),
+            },
+            finish_reason: inference::FinishReason::Stop,
+            logprobs: vec![],
+            usage: inference::TokenUsage {
+                prompt: 0,
+                completion: 0,
+            },
+        });
+        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/csi/v1/chat_stream")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get separate events for each letter in "Hello"
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = "event: message_start
+data: {\"role\":\"assistant\"}
+
+event: message_delta
+data: {\"content\":\"Say hello to Homer\",\"logprobs\":[]}
+
+event: message_end
+data: {\"finish_reason\":\"stop\"}
+
+event: usage
+data: {\"usage\":{\"prompt\":0,\"completion\":0}}
+
+";
+        assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
     async fn run_skill_with_bad_namespace() {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";

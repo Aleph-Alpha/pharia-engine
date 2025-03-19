@@ -25,7 +25,7 @@ use serde_json::{Value, json};
 use crate::{
     chunking,
     csi::Csi,
-    inference::{self, CompletionEvent},
+    inference::{self, ChatEvent, CompletionEvent},
     language_selection, search,
 };
 use crate::{csi_shell::CsiShellError, shell::CsiState};
@@ -101,6 +101,84 @@ struct CompletionFinishedEvent {
 
 #[derive(Serialize)]
 struct CompletionUsageEvent {
+    usage: TokenUsage,
+}
+
+pub async fn chat_streaming<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(request): Json<ChatRequest>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
+where
+    C: Csi + Clone + Sync,
+{
+    let mut recv = csi
+        .chat_stream(bearer.token().to_owned(), request.into())
+        .await;
+
+    let stream = try_stream! {
+        while let Some(result) = recv.recv().await {
+            yield match result {
+                Ok(event) => event.into(),
+                Err(err) => Event::default()
+                    .event("error")
+                    .json_data(SseErrorEvent { message: err.to_string() })
+                    .expect("`json_data` must only be called once."),
+            }
+        }
+    };
+
+    Sse::new(stream)
+}
+
+impl From<ChatEvent> for Event {
+    fn from(event: ChatEvent) -> Self {
+        match event {
+            ChatEvent::MessageStart { role } => Event::default()
+                .event("message_start")
+                .json_data(ChatMessageStartEvent { role })
+                .expect("`json_data` must only be called once."),
+            ChatEvent::MessageDelta { content, logprobs } => Event::default()
+                .event("message_delta")
+                .json_data(ChatMessageDeltaEvent {
+                    content,
+                    logprobs: logprobs.into_iter().map(Into::into).collect(),
+                })
+                .expect("`json_data` must only be called once."),
+            ChatEvent::MessageEnd { finish_reason } => Event::default()
+                .event("message_end")
+                .json_data(ChatMessageEndEvent {
+                    finish_reason: finish_reason.into(),
+                })
+                .expect("`json_data` must only be called once."),
+            ChatEvent::Usage { usage } => Event::default()
+                .event("usage")
+                .json_data(ChatUsageEvent {
+                    usage: usage.into(),
+                })
+                .expect("`json_data` must only be called once."),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ChatMessageStartEvent {
+    role: String,
+}
+
+#[derive(Serialize)]
+struct ChatMessageDeltaEvent {
+    content: String,
+    logprobs: Vec<Distribution>,
+}
+
+#[derive(Serialize)]
+struct ChatMessageEndEvent {
+    finish_reason: FinishReason,
+}
+
+#[derive(Serialize)]
+struct ChatUsageEvent {
     usage: TokenUsage,
 }
 
