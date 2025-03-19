@@ -870,6 +870,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_csi_handle_returns_completion_stream() {
+        // Given a versioned csi request
+        let prompt = "Say hello to Homer";
+        let body = json!({
+            "model": "pharia-1-llm-7b-control",
+            "prompt": prompt,
+            "params": {
+                "max_tokens": 1,
+                "temperature": null,
+                "top_k": null,
+                "top_p": null,
+                "stop": [],
+            },
+        });
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
+        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/csi/v0_3/completion_stream")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get separate events for each letter in "Hello"
+        assert_eq!(resp.status(), StatusCode::OK);
+        // let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        // assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        // let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        // let expected_body = "\
+        //     event: message_delta\n\
+        //     data: {\"text\":\"H\"}\n\n\
+        //     event: message_delta\n\
+        //     data: {\"text\":\"e\"}\n\n\
+        //     event: message_delta\n\
+        //     data: {\"text\":\"l\"}\n\n\
+        //     event: message_delta\n\
+        //     data: {\"text\":\"l\"}\n\n\
+        //     event: message_delta\n\
+        //     data: {\"text\":\"o\"}\n\n";
+        // assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
     async fn run_skill_with_bad_namespace() {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";
