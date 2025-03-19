@@ -7,8 +7,10 @@
 //! If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
 use std::convert::Infallible;
 
+use async_stream::try_stream;
 use axum::{
     Json,
+    extract::State,
     response::{Sse, sse::Event},
 };
 use axum_extra::{
@@ -20,14 +22,86 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::csi_shell::CsiShellError;
-use crate::{chunking, csi::Csi, inference, language_selection, search};
+use crate::{
+    chunking,
+    csi::Csi,
+    inference::{self, CompletionEvent},
+    language_selection, search,
+};
+use crate::{csi_shell::CsiShellError, shell::CsiState};
 
-pub async fn completion_streaming(
-    _bearer: TypedHeader<Authorization<Bearer>>,
-    Json(_input): Json<CompletionRequest>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    Sse::new(futures_util::stream::empty())
+pub async fn completion_streaming<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(request): Json<CompletionRequest>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
+where
+    C: Csi + Clone + Sync,
+{
+    let mut recv = csi
+        .completion_stream(bearer.token().to_owned(), request.into())
+        .await;
+
+    let stream = try_stream! {
+        while let Some(result) = recv.recv().await {
+            yield match result {
+                Ok(event) => event.into(),
+                Err(err) => Event::default()
+                    .event("error")
+                    .json_data(SseErrorEvent { message: err.to_string() })
+                    .expect("`json_data` must only be called once."),
+            }
+        }
+    };
+
+    Sse::new(stream)
+}
+
+impl From<CompletionEvent> for Event {
+    fn from(event: CompletionEvent) -> Self {
+        match event {
+            CompletionEvent::Delta { text, logprobs } => Event::default()
+                .event("delta")
+                .json_data(CompletionDeltaEvent {
+                    text,
+                    logprobs: logprobs.into_iter().map(Into::into).collect(),
+                })
+                .expect("`json_data` must only be called once."),
+            CompletionEvent::Finished { finish_reason } => Event::default()
+                .event("finished")
+                .json_data(CompletionFinishedEvent {
+                    finish_reason: finish_reason.into(),
+                })
+                .expect("`json_data` must only be called once."),
+            CompletionEvent::Usage { usage } => Event::default()
+                .event("usage")
+                .json_data(CompletionUsageEvent {
+                    usage: usage.into(),
+                })
+                .expect("`json_data` must only be called once."),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SseErrorEvent {
+    message: String,
+}
+
+#[derive(Serialize)]
+struct CompletionDeltaEvent {
+    text: String,
+    logprobs: Vec<Distribution>,
+}
+
+#[derive(Serialize)]
+struct CompletionFinishedEvent {
+    finish_reason: FinishReason,
+}
+
+#[derive(Serialize)]
+struct CompletionUsageEvent {
+    usage: TokenUsage,
 }
 
 #[derive(Deserialize)]
