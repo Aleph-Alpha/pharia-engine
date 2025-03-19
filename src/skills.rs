@@ -362,11 +362,18 @@ impl Skill for AnySkill {
     }
 }
 
+pub fn load_skill_from_wasm_bytes(
+    engine: &Engine,
+    bytes: impl AsRef<[u8]>,
+) -> Result<Box<dyn Skill>, SkillError> {
+    Ok(Box::new(AnySkill::new(engine, bytes)?))
+}
+
 /// Pre-initialized skills already attached to their corresponding linker.
 /// Allows for as much initialization work to be done at load time as possible,
 /// which can be cached across multiple invocations.
 #[derive(Clone)]
-pub enum AnySkill {
+enum AnySkill {
     /// Skills targeting versions 0.2.x of the skill world
     V0_2(v0_2::SkillPre<LinkedCtx>),
     /// Skills targeting versions 0.3.x of the skill world
@@ -376,7 +383,7 @@ pub enum AnySkill {
 impl AnySkill {
     /// Extracts the version of the skill WIT world from the provided bytes,
     /// and links it to the appropriate version in the linker.
-    pub fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> Result<Self, SkillError> {
+    fn new(engine: &Engine, bytes: impl AsRef<[u8]>) -> Result<Self, SkillError> {
         let skill_version = SupportedVersion::extract(&bytes)?;
         let pre = engine.instantiate_pre(&bytes)?;
 
