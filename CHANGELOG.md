@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.0...v0.11.1)
+
+### Features
+
+- Rename "stream" route from "chat" - ([ccb86fd](https://github.com/Aleph-Alpha/pharia-kernel/commit/ccb86fd2b115acd686c720f1e7f8ecb9a646bd95))
+
+
 ## [0.11.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.10.2...v0.11.0)
 
 ### Features
