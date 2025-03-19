@@ -15,9 +15,9 @@ use tracing::{error, warn};
 use thiserror::Error;
 
 use super::{
-    ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
-    CompletionRequest, Distribution, Explanation, ExplanationRequest, Granularity, Logprob,
-    Logprobs, Message, TextScore, TokenUsage,
+    ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
+    CompletionParams, CompletionRequest, Distribution, Explanation, ExplanationRequest,
+    Granularity, Logprob, Logprobs, Message, TextScore, TokenUsage,
 };
 
 pub trait InferenceClient: Send + Sync + 'static {
@@ -37,6 +37,12 @@ pub trait InferenceClient: Send + Sync + 'static {
         request: &ChatRequest,
         api_token: String,
     ) -> impl Future<Output = Result<ChatResponse, InferenceClientError>> + Send;
+    fn stream_chat(
+        &self,
+        request: &ChatRequest,
+        api_token: String,
+        send: mpsc::Sender<ChatEvent>,
+    ) -> impl Future<Output = Result<(), InferenceClientError>> + Send;
     fn explain(
         &self,
         request: &ExplanationRequest,
@@ -84,6 +90,26 @@ impl InferenceClient for Client {
             .await?
             .try_into()
             .map_err(InferenceClientError::Other)
+    }
+
+    async fn stream_chat(
+        &self,
+        request: &ChatRequest,
+        api_token: String,
+        send: mpsc::Sender<ChatEvent>,
+    ) -> Result<(), InferenceClientError> {
+        let task = request.to_task_chat();
+        let how = How {
+            api_token: Some(api_token),
+            ..Default::default()
+        };
+
+        let mut stream = retry(|| self.stream_chat(&task, &request.model, &how)).await?;
+
+        while let Some(event) = stream.next().await {
+            drop(send.send(ChatEvent::try_from(event?)?).await);
+        }
+        Ok(())
     }
 
     async fn complete(
@@ -204,6 +230,30 @@ impl TryFrom<aleph_alpha_client::CompletionEvent> for CompletionEvent {
                 finish_reason: reason.parse()?,
             },
             aleph_alpha_client::CompletionEvent::Summary { usage } => CompletionEvent::Usage {
+                usage: usage.into(),
+            },
+        })
+    }
+}
+
+impl TryFrom<aleph_alpha_client::ChatEvent> for ChatEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(value: aleph_alpha_client::ChatEvent) -> Result<Self, Self::Error> {
+        Ok(match value {
+            aleph_alpha_client::ChatEvent::MessageStart { role } => {
+                ChatEvent::MessageStart { role }
+            }
+            aleph_alpha_client::ChatEvent::MessageDelta { content, logprobs } => {
+                ChatEvent::MessageDelta {
+                    content,
+                    logprobs: logprobs.into_iter().map(Into::into).collect(),
+                }
+            }
+            aleph_alpha_client::ChatEvent::MessageEnd { stop_reason } => ChatEvent::MessageEnd {
+                finish_reason: stop_reason.parse()?,
+            },
+            aleph_alpha_client::ChatEvent::Summary { usage } => ChatEvent::Usage {
                 usage: usage.into(),
             },
         })
@@ -847,5 +897,55 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             }
         );
         assert!(matches!(events[2], CompletionEvent::Usage { .. }));
+    }
+
+    #[tokio::test]
+    async fn chat_stream() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let chat_request = ChatRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            messages: vec![Message {
+                role: "user".to_owned(),
+                content: "An apple a day".to_owned(),
+            }],
+            params: ChatParams {
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        };
+        let (send, mut recv) = mpsc::channel(1);
+
+        tokio::spawn(async move {
+            <Client as InferenceClient>::stream_chat(&client, &chat_request, api_token, send)
+                .await
+                .unwrap();
+        });
+
+        let mut events = vec![];
+        while let Some(event) = recv.recv().await {
+            events.push(event);
+        }
+
+        // Then
+        assert_eq!(events.len(), 4);
+        assert_eq!(
+            events[0],
+            ChatEvent::MessageStart {
+                role: "assistant".to_owned()
+            }
+        );
+        assert!(matches!(events[1], ChatEvent::MessageDelta { .. }));
+        assert_eq!(
+            events[2],
+            ChatEvent::MessageEnd {
+                finish_reason: FinishReason::Length
+            }
+        );
+        assert!(matches!(events[3], ChatEvent::Usage { .. }));
     }
 }
