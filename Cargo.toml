@@ -49,7 +49,7 @@ dotenvy = "0.15.7"
 futures = "0.3.31"
 oci-client = "0.14.0"
 oci-wasm = "0.2.1"
-reqwest = { version = "0.12.14", features = [
+reqwest = { version = "0.12.15", features = [
     "brotli",
     "deflate",
     "gzip",
