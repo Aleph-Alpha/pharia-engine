@@ -29,6 +29,7 @@ where
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
     Router::new()
+        .route("/csi/v1/chat_stream", post(v0_3::chat_streaming))
         .route(
             "/csi/v1/completion_stream",
             post(v0_3::completion_streaming),
