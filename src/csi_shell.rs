@@ -16,7 +16,6 @@ use serde_json::{Value, json};
 
 use crate::{
     csi::Csi,
-    csi_shell::{v0_2::CsiRequest as V0_2CsiRequest, v0_3::CsiRequest as V0_3CsiRequest},
     shell::{AppState, CsiState},
     skill_runtime::SkillRuntimeApi,
     skill_store::SkillStoreApi,
@@ -64,9 +63,9 @@ where
 #[serde(rename_all = "snake_case", tag = "version")]
 enum VersionedCsiRequest {
     #[serde(rename = "0.3")]
-    V0_3(V0_3CsiRequest),
+    V0_3(v0_3::CsiRequest),
     #[serde(rename = "0.2")]
-    V0_2(V0_2CsiRequest),
+    V0_2(v0_2::CsiRequest),
     #[serde(untagged)]
     Unknown(UnknownCsiRequest),
 }
