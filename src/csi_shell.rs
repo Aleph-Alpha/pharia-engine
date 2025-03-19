@@ -29,7 +29,10 @@ where
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
     Router::new()
-        .route("/csi/v0_3/completion_stream", post(async || "hi"))
+        .route(
+            "/csi/v0_3/completion_stream",
+            post(v0_3::completion_streaming),
+        )
         .route("/csi", post(http_csi_handle::<C>))
 }
 

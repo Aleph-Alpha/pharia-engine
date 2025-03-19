@@ -908,22 +908,12 @@ mod tests {
 
         // Then we get separate events for each letter in "Hello"
         assert_eq!(resp.status(), StatusCode::OK);
-        // let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
-        // assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
 
-        // let body_text = resp.into_body().collect().await.unwrap().to_bytes();
-        // let expected_body = "\
-        //     event: message_delta\n\
-        //     data: {\"text\":\"H\"}\n\n\
-        //     event: message_delta\n\
-        //     data: {\"text\":\"e\"}\n\n\
-        //     event: message_delta\n\
-        //     data: {\"text\":\"l\"}\n\n\
-        //     event: message_delta\n\
-        //     data: {\"text\":\"l\"}\n\n\
-        //     event: message_delta\n\
-        //     data: {\"text\":\"o\"}\n\n";
-        // assert_eq!(body_text, expected_body);
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = "";
+        assert_eq!(body_text, expected_body);
     }
 
     #[tokio::test]

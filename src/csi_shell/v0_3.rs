@@ -1,16 +1,25 @@
+//! CSI Shell version 0.3
+//!
+//! This module introduces serializable/user-facing structs which are very similar to our "internal" representations.
+//! While this module may appear to contain a lot of boilerplate code, there is a good reason to not serialize our "internal" representations:
+//! It allows us to keep our external interface stable while updating our "internal" representations.
+//! Imagine we introduce a new version (0.4) with breaking changes in the api (e.g. a new field in `CompletionParams`).
+//! If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
+use std::convert::Infallible;
+
+use axum::response::Sse;
+use axum::response::sse::Event;
 use derive_more::{From, Into};
-/// CSI Shell version 0.3
-///
-/// This module introduces serializable/user-facing structs which are very similar to our "internal" representations.
-/// While this module may appear to contain a lot of boilerplate code, there is a good reason to not serialize our "internal" representations:
-/// It allows us to keep our external interface stable while updating our "internal" representations.
-/// Imagine we introduce a new version (0.4) with breaking changes in the api (e.g. a new field in `CompletionParams`).
-/// If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::csi_shell::CsiShellError;
 use crate::{chunking, csi::Csi, inference, language_selection, search};
+
+pub async fn completion_streaming() -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    Sse::new(futures_util::stream::empty())
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
