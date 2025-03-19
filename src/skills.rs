@@ -362,11 +362,115 @@ impl Skill for AnySkill {
     }
 }
 
+/// Factory for creating skills. Responsible for inspecting the skill bytes, and instantiatnig the
+/// right Skill type. The skill is pre-initialized i.e. already attached to their corresponding
+/// linker. This allows for as much initialization work to be done at load time as possible, which
+/// can be cached across multiple invocations.
 pub fn load_skill_from_wasm_bytes(
     engine: &Engine,
     bytes: impl AsRef<[u8]>,
 ) -> Result<Box<dyn Skill>, SkillError> {
-    Ok(Box::new(AnySkill::new(engine, bytes)?))
+    let skill_version = SupportedVersion::extract(&bytes)?;
+    let pre = engine.instantiate_pre(&bytes)?;
+
+    match skill_version {
+        SupportedVersion::V0_2 => {
+            let skill =
+                v0_2::SkillPre::new(pre).map_err(|e| SkillError::SkillPreError(e.to_string()))?;
+            Ok(Box::new(skill))
+        }
+        SupportedVersion::V0_3 => {
+            let skill = v0_3::skill::SkillPre::new(pre)
+                .map_err(|e| SkillError::SkillPreError(e.to_string()))?;
+            Ok(Box::new(skill))
+        }
+    }
+}
+
+#[async_trait]
+impl Skill for v0_3::skill::SkillPre<LinkedCtx> {
+    async fn metadata(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+    ) -> anyhow::Result<AnySkillMetadata> {
+        let mut store = engine.store(LinkedCtx::new(ctx));
+        let bindings = self.instantiate_async(&mut store).await?;
+        let metadata = bindings
+            .pharia_skill_skill_handler()
+            .call_metadata(store)
+            .await?;
+        metadata.try_into().map(AnySkillMetadata::V0_3)
+    }
+
+    async fn run_as_function(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+        input: Value,
+    ) -> anyhow::Result<Value> {
+        let mut store = engine.store(LinkedCtx::new(ctx));
+        let input = serde_json::to_vec(&input)?;
+        let bindings = self.instantiate_async(&mut store).await?;
+        let result = bindings
+            .pharia_skill_skill_handler()
+            .call_run(store, &input)
+            .await?;
+        let result = match result {
+            Ok(result) => result,
+            Err(e) => match e {
+                v0_3::skill::exports::pharia::skill::skill_handler::Error::Internal(e) => {
+                    tracing::error!("Failed to run skill, internal skill error:\n{e}");
+                    return Err(anyhow!("Internal skill error:\n{e}"));
+                }
+                v0_3::skill::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                    tracing::error!("Failed to run skill, invalid input:\n{e}");
+                    return Err(anyhow!("Invalid input:\n{e}"));
+                }
+            },
+        };
+        Ok(serde_json::from_slice(&result)?)
+    }
+}
+
+#[async_trait]
+impl Skill for v0_2::SkillPre<LinkedCtx> {
+    async fn metadata(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+    ) -> anyhow::Result<AnySkillMetadata> {
+        Ok(AnySkillMetadata::V0)
+    }
+
+    async fn run_as_function(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+        input: Value,
+    ) -> anyhow::Result<Value> {
+        let mut store = engine.store(LinkedCtx::new(ctx));
+        let input = serde_json::to_vec(&input)?;
+        let bindings = self.instantiate_async(&mut store).await?;
+        let result = bindings
+            .pharia_skill_skill_handler()
+            .call_run(store, &input)
+            .await?;
+        let result = match result {
+            Ok(result) => result,
+            Err(e) => match e {
+                v0_2::exports::pharia::skill::skill_handler::Error::Internal(e) => {
+                    tracing::error!("Failed to run skill, internal skill error:\n{e}");
+                    return Err(anyhow!("Internal skill error:\n{e}"));
+                }
+                v0_2::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                    tracing::error!("Failed to run skill, invalid input:\n{e}");
+                    return Err(anyhow!("Invalid input:\n{e}"));
+                }
+            },
+        };
+        Ok(serde_json::from_slice(&result)?)
+    }
 }
 
 /// Pre-initialized skills already attached to their corresponding linker.
@@ -687,7 +791,7 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingMock);
         let engine = Engine::new(false).unwrap();
 
-        let skill = AnySkill::new(&engine, skill.bytes()).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
         let actual = skill
             .run_as_function(&engine, skill_ctx, json!("Homer"))
             .await
@@ -701,7 +805,7 @@ pub mod tests {
         let skill_bytes = given_rust_skill_greet_v0_2().bytes();
         let engine = Engine::new(false).unwrap();
 
-        let skill = AnySkill::new(&engine, skill_bytes).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
         let actual = skill
             .run_as_function(&engine, Box::new(CsiGreetingMock), json!("Homer"))
             .await
@@ -723,7 +827,7 @@ pub mod tests {
             }])
         });
         let ctx = Box::new(SkillInvocationCtx::new(send, csi, "dummy token".to_owned()));
-        let skill = AnySkill::new(&engine, skill_bytes).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
         let actual = skill
             .run_as_function(
                 &engine,
@@ -741,7 +845,7 @@ pub mod tests {
         // Given a skill is linked againts skill package v0.2
         let test_skill = given_rust_skill_greet_v0_2();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, test_skill.bytes()).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, test_skill.bytes()).unwrap();
 
         // When metadata for a skill is requested
         let metadata = skill
@@ -758,7 +862,7 @@ pub mod tests {
         // Given a skill runtime that always returns an invalid output skill
         let skill_bytes = given_invalid_output_skill().bytes();
         let engine = Engine::new(false).unwrap();
-        let skill = AnySkill::new(&engine, skill_bytes).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
 
         // When metadata for a skill is requested
         let metadata_result = skill.metadata(&engine, Box::new(CsiForSkillsDummy)).await;
