@@ -112,14 +112,14 @@ impl TryFrom<Value> for JsonSchema {
 
 /// Describes the signature of a skill. The signature is the contract of how the skill can be
 /// invoked and what its result are.
-#[expect(dead_code)] // Chat currently under construction
+#[expect(dead_code)] // Stream currently under construction
 #[derive(Debug, Clone)]
 pub enum Signature {
     Function {
         input_schema: JsonSchema,
         output_schema: JsonSchema,
     },
-    Chat {
+    Stream {
         input_schema: JsonSchema,
     },
 }
@@ -127,21 +127,21 @@ pub enum Signature {
 impl Signature {
     pub fn input_schema(&self) -> &JsonSchema {
         match self {
-            Self::Chat { input_schema } | Self::Function { input_schema, .. } => input_schema,
+            Self::Stream { input_schema } | Self::Function { input_schema, .. } => input_schema,
         }
     }
 
     pub fn output_schema(&self) -> Option<&JsonSchema> {
         match self {
             Self::Function { output_schema, .. } => Some(output_schema),
-            Self::Chat { .. } => None,
+            Self::Stream { .. } => None,
         }
     }
 
     pub fn skill_type_name(&self) -> &'static str {
         match self {
             Self::Function { .. } => "function",
-            Self::Chat { .. } => "generator",
+            Self::Stream { .. } => "generator",
         }
     }
 }

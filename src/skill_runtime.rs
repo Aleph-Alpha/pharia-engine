@@ -50,12 +50,12 @@ where
         }
     }
 
-    pub async fn run_chat(
+    pub async fn run_stream(
         &self,
         skill_path: &SkillPath,
         _input: Value,
         mut ctx: Box<dyn CsiForSkills + Send>,
-        sender: mpsc::Sender<ChatEvent>,
+        sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillExecutionError> {
         if skill_path.namespace != Namespace::new("test-beta").unwrap() {
             return Err(SkillExecutionError::SkillNotConfigured);
@@ -69,7 +69,10 @@ where
             )))
         } else if name.eq_ignore_ascii_case("hello") {
             for c in "Hello".chars() {
-                sender.send(ChatEvent::Append(c.to_string())).await.unwrap();
+                sender
+                    .send(StreamEvent::Append(c.to_string()))
+                    .await
+                    .unwrap();
             }
             Ok(())
         } else if name.eq_ignore_ascii_case("tell_me_a_joke") {
@@ -97,7 +100,7 @@ where
             let stream_id = ctx.completion_stream_new(request).await;
             while let Some(event) = ctx.completion_stream_next(&stream_id).await {
                 if let CompletionEvent::Delta { text, .. } = event {
-                    sender.send(ChatEvent::Append(text)).await.unwrap();
+                    sender.send(StreamEvent::Append(text)).await.unwrap();
                 }
             }
             ctx.completion_stream_drop(stream_id).await;
@@ -206,12 +209,12 @@ pub trait SkillRuntimeApi {
         api_token: String,
     ) -> Result<Value, SkillExecutionError>;
 
-    async fn run_chat(
+    async fn run_stream(
         &self,
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> mpsc::Receiver<ChatEvent>;
+    ) -> mpsc::Receiver<StreamEvent>;
 
     async fn skill_metadata(
         &self,
@@ -240,22 +243,22 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         recv.await.unwrap()
     }
 
-    async fn run_chat(
+    async fn run_stream(
         &self,
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> mpsc::Receiver<ChatEvent> {
-        let (send, recv) = mpsc::channel::<ChatEvent>(1);
+    ) -> mpsc::Receiver<StreamEvent> {
+        let (send, recv) = mpsc::channel::<StreamEvent>(1);
 
-        let msg = RunChatMsg {
+        let msg = RunStreamMsg {
             skill_path,
             input,
             send,
             api_token,
         };
 
-        self.send(SkillRuntimeMsg::Chat(msg))
+        self.send(SkillRuntimeMsg::Stream(msg))
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
@@ -404,7 +407,7 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
 
 #[derive(Debug)]
 pub enum SkillRuntimeMsg {
-    Chat(RunChatMsg),
+    Stream(RunStreamMsg),
     Function(RunFunctionMsg),
     Metadata(MetadataMsg),
 }
@@ -416,7 +419,7 @@ impl SkillRuntimeMsg {
         runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
         match self {
-            SkillRuntimeMsg::Chat(msg) => {
+            SkillRuntimeMsg::Stream(msg) => {
                 msg.act(csi_apis, runtime).await;
             }
             SkillRuntimeMsg::Function(msg) => {
@@ -449,14 +452,14 @@ impl MetadataMsg {
 }
 
 #[derive(Debug)]
-pub struct RunChatMsg {
+pub struct RunStreamMsg {
     pub skill_path: SkillPath,
     pub input: Value,
-    pub send: mpsc::Sender<ChatEvent>,
+    pub send: mpsc::Sender<StreamEvent>,
     pub api_token: String,
 }
 
-impl RunChatMsg {
+impl RunStreamMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
@@ -464,7 +467,7 @@ impl RunChatMsg {
     ) {
         let start = Instant::now();
 
-        let RunChatMsg {
+        let RunStreamMsg {
             skill_path,
             input,
             send,
@@ -474,7 +477,7 @@ impl RunChatMsg {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
-            result = runtime.run_chat(&skill_path, input, ctx, send.clone()) => result,
+            result = runtime.run_stream(&skill_path, input, ctx, send.clone()) => result,
             // An error occurred during skill execution.
             Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
@@ -484,7 +487,7 @@ impl RunChatMsg {
         // We do not bubble up the error, instead we insert it into the event stream, as the last
         // event.
         if let Err(error) = response {
-            send.send(ChatEvent::Error(error.to_string()))
+            send.send(StreamEvent::Error(error.to_string()))
                 .await
                 .unwrap();
         };
@@ -519,9 +522,9 @@ fn status_label(result: Result<(), &SkillExecutionError>) -> String {
     .to_owned()
 }
 
-/// An event emitted by a chat skill
+/// An event emitted by a streaming skill
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ChatEvent {
+pub enum StreamEvent {
     /// Append the internal string to the current message
     Append(String),
     /// An error occurred during skill execution. This kind of error can happen after streaming has
@@ -1241,7 +1244,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn chat_hello_test() {
+    async fn stream_hello_test() {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
         let runtime = SkillRuntime::new(engine, CsiDummy, SkillStoreDummy);
@@ -1249,7 +1252,7 @@ pub mod tests {
         // When
         let mut recv = runtime
             .api()
-            .run_chat(
+            .run_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "hello"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
@@ -1259,23 +1262,23 @@ pub mod tests {
         // Then
         assert_eq!(
             recv.recv().await.unwrap(),
-            ChatEvent::Append("H".to_string())
+            StreamEvent::Append("H".to_string())
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            ChatEvent::Append("e".to_string())
+            StreamEvent::Append("e".to_string())
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            ChatEvent::Append("l".to_string())
+            StreamEvent::Append("l".to_string())
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            ChatEvent::Append("l".to_string())
+            StreamEvent::Append("l".to_string())
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            ChatEvent::Append("o".to_string())
+            StreamEvent::Append("o".to_string())
         );
         assert!(recv.recv().await.is_none());
 
@@ -1284,7 +1287,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn chat_saboteur_test() {
+    async fn stream_saboteur_test() {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
         let runtime = SkillRuntime::new(engine, CsiDummy, SkillStoreDummy);
@@ -1292,7 +1295,7 @@ pub mod tests {
         // When
         let mut recv = runtime
             .api()
-            .run_chat(
+            .run_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "saboteur"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
@@ -1305,7 +1308,7 @@ pub mod tests {
             developer. Error reported by Skill:\n\nSkill is a saboteur";
         assert_eq!(
             recv.recv().await.unwrap(),
-            ChatEvent::Error(expected_error_msg.to_string())
+            StreamEvent::Error(expected_error_msg.to_string())
         );
         assert!(recv.recv().await.is_none());
 
@@ -1355,7 +1358,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn chat_skill_should_emit_error_in_case_of_runtime_error_in_csi() {
+    async fn stream_skill_should_emit_error_in_case_of_runtime_error_in_csi() {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
         let runtime = SkillRuntime::new(engine, CsiSaboteur, SkillStoreDummy);
@@ -1364,7 +1367,7 @@ pub mod tests {
         // When
         let mut recv = runtime
             .api()
-            .run_chat(skill_path, json!({}), "dumm_token".to_owned())
+            .run_stream(skill_path, json!({}), "dumm_token".to_owned())
             .await;
 
         // Then
@@ -1373,7 +1376,7 @@ pub mod tests {
             runtime is currently \nunavailable or misconfigured. You should try again later, if \
             the situation persists you \nmay want to contact the operaters. Original error:\n\n\
             Test error";
-        assert_eq!(event, ChatEvent::Error(expected_error_msg.to_string()));
+        assert_eq!(event, StreamEvent::Error(expected_error_msg.to_string()));
     }
 
     #[tokio::test]
