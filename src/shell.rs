@@ -41,7 +41,7 @@ use crate::{
     csi_shell,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
-    skill_runtime::{ChatEvent, SkillExecutionError, SkillRuntimeApi},
+    skill_runtime::{SkillExecutionError, SkillRuntimeApi, StreamEvent},
     skill_store::{SkillStoreApi, SkillStoreMsg},
     skills::{AnySkillMetadata, JsonSchema, Signature, SkillPath},
 };
@@ -202,7 +202,7 @@ where
             get(skill_metadata),
         )
         .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
-        .route("/v1/skills/{namespace}/{name}/chat", post(chat_skill))
+        .route("/v1/skills/{namespace}/{name}/stream", post(stream_skill))
         .merge(csi_shell::http())
         // Keep for backwards compatibility
         .route("/skills", get(skills))
@@ -347,7 +347,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, skills, run_skill, chat_skill, skill_wit, skill_metadata),
+    paths(serve_docs, skills, run_skill, stream_skill, skill_wit, skill_metadata),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -508,13 +508,13 @@ where
     Ok(Json(response))
 }
 
-/// Chat
+/// Stream
 ///
-/// Chat with a Skill in the Kernel from one of the available repositories.
+/// Stream from a Skill in the Kernel from one of the available repositories.
 #[utoipa::path(
     post,
-    operation_id = "chat_skill",
-    path = "/v1/skills/{namespace}/{name}/chat",
+    operation_id = "stream_skill",
+    path = "/v1/skills/{namespace}/{name}/stream",
     request_body(
         content_type = "application/json",
         description = "The expected input for the skill in JSON format.",
@@ -524,12 +524,12 @@ where
     tag = "skills",
     responses(
         (status = 200,
-            description = "A stream of substrings composing a message in response to a chat history",
+            description = "A stream of substrings composing a message",
             body=Value,
             content(("text/event-stream", example = ""))),
         ),
 )]
-async fn chat_skill<R>(
+async fn stream_skill<R>(
     State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
@@ -539,8 +539,8 @@ where
     R: SkillRuntimeApi,
 {
     let path = SkillPath::new(namespace, name);
-    let mut chat_events = skill_runtime_api
-        .run_chat(path, input, bearer.token().to_owned())
+    let mut stream_events = skill_runtime_api
+        .run_stream(path, input, bearer.token().to_owned())
         .await;
 
     // We need to use `try_stream!` instead of `stream!`, because `stream!` does not implement the
@@ -548,8 +548,8 @@ where
     // the implementation provided by axum for this, we use `try_stream!` with an infallible error
     // type. Please note, that we report the actual errors as "normal" events in the stream.
     let stream = try_stream! {
-        while let Some(event) = chat_events.recv().await {
-            // Convert Chat events to Server Side Events
+        while let Some(event) = stream_events.recv().await {
+            // Convert stream events to Server Side Events
             yield event.into();
         }
     };
@@ -557,14 +557,14 @@ where
     Sse::new(stream)
 }
 
-impl From<ChatEvent> for Event {
-    fn from(value: ChatEvent) -> Self {
+impl From<StreamEvent> for Event {
+    fn from(value: StreamEvent) -> Self {
         match value {
-            ChatEvent::Append(text) => Self::default()
+            StreamEvent::Append(text) => Self::default()
                 .event("message_delta")
                 .json_data(MessageDelta { text })
                 .expect("`json_data` must only be called once."),
-            ChatEvent::Error(message) => Self::default()
+            StreamEvent::Error(message) => Self::default()
                 .event("error")
                 .json_data(SseErrorEvent { message })
                 .expect("`json_data` must only be called once."),
@@ -925,7 +925,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
-    async fn http_csi_handle_returns_chat_stream() {
+    async fn http_csi_handle_returns_stream() {
         // Given a versioned csi request
         let message = "Say hello to Homer";
         let body = json!({
@@ -1089,17 +1089,17 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
-    async fn chat_endpoint_should_send_individual_message_deltas() {
+    async fn stream_endpoint_should_send_individual_message_deltas() {
         // Given
-        let chat_events = "Hello"
+        let stream_events = "Hello"
             .chars()
-            .map(|c| ChatEvent::Append(c.to_string()))
+            .map(|c| StreamEvent::Append(c.to_string()))
             .collect();
-        let skill_executer_mock = SkillRuntimeStub::with_chat_events(chat_events);
+        let skill_executer_mock = SkillRuntimeStub::with_stream_events(stream_events);
         let app_state = AppState::dummy().with_skill_runtime_api(skill_executer_mock);
         let http = http(FeatureSet::Beta, app_state);
 
-        // When asking for a chat message
+        // When asking for a message stream
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
@@ -1110,7 +1110,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .header(AUTHORIZATION, auth_value)
-                    .uri("/v1/skills/local/hello/chat")
+                    .uri("/v1/skills/local/hello/stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
             )
@@ -1138,14 +1138,14 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
-    async fn chat_endpoint_for_saboteur_skill() {
+    async fn stream_endpoint_for_saboteur_skill() {
         // Given
-        let chat_events = vec![ChatEvent::Error("Skill is a saboteur".to_string())];
-        let skill_runtime = SkillRuntimeStub::with_chat_events(chat_events);
+        let stream_events = vec![StreamEvent::Error("Skill is a saboteur".to_string())];
+        let skill_runtime = SkillRuntimeStub::with_stream_events(stream_events);
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(FeatureSet::Beta, app_state);
 
-        // When asking for a chat message from a skill that does not exist
+        // When asking for a message stream from a skill that does not exist
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
@@ -1156,7 +1156,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .header(AUTHORIZATION, auth_value)
-                    .uri("/v1/skills/local/saboteur/chat")
+                    .uri("/v1/skills/local/saboteur/stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
             )
@@ -1601,12 +1601,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             panic!("Skill runtime dummy called")
         }
 
-        async fn run_chat(
+        async fn run_stream(
             &self,
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-        ) -> mpsc::Receiver<ChatEvent> {
+        ) -> mpsc::Receiver<StreamEvent> {
             panic!("Skill runtime dummy called")
         }
 
@@ -1643,14 +1643,14 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             Err((*self.make_error)())
         }
 
-        async fn run_chat(
+        async fn run_stream(
             &self,
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-        ) -> mpsc::Receiver<ChatEvent> {
+        ) -> mpsc::Receiver<StreamEvent> {
             panic!(
-                "Use the `SkillRuntimeStub`, to simulate errors during chat instead of the \
+                "Use the `SkillRuntimeStub`, to simulate errors during streaming instead of the \
                 `SkillRuntimeSaboteur`."
             )
         }
@@ -1663,27 +1663,27 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    /// Stub Skill Runtime which emits predifined chat events
+    /// Stub Skill Runtime which emits predefined stream events
     #[derive(Debug, Clone)]
     struct SkillRuntimeStub {
         function_result: Value,
         metadata: AnySkillMetadata,
-        chat_events: Vec<ChatEvent>,
+        stream_events: Vec<StreamEvent>,
     }
 
     impl SkillRuntimeStub {
         pub fn with_function_ok(value: Value) -> Self {
             Self {
                 function_result: value,
-                chat_events: Vec::new(),
+                stream_events: Vec::new(),
                 metadata: AnySkillMetadata::V0,
             }
         }
 
-        pub fn with_chat_events(chat_events: Vec<ChatEvent>) -> Self {
+        pub fn with_stream_events(stream_events: Vec<StreamEvent>) -> Self {
             Self {
                 function_result: Value::default(),
-                chat_events,
+                stream_events,
                 metadata: AnySkillMetadata::V0,
             }
         }
@@ -1691,7 +1691,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         pub fn with_metadata(metadata: AnySkillMetadata) -> Self {
             Self {
                 function_result: Value::default(),
-                chat_events: Vec::new(),
+                stream_events: Vec::new(),
                 metadata,
             }
         }
@@ -1708,14 +1708,14 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             Ok(self.function_result.clone())
         }
 
-        async fn run_chat(
+        async fn run_stream(
             &self,
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-        ) -> mpsc::Receiver<ChatEvent> {
-            let (send, recv) = mpsc::channel(self.chat_events.len());
-            for ce in &self.chat_events {
+        ) -> mpsc::Receiver<StreamEvent> {
+            let (send, recv) = mpsc::channel(self.stream_events.len());
+            for ce in &self.stream_events {
                 send.send(ce.clone()).await.unwrap();
             }
             recv
@@ -1780,12 +1780,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             Ok(Value::default())
         }
 
-        async fn run_chat(
+        async fn run_stream(
             &self,
             skill_path: SkillPath,
             input: Value,
             api_token: String,
-        ) -> mpsc::Receiver<ChatEvent> {
+        ) -> mpsc::Receiver<StreamEvent> {
             let mut inner = self.inner.lock().unwrap();
             inner.api_token = api_token;
             inner.input = input;
