@@ -214,7 +214,7 @@ pub struct ChatParams {
     pub logprobs: Logprobs,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Message {
     pub role: String,
     pub content: String,
@@ -300,7 +300,7 @@ pub enum CompletionEvent {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ChatResponse {
     pub message: Message,
     pub finish_reason: FinishReason,
