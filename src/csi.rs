@@ -21,6 +21,9 @@ use crate::{
 /// `CompletionStreamId` is a unique identifier for a completion stream.
 #[derive(Debug, Clone, Constructor, Copy, From, PartialEq, Eq, Hash)]
 pub struct CompletionStreamId(usize);
+/// `ChatStreamId` is a unique identifier for a chat stream.
+#[derive(Debug, Clone, Constructor, Copy, From, PartialEq, Eq, Hash)]
+pub struct ChatStreamId(usize);
 
 /// Collection of api handles to the actors used to implement the Cognitive System Interface (CSI)
 ///
