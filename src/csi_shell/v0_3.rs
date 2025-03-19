@@ -7,8 +7,14 @@
 //! If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
 use std::convert::Infallible;
 
-use axum::response::Sse;
-use axum::response::sse::Event;
+use axum::{
+    Json,
+    response::{Sse, sse::Event},
+};
+use axum_extra::{
+    TypedHeader,
+    headers::{Authorization, authorization::Bearer},
+};
 use derive_more::{From, Into};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -17,7 +23,10 @@ use serde_json::{Value, json};
 use crate::csi_shell::CsiShellError;
 use crate::{chunking, csi::Csi, inference, language_selection, search};
 
-pub async fn completion_streaming() -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+pub async fn completion_streaming(
+    _bearer: TypedHeader<Authorization<Bearer>>,
+    Json(_input): Json<CompletionRequest>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     Sse::new(futures_util::stream::empty())
 }
 
