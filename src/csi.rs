@@ -425,7 +425,18 @@ pub mod tests {
         };
 
         // When chatting with the StubCsi
-        let csi = StubCsi::empty();
+        let csi = StubCsi::with_chat(|_| ChatResponse {
+            message: Message {
+                role: "assistant".to_owned(),
+                content: "Hello".to_owned(),
+            },
+            finish_reason: FinishReason::Stop,
+            logprobs: vec![],
+            usage: TokenUsage {
+                prompt: 1,
+                completion: 1,
+            },
+        });
         let result = csi
             .chat("dummy-token".to_owned(), vec![chat_request])
             .await
@@ -685,6 +696,8 @@ pub mod tests {
         }
     }
 
+    type ChatFn = dyn Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync + 'static;
+
     type CompleteFn =
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
@@ -696,6 +709,7 @@ pub mod tests {
 
     #[derive(Clone)]
     pub struct StubCsi {
+        pub chat: Arc<Box<ChatFn>>,
         pub completion: Arc<Box<CompleteFn>>,
         pub chunking: Arc<Box<ChunkFn>>,
         pub explain: Arc<Box<ExplainFn>>,
@@ -704,6 +718,7 @@ pub mod tests {
     impl StubCsi {
         pub fn empty() -> Self {
             StubCsi {
+                chat: Arc::new(Box::new(|_| bail!("Chat not set in StubCsi"))),
                 completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
                 chunking: Arc::new(Box::new(|_| bail!("Chunking not set in StubCsi"))),
                 explain: Arc::new(Box::new(|_| bail!("Explain not set in StubCsi"))),
@@ -715,6 +730,13 @@ pub mod tests {
             f: impl Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> + Send + Sync + 'static,
         ) {
             self.chunking = Arc::new(Box::new(f));
+        }
+
+        pub fn with_chat(f: impl Fn(ChatRequest) -> ChatResponse + Send + Sync + 'static) -> Self {
+            StubCsi {
+                chat: Arc::new(Box::new(move |cr| Ok(f(cr)))),
+                ..Self::empty()
+            }
         }
 
         pub fn with_completion(
@@ -798,18 +820,7 @@ pub mod tests {
             _auth: String,
             requests: Vec<ChatRequest>,
         ) -> anyhow::Result<Vec<ChatResponse>> {
-            Ok(requests
-                .into_iter()
-                .map(|mut request| ChatResponse {
-                    message: request.messages.remove(0),
-                    finish_reason: FinishReason::Stop,
-                    logprobs: vec![],
-                    usage: TokenUsage {
-                        prompt: 0,
-                        completion: 0,
-                    },
-                })
-                .collect())
+            requests.into_iter().map(|r| (*self.chat)(r)).collect()
         }
 
         async fn search(
