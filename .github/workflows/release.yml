@@ -31,7 +31,7 @@ jobs:
         uses: ./.github/actions/jfrog
 
       - name: Run release-plz
-        uses: MarcoIeni/release-plz-action@v0.5
+        uses: release-plz/action@v0.5
         with:
           command: release
           registry: jfrog
@@ -61,7 +61,7 @@ jobs:
 
       - name: Run release-plz
         id: release-plz
-        uses: MarcoIeni/release-plz-action@v0.5
+        uses: release-plz/action@v0.5
         with:
           command: release-pr
           registry: jfrog
