@@ -8,10 +8,10 @@ use pharia::skill::{
         SearchResult, TextCursor,
     },
     inference::{
-        ChatParams, ChatRequest, ChatResponse, Completion, CompletionDelta, CompletionEvent,
-        CompletionParams, CompletionRequest, CompletionStream, Distribution, ExplanationRequest,
-        FinishReason, Granularity, Host as InferenceHost, HostCompletionStream, Logprob, Logprobs,
-        Message, TextScore, TokenUsage,
+        ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionDelta,
+        CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
+        ExplanationRequest, FinishReason, Granularity, Host as InferenceHost, HostChatStream,
+        HostCompletionStream, Logprob, Logprobs, Message, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
 };
@@ -27,6 +27,7 @@ bindgen!({
     path: "./wit/skill@0.3",
     async: true,
     with: {
+        "pharia:skill/inference/chat-stream": csi::ChatStreamId,
         "pharia:skill/inference/completion-stream": csi::CompletionStreamId
     },
 });
@@ -392,6 +393,20 @@ impl HostCompletionStream for LinkedCtx {
             .expect("Failed to delete stream from resource table");
         self.skill_ctx.completion_stream_drop(stream_id).await;
         Ok(())
+    }
+}
+
+impl HostChatStream for LinkedCtx {
+    async fn new(&mut self, init: ChatRequest) -> Resource<ChatStream> {
+        todo!()
+    }
+
+    async fn next(&mut self, stream: Resource<ChatStream>) -> Option<ChatEvent> {
+        todo!()
+    }
+
+    async fn drop(&mut self, stream: Resource<ChatStream>) -> anyhow::Result<()> {
+        todo!()
     }
 }
 
