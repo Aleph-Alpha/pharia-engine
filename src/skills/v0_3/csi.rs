@@ -11,7 +11,7 @@ use pharia::skill::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionDelta,
         CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
         ExplanationRequest, FinishReason, Granularity, Host as InferenceHost, HostChatStream,
-        HostCompletionStream, Logprob, Logprobs, Message, TextScore, TokenUsage,
+        HostCompletionStream, Logprob, Logprobs, Message, MessageDelta, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
 };
@@ -398,15 +398,35 @@ impl HostCompletionStream for LinkedCtx {
 
 impl HostChatStream for LinkedCtx {
     async fn new(&mut self, init: ChatRequest) -> Resource<ChatStream> {
-        todo!()
+        let stream_id = self.skill_ctx.chat_stream_new(init.into()).await;
+        self.resource_table
+            .push(stream_id)
+            .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
+            .expect("Failed to push stream to resource table")
     }
 
     async fn next(&mut self, stream: Resource<ChatStream>) -> Option<ChatEvent> {
-        todo!()
+        debug_assert!(!stream.owned());
+        let stream_id = self
+            .resource_table
+            .get(&stream)
+            .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
+            .expect("Failed to get stream from resource table");
+        self.skill_ctx
+            .chat_stream_next(stream_id)
+            .await
+            .map(Into::into)
     }
 
     async fn drop(&mut self, stream: Resource<ChatStream>) -> anyhow::Result<()> {
-        todo!()
+        debug_assert!(stream.owned());
+        let stream_id = self
+            .resource_table
+            .delete(stream)
+            .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
+            .expect("Failed to delete stream from resource table");
+        self.skill_ctx.chat_stream_drop(stream_id).await;
+        Ok(())
     }
 }
 
@@ -423,6 +443,24 @@ impl From<inference::CompletionEvent> for CompletionEvent {
                 CompletionEvent::Finished(finish_reason.into())
             }
             inference::CompletionEvent::Usage { usage } => CompletionEvent::Usage(usage.into()),
+        }
+    }
+}
+
+impl From<inference::ChatEvent> for ChatEvent {
+    fn from(value: inference::ChatEvent) -> Self {
+        match value {
+            inference::ChatEvent::MessageStart { role } => ChatEvent::MessageStart(role),
+            inference::ChatEvent::MessageDelta { content, logprobs } => {
+                ChatEvent::MessageDelta(MessageDelta {
+                    content,
+                    logprobs: logprobs.into_iter().map(Into::into).collect(),
+                })
+            }
+            inference::ChatEvent::MessageEnd { finish_reason } => {
+                ChatEvent::MessageEnd(finish_reason.into())
+            }
+            inference::ChatEvent::Usage { usage } => ChatEvent::Usage(usage.into()),
         }
     }
 }

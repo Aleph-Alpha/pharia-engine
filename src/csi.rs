@@ -8,8 +8,8 @@ use tracing::trace;
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest, Explanation,
-        ExplanationRequest, InferenceApi,
+        ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
+        Explanation, ExplanationRequest, InferenceApi,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     search::{
@@ -53,6 +53,9 @@ pub trait CsiForSkills {
         requests: Vec<SelectLanguageRequest>,
     ) -> Vec<Option<Language>>;
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse>;
+    async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId;
+    async fn chat_stream_next(&mut self, id: &ChatStreamId) -> Option<ChatEvent>;
+    async fn chat_stream_drop(&mut self, id: ChatStreamId);
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>>;
     async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;
     async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
@@ -331,8 +334,8 @@ pub mod tests {
     use crate::{
         chunking::ChunkParams,
         inference::{
-            ChatParams, CompletionEvent, CompletionParams, FinishReason, Message, TextScore,
-            TokenUsage, tests::InferenceStub,
+            ChatEvent, ChatParams, CompletionEvent, CompletionParams, FinishReason, Message,
+            TextScore, TokenUsage, tests::InferenceStub,
         },
         search::{TextCursor, tests::SearchStub},
         tests::api_token,
@@ -893,6 +896,18 @@ pub mod tests {
             unimplemented!()
         }
 
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            unimplemented!()
+        }
+
+        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+            unimplemented!()
+        }
+
+        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
+            unimplemented!()
+        }
+
         async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             unimplemented!()
         }
@@ -944,6 +959,102 @@ pub mod tests {
 
         async fn completion_stream_drop(&mut self, id: CompletionStreamId) {
             self.streams.remove(&id);
+        }
+
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            unimplemented!()
+        }
+
+        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+            unimplemented!()
+        }
+
+        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
+            unimplemented!()
+        }
+
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+            unimplemented!()
+        }
+        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            unimplemented!()
+        }
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            unimplemented!()
+        }
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            unimplemented!()
+        }
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            unimplemented!()
+        }
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            unimplemented!()
+        }
+        async fn document_metadata(
+            &mut self,
+            _document_paths: Vec<DocumentPath>,
+        ) -> Vec<Option<Value>> {
+            unimplemented!()
+        }
+        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
+            unimplemented!()
+        }
+    }
+
+    pub struct CsiChatStreamStub {
+        current_id: usize,
+        events: Vec<ChatEvent>,
+        streams: HashMap<ChatStreamId, Vec<ChatEvent>>,
+    }
+
+    impl CsiChatStreamStub {
+        pub fn new(mut events: Vec<ChatEvent>) -> Self {
+            events.reverse();
+            Self {
+                current_id: 0,
+                events,
+                streams: HashMap::new(),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl CsiForSkills for CsiChatStreamStub {
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            let id = ChatStreamId::new(self.current_id);
+            self.streams.insert(id, self.events.clone());
+            self.current_id += 1;
+            id
+        }
+
+        async fn chat_stream_next(&mut self, id: &ChatStreamId) -> Option<ChatEvent> {
+            self.streams.get_mut(id)?.pop()
+        }
+
+        async fn chat_stream_drop(&mut self, id: ChatStreamId) {
+            self.streams.remove(&id);
+        }
+
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            unimplemented!()
+        }
+
+        async fn completion_stream_next(
+            &mut self,
+            _id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            unimplemented!()
+        }
+
+        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
+            unimplemented!()
         }
 
         async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
@@ -1074,6 +1185,18 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 .collect()
         }
 
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            unimplemented!()
+        }
+
+        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+            unimplemented!()
+        }
+
+        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
+            unimplemented!()
+        }
+
         async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             requests
                 .into_iter()
@@ -1157,6 +1280,18 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         }
 
         async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            unimplemented!()
+        }
+
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            unimplemented!()
+        }
+
+        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+            unimplemented!()
+        }
+
+        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
             unimplemented!()
         }
 

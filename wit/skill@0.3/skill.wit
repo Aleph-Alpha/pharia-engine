@@ -475,7 +475,7 @@ interface inference {
         /// The end of a message. It includes the reason for the message end.
         message-end(finish-reason),
         /// The usage from the generated message.s
-        summary(token-usage),
+        usage(token-usage),
     }
 
     @unstable(feature = streaming)

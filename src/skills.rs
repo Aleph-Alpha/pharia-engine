@@ -615,9 +615,9 @@ pub mod tests {
     use fake::{Fake, Faker};
     use serde_json::json;
     use test_skills::{
-        given_complete_stream_skill, given_python_skill_greet_v0_2, given_python_skill_greet_v0_3,
-        given_rust_skill_chat, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
-        given_rust_skill_search,
+        given_chat_stream_skill, given_complete_stream_skill, given_python_skill_greet_v0_2,
+        given_python_skill_greet_v0_3, given_rust_skill_chat, given_rust_skill_greet_v0_2,
+        given_rust_skill_greet_v0_3, given_rust_skill_search,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -625,12 +625,12 @@ pub mod tests {
     use crate::{
         chunking::{Chunk, ChunkRequest},
         csi::{
-            CompletionStreamId,
-            tests::{CsiCompleteStreamStub, CsiDummy, CsiGreetingMock},
+            ChatStreamId, CompletionStreamId,
+            tests::{CsiChatStreamStub, CsiCompleteStreamStub, CsiDummy, CsiGreetingMock},
         },
         inference::{
-            ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest, Explanation,
-            ExplanationRequest, FinishReason, TokenUsage,
+            ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
+            Explanation, ExplanationRequest, FinishReason, TokenUsage,
         },
         language_selection::{self, SelectLanguageRequest},
         search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -862,6 +862,51 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn can_load_and_run_chat_stream_module() {
+        // Given a skill loaded by our engine
+        let events = vec![
+            ChatEvent::MessageStart {
+                role: "assistant".to_owned(),
+            },
+            ChatEvent::MessageDelta {
+                content: "Homer".to_owned(),
+                logprobs: vec![],
+            },
+            ChatEvent::MessageEnd {
+                finish_reason: FinishReason::Stop,
+            },
+            ChatEvent::Usage {
+                usage: TokenUsage {
+                    prompt: 1,
+                    completion: 2,
+                },
+            },
+        ];
+        let test_skill = given_chat_stream_skill();
+        let wasm = test_skill.bytes();
+        let engine = Engine::new(false).unwrap();
+        let skill = AnySkill::new(&engine, wasm).unwrap();
+        let ctx = Box::new(CsiChatStreamStub::new(events));
+
+        // When invoked with a json string
+        let result = skill
+            .run_as_function(&engine, ctx, json!("Homer"))
+            .await
+            .unwrap();
+
+        // Then it returns a json string
+        assert_eq!(
+            result,
+            json!([
+                "assistant",
+                "Homer",
+                "FinishReason::Stop",
+                "prompt: 1, completion: 2"
+            ])
+        );
+    }
+
+    #[tokio::test]
     async fn can_load_and_run_chat_skill() {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_chat().bytes();
@@ -1045,6 +1090,15 @@ pub mod tests {
             panic!("I am a dummy CsiForSkills")
         }
         async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+            panic!("I am a dummy CsiForSkills")
+        }
+        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
             panic!("I am a dummy CsiForSkills")
         }
         async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {

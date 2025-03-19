@@ -20,9 +20,9 @@ use tokio::{
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
-    csi::{CompletionStreamId, Csi, CsiForSkills},
+    csi::{ChatStreamId, CompletionStreamId, Csi, CsiForSkills},
     inference::{
-        ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
+        self, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
         CompletionRequest, Explanation, ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
@@ -677,6 +677,18 @@ where
         }
     }
 
+    async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId {
+        todo!()
+    }
+
+    async fn chat_stream_next(&mut self, id: &ChatStreamId) -> Option<inference::ChatEvent> {
+        todo!()
+    }
+
+    async fn chat_stream_drop(&mut self, id: ChatStreamId) {
+        todo!()
+    }
+
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
         match self.csi_apis.chunk(self.api_token.clone(), requests).await {
             Ok(chunks) => chunks,
@@ -789,6 +801,18 @@ impl CsiForSkills for SkillMetadataCtx {
 
     async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
         self.send_error().await
+    }
+
+    async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+        self.send_error().await
+    }
+
+    async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<inference::ChatEvent> {
+        self.send_error().await
+    }
+
+    async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
+        self.send_error::<()>().await;
     }
 
     async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
