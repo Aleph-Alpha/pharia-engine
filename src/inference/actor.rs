@@ -405,22 +405,25 @@ impl InferenceMessage {
                 send,
                 api_token,
             } => {
-                let (inner_send, mut recv) = mpsc::channel(1);
+                let (event_send, mut event_recv) = mpsc::channel(1);
                 let mut stream =
-                    Box::pin(client.stream_completion(&request, api_token, inner_send));
+                    Box::pin(client.stream_completion(&request, api_token, event_send));
 
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
                     select! {
                         // Pull from receiver as long as there are still senders
-                        Some(msg) = recv.recv(), if !recv.is_closed() =>  {
-                            drop(send.send(Ok(msg)).await);
+                        Some(msg) = event_recv.recv(), if !event_recv.is_closed() =>  {
+                            let Ok(()) = send.send(Ok(msg)).await else {
+                                // The receiver is dropped so we can stop polling the stream.
+                                break;
+                            };
                         },
                         result = &mut stream =>  {
-                            // Break out of the loopp once the stream is done
                             if let Err(err) = result {
                                 drop(send.send(Err(err.into())).await);
                             }
+                            // Break out of the loop once the stream is done
                             break;
                         }
                     };
