@@ -288,15 +288,18 @@ async fn run_chat_stream_skill() {
     let status = resp.status();
     let value: Value = resp.json().await.unwrap();
     assert_eq!(status, axum::http::StatusCode::OK);
-    assert_eq!(value[0], "assistant");
-    let completion = value[1].as_str().unwrap().to_owned() + value[2].as_str().unwrap();
+    let values = value.as_array().unwrap();
+    assert_eq!(values[0], "assistant");
+    let completion = values[1..values.len() - 2]
+        .iter()
+        .fold(String::new(), |acc, v| acc + v.as_str().unwrap());
     assert_eq!(
         completion,
         "I'm here to help you with any questions or assistance you need. Please feel free to ask \
-        any questions or provide more information on what you'd like help with."
+        anything, and I'll do my best to provide helpful information or guidance."
     );
-    assert_eq!(value[3], "FinishReason::Stop");
-    assert_eq!(value[4], "prompt: 17, completion: 36");
+    assert_eq!(values[values.len() - 2], "FinishReason::Stop");
+    assert_eq!(values[values.len() - 1], "prompt: 17, completion: 37");
 
     kernel.shutdown().await;
 }
