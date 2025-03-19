@@ -878,9 +878,7 @@ pub mod tests {
     use metrics_util::debugging::DebugValue;
     use metrics_util::debugging::{DebuggingRecorder, Snapshot};
     use serde_json::json;
-    use test_skills::{
-        given_invalid_output_skill, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
-    };
+    use test_skills::{given_invalid_output_skill, given_rust_skill_greet_v0_2};
     use tokio::sync::broadcast;
 
     use super::*;
@@ -932,36 +930,6 @@ pub mod tests {
             metadata.unwrap_err().to_string(),
             "The metadata function of the invoked skill is bugged. It is forbidden to invoke any \
             CSI functions from the metadata function, yet the skill does precisely this."
-        );
-    }
-
-    #[tokio::test]
-    async fn skill_metadata_v0_3() {
-        // Given a skill runtime api that always returns a v0.3 skill
-        let test_skill = given_rust_skill_greet_v0_3();
-        let skill_path = SkillPath::local("greet");
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let store =
-            SkillStoreStubLegacy::new(engine.clone(), test_skill.bytes(), skill_path.clone());
-        let runtime = SkillRuntime::new(engine, CsiSaboteur, store.api());
-
-        // When metadata for a skill is requested
-        let metadata = runtime.api().skill_metadata(skill_path).await.unwrap();
-        runtime.wait_for_shutdown().await;
-
-        // Then the metadata is returned
-        assert_eq!(metadata.description().unwrap(), "A friendly greeting skill");
-        assert_eq!(
-            metadata.signature().unwrap().input_schema(),
-            &json!({"type": "string", "description": "The name of the person to greet"})
-                .try_into()
-                .unwrap()
-        );
-        assert_eq!(
-            metadata.signature().unwrap().output_schema().unwrap(),
-            &json!({"type": "string", "description": "A friendly greeting message"})
-                .try_into()
-                .unwrap()
         );
     }
 

@@ -1073,6 +1073,35 @@ pub mod tests {
         assert_eq!(third_result, json!("Hello Homer"));
     }
 
+    #[tokio::test]
+    async fn skill_metadata_v0_3() {
+        // Given a skill runtime api that always returns a v0.3 skill
+        let skill_bytes = given_rust_skill_greet_v0_3().bytes();
+        let engine = Engine::new(false).unwrap();
+        let skill = AnySkill::new(&engine, skill_bytes).unwrap();
+
+        // When metadata for a skill is requested
+        let metadata = skill
+            .metadata(&engine, Box::new(CsiForSkillsDummy))
+            .await
+            .unwrap();
+
+        // Then the metadata is returned
+        assert_eq!(metadata.description().unwrap(), "A friendly greeting skill");
+        assert_eq!(
+            metadata.signature().unwrap().input_schema(),
+            &json!({"type": "string", "description": "The name of the person to greet"})
+                .try_into()
+                .unwrap()
+        );
+        assert_eq!(
+            metadata.signature().unwrap().output_schema().unwrap(),
+            &json!({"type": "string", "description": "A friendly greeting message"})
+                .try_into()
+                .unwrap()
+        );
+    }
+
     pub struct SkillDummy;
 
     #[async_trait]
