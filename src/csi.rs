@@ -248,7 +248,7 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
             .increment(1);
 
-        todo!()
+        self.inference.chat_stream(request, auth).await
     }
 
     async fn chunk(
@@ -530,7 +530,8 @@ pub mod tests {
     #[tokio::test]
     async fn completion_stream_events() {
         // Given a CSI drivers with stub completion
-        let inference_stub = InferenceStub::new(|r| Ok(Completion::from_text(r.prompt)));
+        let inference_stub =
+            InferenceStub::with_completion(|r| Ok(Completion::from_text(r.prompt)));
         let csi_apis = CsiDrivers {
             inference: inference_stub.api(),
             ..dummy_csi_drivers()
@@ -563,9 +564,60 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn chat_stream_events() {
+        // Given a CSI drivers with stub completion
+        let inference_stub = InferenceStub::with_chat(|_| {
+            Ok(ChatResponse {
+                message: Message {
+                    role: "assistant".to_owned(),
+                    content: "Hello".to_owned(),
+                },
+                finish_reason: FinishReason::Stop,
+                logprobs: vec![],
+                usage: TokenUsage {
+                    prompt: 1,
+                    completion: 1,
+                },
+            })
+        });
+        let csi_apis = CsiDrivers {
+            inference: inference_stub.api(),
+            ..dummy_csi_drivers()
+        };
+
+        // When requesting a streamed completion
+        let chat_req = ChatRequest {
+            model: "dummy_model".to_owned(),
+            messages: vec![Message {
+                role: "user".to_owned(),
+                content: "request".to_owned(),
+            }],
+            params: ChatParams::default(),
+        };
+
+        let mut chat = csi_apis.chat_stream(api_token().to_owned(), chat_req).await;
+
+        let mut events = vec![];
+        while let Some(Ok(event)) = chat.recv().await {
+            events.push(event);
+        }
+
+        drop(csi_apis);
+        inference_stub.wait_for_shutdown().await;
+
+        // Then the completion must have the same order as the respective requests
+        assert_eq!(events.len(), 4);
+        assert!(matches!(events[0], ChatEvent::MessageStart { .. }));
+        assert!(matches!(events[1], ChatEvent::MessageDelta { .. }));
+        assert!(matches!(events[2], ChatEvent::MessageEnd { .. }));
+        assert!(matches!(events[3], ChatEvent::Usage { .. }));
+    }
+
+    #[tokio::test]
     async fn completion_requests_in_respective_order() {
         // Given a CSI drivers with stub completion
-        let inference_stub = InferenceStub::new(|r| Ok(Completion::from_text(r.prompt)));
+        let inference_stub =
+            InferenceStub::with_completion(|r| Ok(Completion::from_text(r.prompt)));
         let csi_apis = CsiDrivers {
             inference: inference_stub.api(),
             ..dummy_csi_drivers()
