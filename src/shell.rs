@@ -43,7 +43,7 @@ use crate::{
     namespace_watcher::Namespace,
     skill_runtime::{SkillExecutionError, SkillRuntimeApi, StreamEvent},
     skill_store::{SkillStoreApi, SkillStoreMsg},
-    skills::{AnySkillMetadata, JsonSchema, Signature, SkillPath},
+    skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
 };
 
 pub struct Shell {
@@ -285,10 +285,11 @@ impl From<SkillExecutionError> for HttpError {
         let status_code = match &value {
             SkillExecutionError::MisconfiguredNamespace { .. }
             | SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::InvalidOutput(_)
             | SkillExecutionError::RuntimeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            SkillExecutionError::SkillLogicError(_) | SkillExecutionError::SkillNotConfigured => {
-                StatusCode::BAD_REQUEST
-            }
+            SkillExecutionError::UserCode(_)
+            | SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         };
         HttpError::new(value.to_string(), status_code)
     }
@@ -464,8 +465,8 @@ struct SkillMetadataV1Representation {
     output_schema: Option<JsonSchema>,
 }
 
-impl From<AnySkillMetadata> for SkillMetadataV1Representation {
-    fn from(metadata: AnySkillMetadata) -> Self {
+impl From<AnySkillManifest> for SkillMetadataV1Representation {
+    fn from(metadata: AnySkillManifest) -> Self {
         let signature = metadata.signature();
         SkillMetadataV1Representation {
             description: metadata.description().map(ToOwned::to_owned),
@@ -696,7 +697,7 @@ mod tests {
         inference,
         skill_runtime::SkillExecutionError,
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
-        skills::{AnySkillMetadata, JsonSchema, SkillMetadataV0_3, SkillPath},
+        skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
     };
 
@@ -783,7 +784,7 @@ mod tests {
     #[tokio::test]
     async fn skill_metadata() {
         // Given
-        let metadata = AnySkillMetadata::V0_3(SkillMetadataV0_3 {
+        let metadata = AnySkillManifest::V0_3(SkillMetadataV0_3 {
             description: Some("dummy description".to_owned()),
             signature: Signature::Function {
                 input_schema: JsonSchema::dummy(),
@@ -1613,7 +1614,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<AnySkillMetadata, SkillExecutionError> {
+        ) -> Result<AnySkillManifest, SkillExecutionError> {
             panic!("Skill runtime dummy called")
         }
     }
@@ -1658,7 +1659,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<AnySkillMetadata, SkillExecutionError> {
+        ) -> Result<AnySkillManifest, SkillExecutionError> {
             Err((*self.make_error)())
         }
     }
@@ -1667,7 +1668,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     #[derive(Debug, Clone)]
     struct SkillRuntimeStub {
         function_result: Value,
-        metadata: AnySkillMetadata,
+        metadata: AnySkillManifest,
         stream_events: Vec<StreamEvent>,
     }
 
@@ -1676,7 +1677,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             Self {
                 function_result: value,
                 stream_events: Vec::new(),
-                metadata: AnySkillMetadata::V0,
+                metadata: AnySkillManifest::V0,
             }
         }
 
@@ -1684,11 +1685,11 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             Self {
                 function_result: Value::default(),
                 stream_events,
-                metadata: AnySkillMetadata::V0,
+                metadata: AnySkillManifest::V0,
             }
         }
 
-        pub fn with_metadata(metadata: AnySkillMetadata) -> Self {
+        pub fn with_metadata(metadata: AnySkillManifest) -> Self {
             Self {
                 function_result: Value::default(),
                 stream_events: Vec::new(),
@@ -1724,7 +1725,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<AnySkillMetadata, SkillExecutionError> {
+        ) -> Result<AnySkillManifest, SkillExecutionError> {
             Ok(self.metadata.clone())
         }
     }
@@ -1797,7 +1798,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
-        ) -> Result<AnySkillMetadata, SkillExecutionError> {
+        ) -> Result<AnySkillManifest, SkillExecutionError> {
             unimplemented!("Not needed in any test for now")
         }
     }

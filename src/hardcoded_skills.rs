@@ -1,6 +1,5 @@
 //! Contains hardcoded skills that are available in beta systems for testing.
 
-use anyhow::bail;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -9,7 +8,7 @@ use serde_json::Value;
 use crate::{
     csi::CsiForSkills,
     namespace_watcher::Namespace,
-    skills::{AnySkillMetadata, Engine, Skill, SkillPath},
+    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillPath},
 };
 
 /// If the path designates a hardcoded skill, return it.
@@ -32,12 +31,12 @@ pub struct SkillTellMeAJoke;
 
 #[async_trait]
 impl Skill for SkillHello {
-    async fn metadata(
+    async fn manifest(
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<AnySkillMetadata> {
-        Ok(AnySkillMetadata::V0)
+    ) -> Result<AnySkillManifest, SkillError> {
+        Ok(AnySkillManifest::V0)
     }
 
     async fn run_as_function(
@@ -45,19 +44,19 @@ impl Skill for SkillHello {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
-    ) -> anyhow::Result<Value> {
-        bail!("I am a dummy Skill")
+    ) -> Result<Value, SkillError> {
+        Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
 }
 
 #[async_trait]
 impl Skill for SkillSaboteur {
-    async fn metadata(
+    async fn manifest(
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<AnySkillMetadata> {
-        Ok(AnySkillMetadata::V0)
+    ) -> Result<AnySkillManifest, SkillError> {
+        Ok(AnySkillManifest::V0)
     }
 
     async fn run_as_function(
@@ -65,19 +64,19 @@ impl Skill for SkillSaboteur {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
-    ) -> anyhow::Result<Value> {
-        bail!("I am a dummy Skill")
+    ) -> Result<Value, SkillError> {
+        Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
 }
 
 #[async_trait]
 impl Skill for SkillTellMeAJoke {
-    async fn metadata(
+    async fn manifest(
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<AnySkillMetadata> {
-        bail!("I am a dummy Skill")
+    ) -> Result<AnySkillManifest, SkillError> {
+        Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
 
     async fn run_as_function(
@@ -85,7 +84,7 @@ impl Skill for SkillTellMeAJoke {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
-    ) -> anyhow::Result<Value> {
-        bail!("I am a dummy Skill")
+    ) -> Result<Value, SkillError> {
+        Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
 }
