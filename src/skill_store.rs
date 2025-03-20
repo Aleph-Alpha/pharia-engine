@@ -1,6 +1,7 @@
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::{
+    hardcoded_skills::hardcoded_skill,
     namespace_watcher::Namespace,
     registries::Digest,
     skill_loader::{ConfiguredSkill, SkillLoaderApi, SkillLoaderError},
@@ -483,6 +484,10 @@ where
         match msg {
             SkillStoreMsg::Fetch { skill_path, send } => {
                 if let Some(skill) = self.provider.cached_skill(&skill_path) {
+                    drop(send.send(Ok(Some(skill))));
+                    return;
+                }
+                if let Some(skill) = hardcoded_skill(&skill_path) {
                     drop(send.send(Ok(Some(skill))));
                     return;
                 }

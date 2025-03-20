@@ -4,6 +4,7 @@ mod config;
 mod csi;
 mod csi_shell;
 mod feature_set;
+mod hardcoded_skills;
 mod http;
 mod inference;
 mod language_selection;

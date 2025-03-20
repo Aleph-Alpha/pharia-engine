@@ -57,9 +57,7 @@ where
         mut ctx: Box<dyn CsiForSkills + Send>,
         sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillExecutionError> {
-        if skill_path.namespace != Namespace::new("test-beta").unwrap() {
-            return Err(SkillExecutionError::SkillNotConfigured);
-        }
+        let _skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
 
         let name = skill_path.name.clone();
         // Hardcoded domain logic-----------------------------
@@ -862,12 +860,15 @@ pub mod tests {
 
     use crate::csi::tests::CsiCompleteStub;
     use crate::csi::tests::CsiSaboteur;
+    use crate::hardcoded_skills::SkillSaboteur;
+    use crate::hardcoded_skills::SkillTellMeAJoke;
     use crate::inference::{
         ChatParams, Explanation, FinishReason, Granularity, Logprobs, Message, TextScore,
         TokenUsage,
     };
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::{SkillStoreDummy, SkillStoreStub};
+    use crate::skills::tests::SkillDummy;
     use crate::skills::{AnySkillMetadata, Skill};
     use crate::{
         chunking::ChunkParams,
@@ -1247,7 +1248,9 @@ pub mod tests {
     async fn stream_hello_test() {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
-        let runtime = SkillRuntime::new(engine, CsiDummy, SkillStoreDummy);
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(Some(Arc::new(SkillDummy)));
+        let runtime = SkillRuntime::new(engine, CsiDummy, store);
 
         // When
         let mut recv = runtime
@@ -1290,7 +1293,9 @@ pub mod tests {
     async fn stream_saboteur_test() {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
-        let runtime = SkillRuntime::new(engine, CsiDummy, SkillStoreDummy);
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(Some(Arc::new(SkillSaboteur)));
+        let runtime = SkillRuntime::new(engine, CsiDummy, store);
 
         // When
         let mut recv = runtime
@@ -1361,7 +1366,9 @@ pub mod tests {
     async fn stream_skill_should_emit_error_in_case_of_runtime_error_in_csi() {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
-        let runtime = SkillRuntime::new(engine, CsiSaboteur, SkillStoreDummy);
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(Some(Arc::new(SkillTellMeAJoke)));
+        let runtime = SkillRuntime::new(engine, CsiSaboteur, store);
         let skill_path = SkillPath::new(Namespace::new("test-beta").unwrap(), "tell_me_a_joke");
 
         // When
