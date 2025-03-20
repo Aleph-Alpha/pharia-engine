@@ -29,7 +29,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skill_store::{SkillStoreApi, SkillStoreError},
-    skills::{AnySkillMetadata, Engine, SkillPath},
+    skills::{AnySkillManifest, Engine, SkillError, SkillPath},
 };
 
 pub struct WasmRuntime<S> {
@@ -62,9 +62,9 @@ where
         let name = skill_path.name.clone();
         // Hardcoded domain logic-----------------------------
         if name.eq_ignore_ascii_case("saboteur") {
-            Err(SkillExecutionError::SkillLogicError(anyhow!(
-                "Skill is a saboteur"
-            )))
+            Err(SkillExecutionError::UserCode(
+                "Skill is a saboteur".to_owned(),
+            ))
         } else if name.eq_ignore_ascii_case("hello") {
             for c in "Hello".chars() {
                 sender
@@ -118,24 +118,20 @@ where
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
-        skill
-            .run_as_function(&self.engine, ctx, input)
-            .await
-            .map_err(SkillExecutionError::SkillLogicError)
+        let output = skill.run_as_function(&self.engine, ctx, input).await?;
+        Ok(output)
     }
 
     pub async fn metadata(
         &self,
         skill_path: &SkillPath,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<AnySkillMetadata, SkillExecutionError> {
+    ) -> Result<AnySkillManifest, SkillExecutionError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
-        skill
-            .metadata(self.engine.as_ref(), ctx)
-            .await
-            .map_err(SkillExecutionError::SkillLogicError)
+        let manifest = skill.manifest(self.engine.as_ref(), ctx).await?;
+        Ok(manifest)
     }
 }
 
@@ -154,6 +150,18 @@ impl From<SkillStoreError> for SkillExecutionError {
                     original_syntax_error,
                 }
             }
+        }
+    }
+}
+
+impl From<SkillError> for SkillExecutionError {
+    fn from(source: SkillError) -> Self {
+        match source {
+            SkillError::Any(error) => Self::UserCode(error.to_string()),
+            SkillError::InvalidInput(error) => Self::InvalidInput(error),
+            SkillError::UserCode(error) => Self::UserCode(error),
+            SkillError::InvalidOutput(error) => Self::InvalidOutput(error),
+            SkillError::RuntimeError(error) => SkillExecutionError::RuntimeError(error),
         }
     }
 }
@@ -217,7 +225,7 @@ pub trait SkillRuntimeApi {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<AnySkillMetadata, SkillExecutionError>;
+    ) -> Result<AnySkillManifest, SkillExecutionError>;
 }
 
 #[async_trait]
@@ -265,7 +273,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<AnySkillMetadata, SkillExecutionError> {
+    ) -> Result<AnySkillManifest, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Metadata(MetadataMsg { skill_path, send });
         self.send(msg)
@@ -304,7 +312,16 @@ pub enum SkillExecutionError {
         seems to be correct you may want to contact the skill developer. Error reported by Skill:\n\
         \n{0}"
     )]
-    SkillLogicError(#[source] anyhow::Error),
+    UserCode(String),
+    /// Skills are still responsible for parsing the input bytes. Our SDK emits a specific error if
+    /// the input is not interpretable.
+    #[error("The skill had trouble interpreting the input:\n\n{0}")]
+    InvalidInput(String),
+    #[error(
+        "The skill returned an output the Kernel could not interpret. This hints to a bug in the \
+        skill. Please contact its developer. Caused by: \n\n{0}"
+    )]
+    InvalidOutput(String),
     /// A runtime error is caused by the runtime, i.e. the dependencies and resources we need to be
     /// available in order execute skills. For us this are mostly the drivers behind the CSI. This
     /// does not mean that all CSI errors are runtime errors, because the Inference may e.g. be
@@ -433,7 +450,7 @@ impl SkillRuntimeMsg {
 #[derive(Debug)]
 pub struct MetadataMsg {
     pub skill_path: SkillPath,
-    pub send: oneshot::Sender<Result<AnySkillMetadata, SkillExecutionError>>,
+    pub send: oneshot::Sender<Result<AnySkillManifest, SkillExecutionError>>,
 }
 
 impl MetadataMsg {
@@ -510,9 +527,11 @@ fn status_label(result: Result<(), &SkillExecutionError>) -> String {
     match result {
         Ok(()) => "ok",
         Err(
-            SkillExecutionError::SkillLogicError(_)
+            SkillExecutionError::UserCode(_)
             | SkillExecutionError::CsiUseFromMetadata
             | SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::InvalidInput(_)
+            | SkillExecutionError::InvalidOutput(_)
             | SkillExecutionError::MisconfiguredNamespace { .. },
         ) => "logic_error",
         Err(SkillExecutionError::RuntimeError(_)) => "runtime_error",
@@ -869,7 +888,7 @@ pub mod tests {
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::SkillStoreStub;
     use crate::skills::tests::SkillDummy;
-    use crate::skills::{AnySkillMetadata, Skill};
+    use crate::skills::{AnySkillManifest, Skill};
     use crate::{
         chunking::ChunkParams,
         csi::tests::{CsiDummy, StubCsi},
@@ -891,11 +910,11 @@ pub mod tests {
         struct CsiFromMetadataSkill;
         #[async_trait]
         impl Skill for CsiFromMetadataSkill {
-            async fn metadata(
+            async fn manifest(
                 &self,
                 _engine: &Engine,
                 mut ctx: Box<dyn CsiForSkills + Send>,
-            ) -> Result<AnySkillMetadata, anyhow::Error> {
+            ) -> Result<AnySkillManifest, SkillError> {
                 ctx.select_language(vec![SelectLanguageRequest {
                     text: "Hello, good sir!".to_owned(),
                     languages: Vec::new(),
@@ -911,7 +930,7 @@ pub mod tests {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
-            ) -> Result<Value, anyhow::Error> {
+            ) -> Result<Value, SkillError> {
                 unreachable!("This won't be invoked during the test")
             }
         }
@@ -946,7 +965,7 @@ pub mod tests {
                 _engine: &Engine,
                 mut ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
-            ) -> Result<Value, anyhow::Error> {
+            ) -> Result<Value, SkillError> {
                 let explanation = ctx
                     .explain(vec![ExplanationRequest {
                         prompt: "An apple a day".to_owned(),
@@ -964,11 +983,11 @@ pub mod tests {
                 Ok(json!(output))
             }
 
-            async fn metadata(
+            async fn manifest(
                 &self,
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
-            ) -> Result<AnySkillMetadata, anyhow::Error> {
+            ) -> Result<AnySkillManifest, SkillError> {
                 panic!("Dummy metadata implementation of SkillDoubleUsingExplain")
             }
         }
@@ -1192,7 +1211,7 @@ pub mod tests {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
-            ) -> Result<Value, anyhow::Error> {
+            ) -> Result<Value, SkillError> {
                 let mut recv = self.send.subscribe();
                 self.send.send(()).unwrap();
                 // Send once await two responses. This way we can only finish any skill if we
@@ -1204,11 +1223,11 @@ pub mod tests {
                 Ok(json!("Hello"))
             }
 
-            async fn metadata(
+            async fn manifest(
                 &self,
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
-            ) -> Result<AnySkillMetadata, anyhow::Error> {
+            ) -> Result<AnySkillManifest, SkillError> {
                 panic!("Dummy metadata implementation of Assert concurrency skill")
             }
         }
@@ -1498,15 +1517,15 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
-        ) -> Result<Value, anyhow::Error> {
+        ) -> Result<Value, SkillError> {
             Ok(json!("Hello"))
         }
 
-        async fn metadata(
+        async fn manifest(
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
-        ) -> Result<AnySkillMetadata, anyhow::Error> {
+        ) -> Result<AnySkillManifest, SkillError> {
             panic!("Dummy metadata implementation of Greet Skill")
         }
     }
@@ -1521,7 +1540,7 @@ pub mod tests {
             _engine: &Engine,
             mut ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
-        ) -> Result<Value, anyhow::Error> {
+        ) -> Result<Value, SkillError> {
             let mut completions = ctx
                 .complete(vec![CompletionRequest {
                     prompt: "Hello".to_owned(),
@@ -1543,11 +1562,11 @@ pub mod tests {
             Ok(json!(completion))
         }
 
-        async fn metadata(
+        async fn manifest(
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
-        ) -> Result<AnySkillMetadata, anyhow::Error> {
+        ) -> Result<AnySkillManifest, SkillError> {
             panic!("Dummy metadata implementation of Skill Greet Completion")
         }
     }

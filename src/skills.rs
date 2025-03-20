@@ -14,6 +14,7 @@ use semver::Version;
 use serde::Serialize;
 use serde_json::Value;
 use strum::{EnumIter, IntoEnumIterator};
+use thiserror::Error;
 use tracing::info;
 use utoipa::ToSchema;
 use wasmtime::{
@@ -54,13 +55,13 @@ impl fmt::Display for SkillPath {
 }
 
 #[derive(Debug, Clone)]
-pub enum AnySkillMetadata {
+pub enum AnySkillManifest {
     /// Earliest skill versions do not contain metadata
     V0,
     V0_3(SkillMetadataV0_3),
 }
 
-impl AnySkillMetadata {
+impl AnySkillManifest {
     pub fn description(&self) -> Option<&str> {
         match self {
             Self::V0 => None,
@@ -149,7 +150,23 @@ impl Signature {
     }
 }
 
-#[derive(Debug, thiserror::Error, Clone)]
+#[derive(Debug)]
+pub enum SkillError {
+    Any(anyhow::Error),
+    /// Skills are still responsible for parsing the input bytes. Our SDK emits a specific error if
+    /// the input is not interpretable.
+    InvalidInput(String),
+    /// Could be a bug in the skill code, an invalid input, which is not catched by the signature,
+    /// or an unmet precondition. E.g. a model not existing, or a collection not available. It
+    /// should always map to a logic error.
+    UserCode(String),
+    InvalidOutput(String),
+    /// E.g. if instantiating the skill fails.
+    RuntimeError(anyhow::Error),
+}
+
+/// Failures which occur when loading a skill from Web Assembly bytes.
+#[derive(Debug, Error, Clone)]
 pub enum LoadSkillError {
     #[error("Failed to pre-instantiate the skill: {0}")]
     SkillPreError(String),
@@ -269,18 +286,18 @@ impl Engine {
 
 #[async_trait]
 pub trait Skill: Send + Sync {
-    async fn metadata(
+    async fn manifest(
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<AnySkillMetadata>;
+    ) -> Result<AnySkillManifest, SkillError>;
 
     async fn run_as_function(
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
-    ) -> anyhow::Result<Value>;
+    ) -> Result<Value, SkillError>;
 }
 
 /// Factory for creating skills. Responsible for inspecting the skill bytes, and instantiatnig the
@@ -310,18 +327,25 @@ pub fn load_skill_from_wasm_bytes(
 
 #[async_trait]
 impl Skill for v0_3::skill::SkillPre<LinkedCtx> {
-    async fn metadata(
+    async fn manifest(
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<AnySkillMetadata> {
+    ) -> Result<AnySkillManifest, SkillError> {
         let mut store = engine.store(LinkedCtx::new(ctx));
-        let bindings = self.instantiate_async(&mut store).await?;
-        let metadata = bindings
+        let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
+            tracing::error!("Failed to instantiate skill: {}", e);
+            SkillError::RuntimeError(e.into())
+        })?;
+        let manifest = bindings
             .pharia_skill_skill_handler()
             .call_metadata(store)
-            .await?;
-        metadata.try_into().map(AnySkillMetadata::V0_3)
+            .await
+            .map_err(|e| SkillError::RuntimeError(e.into()))?;
+        manifest
+            .try_into()
+            .map(AnySkillManifest::V0_3)
+            .map_err(SkillError::Any)
     }
 
     async fn run_as_function(
@@ -329,39 +353,50 @@ impl Skill for v0_3::skill::SkillPre<LinkedCtx> {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
-    ) -> anyhow::Result<Value> {
+    ) -> Result<Value, SkillError> {
         let mut store = engine.store(LinkedCtx::new(ctx));
-        let input = serde_json::to_vec(&input)?;
-        let bindings = self.instantiate_async(&mut store).await?;
+        let input = serde_json::to_vec(&input).expect("Json is always serializable");
+        let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
+            tracing::error!("Failed to instantiate skill: {}", e);
+            SkillError::RuntimeError(e.into())
+        })?;
         let result = bindings
             .pharia_skill_skill_handler()
             .call_run(store, &input)
-            .await?;
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to execute skill handler: {}", e);
+                SkillError::RuntimeError(e.into())
+            })?;
         let result = match result {
             Ok(result) => result,
             Err(e) => match e {
                 v0_3::skill::exports::pharia::skill::skill_handler::Error::Internal(e) => {
-                    tracing::error!("Failed to run skill, internal skill error:\n{e}");
-                    return Err(anyhow!("Internal skill error:\n{e}"));
+                    return Err(SkillError::UserCode(e.into()));
                 }
                 v0_3::skill::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
-                    tracing::error!("Failed to run skill, invalid input:\n{e}");
-                    return Err(anyhow!("Invalid input:\n{e}"));
+                    return Err(SkillError::InvalidInput(e.to_string()));
                 }
             },
         };
-        Ok(serde_json::from_slice(&result)?)
+        match serde_json::from_slice(&result) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                tracing::warn!("A skill returned invalid output: {}", e);
+                Err(SkillError::InvalidOutput(e.to_string()))
+            }
+        }
     }
 }
 
 #[async_trait]
 impl Skill for v0_2::SkillPre<LinkedCtx> {
-    async fn metadata(
+    async fn manifest(
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
-    ) -> anyhow::Result<AnySkillMetadata> {
-        Ok(AnySkillMetadata::V0)
+    ) -> Result<AnySkillManifest, SkillError> {
+        Ok(AnySkillManifest::V0)
     }
 
     async fn run_as_function(
@@ -369,28 +404,37 @@ impl Skill for v0_2::SkillPre<LinkedCtx> {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
-    ) -> anyhow::Result<Value> {
+    ) -> Result<Value, SkillError> {
         let mut store = engine.store(LinkedCtx::new(ctx));
-        let input = serde_json::to_vec(&input)?;
-        let bindings = self.instantiate_async(&mut store).await?;
+        let input = serde_json::to_vec(&input).expect("Json is always serializable");
+        let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
+            tracing::error!("Failed to instantiate skill: {}", e);
+            SkillError::RuntimeError(e.into())
+        })?;
         let result = bindings
             .pharia_skill_skill_handler()
             .call_run(store, &input)
-            .await?;
+            .await
+            .map_err(|e| SkillError::RuntimeError(e.into()))?;
         let result = match result {
             Ok(result) => result,
             Err(e) => match e {
                 v0_2::exports::pharia::skill::skill_handler::Error::Internal(e) => {
-                    tracing::error!("Failed to run skill, internal skill error:\n{e}");
-                    return Err(anyhow!("Internal skill error:\n{e}"));
+                    return Err(SkillError::UserCode(e.to_string()));
                 }
                 v0_2::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
-                    tracing::error!("Failed to run skill, invalid input:\n{e}");
-                    return Err(anyhow!("Invalid input:\n{e}"));
+                    return Err(SkillError::InvalidInput(e.to_string()));
                 }
             },
         };
-        Ok(serde_json::from_slice(&result)?)
+        match serde_json::from_slice(&result) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                // An operater might want to know that there is a buggy skill deployed.
+                tracing::warn!("A skill returned invalid output: {}", e);
+                Err(SkillError::InvalidOutput(e.to_string()))
+            }
+        }
     }
 }
 
@@ -772,12 +816,12 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata = skill
-            .metadata(&engine, Box::new(CsiForSkillsDummy))
+            .manifest(&engine, Box::new(CsiForSkillsDummy))
             .await
             .unwrap();
 
         // Then the metadata is the empty V0, because v0.2 had no metadata
-        assert!(matches!(metadata, AnySkillMetadata::V0));
+        assert!(matches!(metadata, AnySkillManifest::V0));
     }
 
     #[tokio::test]
@@ -788,7 +832,7 @@ pub mod tests {
         let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
 
         // When metadata for a skill is requested
-        let metadata_result = skill.metadata(&engine, Box::new(CsiForSkillsDummy)).await;
+        let metadata_result = skill.manifest(&engine, Box::new(CsiForSkillsDummy)).await;
 
         // Then the metadata gives an error
         assert!(metadata_result.is_err());
@@ -1122,7 +1166,7 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata = skill
-            .metadata(&engine, Box::new(CsiForSkillsDummy))
+            .manifest(&engine, Box::new(CsiForSkillsDummy))
             .await
             .unwrap();
 
@@ -1146,11 +1190,11 @@ pub mod tests {
 
     #[async_trait]
     impl Skill for SkillDummy {
-        async fn metadata(
+        async fn manifest(
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
-        ) -> anyhow::Result<AnySkillMetadata> {
+        ) -> Result<AnySkillManifest, SkillError> {
             panic!("I am a dummy Skill")
         }
 
@@ -1159,7 +1203,7 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
-        ) -> anyhow::Result<Value> {
+        ) -> Result<Value, SkillError> {
             panic!("I am a dummy Skill")
         }
     }
