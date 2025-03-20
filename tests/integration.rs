@@ -646,7 +646,9 @@ async fn invoke_function_as_stream() {
     let body = resp.text().await.unwrap();
     assert_eq!(
         body,
-        "event: error\ndata: {\"message\":\"Sorry, We could not find the skill you requested in its namespace. This can have three causes:\\n\\n1. You send the wrong skill name.\\n2. You send the wrong namespace.\\n3. The skill is not configured in the namespace you requested. You may want to check the namespace configuration.\"}\n\n"
+        "event: error\n\
+        data: {\"message\":\"The skill is designed to be executed as a function. Please invoke it \
+        via the /run endpoint.\"}\n\n"
     );
 
     kernel.shutdown().await;

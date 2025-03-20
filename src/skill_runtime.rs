@@ -22,8 +22,8 @@ use crate::{
     chunking::{Chunk, ChunkRequest},
     csi::{ChatStreamId, CompletionStreamId, Csi, CsiForSkills},
     inference::{
-        self, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
-        CompletionRequest, Explanation, ExplanationRequest,
+        self, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
+        Explanation, ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
     namespace_watcher::Namespace,
@@ -53,60 +53,19 @@ where
     pub async fn run_stream(
         &self,
         skill_path: &SkillPath,
-        _input: Value,
-        mut ctx: Box<dyn CsiForSkills + Send>,
+        input: Value,
+        ctx: Box<dyn CsiForSkills + Send>,
         sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillExecutionError> {
-        let _skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
-
-        let name = skill_path.name.clone();
-        // Hardcoded domain logic-----------------------------
-        if name.eq_ignore_ascii_case("saboteur") {
-            Err(SkillExecutionError::UserCode(
-                "Skill is a saboteur".to_owned(),
-            ))
-        } else if name.eq_ignore_ascii_case("hello") {
-            for c in "Hello".chars() {
-                sender
-                    .send(StreamEvent::Append(c.to_string()))
-                    .await
-                    .unwrap();
-            }
-            Ok(())
-        } else if name.eq_ignore_ascii_case("tell_me_a_joke") {
-            let prompt = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\
-                            \n\
-                        Tell me a joke!<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\
-                        "
-            .to_owned();
-            let params = CompletionParams {
-                return_special_tokens: false,
-                max_tokens: Some(300),
-                temperature: Some(0.3),
-                top_k: None,
-                top_p: None,
-                stop: vec![],
-                frequency_penalty: None,
-                presence_penalty: None,
-                logprobs: crate::inference::Logprobs::No,
-            };
-            let request = CompletionRequest {
-                prompt,
-                model: "llama-3.1-8b-instruct".to_owned(),
-                params,
-            };
-            let stream_id = ctx.completion_stream_new(request).await;
-            while let Some(event) = ctx.completion_stream_next(&stream_id).await {
-                if let CompletionEvent::Delta { text, .. } = event {
-                    sender.send(StreamEvent::Append(text)).await.unwrap();
-                }
-            }
-            ctx.completion_stream_drop(stream_id).await;
-            Ok(())
-        } else {
-            Err(SkillExecutionError::SkillNotConfigured)
-        }
-        // ---------------------------------------------------
+        let skill = self
+            .skill_store_api
+            .fetch(skill_path.to_owned())
+            .await?
+            .ok_or(SkillExecutionError::SkillNotConfigured)?;
+        skill
+            .run_as_generator(&self.engine, ctx, input, sender)
+            .await?;
+        Ok(())
     }
 
     pub async fn run_function(
@@ -889,15 +848,16 @@ pub mod tests {
 
     use crate::csi::tests::CsiCompleteStub;
     use crate::csi::tests::CsiSaboteur;
+    use crate::hardcoded_skills::SkillHello;
     use crate::hardcoded_skills::SkillSaboteur;
     use crate::hardcoded_skills::SkillTellMeAJoke;
+    use crate::inference::CompletionParams;
     use crate::inference::{
         ChatParams, Explanation, FinishReason, Granularity, Logprobs, Message, TextScore,
         TokenUsage,
     };
     use crate::namespace_watcher::Namespace;
     use crate::skill_store::tests::SkillStoreStub;
-    use crate::skills::tests::SkillDummy;
     use crate::skills::{AnySkillManifest, Skill};
     use crate::{
         chunking::ChunkParams,
@@ -949,8 +909,9 @@ pub mod tests {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
+                _sender: mpsc::Sender<StreamEvent>,
             ) -> Result<(), SkillError> {
-                Err(SkillError::IsFunction)
+                unreachable!("This won't be invoked during the test")
             }
         }
 
@@ -1015,8 +976,9 @@ pub mod tests {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
+                _sender: mpsc::Sender<StreamEvent>,
             ) -> Result<(), SkillError> {
-                Err(SkillError::IsFunction)
+                panic!("Dummy generator implementation of SkillDoubleUsingExplain")
             }
         }
 
@@ -1264,8 +1226,9 @@ pub mod tests {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
+                _mpsc: mpsc::Sender<StreamEvent>,
             ) -> Result<(), SkillError> {
-                Err(SkillError::IsFunction)
+                panic!("Dummy generator implementation of Assert concurrency skill")
             }
         }
 
@@ -1305,7 +1268,7 @@ pub mod tests {
         // Given
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut store = SkillStoreStub::new();
-        store.with_fetch_response(Some(Arc::new(SkillDummy)));
+        store.with_fetch_response(Some(Arc::new(SkillHello)));
         let runtime = SkillRuntime::new(engine, CsiDummy, store);
 
         // When
@@ -1571,6 +1534,7 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
+            _sender: mpsc::Sender<StreamEvent>,
         ) -> Result<(), SkillError> {
             Err(SkillError::IsFunction)
         }
@@ -1621,6 +1585,7 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
+            _sender: mpsc::Sender<StreamEvent>,
         ) -> Result<(), SkillError> {
             Err(SkillError::IsFunction)
         }
