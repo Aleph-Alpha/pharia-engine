@@ -335,13 +335,13 @@ impl Skill for v0_3::skill::SkillPre<LinkedCtx> {
         let mut store = engine.store(LinkedCtx::new(ctx));
         let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
             tracing::error!("Failed to instantiate skill: {}", e);
-            SkillError::RuntimeError(e.into())
+            SkillError::RuntimeError(e)
         })?;
         let manifest = bindings
             .pharia_skill_skill_handler()
             .call_metadata(store)
             .await
-            .map_err(|e| SkillError::RuntimeError(e.into()))?;
+            .map_err(SkillError::RuntimeError)?;
         manifest
             .try_into()
             .map(AnySkillManifest::V0_3)
@@ -358,7 +358,7 @@ impl Skill for v0_3::skill::SkillPre<LinkedCtx> {
         let input = serde_json::to_vec(&input).expect("Json is always serializable");
         let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
             tracing::error!("Failed to instantiate skill: {}", e);
-            SkillError::RuntimeError(e.into())
+            SkillError::RuntimeError(e)
         })?;
         let result = bindings
             .pharia_skill_skill_handler()
@@ -366,13 +366,13 @@ impl Skill for v0_3::skill::SkillPre<LinkedCtx> {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to execute skill handler: {}", e);
-                SkillError::RuntimeError(e.into())
+                SkillError::RuntimeError(e)
             })?;
         let result = match result {
             Ok(result) => result,
             Err(e) => match e {
                 v0_3::skill::exports::pharia::skill::skill_handler::Error::Internal(e) => {
-                    return Err(SkillError::UserCode(e.into()));
+                    return Err(SkillError::UserCode(e));
                 }
                 v0_3::skill::exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
                     return Err(SkillError::InvalidInput(e.to_string()));
@@ -409,13 +409,13 @@ impl Skill for v0_2::SkillPre<LinkedCtx> {
         let input = serde_json::to_vec(&input).expect("Json is always serializable");
         let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
             tracing::error!("Failed to instantiate skill: {}", e);
-            SkillError::RuntimeError(e.into())
+            SkillError::RuntimeError(e)
         })?;
         let result = bindings
             .pharia_skill_skill_handler()
             .call_run(store, &input)
             .await
-            .map_err(|e| SkillError::RuntimeError(e.into()))?;
+            .map_err(SkillError::RuntimeError)?;
         let result = match result {
             Ok(result) => result,
             Err(e) => match e {
