@@ -431,16 +431,15 @@ impl SupportedVersion {
     fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> Result<Option<Version>, SkillError> {
         let decoded =
             decode(wasm.as_ref()).map_err(|e| SkillError::WasmDecodeError(e.to_string()))?;
-        if let DecodedWasm::Component(resolve, ..) = decoded {
-            let package_name = &resolve
-                .package_names
-                .keys()
-                .find(|k| (k.namespace == "pharia" && k.name == "skill"))
-                .ok_or_else(|| SkillError::NotPhariaSkill)?;
-            Ok(package_name.version.clone())
-        } else {
-            Err(SkillError::NotComponent)
-        }
+        let DecodedWasm::Component(resolve, ..) = decoded else {
+            return Err(SkillError::NotComponent);
+        };
+        let package_name = resolve
+            .package_names
+            .into_keys()
+            .find(|k| (k.namespace == "pharia" && k.name == "skill"))
+            .ok_or_else(|| SkillError::NotPhariaSkill)?;
+        Ok(package_name.version)
     }
 
     /// Extracts the package version from a given WIT file.
