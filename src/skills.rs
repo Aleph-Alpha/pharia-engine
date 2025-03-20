@@ -15,6 +15,7 @@ use serde::Serialize;
 use serde_json::Value;
 use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
+use tokio::sync::mpsc;
 use tracing::info;
 use utoipa::ToSchema;
 use wasmtime::{
@@ -28,7 +29,7 @@ use wit_parser::{
     decoding::{DecodedWasm, decode},
 };
 
-use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
+use crate::{csi::CsiForSkills, namespace_watcher::Namespace, skill_runtime::StreamEvent};
 
 pub use self::v0_3::SkillMetadataV0_3;
 
@@ -308,6 +309,7 @@ pub trait Skill: Send + Sync {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
+        sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillError>;
 }
 
@@ -404,6 +406,7 @@ impl Skill for v0_3::skill::SkillPre<LinkedCtx> {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
+        _sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillError> {
         Err(SkillError::IsFunction)
     }
@@ -462,6 +465,7 @@ impl Skill for v0_2::SkillPre<LinkedCtx> {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
+        _sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillError> {
         Err(SkillError::IsFunction)
     }
@@ -1240,6 +1244,7 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
+            _sender: mpsc::Sender<StreamEvent>,
         ) -> Result<(), SkillError> {
             panic!("I am a dummy Skill")
         }
