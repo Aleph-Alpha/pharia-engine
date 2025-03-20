@@ -1,5 +1,6 @@
 //! Contains hardcoded skills that are available in beta systems for testing.
 
+use anyhow::bail;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -36,7 +37,7 @@ impl Skill for SkillHello {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
     ) -> anyhow::Result<AnySkillMetadata> {
-        panic!("I am a dummy Skill")
+        Ok(AnySkillMetadata::V0)
     }
 
     async fn run_as_function(
@@ -45,7 +46,7 @@ impl Skill for SkillHello {
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
     ) -> anyhow::Result<Value> {
-        panic!("I am a dummy Skill")
+        bail!("I am a dummy Skill")
     }
 }
 
@@ -56,7 +57,7 @@ impl Skill for SkillSaboteur {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
     ) -> anyhow::Result<AnySkillMetadata> {
-        panic!("I am a dummy Skill")
+        Ok(AnySkillMetadata::V0)
     }
 
     async fn run_as_function(
@@ -65,7 +66,7 @@ impl Skill for SkillSaboteur {
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
     ) -> anyhow::Result<Value> {
-        panic!("I am a dummy Skill")
+        bail!("I am a dummy Skill")
     }
 }
 
@@ -76,7 +77,7 @@ impl Skill for SkillTellMeAJoke {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
     ) -> anyhow::Result<AnySkillMetadata> {
-        panic!("I am a dummy Skill")
+        bail!("I am a dummy Skill")
     }
 
     async fn run_as_function(
@@ -85,6 +86,6 @@ impl Skill for SkillTellMeAJoke {
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
     ) -> anyhow::Result<Value> {
-        panic!("I am a dummy Skill")
+        bail!("I am a dummy Skill")
     }
 }

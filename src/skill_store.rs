@@ -4,7 +4,7 @@ use crate::{
     hardcoded_skills::hardcoded_skill,
     namespace_watcher::Namespace,
     registries::Digest,
-    skill_loader::{ConfiguredSkill, SkillLoaderApi, SkillLoaderError},
+    skill_loader::{ConfiguredSkill, SkillLoaderApi, SkillFetchError},
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
@@ -349,7 +349,7 @@ pub enum SkillStoreMsg {
 #[derive(Debug, thiserror::Error)]
 pub enum SkillStoreError {
     #[error(transparent)]
-    SkillLoaderError(#[from] SkillLoaderError),
+    SkillLoaderError(#[from] SkillFetchError),
     #[error("Namespace {0} is invalid: {1}")]
     InvalidNamespaceError(Namespace, String),
 }
@@ -366,7 +366,7 @@ type SkillRequest = Pin<
         dyn Future<
                 Output = (
                     SkillPath,
-                    Result<(Arc<dyn Skill>, Digest), SkillLoaderError>,
+                    Result<(Arc<dyn Skill>, Digest), SkillFetchError>,
                 ),
             > + Send,
     >,
@@ -413,7 +413,7 @@ impl SkillRequests {
     /// Return the skill path and result.
     pub async fn select_next_some(
         &mut self,
-    ) -> Result<(SkillPath, (Arc<dyn Skill>, Digest)), SkillLoaderError> {
+    ) -> Result<(SkillPath, (Arc<dyn Skill>, Digest)), SkillFetchError> {
         let (skill_path, result) = self.requests.select_next_some().await;
         let senders = self.recipients.remove(&skill_path).unwrap();
         match result {
@@ -686,9 +686,9 @@ pub mod tests {
         let mut requests = SkillRequests::new();
         let first_skill = SkillPath::local("first_skill");
         let second_skill = SkillPath::local("second_skill");
-        let first_error = SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(&first_skill));
+        let first_error = SkillFetchError::SkillNotFound(ConfiguredSkill::from_path(&first_skill));
         let second_error =
-            SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(&second_skill));
+            SkillFetchError::SkillNotFound(ConfiguredSkill::from_path(&second_skill));
 
         // When pushing two requests for the same skill to the cache (but their futures return different errors)
         let first_skill_clone = first_skill.clone();
@@ -750,7 +750,7 @@ pub mod tests {
             Box::pin(async move {
                 (
                     first_skill_clone.clone(),
-                    Err(SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(
+                    Err(SkillFetchError::SkillNotFound(ConfiguredSkill::from_path(
                         &first_skill_clone,
                     ))),
                 )
@@ -765,7 +765,7 @@ pub mod tests {
             Box::pin(async move {
                 (
                     second_skill_clone.clone(),
-                    Err(SkillLoaderError::SkillNotFound(ConfiguredSkill::from_path(
+                    Err(SkillFetchError::SkillNotFound(ConfiguredSkill::from_path(
                         &second_skill_clone,
                     ))),
                 )
@@ -826,7 +826,7 @@ pub mod tests {
         // When answering the first request with an error message
         match recv.recv().await.unwrap() {
             SkillLoaderMsg::Fetch { send, .. } => {
-                drop(send.send(Err(SkillLoaderError::SkillNotFound(skill))));
+                drop(send.send(Err(SkillFetchError::SkillNotFound(skill))));
             }
             SkillLoaderMsg::FetchDigest { .. } => unreachable!(),
         }
@@ -1171,13 +1171,13 @@ pub mod tests {
         async fn fetch(
             &self,
             skill: ConfiguredSkill,
-        ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError> {
+        ) -> Result<(Box<dyn Skill>, Digest), SkillFetchError> {
             self.skills
                 .lock()
                 .unwrap()
                 .get_mut(&skill)
                 .map(|f| f())
-                .ok_or(SkillLoaderError::SkillNotFound(skill))
+                .ok_or(SkillFetchError::SkillNotFound(skill))
         }
 
         async fn fetch_digest(

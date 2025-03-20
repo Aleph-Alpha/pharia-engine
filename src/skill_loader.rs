@@ -9,7 +9,7 @@ use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
-use crate::skills::{Engine, Skill, SkillError, SkillPath, load_skill_from_wasm_bytes};
+use crate::skills::{Engine, LoadSkillError, Skill, SkillPath, load_skill_from_wasm_bytes};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
@@ -44,11 +44,11 @@ impl ConfiguredSkill {
 }
 
 #[derive(Debug, thiserror::Error, Clone)]
-pub enum SkillLoaderError {
+pub enum SkillFetchError {
     #[error(transparent)]
     RegistryError(#[from] RegistryError),
     #[error(transparent)]
-    SkillError(#[from] SkillError),
+    SkillLoadingError(#[from] LoadSkillError),
     #[error("Skill {0} not found in registry.")]
     SkillNotFound(ConfiguredSkill),
 }
@@ -58,7 +58,7 @@ type SkillAndDigest = (Box<dyn Skill>, Digest);
 pub enum SkillLoaderMsg {
     Fetch {
         skill: ConfiguredSkill,
-        send: oneshot::Sender<Result<SkillAndDigest, SkillLoaderError>>,
+        send: oneshot::Sender<Result<SkillAndDigest, SkillFetchError>>,
     },
     FetchDigest {
         skill: ConfiguredSkill,
@@ -147,7 +147,7 @@ pub trait SkillLoaderApi {
     async fn fetch(
         &self,
         skill: ConfiguredSkill,
-    ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError>;
+    ) -> Result<(Box<dyn Skill>, Digest), SkillFetchError>;
 
     async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError>;
 }
@@ -157,7 +157,7 @@ impl SkillLoaderApi for mpsc::Sender<SkillLoaderMsg> {
     async fn fetch(
         &self,
         skill: ConfiguredSkill,
-    ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError> {
+    ) -> Result<(Box<dyn Skill>, Digest), SkillFetchError> {
         let (send, recv) = oneshot::channel();
         self.send(SkillLoaderMsg::Fetch { skill, send })
             .await
@@ -226,10 +226,10 @@ impl SkillLoaderActor {
         registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
         skill: &ConfiguredSkill,
-    ) -> Result<(Box<dyn Skill>, Digest), SkillLoaderError> {
+    ) -> Result<(Box<dyn Skill>, Digest), SkillFetchError> {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
-            skill_bytes.ok_or_else(|| SkillLoaderError::SkillNotFound(skill.clone()))?;
+            skill_bytes.ok_or_else(|| SkillFetchError::SkillNotFound(skill.clone()))?;
         let skill = spawn_blocking(move || load_skill_from_wasm_bytes(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")?;
