@@ -83,22 +83,28 @@ jobs:
         shell: bash
 
       - name: Log in to GitLab to access shared images
-        uses: redhat-actions/podman-login@v1
+        uses: docker/login-action@v3
         with:
           registry: registry.gitlab.aleph-alpha.de
           username: ${{ secrets.GITLAB_USER }}
           password: ${{ secrets.GITLAB_TOKEN }}
 
-      - name: Build image
-        id: build-image
-        uses: redhat-actions/buildah-build@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
         with:
-          image: pharia-kernel
-          layers: true
-          tags: latest ${{ env.IMAGE_ID }}
-          oci: true
-          containerfiles: |
-            ./Containerfile
+          driver-opts: network=host
+
+      - name: Build container
+        uses: docker/build-push-action@v6
+        id: build-image
+        with:
+          load: true
+          pull: true
+          push: false
+          file: ./Containerfile
+          tags: pharia-kernel:latest, pharia-kernel:${{ env.IMAGE_ID }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Container test
         run: bash -x ./tests/test-container.sh pharia-kernel:$IMAGE_ID
@@ -122,13 +128,11 @@ jobs:
           registry_port: 5001
 
       - name: Push to local registry
-        id: push-local
-        uses: redhat-actions/push-to-registry@v2
+        uses: docker/build-push-action@v6
         with:
-          image: ${{ steps.build-image.outputs.image }}
-          tags: ${{ env.IMAGE_ID }}
-          registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
-          tls-verify: false
+          push: true
+          file: ./Containerfile
+          tags: ${{ steps.kind.outputs.LOCAL_REGISTRY }}/pharia-kernel:${{ env.IMAGE_ID }}
 
       - name: Test Helm chart
         env:
@@ -170,7 +174,7 @@ jobs:
 
       - if: github.event_name != 'pull_request'
         name: Log in to JFrog Artifactory
-        uses: redhat-actions/podman-login@v1
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.ARTIFACTORY_REPOSITORY }}
           username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
@@ -179,11 +183,11 @@ jobs:
       - if: github.event_name != 'pull_request'
         name: Push to JFrog Artifactory
         id: push
-        uses: redhat-actions/push-to-registry@v2
+        uses: docker/build-push-action@v6
         with:
-          image: ${{ steps.build-image.outputs.image }}
-          tags: ${{ steps.build-image.outputs.tags }}
-          registry: ${{ env.ARTIFACTORY_REPOSITORY }}
+          push: true
+          file: ./Containerfile
+          tags: ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:latest, ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:${{ env.IMAGE_ID }}
 
       - if: github.event_name != 'pull_request'
         name: Print image URL
