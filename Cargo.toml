@@ -89,7 +89,7 @@ tokenizers = { version = "0.21.1", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.24.1", features = ["tokenizers"] }
+text-splitter = { version = "0.24.2", features = ["tokenizers"] }
 lingua = { version = "1.6.2" }
 opentelemetry = "0.28.0"
 opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
@@ -141,7 +141,7 @@ test-skills = { path = "./test-skills" }
 fake = { version = "4.0.0", features = ["derive"] }
 http-body-util = "0.1.3"
 mime = "0.3.17"
-tempfile = "3.19.0"
+tempfile = "3.19.1"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.44.1", features = ["test-util"] }
 tokio-test = "0.4.4"
