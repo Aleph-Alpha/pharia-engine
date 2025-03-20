@@ -22,7 +22,10 @@ use wasmtime::{
     component::{Component, InstancePre, Linker as WasmtimeLinker},
 };
 use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
-use wit_parser::decoding::{DecodedWasm, decode};
+use wit_parser::{
+    WorldKey,
+    decoding::{DecodedWasm, decode},
+};
 
 use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
 
@@ -434,12 +437,47 @@ impl SupportedVersion {
         let DecodedWasm::Component(resolve, ..) = decoded else {
             return Err(SkillError::NotComponent);
         };
-        let package_name = resolve
-            .package_names
-            .into_keys()
-            .find(|k| (k.namespace == "pharia" && k.name == "skill"))
-            .ok_or_else(|| SkillError::NotPhariaSkill)?;
-        Ok(package_name.version)
+
+        // Decoding library should export a "root" world as the target world for the component.
+        let root_world = resolve
+            .worlds
+            .into_iter()
+            .find(|(_, world)| world.name == "root")
+            .map(|(_, world)| world)
+            .expect("Root world should exist");
+
+        // Exports from the component that come from pharia:skill
+        let exported_interfaces = root_world
+            .exports
+            .into_iter()
+            // Filter to just exported interfaces
+            .filter_map(|(key, _)| match key {
+                WorldKey::Name(_) => None,
+                WorldKey::Interface(id) => resolve.interfaces.get(id),
+            })
+            // Filter to interfaces with associated packages
+            .filter_map(|interface| {
+                interface
+                    .package
+                    .and_then(|package| resolve.packages.get(package))
+                    .map(|package| (&package.name, interface))
+            })
+            // Filter to interfaces with names
+            .filter_map(|(package_name, interface)| {
+                interface.name.as_ref().map(|name| (package_name, name))
+            })
+            // Only keep interfaces from the pharia:skill package
+            .filter(|(package, _)| package.namespace == "pharia" && package.name == "skill");
+
+        for (package_name, interface_name) in exported_interfaces {
+            // export pharia:skill/skill-handler@X.X.X
+            if interface_name == "skill-handler" {
+                return Ok(package_name.version.clone());
+            }
+        }
+
+        // We didn't find an expected export
+        Err(SkillError::NotPhariaSkill)
     }
 
     /// Extracts the package version from a given WIT file.
