@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
 use test_skills::{
     given_chat_stream_skill, given_complete_stream_skill, given_rust_skill_doc_metadata,
-    given_rust_skill_greet_v0_2, given_rust_skill_search,
+    given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
 };
 use tokio::sync::oneshot;
 
@@ -612,6 +612,41 @@ async fn metadata_via_remote_csi() {
             .as_str()
             .unwrap()
             .starts_with("https://pharia-kernel")
+    );
+
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn invoke_function_as_stream() {
+    let greet_skill_wasm = given_rust_skill_greet_v0_3().bytes();
+    let mut local_skill_dir = TestFileRegistry::new();
+    local_skill_dir.with_skill("greet", greet_skill_wasm);
+    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/greet/stream",
+            kernel.port()
+        ))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(json!("Homer").to_string()))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    eprintln!("{resp:?}");
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let body = resp.text().await.unwrap();
+    assert_eq!(
+        body,
+        "event: error\ndata: {\"message\":\"Sorry, We could not find the skill you requested in its namespace. This can have three causes:\\n\\n1. You send the wrong skill name.\\n2. You send the wrong namespace.\\n3. The skill is not configured in the namespace you requested. You may want to check the namespace configuration.\"}\n\n"
     );
 
     kernel.shutdown().await;

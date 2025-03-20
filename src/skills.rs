@@ -163,6 +163,10 @@ pub enum SkillError {
     InvalidOutput(String),
     /// E.g. if instantiating the skill fails.
     RuntimeError(anyhow::Error),
+    /// Returned if a function is invoked as a generator
+    IsFunction,
+    /// Retruned if a generator is invoked as a function
+    IsGenerator,
 }
 
 /// Failures which occur when loading a skill from Web Assembly bytes.
@@ -298,6 +302,13 @@ pub trait Skill: Send + Sync {
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
     ) -> Result<Value, SkillError>;
+
+    async fn run_as_generator(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+        input: Value,
+    ) -> Result<(), SkillError>;
 }
 
 /// Factory for creating skills. Responsible for inspecting the skill bytes, and instantiatnig the
@@ -387,6 +398,15 @@ impl Skill for v0_3::skill::SkillPre<LinkedCtx> {
             }
         }
     }
+
+    async fn run_as_generator(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+        _input: Value,
+    ) -> Result<(), SkillError> {
+        Err(SkillError::IsFunction)
+    }
 }
 
 #[async_trait]
@@ -435,6 +455,15 @@ impl Skill for v0_2::SkillPre<LinkedCtx> {
                 Err(SkillError::InvalidOutput(e.to_string()))
             }
         }
+    }
+
+    async fn run_as_generator(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+        _input: Value,
+    ) -> Result<(), SkillError> {
+        Err(SkillError::IsFunction)
     }
 }
 
@@ -1203,6 +1232,15 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
         ) -> Result<Value, SkillError> {
+            panic!("I am a dummy Skill")
+        }
+
+        async fn run_as_generator(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> Result<(), SkillError> {
             panic!("I am a dummy Skill")
         }
     }
