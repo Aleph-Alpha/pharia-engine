@@ -58,7 +58,7 @@ impl Skill for SkillHello {
         _input: Value,
         sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillError> {
-        sender.send(StreamEvent::MessageStart).await.unwrap();
+        sender.send(StreamEvent::MessageBegin).await.unwrap();
         for c in "Hello".chars() {
             sender
                 .send(StreamEvent::MessageAppend {
