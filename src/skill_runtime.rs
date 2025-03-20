@@ -867,7 +867,7 @@ pub mod tests {
         TokenUsage,
     };
     use crate::namespace_watcher::Namespace;
-    use crate::skill_store::tests::{SkillStoreDummy, SkillStoreStub};
+    use crate::skill_store::tests::SkillStoreStub;
     use crate::skills::tests::SkillDummy;
     use crate::skills::{AnySkillMetadata, Skill};
     use crate::{
