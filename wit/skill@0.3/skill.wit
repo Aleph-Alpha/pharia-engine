@@ -31,6 +31,50 @@ interface skill-handler {
     metadata: func() -> skill-metadata;
 }
 
+@unstable(feature = streaming)
+world streaming-skill {
+    @unstable(feature = streaming)
+    include csi;
+    @unstable(feature = streaming)
+    export streaming-skill-handler;
+}
+
+// For some reason cannot enable unstable here
+// @unstable(feature = streaming)
+interface streaming-skill-handler {
+    /// The set of errors which may be raised by functions in this interface
+    @unstable(feature = streaming)
+    variant error {
+        internal(string),
+        invalid-input(string)
+    }
+
+    // For some reason cannot enable unstable here
+    // @unstable(feature = streaming)
+    variant message-item {
+        /// Start a new message, with an optional role of the turn.
+        /// Cannot be sent before a previous message has ended.
+        message-start(option<string>),
+        /// A chunk of the message text. If all deltas are aggregated, it should produce the full message.
+        message-delta(string),
+        /// Indicate the end of the message, with an optional payload.
+        /// Needs to be preceded by at least a message-start.
+        message-end(option<list<u8>>),
+    }
+
+    @unstable(feature = streaming)
+    resource stream-output {
+        /// Puts part of a message into the output stream.
+        @unstable(feature = streaming)
+        write-message: func(item: message-item);
+    }
+
+    /// Run the skill. Output is streamed out of the stream-output resource.
+    /// The skill is allowed to also terminate early with an error.
+    @unstable(feature = streaming)
+    run: func(input: list<u8>, output: stream-output) -> result<_, error>;
+}
+
 // A WIT world dedicated to interacting with Large Language Models and other AI-related tasks.
 @since(version = 0.3.0)
 world csi {
