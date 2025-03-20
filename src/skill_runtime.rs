@@ -514,7 +514,7 @@ pub enum StreamEvent {
     /// Send at the beginning of each message, currently carries no information. May be used in the
     /// future to communicate the role. Can also be useful to the UI to communicate that its about
     /// time to start rendering that speech bubble.
-    MessageStart,
+    MessageBegin,
     /// Send at the end of each message. Can carry an arbitrary payload, to make messages more of a
     /// dropin for classical functions. Might be refined in the future. We anticipate the stop
     /// reason to be very useful for end appliacations. We also introduce end messages to keep the
@@ -1291,7 +1291,7 @@ pub mod tests {
             .await;
 
         // Then
-        assert_eq!(recv.recv().await.unwrap(), StreamEvent::MessageStart);
+        assert_eq!(recv.recv().await.unwrap(), StreamEvent::MessageBegin);
         assert_eq!(
             recv.recv().await.unwrap(),
             StreamEvent::MessageAppend {

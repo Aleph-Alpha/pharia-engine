@@ -565,9 +565,9 @@ where
 impl From<StreamEvent> for Event {
     fn from(value: StreamEvent) -> Self {
         match value {
-            StreamEvent::MessageStart => Self::default()
+            StreamEvent::MessageBegin => Self::default()
                 .event("message")
-                .json_data(MessageEvent::Start)
+                .json_data(MessageEvent::Begin)
                 .expect("`json_data` must only be called once."),
             StreamEvent::MessageEnd { payload } => Self::default()
                 .event("message")
@@ -588,7 +588,7 @@ impl From<StreamEvent> for Event {
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum MessageEvent {
-    Start,
+    Begin,
     Append { text: String },
     End { payload: Value },
 }
@@ -1108,7 +1108,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     async fn stream_endpoint_should_send_individual_message_deltas() {
         // Given
         let mut stream_events = Vec::new();
-        stream_events.push(StreamEvent::MessageStart);
+        stream_events.push(StreamEvent::MessageBegin);
         stream_events.extend("Hello".chars().map(|c| StreamEvent::MessageAppend {
             text: c.to_string(),
         }));
@@ -1145,7 +1145,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
         let expected_body = "\
             event: message\n\
-            data: {\"type\":\"start\"}\n\n\
+            data: {\"type\":\"begin\"}\n\n\
             event: message\n\
             data: {\"type\":\"append\",\"text\":\"H\"}\n\n\
             event: message\n\
