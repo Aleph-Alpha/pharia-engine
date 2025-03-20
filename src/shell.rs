@@ -565,9 +565,17 @@ where
 impl From<StreamEvent> for Event {
     fn from(value: StreamEvent) -> Self {
         match value {
-            StreamEvent::Append(text) => Self::default()
-                .event("message_delta")
-                .json_data(MessageDelta { text })
+            StreamEvent::MessageStart => Self::default()
+                .event("message")
+                .json_data(MessageEvent::Start)
+                .expect("`json_data` must only be called once."),
+            StreamEvent::MessageEnd { payload } => Self::default()
+                .event("message")
+                .json_data(MessageEvent::End { payload })
+                .expect("`json_data` must only be called once."),
+            StreamEvent::MessageAppend { text } => Self::default()
+                .event("message")
+                .json_data(MessageEvent::Append { text })
                 .expect("`json_data` must only be called once."),
             StreamEvent::Error(message) => Self::default()
                 .event("error")
@@ -578,8 +586,11 @@ impl From<StreamEvent> for Event {
 }
 
 #[derive(Serialize)]
-struct MessageDelta {
-    text: String,
+#[serde(tag = "type", rename_all = "snake_case")]
+enum MessageEvent {
+    Start,
+    Append { text: String },
+    End { payload: Value },
 }
 
 #[derive(Serialize)]
@@ -1096,10 +1107,14 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     #[tokio::test]
     async fn stream_endpoint_should_send_individual_message_deltas() {
         // Given
-        let stream_events = "Hello"
-            .chars()
-            .map(|c| StreamEvent::Append(c.to_string()))
-            .collect();
+        let mut stream_events = Vec::new();
+        stream_events.push(StreamEvent::MessageStart);
+        stream_events.extend("Hello".chars().map(|c| StreamEvent::MessageAppend {
+            text: c.to_string(),
+        }));
+        stream_events.push(StreamEvent::MessageEnd {
+            payload: json!(null),
+        });
         let skill_executer_mock = SkillRuntimeStub::with_stream_events(stream_events);
         let app_state = AppState::dummy().with_skill_runtime_api(skill_executer_mock);
         let http = http(FeatureSet::Beta, app_state);
@@ -1129,16 +1144,20 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
         let expected_body = "\
-            event: message_delta\n\
-            data: {\"text\":\"H\"}\n\n\
-            event: message_delta\n\
-            data: {\"text\":\"e\"}\n\n\
-            event: message_delta\n\
-            data: {\"text\":\"l\"}\n\n\
-            event: message_delta\n\
-            data: {\"text\":\"l\"}\n\n\
-            event: message_delta\n\
-            data: {\"text\":\"o\"}\n\n";
+            event: message\n\
+            data: {\"type\":\"start\"}\n\n\
+            event: message\n\
+            data: {\"type\":\"append\",\"text\":\"H\"}\n\n\
+            event: message\n\
+            data: {\"type\":\"append\",\"text\":\"e\"}\n\n\
+            event: message\n\
+            data: {\"type\":\"append\",\"text\":\"l\"}\n\n\
+            event: message\n\
+            data: {\"type\":\"append\",\"text\":\"l\"}\n\n\
+            event: message\n\
+            data: {\"type\":\"append\",\"text\":\"o\"}\n\n\
+            event: message\n\
+            data: {\"type\":\"end\",\"payload\":null}\n\n";
         assert_eq!(body_text, expected_body);
     }
 
