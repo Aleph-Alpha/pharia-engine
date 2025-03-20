@@ -5452,9 +5452,9 @@ checksum = "e502f78cdbb8ba4718f566c418c52bc729126ffd16baee5baa718cf25dd5a69a"
 
 [[package]]
 name = "tempfile"
-version = "3.19.0"
+version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "488960f40a3fd53d72c2a29a58722561dee8afdd175bd88e3db4677d7b2ba600"
+checksum = "7437ac7763b9b123ccf33c338a5cc1bac6f69b45a136c19bdd8a65e3916435bf"
 dependencies = [
  "fastrand",
  "getrandom 0.3.1",
@@ -5483,9 +5483,9 @@ dependencies = [
 
 [[package]]
 name = "text-splitter"
-version = "0.24.1"
+version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "698b22fc8ce5bef13475143a43e87df82440e66b2a18d7655d1425dd36580a53"
+checksum = "d2ccb8f11d97bd7f4fe5478338937de98fbb104837afe33f28c16bf3dc2be562"
 dependencies = [
  "ahash",
  "auto_enums",
