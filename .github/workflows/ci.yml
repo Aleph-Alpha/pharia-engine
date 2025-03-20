@@ -94,6 +94,7 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           image: pharia-kernel
+          layers: true
           tags: latest ${{ env.IMAGE_ID }}
           oci: true
           containerfiles: |
@@ -155,6 +156,13 @@ jobs:
 
           ./tests/test-list-skills.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
           ./tests/test-run-skill.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
+
+      - uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ steps.kind.outputs.LOCAL_REGISTRY }}/pharia-kernel:${{ env.IMAGE_ID }}
+          trivyignores: ".trivyignore"
+          severity: "MEDIUM,HIGH,CRITICAL"
+          exit-code: "1"
 
       - if: github.event_name != 'pull_request'
         name: Get JFrog Artifactory login credentials
