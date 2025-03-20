@@ -157,8 +157,6 @@ pub enum SkillError {
     LinkerError(String),
     #[error("Failed to instantiate the component: {0}")]
     ComponentError(String),
-    #[error("Skill version is missing.")]
-    MissingVersion,
     #[error("Skill version {0} is no longer supported by the Kernel. Try upgrading your SDK.")]
     NoLongerSupported(Version),
     #[error(
@@ -431,7 +429,7 @@ impl SupportedVersion {
         Self::validate_version(version)
     }
 
-    fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> Result<Option<Version>, SkillError> {
+    fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> Result<Version, SkillError> {
         let decoded =
             decode(wasm.as_ref()).map_err(|e| SkillError::WasmDecodeError(e.to_string()))?;
         let DecodedWasm::Component(resolve, ..) = decoded else {
@@ -466,13 +464,18 @@ impl SupportedVersion {
             .filter_map(|(package_name, interface)| {
                 interface.name.as_ref().map(|name| (package_name, name))
             })
-            // Only keep interfaces from the pharia:skill package
-            .filter(|(package, _)| package.namespace == "pharia" && package.name == "skill");
+            // Only keep interfaces from the pharia:skill package with a version
+            .filter_map(|(package, name)| {
+                package.version.as_ref().and_then(|version| {
+                    (package.namespace == "pharia" && package.name == "skill")
+                        .then_some((version, name))
+                })
+            });
 
-        for (package_name, interface_name) in exported_interfaces {
+        for (package_version, interface_name) in exported_interfaces {
             // export pharia:skill/skill-handler@X.X.X
             if interface_name == "skill-handler" {
-                return Ok(package_name.version.clone());
+                return Ok(package_version.clone());
             }
         }
 
@@ -532,11 +535,7 @@ impl SupportedVersion {
     }
 
     /// Check if a given version is valid
-    fn validate_version(version: Option<Version>) -> Result<Self, SkillError> {
-        let Some(version) = version else {
-            return Err(SkillError::MissingVersion);
-        };
-
+    fn validate_version(version: Version) -> Result<Self, SkillError> {
         match version {
             Version {
                 major: 0, minor: 2, ..
@@ -798,9 +797,7 @@ pub mod tests {
     #[test]
     fn can_parse_module() {
         let wasm = given_rust_skill_greet_v0_2().bytes();
-        let version = SupportedVersion::extract_pharia_skill_version(wasm)
-            .unwrap()
-            .unwrap();
+        let version = SupportedVersion::extract_pharia_skill_version(wasm).unwrap();
         assert_eq!(version, Version::new(0, 2, 10));
     }
 
@@ -1062,20 +1059,14 @@ pub mod tests {
     }
 
     #[test]
-    fn unsupported_unversioned() {
-        let error = SupportedVersion::validate_version(None).unwrap_err();
-        assert!(matches!(error, SkillError::MissingVersion));
-    }
-
-    #[test]
     fn unsupported_v0_1() {
-        let error = SupportedVersion::validate_version(Some(Version::new(0, 1, 0))).unwrap_err();
+        let error = SupportedVersion::validate_version(Version::new(0, 1, 0)).unwrap_err();
         assert!(matches!(error, SkillError::NoLongerSupported(..)));
     }
 
     #[test]
     fn valid_0_2_version() -> anyhow::Result<()> {
-        let version = Some(Version::new(0, 2, 0));
+        let version = Version::new(0, 2, 0);
         let supported_version = SupportedVersion::validate_version(version)?;
         assert_eq!(supported_version, SupportedVersion::V0_2);
         Ok(())
@@ -1083,16 +1074,14 @@ pub mod tests {
 
     #[test]
     fn invalid_0_2_version() {
-        let error =
-            SupportedVersion::validate_version(Some(Version::new(0, 2, u64::MAX))).unwrap_err();
+        let error = SupportedVersion::validate_version(Version::new(0, 2, u64::MAX)).unwrap_err();
         assert!(matches!(error, SkillError::NotSupportedYet(..)));
     }
 
     #[test]
     fn invalid_future_version() {
-        let error =
-            SupportedVersion::validate_version(Some(Version::new(u64::MAX, u64::MAX, u64::MAX)))
-                .unwrap_err();
+        let error = SupportedVersion::validate_version(Version::new(u64::MAX, u64::MAX, u64::MAX))
+            .unwrap_err();
         assert!(matches!(error, SkillError::NotSupportedYet(..)));
     }
 
