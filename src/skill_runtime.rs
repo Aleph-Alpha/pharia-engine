@@ -162,6 +162,8 @@ impl From<SkillError> for SkillExecutionError {
             SkillError::UserCode(error) => Self::UserCode(error),
             SkillError::InvalidOutput(error) => Self::InvalidOutput(error),
             SkillError::RuntimeError(error) => SkillExecutionError::RuntimeError(error),
+            SkillError::IsFunction => SkillExecutionError::IsFunction,
+            SkillError::IsGenerator => SkillExecutionError::IsGenerator,
         }
     }
 }
@@ -355,6 +357,12 @@ pub enum SkillExecutionError {
         namespace: Namespace,
         original_syntax_error: String,
     },
+    #[error(
+        "The skill is designed to be executed as a function. Please invoke it via the /run endpoint."
+    )]
+    IsFunction,
+    #[error("The skill is designed to stream output. Please invoke it via the /stream endpoint.")]
+    IsGenerator,
 }
 
 struct SkillRuntimeActor<C, S> {
@@ -532,7 +540,9 @@ fn status_label(result: Result<(), &SkillExecutionError>) -> String {
             | SkillExecutionError::SkillNotConfigured
             | SkillExecutionError::InvalidInput(_)
             | SkillExecutionError::InvalidOutput(_)
-            | SkillExecutionError::MisconfiguredNamespace { .. },
+            | SkillExecutionError::MisconfiguredNamespace { .. }
+            | SkillExecutionError::IsFunction
+            | SkillExecutionError::IsGenerator,
         ) => "logic_error",
         Err(SkillExecutionError::RuntimeError(_)) => "runtime_error",
     }
@@ -933,6 +943,15 @@ pub mod tests {
             ) -> Result<Value, SkillError> {
                 unreachable!("This won't be invoked during the test")
             }
+
+            async fn run_as_generator(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<(), SkillError> {
+                Err(SkillError::IsFunction)
+            }
         }
 
         let mut store = SkillStoreStub::new();
@@ -989,6 +1008,15 @@ pub mod tests {
                 _ctx: Box<dyn CsiForSkills + Send>,
             ) -> Result<AnySkillManifest, SkillError> {
                 panic!("Dummy metadata implementation of SkillDoubleUsingExplain")
+            }
+
+            async fn run_as_generator(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<(), SkillError> {
+                Err(SkillError::IsFunction)
             }
         }
 
@@ -1229,6 +1257,15 @@ pub mod tests {
                 _ctx: Box<dyn CsiForSkills + Send>,
             ) -> Result<AnySkillManifest, SkillError> {
                 panic!("Dummy metadata implementation of Assert concurrency skill")
+            }
+
+            async fn run_as_generator(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<(), SkillError> {
+                Err(SkillError::IsFunction)
             }
         }
 
@@ -1528,6 +1565,15 @@ pub mod tests {
         ) -> Result<AnySkillManifest, SkillError> {
             panic!("Dummy metadata implementation of Greet Skill")
         }
+
+        async fn run_as_generator(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> Result<(), SkillError> {
+            Err(SkillError::IsFunction)
+        }
     }
 
     /// A test double for a skill. It invokes the csi with a prompt and returns the result.
@@ -1568,6 +1614,15 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
         ) -> Result<AnySkillManifest, SkillError> {
             panic!("Dummy metadata implementation of Skill Greet Completion")
+        }
+
+        async fn run_as_generator(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> Result<(), SkillError> {
+            Err(SkillError::IsFunction)
         }
     }
 }

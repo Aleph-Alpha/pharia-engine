@@ -283,12 +283,16 @@ impl IntoResponse for HttpError {
 impl From<SkillExecutionError> for HttpError {
     fn from(value: SkillExecutionError) -> Self {
         let status_code = match &value {
+            // We return 5xx not only for runtime errors, but also for errors we consider Bugs
             SkillExecutionError::MisconfiguredNamespace { .. }
             | SkillExecutionError::CsiUseFromMetadata
             | SkillExecutionError::InvalidOutput(_)
             | SkillExecutionError::RuntimeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            // 400 for every error we see an error on the client side of HTTP
             SkillExecutionError::UserCode(_)
             | SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::IsFunction
+            | SkillExecutionError::IsGenerator
             | SkillExecutionError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         };
         HttpError::new(value.to_string(), status_code)

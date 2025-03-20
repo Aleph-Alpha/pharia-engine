@@ -47,6 +47,15 @@ impl Skill for SkillHello {
     ) -> Result<Value, SkillError> {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
+
+    async fn run_as_generator(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+        _input: Value,
+    ) -> Result<(), SkillError> {
+        Err(SkillError::IsFunction)
+    }
 }
 
 #[async_trait]
@@ -67,6 +76,15 @@ impl Skill for SkillSaboteur {
     ) -> Result<Value, SkillError> {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
+
+    async fn run_as_generator(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+        _input: Value,
+    ) -> Result<(), SkillError> {
+        Err(SkillError::IsFunction)
+    }
 }
 
 #[async_trait]
@@ -86,5 +104,14 @@ impl Skill for SkillTellMeAJoke {
         _input: Value,
     ) -> Result<Value, SkillError> {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
+    }
+
+    async fn run_as_generator(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+        _input: Value,
+    ) -> Result<(), SkillError> {
+        Err(SkillError::IsFunction)
     }
 }
