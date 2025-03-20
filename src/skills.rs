@@ -256,8 +256,7 @@ impl Engine {
         // If it has been running for more than 10 minutes, it will trap and return an error.
         let start = Instant::now();
         store.epoch_deadline_callback(move |_| {
-            let now = Instant::now();
-            if now - start < Self::MAX_EXECUTION_TIME {
+            if start.elapsed() < Self::MAX_EXECUTION_TIME {
                 Ok(UpdateDeadline::Yield(1))
             } else {
                 Err(anyhow!("Maximum skill execution time reached."))
