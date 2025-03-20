@@ -1118,8 +1118,7 @@ pub mod tests {
 
     #[test]
     fn invalid_0_2_version() {
-        let error =
-            SupportedVersion::validate_version(Version::new(0, 2, u64::MAX)).unwrap_err();
+        let error = SupportedVersion::validate_version(Version::new(0, 2, u64::MAX)).unwrap_err();
         assert!(matches!(error, LoadSkillError::NotSupportedYet(..)));
     }
 
