@@ -42,6 +42,9 @@ world streaming-skill {
 // For some reason cannot enable unstable here
 // @unstable(feature = streaming)
 interface streaming-skill-handler {
+    @unstable(feature = streaming)
+    use streaming-host.{stream-output};
+
     /// The set of errors which may be raised by functions in this interface
     @unstable(feature = streaming)
     variant error {
@@ -49,6 +52,16 @@ interface streaming-skill-handler {
         invalid-input(string)
     }
 
+    /// Run the skill. Output is streamed out of the stream-output resource.
+    /// The skill is allowed to also terminate early with an error.
+    @unstable(feature = streaming)
+    run: func(input: list<u8>, output: stream-output) -> result<_, error>;
+}
+
+/// Provided host types for supporting running streaming skills.
+// For some reason cannot enable unstable here
+// @unstable(feature = streaming)
+interface streaming-host {
     // For some reason cannot enable unstable here
     // @unstable(feature = streaming)
     variant message-item {
@@ -68,11 +81,6 @@ interface streaming-skill-handler {
         @unstable(feature = streaming)
         write-message: func(item: message-item);
     }
-
-    /// Run the skill. Output is streamed out of the stream-output resource.
-    /// The skill is allowed to also terminate early with an error.
-    @unstable(feature = streaming)
-    run: func(input: list<u8>, output: stream-output) -> result<_, error>;
 }
 
 // A WIT world dedicated to interacting with Large Language Models and other AI-related tasks.
