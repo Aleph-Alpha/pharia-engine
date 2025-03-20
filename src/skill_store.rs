@@ -4,7 +4,7 @@ use crate::{
     hardcoded_skills::hardcoded_skill,
     namespace_watcher::Namespace,
     registries::Digest,
-    skill_loader::{ConfiguredSkill, SkillLoaderApi, SkillFetchError},
+    skill_loader::{ConfiguredSkill, SkillFetchError, SkillLoaderApi},
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
@@ -362,14 +362,7 @@ struct SkillStoreActor<L> {
 }
 
 type SkillRequest = Pin<
-    Box<
-        dyn Future<
-                Output = (
-                    SkillPath,
-                    Result<(Arc<dyn Skill>, Digest), SkillFetchError>,
-                ),
-            > + Send,
-    >,
+    Box<dyn Future<Output = (SkillPath, Result<(Arc<dyn Skill>, Digest), SkillFetchError>)> + Send>,
 >;
 
 type Recipient = oneshot::Sender<Result<Option<Arc<dyn Skill>>, SkillStoreError>>;
