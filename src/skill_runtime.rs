@@ -511,8 +511,17 @@ fn status_label(result: Result<(), &SkillExecutionError>) -> String {
 /// An event emitted by a streaming skill
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StreamEvent {
+    /// Send at the beginning of each message, currently carries no information. May be used in the
+    /// future to communicate the role. Can also be useful to the UI to communicate that its about
+    /// time to start rendering that speech bubble.
+    MessageStart,
+    /// Send at the end of each message. Can carry an arbitrary payload, to make messages more of a
+    /// dropin for classical functions. Might be refined in the future. We anticipate the stop
+    /// reason to be very useful for end appliacations. We also introduce end messages to keep the
+    /// door open for multiple messages in a stream.
+    MessageEnd { payload: Value },
     /// Append the internal string to the current message
-    Append(String),
+    MessageAppend { text: String },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
     Error(String),
@@ -1282,25 +1291,42 @@ pub mod tests {
             .await;
 
         // Then
+        assert_eq!(recv.recv().await.unwrap(), StreamEvent::MessageStart);
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::Append("H".to_string())
+            StreamEvent::MessageAppend {
+                text: "H".to_string()
+            }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::Append("e".to_string())
+            StreamEvent::MessageAppend {
+                text: "e".to_string()
+            }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::Append("l".to_string())
+            StreamEvent::MessageAppend {
+                text: "l".to_string()
+            }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::Append("l".to_string())
+            StreamEvent::MessageAppend {
+                text: "l".to_string()
+            }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::Append("o".to_string())
+            StreamEvent::MessageAppend {
+                text: "o".to_string()
+            }
+        );
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            StreamEvent::MessageEnd {
+                payload: json!(null)
+            }
         );
         assert!(recv.recv().await.is_none());
 

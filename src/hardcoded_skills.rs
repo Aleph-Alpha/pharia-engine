@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -58,12 +58,21 @@ impl Skill for SkillHello {
         _input: Value,
         sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillError> {
+        sender.send(StreamEvent::MessageStart).await.unwrap();
         for c in "Hello".chars() {
             sender
-                .send(StreamEvent::Append(c.to_string()))
+                .send(StreamEvent::MessageAppend {
+                    text: c.to_string(),
+                })
                 .await
                 .unwrap();
         }
+        sender
+            .send(StreamEvent::MessageEnd {
+                payload: json!(null),
+            })
+            .await
+            .unwrap();
         Ok(())
     }
 }
@@ -148,7 +157,10 @@ impl Skill for SkillTellMeAJoke {
         let stream_id = ctx.completion_stream_new(request).await;
         while let Some(event) = ctx.completion_stream_next(&stream_id).await {
             if let CompletionEvent::Delta { text, .. } = event {
-                sender.send(StreamEvent::Append(text)).await.unwrap();
+                sender
+                    .send(StreamEvent::MessageAppend { text })
+                    .await
+                    .unwrap();
             }
         }
         ctx.completion_stream_drop(stream_id).await;
