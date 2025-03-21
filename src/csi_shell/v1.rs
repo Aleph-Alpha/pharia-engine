@@ -186,7 +186,7 @@ where
 async fn chunk_with_offsets<C>(
     State(CsiState(csi)): State<CsiState<C>>,
     bearer: TypedHeader<Authorization<Bearer>>,
-    Json(requests): Json<Vec<ChunkRequest>>,
+    Json(requests): Json<Vec<ChunkWithOffsetRequest>>,
 ) -> Result<Json<Vec<Vec<ChunkWithOffset>>>, CsiShellError>
 where
     C: Csi,
