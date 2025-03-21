@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.1...v0.11.2)
+
+### Features
+
+- Enable unstable streaming skill module execution - ([bb45207](https://github.com/Aleph-Alpha/pharia-kernel/commit/bb4520764f518e7a1dd41a276d1fa3301e474043))
+- Rename Message start -> Message begin - ([e17b499](https://github.com/Aleph-Alpha/pharia-kernel/commit/e17b499f8f9c80f8c8ff5fa62237413550484e09))
+- Messages emit start and end event - ([443101d](https://github.com/Aleph-Alpha/pharia-kernel/commit/443101d0eda48af23a7bfa99951cbb2291342420))
+- Correctly report if functions are erroneously invoked as generators. - ([ee68694](https://github.com/Aleph-Alpha/pharia-kernel/commit/ee6869406d9d810b9e0314ab10159d5becbda751))
+
+### Fixes
+
+- Event stream for tell me a joke skill - ([5fc9286](https://github.com/Aleph-Alpha/pharia-kernel/commit/5fc928669cbc4a6be218ead7e1ec8bb40c785698))
+
+### Builds
+
+- *(deps)* Bump the wasmtime group with 17 updates - ([3b14786](https://github.com/Aleph-Alpha/pharia-kernel/commit/3b14786a7f3513179b36a4324653158ad1f141ef))
+- *(deps)* Bump the minor group with 83 updates - ([027e75b](https://github.com/Aleph-Alpha/pharia-kernel/commit/027e75bd4da90b17942d155aa9e41d785e6141ab))
+- *(deps)* Bump the minor group with 2 updates - ([04f3fb0](https://github.com/Aleph-Alpha/pharia-kernel/commit/04f3fb084485358b1e809f86265eb32733514f50))
+
+
 ## [0.11.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.0...v0.11.1)
 
 ### Features
