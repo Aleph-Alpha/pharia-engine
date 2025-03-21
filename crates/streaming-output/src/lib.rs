@@ -1,12 +1,12 @@
 use anyhow::anyhow;
-use exports::pharia::skill::streaming_skill_handler::{Error, Guest};
+use exports::pharia::skill::message_stream::{Error, Guest};
 use pharia::skill::{
-    inference::{ChatEvent, ChatParams, ChatRequest, ChatStream, Logprobs, Message, MessageDelta},
-    streaming_host::{BeginAttributes, MessageItem, StreamOutput},
+    inference::{ChatEvent, ChatParams, ChatRequest, ChatStream, Logprobs, Message, MessageAppend},
+    streaming_output::{BeginAttributes, MessageItem, StreamOutput},
 };
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "streaming-skill", features: ["streaming"] });
+wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "message-stream-skill", features: ["streaming"] });
 
 struct Skill;
 
@@ -38,10 +38,10 @@ impl Guest for Skill {
 
         while let Some(event) = stream.next() {
             let item = match event {
-                ChatEvent::MessageStart(role) => Some(MessageItem::MessageBegin(BeginAttributes {
+                ChatEvent::MessageBegin(role) => Some(MessageItem::MessageBegin(BeginAttributes {
                     role: Some(role),
                 })),
-                ChatEvent::MessageDelta(MessageDelta { content, .. }) => {
+                ChatEvent::MessageAppend(MessageAppend { content, .. }) => {
                     Some(MessageItem::MessageAppend(content))
                 }
                 ChatEvent::MessageEnd(finish_reason) => Some(MessageItem::MessageEnd(Some(
@@ -52,7 +52,7 @@ impl Guest for Skill {
             };
 
             if let Some(item) = item {
-                stream_output.write_message_item(&item);
+                stream_output.write(&item);
             }
         }
 

@@ -8,10 +8,10 @@ use pharia::skill::{
         SearchResult, TextCursor,
     },
     inference::{
-        ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionDelta,
+        ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionAppend,
         CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
         ExplanationRequest, FinishReason, Granularity, Host as InferenceHost, HostChatStream,
-        HostCompletionStream, Logprob, Logprobs, Message, MessageDelta, TextScore, TokenUsage,
+        HostCompletionStream, Logprob, Logprobs, Message, MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
 };
@@ -433,14 +433,14 @@ impl HostChatStream for LinkedCtx {
 impl From<inference::CompletionEvent> for CompletionEvent {
     fn from(value: inference::CompletionEvent) -> Self {
         match value {
-            inference::CompletionEvent::Delta { text, logprobs } => {
-                CompletionEvent::Delta(CompletionDelta {
+            inference::CompletionEvent::Append { text, logprobs } => {
+                CompletionEvent::Append(CompletionAppend {
                     text,
                     logprobs: logprobs.into_iter().map(Into::into).collect(),
                 })
             }
-            inference::CompletionEvent::Finished { finish_reason } => {
-                CompletionEvent::Finished(finish_reason.into())
+            inference::CompletionEvent::End { finish_reason } => {
+                CompletionEvent::End(finish_reason.into())
             }
             inference::CompletionEvent::Usage { usage } => CompletionEvent::Usage(usage.into()),
         }
@@ -450,9 +450,9 @@ impl From<inference::CompletionEvent> for CompletionEvent {
 impl From<inference::ChatEvent> for ChatEvent {
     fn from(value: inference::ChatEvent) -> Self {
         match value {
-            inference::ChatEvent::MessageStart { role } => ChatEvent::MessageStart(role),
-            inference::ChatEvent::MessageDelta { content, logprobs } => {
-                ChatEvent::MessageDelta(MessageDelta {
+            inference::ChatEvent::MessageBegin { role } => ChatEvent::MessageBegin(role),
+            inference::ChatEvent::MessageAppend { content, logprobs } => {
+                ChatEvent::MessageAppend(MessageAppend {
                     content,
                     logprobs: logprobs.into_iter().map(Into::into).collect(),
                 })

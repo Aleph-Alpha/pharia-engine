@@ -112,7 +112,7 @@ impl crate::skills::Skill for SkillPre<LinkedCtx> {
         }
     }
 
-    async fn run_as_generator(
+    async fn run_as_message_stream(
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,

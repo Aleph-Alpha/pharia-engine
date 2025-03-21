@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use pharia::skill::streaming_host::{Host, HostStreamOutput, MessageItem};
+use pharia::skill::streaming_output::{Host, HostStreamOutput, MessageItem};
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::error;
@@ -14,7 +14,7 @@ use crate::{
 pub type StreamOutput = mpsc::Sender<StreamEvent>;
 
 bindgen!({
-    world: "streaming-skill",
+    world: "message-stream-skill",
     path: "./wit/skill@0.3",
     async: true,
     with: {
@@ -22,12 +22,12 @@ bindgen!({
         "pharia:skill/document-index": super::csi::pharia::skill::document_index,
         "pharia:skill/inference": super::csi::pharia::skill::inference,
         "pharia:skill/language": super::csi::pharia::skill::language,
-        "pharia:skill/streaming-host/stream-output": StreamOutput,
+        "pharia:skill/streaming-output/stream-output": StreamOutput,
     },
 });
 
 #[async_trait]
-impl crate::skills::Skill for StreamingSkillPre<LinkedCtx> {
+impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         _engine: &Engine,
@@ -46,7 +46,7 @@ impl crate::skills::Skill for StreamingSkillPre<LinkedCtx> {
         Err(SkillError::IsFunction)
     }
 
-    async fn run_as_generator(
+    async fn run_as_message_stream(
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
@@ -65,7 +65,7 @@ impl crate::skills::Skill for StreamingSkillPre<LinkedCtx> {
             SkillError::RuntimeError(e)
         })?;
         bindings
-            .pharia_skill_streaming_skill_handler()
+            .pharia_skill_message_stream()
             .call_run(store, &input, stream_output)
             .await
             .map_err(|e| {
@@ -73,10 +73,10 @@ impl crate::skills::Skill for StreamingSkillPre<LinkedCtx> {
                 SkillError::RuntimeError(e)
             })?
             .map_err(|e| match e {
-                exports::pharia::skill::streaming_skill_handler::Error::Internal(e) => {
+                exports::pharia::skill::message_stream::Error::Internal(e) => {
                     SkillError::UserCode(e)
                 }
-                exports::pharia::skill::streaming_skill_handler::Error::InvalidInput(e) => {
+                exports::pharia::skill::message_stream::Error::InvalidInput(e) => {
                     SkillError::InvalidInput(e.to_string())
                 }
             })
@@ -86,7 +86,7 @@ impl crate::skills::Skill for StreamingSkillPre<LinkedCtx> {
 impl Host for LinkedCtx {}
 
 impl HostStreamOutput for LinkedCtx {
-    async fn write_message_item(&mut self, output: Resource<StreamOutput>, item: MessageItem) {
+    async fn write(&mut self, output: Resource<StreamOutput>, item: MessageItem) {
         debug_assert!(!output.owned());
         let sender = self
             .resource_table

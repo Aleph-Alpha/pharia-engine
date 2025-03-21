@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::inference::{
-    CompletionDelta, CompletionEvent, CompletionParams, CompletionRequest, CompletionStream,
+    CompletionAppend, CompletionEvent, CompletionParams, CompletionRequest, CompletionStream,
     Logprobs,
 };
 use serde_json::json;
@@ -48,8 +48,8 @@ Provide a nice greeting for the person named: {name}<|eot_id|><|start_header_id|
         let mut events = vec![];
         while let Some(event) = stream.next() {
             events.push(match event {
-                CompletionEvent::Delta(CompletionDelta { text, .. }) => text,
-                CompletionEvent::Finished(finish_reason) => format!("{finish_reason:?}"),
+                CompletionEvent::Append(CompletionAppend { text, .. }) => text,
+                CompletionEvent::End(finish_reason) => format!("{finish_reason:?}"),
                 CompletionEvent::Usage(token_usage) => format!(
                     "prompt: {}, completion: {}",
                     token_usage.prompt, token_usage.completion

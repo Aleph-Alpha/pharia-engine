@@ -63,7 +63,7 @@ where
             .await?
             .ok_or(SkillExecutionError::SkillNotConfigured)?;
         skill
-            .run_as_generator(&self.engine, ctx, input, sender)
+            .run_as_message_stream(&self.engine, ctx, input, sender)
             .await?;
         Ok(())
     }
@@ -122,7 +122,7 @@ impl From<SkillError> for SkillExecutionError {
             SkillError::InvalidOutput(error) => Self::InvalidOutput(error),
             SkillError::RuntimeError(error) => SkillExecutionError::RuntimeError(error),
             SkillError::IsFunction => SkillExecutionError::IsFunction,
-            SkillError::IsGenerator => SkillExecutionError::IsGenerator,
+            SkillError::IsMessageStream => SkillExecutionError::IsMessageStream,
         }
     }
 }
@@ -321,7 +321,7 @@ pub enum SkillExecutionError {
     )]
     IsFunction,
     #[error("The skill is designed to stream output. Please invoke it via the /stream endpoint.")]
-    IsGenerator,
+    IsMessageStream,
 }
 
 struct SkillRuntimeActor<C, S> {
@@ -501,7 +501,7 @@ fn status_label(result: Result<(), &SkillExecutionError>) -> String {
             | SkillExecutionError::InvalidOutput(_)
             | SkillExecutionError::MisconfiguredNamespace { .. }
             | SkillExecutionError::IsFunction
-            | SkillExecutionError::IsGenerator,
+            | SkillExecutionError::IsMessageStream,
         ) => "logic_error",
         Err(SkillExecutionError::RuntimeError(_)) => "runtime_error",
     }
@@ -913,7 +913,7 @@ pub mod tests {
                 unreachable!("This won't be invoked during the test")
             }
 
-            async fn run_as_generator(
+            async fn run_as_message_stream(
                 &self,
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
@@ -980,14 +980,14 @@ pub mod tests {
                 panic!("Dummy metadata implementation of SkillDoubleUsingExplain")
             }
 
-            async fn run_as_generator(
+            async fn run_as_message_stream(
                 &self,
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
                 _sender: mpsc::Sender<StreamEvent>,
             ) -> Result<(), SkillError> {
-                panic!("Dummy generator implementation of SkillDoubleUsingExplain")
+                panic!("Dummy message stream implementation of SkillDoubleUsingExplain")
             }
         }
 
@@ -1230,14 +1230,14 @@ pub mod tests {
                 panic!("Dummy metadata implementation of Assert concurrency skill")
             }
 
-            async fn run_as_generator(
+            async fn run_as_message_stream(
                 &self,
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
                 _mpsc: mpsc::Sender<StreamEvent>,
             ) -> Result<(), SkillError> {
-                panic!("Dummy generator implementation of Assert concurrency skill")
+                panic!("Dummy message stream implementation of Assert concurrency skill")
             }
         }
 
@@ -1458,11 +1458,11 @@ pub mod tests {
         assert_eq!(
             events,
             vec![
-                CompletionEvent::Delta {
+                CompletionEvent::Append {
                     text: completion.text,
                     logprobs: completion.logprobs
                 },
-                CompletionEvent::Finished {
+                CompletionEvent::End {
                     finish_reason: completion.finish_reason
                 },
                 CompletionEvent::Usage {
@@ -1507,10 +1507,10 @@ pub mod tests {
         assert_eq!(
             events,
             vec![
-                inference::ChatEvent::MessageStart {
+                inference::ChatEvent::MessageBegin {
                     role: response.message.role,
                 },
-                inference::ChatEvent::MessageDelta {
+                inference::ChatEvent::MessageAppend {
                     content: response.message.content,
                     logprobs: response.logprobs,
                 },
@@ -1555,7 +1555,7 @@ pub mod tests {
             panic!("Dummy metadata implementation of Greet Skill")
         }
 
-        async fn run_as_generator(
+        async fn run_as_message_stream(
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
@@ -1606,7 +1606,7 @@ pub mod tests {
             panic!("Dummy metadata implementation of Skill Greet Completion")
         }
 
-        async fn run_as_generator(
+        async fn run_as_message_stream(
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,

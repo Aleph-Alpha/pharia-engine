@@ -292,7 +292,7 @@ impl From<SkillExecutionError> for HttpError {
             SkillExecutionError::UserCode(_)
             | SkillExecutionError::SkillNotConfigured
             | SkillExecutionError::IsFunction
-            | SkillExecutionError::IsGenerator
+            | SkillExecutionError::IsMessageStream
             | SkillExecutionError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         };
         HttpError::new(value.to_string(), status_code)

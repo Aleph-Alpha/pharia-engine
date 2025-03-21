@@ -60,14 +60,14 @@ where
 impl From<CompletionEvent> for Event {
     fn from(event: CompletionEvent) -> Self {
         match event {
-            CompletionEvent::Delta { text, logprobs } => Event::default()
+            CompletionEvent::Append { text, logprobs } => Event::default()
                 .event("delta")
                 .json_data(CompletionDeltaEvent {
                     text,
                     logprobs: logprobs.into_iter().map(Into::into).collect(),
                 })
                 .expect("`json_data` must only be called once."),
-            CompletionEvent::Finished { finish_reason } => Event::default()
+            CompletionEvent::End { finish_reason } => Event::default()
                 .event("finished")
                 .json_data(CompletionFinishedEvent {
                     finish_reason: finish_reason.into(),
@@ -134,11 +134,11 @@ where
 impl From<ChatEvent> for Event {
     fn from(event: ChatEvent) -> Self {
         match event {
-            ChatEvent::MessageStart { role } => Event::default()
+            ChatEvent::MessageBegin { role } => Event::default()
                 .event("message_start")
                 .json_data(ChatMessageStartEvent { role })
                 .expect("`json_data` must only be called once."),
-            ChatEvent::MessageDelta { content, logprobs } => Event::default()
+            ChatEvent::MessageAppend { content, logprobs } => Event::default()
                 .event("message_delta")
                 .json_data(ChatMessageDeltaEvent {
                     content,

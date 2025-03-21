@@ -51,7 +51,7 @@ impl Skill for SkillHello {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
 
-    async fn run_as_generator(
+    async fn run_as_message_stream(
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
@@ -93,10 +93,10 @@ impl Skill for SkillSaboteur {
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
     ) -> Result<Value, SkillError> {
-        Err(SkillError::IsGenerator)
+        Err(SkillError::IsMessageStream)
     }
 
-    async fn run_as_generator(
+    async fn run_as_message_stream(
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
@@ -126,7 +126,7 @@ impl Skill for SkillTellMeAJoke {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
 
-    async fn run_as_generator(
+    async fn run_as_message_stream(
         &self,
         _engine: &Engine,
         mut ctx: Box<dyn CsiForSkills + Send>,
@@ -156,7 +156,7 @@ impl Skill for SkillTellMeAJoke {
         };
         let stream_id = ctx.completion_stream_new(request).await;
         while let Some(event) = ctx.completion_stream_next(&stream_id).await {
-            if let CompletionEvent::Delta { text, .. } = event {
+            if let CompletionEvent::Append { text, .. } = event {
                 sender
                     .send(StreamEvent::MessageAppend { text })
                     .await

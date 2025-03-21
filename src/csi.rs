@@ -558,8 +558,8 @@ pub mod tests {
 
         // Then the completion must have the same order as the respective requests
         assert_eq!(events.len(), 3);
-        assert!(matches!(events[0], CompletionEvent::Delta { .. }));
-        assert!(matches!(events[1], CompletionEvent::Finished { .. }));
+        assert!(matches!(events[0], CompletionEvent::Append { .. }));
+        assert!(matches!(events[1], CompletionEvent::End { .. }));
         assert!(matches!(events[2], CompletionEvent::Usage { .. }));
     }
 
@@ -607,8 +607,8 @@ pub mod tests {
 
         // Then the completion must have the same order as the respective requests
         assert_eq!(events.len(), 4);
-        assert!(matches!(events[0], ChatEvent::MessageStart { .. }));
-        assert!(matches!(events[1], ChatEvent::MessageDelta { .. }));
+        assert!(matches!(events[0], ChatEvent::MessageBegin { .. }));
+        assert!(matches!(events[1], ChatEvent::MessageAppend { .. }));
         assert!(matches!(events[2], ChatEvent::MessageEnd { .. }));
         assert!(matches!(events[3], ChatEvent::Usage { .. }));
     }
@@ -879,11 +879,11 @@ pub mod tests {
             } = (*self.completion)(request).unwrap();
             tokio::spawn(async move {
                 sender
-                    .send(Ok(CompletionEvent::Delta { text, logprobs }))
+                    .send(Ok(CompletionEvent::Append { text, logprobs }))
                     .await
                     .unwrap();
                 sender
-                    .send(Ok(CompletionEvent::Finished { finish_reason }))
+                    .send(Ok(CompletionEvent::End { finish_reason }))
                     .await
                     .unwrap();
                 sender
@@ -924,11 +924,11 @@ pub mod tests {
             } = (*self.chat)(request).unwrap();
             tokio::spawn(async move {
                 sender
-                    .send(Ok(ChatEvent::MessageStart { role: message.role }))
+                    .send(Ok(ChatEvent::MessageBegin { role: message.role }))
                     .await
                     .unwrap();
                 sender
-                    .send(Ok(ChatEvent::MessageDelta {
+                    .send(Ok(ChatEvent::MessageAppend {
                         content: message.content,
                         logprobs,
                     }))

@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::inference::{
-    ChatEvent, ChatParams, ChatRequest, ChatStream, Logprobs, Message, MessageDelta,
+    ChatEvent, ChatParams, ChatRequest, ChatStream, Logprobs, Message, MessageAppend,
 };
 use serde_json::json;
 
@@ -38,8 +38,8 @@ impl Guest for Skill {
         let mut events = vec![];
         while let Some(event) = stream.next() {
             events.push(match event {
-                ChatEvent::MessageStart(role) => role,
-                ChatEvent::MessageDelta(MessageDelta { content, .. }) => content,
+                ChatEvent::MessageBegin(role) => role,
+                ChatEvent::MessageAppend(MessageAppend { content, .. }) => content,
                 ChatEvent::MessageEnd(finish_reason) => format!("{finish_reason:?}"),
                 ChatEvent::Usage(token_usage) => format!(
                     "prompt: {}, completion: {}",
