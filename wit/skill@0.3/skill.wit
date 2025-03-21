@@ -64,7 +64,9 @@ interface streaming-skill-handler {
 interface streaming-host {
     /// Payload for the beginning of a message.
     record begin-attributes {
-        /// Optional role of the message.
+        /// Optional role of the message. Currently unused. Setting it will have no effect. In case
+        /// we would need it soon, it allows us to introduce it though without breaking changes to
+        /// the wit world. Users consuming the SDK do not need to worry about this field.
         role: option<string>
     }
 
