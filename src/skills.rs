@@ -180,17 +180,17 @@ pub enum LoadSkillError {
     #[error("Failed to instantiate the component: {0}")]
     ComponentError(String),
     #[error("Skill version {0} is no longer supported by the Kernel. Try upgrading your SDK.")]
-    NoLongerSupported(Version),
+    NoLongerSupported(String),
     #[error(
         "Skill version {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK."
     )]
-    NotSupportedYet(Version),
+    NotSupportedYet(String),
     #[error("Error decoding Wasm component: {0}")]
     WasmDecodeError(String),
     #[error("Wasm isn't a component.")]
     NotComponent,
-    #[error("Wasm component isn't using Pharia Skill.")]
-    NotPhariaSkill,
+    #[error("Wasm component isn't using a supported pharia:skill world.")]
+    UnsupportedWorld,
 }
 
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
@@ -368,16 +368,7 @@ impl SupportedSkillWorld {
         Ok(())
     }
 
-    fn extract(wasm: impl AsRef<[u8]>) -> Result<Self, LoadSkillError> {
-        let version = Self::extract_pharia_skill_version(wasm)?;
-        let supported_version = SupportedVersion::validate_version(version)?;
-        Ok(match supported_version {
-            SupportedVersion::V0_2 => Self::V0_2Function,
-            SupportedVersion::V0_3 => Self::V0_3Function,
-        })
-    }
-
-    fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> Result<Version, LoadSkillError> {
+    fn extract(wasm: impl AsRef<[u8]>) -> Result<SupportedSkillWorld, LoadSkillError> {
         let decoded =
             decode(wasm.as_ref()).map_err(|e| LoadSkillError::WasmDecodeError(e.to_string()))?;
         let DecodedWasm::Component(resolve, ..) = decoded else {
@@ -421,14 +412,21 @@ impl SupportedSkillWorld {
             });
 
         for (package_version, interface_name) in exported_interfaces {
+            let supported_version = SupportedVersion::try_from(package_version)?;
             // export pharia:skill/skill-handler@X.X.X
-            if interface_name == "skill-handler" {
-                return Ok(package_version.clone());
+            match (supported_version, interface_name.as_str()) {
+                (SupportedVersion::V0_2, "skill-handler") => {
+                    return Ok(SupportedSkillWorld::V0_2Function);
+                }
+                (SupportedVersion::V0_3, "skill-handler") => {
+                    return Ok(SupportedSkillWorld::V0_3Function);
+                }
+                _ => {}
             }
         }
 
         // We didn't find an expected export
-        Err(LoadSkillError::NotPhariaSkill)
+        Err(LoadSkillError::UnsupportedWorld)
     }
 }
 
@@ -439,6 +437,40 @@ pub enum SupportedVersion {
     V0_2,
     /// Versions 0.3.x of the skill world
     V0_3,
+}
+
+impl TryFrom<&Version> for SupportedVersion {
+    type Error = LoadSkillError;
+
+    fn try_from(version: &Version) -> Result<Self, Self::Error> {
+        match version {
+            Version {
+                major: 0, minor: 2, ..
+            } => {
+                if version <= Self::V0_2.current_supported_version() {
+                    Ok(Self::V0_2)
+                } else {
+                    Err(LoadSkillError::NotSupportedYet(version.to_string()))
+                }
+            }
+            Version {
+                major: 0, minor: 3, ..
+            } => {
+                if version <= Self::V0_3.current_supported_version() {
+                    Ok(Self::V0_3)
+                } else {
+                    Err(LoadSkillError::NotSupportedYet(version.to_string()))
+                }
+            }
+            _ => {
+                if version > Self::latest_supported_version() {
+                    Err(LoadSkillError::NotSupportedYet(version.to_string()))
+                } else {
+                    Err(LoadSkillError::NoLongerSupported(version.to_string()))
+                }
+            }
+        }
+    }
 }
 
 impl SupportedVersion {
@@ -491,37 +523,6 @@ impl SupportedVersion {
             .map(SupportedVersion::current_supported_version)
             .max()
             .expect("At least one version.")
-    }
-
-    /// Check if a given version is valid
-    fn validate_version(version: Version) -> Result<Self, LoadSkillError> {
-        match version {
-            Version {
-                major: 0, minor: 2, ..
-            } => {
-                if &version <= Self::V0_2.current_supported_version() {
-                    Ok(Self::V0_2)
-                } else {
-                    Err(LoadSkillError::NotSupportedYet(version))
-                }
-            }
-            Version {
-                major: 0, minor: 3, ..
-            } => {
-                if &version <= Self::V0_3.current_supported_version() {
-                    Ok(Self::V0_3)
-                } else {
-                    Err(LoadSkillError::NotSupportedYet(version))
-                }
-            }
-            _ => {
-                if &version > Self::latest_supported_version() {
-                    Err(LoadSkillError::NotSupportedYet(version))
-                } else {
-                    Err(LoadSkillError::NoLongerSupported(version))
-                }
-            }
-        }
     }
 }
 
@@ -756,21 +757,21 @@ pub mod tests {
     #[test]
     fn can_parse_module() {
         let wasm = given_rust_skill_greet_v0_2().bytes();
-        let version = SupportedSkillWorld::extract_pharia_skill_version(wasm).unwrap();
-        assert_eq!(version, Version::new(0, 2, 10));
+        let world = SupportedSkillWorld::extract(wasm).unwrap();
+        assert_eq!(world, SupportedSkillWorld::V0_2Function);
     }
 
     #[test]
     fn errors_if_not_pharia_component() {
         let wasm = wat::parse_str("(component)").unwrap();
-        let version = SupportedSkillWorld::extract_pharia_skill_version(wasm);
-        assert!(version.is_err());
+        let world = SupportedSkillWorld::extract(wasm);
+        assert!(world.is_err());
     }
 
     #[test]
     fn errors_if_not_component() {
         let wasm = wat::parse_str("(module)").unwrap();
-        let version = SupportedSkillWorld::extract_pharia_skill_version(wasm);
+        let version = SupportedSkillWorld::extract(wasm);
         assert!(version.is_err());
     }
 
@@ -1072,28 +1073,28 @@ pub mod tests {
 
     #[test]
     fn unsupported_v0_1() {
-        let error = SupportedVersion::validate_version(Version::new(0, 1, 0)).unwrap_err();
+        let error = SupportedVersion::try_from(&Version::new(0, 1, 0)).unwrap_err();
         assert!(matches!(error, LoadSkillError::NoLongerSupported(..)));
     }
 
     #[test]
     fn valid_0_2_version() -> anyhow::Result<()> {
         let version = Version::new(0, 2, 0);
-        let supported_version = SupportedVersion::validate_version(version)?;
+        let supported_version = SupportedVersion::try_from(&version)?;
         assert_eq!(supported_version, SupportedVersion::V0_2);
         Ok(())
     }
 
     #[test]
     fn invalid_0_2_version() {
-        let error = SupportedVersion::validate_version(Version::new(0, 2, u64::MAX)).unwrap_err();
+        let error = SupportedVersion::try_from(&Version::new(0, 2, u64::MAX)).unwrap_err();
         assert!(matches!(error, LoadSkillError::NotSupportedYet(..)));
     }
 
     #[test]
     fn invalid_future_version() {
-        let error = SupportedVersion::validate_version(Version::new(u64::MAX, u64::MAX, u64::MAX))
-            .unwrap_err();
+        let error =
+            SupportedVersion::try_from(&Version::new(u64::MAX, u64::MAX, u64::MAX)).unwrap_err();
         assert!(matches!(error, LoadSkillError::NotSupportedYet(..)));
     }
 
