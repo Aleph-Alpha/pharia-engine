@@ -1155,6 +1155,55 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
+    async fn http_csi_handle_chunk_with_offsets() {
+        let body = json!([{
+            "text": "text",
+            "params": {
+                "model": "model",
+                "max_tokens": 3,
+                "overlap": 0,
+            },
+        }]);
+
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let mut csi = StubCsi::empty();
+        csi.set_chunking(|r| {
+            Ok(r.into_iter()
+                .map(|_| {
+                    vec![chunking::Chunk {
+                        text: "my_chunk".to_owned(),
+                        byte_offset: 0,
+                        character_offset: None,
+                    }]
+                })
+                .collect())
+        });
+
+        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/csi/v1/chunk_with_offsets")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get separate events for each letter in "Hello"
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, APPLICATION_JSON.as_ref());
+    }
+
+    #[tokio::test]
     async fn run_skill_with_bad_namespace() {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";

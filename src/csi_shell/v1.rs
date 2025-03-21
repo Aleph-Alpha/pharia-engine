@@ -61,6 +61,7 @@ where
         .route("/chat", post(chat))
         .route("/chat_stream", post(chat_stream))
         .route("/chunk", post(chunk))
+        .route("/chunk_with_offsets", post(chunk_with_offsets))
         .route("/completion_stream", post(completion_stream))
         .route("/explain", post(explain))
 }
@@ -100,6 +101,28 @@ where
         .map(|v| {
             v.into_iter()
                 .map(|c| c.into_iter().map(|c| c.text).collect())
+                .collect()
+        })?;
+    Ok(Json(results))
+}
+
+async fn chunk_with_offsets<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<Vec<ChunkRequest>>,
+) -> Result<Json<Vec<Vec<ChunkWithOffset>>>, CsiShellError>
+where
+    C: Csi,
+{
+    let results = csi
+        .chunk(
+            bearer.token().to_owned(),
+            requests.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(|v| {
+            v.into_iter()
+                .map(|c| c.into_iter().map(Into::into).collect())
                 .collect()
         })?;
     Ok(Json(results))
