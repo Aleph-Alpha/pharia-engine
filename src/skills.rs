@@ -341,7 +341,7 @@ pub fn load_skill_from_wasm_bytes(
             Ok(Box::new(skill))
         }
         SupportedSkillWorld::V0_3MessageStream => {
-            let skill = v0_3::streaming_skill::MessageStreamSkillPre::new(pre)
+            let skill = v0_3::message_stream_skill::MessageStreamSkillPre::new(pre)
                 .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
         }
@@ -375,9 +375,9 @@ impl SupportedSkillWorld {
                     )?;
                 }
                 Self::V0_3MessageStream => {
-                    v0_3::streaming_skill::MessageStreamSkill::add_to_linker(
+                    v0_3::message_stream_skill::MessageStreamSkill::add_to_linker(
                         linker,
-                        v0_3::streaming_skill::LinkOptions::default().streaming(true),
+                        v0_3::message_stream_skill::LinkOptions::default().streaming(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
