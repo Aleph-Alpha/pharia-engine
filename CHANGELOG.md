@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.2...v0.11.3)
+
+### Fixes
+
+- Correct input type for chunk_with_offsets route - ([a1b6149](https://github.com/Aleph-Alpha/pharia-kernel/commit/a1b6149178700b9fc30e7876565b23a626a6a472))
+
+
 ## [0.11.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.1...v0.11.2)
 
 ### Features
