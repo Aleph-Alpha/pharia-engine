@@ -62,6 +62,7 @@ where
         .route("/chat_stream", post(chat_stream))
         .route("/chunk", post(chunk))
         .route("/chunk_with_offsets", post(chunk_with_offsets))
+        .route("/complete", post(complete))
         .route("/completion_stream", post(completion_stream))
         .route("/explain", post(explain))
 }
@@ -147,6 +148,24 @@ where
                 .map(|r| r.into_iter().map(Into::into).collect())
                 .collect()
         })?;
+    Ok(Json(results))
+}
+
+async fn complete<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<Vec<CompletionRequest>>,
+) -> Result<Json<Vec<Completion>>, CsiShellError>
+where
+    C: Csi,
+{
+    let results = csi
+        .complete(
+            bearer.token().to_owned(),
+            requests.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(|v| v.into_iter().map(Into::into).collect())?;
     Ok(Json(results))
 }
 
