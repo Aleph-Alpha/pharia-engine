@@ -62,17 +62,22 @@ interface streaming-skill-handler {
 // For some reason cannot enable unstable here
 // @unstable(feature = streaming)
 interface streaming-host {
+    /// Payload for the beginning of a message.
+    record begin-attributes {
+        /// Optional role of the message.
+        role: option<string>
+    }
+
     // For some reason cannot enable unstable here
     // @unstable(feature = streaming)
     variant message-item {
-        /// Start a new message, with an optional role of the turn.
-        /// Cannot be sent before a previous message has ended.
-        message-begin(option<string>),
+        /// Begin a new message. Cannot be sent before a previous message has ended.
+        message-begin(begin-attributes),
         /// A chunk of the message text. If all deltas are aggregated, it should produce the full message.
         /// Should be sent after a message-begin.
         message-append(string),
         /// Indicate the end of the message, with an optional payload.
-        /// Needs to be preceded by at least a message-start.
+        /// Needs to be preceded by at least a message-begin.
         message-end(option<list<u8>>),
     }
 
@@ -80,7 +85,7 @@ interface streaming-host {
     resource stream-output {
         /// Puts part of a message into the output stream.
         @unstable(feature = streaming)
-        write-message: func(item: message-item);
+        write-message-item: func(item: message-item);
     }
 }
 
