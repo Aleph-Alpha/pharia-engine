@@ -67,9 +67,10 @@ interface streaming-host {
     variant message-item {
         /// Start a new message, with an optional role of the turn.
         /// Cannot be sent before a previous message has ended.
-        message-start(option<string>),
+        message-begin(option<string>),
         /// A chunk of the message text. If all deltas are aggregated, it should produce the full message.
-        message-delta(string),
+        /// Should be sent after a message-begin.
+        message-append(string),
         /// Indicate the end of the message, with an optional payload.
         /// Needs to be preceded by at least a message-start.
         message-end(option<list<u8>>),
