@@ -276,15 +276,15 @@ impl From<inference::CompletionEvent> for Event {
     fn from(event: inference::CompletionEvent) -> Self {
         match event {
             inference::CompletionEvent::Append { text, logprobs } => Event::default()
-                .event("delta")
-                .json_data(CompletionDeltaEvent {
+                .event("append")
+                .json_data(CompletionAppendEvent {
                     text,
                     logprobs: logprobs.into_iter().map(Into::into).collect(),
                 })
                 .expect("`json_data` must only be called once."),
             inference::CompletionEvent::End { finish_reason } => Event::default()
-                .event("finished")
-                .json_data(CompletionFinishedEvent {
+                .event("end")
+                .json_data(CompletionEndEvent {
                     finish_reason: finish_reason.into(),
                 })
                 .expect("`json_data` must only be called once."),
@@ -304,13 +304,13 @@ struct SseErrorEvent {
 }
 
 #[derive(Serialize)]
-struct CompletionDeltaEvent {
+struct CompletionAppendEvent {
     text: String,
     logprobs: Vec<Distribution>,
 }
 
 #[derive(Serialize)]
-struct CompletionFinishedEvent {
+struct CompletionEndEvent {
     finish_reason: FinishReason,
 }
 
@@ -350,12 +350,12 @@ impl From<inference::ChatEvent> for Event {
     fn from(event: inference::ChatEvent) -> Self {
         match event {
             inference::ChatEvent::MessageBegin { role } => Event::default()
-                .event("message_start")
+                .event("message_begin")
                 .json_data(ChatMessageStartEvent { role })
                 .expect("`json_data` must only be called once."),
             inference::ChatEvent::MessageAppend { content, logprobs } => Event::default()
-                .event("message_delta")
-                .json_data(ChatMessageDeltaEvent {
+                .event("message_append")
+                .json_data(ChatMessageAppendEvent {
                     content,
                     logprobs: logprobs.into_iter().map(Into::into).collect(),
                 })
@@ -382,7 +382,7 @@ struct ChatMessageStartEvent {
 }
 
 #[derive(Serialize)]
-struct ChatMessageDeltaEvent {
+struct ChatMessageAppendEvent {
     content: String,
     logprobs: Vec<Distribution>,
 }

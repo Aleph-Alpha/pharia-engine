@@ -928,10 +928,10 @@ mod tests {
         assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
 
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
-        let expected_body = "event: delta
+        let expected_body = "event: append
 data: {\"text\":\"Say hello to Homer\",\"logprobs\":[]}
 
-event: finished
+event: end
 data: {\"finish_reason\":\"stop\"}
 
 event: usage
@@ -1037,10 +1037,10 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
 
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
-        let expected_body = "event: message_start
+        let expected_body = "event: message_begin
 data: {\"role\":\"assistant\"}
 
-event: message_delta
+event: message_append
 data: {\"content\":\"Say hello to Homer\",\"logprobs\":[]}
 
 event: message_end
