@@ -974,7 +974,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    #[should_panic = "not yet implemented"]
     async fn can_load_and_run_streaming_output_module() {
         // Given a skill loaded by our engine
         let events = vec![
