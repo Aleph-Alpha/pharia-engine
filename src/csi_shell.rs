@@ -4,6 +4,7 @@
 /// to the full functionality the Kernel offers as a runtime environment.
 mod v0_2;
 mod v0_3;
+mod v1;
 
 use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
 use axum_extra::{
@@ -29,11 +30,8 @@ where
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
     Router::new()
-        .route("/csi/v1/chat_stream", post(v0_3::chat_streaming))
-        .route(
-            "/csi/v1/completion_stream",
-            post(v0_3::completion_streaming),
-        )
+        .route("/csi/v1/chat_stream", post(v1::chat_stream))
+        .route("/csi/v1/completion_stream", post(v1::completion_stream))
         .route("/csi", post(http_csi_handle::<C>))
 }
 
