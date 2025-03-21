@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     csi::CsiForSkills,
-    inference::{CompletionEvent, CompletionParams, CompletionRequest},
+    inference::{ChatEvent, ChatParams, ChatRequest, Message},
     namespace_watcher::Namespace,
     skill_runtime::StreamEvent,
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillPath},
@@ -133,37 +133,38 @@ impl Skill for SkillTellMeAJoke {
         _input: Value,
         sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillError> {
-        let prompt = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\
-                            \n\
-                        Tell me a joke!<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\
-                        "
-        .to_owned();
-        let params = CompletionParams {
-            return_special_tokens: false,
-            max_tokens: Some(300),
-            temperature: Some(0.3),
-            top_k: None,
-            top_p: None,
-            stop: vec![],
-            frequency_penalty: None,
-            presence_penalty: None,
-            logprobs: crate::inference::Logprobs::No,
-        };
-        let request = CompletionRequest {
-            prompt,
+        let request = ChatRequest {
             model: "llama-3.1-8b-instruct".to_owned(),
-            params,
+            messages: vec![Message {
+                role: "user".to_owned(),
+                content: "Tell me a joke!".to_owned(),
+            }],
+            params: ChatParams {
+                max_tokens: Some(300),
+                temperature: Some(0.3),
+                top_p: None,
+                frequency_penalty: None,
+                presence_penalty: None,
+                logprobs: crate::inference::Logprobs::No,
+            },
         };
-        let stream_id = ctx.completion_stream_new(request).await;
-        while let Some(event) = ctx.completion_stream_next(&stream_id).await {
-            if let CompletionEvent::Append { text, .. } = event {
-                sender
-                    .send(StreamEvent::MessageAppend { text })
-                    .await
-                    .unwrap();
+        let stream_id = ctx.chat_stream_new(request).await;
+        while let Some(event) = ctx.chat_stream_next(&stream_id).await {
+            let event = match event {
+                ChatEvent::MessageBegin { .. } => Some(StreamEvent::MessageBegin),
+                ChatEvent::MessageAppend { content, .. } => {
+                    Some(StreamEvent::MessageAppend { text: content })
+                }
+                ChatEvent::MessageEnd { finish_reason } => Some(StreamEvent::MessageEnd {
+                    payload: json!(format!("{finish_reason:?}")),
+                }),
+                ChatEvent::Usage { .. } => None,
+            };
+            if let Some(event) = event {
+                drop(sender.send(event).await);
             }
         }
-        ctx.completion_stream_drop(stream_id).await;
+        ctx.chat_stream_drop(stream_id).await;
         Ok(())
     }
 }
