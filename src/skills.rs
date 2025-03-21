@@ -246,7 +246,7 @@ impl Engine {
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker)?;
         // Skill world from bindgen
-        SupportedVersion::add_all_to_linker(&mut linker)?;
+        SupportedSkillWorld::add_all_to_linker(&mut linker)?;
 
         Ok(Self {
             inner: engine,
@@ -321,16 +321,16 @@ pub fn load_skill_from_wasm_bytes(
     engine: &Engine,
     bytes: impl AsRef<[u8]>,
 ) -> Result<Box<dyn Skill>, LoadSkillError> {
-    let skill_version = SupportedVersion::extract(&bytes)?;
+    let skill_world = SupportedSkillWorld::extract(&bytes)?;
     let pre = engine.instantiate_pre(&bytes)?;
 
-    match skill_version {
-        SupportedVersion::V0_2 => {
+    match skill_world {
+        SupportedSkillWorld::V0_2Function => {
             let skill = v0_2::SkillPre::new(pre)
                 .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
         }
-        SupportedVersion::V0_3 => {
+        SupportedSkillWorld::V0_3Function => {
             let skill = v0_3::skill::SkillPre::new(pre)
                 .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
@@ -340,22 +340,22 @@ pub fn load_skill_from_wasm_bytes(
 
 /// Currently supported versions of the skill world
 #[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
-pub enum SupportedVersion {
+pub enum SupportedSkillWorld {
     /// Versions 0.2.x of the skill world
-    V0_2,
+    V0_2Function,
     /// Versions 0.3.x of the skill world
-    V0_3,
+    V0_3Function,
 }
 
-impl SupportedVersion {
+impl SupportedSkillWorld {
     /// Links all currently supported versions of the skill world to the engine
     fn add_all_to_linker(linker: &mut WasmtimeLinker<LinkedCtx>) -> anyhow::Result<()> {
         for version in Self::iter() {
             match version {
-                Self::V0_2 => {
+                Self::V0_2Function => {
                     v0_2::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
-                Self::V0_3 => {
+                Self::V0_3Function => {
                     v0_3::skill::Skill::add_to_linker(
                         linker,
                         v0_3::skill::LinkOptions::default().streaming(true),
@@ -370,7 +370,11 @@ impl SupportedVersion {
 
     fn extract(wasm: impl AsRef<[u8]>) -> Result<Self, LoadSkillError> {
         let version = Self::extract_pharia_skill_version(wasm)?;
-        Self::validate_version(version)
+        let supported_version = SupportedVersion::validate_version(version)?;
+        Ok(match supported_version {
+            SupportedVersion::V0_2 => Self::V0_2Function,
+            SupportedVersion::V0_3 => Self::V0_3Function,
+        })
     }
 
     fn extract_pharia_skill_version(wasm: impl AsRef<[u8]>) -> Result<Version, LoadSkillError> {
@@ -426,7 +430,18 @@ impl SupportedVersion {
         // We didn't find an expected export
         Err(LoadSkillError::NotPhariaSkill)
     }
+}
 
+/// Currently supported versions of the skill world
+#[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
+pub enum SupportedVersion {
+    /// Versions 0.2.x of the skill world
+    V0_2,
+    /// Versions 0.3.x of the skill world
+    V0_3,
+}
+
+impl SupportedVersion {
     /// Extracts the package version from a given WIT file.
     /// Path is used for debugging, contents should be the text contents of the WIT file.
     fn extract_wit_package_version(path: impl AsRef<Path>, contents: &str) -> Version {
@@ -741,21 +756,21 @@ pub mod tests {
     #[test]
     fn can_parse_module() {
         let wasm = given_rust_skill_greet_v0_2().bytes();
-        let version = SupportedVersion::extract_pharia_skill_version(wasm).unwrap();
+        let version = SupportedSkillWorld::extract_pharia_skill_version(wasm).unwrap();
         assert_eq!(version, Version::new(0, 2, 10));
     }
 
     #[test]
     fn errors_if_not_pharia_component() {
         let wasm = wat::parse_str("(component)").unwrap();
-        let version = SupportedVersion::extract_pharia_skill_version(wasm);
+        let version = SupportedSkillWorld::extract_pharia_skill_version(wasm);
         assert!(version.is_err());
     }
 
     #[test]
     fn errors_if_not_component() {
         let wasm = wat::parse_str("(module)").unwrap();
-        let version = SupportedVersion::extract_pharia_skill_version(wasm);
+        let version = SupportedSkillWorld::extract_pharia_skill_version(wasm);
         assert!(version.is_err());
     }
 
@@ -938,7 +953,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    #[should_panic = "unsupported wit world for now"]
+    #[should_panic = "called `Result::unwrap()` on an `Err` value: NotPhariaSkill"]
     async fn can_load_and_run_streaming_output_module() {
         // Given a skill loaded by our engine
         let events = vec![
