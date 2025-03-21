@@ -58,9 +58,28 @@ where
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
     Router::new()
+        .route("/chat", post(chat))
         .route("/chat_stream", post(chat_stream))
         .route("/completion_stream", post(completion_stream))
         .route("/explain", post(explain))
+}
+
+async fn chat<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<Vec<ChatRequest>>,
+) -> Result<Json<Vec<ChatResponse>>, CsiShellError>
+where
+    C: Csi,
+{
+    let results = csi
+        .chat(
+            bearer.token().to_owned(),
+            requests.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(|v| v.into_iter().map(Into::into).collect())?;
+    Ok(Json(results))
 }
 
 async fn explain<C>(
