@@ -50,7 +50,7 @@ where
         }
     }
 
-    pub async fn run_stream(
+    pub async fn run_message_stream(
         &self,
         skill_path: &SkillPath,
         input: Value,
@@ -176,7 +176,7 @@ pub trait SkillRuntimeApi {
         api_token: String,
     ) -> Result<Value, SkillExecutionError>;
 
-    async fn run_stream(
+    async fn run_message_stream(
         &self,
         skill_path: SkillPath,
         input: Value,
@@ -210,7 +210,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         recv.await.unwrap()
     }
 
-    async fn run_stream(
+    async fn run_message_stream(
         &self,
         skill_path: SkillPath,
         input: Value,
@@ -218,14 +218,14 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     ) -> mpsc::Receiver<StreamEvent> {
         let (send, recv) = mpsc::channel::<StreamEvent>(1);
 
-        let msg = RunStreamMsg {
+        let msg = RunMessageStreamMsg {
             skill_path,
             input,
             send,
             api_token,
         };
 
-        self.send(SkillRuntimeMsg::Stream(msg))
+        self.send(SkillRuntimeMsg::MessageStream(msg))
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
@@ -389,7 +389,7 @@ impl From<SkillRuntimeMetrics> for metrics::KeyName {
 
 #[derive(Debug)]
 pub enum SkillRuntimeMsg {
-    Stream(RunStreamMsg),
+    MessageStream(RunMessageStreamMsg),
     Function(RunFunctionMsg),
     Metadata(MetadataMsg),
 }
@@ -401,7 +401,7 @@ impl SkillRuntimeMsg {
         runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
         match self {
-            SkillRuntimeMsg::Stream(msg) => {
+            SkillRuntimeMsg::MessageStream(msg) => {
                 msg.act(csi_apis, runtime).await;
             }
             SkillRuntimeMsg::Function(msg) => {
@@ -434,14 +434,14 @@ impl MetadataMsg {
 }
 
 #[derive(Debug)]
-pub struct RunStreamMsg {
+pub struct RunMessageStreamMsg {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: mpsc::Sender<StreamEvent>,
     pub api_token: String,
 }
 
-impl RunStreamMsg {
+impl RunMessageStreamMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
@@ -449,7 +449,7 @@ impl RunStreamMsg {
     ) {
         let start = Instant::now();
 
-        let RunStreamMsg {
+        let RunMessageStreamMsg {
             skill_path,
             input,
             send,
@@ -459,7 +459,7 @@ impl RunStreamMsg {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         let response = select! {
-            result = runtime.run_stream(&skill_path, input, ctx, send.clone()) => result,
+            result = runtime.run_message_stream(&skill_path, input, ctx, send.clone()) => result,
             // An error occurred during skill execution.
             Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
         };
@@ -1283,7 +1283,7 @@ pub mod tests {
         // When
         let mut recv = runtime
             .api()
-            .run_stream(
+            .run_message_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "hello"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
@@ -1345,7 +1345,7 @@ pub mod tests {
         // When
         let mut recv = runtime
             .api()
-            .run_stream(
+            .run_message_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "saboteur"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
@@ -1419,7 +1419,7 @@ pub mod tests {
         // When
         let mut recv = runtime
             .api()
-            .run_stream(skill_path, json!({}), "dumm_token".to_owned())
+            .run_message_stream(skill_path, json!({}), "dumm_token".to_owned())
             .await;
 
         // Then
