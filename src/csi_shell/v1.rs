@@ -2,20 +2,41 @@ use std::convert::Infallible;
 
 use async_stream::try_stream;
 use axum::{
-    Json,
+    Json, Router,
     extract::State,
     response::{Sse, sse::Event},
+    routing::post,
 };
 use axum_extra::{
     TypedHeader,
     headers::{Authorization, authorization::Bearer},
 };
+use derive_more::{From, Into};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
-use crate::{csi::Csi, inference, shell::CsiState};
+use crate::{
+    chunking,
+    csi::Csi,
+    inference, language_selection, search,
+    shell::{AppState, CsiState},
+    skill_runtime::SkillRuntimeApi,
+    skill_store::SkillStoreApi,
+};
 
-pub async fn completion_stream<C>(
+pub fn http<C, R, S>() -> Router<AppState<C, R, S>>
+where
+    C: Csi + Clone + Sync + Send + 'static,
+    R: SkillRuntimeApi + Clone + Send + Sync + 'static,
+    S: SkillStoreApi + Clone + Send + Sync + 'static,
+{
+    Router::new()
+        .route("/chat_stream", post(chat_stream))
+        .route("/completion_stream", post(completion_stream))
+}
+
+async fn completion_stream<C>(
     State(CsiState(csi)): State<CsiState<C>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(request): Json<CompletionRequest>,
@@ -89,7 +110,7 @@ struct CompletionUsageEvent {
     usage: TokenUsage,
 }
 
-pub async fn chat_stream<C>(
+async fn chat_stream<C>(
     State(CsiState(csi)): State<CsiState<C>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Json(request): Json<ChatRequest>,
@@ -168,10 +189,10 @@ struct ChatUsageEvent {
 }
 
 #[derive(Deserialize)]
-pub struct CompletionRequest {
-    pub prompt: String,
-    pub model: String,
-    pub params: CompletionParams,
+struct CompletionRequest {
+    prompt: String,
+    model: String,
+    params: CompletionParams,
 }
 
 impl From<CompletionRequest> for inference::CompletionRequest {
@@ -190,16 +211,16 @@ impl From<CompletionRequest> for inference::CompletionRequest {
 }
 
 #[derive(Deserialize)]
-pub struct CompletionParams {
-    pub return_special_tokens: bool,
-    pub max_tokens: Option<u32>,
-    pub temperature: Option<f64>,
-    pub top_k: Option<u32>,
-    pub top_p: Option<f64>,
-    pub stop: Vec<String>,
-    pub frequency_penalty: Option<f64>,
-    pub presence_penalty: Option<f64>,
-    pub logprobs: Logprobs,
+struct CompletionParams {
+    return_special_tokens: bool,
+    max_tokens: Option<u32>,
+    temperature: Option<f64>,
+    top_k: Option<u32>,
+    top_p: Option<f64>,
+    stop: Vec<String>,
+    frequency_penalty: Option<f64>,
+    presence_penalty: Option<f64>,
+    logprobs: Logprobs,
 }
 
 impl From<CompletionParams> for inference::CompletionParams {
@@ -231,7 +252,7 @@ impl From<CompletionParams> for inference::CompletionParams {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Logprobs {
+enum Logprobs {
     No,
     Sampled,
     Top(u8),
@@ -248,13 +269,13 @@ impl From<Logprobs> for inference::Logprobs {
 }
 
 #[derive(Deserialize)]
-pub struct ChatParams {
-    pub max_tokens: Option<u32>,
-    pub temperature: Option<f64>,
-    pub top_p: Option<f64>,
-    pub frequency_penalty: Option<f64>,
-    pub presence_penalty: Option<f64>,
-    pub logprobs: Logprobs,
+struct ChatParams {
+    max_tokens: Option<u32>,
+    temperature: Option<f64>,
+    top_p: Option<f64>,
+    frequency_penalty: Option<f64>,
+    presence_penalty: Option<f64>,
+    logprobs: Logprobs,
 }
 
 impl From<ChatParams> for inference::ChatParams {
@@ -279,10 +300,10 @@ impl From<ChatParams> for inference::ChatParams {
 }
 
 #[derive(Deserialize)]
-pub struct ChatRequest {
-    pub model: String,
-    pub messages: Vec<Message>,
-    pub params: ChatParams,
+struct ChatRequest {
+    model: String,
+    messages: Vec<Message>,
+    params: ChatParams,
 }
 
 impl From<ChatRequest> for inference::ChatRequest {
@@ -361,14 +382,540 @@ impl From<inference::Distribution> for Distribution {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Message {
-    pub role: String,
-    pub content: String,
+struct Message {
+    role: String,
+    content: String,
 }
 
 impl From<Message> for inference::Message {
     fn from(value: Message) -> Self {
         let Message { role, content } = value;
         inference::Message { role, content }
+    }
+}
+
+impl From<inference::Message> for Message {
+    fn from(value: inference::Message) -> Self {
+        let inference::Message { role, content } = value;
+        Message { role, content }
+    }
+}
+
+#[derive(Serialize)]
+struct TextScore {
+    start: u32,
+    length: u32,
+    score: f64,
+}
+
+impl From<inference::TextScore> for TextScore {
+    fn from(value: inference::TextScore) -> Self {
+        let inference::TextScore {
+            start,
+            length,
+            score,
+        } = value;
+        TextScore {
+            start,
+            length,
+            score,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Granularity {
+    Auto,
+    Word,
+    Sentence,
+    Paragraph,
+}
+
+impl From<Granularity> for inference::Granularity {
+    fn from(value: Granularity) -> Self {
+        match value {
+            Granularity::Auto => inference::Granularity::Auto,
+            Granularity::Word => inference::Granularity::Word,
+            Granularity::Sentence => inference::Granularity::Sentence,
+            Granularity::Paragraph => inference::Granularity::Paragraph,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ExplainRequest {
+    prompt: String,
+    target: String,
+    model: String,
+    granularity: Granularity,
+}
+
+impl From<ExplainRequest> for inference::ExplanationRequest {
+    fn from(value: ExplainRequest) -> Self {
+        let ExplainRequest {
+            prompt,
+            target,
+            model,
+            granularity,
+        } = value;
+        inference::ExplanationRequest {
+            prompt,
+            target,
+            model,
+            granularity: granularity.into(),
+        }
+    }
+}
+#[derive(Deserialize, Serialize)]
+struct DocumentPath {
+    namespace: String,
+    collection: String,
+    name: String,
+}
+
+impl From<DocumentPath> for search::DocumentPath {
+    fn from(value: DocumentPath) -> Self {
+        let DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = value;
+        search::DocumentPath {
+            namespace,
+            collection,
+            name,
+        }
+    }
+}
+
+impl From<search::DocumentPath> for DocumentPath {
+    fn from(value: search::DocumentPath) -> Self {
+        let search::DocumentPath {
+            namespace,
+            collection,
+            name,
+        } = value;
+        DocumentPath {
+            namespace,
+            collection,
+            name,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case", tag = "modality")]
+enum Modality {
+    Text { text: String },
+    Image,
+}
+
+impl From<search::Modality> for Modality {
+    fn from(value: search::Modality) -> Self {
+        match value {
+            search::Modality::Text { text } => Modality::Text { text },
+            search::Modality::Image { bytes: _ } => Modality::Image,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Document {
+    path: DocumentPath,
+    contents: Vec<Modality>,
+    metadata: Option<Value>,
+}
+
+impl From<search::Document> for Document {
+    fn from(value: search::Document) -> Self {
+        let search::Document {
+            path,
+            contents,
+            metadata,
+        } = value;
+        Document {
+            path: path.into(),
+            contents: contents.into_iter().map(Into::into).collect(),
+            metadata,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ChatResponse {
+    message: Message,
+    finish_reason: FinishReason,
+    logprobs: Vec<Distribution>,
+    usage: TokenUsage,
+}
+
+impl From<inference::ChatResponse> for ChatResponse {
+    fn from(value: inference::ChatResponse) -> Self {
+        let inference::ChatResponse {
+            message,
+            finish_reason,
+            logprobs,
+            usage,
+        } = value;
+        ChatResponse {
+            message: message.into(),
+            finish_reason: finish_reason.into(),
+            logprobs: logprobs.into_iter().map(Into::into).collect(),
+            usage: usage.into(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct IndexPath {
+    namespace: String,
+    collection: String,
+    index: String,
+}
+
+impl From<IndexPath> for search::IndexPath {
+    fn from(value: IndexPath) -> Self {
+        let IndexPath {
+            namespace,
+            collection,
+            index,
+        } = value;
+        search::IndexPath {
+            namespace,
+            collection,
+            index,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct SearchRequest {
+    query: String,
+    index_path: IndexPath,
+    max_results: u32,
+    min_score: Option<f64>,
+    filters: Vec<Filter>,
+}
+
+impl From<SearchRequest> for search::SearchRequest {
+    fn from(value: SearchRequest) -> Self {
+        let SearchRequest {
+            query,
+            index_path,
+            max_results,
+            min_score,
+            filters,
+        } = value;
+        search::SearchRequest {
+            query,
+            index_path: index_path.into(),
+            max_results,
+            min_score,
+            filters: filters.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct TextCursor {
+    item: u32,
+    position: u32,
+}
+
+impl From<search::TextCursor> for TextCursor {
+    fn from(value: search::TextCursor) -> Self {
+        let search::TextCursor { item, position } = value;
+        TextCursor { item, position }
+    }
+}
+
+#[derive(Serialize)]
+struct SearchResult {
+    document_path: DocumentPath,
+    content: String,
+    score: f64,
+    start: TextCursor,
+    end: TextCursor,
+}
+
+impl From<search::SearchResult> for SearchResult {
+    fn from(value: search::SearchResult) -> Self {
+        let search::SearchResult {
+            document_path,
+            content,
+            score,
+            start,
+            end,
+        } = value;
+        SearchResult {
+            document_path: document_path.into(),
+            content,
+            score,
+            start: start.into(),
+            end: end.into(),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+enum Filter {
+    Without(Vec<FilterCondition>),
+    WithOneOf(Vec<FilterCondition>),
+    With(Vec<FilterCondition>),
+}
+
+impl From<Filter> for search::Filter {
+    fn from(value: Filter) -> Self {
+        match value {
+            Filter::Without(items) => {
+                search::Filter::Without(items.into_iter().map(Into::into).collect())
+            }
+            Filter::WithOneOf(items) => {
+                search::Filter::WithOneOf(items.into_iter().map(Into::into).collect())
+            }
+            Filter::With(items) => {
+                search::Filter::With(items.into_iter().map(Into::into).collect())
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+/// This representation diverges from the wit world 0.3 schema as it
+/// has one more layer of nesting with the metadata filter and calls
+/// the `with-all` variant simply `with`. While we want to keep the
+/// http and wit representations as close as possible, this divergence
+/// happened as a mistake and we do not update it to not break clients.
+enum FilterCondition {
+    Metadata(MetadataFilter),
+}
+
+impl From<FilterCondition> for search::FilterCondition {
+    fn from(value: FilterCondition) -> Self {
+        match value {
+            FilterCondition::Metadata(metadata_filter) => {
+                search::FilterCondition::Metadata(metadata_filter.into())
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+struct MetadataFilter {
+    field: String,
+    #[serde(flatten)]
+    condition: MetadataFilterCondition,
+}
+
+impl From<MetadataFilter> for search::MetadataFilter {
+    fn from(value: MetadataFilter) -> Self {
+        let MetadataFilter { field, condition } = value;
+        Self {
+            field,
+            condition: condition.into(),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+enum MetadataFilterCondition {
+    GreaterThan(f64),
+    GreaterThanOrEqualTo(f64),
+    LessThan(f64),
+    LessThanOrEqualTo(f64),
+    After(String),
+    AtOrAfter(String),
+    Before(String),
+    AtOrBefore(String),
+    EqualTo(MetadataFieldValue),
+    IsNull(serde_bool::True),
+}
+
+impl From<MetadataFilterCondition> for search::MetadataFilterCondition {
+    fn from(value: MetadataFilterCondition) -> Self {
+        match value {
+            MetadataFilterCondition::GreaterThan(v) => {
+                search::MetadataFilterCondition::GreaterThan(v)
+            }
+            MetadataFilterCondition::GreaterThanOrEqualTo(v) => {
+                search::MetadataFilterCondition::GreaterThanOrEqualTo(v)
+            }
+            MetadataFilterCondition::LessThan(v) => search::MetadataFilterCondition::LessThan(v),
+            MetadataFilterCondition::LessThanOrEqualTo(v) => {
+                search::MetadataFilterCondition::LessThanOrEqualTo(v)
+            }
+            MetadataFilterCondition::After(v) => search::MetadataFilterCondition::After(v),
+            MetadataFilterCondition::AtOrAfter(v) => search::MetadataFilterCondition::AtOrAfter(v),
+            MetadataFilterCondition::Before(v) => search::MetadataFilterCondition::Before(v),
+            MetadataFilterCondition::AtOrBefore(v) => {
+                search::MetadataFilterCondition::AtOrBefore(v)
+            }
+            MetadataFilterCondition::EqualTo(v) => {
+                search::MetadataFilterCondition::EqualTo(v.into())
+            }
+            MetadataFilterCondition::IsNull(v) => search::MetadataFilterCondition::IsNull(v),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+enum MetadataFieldValue {
+    String(String),
+    Integer(i64),
+    Boolean(bool),
+}
+
+impl From<MetadataFieldValue> for search::MetadataFieldValue {
+    fn from(value: MetadataFieldValue) -> Self {
+        match value {
+            MetadataFieldValue::String(v) => search::MetadataFieldValue::String(v),
+            MetadataFieldValue::Integer(v) => search::MetadataFieldValue::Integer(v),
+            MetadataFieldValue::Boolean(v) => search::MetadataFieldValue::Boolean(v),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ChunkParams {
+    model: String,
+    max_tokens: u32,
+    overlap: u32,
+}
+
+impl From<ChunkParams> for chunking::ChunkParams {
+    fn from(value: ChunkParams) -> Self {
+        let ChunkParams {
+            model,
+            max_tokens,
+            overlap,
+        } = value;
+        chunking::ChunkParams {
+            model,
+            max_tokens,
+            overlap,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ChunkRequest {
+    text: String,
+    params: ChunkParams,
+}
+
+impl From<ChunkRequest> for chunking::ChunkRequest {
+    fn from(value: ChunkRequest) -> Self {
+        let ChunkRequest { text, params } = value;
+        chunking::ChunkRequest {
+            text,
+            params: params.into(),
+            character_offsets: false,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ChunkWithOffsetRequest {
+    text: String,
+    params: ChunkParams,
+    character_offsets: bool,
+}
+
+impl From<ChunkWithOffsetRequest> for chunking::ChunkRequest {
+    fn from(value: ChunkWithOffsetRequest) -> Self {
+        let ChunkWithOffsetRequest {
+            text,
+            params,
+            character_offsets,
+        } = value;
+        chunking::ChunkRequest {
+            text,
+            params: params.into(),
+            character_offsets,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ChunkWithOffset {
+    text: String,
+    byte_offset: u64,
+    character_offset: Option<u64>,
+}
+
+impl From<chunking::Chunk> for ChunkWithOffset {
+    fn from(value: chunking::Chunk) -> Self {
+        let chunking::Chunk {
+            text,
+            byte_offset,
+            character_offset,
+        } = value;
+        ChunkWithOffset {
+            text,
+            byte_offset,
+            character_offset,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, From, Into)]
+#[serde(transparent)]
+struct Language(String);
+
+impl From<Language> for language_selection::Language {
+    fn from(value: Language) -> Self {
+        Self::new(value.0)
+    }
+}
+
+impl From<language_selection::Language> for Language {
+    fn from(value: language_selection::Language) -> Self {
+        Self(value.into())
+    }
+}
+
+#[derive(Deserialize)]
+struct SelectLanguageRequest {
+    text: String,
+    languages: Vec<Language>,
+}
+
+impl From<SelectLanguageRequest> for language_selection::SelectLanguageRequest {
+    fn from(value: SelectLanguageRequest) -> Self {
+        let SelectLanguageRequest { text, languages } = value;
+        language_selection::SelectLanguageRequest {
+            text,
+            languages: languages.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Completion {
+    text: String,
+    finish_reason: FinishReason,
+    logprobs: Vec<Distribution>,
+    usage: TokenUsage,
+}
+
+impl From<inference::Completion> for Completion {
+    fn from(value: inference::Completion) -> Self {
+        let inference::Completion {
+            text,
+            finish_reason,
+            logprobs,
+            usage,
+        } = value;
+        Completion {
+            text,
+            finish_reason: finish_reason.into(),
+            logprobs: logprobs.into_iter().map(Into::into).collect(),
+            usage: usage.into(),
+        }
     }
 }
