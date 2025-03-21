@@ -1,0 +1,17 @@
+[package]
+name = "streaming-output"
+version = "0.1.0"
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+anyhow = "1.0.97"
+serde_json = "1.0.140"
+wit-bindgen = "0.41.0"
+
+
+[lib]
+crate-type = ["cdylib"]
+
+[lints]
+workspace = true
