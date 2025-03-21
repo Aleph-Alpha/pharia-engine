@@ -545,7 +545,7 @@ where
 {
     let path = SkillPath::new(namespace, name);
     let mut stream_events = skill_runtime_api
-        .run_stream(path, input, bearer.token().to_owned())
+        .run_message_stream(path, input, bearer.token().to_owned())
         .await;
 
     // We need to use `try_stream!` instead of `stream!`, because `stream!` does not implement the
@@ -1625,7 +1625,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             panic!("Skill runtime dummy called")
         }
 
-        async fn run_stream(
+        async fn run_message_stream(
             &self,
             _skill_path: SkillPath,
             _input: Value,
@@ -1667,7 +1667,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             Err((*self.make_error)())
         }
 
-        async fn run_stream(
+        async fn run_message_stream(
             &self,
             _skill_path: SkillPath,
             _input: Value,
@@ -1732,7 +1732,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             Ok(self.function_result.clone())
         }
 
-        async fn run_stream(
+        async fn run_message_stream(
             &self,
             _skill_path: SkillPath,
             _input: Value,
@@ -1804,7 +1804,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             Ok(Value::default())
         }
 
-        async fn run_stream(
+        async fn run_message_stream(
             &self,
             skill_path: SkillPath,
             input: Value,
