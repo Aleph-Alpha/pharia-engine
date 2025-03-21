@@ -1205,6 +1205,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 "max_tokens": 3,
                 "overlap": 0,
             },
+            "character_offsets": true
         }]);
 
         let api_token = "dummy auth token";
@@ -1217,7 +1218,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                     vec![chunking::Chunk {
                         text: "my_chunk".to_owned(),
                         byte_offset: 0,
-                        character_offset: None,
+                        character_offset: Some(0),
                     }]
                 })
                 .collect())
