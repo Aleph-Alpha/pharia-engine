@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.3...v0.11.4)
+
+### Documentation
+
+- Typo - ([434fde8](https://github.com/Aleph-Alpha/pharia-kernel/commit/434fde81fed117fe1393d5aea15ef75519d49ce7))
+
+
 ## [0.11.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.2...v0.11.3)
 
 ### Fixes
