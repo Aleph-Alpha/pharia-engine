@@ -4,7 +4,8 @@ use async_stream::try_stream;
 use axum::{
     Json, Router,
     extract::State,
-    response::{Sse, sse::Event},
+    http::StatusCode,
+    response::{IntoResponse, Response, Sse, sse::Event},
     routing::post,
 };
 use axum_extra::{
@@ -25,6 +26,31 @@ use crate::{
     skill_store::SkillStoreApi,
 };
 
+// Make our own error that wraps `anyhow::Error`.
+struct CsiShellError(anyhow::Error);
+
+// Tell axum how to convert `AppError` into a response.
+impl IntoResponse for CsiShellError {
+    fn into_response(self) -> Response {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {}", self.0),
+        )
+            .into_response()
+    }
+}
+
+// This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into
+// `Result<_, CsiShellError>`. That way you don't need to do that manually.
+impl<E> From<E> for CsiShellError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
+    }
+}
+
 pub fn http<C, R, S>() -> Router<AppState<C, R, S>>
 where
     C: Csi + Clone + Sync + Send + 'static,
@@ -34,6 +60,29 @@ where
     Router::new()
         .route("/chat_stream", post(chat_stream))
         .route("/completion_stream", post(completion_stream))
+        .route("/explain", post(explain))
+}
+
+async fn explain<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<Vec<ExplainRequest>>,
+) -> Result<Json<Vec<Vec<TextScore>>>, CsiShellError>
+where
+    C: Csi,
+{
+    let results = csi
+        .explain(
+            bearer.token().to_owned(),
+            requests.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(|v| {
+            v.into_iter()
+                .map(|r| r.into_iter().map(Into::into).collect())
+                .collect()
+        })?;
+    Ok(Json(results))
 }
 
 async fn completion_stream<C>(
