@@ -709,7 +709,7 @@ mod tests {
         authorization::{self, tests::StubAuthorization},
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
-        inference,
+        inference::{self, Explanation, TextScore},
         skill_runtime::SkillExecutionError,
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
@@ -1008,6 +1008,46 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
 ";
         assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
+    async fn http_csi_handle_returns_explain() {
+        let body = json!([{
+            "prompt": "prompt",
+            "target": "target",
+            "model": "model",
+            "granularity": "auto"
+        }]);
+
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let csi = StubCsi::with_explain(|_| {
+            Explanation::new(vec![TextScore {
+                score: 0.0,
+                start: 0,
+                length: 2,
+            }])
+        });
+        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/csi/v1/explain")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, APPLICATION_JSON.as_ref());
     }
 
     #[tokio::test]
