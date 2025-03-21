@@ -124,7 +124,7 @@ pub enum Signature {
         input_schema: JsonSchema,
         output_schema: JsonSchema,
     },
-    Stream {
+    MessageStream {
         input_schema: JsonSchema,
     },
 }
@@ -132,21 +132,23 @@ pub enum Signature {
 impl Signature {
     pub fn input_schema(&self) -> &JsonSchema {
         match self {
-            Self::Stream { input_schema } | Self::Function { input_schema, .. } => input_schema,
+            Self::MessageStream { input_schema } | Self::Function { input_schema, .. } => {
+                input_schema
+            }
         }
     }
 
     pub fn output_schema(&self) -> Option<&JsonSchema> {
         match self {
             Self::Function { output_schema, .. } => Some(output_schema),
-            Self::Stream { .. } => None,
+            Self::MessageStream { .. } => None,
         }
     }
 
     pub fn skill_type_name(&self) -> &'static str {
         match self {
             Self::Function { .. } => "function",
-            Self::Stream { .. } => "generator",
+            Self::MessageStream { .. } => "message_stream",
         }
     }
 }
@@ -164,10 +166,10 @@ pub enum SkillError {
     InvalidOutput(String),
     /// E.g. if instantiating the skill fails.
     RuntimeError(anyhow::Error),
-    /// Returned if a function is invoked as a generator
+    /// Returned if a function is invoked as a message stream
     IsFunction,
-    /// Retruned if a generator is invoked as a function
-    IsGenerator,
+    /// Retruned if a message stream is invoked as a function
+    IsMessageStream,
 }
 
 /// Failures which occur when loading a skill from Web Assembly bytes.
@@ -307,7 +309,7 @@ pub trait Skill: Send + Sync {
         input: Value,
     ) -> Result<Value, SkillError>;
 
-    async fn run_as_generator(
+    async fn run_as_message_stream(
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
@@ -338,8 +340,8 @@ pub fn load_skill_from_wasm_bytes(
                 .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
         }
-        SupportedSkillWorld::V0_3Generator => {
-            let skill = v0_3::streaming_skill::StreamingSkillPre::new(pre)
+        SupportedSkillWorld::V0_3MessageStream => {
+            let skill = v0_3::streaming_skill::MessageStreamSkillPre::new(pre)
                 .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
         }
@@ -354,7 +356,7 @@ pub enum SupportedSkillWorld {
     /// Versions 0.3.x of the skill world
     V0_3Function,
     /// Versions 0.3.x of the streaming-skill world
-    V0_3Generator,
+    V0_3MessageStream,
 }
 
 impl SupportedSkillWorld {
@@ -372,8 +374,8 @@ impl SupportedSkillWorld {
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
-                Self::V0_3Generator => {
-                    v0_3::streaming_skill::StreamingSkill::add_to_linker(
+                Self::V0_3MessageStream => {
+                    v0_3::streaming_skill::MessageStreamSkill::add_to_linker(
                         linker,
                         v0_3::streaming_skill::LinkOptions::default().streaming(true),
                         |state: &mut LinkedCtx| state,
@@ -438,8 +440,8 @@ impl SupportedSkillWorld {
                 (SupportedVersion::V0_3, "skill-handler") => {
                     return Ok(SupportedSkillWorld::V0_3Function);
                 }
-                (SupportedVersion::V0_3, "streaming-skill-handler") => {
-                    return Ok(SupportedSkillWorld::V0_3Generator);
+                (SupportedVersion::V0_3, "message-stream") => {
+                    return Ok(SupportedSkillWorld::V0_3MessageStream);
                 }
                 _ => {}
             }
@@ -897,11 +899,11 @@ pub mod tests {
     async fn can_load_and_run_completion_stream_module() {
         // Given a skill loaded by our engine
         let events = vec![
-            CompletionEvent::Delta {
+            CompletionEvent::Append {
                 text: "Homer".to_owned(),
                 logprobs: vec![],
             },
-            CompletionEvent::Finished {
+            CompletionEvent::End {
                 finish_reason: FinishReason::Stop,
             },
             CompletionEvent::Usage {
@@ -932,10 +934,10 @@ pub mod tests {
     async fn can_load_and_run_chat_stream_module() {
         // Given a skill loaded by our engine
         let events = vec![
-            ChatEvent::MessageStart {
+            ChatEvent::MessageBegin {
                 role: "assistant".to_owned(),
             },
-            ChatEvent::MessageDelta {
+            ChatEvent::MessageAppend {
                 content: "Homer".to_owned(),
                 logprobs: vec![],
             },
@@ -977,10 +979,10 @@ pub mod tests {
     async fn can_load_and_run_streaming_output_module() {
         // Given a skill loaded by our engine
         let events = vec![
-            ChatEvent::MessageStart {
+            ChatEvent::MessageBegin {
                 role: "assistant".to_owned(),
             },
-            ChatEvent::MessageDelta {
+            ChatEvent::MessageAppend {
                 content: "Homer".to_owned(),
                 logprobs: vec![],
             },
@@ -1003,7 +1005,7 @@ pub mod tests {
 
         // When invoked with a json string
         skill
-            .run_as_generator(&engine, ctx, json!("Homer"), send)
+            .run_as_message_stream(&engine, ctx, json!("Homer"), send)
             .await
             .unwrap();
 
@@ -1194,7 +1196,7 @@ pub mod tests {
             panic!("I am a dummy Skill")
         }
 
-        async fn run_as_generator(
+        async fn run_as_message_stream(
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,

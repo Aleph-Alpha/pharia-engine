@@ -222,11 +222,11 @@ impl TryFrom<aleph_alpha_client::CompletionEvent> for CompletionEvent {
             aleph_alpha_client::CompletionEvent::Delta {
                 completion,
                 logprobs,
-            } => CompletionEvent::Delta {
+            } => CompletionEvent::Append {
                 text: completion,
                 logprobs: logprobs.into_iter().map(Into::into).collect(),
             },
-            aleph_alpha_client::CompletionEvent::Finished { reason } => CompletionEvent::Finished {
+            aleph_alpha_client::CompletionEvent::Finished { reason } => CompletionEvent::End {
                 finish_reason: reason.parse()?,
             },
             aleph_alpha_client::CompletionEvent::Summary { usage } => CompletionEvent::Usage {
@@ -242,10 +242,10 @@ impl TryFrom<aleph_alpha_client::ChatEvent> for ChatEvent {
     fn try_from(value: aleph_alpha_client::ChatEvent) -> Result<Self, Self::Error> {
         Ok(match value {
             aleph_alpha_client::ChatEvent::MessageStart { role } => {
-                ChatEvent::MessageStart { role }
+                ChatEvent::MessageBegin { role }
             }
             aleph_alpha_client::ChatEvent::MessageDelta { content, logprobs } => {
-                ChatEvent::MessageDelta {
+                ChatEvent::MessageAppend {
                     content,
                     logprobs: logprobs.into_iter().map(Into::into).collect(),
                 }
@@ -889,10 +889,10 @@ Write code to check if number is prime, use that to see if the number 7 is prime
 
         // Then
         assert_eq!(events.len(), 3);
-        assert!(matches!(events[0], CompletionEvent::Delta { .. }));
+        assert!(matches!(events[0], CompletionEvent::Append { .. }));
         assert_eq!(
             events[1],
-            CompletionEvent::Finished {
+            CompletionEvent::End {
                 finish_reason: FinishReason::Length
             }
         );
@@ -935,11 +935,11 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         assert_eq!(events.len(), 4);
         assert_eq!(
             events[0],
-            ChatEvent::MessageStart {
+            ChatEvent::MessageBegin {
                 role: "assistant".to_owned()
             }
         );
-        assert!(matches!(events[1], ChatEvent::MessageDelta { .. }));
+        assert!(matches!(events[1], ChatEvent::MessageAppend { .. }));
         assert_eq!(
             events[2],
             ChatEvent::MessageEnd {
