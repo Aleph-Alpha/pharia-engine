@@ -596,7 +596,7 @@ pub mod tests {
         given_chat_stream_skill, given_complete_stream_skill, given_invalid_output_skill,
         given_python_skill_greet_v0_2, given_python_skill_greet_v0_3, given_rust_skill_chat,
         given_rust_skill_explain, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
-        given_rust_skill_search,
+        given_rust_skill_search, given_streaming_output_skill,
     };
     use tokio::sync::oneshot;
     use v0_2::pharia::skill::csi::{Host, Language};
@@ -934,6 +934,59 @@ pub mod tests {
                 "FinishReason::Stop",
                 "prompt: 1, completion: 2"
             ])
+        );
+    }
+
+    #[tokio::test]
+    #[should_panic = "unsupported wit world for now"]
+    async fn can_load_and_run_streaming_output_module() {
+        // Given a skill loaded by our engine
+        let events = vec![
+            ChatEvent::MessageStart {
+                role: "assistant".to_owned(),
+            },
+            ChatEvent::MessageDelta {
+                content: "Homer".to_owned(),
+                logprobs: vec![],
+            },
+            ChatEvent::MessageEnd {
+                finish_reason: FinishReason::Stop,
+            },
+            ChatEvent::Usage {
+                usage: TokenUsage {
+                    prompt: 1,
+                    completion: 2,
+                },
+            },
+        ];
+        let test_skill = given_streaming_output_skill();
+        let wasm = test_skill.bytes();
+        let engine = Engine::new(false).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let ctx = Box::new(CsiChatStreamStub::new(events));
+        let (send, mut recv) = mpsc::channel(3);
+
+        // When invoked with a json string
+        skill
+            .run_as_generator(&engine, ctx, json!("Homer"), send)
+            .await
+            .unwrap();
+
+        // Then it returns a json string
+        let mut events = vec![];
+        recv.recv_many(&mut events, 3).await;
+
+        assert_eq!(
+            events,
+            vec![
+                StreamEvent::MessageBegin,
+                StreamEvent::MessageAppend {
+                    text: "Homer".to_owned()
+                },
+                StreamEvent::MessageEnd {
+                    payload: json!("FinishReason::Stop")
+                }
+            ]
         );
     }
 
