@@ -31,6 +31,7 @@ where
 {
     Router::new()
         .nest("/csi/v1", v1::http())
+        // Legacy CSI route
         .route("/csi", post(http_csi_handle::<C>))
 }
 
