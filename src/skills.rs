@@ -243,6 +243,9 @@ impl Engine {
         });
 
         let mut linker = WasmtimeLinker::new(&engine);
+        // We currently use the same linker for multiple worlds that use CSI.
+        // This allows them to be hooked up twice, but might also be a clue we might want two linkers to avoid the issue.
+        linker.allow_shadowing(true);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
         wasmtime_wasi::add_to_linker_async(&mut linker)?;
         // Skill world from bindgen
@@ -335,6 +338,11 @@ pub fn load_skill_from_wasm_bytes(
                 .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
         }
+        SupportedSkillWorld::V0_3Generator => {
+            let skill = v0_3::streaming_skill::StreamingSkillPre::new(pre)
+                .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
+            Ok(Box::new(skill))
+        }
     }
 }
 
@@ -345,6 +353,8 @@ pub enum SupportedSkillWorld {
     V0_2Function,
     /// Versions 0.3.x of the skill world
     V0_3Function,
+    /// Versions 0.3.x of the streaming-skill world
+    V0_3Generator,
 }
 
 impl SupportedSkillWorld {
@@ -359,6 +369,13 @@ impl SupportedSkillWorld {
                     v0_3::skill::Skill::add_to_linker(
                         linker,
                         v0_3::skill::LinkOptions::default().streaming(true),
+                        |state: &mut LinkedCtx| state,
+                    )?;
+                }
+                Self::V0_3Generator => {
+                    v0_3::streaming_skill::StreamingSkill::add_to_linker(
+                        linker,
+                        v0_3::streaming_skill::LinkOptions::default().streaming(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
@@ -420,6 +437,9 @@ impl SupportedSkillWorld {
                 }
                 (SupportedVersion::V0_3, "skill-handler") => {
                     return Ok(SupportedSkillWorld::V0_3Function);
+                }
+                (SupportedVersion::V0_3, "streaming-skill-handler") => {
+                    return Ok(SupportedSkillWorld::V0_3Generator);
                 }
                 _ => {}
             }
@@ -954,7 +974,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    #[should_panic = "called `Result::unwrap()` on an `Err` value: NotPhariaSkill"]
+    #[should_panic = "not yet implemented"]
     async fn can_load_and_run_streaming_output_module() {
         // Given a skill loaded by our engine
         let events = vec![
