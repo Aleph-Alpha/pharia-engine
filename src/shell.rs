@@ -942,6 +942,48 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
+    async fn http_csi_v1_handle_returns_completion() {
+        // Given a versioned csi request
+        let prompt = "Say hello to Homer";
+        let body = json!([{
+            "model": "pharia-1-llm-7b-control",
+            "prompt": prompt,
+            "params": {
+                "max_tokens": 1,
+                "stop": [],
+                "return_special_tokens": true,
+                "logprobs": "no",
+            },
+        }]);
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
+        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(header::AUTHORIZATION, auth_value)
+                    .uri("/csi/v1/complete")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get separate events for each letter in "Hello"
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, APPLICATION_JSON.as_ref());
+    }
+
+    #[tokio::test]
     async fn http_csi_handle_returns_stream() {
         // Given a versioned csi request
         let message = "Say hello to Homer";
