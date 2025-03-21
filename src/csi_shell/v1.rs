@@ -64,7 +64,83 @@ where
         .route("/chunk_with_offsets", post(chunk_with_offsets))
         .route("/complete", post(complete))
         .route("/completion_stream", post(completion_stream))
+        .route("/documents", post(documents))
+        .route("/document_metadata", post(document_metadata))
         .route("/explain", post(explain))
+        .route("/search", post(search))
+        .route("/select_language", post(select_language))
+}
+
+async fn select_language<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    _bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<Vec<SelectLanguageRequest>>,
+) -> Result<Json<Vec<Option<Language>>>, CsiShellError>
+where
+    C: Csi + Sync,
+{
+    let results = csi
+        .select_language(requests.into_iter().map(Into::into).collect())
+        .await
+        .map(|v| v.into_iter().map(|m| m.map(Into::into)).collect())?;
+    Ok(Json(results))
+}
+
+async fn search<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<Vec<SearchRequest>>,
+) -> Result<Json<Vec<Vec<SearchResult>>>, CsiShellError>
+where
+    C: Csi,
+{
+    let results = csi
+        .search(
+            bearer.token().to_owned(),
+            requests.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(|v| {
+            v.into_iter()
+                .map(|r| r.into_iter().map(Into::into).collect())
+                .collect()
+        })?;
+    Ok(Json(results))
+}
+
+async fn documents<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<Vec<DocumentPath>>,
+) -> Result<Json<Vec<Document>>, CsiShellError>
+where
+    C: Csi,
+{
+    let results = csi
+        .documents(
+            bearer.token().to_owned(),
+            requests.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(|v| v.into_iter().map(Into::into).collect())?;
+    Ok(Json(results))
+}
+
+async fn document_metadata<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<Vec<DocumentPath>>,
+) -> Result<Json<Vec<Option<Value>>>, CsiShellError>
+where
+    C: Csi,
+{
+    let results = csi
+        .document_metadata(
+            bearer.token().to_owned(),
+            requests.into_iter().map(Into::into).collect(),
+        )
+        .await?;
+    Ok(Json(results))
 }
 
 async fn chat<C>(
