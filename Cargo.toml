@@ -90,7 +90,7 @@ tokenizers = { version = "0.21.1", default-features = false, features = [
     "esaxx_fast",
 ] }
 text-splitter = { version = "0.24.2", features = ["tokenizers"] }
-lingua = { version = "1.6.2" }
+lingua = { version = "1.7.0" }
 opentelemetry = "0.28.0"
 opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.29.0"
