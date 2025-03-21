@@ -1,8 +1,14 @@
+use async_trait::async_trait;
 use exports::pharia::skill::skill_handler::SkillMetadata;
 use serde_json::Value;
+use tokio::sync::mpsc;
 use wasmtime::component::bindgen;
 
-use crate::skills::Signature;
+use crate::{
+    csi::CsiForSkills,
+    skill_runtime::StreamEvent,
+    skills::{AnySkillManifest, Engine, LinkedCtx, Signature, SkillError},
+};
 
 bindgen!({
     world: "skill",
@@ -40,5 +46,79 @@ impl TryFrom<SkillMetadata> for SkillMetadataV0_3 {
             description,
             signature,
         })
+    }
+}
+
+#[async_trait]
+impl crate::skills::Skill for SkillPre<LinkedCtx> {
+    async fn manifest(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+    ) -> Result<AnySkillManifest, SkillError> {
+        let mut store = engine.store(LinkedCtx::new(ctx));
+        let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
+            tracing::error!("Failed to instantiate skill: {}", e);
+            SkillError::RuntimeError(e)
+        })?;
+        let manifest = bindings
+            .pharia_skill_skill_handler()
+            .call_metadata(store)
+            .await
+            .map_err(SkillError::RuntimeError)?;
+        manifest
+            .try_into()
+            .map(AnySkillManifest::V0_3)
+            .map_err(SkillError::Any)
+    }
+
+    async fn run_as_function(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+        input: Value,
+    ) -> Result<Value, SkillError> {
+        let mut store = engine.store(LinkedCtx::new(ctx));
+        let input = serde_json::to_vec(&input).expect("Json is always serializable");
+        let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
+            tracing::error!("Failed to instantiate skill: {}", e);
+            SkillError::RuntimeError(e)
+        })?;
+        let result = bindings
+            .pharia_skill_skill_handler()
+            .call_run(store, &input)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to execute skill handler: {}", e);
+                SkillError::RuntimeError(e)
+            })?;
+        let result = match result {
+            Ok(result) => result,
+            Err(e) => match e {
+                exports::pharia::skill::skill_handler::Error::Internal(e) => {
+                    return Err(SkillError::UserCode(e));
+                }
+                exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                    return Err(SkillError::InvalidInput(e.to_string()));
+                }
+            },
+        };
+        match serde_json::from_slice(&result) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                tracing::warn!("A skill returned invalid output: {}", e);
+                Err(SkillError::InvalidOutput(e.to_string()))
+            }
+        }
+    }
+
+    async fn run_as_generator(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+        _input: Value,
+        _sender: mpsc::Sender<StreamEvent>,
+    ) -> Result<(), SkillError> {
+        Err(SkillError::IsFunction)
     }
 }

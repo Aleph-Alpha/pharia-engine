@@ -1,19 +1,84 @@
+use async_trait::async_trait;
 use pharia::skill::csi::{
     ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
     Document, DocumentPath, FinishReason, Host, IndexPath, Language, Message, Modality, Role,
     SearchResult,
 };
+use serde_json::Value;
+use tokio::sync::mpsc;
 use wasmtime::component::bindgen;
 
 use crate::{
-    chunking, inference,
+    chunking,
+    csi::CsiForSkills,
+    inference,
     language_selection::{self, SelectLanguageRequest},
     search::{self, SearchRequest},
+    skill_runtime::StreamEvent,
 };
 
-use super::LinkedCtx;
+use super::{AnySkillManifest, Engine, LinkedCtx, SkillError};
 
 bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true });
+
+#[async_trait]
+impl super::Skill for SkillPre<LinkedCtx> {
+    async fn manifest(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+    ) -> Result<AnySkillManifest, SkillError> {
+        Ok(AnySkillManifest::V0)
+    }
+
+    async fn run_as_function(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn CsiForSkills + Send>,
+        input: Value,
+    ) -> Result<Value, SkillError> {
+        let mut store = engine.store(LinkedCtx::new(ctx));
+        let input = serde_json::to_vec(&input).expect("Json is always serializable");
+        let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
+            tracing::error!("Failed to instantiate skill: {}", e);
+            SkillError::RuntimeError(e)
+        })?;
+        let result = bindings
+            .pharia_skill_skill_handler()
+            .call_run(store, &input)
+            .await
+            .map_err(SkillError::RuntimeError)?;
+        let result = match result {
+            Ok(result) => result,
+            Err(e) => match e {
+                exports::pharia::skill::skill_handler::Error::Internal(e) => {
+                    return Err(SkillError::UserCode(e.to_string()));
+                }
+                exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                    return Err(SkillError::InvalidInput(e.to_string()));
+                }
+            },
+        };
+        match serde_json::from_slice(&result) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                // An operater might want to know that there is a buggy skill deployed.
+                tracing::warn!("A skill returned invalid output: {}", e);
+                Err(SkillError::InvalidOutput(e.to_string()))
+            }
+        }
+    }
+
+    async fn run_as_generator(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+        _input: Value,
+        _sender: mpsc::Sender<StreamEvent>,
+    ) -> Result<(), SkillError> {
+        Err(SkillError::IsFunction)
+    }
+}
 
 impl Host for LinkedCtx {
     #[must_use]
