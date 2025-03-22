@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.4...v0.11.5)
+
+### Fixes
+
+- Update CSI server-side event names - ([c899146](https://github.com/Aleph-Alpha/pharia-kernel/commit/c89914606ab74c0618e4b420c8694c341baf0263))
+
+
 ## [0.11.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.3...v0.11.4)
 
 ### Documentation
