@@ -115,7 +115,7 @@ jobs:
       - name: Export image to tarball
         run: podman save localhost/pharia-kernel:lastest -o /tmp/pharia-kernel.tar
       - name: Vulnerability scanning with Trivy
-        uses: aquasecurity/trivy-action@v0.30.0
+        uses: aquasecurity/trivy-action@0.30.0
         with:
           input: /tmp/pharia-kernel.tar
           trivyignores: '.trivyignore'
