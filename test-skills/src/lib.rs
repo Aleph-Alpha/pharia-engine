@@ -189,41 +189,6 @@ fn build_python_skill(package_name: &str, target_path: &str, wit_version: &str, 
         .unwrap();
 }
 
-/// Run a command in the given python virtual environment
-fn run_in_venv(venv_path: &Path, args: &[&str]) -> Result<Vec<u8>, Error> {
-    let venv_path = venv_path
-        .to_str()
-        .context("Path to virtual environment must be representable in UTF-8.")?;
-    // Run the Python interpreter in the virtual environment. Use cmd on windows or python
-    // interpreter directly on other platforms
-
-    let mut cmd = if cfg!(target_os = "windows") {
-        let activate_path = format!("{venv_path}\\Scripts\\activate.bat");
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/C", &activate_path, "&&"]).args(args);
-        cmd
-    } else {
-        let mut cmd = Command::new(format!("{venv_path}/bin/{}", args[0]));
-        cmd.args(&args[1..]);
-        cmd
-    };
-
-    let output = cmd.output()?;
-    if !output.status.success() {
-        let standard_error = String::from_utf8_lossy(&output.stderr);
-        bail!(
-            "Failed to run command in virtual environment. Args:\n\
-            {args:?}\n\
-            Standard Error:\n\
-            {standard_error}",
-        )
-    }
-
-    let standard_out = output.stdout;
-
-    Ok(standard_out)
-}
-
 fn static_venv() -> &'static Venv {
     static VENV: OnceLock<Venv> = OnceLock::new();
     VENV.get_or_init(|| Venv::new().unwrap())
@@ -236,19 +201,48 @@ struct Venv {
 
 impl Venv {
     pub fn new() -> Result<Self, Error> {
+        // Assert UV is installed. Return an error otherwise
+        let status = Command::new("uv")
+            .args(["--version"])
+            .status()
+            .context("UV must be available for testing with Python Skills. Please install it")?;
+        if !status.success() {
+            bail!(
+                "uv command exited with an error. Make sure it works in order to test Python \
+                Skills."
+            );
+        }
+
         let directory = tempdir().expect("Must be able to create temporary directory");
         let venv_path = directory.path().join("venv");
         create_virtual_environment(&venv_path)?;
-        run_in_venv(
-            &venv_path,
-            &["python", "-m", "pip", "install", "componentize-py"],
-        )?;
+        install_componentize_py(&venv_path)?;
 
         Ok(Venv { directory })
     }
 
     pub fn run(&self, args: &[&str]) -> Result<(), Error> {
-        run_in_venv(&self.directory.path().join("venv"), args)?;
+        let venv_path = self.directory.path().join("venv");
+        let venv_path = venv_path
+            .to_str()
+            .context("Path to virtual environment must be representable in UTF-8.")?;
+        // Run the Python interpreter in the virtual environment. Use cmd on windows or python
+        // interpreter directly on other platforms
+
+        let output = Command::new("uv")
+            .args(["run", "--python", venv_path])
+            .args(args)
+            .output()?;
+
+        if !output.status.success() {
+            let standard_error = String::from_utf8_lossy(&output.stderr);
+            bail!(
+                "Failed to run command in virtual environment. Args:\n\
+            {args:?}\n\
+            Standard Error:\n\
+            {standard_error}",
+            )
+        }
         Ok(())
     }
 }
@@ -257,12 +251,29 @@ fn create_virtual_environment(venv_path: &Path) -> Result<(), Error> {
     let venv_path = venv_path
         .to_str()
         .expect("Temporary path must be representable in UTF-8");
-    let output = Command::new("python3")
-        .args(["-m", "venv", venv_path])
+    let output = Command::new("uv")
+        .args(["venv", venv_path])
         .output()
-        .context("Failed to start 'python' command.")?;
+        .context("Failed to execute uv command.")?;
     error_on_status(
         "Failed to create virtual environment for Python Skill building.",
+        output,
+    )?;
+    Ok(())
+}
+
+fn install_componentize_py(venv_path: &Path) -> Result<(), Error> {
+    let output = Command::new("uv")
+        .args([
+            "pip",
+            "install",
+            "--python",
+            venv_path.to_str().unwrap(),
+            "componentize-py",
+        ])
+        .output()?;
+    error_on_status(
+        "Failed to install componentize-py in virtual environment.",
         output,
     )?;
     Ok(())
