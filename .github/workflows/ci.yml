@@ -113,7 +113,7 @@ jobs:
           bash -x ./tests/test-image.sh 8081 127.0.0.1
 
       - name: Export image to tarball
-        run: podman save localhost/pharia-kernel:lastest -o /tmp/pharia-kernel.tar
+        run: podman save localhost/pharia-kernel:latest -o /tmp/pharia-kernel.tar
       - name: Vulnerability scanning with Trivy
         uses: aquasecurity/trivy-action@0.30.0
         with:
