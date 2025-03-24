@@ -72,13 +72,20 @@ where
         &self,
         skill_path: &SkillPath,
         input: Value,
-        ctx: Box<dyn CsiForSkills + Send>,
+        csi_apis: impl Csi + Send + Sync + 'static,
+        api_token: String,
     ) -> Result<Value, SkillExecutionError> {
         let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
         // Unwrap Skill, raise error if it is not existing
         let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
-        let output = skill.run_as_function(&self.engine, ctx, input).await?;
-        Ok(output)
+
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
+        select! {
+            result = skill.run_as_function(&self.engine, csi_for_skills, input) => result.map_err(Into::into),
+            // An error occurred during skill execution.
+            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
+        }
     }
 
     pub async fn metadata(
@@ -550,13 +557,9 @@ impl RunFunctionMsg {
             api_token,
         } = self;
 
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
-        let response = select! {
-            result = runtime.run_function(&skill_path, input, ctx) => result,
-            // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
-        };
+        let response = runtime
+            .run_function(&skill_path, input, csi_apis, api_token)
+            .await;
 
         let status = status_label(response.as_ref().map(|_| ()));
         // Error is expected to happen during shutdown. Ignore result.
@@ -855,7 +858,6 @@ impl CsiForSkills for SkillMetadataCtx {
 pub mod tests {
     use std::time::Duration;
 
-    use crate::csi::tests::CsiCompleteStub;
     use crate::csi::tests::CsiSaboteur;
     use crate::hardcoded_skills::SkillHello;
     use crate::hardcoded_skills::SkillSaboteur;
@@ -995,7 +997,6 @@ pub mod tests {
         let engine = Arc::new(Engine::new(false).unwrap());
         let mut store = SkillStoreStub::new();
         store.with_fetch_response(Some(Arc::new(SkillDoubleUsingExplain)));
-        let (send, _) = oneshot::channel();
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
@@ -1003,14 +1004,14 @@ pub mod tests {
                 length: 2,
             }])
         });
-        let skill_ctx = Box::new(SkillInvocationCtx::new(send, csi, "dummy token".to_owned()));
 
         let runtime = WasmRuntime::new(engine, store);
         let resp = runtime
             .run_function(
                 &skill_path,
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
-                skill_ctx,
+                csi,
+                "dummy token".to_owned(),
             )
             .await;
 
@@ -1026,9 +1027,13 @@ pub mod tests {
         let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let runtime = WasmRuntime::new(engine, skill_store.api());
-        let skill_ctx = Box::new(CsiCompleteStub::new(|_| Completion::from_text("")));
         let resp = runtime
-            .run_function(&SkillPath::dummy(), json!("name"), skill_ctx)
+            .run_function(
+                &SkillPath::dummy(),
+                json!("name"),
+                CsiDummy,
+                "dummy_token".to_owned(),
+            )
             .await;
 
         drop(runtime);
