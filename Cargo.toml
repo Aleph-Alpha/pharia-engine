@@ -91,16 +91,16 @@ tokenizers = { version = "0.21.1", default-features = false, features = [
 ] }
 text-splitter = { version = "0.25.0", features = ["tokenizers"] }
 lingua = { version = "1.7.1" }
-opentelemetry = "0.28.0"
-opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
+opentelemetry = "0.29.0"
+opentelemetry_sdk = { version = "0.29.0", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.30.0"
-opentelemetry-otlp = { version = "0.28.0", features = [
+opentelemetry-otlp = { version = "0.29.0", features = [
     "grpc-tonic",
     "gzip-tonic",
     "tls-webpki-roots",
     "zstd-tonic",
 ] }
-opentelemetry-semantic-conventions = { version = "0.28.0", features = [
+opentelemetry-semantic-conventions = { version = "0.29.0", features = [
     "semconv_experimental",
 ] }
 metrics = "0.24.1"
