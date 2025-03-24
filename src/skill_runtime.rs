@@ -52,18 +52,12 @@ where
 
     pub async fn run_message_stream(
         &self,
-        skill_path: &SkillPath,
+        skill: Arc<dyn Skill>,
         input: Value,
         csi: impl Csi + Send + Sync + 'static,
         api_token: String,
         sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillExecutionError> {
-        let skill = self
-            .skill_store_api
-            .fetch(skill_path.to_owned())
-            .await?
-            .ok_or(SkillExecutionError::SkillNotConfigured)?;
-
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi, api_token));
 
@@ -464,8 +458,6 @@ impl RunMessageStreamMsg {
         csi_apis: impl Csi + Send + Sync + 'static,
         runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
-        let start = Instant::now();
-
         let RunMessageStreamMsg {
             skill_path,
             input,
@@ -473,13 +465,35 @@ impl RunMessageStreamMsg {
             api_token,
         } = self;
 
+        let skill_result = fetch_skill(&runtime.skill_store_api, &skill_path).await;
+        let skill = match skill_result {
+            Ok(skill) => skill,
+            Err(e) => {
+                drop(send.send(StreamEvent::Error(e.to_string())).await);
+                return;
+            }
+        };
+
+        let start = Instant::now();
         let result = runtime
-            .run_message_stream(&skill_path, input, csi_apis, api_token, send.clone())
+            .run_message_stream(skill, input, csi_apis, api_token, send.clone())
             .await;
         let label = status_label(result.as_ref().map(|&()| ()));
 
         record_skill_metrics(start, skill_path, label);
     }
+}
+
+async fn fetch_skill(
+    store: &impl SkillStoreApi,
+    skill_path: &SkillPath,
+) -> Result<Arc<dyn Skill>, SkillExecutionError> {
+    let skill_result = match store.fetch(skill_path.clone()).await {
+        Ok(Some(skill)) => Ok(skill),
+        Ok(None) => Err(SkillExecutionError::SkillNotConfigured),
+        Err(e) => Err(e.into()),
+    };
+    skill_result
 }
 
 fn record_skill_metrics(start: Instant, skill_path: SkillPath, status: String) {
@@ -553,14 +567,11 @@ impl RunFunctionMsg {
             api_token,
         } = self;
 
-        let skill = match runtime.skill_store_api.fetch(skill_path.clone()).await {
-            Ok(Some(skill)) => skill,
-            Ok(None) => {
-                drop(send.send(Err(SkillExecutionError::SkillNotConfigured)));
-                return;
-            }
+        let skill_result = fetch_skill(&runtime.skill_store_api, &skill_path).await;
+        let skill = match skill_result {
+            Ok(skill) => skill,
             Err(e) => {
-                drop(send.send(Err(e.into())));
+                drop(send.send(Err(e)));
                 return;
             }
         };
