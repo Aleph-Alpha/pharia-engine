@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.5...v0.11.6)
+
+### Fixes
+
+- Metrics now only measure message execution time - ([a904ba6](https://github.com/Aleph-Alpha/pharia-kernel/commit/a904ba65609e04d302879b650b1b3923b2caa4ef))
+- Function metrics only measure execution time without fetching - ([a03e4ab](https://github.com/Aleph-Alpha/pharia-kernel/commit/a03e4abf7e588e16cfbe2c3b87c09ae1498ff59a))
+
+### Documentation
+
+- Fix typo - ([9deff2f](https://github.com/Aleph-Alpha/pharia-kernel/commit/9deff2f64da780ed926312b319115d4aa5ca17cc))
+
+### Builds
+
+- *(deps)* Bump the minor group with 10 updates - ([875b4d1](https://github.com/Aleph-Alpha/pharia-kernel/commit/875b4d1567031dd26e52c13b7938a733d56834cf))
+
+
 ## [0.11.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.4...v0.11.5)
 
 ### Fixes
