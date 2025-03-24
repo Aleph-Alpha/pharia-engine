@@ -29,7 +29,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skill_store::{SkillStoreApi, SkillStoreError},
-    skills::{AnySkillManifest, Engine, SkillError, SkillPath},
+    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillPath},
 };
 
 pub struct WasmRuntime<S> {
@@ -84,15 +84,11 @@ where
 
     pub async fn run_function(
         &self,
-        skill_path: &SkillPath,
+        skill: Arc<dyn Skill>,
         input: Value,
         csi_apis: impl Csi + Send + Sync + 'static,
         api_token: String,
     ) -> Result<Value, SkillExecutionError> {
-        let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
-        // Unwrap Skill, raise error if it is not existing
-        let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
-
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
         select! {
@@ -550,7 +546,6 @@ impl RunFunctionMsg {
         csi_apis: impl Csi + Send + Sync + 'static,
         runtime: &WasmRuntime<impl SkillStoreApi>,
     ) {
-        let start = Instant::now();
         let RunFunctionMsg {
             skill_path,
             input,
@@ -558,8 +553,21 @@ impl RunFunctionMsg {
             api_token,
         } = self;
 
+        let skill = match runtime.skill_store_api.fetch(skill_path.clone()).await {
+            Ok(Some(skill)) => skill,
+            Ok(None) => {
+                drop(send.send(Err(SkillExecutionError::SkillNotConfigured)));
+                return;
+            }
+            Err(e) => {
+                drop(send.send(Err(e.into())));
+                return;
+            }
+        };
+
+        let start = Instant::now();
         let response = runtime
-            .run_function(&skill_path, input, csi_apis, api_token)
+            .run_function(skill, input, csi_apis, api_token)
             .await;
 
         let status = status_label(response.as_ref().map(|_| ()));
@@ -994,10 +1002,8 @@ pub mod tests {
             }
         }
 
-        let skill_path = SkillPath::local("explain");
         let engine = Arc::new(Engine::new(false).unwrap());
-        let mut store = SkillStoreStub::new();
-        store.with_fetch_response(Some(Arc::new(SkillDoubleUsingExplain)));
+        let store = SkillStoreStub::new();
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
@@ -1009,7 +1015,7 @@ pub mod tests {
         let runtime = WasmRuntime::new(engine, store);
         let resp = runtime
             .run_function(
-                &skill_path,
+                Arc::new(SkillDoubleUsingExplain),
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
                 csi,
                 "dummy token".to_owned(),
@@ -1023,24 +1029,22 @@ pub mod tests {
 
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
-        let engine = Arc::new(Engine::new(false).unwrap());
-        let namespace = Namespace::new("local").unwrap();
-        let skill_loader = SkillLoader::with_file_registry(engine.clone(), namespace).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
-        let runtime = WasmRuntime::new(engine, skill_store.api());
-        let resp = runtime
-            .run_function(
-                &SkillPath::dummy(),
-                json!("name"),
-                CsiDummy,
-                "dummy_token".to_owned(),
-            )
+        // Given a skill actor connected to an empty skill store
+        let mut store = SkillStoreStub::new();
+        store.with_fetch_response(None);
+        let skill_actor = SkillRuntime::new(Arc::new(Engine::new(false).unwrap()), CsiDummy, store);
+
+        // When asking the skill actor to run the skill
+        let result = skill_actor
+            .api()
+            .run_function(SkillPath::dummy(), json!(""), "dummy_token".to_owned())
             .await;
 
-        drop(runtime);
-        skill_store.wait_for_shutdown().await;
-
-        assert!(resp.is_err());
+        // Then the skill actor should return an error
+        assert!(matches!(
+            result,
+            Err(SkillExecutionError::SkillNotConfigured)
+        ));
     }
 
     #[tokio::test]
