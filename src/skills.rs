@@ -651,7 +651,7 @@ pub mod tests {
         },
         language_selection::{self, SelectLanguageRequest},
         search::{Document, DocumentPath, SearchRequest, SearchResult},
-        skill_runtime::SkillInvocationCtx,
+        skill_driver::SkillInvocationCtx,
         tests::api_token,
     };
 

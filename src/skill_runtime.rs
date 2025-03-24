@@ -1,6 +1,5 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
     future::{Future, pending},
     pin::Pin,
     sync::Arc,
@@ -28,91 +27,10 @@ use crate::{
     language_selection::{Language, SelectLanguageRequest},
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
+    skill_driver::SkillDriver,
     skill_store::{SkillStoreApi, SkillStoreError},
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillPath},
 };
-
-pub struct WasmRuntime {
-    /// Used to execute skills. We will share the engine with multiple running skills, and skill
-    /// provider to convert bytes into executable skills.
-    engine: Arc<Engine>,
-}
-
-impl WasmRuntime {
-    pub fn new(engine: Arc<Engine>) -> Self {
-        Self { engine }
-    }
-
-    pub async fn run_message_stream(
-        &self,
-        skill: Arc<dyn Skill>,
-        input: Value,
-        csi: impl Csi + Send + Sync + 'static,
-        api_token: String,
-        sender: mpsc::Sender<StreamEvent>,
-    ) -> Result<(), SkillExecutionError> {
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi, api_token));
-
-        let result = select! {
-            result = skill.run_as_message_stream(&self.engine, csi_for_skills, input, sender.clone()) => result.map_err(Into::into),
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
-        };
-
-        if let Err(err) = &result {
-            sender
-                .send(StreamEvent::Error(err.to_string()))
-                .await
-                .unwrap();
-        }
-
-        result
-    }
-
-    pub async fn run_function(
-        &self,
-        skill: Arc<dyn Skill>,
-        input: Value,
-        csi_apis: impl Csi + Send + Sync + 'static,
-        api_token: String,
-    ) -> Result<Value, SkillExecutionError> {
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
-        select! {
-            result = skill.run_as_function(&self.engine, csi_for_skills, input) => result.map_err(Into::into),
-            // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
-        }
-    }
-
-    pub async fn metadata(
-        &self,
-        skill: Arc<dyn Skill>,
-        ctx: Box<dyn CsiForSkills + Send>,
-    ) -> Result<AnySkillManifest, SkillExecutionError> {
-        let manifest = skill.manifest(self.engine.as_ref(), ctx).await?;
-        Ok(manifest)
-    }
-}
-
-impl From<SkillStoreError> for SkillExecutionError {
-    fn from(source: SkillStoreError) -> Self {
-        match source {
-            SkillStoreError::SkillLoaderError(skill_loader_error) => {
-                SkillExecutionError::RuntimeError(anyhow!(
-                    "Error loading skill: {}",
-                    skill_loader_error
-                ))
-            }
-            SkillStoreError::InvalidNamespaceError(namespace, original_syntax_error) => {
-                SkillExecutionError::MisconfiguredNamespace {
-                    namespace,
-                    original_syntax_error,
-                }
-            }
-        }
-    }
-}
 
 impl From<SkillError> for SkillExecutionError {
     fn from(source: SkillError) -> Self {
@@ -144,7 +62,7 @@ impl SkillRuntime {
     where
         C: Csi + Clone + Send + Sync + 'static,
     {
-        let runtime = WasmRuntime::new(engine);
+        let runtime = SkillDriver::new(engine);
         let (send, recv) = mpsc::channel::<SkillRuntimeMsg>(1);
         let handle = tokio::spawn(async {
             SkillRuntimeActor::new(runtime, store, recv, csi_apis)
@@ -328,7 +246,7 @@ pub enum SkillExecutionError {
 }
 
 struct SkillRuntimeActor<C, S> {
-    runtime: Arc<WasmRuntime>,
+    runtime: Arc<SkillDriver>,
     store: Arc<S>,
     recv: mpsc::Receiver<SkillRuntimeMsg>,
     csi_apis: C,
@@ -342,7 +260,7 @@ where
     S: SkillStoreApi + Send + Sync + 'static,
 {
     fn new(
-        runtime: WasmRuntime,
+        runtime: SkillDriver,
         store: S,
         recv: mpsc::Receiver<SkillRuntimeMsg>,
         csi_apis: C,
@@ -409,7 +327,7 @@ impl SkillRuntimeMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &WasmRuntime,
+        runtime: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {
         match self {
@@ -433,7 +351,7 @@ pub struct MetadataMsg {
 }
 
 impl MetadataMsg {
-    pub async fn act(self, runtime: &WasmRuntime, store: &impl SkillStoreApi) {
+    pub async fn act(self, runtime: &SkillDriver, store: &impl SkillStoreApi) {
         let skill_result = fetch_skill(store, &self.skill_path).await;
         let skill = match skill_result {
             Ok(skill) => skill,
@@ -465,7 +383,7 @@ impl RunMessageStreamMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &WasmRuntime,
+        runtime: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {
         let RunMessageStreamMsg {
@@ -502,6 +420,25 @@ async fn fetch_skill(
         Ok(Some(skill)) => Ok(skill),
         Ok(None) => Err(SkillExecutionError::SkillNotConfigured),
         Err(e) => Err(e.into()),
+    }
+}
+
+impl From<SkillStoreError> for SkillExecutionError {
+    fn from(source: SkillStoreError) -> Self {
+        match source {
+            SkillStoreError::SkillLoaderError(skill_loader_error) => {
+                SkillExecutionError::RuntimeError(anyhow!(
+                    "Error loading skill: {}",
+                    skill_loader_error
+                ))
+            }
+            SkillStoreError::InvalidNamespaceError(namespace, original_syntax_error) => {
+                SkillExecutionError::MisconfiguredNamespace {
+                    namespace,
+                    original_syntax_error,
+                }
+            }
+        }
     }
 }
 
@@ -567,7 +504,7 @@ impl RunFunctionMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &WasmRuntime,
+        runtime: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {
         let RunFunctionMsg {
@@ -595,201 +532,6 @@ impl RunFunctionMsg {
         // Error is expected to happen during shutdown. Ignore result.
         drop(send.send(response));
         record_skill_metrics(start, skill_path, status);
-    }
-}
-
-/// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
-/// calls to csi, to the respective drivers and forwarding runtime errors directly to the actor
-/// so the User defined code must not worry about accidental complexity.
-pub struct SkillInvocationCtx<C> {
-    /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
-    /// can drop the future invoking the skill, and report the error appropriately to user and
-    /// operator.
-    send_rt_error: Option<oneshot::Sender<anyhow::Error>>,
-    csi_apis: C,
-    // How the user authenticates with us
-    api_token: String,
-    /// ID counter for stored streams.
-    current_stream_id: usize,
-    /// Currently running chat streams. We store them here so that we can easier cancel the running
-    /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
-    chat_streams: HashMap<ChatStreamId, mpsc::Receiver<anyhow::Result<inference::ChatEvent>>>,
-    /// Currently running completion streams. We store them here so that we can easier cancel the running
-    /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
-    completion_streams:
-        HashMap<CompletionStreamId, mpsc::Receiver<anyhow::Result<CompletionEvent>>>,
-}
-
-impl<C> SkillInvocationCtx<C> {
-    pub fn new(
-        send_rt_err: oneshot::Sender<anyhow::Error>,
-        csi_apis: C,
-        api_token: String,
-    ) -> Self {
-        SkillInvocationCtx {
-            send_rt_error: Some(send_rt_err),
-            csi_apis,
-            api_token,
-            current_stream_id: 0,
-            chat_streams: HashMap::new(),
-            completion_streams: HashMap::new(),
-        }
-    }
-
-    fn next_stream_id<Id>(&mut self) -> Id
-    where
-        Id: From<usize>,
-    {
-        self.current_stream_id += 1;
-        self.current_stream_id.into()
-    }
-
-    /// Never return, we did report the error via the send error channel.
-    async fn send_error<T>(&mut self, error: anyhow::Error) -> T {
-        self.send_rt_error
-            .take()
-            .expect("Only one error must be send during skill invocation")
-            .send(error)
-            .unwrap();
-        pending().await
-    }
-}
-
-#[async_trait]
-impl<C> CsiForSkills for SkillInvocationCtx<C>
-where
-    C: Csi + Send + Sync,
-{
-    async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-        match self
-            .csi_apis
-            .explain(self.api_token.clone(), requests)
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-        match self
-            .csi_apis
-            .complete(self.api_token.clone(), requests)
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId {
-        let id = self.next_stream_id();
-        let recv = self
-            .csi_apis
-            .completion_stream(self.api_token.clone(), request)
-            .await;
-        self.completion_streams.insert(id, recv);
-        id
-    }
-
-    async fn completion_stream_next(&mut self, id: &CompletionStreamId) -> Option<CompletionEvent> {
-        let event = self
-            .completion_streams
-            .get_mut(id)
-            .expect("Stream not found")
-            .recv()
-            .await
-            .transpose();
-        match event {
-            Ok(event) => event,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn completion_stream_drop(&mut self, id: CompletionStreamId) {
-        self.completion_streams.remove(&id);
-    }
-
-    async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-        match self.csi_apis.chat(self.api_token.clone(), requests).await {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId {
-        let id = self.next_stream_id();
-        let recv = self
-            .csi_apis
-            .chat_stream(self.api_token.clone(), request)
-            .await;
-        self.chat_streams.insert(id, recv);
-        id
-    }
-
-    async fn chat_stream_next(&mut self, id: &ChatStreamId) -> Option<inference::ChatEvent> {
-        let event = self
-            .chat_streams
-            .get_mut(id)
-            .expect("Stream not found")
-            .recv()
-            .await
-            .transpose();
-        match event {
-            Ok(event) => event,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn chat_stream_drop(&mut self, id: ChatStreamId) {
-        self.chat_streams.remove(&id);
-    }
-
-    async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-        match self.csi_apis.chunk(self.api_token.clone(), requests).await {
-            Ok(chunks) => chunks,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn select_language(
-        &mut self,
-        requests: Vec<SelectLanguageRequest>,
-    ) -> Vec<Option<Language>> {
-        match self.csi_apis.select_language(requests).await {
-            Ok(language) => language,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-        match self.csi_apis.search(self.api_token.clone(), requests).await {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
-        match self
-            .csi_apis
-            .documents(self.api_token.clone(), requests)
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
-    }
-
-    async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
-        match self
-            .csi_apis
-            .document_metadata(self.api_token.clone(), requests)
-            .await
-        {
-            // We know there will always be exactly one element in the vector
-            Ok(value) => value,
-            Err(error) => self.send_error(error).await,
-        }
     }
 }
 
@@ -888,28 +630,17 @@ impl CsiForSkills for SkillMetadataCtx {
 pub mod tests {
     use std::time::Duration;
 
-    use crate::csi::tests::CsiSaboteur;
-    use crate::hardcoded_skills::SkillHello;
-    use crate::hardcoded_skills::SkillSaboteur;
-    use crate::hardcoded_skills::SkillTellMeAJoke;
-    use crate::inference::CompletionParams;
-    use crate::inference::{
-        ChatParams, Explanation, FinishReason, Granularity, Logprobs, Message, TextScore,
-        TokenUsage,
-    };
-    use crate::namespace_watcher::Namespace;
-    use crate::skill_store::tests::SkillStoreStub;
-    use crate::skills::{AnySkillManifest, Skill};
     use crate::{
-        chunking::ChunkParams,
-        csi::tests::{CsiDummy, StubCsi},
+        csi::tests::{CsiDummy, CsiSaboteur, StubCsi},
+        hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke},
+        inference::{CompletionParams, Explanation, Granularity, Logprobs, TextScore},
+        namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
-        skill_store::SkillStore,
+        skill_store::{SkillStore, tests::SkillStoreStub},
+        skills::{AnySkillManifest, Skill},
     };
-    use anyhow::anyhow;
     use metrics::Label;
-    use metrics_util::debugging::DebugValue;
-    use metrics_util::debugging::{DebuggingRecorder, Snapshot};
+    use metrics_util::debugging::{DebugValue, DebuggingRecorder, Snapshot};
     use serde_json::json;
     use tokio::sync::broadcast;
 
@@ -1032,7 +763,7 @@ pub mod tests {
             }])
         });
 
-        let runtime = WasmRuntime::new(engine);
+        let runtime = SkillDriver::new(engine);
         let resp = runtime
             .run_function(
                 Arc::new(SkillDoubleUsingExplain),
@@ -1065,79 +796,6 @@ pub mod tests {
             result,
             Err(SkillExecutionError::SkillNotConfigured)
         ));
-    }
-
-    #[tokio::test]
-    async fn chunk() {
-        // Given a skill invocation context with a stub tokenizer provider
-        let (send, _) = oneshot::channel();
-        let mut csi = StubCsi::empty();
-        csi.set_chunking(|r| {
-            Ok(r.into_iter()
-                .map(|_| {
-                    vec![Chunk {
-                        text: "my_chunk".to_owned(),
-                        byte_offset: 0,
-                        character_offset: None,
-                    }]
-                })
-                .collect())
-        });
-
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned());
-
-        // When chunking a short text
-        let model = "Pharia-1-LLM-7B-control".to_owned();
-        let max_tokens = 10;
-        let request = ChunkRequest {
-            text: "Greet".to_owned(),
-            params: ChunkParams {
-                model,
-                max_tokens,
-                overlap: 0,
-            },
-            character_offsets: false,
-        };
-        let chunks = invocation_ctx.chunk(vec![request]).await;
-
-        // Then a single chunk is returned
-        assert_eq!(
-            chunks[0],
-            vec![Chunk {
-                text: "my_chunk".to_owned(),
-                byte_offset: 0,
-                character_offset: None,
-            }]
-        );
-    }
-
-    #[tokio::test]
-    async fn receive_error_if_chunk_failed() {
-        // Given a skill invocation context with a saboteur tokenizer provider
-        let (send, recv) = oneshot::channel();
-        let mut csi = StubCsi::empty();
-        csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned());
-
-        // When chunking a short text
-        let model = "Pharia-1-LLM-7B-control".to_owned();
-        let max_tokens = 10;
-        let request = ChunkRequest {
-            text: "Greet".to_owned(),
-            params: ChunkParams {
-                model,
-                max_tokens,
-                overlap: 0,
-            },
-            character_offsets: false,
-        };
-        let error = select! {
-            error = recv => error.unwrap(),
-            _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
-        };
-
-        // Then receive the error from saboteur tokenizer provider
-        assert_eq!(error.to_string(), "Failed to load tokenizer");
     }
 
     #[tokio::test]
@@ -1412,7 +1070,7 @@ pub mod tests {
 
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(async || {
-            let runtime = WasmRuntime::new(engine);
+            let runtime = SkillDriver::new(engine);
             msg.act(CsiDummy, &runtime, &store).await;
             drop(runtime);
         });
@@ -1459,100 +1117,6 @@ pub mod tests {
             the situation persists you \nmay want to contact the operaters. Original error:\n\n\
             Test error";
         assert_eq!(event, StreamEvent::Error(expected_error_msg.to_string()));
-    }
-
-    #[tokio::test]
-    async fn skill_invocation_ctx_stream_management() {
-        let (send, _) = oneshot::channel();
-        let completion = Completion {
-            text: "text".to_owned(),
-            finish_reason: FinishReason::Stop,
-            logprobs: vec![],
-            usage: TokenUsage {
-                prompt: 2,
-                completion: 2,
-            },
-        };
-        let resp = completion.clone();
-        let csi = StubCsi::with_completion(move |_| resp.clone());
-        let mut ctx = SkillInvocationCtx::new(send, csi, "dummy".to_owned());
-        let request = CompletionRequest::new("prompt", "model");
-
-        let stream_id = ctx.completion_stream_new(request).await;
-        let mut events = vec![];
-        while let Some(event) = ctx.completion_stream_next(&stream_id).await {
-            events.push(event);
-        }
-        ctx.completion_stream_drop(stream_id).await;
-
-        assert_eq!(
-            events,
-            vec![
-                CompletionEvent::Append {
-                    text: completion.text,
-                    logprobs: completion.logprobs
-                },
-                CompletionEvent::End {
-                    finish_reason: completion.finish_reason
-                },
-                CompletionEvent::Usage {
-                    usage: completion.usage
-                }
-            ]
-        );
-        assert!(ctx.completion_streams.is_empty());
-    }
-
-    #[tokio::test]
-    async fn skill_invocation_ctx_chat_stream_management() {
-        let (send, _) = oneshot::channel();
-        let response = ChatResponse {
-            message: Message {
-                role: "assistant".to_owned(),
-                content: "Hello".to_owned(),
-            },
-            finish_reason: FinishReason::Stop,
-            logprobs: vec![],
-            usage: TokenUsage {
-                prompt: 1,
-                completion: 1,
-            },
-        };
-        let stub_response = response.clone();
-        let csi = StubCsi::with_chat(move |_| stub_response.clone());
-        let mut ctx = SkillInvocationCtx::new(send, csi, "dummy".to_owned());
-        let request = ChatRequest {
-            model: "model".to_owned(),
-            messages: vec![],
-            params: ChatParams::default(),
-        };
-
-        let stream_id = ctx.chat_stream_new(request).await;
-        let mut events = vec![];
-        while let Some(event) = ctx.chat_stream_next(&stream_id).await {
-            events.push(event);
-        }
-        ctx.chat_stream_drop(stream_id).await;
-
-        assert_eq!(
-            events,
-            vec![
-                inference::ChatEvent::MessageBegin {
-                    role: response.message.role,
-                },
-                inference::ChatEvent::MessageAppend {
-                    content: response.message.content,
-                    logprobs: response.logprobs,
-                },
-                inference::ChatEvent::MessageEnd {
-                    finish_reason: response.finish_reason
-                },
-                inference::ChatEvent::Usage {
-                    usage: response.usage
-                }
-            ]
-        );
-        assert!(ctx.completion_streams.is_empty());
     }
 
     fn metrics_snapshot<F: Future<Output = ()>>(f: impl FnOnce() -> F) -> Snapshot {
