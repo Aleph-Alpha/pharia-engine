@@ -498,12 +498,11 @@ async fn fetch_skill(
     store: &impl SkillStoreApi,
     skill_path: &SkillPath,
 ) -> Result<Arc<dyn Skill>, SkillExecutionError> {
-    let skill_result = match store.fetch(skill_path.clone()).await {
+    match store.fetch(skill_path.clone()).await {
         Ok(Some(skill)) => Ok(skill),
         Ok(None) => Err(SkillExecutionError::SkillNotConfigured),
         Err(e) => Err(e.into()),
-    };
-    skill_result
+    }
 }
 
 fn record_skill_metrics(start: Instant, skill_path: SkillPath, status: String) {
