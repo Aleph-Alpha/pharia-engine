@@ -54,7 +54,8 @@ where
         &self,
         skill_path: &SkillPath,
         input: Value,
-        ctx: Box<dyn CsiForSkills + Send>,
+        csi: impl Csi + Send + Sync + 'static,
+        api_token: String,
         sender: mpsc::Sender<StreamEvent>,
     ) -> Result<(), SkillExecutionError> {
         let skill = self
@@ -62,10 +63,23 @@ where
             .fetch(skill_path.to_owned())
             .await?
             .ok_or(SkillExecutionError::SkillNotConfigured)?;
-        skill
-            .run_as_message_stream(&self.engine, ctx, input, sender)
-            .await?;
-        Ok(())
+
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi, api_token));
+
+        let result = select! {
+            result = skill.run_as_message_stream(&self.engine, csi_for_skills, input, sender.clone()) => result.map_err(Into::into),
+            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
+        };
+
+        if let Err(err) = &result {
+            sender
+                .send(StreamEvent::Error(err.to_string()))
+                .await
+                .unwrap();
+        }
+
+        result
     }
 
     pub async fn run_function(
@@ -463,23 +477,10 @@ impl RunMessageStreamMsg {
             api_token,
         } = self;
 
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let ctx = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
-        let response = select! {
-            result = runtime.run_message_stream(&skill_path, input, ctx, send.clone()) => result,
-            // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
-        };
-
-        let label = status_label(response.as_ref().map(|&()| ()));
-
-        // We do not bubble up the error, instead we insert it into the event stream, as the last
-        // event.
-        if let Err(error) = response {
-            send.send(StreamEvent::Error(error.to_string()))
-                .await
-                .unwrap();
-        };
+        let result = runtime
+            .run_message_stream(&skill_path, input, csi_apis, api_token, send.clone())
+            .await;
+        let label = status_label(result.as_ref().map(|&()| ()));
 
         record_skill_metrics(start, skill_path, label);
     }
