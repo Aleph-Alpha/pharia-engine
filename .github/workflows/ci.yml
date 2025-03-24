@@ -118,8 +118,9 @@ jobs:
         uses: aquasecurity/trivy-action@0.30.0
         with:
           input: /tmp/pharia-kernel.tar
-          trivyignores: '.trivyignore'
-          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
+          trivyignores: ".trivyignore"
+          severity: "MEDIUM,HIGH,CRITICAL"
+          exit-code: "1"
 
       - name: Create kind cluster with registry
         id: kind
