@@ -32,22 +32,15 @@ use crate::{
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillPath},
 };
 
-pub struct WasmRuntime<S> {
+pub struct WasmRuntime {
     /// Used to execute skills. We will share the engine with multiple running skills, and skill
     /// provider to convert bytes into executable skills.
     engine: Arc<Engine>,
-    skill_store_api: S,
 }
 
-impl<S> WasmRuntime<S>
-where
-    S: SkillStoreApi,
-{
-    pub fn new(engine: Arc<Engine>, skill_store_api: S) -> Self {
-        Self {
-            engine,
-            skill_store_api,
-        }
+impl WasmRuntime {
+    pub fn new(engine: Arc<Engine>) -> Self {
+        Self { engine }
     }
 
     pub async fn run_message_stream(
@@ -94,12 +87,9 @@ where
 
     pub async fn metadata(
         &self,
-        skill_path: &SkillPath,
+        skill: Arc<dyn Skill>,
         ctx: Box<dyn CsiForSkills + Send>,
     ) -> Result<AnySkillManifest, SkillExecutionError> {
-        let skill = self.skill_store_api.fetch(skill_path.to_owned()).await?;
-        // Unwrap Skill, raise error if it is not existing
-        let skill = skill.ok_or(SkillExecutionError::SkillNotConfigured)?;
         let manifest = skill.manifest(self.engine.as_ref(), ctx).await?;
         Ok(manifest)
     }
@@ -149,15 +139,17 @@ impl SkillRuntime {
     pub fn new<C>(
         engine: Arc<Engine>,
         csi_apis: C,
-        skill_store_api: impl SkillStoreApi + Send + Sync + 'static,
+        store: impl SkillStoreApi + Send + Sync + 'static,
     ) -> Self
     where
         C: Csi + Clone + Send + Sync + 'static,
     {
-        let runtime = WasmRuntime::new(engine, skill_store_api);
+        let runtime = WasmRuntime::new(engine);
         let (send, recv) = mpsc::channel::<SkillRuntimeMsg>(1);
         let handle = tokio::spawn(async {
-            SkillRuntimeActor::new(runtime, recv, csi_apis).run().await;
+            SkillRuntimeActor::new(runtime, store, recv, csi_apis)
+                .run()
+                .await;
         });
         SkillRuntime { send, handle }
     }
@@ -336,7 +328,8 @@ pub enum SkillExecutionError {
 }
 
 struct SkillRuntimeActor<C, S> {
-    runtime: Arc<WasmRuntime<S>>,
+    runtime: Arc<WasmRuntime>,
+    store: Arc<S>,
     recv: mpsc::Receiver<SkillRuntimeMsg>,
     csi_apis: C,
     // Can be a skill execution or a skill metadata request
@@ -348,9 +341,15 @@ where
     C: Csi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Send + Sync + 'static,
 {
-    fn new(runtime: WasmRuntime<S>, recv: mpsc::Receiver<SkillRuntimeMsg>, csi_apis: C) -> Self {
+    fn new(
+        runtime: WasmRuntime,
+        store: S,
+        recv: mpsc::Receiver<SkillRuntimeMsg>,
+        csi_apis: C,
+    ) -> Self {
         SkillRuntimeActor {
             runtime: Arc::new(runtime),
+            store: Arc::new(store),
             recv,
             csi_apis,
             running_requests: FuturesUnordered::new(),
@@ -367,8 +366,9 @@ where
                     Some(msg) => {
                         let csi_apis = self.csi_apis.clone();
                         let runtime = self.runtime.clone();
+                        let store = self.store.clone();
                         self.running_requests.push(Box::pin(async move {
-                            msg.act(csi_apis, runtime.as_ref()).await;
+                            msg.act(csi_apis, runtime.as_ref(), store.as_ref()).await;
                         }));
                     },
                     // Senders are gone, break out of the loop for shutdown.
@@ -409,17 +409,18 @@ impl SkillRuntimeMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &WasmRuntime<impl SkillStoreApi>,
+        runtime: &WasmRuntime,
+        store: &impl SkillStoreApi,
     ) {
         match self {
             SkillRuntimeMsg::MessageStream(msg) => {
-                msg.act(csi_apis, runtime).await;
+                msg.act(csi_apis, runtime, store).await;
             }
             SkillRuntimeMsg::Function(msg) => {
-                msg.act(csi_apis, runtime).await;
+                msg.act(csi_apis, runtime, store).await;
             }
             SkillRuntimeMsg::Metadata(msg) => {
-                msg.act(runtime).await;
+                msg.act(runtime, store).await;
             }
         }
     }
@@ -432,11 +433,19 @@ pub struct MetadataMsg {
 }
 
 impl MetadataMsg {
-    pub async fn act(self, runtime: &WasmRuntime<impl SkillStoreApi>) {
+    pub async fn act(self, runtime: &WasmRuntime, store: &impl SkillStoreApi) {
+        let skill_result = fetch_skill(store, &self.skill_path).await;
+        let skill = match skill_result {
+            Ok(skill) => skill,
+            Err(e) => {
+                drop(self.send.send(Err(e)));
+                return;
+            }
+        };
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillMetadataCtx::new(send_rt_err));
         let response = select! {
-            result = runtime.metadata(&self.skill_path, ctx) => result,
+            result = runtime.metadata(skill, ctx) => result,
             // An error occurred during skill execution.
             Ok(_error) = recv_rt_err => Err(SkillExecutionError::CsiUseFromMetadata)
         };
@@ -456,7 +465,8 @@ impl RunMessageStreamMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &WasmRuntime<impl SkillStoreApi>,
+        runtime: &WasmRuntime,
+        store: &impl SkillStoreApi,
     ) {
         let RunMessageStreamMsg {
             skill_path,
@@ -465,7 +475,7 @@ impl RunMessageStreamMsg {
             api_token,
         } = self;
 
-        let skill_result = fetch_skill(&runtime.skill_store_api, &skill_path).await;
+        let skill_result = fetch_skill(store, &skill_path).await;
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {
@@ -558,7 +568,8 @@ impl RunFunctionMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &WasmRuntime<impl SkillStoreApi>,
+        runtime: &WasmRuntime,
+        store: &impl SkillStoreApi,
     ) {
         let RunFunctionMsg {
             skill_path,
@@ -567,7 +578,7 @@ impl RunFunctionMsg {
             api_token,
         } = self;
 
-        let skill_result = fetch_skill(&runtime.skill_store_api, &skill_path).await;
+        let skill_result = fetch_skill(store, &skill_path).await;
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {
@@ -1014,7 +1025,6 @@ pub mod tests {
         }
 
         let engine = Arc::new(Engine::new(false).unwrap());
-        let store = SkillStoreStub::new();
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
@@ -1023,7 +1033,7 @@ pub mod tests {
             }])
         });
 
-        let runtime = WasmRuntime::new(engine, store);
+        let runtime = WasmRuntime::new(engine);
         let resp = runtime
             .run_function(
                 Arc::new(SkillDoubleUsingExplain),
@@ -1403,8 +1413,8 @@ pub mod tests {
 
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(async || {
-            let runtime = WasmRuntime::new(engine, store);
-            msg.act(CsiDummy, &runtime).await;
+            let runtime = WasmRuntime::new(engine);
+            msg.act(CsiDummy, &runtime, &store).await;
             drop(runtime);
         });
 
