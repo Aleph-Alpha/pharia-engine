@@ -502,7 +502,7 @@ interface inference {
         /// Contains the logprobs for the sampled and top n tokens, given that
         /// `chat-request.params.logprobs` has been set to `sampled` or `top`.
         logprobs: list<distribution>,
-        /// Usage statistics for the completion request.
+        /// Usage statistics for the chat request.
         usage: token-usage,
     }
 
