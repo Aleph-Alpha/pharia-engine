@@ -16,7 +16,7 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time::Instant};
-use tokio::{net::TcpListener, sync::mpsc, task::JoinHandle};
+use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -42,7 +42,7 @@ use crate::{
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
     skill_runtime::{SkillExecutionError, SkillRuntimeApi, StreamEvent},
-    skill_store::{SkillStoreApi, SkillStoreMsg},
+    skill_store::SkillStoreApi,
     skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
 };
 
@@ -58,7 +58,7 @@ impl Shell {
         addr: impl Into<SocketAddr>,
         authorization_api: AuthorizationApi,
         skill_runtime_api: impl SkillRuntimeApi + Clone + Send + Sync + 'static,
-        skill_store_api: mpsc::Sender<SkillStoreMsg>,
+        skill_store_api: impl SkillStoreApi + Clone + Send + Sync + 'static,
         csi_drivers: impl Csi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> anyhow::Result<Self> {
