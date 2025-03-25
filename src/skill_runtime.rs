@@ -33,7 +33,9 @@ impl From<SkillError> for SkillExecutionError {
     }
 }
 
-/// Starts and stops the execution of skills as it owns the skill runtime actor.
+/// An actor which invokes skills concurrently. It is responsible for fetching the skills from the
+/// store. Reporting their results back over the API (the shell should be most intersted in it). It
+/// also reports metrics and tracing to the operators.
 pub struct SkillRuntime {
     send: mpsc::Sender<SkillRuntimeMsg>,
     handle: JoinHandle<()>,
@@ -387,7 +389,7 @@ impl RunMessageStreamMsg {
         let result = runtime
             .run_message_stream(skill, input, csi_apis, api_token, send.clone())
             .await;
-        let label = status_label(result.as_ref().map(|&()| ()));
+        let label = status_label(result.as_ref().err());
 
         record_skill_metrics(start, skill_path, label);
     }
@@ -435,10 +437,10 @@ fn record_skill_metrics(start: Instant, skill_path: SkillPath, status: String) {
         .record(latency);
 }
 
-fn status_label(result: Result<(), &SkillExecutionError>) -> String {
+fn status_label(result: Option<&SkillExecutionError>) -> String {
     match result {
-        Ok(()) => "ok",
-        Err(
+        None => "ok",
+        Some(
             SkillExecutionError::UserCode(_)
             | SkillExecutionError::CsiUseFromMetadata
             | SkillExecutionError::SkillNotConfigured
@@ -448,7 +450,7 @@ fn status_label(result: Result<(), &SkillExecutionError>) -> String {
             | SkillExecutionError::IsFunction
             | SkillExecutionError::IsMessageStream,
         ) => "logic_error",
-        Err(SkillExecutionError::RuntimeError(_)) => "runtime_error",
+        Some(SkillExecutionError::RuntimeError(_)) => "runtime_error",
     }
     .to_owned()
 }
@@ -509,7 +511,7 @@ impl RunFunctionMsg {
             .run_function(skill, input, csi_apis, api_token)
             .await;
 
-        let status = status_label(response.as_ref().map(|_| ()));
+        let status = status_label(response.as_ref().err());
         // Error is expected to happen during shutdown. Ignore result.
         drop(send.send(response));
         record_skill_metrics(start, skill_path, status);
