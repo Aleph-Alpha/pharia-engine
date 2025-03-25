@@ -245,7 +245,8 @@ where
                                 .map(MatchedPath::as_str);
 
                             info_span!(
-                                "http_request",
+                                target: "http",
+                                "request",
                                 method = ?request.method(),
                                 matched_path,
                             )

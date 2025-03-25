@@ -10,6 +10,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
+use tracing::{error, info, warn};
 
 use crate::{
     csi::Csi,
@@ -234,6 +235,29 @@ pub enum SkillExecutionError {
     IsMessageStream,
 }
 
+impl SkillExecutionError {
+    /// The severity with which this error is reported to the operator.
+    fn tracing_level(&self) -> tracing::Level {
+        use tracing::Level;
+        match self {
+            // We give this the error severity, because this hints to a shortcoming in the
+            // envirorment. The operator may need to act.
+            SkillExecutionError::RuntimeError(_) => Level::ERROR,
+            // These might all be logic errors caused by users or buggy skill code. We warn the
+            // operator something fishy is going on, but he might not be able to do anything about
+            // it. Maybe some or all of these should be info?
+            SkillExecutionError::UserCode(_)
+            | SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::InvalidInput(_)
+            | SkillExecutionError::InvalidOutput(_)
+            | SkillExecutionError::MisconfiguredNamespace { .. }
+            | SkillExecutionError::IsFunction
+            | SkillExecutionError::IsMessageStream => Level::WARN,
+        }
+    }
+}
+
 struct SkillRuntimeActor<C, S> {
     runtime: Arc<SkillDriver>,
     store: Arc<S>,
@@ -389,9 +413,9 @@ impl RunMessageStreamMsg {
         let result = runtime
             .run_message_stream(skill, input, csi_apis, api_token, send.clone())
             .await;
-        let label = status_label(result.as_ref().err());
 
-        record_skill_metrics(start, skill_path, label);
+        trace_skill_result(&skill_path, &result);
+        record_skill_metrics(start, skill_path, &result);
     }
 }
 
@@ -425,7 +449,26 @@ impl From<SkillStoreError> for SkillExecutionError {
     }
 }
 
-fn record_skill_metrics(start: Instant, skill_path: SkillPath, status: String) {
+fn record_skill_metrics<T>(
+    start: Instant,
+    skill_path: SkillPath,
+    result: &Result<T, SkillExecutionError>,
+) {
+    let status = match result {
+        Ok(_) => "ok",
+        Err(
+            SkillExecutionError::UserCode(_)
+            | SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::InvalidInput(_)
+            | SkillExecutionError::InvalidOutput(_)
+            | SkillExecutionError::MisconfiguredNamespace { .. }
+            | SkillExecutionError::IsFunction
+            | SkillExecutionError::IsMessageStream,
+        ) => "logic_error",
+        Err(SkillExecutionError::RuntimeError(_)) => "runtime_error",
+    };
+
     let latency = start.elapsed().as_secs_f64();
     let labels = [
         ("namespace", Cow::from(skill_path.namespace.to_string())),
@@ -437,22 +480,38 @@ fn record_skill_metrics(start: Instant, skill_path: SkillPath, status: String) {
         .record(latency);
 }
 
-fn status_label(result: Option<&SkillExecutionError>) -> String {
+fn trace_skill_result<T>(skill_path: &SkillPath, result: &Result<T, SkillExecutionError>) {
+    use tracing::Level;
     match result {
-        None => "ok",
-        Some(
-            SkillExecutionError::UserCode(_)
-            | SkillExecutionError::CsiUseFromMetadata
-            | SkillExecutionError::SkillNotConfigured
-            | SkillExecutionError::InvalidInput(_)
-            | SkillExecutionError::InvalidOutput(_)
-            | SkillExecutionError::MisconfiguredNamespace { .. }
-            | SkillExecutionError::IsFunction
-            | SkillExecutionError::IsMessageStream,
-        ) => "logic_error",
-        Some(SkillExecutionError::RuntimeError(_)) => "runtime_error",
+        Ok(_) => {
+            info!(
+                target: "pharia_kernel::skill_execution",
+                skill=%skill_path,
+                message="Skill executed successfully"
+            );
+        }
+        Err(error) => {
+            match error.tracing_level() {
+                Level::ERROR => {
+                    error!(
+                        target: "pharia_kernel::skill_execution", 
+                        skill=%skill_path,
+                        message=%error,
+                        "Skill invocation failed"
+                    );
+                }
+                // Currently only Error and Warn are returned by tracing_level
+                _ => {
+                    warn!(
+                        target: "pharia_kernel::skill_execution",
+                        skill=%skill_path,
+                        message=%error,
+                        "Skill invocation failed"
+                    );
+                }
+            }
+        }
     }
-    .to_owned()
 }
 
 /// An event emitted by a streaming skill
@@ -507,14 +566,15 @@ impl RunFunctionMsg {
         };
 
         let start = Instant::now();
-        let response = runtime
+        let result = runtime
             .run_function(skill, input, csi_apis, api_token)
             .await;
 
-        let status = status_label(response.as_ref().err());
+        trace_skill_result(&skill_path, &result);
+        record_skill_metrics(start, skill_path, &result);
+
         // Error is expected to happen during shutdown. Ignore result.
-        drop(send.send(response));
-        record_skill_metrics(start, skill_path, status);
+        drop(send.send(result));
     }
 }
 
