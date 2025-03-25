@@ -494,7 +494,7 @@ fn trace_skill_result<T>(skill_path: &SkillPath, result: &Result<T, SkillExecuti
             match error.tracing_level() {
                 Level::ERROR => {
                     error!(
-                        target: "pharia_kernel::skill_execution", 
+                        target: "pharia_kernel::skill_execution",
                         skill=%skill_path,
                         message=%error,
                         "Skill invocation failed"
