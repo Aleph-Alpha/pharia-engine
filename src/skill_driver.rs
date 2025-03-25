@@ -1,5 +1,6 @@
 use std::{collections::HashMap, future::pending, sync::Arc};
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::{
@@ -76,10 +77,14 @@ impl SkillDriver {
     pub async fn metadata(
         &self,
         skill: Arc<dyn Skill>,
-        ctx: Box<dyn CsiForSkills + Send>,
     ) -> Result<AnySkillManifest, SkillExecutionError> {
-        let manifest = skill.manifest(self.engine.as_ref(), ctx).await?;
-        Ok(manifest)
+        let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let ctx = Box::new(SkillMetadataCtx::new(send_rt_err));
+        select! {
+            result = skill.manifest(self.engine.as_ref(), ctx) => result.map_err(Into::into),
+            // An error occurred during skill execution.
+            Ok(_error) = recv_rt_err => Err(SkillExecutionError::CsiUseFromMetadata)
+        }
     }
 }
 
@@ -278,15 +283,112 @@ where
     }
 }
 
+/// We know that skill metadata will not invoke any csi functions, but still need to provide an
+/// implementation of `CsiForSkills` We do not want to panic, as someone could build a component
+/// that uses the csi functions inside the metadata function. Therefore, we always send a runtime
+/// error which will lead to skill suspension.
+struct SkillMetadataCtx {
+    send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
+}
+
+impl SkillMetadataCtx {
+    pub fn new(send_rt_err: oneshot::Sender<anyhow::Error>) -> Self {
+        Self {
+            send_rt_err: Some(send_rt_err),
+        }
+    }
+
+    async fn send_error<T>(&mut self) -> T {
+        self.send_rt_err
+            .take()
+            .expect("Only one error must be send during skill invocation")
+            .send(anyhow!(
+                "This message will be translated and thus never seen by a user"
+            ))
+            .unwrap();
+        pending().await
+    }
+}
+
+#[async_trait]
+impl CsiForSkills for SkillMetadataCtx {
+    async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+        self.send_error().await
+    }
+
+    async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+        self.send_error().await
+    }
+
+    async fn completion_stream_new(&mut self, _request: CompletionRequest) -> CompletionStreamId {
+        self.send_error().await
+    }
+
+    async fn completion_stream_next(
+        &mut self,
+        _id: &CompletionStreamId,
+    ) -> Option<CompletionEvent> {
+        self.send_error().await
+    }
+
+    async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
+        self.send_error::<()>().await;
+    }
+
+    async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+        self.send_error().await
+    }
+
+    async fn select_language(
+        &mut self,
+        _requests: Vec<SelectLanguageRequest>,
+    ) -> Vec<Option<Language>> {
+        self.send_error().await
+    }
+
+    async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+        self.send_error().await
+    }
+
+    async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+        self.send_error().await
+    }
+
+    async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+        self.send_error().await
+    }
+
+    async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
+        self.send_error::<()>().await;
+    }
+
+    async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+        self.send_error().await
+    }
+
+    async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
+        self.send_error().await
+    }
+
+    async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+        self.send_error().await
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::{
         chunking::ChunkParams,
-        csi::tests::StubCsi,
-        inference::{ChatParams, FinishReason, Message, TokenUsage},
+        csi::tests::{CsiSaboteur, StubCsi},
+        inference::{
+            ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, Message, TextScore,
+            TokenUsage,
+        },
+        skills::SkillError,
     };
     use anyhow::anyhow;
+    use serde_json::json;
 
     #[tokio::test]
     async fn chunk() {
@@ -453,5 +555,209 @@ mod test {
             ]
         );
         assert!(ctx.completion_streams.is_empty());
+    }
+
+    #[tokio::test]
+    async fn csi_usage_from_metadata_leads_to_suspension() {
+        // Given a skill runtime that always returns a skill that uses the csi from the metadata function
+        struct CsiFromMetadataSkill;
+        #[async_trait]
+        impl Skill for CsiFromMetadataSkill {
+            async fn manifest(
+                &self,
+                _engine: &Engine,
+                mut ctx: Box<dyn CsiForSkills + Send>,
+            ) -> Result<AnySkillManifest, SkillError> {
+                ctx.select_language(vec![SelectLanguageRequest {
+                    text: "Hello, good sir!".to_owned(),
+                    languages: Vec::new(),
+                }])
+                .await;
+                unreachable!(
+                    "The test should never reach this point, as its execution shoud be suspendend"
+                )
+            }
+
+            async fn run_as_function(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<Value, SkillError> {
+                unreachable!("This won't be invoked during the test")
+            }
+
+            async fn run_as_message_stream(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+                _sender: mpsc::Sender<StreamEvent>,
+            ) -> Result<(), SkillError> {
+                unreachable!("This won't be invoked during the test")
+            }
+        }
+
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let skill_driver = SkillDriver::new(engine);
+
+        // When metadata for a skill is requested
+        let metadata = skill_driver.metadata(Arc::new(CsiFromMetadataSkill)).await;
+
+        // Then the metadata is None
+        assert_eq!(
+            metadata.unwrap_err().to_string(),
+            "The metadata function of the invoked skill is bugged. It is forbidden to invoke any \
+            CSI functions from the metadata function, yet the skill does precisely this."
+        );
+    }
+
+    #[tokio::test]
+    async fn forward_explain_response_from_csi() {
+        struct SkillDoubleUsingExplain;
+
+        #[async_trait]
+        impl Skill for SkillDoubleUsingExplain {
+            async fn run_as_function(
+                &self,
+                _engine: &Engine,
+                mut ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<Value, SkillError> {
+                let explanation = ctx
+                    .explain(vec![ExplanationRequest {
+                        prompt: "An apple a day".to_owned(),
+                        target: " keeps the doctor away".to_owned(),
+                        model: "test-model-name".to_owned(),
+                        granularity: Granularity::Auto,
+                    }])
+                    .await
+                    .pop()
+                    .unwrap();
+                let output = explanation
+                    .into_iter()
+                    .map(|text_score| json!({"start": text_score.start, "length": text_score.length}))
+                    .collect::<Vec<_>>();
+                Ok(json!(output))
+            }
+
+            async fn manifest(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+            ) -> Result<AnySkillManifest, SkillError> {
+                panic!("Dummy metadata implementation of SkillDoubleUsingExplain")
+            }
+
+            async fn run_as_message_stream(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+                _sender: mpsc::Sender<StreamEvent>,
+            ) -> Result<(), SkillError> {
+                panic!("Dummy message stream implementation of SkillDoubleUsingExplain")
+            }
+        }
+
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let csi = StubCsi::with_explain(|_| {
+            Explanation::new(vec![TextScore {
+                score: 0.0,
+                start: 0,
+                length: 2,
+            }])
+        });
+
+        let runtime = SkillDriver::new(engine);
+        let resp = runtime
+            .run_function(
+                Arc::new(SkillDoubleUsingExplain),
+                json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
+                csi,
+                "dummy token".to_owned(),
+            )
+            .await;
+
+        drop(runtime);
+
+        assert_eq!(resp.unwrap(), json!([{"start": 0, "length": 2}]));
+    }
+
+    #[tokio::test]
+    async fn should_forward_csi_errors() {
+        // Given a skill using csi and a csi that fails
+        // Note we are using a skill which actually invokes the csi
+        let skill = Arc::new(SkillGreetCompletion);
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let driver = SkillDriver::new(engine);
+
+        // When trying to generate a greeting for Homer using the greet skill
+        let result = driver
+            .run_function(
+                skill,
+                json!("Homer"),
+                CsiSaboteur,
+                "TOKEN_NOT_REQUIRED".to_owned(),
+            )
+            .await;
+
+        // Then
+        let expectet_error_msg = "The skill could not be executed to completion, something in our \
+            runtime is currently \nunavailable or misconfigured. You should try again later, if \
+            the situation persists you \nmay want to contact the operaters. Original error:\n\n\
+            Test error";
+        assert_eq!(result.unwrap_err().to_string(), expectet_error_msg);
+    }
+
+    /// A test double for a skill. It invokes the csi with a prompt and returns the result.
+    struct SkillGreetCompletion;
+
+    #[async_trait]
+    impl Skill for SkillGreetCompletion {
+        async fn run_as_function(
+            &self,
+            _engine: &Engine,
+            mut ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> Result<Value, SkillError> {
+            let mut completions = ctx
+                .complete(vec![CompletionRequest {
+                    prompt: "Hello".to_owned(),
+                    model: "test-model-name".to_owned(),
+                    params: CompletionParams {
+                        max_tokens: Some(10),
+                        temperature: Some(0.5),
+                        top_p: Some(1.0),
+                        presence_penalty: Some(0.0),
+                        frequency_penalty: Some(0.0),
+                        stop: Vec::new(),
+                        return_special_tokens: true,
+                        top_k: None,
+                        logprobs: Logprobs::No,
+                    },
+                }])
+                .await;
+            let completion = completions.pop().unwrap().text;
+            Ok(json!(completion))
+        }
+
+        async fn manifest(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+        ) -> Result<AnySkillManifest, SkillError> {
+            panic!("Dummy metadata implementation of Skill Greet Completion")
+        }
+
+        async fn run_as_message_stream(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+            _sender: mpsc::Sender<StreamEvent>,
+        ) -> Result<(), SkillError> {
+            Err(SkillError::IsFunction)
+        }
     }
 }
