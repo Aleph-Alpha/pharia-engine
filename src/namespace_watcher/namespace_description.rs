@@ -149,8 +149,16 @@ impl NamespaceDescriptionLoader for HttpLoader {
             .await
             .map_err(|e| NamespaceDescriptionError::Recoverable(e.into()))?;
 
-        resp.error_for_status_ref()
-            .map_err(|e| NamespaceDescriptionError::Recoverable(e.into()))?;
+        resp.error_for_status_ref().map_err(|e| {
+            if e.status()
+                .expect("Status must be set if an error is generated because it is set")
+                .is_client_error()
+            {
+                NamespaceDescriptionError::Unrecoverable(e.into())
+            } else {
+                NamespaceDescriptionError::Recoverable(e.into())
+            }
+        })?;
 
         let content = resp
             .text()
@@ -161,7 +169,7 @@ impl NamespaceDescriptionLoader for HttpLoader {
                 "Unable to parse file at '{}' into a valid configuration for a team owned namespace.",
                 self.url
             )
-        }).map_err(NamespaceDescriptionError::Recoverable)?;
+        }).map_err(NamespaceDescriptionError::Unrecoverable)?;
         Ok(desc)
     }
 }
