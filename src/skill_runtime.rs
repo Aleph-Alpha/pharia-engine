@@ -237,23 +237,35 @@ pub enum SkillExecutionError {
 
 impl SkillExecutionError {
     /// The severity with which this error is reported to the operator.
+    ///
+    /// Anything which is wrong with our runtime (i.e. resources, external services, network, etc.)
+    /// is only fixable by the operator. Therefore we report any failure due to these as errors.
+    /// Anything which is wrong with the skill itself, might not be fixable by the operator, but
+    /// still compromises the functionality of the system. Also in some situtations the operator
+    /// might be the skill developer, or at least on the same team. Therefore we report these as
+    /// warnings.
+    /// Anything which can be caused by invalid user input over our HTTP interface, might neither be
+    /// in the power of operator or developer to fix. We report these as info, in order to be not to
+    /// noisy.
     fn tracing_level(&self) -> tracing::Level {
         use tracing::Level;
         match self {
             // We give this the error severity, because this hints to a shortcoming in the
             // envirorment. The operator may need to act.
             SkillExecutionError::RuntimeError(_) => Level::ERROR,
-            // These might all be logic errors caused by users or buggy skill code. We warn the
-            // operator something fishy is going on, but he might not be able to do anything about
-            // it. Maybe some or all of these should be info?
-            SkillExecutionError::UserCode(_)
-            | SkillExecutionError::CsiUseFromMetadata
-            | SkillExecutionError::SkillNotConfigured
-            | SkillExecutionError::InvalidInput(_)
+            // These are bugs in the skill code, or their configuration.
+            SkillExecutionError::CsiUseFromMetadata
             | SkillExecutionError::InvalidOutput(_)
-            | SkillExecutionError::MisconfiguredNamespace { .. }
+            | SkillExecutionError::MisconfiguredNamespace { .. } => Level::WARN,
+            // This could be a wrong configuration, but also just mistying a skill name. So we log
+            // these only as info.
+            SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::InvalidInput(_)
+            | SkillExecutionError::IsMessageStream
             | SkillExecutionError::IsFunction
-            | SkillExecutionError::IsMessageStream => Level::WARN,
+            // Some of these are bugs, but as long as we do not strictly distinguish those from
+            // invalid input, let's reduce false positives and report them as info.
+            | SkillExecutionError::UserCode(..) => Level::INFO,
         }
     }
 }
@@ -414,7 +426,7 @@ impl RunMessageStreamMsg {
             .run_message_stream(skill, input, csi_apis, api_token, send.clone())
             .await;
 
-        trace_skill_result(&skill_path, &result);
+        log_skill_result(&skill_path, &result);
         record_skill_metrics(start, skill_path, &result);
     }
 }
@@ -480,7 +492,7 @@ fn record_skill_metrics<T>(
         .record(latency);
 }
 
-fn trace_skill_result<T>(skill_path: &SkillPath, result: &Result<T, SkillExecutionError>) {
+fn log_skill_result<T>(skill_path: &SkillPath, result: &Result<T, SkillExecutionError>) {
     use tracing::Level;
     match result {
         Ok(_) => {
@@ -570,7 +582,7 @@ impl RunFunctionMsg {
             .run_function(skill, input, csi_apis, api_token)
             .await;
 
-        trace_skill_result(&skill_path, &result);
+        log_skill_result(&skill_path, &result);
         record_skill_metrics(start, skill_path, &result);
 
         // Error is expected to happen during shutdown. Ignore result.
