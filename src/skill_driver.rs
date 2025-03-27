@@ -377,10 +377,12 @@ impl CsiForSkills for SkillMetadataCtx {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Mutex;
+
     use super::*;
     use crate::{
         chunking::ChunkParams,
-        csi::tests::{CsiSaboteur, StubCsi},
+        csi::tests::{CsiDummy, CsiSaboteur, StubCsi},
         inference::{
             ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, Message, TextScore,
             TokenUsage,
@@ -708,6 +710,79 @@ mod test {
             the situation persists you \nmay want to contact the operaters. Original error:\n\n\
             Test error";
         assert_eq!(result.unwrap_err().to_string(), expectet_error_msg);
+    }
+
+    #[tokio::test]
+    async fn should_stop_execution_after_message_stream_emits_error() {
+        // Given a skill that emits an error
+        struct SaboteurSpy {
+            // This will be set to true if skill code is executed after error
+            executed_code_after_error: Mutex<bool>,
+        }
+
+        #[async_trait]
+        impl Skill for SaboteurSpy {
+            async fn run_as_function(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+            ) -> Result<Value, SkillError> {
+                panic!("This function should not be called");
+            }
+
+            async fn manifest(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+            ) -> Result<AnySkillManifest, SkillError> {
+                panic!("This function should not be called");
+            }
+
+            async fn run_as_message_stream(
+                &self,
+                _engine: &Engine,
+                _ctx: Box<dyn CsiForSkills + Send>,
+                _input: Value,
+                sender: mpsc::Sender<StreamEvent>,
+            ) -> Result<(), SkillError> {
+                sender
+                    .send(StreamEvent::Error("Test error".to_owned()))
+                    .await
+                    .unwrap();
+                // Set boolean to true if the code is executed after the error. We test for this in
+                // our assertion
+                *(self.executed_code_after_error.lock().unwrap()) = true;
+                Ok(())
+            }
+        }
+
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let driver = SkillDriver::new(engine);
+
+        // When
+        let skill = Arc::new(SaboteurSpy {
+            executed_code_after_error: Mutex::new(false),
+        });
+        let (send, mut recv) = mpsc::channel(1);
+        driver
+            .run_message_stream(
+                skill.clone(),
+                json!({}),
+                CsiDummy,
+                "Dummy Token".to_owned(),
+                send,
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(
+            StreamEvent::Error("Test error".to_owned()),
+            recv.recv().await.unwrap()
+        );
+        // the boolean should still be false.
+        assert!(!*skill.executed_code_after_error.lock().unwrap());
     }
 
     /// A test double for a skill. It invokes the csi with a prompt and returns the result.
