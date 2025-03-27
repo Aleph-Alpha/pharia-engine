@@ -168,7 +168,7 @@ pub enum SkillError {
     RuntimeError(anyhow::Error),
     /// Returned if a function is invoked as a message stream
     IsFunction,
-    /// Retruned if a message stream is invoked as a function
+    /// Returned if a message stream is invoked as a function
     IsMessageStream,
 }
 
