@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.6...v0.11.7)
+
+### Features
+
+- Invalid user input logs as info - ([fe4cea1](https://github.com/Aleph-Alpha/pharia-kernel/commit/fe4cea1f5c22dfa43a8d95d8b6aa01d865d645e1))
+- Introduce minimal tracing for skill invocation errors - ([14c2b2d](https://github.com/Aleph-Alpha/pharia-kernel/commit/14c2b2da87da72bca73f954ae0f166c2df721c19))
+
+### Fixes
+
+- Return correct error message when stream skill is invoked via run - ([f6b7b9c](https://github.com/Aleph-Alpha/pharia-kernel/commit/f6b7b9cd925edb1541e584a23745f98a1314a95e))
+- TOO_MANY_REQUEST is treated as recoverable for configuration - ([1ec52df](https://github.com/Aleph-Alpha/pharia-kernel/commit/1ec52dfeb2c0ede099c6907bad3adfd1d3214683))
+- Syntax errors in namespace configuration are now classified as unrecoverable - ([4bddd8a](https://github.com/Aleph-Alpha/pharia-kernel/commit/4bddd8a257508b7a58f5d319638ab9fea9813612))
+
+### Documentation
+
+- Update URL to Python SDK documentation - ([ff20b43](https://github.com/Aleph-Alpha/pharia-kernel/commit/ff20b43150f17240ec79988a605a3daaeecc0f0e))
+- Fix typo - ([6d23b76](https://github.com/Aleph-Alpha/pharia-kernel/commit/6d23b768efee3231c05bb00803b4f328add8bd58))
+
+### Builds
+
+- *(deps)* Bump the minor group with 5 updates - ([16e5695](https://github.com/Aleph-Alpha/pharia-kernel/commit/16e56952decc44cd6018b3657e89917d4ad8ec19))
+- *(deps)* Bump the minor group with 9 updates - ([5fe763f](https://github.com/Aleph-Alpha/pharia-kernel/commit/5fe763fb64432389fbf7bb24ae30c926caf6e6e6))
+
+
 ## [0.11.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.5...v0.11.6)
 
 ### Fixes
