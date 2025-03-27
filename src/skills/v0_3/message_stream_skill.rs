@@ -43,7 +43,7 @@ impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
     ) -> Result<Value, SkillError> {
-        Err(SkillError::IsFunction)
+        Err(SkillError::IsMessageStream)
     }
 
     async fn run_as_message_stream(
