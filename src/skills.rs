@@ -368,16 +368,11 @@ impl SupportedSkillWorld {
                     v0_2::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
                 Self::V0_3Function => {
-                    v0_3::skill::Skill::add_to_linker(
-                        linker,
-                        v0_3::skill::LinkOptions::default().streaming(true),
-                        |state: &mut LinkedCtx| state,
-                    )?;
+                    v0_3::skill::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
                 Self::V0_3MessageStream => {
                     v0_3::message_stream_skill::MessageStreamSkill::add_to_linker(
                         linker,
-                        v0_3::message_stream_skill::LinkOptions::default().streaming(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
