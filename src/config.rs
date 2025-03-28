@@ -9,12 +9,6 @@ use crate::{feature_set::FeatureSet, namespace_watcher::NamespaceConfigs};
 mod defaults {
     use std::{net::SocketAddr, time::Duration};
 
-    use crate::feature_set::FeatureSet;
-
-    pub fn pharia_ai_feature_set() -> FeatureSet {
-        FeatureSet::Beta
-    }
-
     pub fn kernel_address() -> SocketAddr {
         "0.0.0.0:8081".parse().unwrap()
     }
@@ -56,10 +50,7 @@ where
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct AppConfig {
-    #[serde(
-        default = "defaults::pharia_ai_feature_set",
-        deserialize_with = "deserialize_feature_set"
-    )]
+    #[serde(default, deserialize_with = "deserialize_feature_set")]
     pharia_ai_feature_set: FeatureSet,
     #[serde(default = "defaults::kernel_address")]
     kernel_address: SocketAddr,
@@ -278,7 +269,7 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            pharia_ai_feature_set: defaults::pharia_ai_feature_set(),
+            pharia_ai_feature_set: FeatureSet::default(),
             kernel_address: defaults::kernel_address(),
             metrics_address: defaults::metrics_address(),
             inference_url: defaults::inference_url(),
