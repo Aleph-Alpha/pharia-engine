@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.8...v0.11.9)
+
+### Fixes
+
+- Use Default::default() for FeatureSet instead of hardcoded values - ([c053b03](https://github.com/Aleph-Alpha/pharia-kernel/commit/c053b03a2eff23c58cf4e6021073f9bc83d29fd2))
+
+
 ## [0.11.8](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.7...v0.11.8)
 
 ### Features
