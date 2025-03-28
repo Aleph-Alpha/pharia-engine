@@ -20,6 +20,12 @@ use crate::{
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillPath},
 };
 
+// It would be nice for users of this module, not to be concerned with the fact that the runtime is
+// using the driver. This may indicate that maybe driver and runtime should be part of the same top
+// level module. For now I decided to leave it like that due to the fact that I am not sure about
+// it. (MK)
+pub use crate::skill_driver::SkillExecutionEvent;
+
 impl From<SkillError> for SkillExecutionError {
     fn from(source: SkillError) -> Self {
         match source {
@@ -526,25 +532,6 @@ fn log_skill_result<T>(skill_path: &SkillPath, result: &Result<T, SkillExecution
             }
         }
     }
-}
-
-/// An event emitted by a streaming skill
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SkillExecutionEvent {
-    /// Send at the beginning of each message, currently carries no information. May be used in the
-    /// future to communicate the role. Can also be useful to the UI to communicate that its about
-    /// time to start rendering that speech bubble.
-    MessageBegin,
-    /// Send at the end of each message. Can carry an arbitrary payload, to make messages more of a
-    /// dropin for classical functions. Might be refined in the future. We anticipate the stop
-    /// reason to be very useful for end appliacations. We also introduce end messages to keep the
-    /// door open for multiple messages in a stream.
-    MessageEnd { payload: Value },
-    /// Append the internal string to the current message
-    MessageAppend { text: String },
-    /// An error occurred during skill execution. This kind of error can happen after streaming has
-    /// started
-    Error(String),
 }
 
 /// Message type used to transfer the input and output of a function skill execution

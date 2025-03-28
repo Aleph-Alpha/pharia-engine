@@ -17,7 +17,7 @@ use crate::{
     },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    skill_runtime::{SkillExecutionError, SkillExecutionEvent},
+    skill_runtime::SkillExecutionError,
     skills::{AnySkillManifest, Engine, Skill, SkillEvent},
 };
 
@@ -392,6 +392,27 @@ impl CsiForSkills for SkillMetadataCtx {
     async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
         self.send_error().await
     }
+}
+
+/// Emitted from executing message stream skills. This differs from [`SkillEvent`] in the way that
+/// it has stroger guarantees. E.g. every [`Self::MessageEnd`] is prefaced by a
+/// [`Self::MessageBegin`]. In addition to this, it also accounts for runtime errors.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SkillExecutionEvent {
+    /// Send at the beginning of each message, currently carries no information. May be used in the
+    /// future to communicate the role. Can also be useful to the UI to communicate that its about
+    /// time to start rendering that speech bubble.
+    MessageBegin,
+    /// Send at the end of each message. Can carry an arbitrary payload, to make messages more of a
+    /// dropin for classical functions. Might be refined in the future. We anticipate the stop
+    /// reason to be very useful for end appliacations. We also introduce end messages to keep the
+    /// door open for multiple messages in a stream.
+    MessageEnd { payload: Value },
+    /// Append the internal string to the current message
+    MessageAppend { text: String },
+    /// An error occurred during skill execution. This kind of error can happen after streaming has
+    /// started
+    Error(String),
 }
 
 #[cfg(test)]
