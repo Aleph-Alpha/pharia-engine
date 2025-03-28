@@ -92,7 +92,7 @@ pub trait SkillRuntimeApi {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> mpsc::Receiver<StreamEvent>;
+    ) -> mpsc::Receiver<SkillExecutionEvent>;
 
     async fn skill_metadata(
         &self,
@@ -126,8 +126,8 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> mpsc::Receiver<StreamEvent> {
-        let (send, recv) = mpsc::channel::<StreamEvent>(1);
+    ) -> mpsc::Receiver<SkillExecutionEvent> {
+        let (send, recv) = mpsc::channel::<SkillExecutionEvent>(1);
 
         let msg = RunMessageStreamMsg {
             skill_path,
@@ -396,7 +396,7 @@ impl MetadataMsg {
 pub struct RunMessageStreamMsg {
     pub skill_path: SkillPath,
     pub input: Value,
-    pub send: mpsc::Sender<StreamEvent>,
+    pub send: mpsc::Sender<SkillExecutionEvent>,
     pub api_token: String,
 }
 
@@ -418,7 +418,7 @@ impl RunMessageStreamMsg {
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {
-                drop(send.send(StreamEvent::Error(e.to_string())).await);
+                drop(send.send(SkillExecutionEvent::Error(e.to_string())).await);
                 return;
             }
         };
@@ -530,7 +530,7 @@ fn log_skill_result<T>(skill_path: &SkillPath, result: &Result<T, SkillExecution
 
 /// An event emitted by a streaming skill
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum StreamEvent {
+pub enum SkillExecutionEvent {
     /// Send at the beginning of each message, currently carries no information. May be used in the
     /// future to communicate the role. Can also be useful to the UI to communicate that its about
     /// time to start rendering that speech bubble.
@@ -786,40 +786,43 @@ pub mod tests {
             .await;
 
         // Then
-        assert_eq!(recv.recv().await.unwrap(), StreamEvent::MessageBegin);
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::MessageAppend {
+            SkillExecutionEvent::MessageBegin
+        );
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            SkillExecutionEvent::MessageAppend {
                 text: "H".to_string()
             }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::MessageAppend {
+            SkillExecutionEvent::MessageAppend {
                 text: "e".to_string()
             }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::MessageAppend {
+            SkillExecutionEvent::MessageAppend {
                 text: "l".to_string()
             }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::MessageAppend {
+            SkillExecutionEvent::MessageAppend {
                 text: "l".to_string()
             }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::MessageAppend {
+            SkillExecutionEvent::MessageAppend {
                 text: "o".to_string()
             }
         );
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::MessageEnd {
+            SkillExecutionEvent::MessageEnd {
                 payload: json!(null)
             }
         );
@@ -853,7 +856,7 @@ pub mod tests {
             developer. Error reported by Skill:\n\nSkill is a saboteur";
         assert_eq!(
             recv.recv().await.unwrap(),
-            StreamEvent::Error(expected_error_msg.to_string())
+            SkillExecutionEvent::Error(expected_error_msg.to_string())
         );
         assert!(recv.recv().await.is_none());
 
@@ -923,7 +926,10 @@ pub mod tests {
             runtime is currently \nunavailable or misconfigured. You should try again later, if \
             the situation persists you \nmay want to contact the operaters. Original error:\n\n\
             Test error";
-        assert_eq!(event, StreamEvent::Error(expected_error_msg.to_string()));
+        assert_eq!(
+            event,
+            SkillExecutionEvent::Error(expected_error_msg.to_string())
+        );
     }
 
     fn metrics_snapshot<F: Future<Output = ()>>(f: impl FnOnce() -> F) -> Snapshot {

@@ -41,7 +41,7 @@ use crate::{
     csi_shell,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
-    skill_runtime::{SkillExecutionError, SkillRuntimeApi, StreamEvent},
+    skill_runtime::{SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi},
     skill_store::SkillStoreApi,
     skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
 };
@@ -566,22 +566,22 @@ where
     Sse::new(stream)
 }
 
-impl From<StreamEvent> for Event {
-    fn from(value: StreamEvent) -> Self {
+impl From<SkillExecutionEvent> for Event {
+    fn from(value: SkillExecutionEvent) -> Self {
         match value {
-            StreamEvent::MessageBegin => Self::default()
+            SkillExecutionEvent::MessageBegin => Self::default()
                 .event("message")
                 .json_data(MessageEvent::Begin)
                 .expect("`json_data` must only be called once."),
-            StreamEvent::MessageEnd { payload } => Self::default()
+            SkillExecutionEvent::MessageEnd { payload } => Self::default()
                 .event("message")
                 .json_data(MessageEvent::End { payload })
                 .expect("`json_data` must only be called once."),
-            StreamEvent::MessageAppend { text } => Self::default()
+            SkillExecutionEvent::MessageAppend { text } => Self::default()
                 .event("message")
                 .json_data(MessageEvent::Append { text })
                 .expect("`json_data` must only be called once."),
-            StreamEvent::Error(message) => Self::default()
+            SkillExecutionEvent::Error(message) => Self::default()
                 .event("error")
                 .json_data(SseErrorEvent { message })
                 .expect("`json_data` must only be called once."),
@@ -1348,11 +1348,11 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     async fn stream_endpoint_should_send_individual_message_deltas() {
         // Given
         let mut stream_events = Vec::new();
-        stream_events.push(StreamEvent::MessageBegin);
-        stream_events.extend("Hello".chars().map(|c| StreamEvent::MessageAppend {
+        stream_events.push(SkillExecutionEvent::MessageBegin);
+        stream_events.extend("Hello".chars().map(|c| SkillExecutionEvent::MessageAppend {
             text: c.to_string(),
         }));
-        stream_events.push(StreamEvent::MessageEnd {
+        stream_events.push(SkillExecutionEvent::MessageEnd {
             payload: json!(null),
         });
         let skill_executer_mock = SkillRuntimeStub::with_stream_events(stream_events);
@@ -1404,7 +1404,9 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     #[tokio::test]
     async fn stream_endpoint_for_saboteur_skill() {
         // Given
-        let stream_events = vec![StreamEvent::Error("Skill is a saboteur".to_string())];
+        let stream_events = vec![SkillExecutionEvent::Error(
+            "Skill is a saboteur".to_string(),
+        )];
         let skill_runtime = SkillRuntimeStub::with_stream_events(stream_events);
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(FeatureSet::Beta, app_state);
@@ -1870,7 +1872,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-        ) -> mpsc::Receiver<StreamEvent> {
+        ) -> mpsc::Receiver<SkillExecutionEvent> {
             panic!("Skill runtime dummy called")
         }
 
@@ -1912,7 +1914,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-        ) -> mpsc::Receiver<StreamEvent> {
+        ) -> mpsc::Receiver<SkillExecutionEvent> {
             panic!(
                 "Use the `SkillRuntimeStub`, to simulate errors during streaming instead of the \
                 `SkillRuntimeSaboteur`."
@@ -1932,7 +1934,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     struct SkillRuntimeStub {
         function_result: Value,
         metadata: AnySkillManifest,
-        stream_events: Vec<StreamEvent>,
+        stream_events: Vec<SkillExecutionEvent>,
     }
 
     impl SkillRuntimeStub {
@@ -1944,7 +1946,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             }
         }
 
-        pub fn with_stream_events(stream_events: Vec<StreamEvent>) -> Self {
+        pub fn with_stream_events(stream_events: Vec<SkillExecutionEvent>) -> Self {
             Self {
                 function_result: Value::default(),
                 stream_events,
@@ -1977,7 +1979,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-        ) -> mpsc::Receiver<StreamEvent> {
+        ) -> mpsc::Receiver<SkillExecutionEvent> {
             let (send, recv) = mpsc::channel(self.stream_events.len());
             for ce in &self.stream_events {
                 send.send(ce.clone()).await.unwrap();
@@ -2049,7 +2051,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             skill_path: SkillPath,
             input: Value,
             api_token: String,
-        ) -> mpsc::Receiver<StreamEvent> {
+        ) -> mpsc::Receiver<SkillExecutionEvent> {
             let mut inner = self.inner.lock().unwrap();
             inner.api_token = api_token;
             inner.input = input;
