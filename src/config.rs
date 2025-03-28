@@ -292,6 +292,7 @@ mod tests {
     use config::Config;
     use tempfile::tempdir;
 
+    use crate::feature_set::PRODUCTION_FEATURE_SET;
     use crate::namespace_watcher::tests::NamespaceConfig;
     use crate::namespace_watcher::{Namespace, Registry};
 
@@ -366,7 +367,7 @@ mod tests {
         let config = config.try_deserialize::<AppConfig>()?;
 
         // Then the config contains the default values
-        assert_eq!(config.pharia_ai_feature_set(), FeatureSet::Beta);
+        assert_eq!(config.pharia_ai_feature_set(), PRODUCTION_FEATURE_SET);
         assert_eq!(config.kernel_address(), "0.0.0.0:8081".parse().unwrap());
         assert_eq!(config.metrics_address(), "0.0.0.0:9000".parse().unwrap());
         assert_eq!(
