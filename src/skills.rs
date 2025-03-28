@@ -29,7 +29,7 @@ use wit_parser::{
     decoding::{DecodedWasm, decode},
 };
 
-use crate::{csi::CsiForSkills, namespace_watcher::Namespace, skill_runtime::SkillExecutionEvent};
+use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
 
 pub use self::v0_3::SkillMetadataV0_3;
 
@@ -625,12 +625,26 @@ fn pooling_allocator_is_supported() -> bool {
 /// not checked yet for invalid state transitions. Example of invalid state transition would be
 /// starting a message with end rather than start.
 #[derive(Debug, PartialEq, Eq)]
-pub struct SkillEvent(pub SkillExecutionEvent);
+pub enum SkillEvent {
+    /// Send at the beginning of each message, currently carries no information. May be used in the
+    /// future to communicate the role. Can also be useful to the UI to communicate that its about
+    /// time to start rendering that speech bubble.
+    MessageBegin,
+    /// Send at the end of each message. Can carry an arbitrary payload, to make messages more of a
+    /// dropin for classical functions. Might be refined in the future. We anticipate the stop
+    /// reason to be very useful for end appliacations. We also introduce end messages to keep the
+    /// door open for multiple messages in a stream.
+    MessageEnd { payload: Value },
+    /// Append the internal string to the current message
+    MessageAppend { text: String },
+    /// A bug caused by the skill code, there the object passed in the payload is not valid JSON.
+    InvalidBytesInPayload { message: String },
+}
 
 #[cfg(test)]
 pub mod tests {
     use async_trait::async_trait;
-    use fake::{Fake, Faker};
+    use fake::{Fake as _, Faker};
     use serde_json::json;
     use test_skills::{
         given_chat_stream_skill, given_complete_stream_skill, given_invalid_output_skill,
@@ -1018,13 +1032,13 @@ pub mod tests {
         assert_eq!(
             events,
             vec![
-                SkillEvent(SkillExecutionEvent::MessageBegin),
-                SkillEvent(SkillExecutionEvent::MessageAppend {
+                SkillEvent::MessageBegin,
+                SkillEvent::MessageAppend {
                     text: "Homer".to_owned()
-                }),
-                SkillEvent(SkillExecutionEvent::MessageEnd {
+                },
+                SkillEvent::MessageEnd {
                     payload: json!("FinishReason::Stop")
-                })
+                }
             ]
         );
     }

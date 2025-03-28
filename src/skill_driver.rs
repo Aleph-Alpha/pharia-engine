@@ -50,10 +50,8 @@ impl SkillDriver {
 
         let result = loop {
             select! {
-                Some(SkillEvent(event)) = recv_inner.recv() => {
-                    if let SkillExecutionEvent::Error(message) = event {
-                        break Err(SkillExecutionError::UserCode(message));
-                    }
+                Some(event) = recv_inner.recv() => {
+                    let event = translate_to_execution_event(event);
                     sender.send(event).await.unwrap();
                 }
                 result = &mut execute_skill => break result.map_err(Into::into),
@@ -63,7 +61,8 @@ impl SkillDriver {
 
         // In case the skill invocation finishes faster than we could extract the last event. I.e.
         // the event is placed in the channel, yet the receiver did not pick it up yet.
-        if let Ok(SkillEvent(event)) = recv_inner.try_recv() {
+        if let Ok(event) = recv_inner.try_recv() {
+            let event = translate_to_execution_event(event);
             sender.send(event).await.unwrap();
         }
 
@@ -413,6 +412,15 @@ pub enum SkillExecutionEvent {
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
     Error(String),
+}
+
+fn translate_to_execution_event(source: SkillEvent) -> SkillExecutionEvent {
+    match source {
+        SkillEvent::MessageBegin => SkillExecutionEvent::MessageBegin,
+        SkillEvent::MessageEnd { payload } => SkillExecutionEvent::MessageEnd { payload },
+        SkillEvent::MessageAppend { text } => SkillExecutionEvent::MessageAppend { text },
+        SkillEvent::InvalidBytesInPayload { message } => SkillExecutionEvent::Error(message),
+    }
 }
 
 #[cfg(test)]
@@ -783,9 +791,9 @@ mod test {
                 sender: mpsc::Sender<SkillEvent>,
             ) -> Result<(), SkillError> {
                 sender
-                    .send(SkillEvent(SkillExecutionEvent::MessageEnd {
+                    .send(SkillEvent::MessageEnd {
                         payload: json!(null),
-                    }))
+                    })
                     .await
                     .unwrap();
                 Ok(())
