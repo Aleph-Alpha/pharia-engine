@@ -11,7 +11,7 @@ use crate::{
     inference::{ChatEvent, ChatParams, ChatRequest, Message},
     namespace_watcher::Namespace,
     skill_runtime::StreamEvent,
-    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillPath},
+    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillPath},
 };
 
 /// If the path designates a hardcoded skill, return it.
@@ -56,21 +56,24 @@ impl Skill for SkillHello {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
-        sender: mpsc::Sender<StreamEvent>,
+        sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
-        sender.send(StreamEvent::MessageBegin).await.unwrap();
+        sender
+            .send(SkillEvent(StreamEvent::MessageBegin))
+            .await
+            .unwrap();
         for c in "Hello".chars() {
             sender
-                .send(StreamEvent::MessageAppend {
+                .send(SkillEvent(StreamEvent::MessageAppend {
                     text: c.to_string(),
-                })
+                }))
                 .await
                 .unwrap();
         }
         sender
-            .send(StreamEvent::MessageEnd {
+            .send(SkillEvent(StreamEvent::MessageEnd {
                 payload: json!(null),
-            })
+            }))
             .await
             .unwrap();
         Ok(())
@@ -101,7 +104,7 @@ impl Skill for SkillSaboteur {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
-        _sender: mpsc::Sender<StreamEvent>,
+        _sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
         Err(SkillError::UserCode("Skill is a saboteur".to_owned()))
     }
@@ -131,7 +134,7 @@ impl Skill for SkillTellMeAJoke {
         _engine: &Engine,
         mut ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
-        sender: mpsc::Sender<StreamEvent>,
+        sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
         let request = ChatRequest {
             model: "llama-3.1-8b-instruct".to_owned(),
@@ -161,7 +164,7 @@ impl Skill for SkillTellMeAJoke {
                 ChatEvent::Usage { .. } => None,
             };
             if let Some(event) = event {
-                drop(sender.send(event).await);
+                drop(sender.send(SkillEvent(event)).await);
             }
         }
         ctx.chat_stream_drop(stream_id).await;

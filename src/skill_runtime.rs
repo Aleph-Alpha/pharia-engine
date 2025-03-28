@@ -605,7 +605,7 @@ pub mod tests {
         namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
-        skills::{AnySkillManifest, Skill},
+        skills::{AnySkillManifest, Skill, SkillEvent},
     };
     use metrics::Label;
     use metrics_util::debugging::{DebugValue, DebuggingRecorder, Snapshot};
@@ -730,7 +730,7 @@ pub mod tests {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
-                _mpsc: mpsc::Sender<StreamEvent>,
+                _mpsc: mpsc::Sender<SkillEvent>,
             ) -> Result<(), SkillError> {
                 panic!("Dummy message stream implementation of Assert concurrency skill")
             }
@@ -961,7 +961,7 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
-            _sender: mpsc::Sender<StreamEvent>,
+            _sender: mpsc::Sender<SkillEvent>,
         ) -> Result<(), SkillError> {
             Err(SkillError::IsFunction)
         }

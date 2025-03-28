@@ -314,7 +314,7 @@ pub trait Skill: Send + Sync {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
-        sender: mpsc::Sender<StreamEvent>,
+        sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError>;
 }
 
@@ -619,6 +619,13 @@ fn pooling_allocator_is_supported() -> bool {
     });
     *USE_POOLING
 }
+
+/// A event emitted by the buisness logic living in the skill. As oppossed to an event emitted by
+/// executing the skill. The difference is that the former can not contain runtime errors, and is
+/// not checked yet for invalid state transitions. Example of invalid state transition would be
+/// starting a message with end rather than start.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SkillEvent(pub StreamEvent);
 
 #[cfg(test)]
 pub mod tests {
@@ -1011,13 +1018,13 @@ pub mod tests {
         assert_eq!(
             events,
             vec![
-                StreamEvent::MessageBegin,
-                StreamEvent::MessageAppend {
+                SkillEvent(StreamEvent::MessageBegin),
+                SkillEvent(StreamEvent::MessageAppend {
                     text: "Homer".to_owned()
-                },
-                StreamEvent::MessageEnd {
+                }),
+                SkillEvent(StreamEvent::MessageEnd {
                     payload: json!("FinishReason::Stop")
-                }
+                })
             ]
         );
     }
@@ -1196,7 +1203,7 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
-            _sender: mpsc::Sender<StreamEvent>,
+            _sender: mpsc::Sender<SkillEvent>,
         ) -> Result<(), SkillError> {
             panic!("I am a dummy Skill")
         }

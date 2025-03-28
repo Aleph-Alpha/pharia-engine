@@ -8,10 +8,10 @@ use wasmtime::component::{Resource, bindgen};
 use crate::{
     csi::CsiForSkills,
     skill_runtime::StreamEvent,
-    skills::{AnySkillManifest, Engine, LinkedCtx, SkillError},
+    skills::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent},
 };
 
-pub type StreamOutput = mpsc::Sender<StreamEvent>;
+pub type StreamOutput = mpsc::Sender<SkillEvent>;
 
 bindgen!({
     world: "message-stream-skill",
@@ -51,7 +51,7 @@ impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
-        sender: mpsc::Sender<StreamEvent>,
+        sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
         let mut linked_ctx = LinkedCtx::new(ctx);
         let stream_output = linked_ctx
@@ -106,7 +106,7 @@ impl HostStreamOutput for LinkedCtx {
                 },
             },
         };
-        drop(sender.send(event).await);
+        drop(sender.send(SkillEvent(event)).await);
     }
 
     async fn drop(&mut self, output: Resource<StreamOutput>) -> anyhow::Result<()> {
