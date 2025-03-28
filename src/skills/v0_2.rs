@@ -14,10 +14,9 @@ use crate::{
     inference,
     language_selection::{self, SelectLanguageRequest},
     search::{self, SearchRequest},
-    skill_runtime::StreamEvent,
 };
 
-use super::{AnySkillManifest, Engine, LinkedCtx, SkillError};
+use super::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent};
 
 bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true });
 
@@ -74,7 +73,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
-        _sender: mpsc::Sender<StreamEvent>,
+        _sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
         Err(SkillError::IsFunction)
     }

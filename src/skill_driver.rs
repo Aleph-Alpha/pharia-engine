@@ -18,7 +18,7 @@ use crate::{
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skill_runtime::{SkillExecutionError, StreamEvent},
-    skills::{AnySkillManifest, Engine, Skill},
+    skills::{AnySkillManifest, Engine, Skill, SkillEvent},
 };
 
 pub struct SkillDriver {
@@ -50,7 +50,7 @@ impl SkillDriver {
 
         let result = loop {
             select! {
-                Some(event) = recv_inner.recv() => {
+                Some(SkillEvent(event)) = recv_inner.recv() => {
                     if let StreamEvent::Error(message) = event {
                         break Err(SkillExecutionError::UserCode(message));
                     }
@@ -63,7 +63,7 @@ impl SkillDriver {
 
         // In case the skill invocation finishes faster than we could extract the last event. I.e.
         // the event is placed in the channel, yet the receiver did not pick it up yet.
-        if let Ok(event) = recv_inner.try_recv() {
+        if let Ok(SkillEvent(event)) = recv_inner.try_recv() {
             sender.send(event).await.unwrap();
         }
 
@@ -611,7 +611,7 @@ mod test {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
-                _sender: mpsc::Sender<StreamEvent>,
+                _sender: mpsc::Sender<SkillEvent>,
             ) -> Result<(), SkillError> {
                 unreachable!("This won't be invoked during the test")
             }
@@ -673,7 +673,7 @@ mod test {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
-                _sender: mpsc::Sender<StreamEvent>,
+                _sender: mpsc::Sender<SkillEvent>,
             ) -> Result<(), SkillError> {
                 panic!("Dummy message stream implementation of SkillDoubleUsingExplain")
             }
@@ -759,12 +759,12 @@ mod test {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
-                sender: mpsc::Sender<StreamEvent>,
+                sender: mpsc::Sender<SkillEvent>,
             ) -> Result<(), SkillError> {
                 sender
-                    .send(StreamEvent::MessageEnd {
+                    .send(SkillEvent(StreamEvent::MessageEnd {
                         payload: json!(null),
-                    })
+                    }))
                     .await
                     .unwrap();
                 Ok(())
@@ -840,7 +840,7 @@ mod test {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
-            _sender: mpsc::Sender<StreamEvent>,
+            _sender: mpsc::Sender<SkillEvent>,
         ) -> Result<(), SkillError> {
             Err(SkillError::IsFunction)
         }

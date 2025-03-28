@@ -6,8 +6,7 @@ use wasmtime::component::bindgen;
 
 use crate::{
     csi::CsiForSkills,
-    skill_runtime::StreamEvent,
-    skills::{AnySkillManifest, Engine, LinkedCtx, Signature, SkillError},
+    skills::{AnySkillManifest, Engine, LinkedCtx, Signature, SkillError, SkillEvent},
 };
 
 bindgen!({
@@ -117,7 +116,7 @@ impl crate::skills::Skill for SkillPre<LinkedCtx> {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
-        _sender: mpsc::Sender<StreamEvent>,
+        _sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
         Err(SkillError::IsFunction)
     }
