@@ -202,7 +202,10 @@ where
             get(skill_metadata),
         )
         .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
-        .route("/v1/skills/{namespace}/{name}/stream", post(stream_skill))
+        .route(
+            "/v1/skills/{namespace}/{name}/message-stream",
+            post(message_stream_skill),
+        )
         .merge(csi_shell::http())
         // Keep for backwards compatibility
         .route("/skills", get(skills))
@@ -340,7 +343,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, skills, run_skill, skill_wit),
+    paths(serve_docs, skills, run_skill, message_stream_skill, skill_wit),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -353,7 +356,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, skills, run_skill, stream_skill, skill_wit, skill_metadata),
+    paths(serve_docs, skills, run_skill, message_stream_skill, skill_wit, skill_metadata),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -519,8 +522,8 @@ where
 /// Stream from a Skill in the Kernel from one of the available repositories.
 #[utoipa::path(
     post,
-    operation_id = "stream_skill",
-    path = "/v1/skills/{namespace}/{name}/stream",
+    operation_id = "message_stream_skill",
+    path = "/v1/skills/{namespace}/{name}/message-stream",
     request_body(
         content_type = "application/json",
         description = "The expected input for the skill in JSON format.",
@@ -535,7 +538,7 @@ where
             content(("text/event-stream", example = ""))),
         ),
 )]
-async fn stream_skill<R>(
+async fn message_stream_skill<R>(
     State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
     bearer: TypedHeader<Authorization<Bearer>>,
     Path((namespace, name)): Path<(Namespace, String)>,
@@ -1367,7 +1370,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .header(AUTHORIZATION, auth_value)
-                    .uri("/v1/skills/local/hello/stream")
+                    .uri("/v1/skills/local/hello/message-stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
             )
@@ -1417,7 +1420,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
                     .header(AUTHORIZATION, auth_value)
-                    .uri("/v1/skills/local/saboteur/stream")
+                    .uri("/v1/skills/local/saboteur/message-stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
             )

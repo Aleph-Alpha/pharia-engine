@@ -231,7 +231,9 @@ pub enum SkillExecutionError {
         "The skill is designed to be executed as a function. Please invoke it via the /run endpoint."
     )]
     IsFunction,
-    #[error("The skill is designed to stream output. Please invoke it via the /stream endpoint.")]
+    #[error(
+        "The skill is designed to stream output. Please invoke it via the /message-stream endpoint."
+    )]
     IsMessageStream,
 }
 
