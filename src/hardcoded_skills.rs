@@ -10,7 +10,7 @@ use crate::{
     csi::CsiForSkills,
     inference::{ChatEvent, ChatParams, ChatRequest, Message},
     namespace_watcher::Namespace,
-    skill_runtime::StreamEvent,
+    skill_runtime::SkillExecutionEvent,
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillPath},
 };
 
@@ -59,19 +59,19 @@ impl Skill for SkillHello {
         sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
         sender
-            .send(SkillEvent(StreamEvent::MessageBegin))
+            .send(SkillEvent(SkillExecutionEvent::MessageBegin))
             .await
             .unwrap();
         for c in "Hello".chars() {
             sender
-                .send(SkillEvent(StreamEvent::MessageAppend {
+                .send(SkillEvent(SkillExecutionEvent::MessageAppend {
                     text: c.to_string(),
                 }))
                 .await
                 .unwrap();
         }
         sender
-            .send(SkillEvent(StreamEvent::MessageEnd {
+            .send(SkillEvent(SkillExecutionEvent::MessageEnd {
                 payload: json!(null),
             }))
             .await
@@ -154,11 +154,11 @@ impl Skill for SkillTellMeAJoke {
         let stream_id = ctx.chat_stream_new(request).await;
         while let Some(event) = ctx.chat_stream_next(&stream_id).await {
             let event = match event {
-                ChatEvent::MessageBegin { .. } => Some(StreamEvent::MessageBegin),
+                ChatEvent::MessageBegin { .. } => Some(SkillExecutionEvent::MessageBegin),
                 ChatEvent::MessageAppend { content, .. } => {
-                    Some(StreamEvent::MessageAppend { text: content })
+                    Some(SkillExecutionEvent::MessageAppend { text: content })
                 }
-                ChatEvent::MessageEnd { finish_reason } => Some(StreamEvent::MessageEnd {
+                ChatEvent::MessageEnd { finish_reason } => Some(SkillExecutionEvent::MessageEnd {
                     payload: json!(format!("{finish_reason:?}")),
                 }),
                 ChatEvent::Usage { .. } => None,

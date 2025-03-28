@@ -29,7 +29,7 @@ use wit_parser::{
     decoding::{DecodedWasm, decode},
 };
 
-use crate::{csi::CsiForSkills, namespace_watcher::Namespace, skill_runtime::StreamEvent};
+use crate::{csi::CsiForSkills, namespace_watcher::Namespace, skill_runtime::SkillExecutionEvent};
 
 pub use self::v0_3::SkillMetadataV0_3;
 
@@ -625,7 +625,7 @@ fn pooling_allocator_is_supported() -> bool {
 /// not checked yet for invalid state transitions. Example of invalid state transition would be
 /// starting a message with end rather than start.
 #[derive(Debug, PartialEq, Eq)]
-pub struct SkillEvent(pub StreamEvent);
+pub struct SkillEvent(pub SkillExecutionEvent);
 
 #[cfg(test)]
 pub mod tests {
@@ -1018,11 +1018,11 @@ pub mod tests {
         assert_eq!(
             events,
             vec![
-                SkillEvent(StreamEvent::MessageBegin),
-                SkillEvent(StreamEvent::MessageAppend {
+                SkillEvent(SkillExecutionEvent::MessageBegin),
+                SkillEvent(SkillExecutionEvent::MessageAppend {
                     text: "Homer".to_owned()
                 }),
-                SkillEvent(StreamEvent::MessageEnd {
+                SkillEvent(SkillExecutionEvent::MessageEnd {
                     payload: json!("FinishReason::Stop")
                 })
             ]

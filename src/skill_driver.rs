@@ -17,7 +17,7 @@ use crate::{
     },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    skill_runtime::{SkillExecutionError, StreamEvent},
+    skill_runtime::{SkillExecutionError, SkillExecutionEvent},
     skills::{AnySkillManifest, Engine, Skill, SkillEvent},
 };
 
@@ -38,7 +38,7 @@ impl SkillDriver {
         input: Value,
         csi: impl Csi + Send + Sync + 'static,
         api_token: String,
-        sender: mpsc::Sender<StreamEvent>,
+        sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
         let (send_rt_err, mut recv_rt_err) = oneshot::channel();
         let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi, api_token));
@@ -51,7 +51,7 @@ impl SkillDriver {
         let result = loop {
             select! {
                 Some(SkillEvent(event)) = recv_inner.recv() => {
-                    if let StreamEvent::Error(message) = event {
+                    if let SkillExecutionEvent::Error(message) = event {
                         break Err(SkillExecutionError::UserCode(message));
                     }
                     sender.send(event).await.unwrap();
@@ -69,7 +69,7 @@ impl SkillDriver {
 
         if let Err(err) = &result {
             sender
-                .send(StreamEvent::Error(err.to_string()))
+                .send(SkillExecutionEvent::Error(err.to_string()))
                 .await
                 .unwrap();
         }
@@ -762,7 +762,7 @@ mod test {
                 sender: mpsc::Sender<SkillEvent>,
             ) -> Result<(), SkillError> {
                 sender
-                    .send(SkillEvent(StreamEvent::MessageEnd {
+                    .send(SkillEvent(SkillExecutionEvent::MessageEnd {
                         payload: json!(null),
                     }))
                     .await
@@ -790,7 +790,7 @@ mod test {
 
         // Then
         assert_eq!(
-            StreamEvent::Error("Test error".to_owned()),
+            SkillExecutionEvent::Error("Test error".to_owned()),
             recv.recv().await.unwrap()
         );
     }
