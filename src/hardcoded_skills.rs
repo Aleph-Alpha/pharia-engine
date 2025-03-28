@@ -10,7 +10,6 @@ use crate::{
     csi::CsiForSkills,
     inference::{ChatEvent, ChatParams, ChatRequest, Message},
     namespace_watcher::Namespace,
-    skill_runtime::SkillExecutionEvent,
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillPath},
 };
 
@@ -58,22 +57,19 @@ impl Skill for SkillHello {
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
-        sender
-            .send(SkillEvent(SkillExecutionEvent::MessageBegin))
-            .await
-            .unwrap();
+        sender.send(SkillEvent::MessageBegin).await.unwrap();
         for c in "Hello".chars() {
             sender
-                .send(SkillEvent(SkillExecutionEvent::MessageAppend {
+                .send(SkillEvent::MessageAppend {
                     text: c.to_string(),
-                }))
+                })
                 .await
                 .unwrap();
         }
         sender
-            .send(SkillEvent(SkillExecutionEvent::MessageEnd {
+            .send(SkillEvent::MessageEnd {
                 payload: json!(null),
-            }))
+            })
             .await
             .unwrap();
         Ok(())
@@ -154,17 +150,17 @@ impl Skill for SkillTellMeAJoke {
         let stream_id = ctx.chat_stream_new(request).await;
         while let Some(event) = ctx.chat_stream_next(&stream_id).await {
             let event = match event {
-                ChatEvent::MessageBegin { .. } => Some(SkillExecutionEvent::MessageBegin),
+                ChatEvent::MessageBegin { .. } => Some(SkillEvent::MessageBegin),
                 ChatEvent::MessageAppend { content, .. } => {
-                    Some(SkillExecutionEvent::MessageAppend { text: content })
+                    Some(SkillEvent::MessageAppend { text: content })
                 }
-                ChatEvent::MessageEnd { finish_reason } => Some(SkillExecutionEvent::MessageEnd {
+                ChatEvent::MessageEnd { finish_reason } => Some(SkillEvent::MessageEnd {
                     payload: json!(format!("{finish_reason:?}")),
                 }),
                 ChatEvent::Usage { .. } => None,
             };
             if let Some(event) = event {
-                drop(sender.send(SkillEvent(event)).await);
+                drop(sender.send(event).await);
             }
         }
         ctx.chat_stream_drop(stream_id).await;

@@ -7,7 +7,6 @@ use wasmtime::component::{Resource, bindgen};
 
 use crate::{
     csi::CsiForSkills,
-    skill_runtime::SkillExecutionEvent,
     skills::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent},
 };
 
@@ -94,19 +93,21 @@ impl HostStreamOutput for LinkedCtx {
             .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
             .expect("Failed to push stream to resource table");
         let event = match item {
-            MessageItem::MessageBegin(_) => SkillExecutionEvent::MessageBegin,
-            MessageItem::MessageAppend(text) => SkillExecutionEvent::MessageAppend { text },
+            MessageItem::MessageBegin(_) => SkillEvent::MessageBegin,
+            MessageItem::MessageAppend(text) => SkillEvent::MessageAppend { text },
             MessageItem::MessageEnd(payload) => match payload {
                 Some(payload) => match serde_json::from_slice(&payload) {
-                    Ok(payload) => SkillExecutionEvent::MessageEnd { payload },
-                    Err(e) => SkillExecutionEvent::Error(e.to_string()),
+                    Ok(payload) => SkillEvent::MessageEnd { payload },
+                    Err(e) => SkillEvent::InvalidBytesInPayload {
+                        message: e.to_string(),
+                    },
                 },
-                None => SkillExecutionEvent::MessageEnd {
+                None => SkillEvent::MessageEnd {
                     payload: Value::Null,
                 },
             },
         };
-        drop(sender.send(SkillEvent(event)).await);
+        drop(sender.send(event).await);
     }
 
     async fn drop(&mut self, output: Resource<StreamOutput>) -> anyhow::Result<()> {
