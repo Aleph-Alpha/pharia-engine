@@ -630,7 +630,7 @@ async fn invoke_function_as_stream() {
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
-            "http://127.0.0.1:{}/v1/skills/local/greet/stream",
+            "http://127.0.0.1:{}/v1/skills/local/greet/message-stream",
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
