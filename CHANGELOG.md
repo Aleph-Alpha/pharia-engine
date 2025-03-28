@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.8](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.7...v0.11.8)
+
+### Features
+
+- Promote /message-stream endpoint to stable - ([edf5354](https://github.com/Aleph-Alpha/pharia-kernel/commit/edf53544e7c29436ddd30a257e8d2edc15217b59))
+- Promote streaming features from unstable to stable - ([edcb5fa](https://github.com/Aleph-Alpha/pharia-kernel/commit/edcb5fa42226c542ba3aa00f49584dec2363570d))
+
+### Builds
+
+- *(deps)* Bump the minor group with 3 updates - ([677ad11](https://github.com/Aleph-Alpha/pharia-kernel/commit/677ad114eb6275dfc86faa3f02818c8271f0bed5))
+
+
 ## [0.11.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.6...v0.11.7)
 
 ### Features
