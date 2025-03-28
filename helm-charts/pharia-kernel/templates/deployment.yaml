@@ -74,6 +74,10 @@ spec:
             - name: OTEL_ENDPOINT
               value: {{ .Values.openTelemetryEndpoint | quote }}
             {{- end }}
+            {{- if .Values.global.phariaAiFeatureSet }}
+            - name: PHARIA_AI_FEATURE_SET
+              value: {{ .Values.global.phariaAiFeatureSet | quote }}
+            {{- end }}
             {{- if .Values.authorizationAddress }}
             - name: AUTHORIZATION_URL
               value: {{ .Values.authorizationAddress | quote }}
