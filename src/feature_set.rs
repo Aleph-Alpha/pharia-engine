@@ -18,6 +18,12 @@ pub enum FeatureSet {
     Stable(u32),
 }
 
+impl Default for FeatureSet {
+    fn default() -> Self {
+        PRODUCTION_FEATURE_SET
+    }
+}
+
 impl FromStr for FeatureSet {
     type Err = Infallible;
 
@@ -31,7 +37,7 @@ impl FromStr for FeatureSet {
                 "Failed to parse feature set: '{}. Falling back to stable feature set.",
                 s
             );
-            Ok(PRODUCTION_FEATURE_SET)
+            Ok(Self::default())
         }
     }
 }
