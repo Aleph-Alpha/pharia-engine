@@ -50,12 +50,19 @@ impl SkillDriver {
 
         let result = loop {
             select! {
+                // Controls the polling order. We want to ensure that we poll runtime errors first
+                // than messages, and finally the result of the skill handler. It is suitable to
+                // check for the runtime errors first, since we would then error out and terminate
+                // anyways. We can not rely on it for correctness, but we poll the before the
+                // receiver of events before the handler.
+                biased;
+
+                Ok(error) = &mut recv_rt_err => break Err(SkillExecutionError::RuntimeError(error)),
                 Some(event) = recv_inner.recv() => {
                     let event = translate_to_execution_event(event);
                     sender.send(event).await.unwrap();
                 }
                 result = &mut execute_skill => break result.map_err(Into::into),
-                Ok(error) = &mut recv_rt_err => break Err(SkillExecutionError::RuntimeError(error))
             }
         };
 
