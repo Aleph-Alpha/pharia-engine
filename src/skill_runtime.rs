@@ -351,7 +351,10 @@ fn record_skill_metrics<T>(
             | SkillExecutionError::InvalidOutput(_)
             | SkillExecutionError::MisconfiguredNamespace { .. }
             | SkillExecutionError::IsFunction
-            | SkillExecutionError::IsMessageStream,
+            | SkillExecutionError::IsMessageStream
+            | SkillExecutionError::MessageAppendWithoutMessageBegin
+            | SkillExecutionError::MessageEndWithoutMessageBegin
+            | SkillExecutionError::MessageBeginWhileMessageActive,
         ) => "logic_error",
         Err(SkillExecutionError::RuntimeError(_)) => "runtime_error",
     };

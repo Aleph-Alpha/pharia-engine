@@ -291,6 +291,9 @@ impl From<SkillExecutionError> for HttpError {
             SkillExecutionError::MisconfiguredNamespace { .. }
             | SkillExecutionError::CsiUseFromMetadata
             | SkillExecutionError::InvalidOutput(_)
+            | SkillExecutionError::MessageAppendWithoutMessageBegin
+            | SkillExecutionError::MessageBeginWhileMessageActive
+            | SkillExecutionError::MessageEndWithoutMessageBegin
             | SkillExecutionError::RuntimeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             // 400 for every error we see an error on the client side of HTTP
             SkillExecutionError::UserCode(_)
