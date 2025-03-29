@@ -3,6 +3,7 @@ use std::{collections::HashMap, future::pending, sync::Arc};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use serde_json::Value;
+use thiserror::Error;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -16,9 +17,9 @@ use crate::{
         Explanation, ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
+    namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    skill_runtime::SkillExecutionError,
-    skills::{AnySkillManifest, Engine, Skill, SkillEvent},
+    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent},
 };
 
 pub struct SkillDriver {
@@ -58,9 +59,12 @@ impl SkillDriver {
                 biased;
 
                 Ok(error) = &mut recv_rt_err => break Err(SkillExecutionError::RuntimeError(error)),
-                Some(event) = recv_inner.recv() => {
-                    let event = translate_to_execution_event(event);
-                    sender.send(event).await.unwrap();
+                Some(skill_event) = recv_inner.recv() => {
+                    let (execution_event, maybe_error) = translate_to_execution_event(skill_event);
+                    sender.send(execution_event).await.unwrap();
+                    if let Some(error) = maybe_error {
+                        break Err(error);
+                    }
                 }
                 result = &mut execute_skill => break result.map_err(Into::into),
             }
@@ -68,9 +72,12 @@ impl SkillDriver {
 
         // In case the skill invocation finishes faster than we could extract the last event. I.e.
         // the event is placed in the channel, yet the receiver did not pick it up yet.
-        if let Ok(event) = recv_inner.try_recv() {
-            let event = translate_to_execution_event(event);
-            sender.send(event).await.unwrap();
+        if let Ok(skill_event) = recv_inner.try_recv() {
+            let (execution_event, maybe_error) = translate_to_execution_event(skill_event);
+            sender.send(execution_event).await.unwrap();
+            if let Some(error) = maybe_error {
+                return Err(error);
+            }
         }
 
         if let Err(err) = &result {
@@ -421,17 +428,160 @@ pub enum SkillExecutionEvent {
     Error(String),
 }
 
-fn translate_to_execution_event(source: SkillEvent) -> SkillExecutionEvent {
+/// Output the associated [`SkillExecutionEvent`] for a given [`SkillEvent`]. In case the
+/// [`SkillEvent`] indicates an error, we also return the [`SkillExecutionError`]. The semantics for
+/// this is to log the error and stop processing the stream. Technically the `SkillExecutionEvent`
+/// would contain the information of the error as well, but due to errors not being [`Clone`] we
+/// just need two instances of it. One for the operator, and one for the user.
+fn translate_to_execution_event(
+    source: SkillEvent,
+) -> (SkillExecutionEvent, Option<SkillExecutionError>) {
     match source {
-        SkillEvent::MessageBegin => SkillExecutionEvent::MessageBegin,
-        SkillEvent::MessageEnd { payload } => SkillExecutionEvent::MessageEnd { payload },
-        SkillEvent::MessageAppend { text } => SkillExecutionEvent::MessageAppend { text },
-        SkillEvent::InvalidBytesInPayload { message } => SkillExecutionEvent::Error(message),
+        SkillEvent::MessageBegin => (SkillExecutionEvent::MessageBegin, None),
+        SkillEvent::MessageEnd { payload } => (SkillExecutionEvent::MessageEnd { payload }, None),
+        SkillEvent::MessageAppend { text } => (SkillExecutionEvent::MessageAppend { text }, None),
+        SkillEvent::InvalidBytesInPayload { message } => (
+            SkillExecutionEvent::Error(message.clone()),
+            Some(SkillExecutionError::InvalidOutput(message)),
+        ),
+    }
+}
+
+/// Errors which may prevent a skill from executing to completion successfully.
+#[derive(Debug, Error)]
+pub enum SkillExecutionError {
+    #[error(
+        "The metadata function of the invoked skill is bugged. It is forbidden to invoke any CSI \
+        functions from the metadata function, yet the skill does precisely this."
+    )]
+    CsiUseFromMetadata,
+    /// A skill name is not mentioned in the namespace and therfore it is not served. This is a
+    /// logic error. Yet it does not originate in the skill code itself. It could be an error in the
+    /// request by the user, or a missing configuration at the side of the skill developer.
+    #[error(
+        "Sorry, We could not find the skill you requested in its namespace. This can have three \
+        causes:\n\n\
+        1. You send the wrong skill name.\n\
+        2. You send the wrong namespace.\n\
+        3. The skill is not configured in the namespace you requested. You may want to check the \
+        namespace configuration."
+    )]
+    SkillNotConfigured,
+    /// Skill Logic errors are logic errors which are reported by the skill code itself. These may
+    /// be due to bugs in the skill code, or invalid user input, we will not be able to tell. For
+    /// the operater these are both user errors. The skill user and developer are often the same
+    /// person so in either case we do well to report it in our answer.
+    #[error(
+        "The skill you called responded with an error. Maybe you should check your input, if it \
+        seems to be correct you may want to contact the skill developer. Error reported by Skill:\n\
+        \n{0}"
+    )]
+    UserCode(String),
+    /// Skills are still responsible for parsing the input bytes. Our SDK emits a specific error if
+    /// the input is not interpretable.
+    #[error("The skill had trouble interpreting the input:\n\n{0}")]
+    InvalidInput(String),
+    #[error(
+        "The skill returned an output the Kernel could not interpret. This hints to a bug in the \
+        skill. Please contact its developer. Caused by: \n\n{0}"
+    )]
+    InvalidOutput(String),
+    /// A runtime error is caused by the runtime, i.e. the dependencies and resources we need to be
+    /// available in order execute skills. For us this are mostly the drivers behind the CSI. This
+    /// does not mean that all CSI errors are runtime errors, because the Inference may e.g. be
+    /// available, but the prompt exceeds the maximum length, etc. Yet any error caused by spurious
+    /// network errors, inference being to busy, etc. will fall in this category. For runtime errors
+    /// it is most important to report them to the operator, so they can take action.
+    ///
+    /// For our other **users** we should not forward them transparently, but either just tell them
+    /// something went wrong, or give appropriate context. E.g. whether it was inference or document
+    /// index which caused the error.
+    #[error(
+        "The skill could not be executed to completion, something in our runtime is currently \n\
+        unavailable or misconfigured. You should try again later, if the situation persists you \n\
+        may want to contact the operaters. Original error:\n\n{0}"
+    )]
+    RuntimeError(#[source] anyhow::Error),
+    /// This happens if a configuration for an individual namespace is broken. For the user calling
+    /// the route to execute a skill, we treat this as a runtime, but make sure he gets all the
+    /// context, because it very likely might be the skill developer who misconfigured the
+    /// namespace. For the operater team, operating all of Pharia Kernel we treat this as a logic
+    /// error, because there is nothing wrong about the kernel installion or inference, or network
+    /// or other stuff, which they would be able to fix.
+    #[error(
+        "The skill could not be executed to completion, the namespace '{namespace}' is \
+        misconfigured. If you are the developer who configured the skill, you should probably fix \
+        this error. If you are not, there is nothing you can do, until the developer who maintains \
+        the list of skills to be served, fixes this. Original Syntax error:\n\n\
+        {original_syntax_error}"
+    )]
+    MisconfiguredNamespace {
+        namespace: Namespace,
+        original_syntax_error: String,
+    },
+    #[error(
+        "The skill is designed to be executed as a function. Please invoke it via the /run endpoint."
+    )]
+    IsFunction,
+    #[error(
+        "The skill is designed to stream output. Please invoke it via the /message-stream endpoint."
+    )]
+    IsMessageStream,
+}
+
+impl SkillExecutionError {
+    /// The severity with which this error is reported to the operator.
+    ///
+    /// Anything which is wrong with our runtime (i.e. resources, external services, network, etc.)
+    /// is only fixable by the operator. Therefore we report any failure due to these as errors.
+    /// Anything which is wrong with the skill itself, might not be fixable by the operator, but
+    /// still compromises the functionality of the system. Also in some situtations the operator
+    /// might be the skill developer, or at least on the same team. Therefore we report these as
+    /// warnings.
+    /// Anything which can be caused by invalid user input over our HTTP interface, might neither be
+    /// in the power of operator or developer to fix. We report these as info, in order to be not to
+    /// noisy.
+    pub fn tracing_level(&self) -> tracing::Level {
+        use tracing::Level;
+        match self {
+            // We give this the error severity, because this hints to a shortcoming in the
+            // envirorment. The operator may need to act.
+            SkillExecutionError::RuntimeError(_) => Level::ERROR,
+            // These are bugs in the skill code, or their configuration.
+            SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::InvalidOutput(_)
+            | SkillExecutionError::MisconfiguredNamespace { .. } => Level::WARN,
+            // This could be a wrong configuration, but also just mistying a skill name. So we log
+            // these only as info.
+            SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::InvalidInput(_)
+            | SkillExecutionError::IsMessageStream
+            | SkillExecutionError::IsFunction
+            // Some of these are bugs, but as long as we do not strictly distinguish those from
+            // invalid input, let's reduce false positives and report them as info.
+            | SkillExecutionError::UserCode(..) => Level::INFO,
+        }
+    }
+}
+
+impl From<SkillError> for SkillExecutionError {
+    fn from(source: SkillError) -> Self {
+        match source {
+            SkillError::Any(error) => Self::UserCode(error.to_string()),
+            SkillError::InvalidInput(error) => Self::InvalidInput(error),
+            SkillError::UserCode(error) => Self::UserCode(error),
+            SkillError::InvalidOutput(error) => Self::InvalidOutput(error),
+            SkillError::RuntimeError(error) => SkillExecutionError::RuntimeError(error),
+            SkillError::IsFunction => SkillExecutionError::IsFunction,
+            SkillError::IsMessageStream => SkillExecutionError::IsMessageStream,
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::panic;
+
     use super::*;
     use crate::{
         chunking::ChunkParams,
@@ -766,6 +916,37 @@ mod test {
     }
 
     #[tokio::test]
+    async fn should_translate_json_errors_emitted_by_message_stream() {
+        // Given a skill that emits a JSON error
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let driver = SkillDriver::new(engine);
+
+        // When
+        let skill = Arc::new(SkillSaboteurInvalidMessageOutput);
+        let (send, mut recv) = mpsc::channel(1);
+        let result = driver
+            .run_message_stream(
+                skill.clone(),
+                json!({}),
+                CsiDummy,
+                "Dummy Token".to_owned(),
+                send,
+            )
+            .await;
+
+        // Then
+        assert_eq!(
+            SkillExecutionEvent::Error("Test error parsing JSON".to_owned()),
+            recv.recv().await.unwrap()
+        );
+
+        assert!(matches!(
+            result,
+            Err(SkillExecutionError::InvalidOutput(..))
+        ));
+    }
+
+    #[tokio::test]
     #[ignore = "not implemented yet"]
     async fn should_insert_error_if_message_stream_emits_message_end_without_message_start() {
         // Given a skill that emits a message_end without a message_start
@@ -879,6 +1060,45 @@ mod test {
             _sender: mpsc::Sender<SkillEvent>,
         ) -> Result<(), SkillError> {
             Err(SkillError::IsFunction)
+        }
+    }
+
+    /// Test double emmiting a syntax error in the message stream.
+    struct SkillSaboteurInvalidMessageOutput;
+
+    #[async_trait]
+    impl Skill for SkillSaboteurInvalidMessageOutput {
+        async fn run_as_function(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> Result<Value, SkillError> {
+            panic!("Dummy, not invoked in test")
+        }
+
+        async fn manifest(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+        ) -> Result<AnySkillManifest, SkillError> {
+            panic!("Dummy, not invoked in test")
+        }
+
+        async fn run_as_message_stream(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+            sender: mpsc::Sender<SkillEvent>,
+        ) -> Result<(), SkillError> {
+            sender
+                .send(SkillEvent::InvalidBytesInPayload {
+                    message: "Test error parsing JSON".to_owned(),
+                })
+                .await
+                .unwrap();
+            Ok(())
         }
     }
 }
