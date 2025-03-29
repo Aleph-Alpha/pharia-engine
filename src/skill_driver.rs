@@ -49,6 +49,8 @@ impl SkillDriver {
         let mut execute_skill =
             skill.run_as_message_stream(&self.engine, csi_for_skills, input, send_inner);
 
+        let mut translator = EventTranslator::new();
+
         let result = loop {
             select! {
                 // Controls the polling order. We want to ensure that we poll runtime errors first
@@ -60,7 +62,8 @@ impl SkillDriver {
 
                 Ok(error) = &mut recv_rt_err => break Err(SkillExecutionError::RuntimeError(error)),
                 Some(skill_event) = recv_inner.recv() => {
-                    let (execution_event, maybe_error) = translate_to_execution_event(skill_event);
+                    let (execution_event, maybe_error) =
+                        translator.translate_to_execution_event(skill_event);
                     sender.send(execution_event).await.unwrap();
                     if let Some(error) = maybe_error {
                         break Err(error);
@@ -73,7 +76,8 @@ impl SkillDriver {
         // In case the skill invocation finishes faster than we could extract the last event. I.e.
         // the event is placed in the channel, yet the receiver did not pick it up yet.
         if let Ok(skill_event) = recv_inner.try_recv() {
-            let (execution_event, maybe_error) = translate_to_execution_event(skill_event);
+            let (execution_event, maybe_error) =
+                translator.translate_to_execution_event(skill_event);
             sender.send(execution_event).await.unwrap();
             if let Some(error) = maybe_error {
                 return Err(error);
@@ -428,22 +432,66 @@ pub enum SkillExecutionEvent {
     Error(String),
 }
 
-/// Output the associated [`SkillExecutionEvent`] for a given [`SkillEvent`]. In case the
-/// [`SkillEvent`] indicates an error, we also return the [`SkillExecutionError`]. The semantics for
-/// this is to log the error and stop processing the stream. Technically the `SkillExecutionEvent`
-/// would contain the information of the error as well, but due to errors not being [`Clone`] we
-/// just need two instances of it. One for the operator, and one for the user.
-fn translate_to_execution_event(
-    source: SkillEvent,
-) -> (SkillExecutionEvent, Option<SkillExecutionError>) {
-    match source {
-        SkillEvent::MessageBegin => (SkillExecutionEvent::MessageBegin, None),
-        SkillEvent::MessageEnd { payload } => (SkillExecutionEvent::MessageEnd { payload }, None),
-        SkillEvent::MessageAppend { text } => (SkillExecutionEvent::MessageAppend { text }, None),
-        SkillEvent::InvalidBytesInPayload { message } => (
-            SkillExecutionEvent::Error(message.clone()),
-            Some(SkillExecutionError::InvalidOutput(message)),
-        ),
+/// Translates [`SkillEvent`]s emitted by skills to [`SkillExecutionEvent`]s. It also keeps track
+/// of message begin and end in order to detect invalid state transitions.
+struct EventTranslator {
+    /// `true` if the stream is in between a begin and end message event. A message is active after
+    /// a begin and becommes inactive after an end event.
+    message_active: bool,
+}
+
+impl EventTranslator {
+    fn new() -> Self {
+        Self {
+            message_active: false,
+        }
+    }
+
+    /// Output the associated [`SkillExecutionEvent`] for a given [`SkillEvent`]. In case the
+    /// [`SkillEvent`] indicates an error, we also return the [`SkillExecutionError`]. The semantics
+    /// for this is to log the error and stop processing the stream. Technically the
+    /// [`SkillExecutionEvent`] would contain the information of the error as well, but due to
+    /// errors not being [`Clone`] we just need two instances of it. One for the operator, and one
+    /// for the user.
+    fn translate_to_execution_event(
+        &mut self,
+        source: SkillEvent,
+    ) -> (SkillExecutionEvent, Option<SkillExecutionError>) {
+        match (source, self.message_active) {
+            (SkillEvent::MessageBegin, false) => {
+                self.message_active = true;
+                (SkillExecutionEvent::MessageBegin, None)
+            }
+            (SkillEvent::MessageBegin, true) => (
+                SkillExecutionEvent::Error(
+                    SkillExecutionError::MessageBeginWhileMessageActive.to_string(),
+                ),
+                Some(SkillExecutionError::MessageBeginWhileMessageActive),
+            ),
+            (SkillEvent::MessageEnd { payload }, true) => {
+                self.message_active = false;
+                (SkillExecutionEvent::MessageEnd { payload }, None)
+            }
+            (SkillEvent::MessageEnd { .. }, false) => (
+                SkillExecutionEvent::Error(
+                    SkillExecutionError::MessageEndWithoutMessageBegin.to_string(),
+                ),
+                Some(SkillExecutionError::MessageEndWithoutMessageBegin),
+            ),
+            (SkillEvent::MessageAppend { text }, true) => {
+                (SkillExecutionEvent::MessageAppend { text }, None)
+            }
+            (SkillEvent::MessageAppend { .. }, false) => (
+                SkillExecutionEvent::Error(
+                    SkillExecutionError::MessageAppendWithoutMessageBegin.to_string(),
+                ),
+                Some(SkillExecutionError::MessageAppendWithoutMessageBegin),
+            ),
+            (SkillEvent::InvalidBytesInPayload { message }, _) => (
+                SkillExecutionEvent::Error(message.clone()),
+                Some(SkillExecutionError::InvalidOutput(message)),
+            ),
+        }
     }
 }
 
@@ -486,6 +534,21 @@ pub enum SkillExecutionError {
         skill. Please contact its developer. Caused by: \n\n{0}"
     )]
     InvalidOutput(String),
+    #[error(
+        "The skill inserted a message end into the stream, which has not been preceded by a \
+        message begin. This is a bug in the skill. Please contact its developer."
+    )]
+    MessageEndWithoutMessageBegin,
+    #[error(
+        "The skill inserted a message append into the stream, which has not been preceded by a \
+        message begin. This is a bug in the skill. Please contact its developer."
+    )]
+    MessageAppendWithoutMessageBegin,
+    #[error(
+        "The skill inserted a message begin into while the previous message has not been ended \
+        yet. This is a bug in the skill. Please contact its developer."
+    )]
+    MessageBeginWhileMessageActive,
     /// A runtime error is caused by the runtime, i.e. the dependencies and resources we need to be
     /// available in order execute skills. For us this are mostly the drivers behind the CSI. This
     /// does not mean that all CSI errors are runtime errors, because the Inference may e.g. be
@@ -549,6 +612,9 @@ impl SkillExecutionError {
             SkillExecutionError::RuntimeError(_) => Level::ERROR,
             // These are bugs in the skill code, or their configuration.
             SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::MessageEndWithoutMessageBegin
+            | SkillExecutionError::MessageAppendWithoutMessageBegin
+            | SkillExecutionError::MessageBeginWhileMessageActive
             | SkillExecutionError::InvalidOutput(_)
             | SkillExecutionError::MisconfiguredNamespace { .. } => Level::WARN,
             // This could be a wrong configuration, but also just mistying a skill name. So we log
@@ -947,7 +1013,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore = "not implemented yet"]
     async fn should_insert_error_if_message_stream_emits_message_end_without_message_start() {
         // Given a skill that emits a message_end without a message_start
         struct BuggyStreamingSkill;
@@ -994,7 +1059,7 @@ mod test {
         // When
         let skill = Arc::new(BuggyStreamingSkill);
         let (send, mut recv) = mpsc::channel(1);
-        driver
+        let result = driver
             .run_message_stream(
                 skill.clone(),
                 json!({}),
@@ -1002,14 +1067,21 @@ mod test {
                 "Dummy Token".to_owned(),
                 send,
             )
-            .await
-            .unwrap();
+            .await;
 
         // Then
         assert_eq!(
-            SkillExecutionEvent::Error("Test error".to_owned()),
+            SkillExecutionEvent::Error(
+                "The skill inserted a message end into the stream, which has not been preceded by \
+                a message begin. This is a bug in the skill. Please contact its developer."
+                .to_owned()
+            ),
             recv.recv().await.unwrap()
         );
+        assert!(matches!(
+            result,
+            Err(SkillExecutionError::MessageEndWithoutMessageBegin)
+        ));
     }
 
     /// A test double for a skill. It invokes the csi with a prompt and returns the result.
