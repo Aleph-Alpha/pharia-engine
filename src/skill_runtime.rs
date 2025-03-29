@@ -4,7 +4,6 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde_json::Value;
-use thiserror::Error;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -14,31 +13,16 @@ use tracing::{error, info, warn};
 
 use crate::{
     csi::Csi,
-    namespace_watcher::Namespace,
     skill_driver::SkillDriver,
     skill_store::{SkillStoreApi, SkillStoreError},
-    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillPath},
+    skills::{AnySkillManifest, Engine, Skill, SkillPath},
 };
 
 // It would be nice for users of this module, not to be concerned with the fact that the runtime is
 // using the driver. This may indicate that maybe driver and runtime should be part of the same top
 // level module. For now I decided to leave it like that due to the fact that I am not sure about
 // it. (MK)
-pub use crate::skill_driver::SkillExecutionEvent;
-
-impl From<SkillError> for SkillExecutionError {
-    fn from(source: SkillError) -> Self {
-        match source {
-            SkillError::Any(error) => Self::UserCode(error.to_string()),
-            SkillError::InvalidInput(error) => Self::InvalidInput(error),
-            SkillError::UserCode(error) => Self::UserCode(error),
-            SkillError::InvalidOutput(error) => Self::InvalidOutput(error),
-            SkillError::RuntimeError(error) => SkillExecutionError::RuntimeError(error),
-            SkillError::IsFunction => SkillExecutionError::IsFunction,
-            SkillError::IsMessageStream => SkillExecutionError::IsMessageStream,
-        }
-    }
-}
+pub use crate::skill_driver::{SkillExecutionError, SkillExecutionEvent};
 
 /// An actor which invokes skills concurrently. It is responsible for fetching the skills from the
 /// store. Reporting their results back over the API (the shell should be most intersted in it). It
@@ -158,123 +142,6 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
-    }
-}
-
-/// Errors which may prevent a skill from executing to completion successfully.
-#[derive(Debug, Error)]
-pub enum SkillExecutionError {
-    #[error(
-        "The metadata function of the invoked skill is bugged. It is forbidden to invoke any CSI \
-        functions from the metadata function, yet the skill does precisely this."
-    )]
-    CsiUseFromMetadata,
-    /// A skill name is not mentioned in the namespace and therfore it is not served. This is a
-    /// logic error. Yet it does not originate in the skill code itself. It could be an error in the
-    /// request by the user, or a missing configuration at the side of the skill developer.
-    #[error(
-        "Sorry, We could not find the skill you requested in its namespace. This can have three \
-        causes:\n\n\
-        1. You send the wrong skill name.\n\
-        2. You send the wrong namespace.\n\
-        3. The skill is not configured in the namespace you requested. You may want to check the \
-        namespace configuration."
-    )]
-    SkillNotConfigured,
-    /// Skill Logic errors are logic errors which are reported by the skill code itself. These may
-    /// be due to bugs in the skill code, or invalid user input, we will not be able to tell. For
-    /// the operater these are both user errors. The skill user and developer are often the same
-    /// person so in either case we do well to report it in our answer.
-    #[error(
-        "The skill you called responded with an error. Maybe you should check your input, if it \
-        seems to be correct you may want to contact the skill developer. Error reported by Skill:\n\
-        \n{0}"
-    )]
-    UserCode(String),
-    /// Skills are still responsible for parsing the input bytes. Our SDK emits a specific error if
-    /// the input is not interpretable.
-    #[error("The skill had trouble interpreting the input:\n\n{0}")]
-    InvalidInput(String),
-    #[error(
-        "The skill returned an output the Kernel could not interpret. This hints to a bug in the \
-        skill. Please contact its developer. Caused by: \n\n{0}"
-    )]
-    InvalidOutput(String),
-    /// A runtime error is caused by the runtime, i.e. the dependencies and resources we need to be
-    /// available in order execute skills. For us this are mostly the drivers behind the CSI. This
-    /// does not mean that all CSI errors are runtime errors, because the Inference may e.g. be
-    /// available, but the prompt exceeds the maximum length, etc. Yet any error caused by spurious
-    /// network errors, inference being to busy, etc. will fall in this category. For runtime errors
-    /// it is most important to report them to the operator, so they can take action.
-    ///
-    /// For our other **users** we should not forward them transparently, but either just tell them
-    /// something went wrong, or give appropriate context. E.g. whether it was inference or document
-    /// index which caused the error.
-    #[error(
-        "The skill could not be executed to completion, something in our runtime is currently \n\
-        unavailable or misconfigured. You should try again later, if the situation persists you \n\
-        may want to contact the operaters. Original error:\n\n{0}"
-    )]
-    RuntimeError(#[source] anyhow::Error),
-    /// This happens if a configuration for an individual namespace is broken. For the user calling
-    /// the route to execute a skill, we treat this as a runtime, but make sure he gets all the
-    /// context, because it very likely might be the skill developer who misconfigured the
-    /// namespace. For the operater team, operating all of Pharia Kernel we treat this as a logic
-    /// error, because there is nothing wrong about the kernel installion or inference, or network
-    /// or other stuff, which they would be able to fix.
-    #[error(
-        "The skill could not be executed to completion, the namespace '{namespace}' is \
-        misconfigured. If you are the developer who configured the skill, you should probably fix \
-        this error. If you are not, there is nothing you can do, until the developer who maintains \
-        the list of skills to be served, fixes this. Original Syntax error:\n\n\
-        {original_syntax_error}"
-    )]
-    MisconfiguredNamespace {
-        namespace: Namespace,
-        original_syntax_error: String,
-    },
-    #[error(
-        "The skill is designed to be executed as a function. Please invoke it via the /run endpoint."
-    )]
-    IsFunction,
-    #[error(
-        "The skill is designed to stream output. Please invoke it via the /message-stream endpoint."
-    )]
-    IsMessageStream,
-}
-
-impl SkillExecutionError {
-    /// The severity with which this error is reported to the operator.
-    ///
-    /// Anything which is wrong with our runtime (i.e. resources, external services, network, etc.)
-    /// is only fixable by the operator. Therefore we report any failure due to these as errors.
-    /// Anything which is wrong with the skill itself, might not be fixable by the operator, but
-    /// still compromises the functionality of the system. Also in some situtations the operator
-    /// might be the skill developer, or at least on the same team. Therefore we report these as
-    /// warnings.
-    /// Anything which can be caused by invalid user input over our HTTP interface, might neither be
-    /// in the power of operator or developer to fix. We report these as info, in order to be not to
-    /// noisy.
-    fn tracing_level(&self) -> tracing::Level {
-        use tracing::Level;
-        match self {
-            // We give this the error severity, because this hints to a shortcoming in the
-            // envirorment. The operator may need to act.
-            SkillExecutionError::RuntimeError(_) => Level::ERROR,
-            // These are bugs in the skill code, or their configuration.
-            SkillExecutionError::CsiUseFromMetadata
-            | SkillExecutionError::InvalidOutput(_)
-            | SkillExecutionError::MisconfiguredNamespace { .. } => Level::WARN,
-            // This could be a wrong configuration, but also just mistying a skill name. So we log
-            // these only as info.
-            SkillExecutionError::SkillNotConfigured
-            | SkillExecutionError::InvalidInput(_)
-            | SkillExecutionError::IsMessageStream
-            | SkillExecutionError::IsFunction
-            // Some of these are bugs, but as long as we do not strictly distinguish those from
-            // invalid input, let's reduce false positives and report them as info.
-            | SkillExecutionError::UserCode(..) => Level::INFO,
-        }
     }
 }
 
@@ -592,7 +459,7 @@ pub mod tests {
         namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
-        skills::{AnySkillManifest, Skill, SkillEvent},
+        skills::{AnySkillManifest, Skill, SkillError, SkillEvent},
     };
     use metrics::Label;
     use metrics_util::debugging::{DebugValue, DebuggingRecorder, Snapshot};
