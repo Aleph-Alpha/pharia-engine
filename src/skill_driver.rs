@@ -1074,7 +1074,7 @@ mod test {
             SkillExecutionEvent::Error(
                 "The skill inserted a message end into the stream, which has not been preceded by \
                 a message begin. This is a bug in the skill. Please contact its developer."
-                .to_owned()
+                    .to_owned()
             ),
             recv.recv().await.unwrap()
         );
