@@ -1,19 +1,4 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "pharia-kernel.fullname" . }}
-  labels:
-    {{- include "pharia-kernel.labels" . | nindent 4 }}
-spec:
-  type: {{ .Values.service.type }}
-  ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.targetPortName }}
-      protocol: {{ .Values.service.protocol }}
-      name: {{ .Values.service.portName }}
-    - port: {{ .Values.service.metricsPort }}
-      targetPort: {{ .Values.service.metricsTargetPortName }}
-      protocol: {{ .Values.service.metricsProtocol }}
-      name: {{ .Values.service.metricsPortName }}
-  selector:
-    {{- include "pharia-kernel.selectorLabels" . | nindent 4 }}
+{{- template "pharia-common.service" (dict "value" (list . "pharia-kernel.service") "context" $) -}}
+{{- define "pharia-kernel.service" -}}
+## Define overrides for your resource here
+{{- end -}}

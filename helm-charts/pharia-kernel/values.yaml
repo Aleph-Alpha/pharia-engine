@@ -1,51 +1,51 @@
 global:
-  phariaAIConfigMap: ""
-  imagePullSecretName: ""
   # Global config for all ingress resources
   ingress:
-    # -- The ingressClassName globally defined for all ingress resources.
-    #    See also: https://kubernetes.io/docs/concepts/services-networking/ingress/#the-ingress-resource
-    ingressClassName: nginx
     # -- Domain for external access / ingress to Pharia AI services via {service}.{domain}
     #    e.g. {service}.pharia-ai.example.com
     ingressDomain: local
-    # -- Additional annotations globally defined for all ingress-resources. This can be used to add ingress controller specific annotations.
-    additionalAnnotations: {}
 image:
-  repository: alephalpha.jfrog.io/container-images/pharia-kernel
-  pullPolicy: Always
-  # Overrides the image tag whose default is the chart appVersion.
+  registry: alephalpha.jfrog.io
+  repository: container-images/pharia-kernel
   tag: ""
-nameOverride: pharia-kernel
+  pullPolicy: IfNotPresent
 fullnameOverride: pharia-kernel
-imagePullSecrets: []
-podAnnotations: {}
-podLabels:
+service:
+  type: ClusterIP
+  ports:
+    - name: http
+      servicePort: 80
+      containerPort: 8081
+      protocol: TCP
+    - name: metrics
+      servicePort: 9000
+      containerPort: 9000
+      protocol: TCP
+serviceAccount:
+  automountServiceAccountToken: true
+automountServiceAccountToken: true
+serviceMonitor:
+  enabled: false
+  endpoints:
+    - interval: 30s
+      path: /
+      port: metrics
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 2000
   runAsGroup: 2000
-securityContext:
+containerSecurityContext:
   capabilities:
     drop:
       - ALL
   allowPrivilegeEscalation: false
   seccompProfile:
     type: RuntimeDefault
-service:
-  type: ClusterIP
-  port: 80
-  portName: http
-  targetPort: 8081
-  targetPortName: http
-  protocol: TCP
-  metricsPort: 9000
-  metricsPortName: metrics
-  metricsTargetPort: 9000
-  metricsTargetPortName: metrics
-  metricsProtocol: TCP
-serviceMonitor:
-  enabled: false
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
 # -- Specify the default namespaces for PhariaKernel, which provide the default skills.
 # If the default namespaces are configured, any duplicate namespaces in `pharia-kernel.namespaces` are ignored
 # because these are backed by environment variables, which have higher precedence.
@@ -78,13 +78,16 @@ authorizationAddress: ""
 inferenceAddress: ""
 documentIndexAddress: ""
 
-ingress:
-  enabled: true
-  hostname: pharia-kernel
-  annotations: {}
-  tls:
-    enabled: false
-    secretName: ""
+extraVolumes:
+  - name: config-volume
+    configMap:
+      name: '{{ include "pharia-common.names.fullname" . }}-config'
+extraVolumeMounts:
+  - name: config-volume
+    mountPath: /app/config.toml
+    subPath: config.toml
+    readOnly: true
+
 # We usually recommend not to specify default resources and to leave this as a conscious
 # choice for the user. This also increases chances charts run on environments with little
 # resources, such as Minikube. If you do want to specify resources, add the following
@@ -102,15 +105,21 @@ resources:
   requests:
     cpu: "2"
     memory: 4Gi
-volumes:
-  - name: config-volume
-    configMap:
-      name: pharia-kernel-config
-volumeMounts:
-  - name: config-volume
-    mountPath: /app/config.toml
-    subPath: config.toml
-    readOnly: true
-nodeSelector: {}
-tolerations: []
-affinity: {}
+
+env:
+  customTemplate: "pharia-kernel.envvar"
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 15
+  failureThreshold: 2
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 2

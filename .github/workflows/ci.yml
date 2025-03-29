@@ -144,6 +144,9 @@ jobs:
           registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
           tls-verify: false
 
+      - name: Get JFrog Artifactory login credentials
+        uses: ./.github/actions/jfrog
+
       - name: Test Helm chart
         env:
           LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
@@ -151,9 +154,16 @@ jobs:
           kubectl cluster-info
           kubectl get storageclass standard
 
+          echo $JFROG_ACCESS_TOKEN | helm registry login $ARTIFACTORY_HOST -u $JFROG_ACCESS_TOKEN_SUBJECT --password-stdin
+
+          helm dependency update helm-charts/pharia-kernel
+
+          helm lint helm-charts/pharia-kernel
+
           helm install pharia-kernel helm-charts/pharia-kernel \
               -f helm-charts/pharia-kernel/values-kind.yaml \
-              --set "image.repository=$LOCAL_REGISTRY/pharia-kernel" \
+              --set "image.registry=$LOCAL_REGISTRY" \
+              --set "image.repository=pharia-kernel" \
               --set "image.tag=$IMAGE_ID" \
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
@@ -170,10 +180,6 @@ jobs:
 
           ./tests/test-list-skills.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
           ./tests/test-run-skill.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
-
-      - if: github.event_name != 'pull_request'
-        name: Get JFrog Artifactory login credentials
-        uses: ./.github/actions/jfrog
 
       - if: github.event_name != 'pull_request'
         name: Log in to JFrog Artifactory

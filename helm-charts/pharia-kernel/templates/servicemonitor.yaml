@@ -1,0 +1,4 @@
+{{- template "pharia-common.serviceMonitor" (dict "value" (list . "pharia-kernel.serviceMonitor") "context" $) -}}
+{{- define "pharia-kernel.serviceMonitor" -}}
+## Define overrides for your resource here
+{{- end -}}
