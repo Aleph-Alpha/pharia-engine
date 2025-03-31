@@ -12,9 +12,7 @@ use crate::{
         Explanation, ExplanationRequest, InferenceApi,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
-    search::{
-        Document, DocumentIndexMessage, DocumentPath, SearchApi, SearchRequest, SearchResult,
-    },
+    search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
 };
 
@@ -29,10 +27,10 @@ pub struct ChatStreamId(usize);
 ///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
-pub struct CsiDrivers<I, T> {
+pub struct CsiDrivers<I, S, T> {
     /// We use the inference Api to complete text
     pub inference: I,
-    pub search: mpsc::Sender<DocumentIndexMessage>,
+    pub search: S,
     pub tokenizers: T,
 }
 
@@ -152,9 +150,10 @@ impl From<CsiMetrics> for metrics::KeyName {
 }
 
 #[async_trait]
-impl<I, T> Csi for CsiDrivers<I, T>
+impl<I, S, T> Csi for CsiDrivers<I, S, T>
 where
     I: InferenceApi + Send + Sync,
+    S: SearchApi + Send + Sync,
     T: TokenizerApi + Send + Sync,
 {
     async fn explain(
@@ -507,9 +506,9 @@ pub mod tests {
     #[tokio::test]
     async fn documents() {
         // Given a skill invocation context with a stub tokenizer provider
-        let search = SearchStub::with_documents(|_| Document::dummy());
+        let search = SearchStub::new().with_document(|_| Ok(Document::dummy()));
         let csi_apis = CsiDrivers {
-            search: search.api(),
+            search,
             ..dummy_csi_drivers()
         };
 
@@ -651,9 +650,10 @@ pub mod tests {
     #[tokio::test]
     async fn document_metadata_requests_in_respective_order() {
         // Given a CSI drivers with stub search
-        let search_stub = SearchStub::with_metadata(|r| Ok(Some(Value::String(r.name.clone()))));
+        let search =
+            SearchStub::new().with_document_metadata(|r| Ok(Some(Value::String(r.name.clone()))));
         let csi_apis = CsiDrivers {
-            search: search_stub.api(),
+            search,
             ..dummy_csi_drivers()
         };
 
@@ -675,7 +675,6 @@ pub mod tests {
             .unwrap();
 
         drop(csi_apis);
-        search_stub.wait_for_shutdown().await;
 
         // Then the responses must have the same order as the respective requests
         let responses: Vec<String> = responses
@@ -688,15 +687,11 @@ pub mod tests {
         assert!(responses[1].contains("2nd"));
     }
 
-    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, FakeTokenizers> {
-        let inference = InferenceStub::new();
-        let (search, _recv) = mpsc::channel(1);
-        let tokenizers = FakeTokenizers;
-
+    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, SearchStub, FakeTokenizers> {
         CsiDrivers {
-            inference,
-            search,
-            tokenizers,
+            inference: InferenceStub::new(),
+            search: SearchStub::new(),
+            tokenizers: FakeTokenizers,
         }
     }
 
