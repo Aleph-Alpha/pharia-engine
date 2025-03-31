@@ -91,7 +91,7 @@ impl NamespaceWatcher {
             NamespaceWatcherActor::new(
                 ready_sender,
                 shutdown_receiver,
-                Box::new(skill_store_api),
+                skill_store_api,
                 config,
                 update_interval,
             )
@@ -111,10 +111,10 @@ impl NamespaceWatcher {
     }
 }
 
-struct NamespaceWatcherActor {
+struct NamespaceWatcherActor<S> {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
-    skill_store_api: Box<dyn SkillStoreApi + Send + Sync>,
+    skill_store_api: S,
     config: Box<dyn ObservableConfig + Send + Sync>,
     update_interval: Duration,
     skills: HashMap<Namespace, Vec<SkillDescription>>,
@@ -148,11 +148,14 @@ impl Diff {
     }
 }
 
-impl NamespaceWatcherActor {
+impl<S> NamespaceWatcherActor<S>
+where
+    S: SkillStoreApi,
+{
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
-        skill_store_api: Box<dyn SkillStoreApi + Send + Sync>,
+        skill_store_api: S,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -376,7 +379,7 @@ pub mod tests {
             SkillDescription::with_name("old_skill"),
         ];
 
-        let diff = NamespaceWatcherActor::compute_diff(&existing, &incoming);
+        let diff = NamespaceWatcherActor::<SkillStoreDummy>::compute_diff(&existing, &incoming);
 
         // when the observer checks for new skills
         assert_eq!(
@@ -393,7 +396,10 @@ pub mod tests {
         let incoming = SkillDescription::new("existing_skill", Some("v2"));
 
         // When the observer checks for new skills
-        let diff = NamespaceWatcherActor::compute_diff(&[existing.clone()], &[incoming.clone()]);
+        let diff = NamespaceWatcherActor::<SkillStoreDummy>::compute_diff(
+            &[existing.clone()],
+            &[incoming.clone()],
+        );
 
         // Then the new version is added and the old version is not removed as only the tag changed
         assert_eq!(diff.added_or_changed, vec![incoming]);
@@ -495,10 +501,13 @@ pub mod tests {
         observer.wait_for_shutdown().await;
     }
 
-    impl NamespaceWatcherActor {
+    impl<S> NamespaceWatcherActor<S>
+    where
+        S: SkillStoreApi + Send + Sync,
+    {
         fn with_skills(
             skills: HashMap<Namespace, Vec<SkillDescription>>,
-            skill_store_api: impl SkillStoreApi + Send + Sync + 'static,
+            skill_store_api: S,
             config: Box<dyn ObservableConfig + Send + Sync>,
         ) -> Self {
             let (ready, _) = tokio::sync::watch::channel(false);
@@ -506,7 +515,7 @@ pub mod tests {
             Self {
                 ready,
                 shutdown,
-                skill_store_api: Box::new(skill_store_api),
+                skill_store_api,
                 config,
                 update_interval: Duration::from_millis(1),
                 skills,
