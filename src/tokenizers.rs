@@ -2,23 +2,20 @@ use std::{collections::HashMap, sync::Arc};
 
 use aleph_alpha_client::Client;
 use anyhow::Context as _;
-use async_trait::async_trait;
 use tokenizers::Tokenizer;
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
 
-#[async_trait]
 pub trait TokenizerApi {
-    async fn tokenizer_by_model(
+    fn tokenizer_by_model(
         &self,
         api_token: String,
         model_name: String,
-    ) -> anyhow::Result<Arc<Tokenizer>>;
+    ) -> impl Future<Output = anyhow::Result<Arc<Tokenizer>>> + Send;
 }
 
-#[async_trait]
 impl TokenizerApi for mpsc::Sender<TokenizersMsg> {
     async fn tokenizer_by_model(
         &self,
@@ -137,7 +134,6 @@ impl TokenizersActor {
 #[cfg(test)]
 pub mod tests {
     use anyhow::anyhow;
-    use async_trait::async_trait;
     use std::sync::Arc;
 
     use super::{Tokenizer, TokenizerApi};
@@ -157,7 +153,6 @@ pub mod tests {
     #[derive(Clone)]
     pub struct FakeTokenizers;
 
-    #[async_trait]
     impl TokenizerApi for FakeTokenizers {
         async fn tokenizer_by_model(
             &self,
