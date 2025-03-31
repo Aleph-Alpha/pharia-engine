@@ -1,6 +1,5 @@
 use std::{borrow::Cow, future::Future, pin::Pin, sync::Arc, time::Instant};
 
-use anyhow::anyhow;
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde_json::Value;
 use tokio::{
@@ -318,9 +317,8 @@ impl From<SkillStoreError> for SkillExecutionError {
     fn from(source: SkillStoreError) -> Self {
         match source {
             SkillStoreError::SkillLoaderError(skill_loader_error) => {
-                SkillExecutionError::RuntimeError(anyhow!(
-                    "Error loading skill: {}",
-                    skill_loader_error
+                SkillExecutionError::RuntimeError(format!(
+                    "Error loading skill: {skill_loader_error}"
                 ))
             }
             SkillStoreError::InvalidNamespaceError(namespace, original_syntax_error) => {

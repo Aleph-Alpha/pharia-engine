@@ -60,7 +60,7 @@ impl SkillDriver {
                 // receiver of events before the handler.
                 biased;
 
-                Ok(error) = &mut recv_rt_err => break Err(SkillExecutionError::RuntimeError(error)),
+                Ok(error) = &mut recv_rt_err => break Err(SkillExecutionError::RuntimeError(error.to_string())),
                 Some(skill_event) = recv_inner.recv() => {
                     let (execution_event, maybe_error) =
                         translator.translate_to_execution_event(skill_event);
@@ -106,7 +106,7 @@ impl SkillDriver {
         select! {
             result = skill.run_as_function(&self.engine, csi_for_skills, input) => result.map_err(Into::into),
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error))
+            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error.to_string()))
         }
     }
 
@@ -496,7 +496,7 @@ impl EventTranslator {
 }
 
 /// Errors which may prevent a skill from executing to completion successfully.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum SkillExecutionError {
     #[error(
         "The metadata function of the invoked skill is bugged. It is forbidden to invoke any CSI \
@@ -564,7 +564,7 @@ pub enum SkillExecutionError {
         unavailable or misconfigured. You should try again later, if the situation persists you \n\
         may want to contact the operators. Original error:\n\n{0}"
     )]
-    RuntimeError(#[source] anyhow::Error),
+    RuntimeError(String),
     /// This happens if a configuration for an individual namespace is broken. For the user calling
     /// the route to execute a skill, we treat this as a runtime error, but make sure he gets all the
     /// context, because it very likely might be the skill developer who misconfigured the
@@ -637,7 +637,7 @@ impl From<SkillError> for SkillExecutionError {
             SkillError::InvalidInput(error) => Self::InvalidInput(error),
             SkillError::UserCode(error) => Self::UserCode(error),
             SkillError::InvalidOutput(error) => Self::InvalidOutput(error),
-            SkillError::RuntimeError(error) => Self::RuntimeError(error),
+            SkillError::RuntimeError(error) => Self::RuntimeError(error.to_string()),
             SkillError::IsFunction => Self::IsFunction,
             SkillError::IsMessageStream => Self::IsMessageStream,
         }
