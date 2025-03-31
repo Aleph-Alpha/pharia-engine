@@ -637,9 +637,9 @@ impl From<SkillError> for SkillExecutionError {
             SkillError::InvalidInput(error) => Self::InvalidInput(error),
             SkillError::UserCode(error) => Self::UserCode(error),
             SkillError::InvalidOutput(error) => Self::InvalidOutput(error),
-            SkillError::RuntimeError(error) => SkillExecutionError::RuntimeError(error),
-            SkillError::IsFunction => SkillExecutionError::IsFunction,
-            SkillError::IsMessageStream => SkillExecutionError::IsMessageStream,
+            SkillError::RuntimeError(error) => Self::RuntimeError(error),
+            SkillError::IsFunction => Self::IsFunction,
+            SkillError::IsMessageStream => Self::IsMessageStream,
         }
     }
 }
