@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
+    authorization::AuthorizationApi,
     chunking,
     csi::Csi,
     inference, language_selection, search,
@@ -51,8 +52,9 @@ where
     }
 }
 
-pub fn http<C, R, S>() -> Router<AppState<C, R, S>>
+pub fn http<A, C, R, S>() -> Router<AppState<A, C, R, S>>
 where
+    A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: Csi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,

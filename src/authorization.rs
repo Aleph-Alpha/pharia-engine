@@ -1,16 +1,6 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use axum::{
-    body::Body,
-    extract::State,
-    http::{HeaderMap, Request, StatusCode},
-    middleware::Next,
-    response::{ErrorResponse, Response},
-};
-use axum_extra::{
-    TypedHeader,
-    headers::{self, authorization::Bearer},
-};
+use axum::http::{HeaderMap, StatusCode};
 use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
 use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
@@ -36,8 +26,8 @@ impl Authorization {
         Authorization { send, handle }
     }
 
-    pub fn api(&self) -> AuthorizationApi {
-        AuthorizationApi::new(self.send.clone())
+    pub fn api(&self) -> mpsc::Sender<AuthorizationMsg> {
+        self.send.clone()
     }
 
     /// Authorization is going to shutdown, as soon as the last instance of [`AuthorizationApi`] is
@@ -81,21 +71,18 @@ impl<C: AuthorizationClient> AuthorizationActor<C> {
     }
 }
 
-#[derive(Clone)]
-pub struct AuthorizationApi {
-    send: mpsc::Sender<AuthorizationMsg>,
+pub trait AuthorizationApi {
+    fn check_permission(
+        &self,
+        api_token: String,
+    ) -> impl Future<Output = anyhow::Result<bool>> + Send;
 }
 
-impl AuthorizationApi {
-    pub fn new(send: mpsc::Sender<AuthorizationMsg>) -> Self {
-        Self { send }
-    }
-
-    pub async fn check_permission(&self, api_token: String) -> anyhow::Result<bool> {
+impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
+    async fn check_permission(&self, api_token: String) -> anyhow::Result<bool> {
         let (send, recv) = oneshot::channel();
         let msg = AuthorizationMsg::Auth { api_token, send };
-        self.send
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
@@ -119,39 +106,6 @@ impl AuthorizationMsg {
             }
         };
     }
-}
-
-pub async fn authorization_middleware(
-    State(authorization_api): State<AuthorizationApi>,
-    bearer: Option<TypedHeader<headers::Authorization<Bearer>>>,
-    request: Request<Body>,
-    next: Next,
-) -> Result<Response, ErrorResponse> {
-    if let Some(bearer) = bearer {
-        if let Ok(allowed) = authorization_api
-            .check_permission(bearer.token().to_owned())
-            .await
-        {
-            if !allowed {
-                return Err(ErrorResponse::from((
-                    StatusCode::FORBIDDEN,
-                    "Bearer token invalid".to_owned(),
-                )));
-            }
-        } else {
-            return Err(ErrorResponse::from((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to check permission".to_owned(),
-            )));
-        }
-    } else {
-        return Err(ErrorResponse::from((
-            StatusCode::BAD_REQUEST,
-            "Bearer token expected".to_owned(),
-        )));
-    }
-    let response = next.run(request).await;
-    Ok(response)
 }
 
 pub trait AuthorizationClient: Send + Sync + 'static {
@@ -218,24 +172,21 @@ pub mod tests {
     use super::*;
     use crate::tests::{api_token, authorization_url};
 
-    /// An authorization double, loaded up with predefined answers.
+    #[derive(Debug, Clone)]
     pub struct StubAuthorization {
-        send: mpsc::Sender<AuthorizationMsg>,
+        /// Whether the permission check should succeed or not
+        response: bool,
     }
 
     impl StubAuthorization {
-        pub fn new(mut handle: impl FnMut(AuthorizationMsg) + Send + 'static) -> Self {
-            let (send, mut recv) = mpsc::channel(1);
-            tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    handle(msg);
-                }
-            });
-            Self { send }
+        pub fn new(response: bool) -> Self {
+            Self { response }
         }
+    }
 
-        pub fn api(&self) -> AuthorizationApi {
-            AuthorizationApi::new(self.send.clone())
+    impl AuthorizationApi for StubAuthorization {
+        async fn check_permission(&self, _api_token: String) -> anyhow::Result<bool> {
+            Ok(self.response)
         }
     }
 
@@ -277,12 +228,12 @@ pub mod tests {
     async fn auth_api_answers_messages() {
         // Given a stub authorization client
         let client = StubAuthorizationClient;
-        let api = Authorization::with_client(client).api();
+        let auth = Authorization::with_client(client);
 
         // When checking permissions for a token
         let result = timeout(
             Duration::from_millis(10),
-            api.check_permission("valid".to_owned()),
+            auth.api().check_permission("valid".to_owned()),
         )
         .await;
 

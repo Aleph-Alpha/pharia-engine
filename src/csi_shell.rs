@@ -16,6 +16,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
+    authorization::AuthorizationApi,
     csi::Csi,
     shell::{AppState, CsiState},
     skill_runtime::SkillRuntimeApi,
@@ -23,8 +24,9 @@ use crate::{
     skills::SupportedVersion,
 };
 
-pub fn http<C, R, S>() -> Router<AppState<C, R, S>>
+pub fn http<A, C, R, S>() -> Router<AppState<A, C, R, S>>
 where
+    A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: Csi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
