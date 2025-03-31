@@ -86,7 +86,7 @@ impl SkillDriver {
 
         if let Err(err) = &result {
             sender
-                .send(SkillExecutionEvent::Error(err.to_string()))
+                .send(SkillExecutionEvent::Error(err.clone()))
                 .await
                 .unwrap();
         }
@@ -429,7 +429,7 @@ pub enum SkillExecutionEvent {
     MessageAppend { text: String },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
-    Error(String),
+    Error(SkillExecutionError),
 }
 
 /// Translates [`SkillEvent`]s emitted by skills to [`SkillExecutionEvent`]s. It also keeps track
@@ -463,9 +463,7 @@ impl EventTranslator {
                 (SkillExecutionEvent::MessageBegin, None)
             }
             (SkillEvent::MessageBegin, true) => (
-                SkillExecutionEvent::Error(
-                    SkillExecutionError::MessageBeginWhileMessageActive.to_string(),
-                ),
+                SkillExecutionEvent::Error(SkillExecutionError::MessageBeginWhileMessageActive),
                 Some(SkillExecutionError::MessageBeginWhileMessageActive),
             ),
             (SkillEvent::MessageEnd { payload }, true) => {
@@ -473,22 +471,18 @@ impl EventTranslator {
                 (SkillExecutionEvent::MessageEnd { payload }, None)
             }
             (SkillEvent::MessageEnd { .. }, false) => (
-                SkillExecutionEvent::Error(
-                    SkillExecutionError::MessageEndWithoutMessageBegin.to_string(),
-                ),
+                SkillExecutionEvent::Error(SkillExecutionError::MessageEndWithoutMessageBegin),
                 Some(SkillExecutionError::MessageEndWithoutMessageBegin),
             ),
             (SkillEvent::MessageAppend { text }, true) => {
                 (SkillExecutionEvent::MessageAppend { text }, None)
             }
             (SkillEvent::MessageAppend { .. }, false) => (
-                SkillExecutionEvent::Error(
-                    SkillExecutionError::MessageAppendWithoutMessageBegin.to_string(),
-                ),
+                SkillExecutionEvent::Error(SkillExecutionError::MessageAppendWithoutMessageBegin),
                 Some(SkillExecutionError::MessageAppendWithoutMessageBegin),
             ),
             (SkillEvent::InvalidBytesInPayload { message }, _) => (
-                SkillExecutionEvent::Error(message.clone()),
+                SkillExecutionEvent::Error(SkillExecutionError::InvalidOutput(message.clone())),
                 Some(SkillExecutionError::InvalidOutput(message)),
             ),
         }
@@ -496,7 +490,7 @@ impl EventTranslator {
 }
 
 /// Errors which may prevent a skill from executing to completion successfully.
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum SkillExecutionError {
     #[error(
         "The metadata function of the invoked skill is bugged. It is forbidden to invoke any CSI \
@@ -560,9 +554,9 @@ pub enum SkillExecutionError {
     /// something went wrong, or give appropriate context. E.g. whether it was inference or document
     /// index which caused the error.
     #[error(
-        "The skill could not be executed to completion, something in our runtime is currently \n\
-        unavailable or misconfigured. You should try again later, if the situation persists you \n\
-        may want to contact the operators. Original error:\n\n{0}"
+        "The skill could not be executed to completion, something in our runtime is currently \
+        unavailable or misconfigured. You should try again later, if the situation persists you may \
+        want to contact the operators. Original error:\n\n{0}"
     )]
     RuntimeError(String),
     /// This happens if a configuration for an individual namespace is broken. For the user calling
@@ -975,8 +969,8 @@ mod test {
 
         // Then
         let expectet_error_msg = "The skill could not be executed to completion, something in our \
-            runtime is currently \nunavailable or misconfigured. You should try again later, if \
-            the situation persists you \nmay want to contact the operators. Original error:\n\n\
+            runtime is currently unavailable or misconfigured. You should try again later, if \
+            the situation persists you may want to contact the operators. Original error:\n\n\
             Test error";
         assert_eq!(result.unwrap_err().to_string(), expectet_error_msg);
     }
@@ -1002,7 +996,9 @@ mod test {
 
         // Then
         assert_eq!(
-            SkillExecutionEvent::Error("Test error parsing JSON".to_owned()),
+            SkillExecutionEvent::Error(SkillExecutionError::InvalidOutput(
+                "Test error parsing JSON".to_owned()
+            )),
             recv.recv().await.unwrap()
         );
 
@@ -1071,11 +1067,7 @@ mod test {
 
         // Then
         assert_eq!(
-            SkillExecutionEvent::Error(
-                "The skill inserted a message end into the stream, which has not been preceded by \
-                a message begin. This is a bug in the skill. Please contact its developer."
-                    .to_owned()
-            ),
+            SkillExecutionEvent::Error(SkillExecutionError::MessageEndWithoutMessageBegin),
             recv.recv().await.unwrap()
         );
         assert!(matches!(

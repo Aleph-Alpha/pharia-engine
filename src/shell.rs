@@ -637,9 +637,11 @@ impl From<SkillExecutionEvent> for Event {
                 .event("message")
                 .json_data(MessageEvent::Append { text })
                 .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::Error(message) => Self::default()
+            SkillExecutionEvent::Error(error) => Self::default()
                 .event("error")
-                .json_data(SseErrorEvent { message })
+                .json_data(SseErrorEvent {
+                    message: error.to_string(),
+                })
                 .expect("`json_data` must only be called once."),
         }
     }
@@ -1460,7 +1462,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     async fn stream_endpoint_for_saboteur_skill() {
         // Given
         let stream_events = vec![SkillExecutionEvent::Error(
-            "Skill is a saboteur".to_string(),
+            SkillExecutionError::RuntimeError("Skill is a saboteur".to_string()),
         )];
         let skill_runtime = SkillRuntimeStub::with_stream_events(stream_events);
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
@@ -1492,8 +1494,10 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
         let expected_body = "\
             event: error\n\
-            data: {\"message\":\"Skill is a saboteur\"}\
-            \n\n";
+            data: {\"message\":\"The skill could not be executed to completion, something in our \
+                runtime is currently unavailable or misconfigured. You should try again later, if \
+                the situation persists you may want to contact the operators. Original error:\\n\\n\
+                Skill is a saboteur\"}\n\n";
         assert_eq!(body_text, expected_body);
     }
 
