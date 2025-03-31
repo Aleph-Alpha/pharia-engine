@@ -8,7 +8,6 @@ use crate::{
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
-use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
@@ -222,33 +221,37 @@ impl SkillStore {
     }
 }
 
-#[async_trait]
 pub trait SkillStoreApi {
-    async fn remove(&self, skill_path: SkillPath);
+    fn remove(&self, skill_path: SkillPath) -> impl Future<Output = ()> + Send;
 
-    async fn upsert(&self, skill: ConfiguredSkill);
+    fn upsert(&self, skill: ConfiguredSkill) -> impl Future<Output = ()> + Send;
 
     /// Report a namespace as erroneous (e.g. in case its configuration is messed up). Set `None`
     /// to communicate that a namespace is no longer erroneous.
-    async fn set_namespace_error(&self, namespace: Namespace, error: Option<anyhow::Error>);
+    fn set_namespace_error(
+        &self,
+        namespace: Namespace,
+        error: Option<anyhow::Error>,
+    ) -> impl Future<Output = ()> + Send;
 
     /// Fetch an executable skill
-    async fn fetch(&self, skill_path: SkillPath)
-    -> Result<Option<Arc<dyn Skill>>, SkillStoreError>;
+    fn fetch(
+        &self,
+        skill_path: SkillPath,
+    ) -> impl Future<Output = Result<Option<Arc<dyn Skill>>, SkillStoreError>> + Send;
 
     /// List all skills which are currently cached and can be executed without fetching the wasm
     /// component from an OCI
-    async fn list_cached(&self) -> Vec<SkillPath>;
+    fn list_cached(&self) -> impl Future<Output = Vec<SkillPath>> + Send;
 
     /// List all skills from all namespaces
-    async fn list(&self) -> Vec<SkillPath>;
+    fn list(&self) -> impl Future<Output = Vec<SkillPath>> + Send;
 
     /// Drops a skill from the cache in case it has been cached before. `true` if the skill has been
     /// in the cache before, `false` otherwise .
-    async fn invalidate_cache(&self, skill_path: SkillPath) -> bool;
+    fn invalidate_cache(&self, skill_path: SkillPath) -> impl Future<Output = bool> + Send;
 }
 
-#[async_trait]
 impl SkillStoreApi for mpsc::Sender<SkillStoreMsg> {
     async fn remove(&self, skill_path: SkillPath) {
         let msg = SkillStoreMsg::Remove { skill_path };
@@ -543,7 +546,6 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use async_trait::async_trait;
     use std::sync::Mutex;
     use tokio::time::{sleep, timeout};
 
@@ -561,7 +563,6 @@ pub mod tests {
     #[derive(Debug, Clone)]
     pub struct SkillStoreDummy;
 
-    #[async_trait]
     impl SkillStoreApi for SkillStoreDummy {
         async fn remove(&self, _skill_path: SkillPath) {
             panic!("Skill store dummy called.");
@@ -627,7 +628,6 @@ pub mod tests {
         }
     }
 
-    #[async_trait]
     impl SkillStoreApi for SkillStoreStub {
         async fn remove(&self, _skill_path: SkillPath) {
             panic!("Skill store stub called.")
