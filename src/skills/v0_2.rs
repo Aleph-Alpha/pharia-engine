@@ -61,7 +61,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
         match serde_json::from_slice(&result) {
             Ok(result) => Ok(result),
             Err(e) => {
-                // An operater might want to know that there is a buggy skill deployed.
+                // An operator might want to know that there is a buggy skill deployed.
                 tracing::warn!("A skill returned invalid output: {}", e);
                 Err(SkillError::InvalidOutput(e.to_string()))
             }

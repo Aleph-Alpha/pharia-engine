@@ -53,8 +53,8 @@ impl SkillDriver {
 
         let result = loop {
             select! {
-                // Controls the polling order. We want to ensure that we poll runtime errors first
-                // than messages, and finally the result of the skill handler. It is suitable to
+                // Controls the polling order. We want to ensure that we poll runtime errors first,
+                // then messages, and finally the result of the skill handler. It is suitable to
                 // check for the runtime errors first, since we would then error out and terminate
                 // anyways. We can not rely on it for correctness, but we poll the before the
                 // receiver of events before the handler.
@@ -412,17 +412,17 @@ impl CsiForSkills for SkillMetadataCtx {
 }
 
 /// Emitted from executing message stream skills. This differs from [`SkillEvent`] in the way that
-/// it has stroger guarantees. E.g. every [`Self::MessageEnd`] is prefaced by a
+/// it has stronger guarantees. E.g. every [`Self::MessageEnd`] is prefaced by a
 /// [`Self::MessageBegin`]. In addition to this, it also accounts for runtime errors.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SkillExecutionEvent {
     /// Send at the beginning of each message, currently carries no information. May be used in the
-    /// future to communicate the role. Can also be useful to the UI to communicate that its about
+    /// future to communicate the role. Can also be useful to the UI to communicate that it's about
     /// time to start rendering that speech bubble.
     MessageBegin,
     /// Send at the end of each message. Can carry an arbitrary payload, to make messages more of a
     /// dropin for classical functions. Might be refined in the future. We anticipate the stop
-    /// reason to be very useful for end appliacations. We also introduce end messages to keep the
+    /// reason to be very useful for end applications. We also introduce end messages to keep the
     /// door open for multiple messages in a stream.
     MessageEnd { payload: Value },
     /// Append the internal string to the current message
@@ -436,7 +436,7 @@ pub enum SkillExecutionEvent {
 /// of message begin and end in order to detect invalid state transitions.
 struct EventTranslator {
     /// `true` if the stream is in between a begin and end message event. A message is active after
-    /// a begin and becommes inactive after an end event.
+    /// a begin and becomes inactive after an end event.
     message_active: bool,
 }
 
@@ -509,15 +509,15 @@ pub enum SkillExecutionError {
     #[error(
         "Sorry, we could not find the skill you requested in its namespace. This can have three \
         causes:\n\n\
-        1. You send the wrong skill name.\n\
-        2. You send the wrong namespace.\n\
+        1. You sent the wrong skill name.\n\
+        2. You sent the wrong namespace.\n\
         3. The skill is not configured in the namespace you requested. You may want to check the \
         namespace configuration."
     )]
     SkillNotConfigured,
     /// Skill Logic errors are logic errors which are reported by the skill code itself. These may
     /// be due to bugs in the skill code, or invalid user input, we will not be able to tell. For
-    /// the operater these are both user errors. The skill user and developer are often the same
+    /// the operator these are both user errors. The skill user and developer are often the same
     /// person so in either case we do well to report it in our answer.
     #[error(
         "The skill you called responded with an error. Maybe you should check your input, if it \
@@ -562,14 +562,14 @@ pub enum SkillExecutionError {
     #[error(
         "The skill could not be executed to completion, something in our runtime is currently \n\
         unavailable or misconfigured. You should try again later, if the situation persists you \n\
-        may want to contact the operaters. Original error:\n\n{0}"
+        may want to contact the operators. Original error:\n\n{0}"
     )]
     RuntimeError(#[source] anyhow::Error),
     /// This happens if a configuration for an individual namespace is broken. For the user calling
-    /// the route to execute a skill, we treat this as a runtime, but make sure he gets all the
+    /// the route to execute a skill, we treat this as a runtime error, but make sure he gets all the
     /// context, because it very likely might be the skill developer who misconfigured the
-    /// namespace. For the operater team, operating all of Pharia Kernel we treat this as a logic
-    /// error, because there is nothing wrong about the kernel installion or inference, or network
+    /// namespace. For the operator team, operating all of Pharia Kernel we treat this as a logic
+    /// error, because there is nothing wrong about the Kernel installation or inference, or network
     /// or other stuff, which they would be able to fix.
     #[error(
         "The skill could not be executed to completion, the namespace '{namespace}' is \
@@ -976,7 +976,7 @@ mod test {
         // Then
         let expectet_error_msg = "The skill could not be executed to completion, something in our \
             runtime is currently \nunavailable or misconfigured. You should try again later, if \
-            the situation persists you \nmay want to contact the operaters. Original error:\n\n\
+            the situation persists you \nmay want to contact the operators. Original error:\n\n\
             Test error";
         assert_eq!(result.unwrap_err().to_string(), expectet_error_msg);
     }
