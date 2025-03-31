@@ -778,7 +778,6 @@ mod tests {
 
     use super::*;
 
-    use async_trait::async_trait;
     use axum::{
         body::Body,
         http::{Method, Request, header},
@@ -1877,7 +1876,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     #[derive(Debug, Clone)]
     struct SkillRuntimeDummy;
 
-    #[async_trait]
     impl SkillRuntimeApi for SkillRuntimeDummy {
         async fn run_function(
             &self,
@@ -1919,7 +1917,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    #[async_trait]
     impl SkillRuntimeApi for SkillRuntimeSaboteur {
         async fn run_function(
             &self,
@@ -1984,7 +1981,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    #[async_trait]
     impl SkillRuntimeApi for SkillRuntimeStub {
         async fn run_function(
             &self,
@@ -2052,7 +2048,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    #[async_trait]
     impl SkillRuntimeApi for SkillRuntimeSpy {
         async fn run_function(
             &self,
