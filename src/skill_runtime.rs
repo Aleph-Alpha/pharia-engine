@@ -287,7 +287,7 @@ impl RunMessageStreamMsg {
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {
-                drop(send.send(SkillExecutionEvent::Error(e.to_string())).await);
+                drop(send.send(SkillExecutionEvent::Error(e)).await);
                 return;
             }
         };
@@ -704,12 +704,11 @@ pub mod tests {
             .await;
 
         // Then
-        let expected_error_msg = "The skill you called responded with an error. Maybe you should \
-            check your input, if it seems to be correct you may want to contact the skill \
-            developer. Error reported by Skill:\n\nSkill is a saboteur";
         assert_eq!(
             recv.recv().await.unwrap(),
-            SkillExecutionEvent::Error(expected_error_msg.to_string())
+            SkillExecutionEvent::Error(SkillExecutionError::UserCode(
+                "Skill is a saboteur".to_owned()
+            ))
         );
         assert!(recv.recv().await.is_none());
 
@@ -775,13 +774,9 @@ pub mod tests {
 
         // Then
         let event = recv.recv().await.unwrap();
-        let expected_error_msg = "The skill could not be executed to completion, something in our \
-            runtime is currently \nunavailable or misconfigured. You should try again later, if \
-            the situation persists you \nmay want to contact the operators. Original error:\n\n\
-            Test error";
         assert_eq!(
             event,
-            SkillExecutionEvent::Error(expected_error_msg.to_string())
+            SkillExecutionEvent::Error(SkillExecutionError::RuntimeError("Test error".to_owned()))
         );
     }
 
