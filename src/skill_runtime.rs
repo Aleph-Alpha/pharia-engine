@@ -1,7 +1,6 @@
 use std::{borrow::Cow, future::Future, pin::Pin, sync::Arc, time::Instant};
 
 use anyhow::anyhow;
-use async_trait::async_trait;
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde_json::Value;
 use tokio::{
@@ -68,29 +67,27 @@ impl SkillRuntime {
 ///
 /// Using a trait rather than an mpsc allows for easier and more ergonomic testing, since the
 /// implementation of the test double is not required to be an actor.
-#[async_trait]
 pub trait SkillRuntimeApi {
-    async fn run_function(
+    fn run_function(
         &self,
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> Result<Value, SkillExecutionError>;
+    ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send;
 
-    async fn run_message_stream(
+    fn run_message_stream(
         &self,
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-    ) -> mpsc::Receiver<SkillExecutionEvent>;
+    ) -> impl Future<Output = mpsc::Receiver<SkillExecutionEvent>> + Send;
 
-    async fn skill_metadata(
+    fn skill_metadata(
         &self,
         skill_path: SkillPath,
-    ) -> Result<AnySkillManifest, SkillExecutionError>;
+    ) -> impl Future<Output = Result<AnySkillManifest, SkillExecutionError>> + Send;
 }
 
-#[async_trait]
 impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn run_function(
         &self,
@@ -464,6 +461,7 @@ pub mod tests {
         skill_store::{SkillStore, tests::SkillStoreStub},
         skills::{AnySkillManifest, Skill, SkillError, SkillEvent},
     };
+    use async_trait::async_trait;
     use metrics::Label;
     use metrics_util::debugging::{DebugValue, DebuggingRecorder, Snapshot};
     use serde_json::json;
