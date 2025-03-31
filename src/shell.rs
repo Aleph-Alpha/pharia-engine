@@ -182,6 +182,22 @@ where
     }
 }
 
+fn v1<C, R, S>() -> Router<AppState<C, R, S>>
+where
+    C: Csi + Clone + Sync + Send + 'static,
+    R: SkillRuntimeApi + Clone + Send + Sync + 'static,
+    S: SkillStoreApi + Clone + Send + Sync + 'static,
+{
+    Router::new()
+        .route("/skills", get(skills))
+        .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
+        .route("/skills/{namespace}/{name}/run", post(run_skill))
+        .route(
+            "/skills/{namespace}/{name}/message-stream",
+            post(message_stream_skill),
+        )
+}
+
 fn http<C, R, S>(feature_set: FeatureSet, app_state: AppState<C, R, S>) -> Router
 where
     C: Csi + Clone + Sync + Send + 'static,
@@ -194,18 +210,10 @@ where
     } else {
         ApiDoc::openapi()
     };
+
     Router::new()
         // Authenticated routes
-        .route("/v1/skills", get(skills))
-        .route(
-            "/v1/skills/{namespace}/{name}/metadata",
-            get(skill_metadata),
-        )
-        .route("/v1/skills/{namespace}/{name}/run", post(run_skill))
-        .route(
-            "/v1/skills/{namespace}/{name}/message-stream",
-            post(message_stream_skill),
-        )
+        .nest("/v1", v1())
         .merge(csi_shell::http())
         // Hidden routes for cache for internal use
         .route("/cached_skills", get(cached_skills))
