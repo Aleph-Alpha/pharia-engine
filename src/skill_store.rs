@@ -1159,7 +1159,6 @@ pub mod tests {
         }
     }
 
-    #[async_trait]
     impl SkillLoaderApi for SkillLoaderStub {
         async fn fetch(
             &self,

@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinHandle, spawn_blocking};
@@ -142,17 +141,18 @@ impl SkillLoader {
     }
 }
 
-#[async_trait]
 pub trait SkillLoaderApi {
-    async fn fetch(
+    fn fetch(
         &self,
         skill: ConfiguredSkill,
-    ) -> Result<(Box<dyn Skill>, Digest), SkillFetchError>;
+    ) -> impl Future<Output = Result<(Box<dyn Skill>, Digest), SkillFetchError>> + Send;
 
-    async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError>;
+    fn fetch_digest(
+        &self,
+        skill: ConfiguredSkill,
+    ) -> impl Future<Output = Result<Option<Digest>, RegistryError>> + Send;
 }
 
-#[async_trait]
 impl SkillLoaderApi for mpsc::Sender<SkillLoaderMsg> {
     async fn fetch(
         &self,
