@@ -503,11 +503,11 @@ pub enum SkillExecutionError {
         functions from the metadata function, yet the skill does precisely this."
     )]
     CsiUseFromMetadata,
-    /// A skill name is not mentioned in the namespace and therfore it is not served. This is a
+    /// A skill name is not mentioned in the namespace and therefore it is not served. This is a
     /// logic error. Yet it does not originate in the skill code itself. It could be an error in the
     /// request by the user, or a missing configuration at the side of the skill developer.
     #[error(
-        "Sorry, We could not find the skill you requested in its namespace. This can have three \
+        "Sorry, we could not find the skill you requested in its namespace. This can have three \
         causes:\n\n\
         1. You send the wrong skill name.\n\
         2. You send the wrong namespace.\n\
@@ -617,7 +617,7 @@ impl SkillExecutionError {
             | SkillExecutionError::MessageBeginWhileMessageActive
             | SkillExecutionError::InvalidOutput(_)
             | SkillExecutionError::MisconfiguredNamespace { .. } => Level::WARN,
-            // This could be a wrong configuration, but also just mistying a skill name. So we log
+            // This could be a wrong configuration, but also just mistyping a skill name. So we log
             // these only as info.
             SkillExecutionError::SkillNotConfigured
             | SkillExecutionError::InvalidInput(_)
