@@ -781,7 +781,7 @@ pub mod tests {
         let event = recv.recv().await.unwrap();
         let expected_error_msg = "The skill could not be executed to completion, something in our \
             runtime is currently \nunavailable or misconfigured. You should try again later, if \
-            the situation persists you \nmay want to contact the operaters. Original error:\n\n\
+            the situation persists you \nmay want to contact the operators. Original error:\n\n\
             Test error";
         assert_eq!(
             event,
