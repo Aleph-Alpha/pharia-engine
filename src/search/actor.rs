@@ -1,6 +1,5 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use async_trait::async_trait;
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde_json::value::Value;
 use tokio::{
@@ -50,26 +49,24 @@ impl Search {
 /// Use this to execute tasks with the Search API. The existence of this API handle implies the
 /// actor is alive and running. This means this handle must be disposed of, before the search
 /// actor can shut down.
-#[async_trait]
-pub trait SearchApi: Clone + Send + Sync + 'static {
-    async fn search(
+pub trait SearchApi {
+    fn search(
         &self,
         request: SearchRequest,
         api_token: String,
-    ) -> anyhow::Result<Vec<SearchResult>>;
-    async fn document_metadata(
+    ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
+    fn document_metadata(
         &self,
         document_path: DocumentPath,
         api_token: String,
-    ) -> anyhow::Result<Option<Value>>;
-    async fn document(
+    ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
+    fn document(
         &self,
         document_path: DocumentPath,
         api_token: String,
-    ) -> anyhow::Result<Document>;
+    ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
 
-#[async_trait]
 impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
     async fn search(
         &self,
@@ -368,71 +365,63 @@ pub mod tests {
 
     use super::*;
 
-    /// Always return the same completion
     pub struct SearchStub {
-        send: mpsc::Sender<DocumentIndexMessage>,
-        join_handle: JoinHandle<()>,
+        document: Box<dyn Fn(DocumentPath) -> anyhow::Result<Document> + Send + Sync + 'static>,
+        document_metadata:
+            Box<dyn Fn(DocumentPath) -> anyhow::Result<Option<Value>> + Send + Sync + 'static>,
     }
 
     impl SearchStub {
-        pub fn with_metadata(
-            result: impl Fn(DocumentPath) -> anyhow::Result<Option<Value>> + Send + 'static,
+        pub fn new() -> Self {
+            Self {
+                document: Box::new(|_| Err(anyhow::anyhow!("Not implemented"))),
+                document_metadata: Box::new(|_| Err(anyhow::anyhow!("Not implemented"))),
+            }
+        }
+
+        pub fn with_document(
+            mut self,
+            document: impl Fn(DocumentPath) -> anyhow::Result<Document> + Send + Sync + 'static,
         ) -> Self {
-            let (send, mut recv) = mpsc::channel::<DocumentIndexMessage>(1);
-            let join_handle = tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    match msg {
-                        DocumentIndexMessage::Metadata {
-                            document_path,
-                            send,
-                            ..
-                        } => {
-                            send.send(result(document_path)).unwrap();
-                        }
-                        DocumentIndexMessage::Search { .. } => {
-                            unimplemented!()
-                        }
-                        DocumentIndexMessage::Document { .. } => {
-                            unimplemented!()
-                        }
-                    }
-                }
-            });
-
-            Self { send, join_handle }
+            self.document = Box::new(document);
+            self
         }
 
-        pub fn with_documents(result: impl Fn(DocumentPath) -> Document + Send + 'static) -> Self {
-            let (send, mut recv) = mpsc::channel::<DocumentIndexMessage>(1);
-            let join_handle = tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    match msg {
-                        DocumentIndexMessage::Metadata { .. } => {
-                            unimplemented!()
-                        }
-                        DocumentIndexMessage::Search { .. } => {
-                            unimplemented!()
-                        }
-                        DocumentIndexMessage::Document {
-                            document_path,
-                            send,
-                            ..
-                        } => {
-                            send.send(Ok(result(document_path))).unwrap();
-                        }
-                    }
-                }
-            });
-
-            Self { send, join_handle }
+        pub fn with_document_metadata(
+            mut self,
+            document_metadata: impl Fn(DocumentPath) -> anyhow::Result<Option<Value>>
+            + Send
+            + Sync
+            + 'static,
+        ) -> Self {
+            self.document_metadata = Box::new(document_metadata);
+            self
         }
-        pub async fn wait_for_shutdown(self) {
-            drop(self.send);
-            self.join_handle.await.unwrap();
+    }
+
+    impl SearchApi for SearchStub {
+        async fn search(
+            &self,
+            _request: SearchRequest,
+            _api_token: String,
+        ) -> anyhow::Result<Vec<SearchResult>> {
+            unimplemented!()
         }
 
-        pub fn api(&self) -> mpsc::Sender<DocumentIndexMessage> {
-            self.send.clone()
+        async fn document_metadata(
+            &self,
+            document_path: DocumentPath,
+            _api_token: String,
+        ) -> anyhow::Result<Option<Value>> {
+            (self.document_metadata)(document_path)
+        }
+
+        async fn document(
+            &self,
+            document_path: DocumentPath,
+            _api_token: String,
+        ) -> anyhow::Result<Document> {
+            (self.document)(document_path)
         }
     }
 
