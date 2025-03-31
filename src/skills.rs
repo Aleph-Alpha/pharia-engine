@@ -174,7 +174,7 @@ pub enum SkillError {
 
 /// Failures which occur when loading a skill from Web Assembly bytes.
 #[derive(Debug, Error, Clone)]
-pub enum LoadSkillError {
+pub enum SkillLoadError {
     #[error("Failed to pre-instantiate the skill: {0}")]
     SkillPreError(String),
     #[error("Failed to pre-instantiate the component: {0}")]
@@ -264,12 +264,12 @@ impl Engine {
     pub fn instantiate_pre(
         &self,
         bytes: impl AsRef<[u8]>,
-    ) -> Result<InstancePre<LinkedCtx>, LoadSkillError> {
+    ) -> Result<InstancePre<LinkedCtx>, SkillLoadError> {
         let component = Component::new(&self.inner, bytes)
-            .map_err(|e| LoadSkillError::ComponentError(e.to_string()))?;
+            .map_err(|e| SkillLoadError::ComponentError(e.to_string()))?;
         self.linker
             .instantiate_pre(&component)
-            .map_err(|e| LoadSkillError::LinkerError(e.to_string()))
+            .map_err(|e| SkillLoadError::LinkerError(e.to_string()))
     }
 
     /// Generates a store for a specific invocation.
@@ -325,24 +325,24 @@ pub trait Skill: Send + Sync {
 pub fn load_skill_from_wasm_bytes(
     engine: &Engine,
     bytes: impl AsRef<[u8]>,
-) -> Result<Box<dyn Skill>, LoadSkillError> {
+) -> Result<Box<dyn Skill>, SkillLoadError> {
     let skill_world = SupportedSkillWorld::extract(&bytes)?;
     let pre = engine.instantiate_pre(&bytes)?;
 
     match skill_world {
         SupportedSkillWorld::V0_2Function => {
             let skill = v0_2::SkillPre::new(pre)
-                .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
+                .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
         }
         SupportedSkillWorld::V0_3Function => {
             let skill = v0_3::skill::SkillPre::new(pre)
-                .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
+                .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
         }
         SupportedSkillWorld::V0_3MessageStream => {
             let skill = v0_3::message_stream_skill::MessageStreamSkillPre::new(pre)
-                .map_err(|e| LoadSkillError::SkillPreError(e.to_string()))?;
+                .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
             Ok(Box::new(skill))
         }
     }
@@ -382,11 +382,11 @@ impl SupportedSkillWorld {
         Ok(())
     }
 
-    fn extract(wasm: impl AsRef<[u8]>) -> Result<SupportedSkillWorld, LoadSkillError> {
+    fn extract(wasm: impl AsRef<[u8]>) -> Result<SupportedSkillWorld, SkillLoadError> {
         let decoded =
-            decode(wasm.as_ref()).map_err(|e| LoadSkillError::WasmDecodeError(e.to_string()))?;
+            decode(wasm.as_ref()).map_err(|e| SkillLoadError::WasmDecodeError(e.to_string()))?;
         let DecodedWasm::Component(resolve, ..) = decoded else {
-            return Err(LoadSkillError::NotComponent);
+            return Err(SkillLoadError::NotComponent);
         };
 
         // Decoding library should export a "root" world as the target world for the component.
@@ -443,7 +443,7 @@ impl SupportedSkillWorld {
         }
 
         // We didn't find an expected export
-        Err(LoadSkillError::UnsupportedWorld)
+        Err(SkillLoadError::UnsupportedWorld)
     }
 }
 
@@ -457,7 +457,7 @@ pub enum SupportedVersion {
 }
 
 impl TryFrom<&Version> for SupportedVersion {
-    type Error = LoadSkillError;
+    type Error = SkillLoadError;
 
     fn try_from(version: &Version) -> Result<Self, Self::Error> {
         match version {
@@ -467,7 +467,7 @@ impl TryFrom<&Version> for SupportedVersion {
                 if version <= Self::V0_2.current_supported_version() {
                     Ok(Self::V0_2)
                 } else {
-                    Err(LoadSkillError::NotSupportedYet(version.to_string()))
+                    Err(SkillLoadError::NotSupportedYet(version.to_string()))
                 }
             }
             Version {
@@ -476,14 +476,14 @@ impl TryFrom<&Version> for SupportedVersion {
                 if version <= Self::V0_3.current_supported_version() {
                     Ok(Self::V0_3)
                 } else {
-                    Err(LoadSkillError::NotSupportedYet(version.to_string()))
+                    Err(SkillLoadError::NotSupportedYet(version.to_string()))
                 }
             }
             _ => {
                 if version > Self::latest_supported_version() {
-                    Err(LoadSkillError::NotSupportedYet(version.to_string()))
+                    Err(SkillLoadError::NotSupportedYet(version.to_string()))
                 } else {
-                    Err(LoadSkillError::NoLongerSupported(version.to_string()))
+                    Err(SkillLoadError::NoLongerSupported(version.to_string()))
                 }
             }
         }
@@ -1111,7 +1111,7 @@ pub mod tests {
     #[test]
     fn unsupported_v0_1() {
         let error = SupportedVersion::try_from(&Version::new(0, 1, 0)).unwrap_err();
-        assert!(matches!(error, LoadSkillError::NoLongerSupported(..)));
+        assert!(matches!(error, SkillLoadError::NoLongerSupported(..)));
     }
 
     #[test]
@@ -1125,14 +1125,14 @@ pub mod tests {
     #[test]
     fn invalid_0_2_version() {
         let error = SupportedVersion::try_from(&Version::new(0, 2, u64::MAX)).unwrap_err();
-        assert!(matches!(error, LoadSkillError::NotSupportedYet(..)));
+        assert!(matches!(error, SkillLoadError::NotSupportedYet(..)));
     }
 
     #[test]
     fn invalid_future_version() {
         let error =
             SupportedVersion::try_from(&Version::new(u64::MAX, u64::MAX, u64::MAX)).unwrap_err();
-        assert!(matches!(error, LoadSkillError::NotSupportedYet(..)));
+        assert!(matches!(error, SkillLoadError::NotSupportedYet(..)));
     }
 
     /// Learning test to verify nothing strange happens if a instantiated skill is invoked multiple times.

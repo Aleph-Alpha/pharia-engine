@@ -8,7 +8,7 @@ use crate::namespace_watcher::{Namespace, Registry};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
-use crate::skills::{Engine, LoadSkillError, Skill, SkillPath, load_skill_from_wasm_bytes};
+use crate::skills::{Engine, Skill, SkillLoadError, SkillPath, load_skill_from_wasm_bytes};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
@@ -47,7 +47,7 @@ pub enum SkillFetchError {
     #[error(transparent)]
     RegistryError(#[from] RegistryError),
     #[error(transparent)]
-    SkillLoadingError(#[from] LoadSkillError),
+    SkillLoadingError(#[from] SkillLoadError),
     #[error("Skill {0} not found in registry.")]
     SkillNotFound(ConfiguredSkill),
 }
