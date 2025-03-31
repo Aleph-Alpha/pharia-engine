@@ -207,8 +207,6 @@ where
             post(message_stream_skill),
         )
         .merge(csi_shell::http())
-        // Keep for backwards compatibility
-        .route("/skills", get(skills))
         // Hidden routes for cache for internal use
         .route("/cached_skills", get(cached_skills))
         .route(
@@ -1647,23 +1645,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
-    async fn healthcheck() {
-        let app_state = AppState::dummy();
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .uri("/healthcheck")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(&body[..], b"ok");
-    }
-
-    #[tokio::test]
     async fn health() {
         let saboteur_authorization = StubAuthorization::new(|msg| {
             match msg {
@@ -1725,7 +1706,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let resp = http
             .oneshot(
                 Request::builder()
-                    .uri("/skills")
+                    .uri("/v1/skills")
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
@@ -1761,7 +1742,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let resp = http
             .oneshot(
                 Request::builder()
-                    .uri("/skills")
+                    .uri("/v1/skills")
                     .header(header::AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
