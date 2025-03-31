@@ -659,7 +659,7 @@ pub mod tests {
         chunking::{Chunk, ChunkRequest},
         csi::{
             ChatStreamId, CompletionStreamId,
-            tests::{CsiChatStreamStub, CsiCompleteStreamStub, CsiDummy, CsiGreetingMock, StubCsi},
+            tests::{CsiChatStreamStub, CsiCompleteStreamStub, CsiGreetingMock, StubCsi},
         },
         inference::{
             ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
@@ -844,7 +844,7 @@ pub mod tests {
         let (send_rt_err, _) = oneshot::channel();
         let skill_ctx = Box::new(SkillInvocationCtx::new(
             send_rt_err,
-            CsiDummy,
+            StubCsi::empty(),
             api_token().to_owned(),
         ));
         let mut ctx = LinkedCtx::new(skill_ctx);

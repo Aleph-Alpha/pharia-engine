@@ -59,82 +59,71 @@ pub trait CsiForSkills {
     async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
 }
 
-/// Cognitive System Interface (CSI) as consumed internally by PhariaKernel, before the CSI is
+/// Cognitive System Interface (CSI) as consumed internally by `PhariaKernel`, before the CSI is
 /// passed to the end user in Skill code we further strip away some of the accidental complexity.
 /// See its sibling trait `CsiForSkills`. These methods take `Vec`s rather than individual requests
 /// in order to allow for parallization behind the scenes.
-#[async_trait]
 pub trait Csi {
-    async fn explain(
+    fn explain(
         &self,
         auth: String,
         requests: Vec<ExplanationRequest>,
-    ) -> anyhow::Result<Vec<Explanation>>;
+    ) -> impl Future<Output = anyhow::Result<Vec<Explanation>>> + Send;
 
-    async fn complete(
+    fn complete(
         &self,
         auth: String,
         requests: Vec<CompletionRequest>,
-    ) -> anyhow::Result<Vec<Completion>>;
+    ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send;
 
-    async fn completion_stream(
+    fn completion_stream(
         &self,
         auth: String,
         request: CompletionRequest,
-    ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>>;
+    ) -> impl Future<Output = mpsc::Receiver<anyhow::Result<CompletionEvent>>> + Send;
 
-    async fn chat(
+    fn chat(
         &self,
         auth: String,
         requests: Vec<ChatRequest>,
-    ) -> anyhow::Result<Vec<ChatResponse>>;
+    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
 
-    async fn chat_stream(
+    fn chat_stream(
         &self,
         auth: String,
         request: ChatRequest,
-    ) -> mpsc::Receiver<anyhow::Result<ChatEvent>>;
+    ) -> impl Future<Output = mpsc::Receiver<anyhow::Result<ChatEvent>>> + Send;
 
-    async fn chunk(
+    fn chunk(
         &self,
         auth: String,
         requests: Vec<ChunkRequest>,
-    ) -> anyhow::Result<Vec<Vec<Chunk>>>;
+    ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send;
 
     // While the implementation might not be async, we want the interface to be asynchronous.
     // It is up to the implementer whether the actual implementation is async.
-    async fn select_language(
+    fn select_language(
         &self,
         requests: Vec<SelectLanguageRequest>,
-    ) -> anyhow::Result<Vec<Option<Language>>> {
-        // default implementation can be provided here because language selection is stateless
-        Ok(try_join_all(
-            requests
-                .into_iter()
-                .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
-        )
-        .await?
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?)
-    }
+    ) -> impl Future<Output = anyhow::Result<Vec<Option<Language>>>> + Send;
 
-    async fn search(
+    fn search(
         &self,
         auth: String,
         requests: Vec<SearchRequest>,
-    ) -> anyhow::Result<Vec<Vec<SearchResult>>>;
+    ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send;
 
-    async fn documents(
+    fn documents(
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> anyhow::Result<Vec<Document>>;
+    ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send;
 
-    async fn document_metadata(
+    fn document_metadata(
         &self,
         auth: String,
         requests: Vec<DocumentPath>,
-    ) -> anyhow::Result<Vec<Option<Value>>>;
+    ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send;
 }
 
 pub enum CsiMetrics {
@@ -149,7 +138,6 @@ impl From<CsiMetrics> for metrics::KeyName {
     }
 }
 
-#[async_trait]
 impl<I, S, T> Csi for CsiDrivers<I, S, T>
 where
     I: InferenceApi + Send + Sync,
@@ -276,6 +264,20 @@ where
         .await
     }
 
+    async fn select_language(
+        &self,
+        requests: Vec<SelectLanguageRequest>,
+    ) -> anyhow::Result<Vec<Option<Language>>> {
+        Ok(try_join_all(
+            requests
+                .into_iter()
+                .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
+        )
+        .await?
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?)
+    }
+
     async fn search(
         &self,
         auth: String,
@@ -364,7 +366,6 @@ pub mod tests {
     #[derive(Clone)]
     pub struct CsiSaboteur;
 
-    #[async_trait]
     impl Csi for CsiSaboteur {
         async fn explain(
             &self,
@@ -415,6 +416,13 @@ pub mod tests {
             let (send, recv) = mpsc::channel(1);
             send.send(Err(anyhow::anyhow!("Test error"))).await.unwrap();
             recv
+        }
+
+        async fn select_language(
+            &self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> anyhow::Result<Vec<Option<Language>>> {
+            bail!("Test error")
         }
 
         async fn search(
@@ -698,7 +706,6 @@ pub mod tests {
     #[derive(Clone)]
     pub struct CsiDummy;
 
-    #[async_trait]
     impl Csi for CsiDummy {
         async fn explain(
             &self,
@@ -745,6 +752,13 @@ pub mod tests {
             _request: ChatRequest,
         ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
             panic!("DummyCsi chat_stream called")
+        }
+
+        async fn select_language(
+            &self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> anyhow::Result<Vec<Option<Language>>> {
+            panic!("DummyCsi select_language called")
         }
 
         async fn search(
@@ -834,7 +848,6 @@ pub mod tests {
         }
     }
 
-    #[async_trait]
     impl Csi for StubCsi {
         async fn explain(
             &self,
@@ -938,6 +951,20 @@ pub mod tests {
             _requests: Vec<SearchRequest>,
         ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
             unimplemented!()
+        }
+
+        async fn select_language(
+            &self,
+            requests: Vec<SelectLanguageRequest>,
+        ) -> anyhow::Result<Vec<Option<Language>>> {
+            Ok(try_join_all(
+                requests
+                    .into_iter()
+                    .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
+            )
+            .await?
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?)
         }
 
         async fn documents(
