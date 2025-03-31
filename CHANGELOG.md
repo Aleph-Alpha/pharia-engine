@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.10](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.9...v0.11.10)
+
+### Features
+
+- Insert errors into streams on invalid message state transitions - ([a3e1196](https://github.com/Aleph-Alpha/pharia-kernel/commit/a3e11961d99d26003bb3713c40d14b228d34e1d0))
+
+### Fixes
+
+- Skills emitting invalid Json in stream are now correctly logged as being buggy. - ([691911c](https://github.com/Aleph-Alpha/pharia-kernel/commit/691911c8f02daf8211e2d6b962a861b1af91acc2))
+
+### Documentation
+
+- Fix spelling of operator - ([247cb6b](https://github.com/Aleph-Alpha/pharia-kernel/commit/247cb6bc9a9227e364c52c83eeee12b9976fd6a6))
+- Fix typos in skill event doc string - ([014a515](https://github.com/Aleph-Alpha/pharia-kernel/commit/014a51569d3bf2f0924443cf3ac6f1ff7e4fc851))
+- Fix multiple small typos - ([5cad009](https://github.com/Aleph-Alpha/pharia-kernel/commit/5cad0096d7d4baa1a8db608c5602d7027001ab27))
+
+### Builds
+
+- *(deps)* Bump the minor group with 8 updates - ([28aee9a](https://github.com/Aleph-Alpha/pharia-kernel/commit/28aee9ad3281332698ddfe70b4326ee8832a4fd4))
+
+
 ## [0.11.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.8...v0.11.9)
 
 ### Fixes
