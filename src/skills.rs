@@ -620,7 +620,7 @@ fn pooling_allocator_is_supported() -> bool {
     *USE_POOLING
 }
 
-/// A event emitted by the buisness logic living in the skill. As oppossed to an event emitted by
+/// An event emitted by the business logic living in the skill. As opposed to an event emitted by
 /// executing the skill. The difference is that the former can not contain runtime errors, and is
 /// not checked yet for invalid state transitions. Example of invalid state transition would be
 /// starting a message with end rather than start.
@@ -632,7 +632,7 @@ pub enum SkillEvent {
     MessageBegin,
     /// Send at the end of each message. Can carry an arbitrary payload, to make messages more of a
     /// dropin for classical functions. Might be refined in the future. We anticipate the stop
-    /// reason to be very useful for end appliacations. We also introduce end messages to keep the
+    /// reason to be very useful for end applications. We also introduce end messages to keep the
     /// door open for multiple messages in a stream.
     MessageEnd { payload: Value },
     /// Append the internal string to the current message
