@@ -19,7 +19,7 @@ use crate::{
     language_selection::{Language, SelectLanguageRequest},
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent},
+    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
 };
 
 pub struct SkillDriver {
@@ -492,6 +492,8 @@ impl EventTranslator {
 /// Errors which may prevent a skill from executing to completion successfully.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum SkillExecutionError {
+    #[error("The skill could not be loaded. Original error:\n\n{0}")]
+    SkillLoadError(#[from] SkillLoadError),
     #[error(
         "The metadata function of the invoked skill is bugged. It is forbidden to invoke any CSI \
         functions from the metadata function, yet the skill does precisely this."
@@ -603,9 +605,11 @@ impl SkillExecutionError {
         match self {
             // We give this the error severity, because this hints to a shortcoming in the
             // envirorment. The operator may need to act.
+            SkillExecutionError::SkillLoadError(SkillLoadError::NotSupportedYet(..)) |
             SkillExecutionError::RuntimeError(_) => Level::ERROR,
             // These are bugs in the skill code, or their configuration.
             SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::SkillLoadError(_)
             | SkillExecutionError::MessageEndWithoutMessageBegin
             | SkillExecutionError::MessageAppendWithoutMessageBegin
             | SkillExecutionError::MessageBeginWhileMessageActive

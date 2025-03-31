@@ -173,7 +173,7 @@ pub enum SkillError {
 }
 
 /// Failures which occur when loading a skill from Web Assembly bytes.
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum SkillLoadError {
     #[error("Failed to pre-instantiate the skill: {0}")]
     SkillPreError(String),
@@ -184,14 +184,15 @@ pub enum SkillLoadError {
     #[error("Skill version {0} is no longer supported by the Kernel. Try upgrading your SDK.")]
     NoLongerSupported(String),
     #[error(
-        "Skill version {0} is not supported by this Kernel installation yet. Try updating your Kernel version or downgrading your SDK."
+        "Skill version {0} is not supported by this Kernel installation yet. Try updating your \
+        Kernel version or downgrading your SDK."
     )]
     NotSupportedYet(String),
     #[error("Error decoding Wasm component: {0}")]
     WasmDecodeError(String),
-    #[error("Wasm isn't a component.")]
+    #[error("Web Assembly is not a component.")]
     NotComponent,
-    #[error("Wasm component isn't using a supported pharia:skill world.")]
+    #[error("Web assembly component is not using a supported pharia:skill world.")]
     UnsupportedWorld,
 }
 
