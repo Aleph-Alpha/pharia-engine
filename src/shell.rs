@@ -228,8 +228,6 @@ where
             get(async || Html(Scalar::new(api_doc).to_html())),
         )
         .route("/openapi.json", get(serve_docs))
-        // maintaining `healthcheck` route for backward compatibility
-        .route("/healthcheck", get(async || "ok"))
         .route("/health", get(async || "ok"))
         .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
