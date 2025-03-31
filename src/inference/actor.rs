@@ -31,8 +31,8 @@ impl Inference {
         Inference { send, handle }
     }
 
-    pub fn api(&self) -> InferenceApi {
-        InferenceApi::new(self.send.clone())
+    pub fn api(&self) -> mpsc::Sender<InferenceMessage> {
+        self.send.clone()
     }
 
     /// Inference is going to shutdown, as soon as the last instance of [`InferenceApi`] is dropped.
@@ -42,20 +42,40 @@ impl Inference {
     }
 }
 
-/// Use this to execute tasks with the inference API. The existence of this API handle implies the
-/// actor is alive and running. This means this handle must be disposed of, before the inference
-/// actor can shut down.
-#[derive(Clone)]
-pub struct InferenceApi {
-    send: mpsc::Sender<InferenceMessage>,
+pub trait InferenceApi {
+    fn explain(
+        &self,
+        request: ExplanationRequest,
+        api_token: String,
+    ) -> impl Future<Output = anyhow::Result<Explanation>> + Send;
+
+    fn complete(
+        &self,
+        request: CompletionRequest,
+        api_token: String,
+    ) -> impl Future<Output = anyhow::Result<Completion>> + Send;
+
+    fn completion_stream(
+        &self,
+        request: CompletionRequest,
+        api_token: String,
+    ) -> impl Future<Output = mpsc::Receiver<anyhow::Result<CompletionEvent>>> + Send;
+
+    fn chat(
+        &self,
+        request: ChatRequest,
+        api_token: String,
+    ) -> impl Future<Output = anyhow::Result<ChatResponse>> + Send;
+
+    fn chat_stream(
+        &self,
+        request: ChatRequest,
+        api_token: String,
+    ) -> impl Future<Output = mpsc::Receiver<anyhow::Result<ChatEvent>>> + Send;
 }
 
-impl InferenceApi {
-    pub fn new(send: mpsc::Sender<InferenceMessage>) -> InferenceApi {
-        InferenceApi { send }
-    }
-
-    pub async fn explain(
+impl InferenceApi for mpsc::Sender<InferenceMessage> {
+    async fn explain(
         &self,
         request: ExplanationRequest,
         api_token: String,
@@ -66,15 +86,14 @@ impl InferenceApi {
             send,
             api_token,
         };
-        self.send
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
             .expect("sender must be alive when awaiting for answers")
     }
 
-    pub async fn complete(
+    async fn complete(
         &self,
         request: CompletionRequest,
         api_token: String,
@@ -85,15 +104,14 @@ impl InferenceApi {
             send,
             api_token,
         };
-        self.send
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
             .expect("sender must be alive when awaiting for answers")
     }
 
-    pub async fn completion_stream(
+    async fn completion_stream(
         &self,
         request: CompletionRequest,
         api_token: String,
@@ -104,33 +122,27 @@ impl InferenceApi {
             send,
             api_token,
         };
-        self.send
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
     }
 
-    pub async fn chat(
-        &self,
-        request: ChatRequest,
-        api_token: String,
-    ) -> anyhow::Result<ChatResponse> {
+    async fn chat(&self, request: ChatRequest, api_token: String) -> anyhow::Result<ChatResponse> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Chat {
             request,
             send,
             api_token,
         };
-        self.send
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
             .expect("sender must be alive when awaiting for answers")
     }
 
-    pub async fn chat_stream(
+    async fn chat_stream(
         &self,
         request: ChatRequest,
         api_token: String,
@@ -141,8 +153,7 @@ impl InferenceApi {
             send,
             api_token,
         };
-        self.send
-            .send(msg)
+        self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
@@ -541,7 +552,7 @@ pub mod tests {
     };
 
     use anyhow::anyhow;
-    use tokio::{sync::mpsc, task::JoinHandle, time::sleep, try_join};
+    use tokio::{sync::mpsc, time::sleep, try_join};
 
     use crate::inference::client::{InferenceClient, InferenceClientError};
 
@@ -561,109 +572,125 @@ pub mod tests {
         }
     }
 
-    /// Always return the same completion
     pub struct InferenceStub {
-        send: mpsc::Sender<InferenceMessage>,
-        join_handle: JoinHandle<()>,
+        complete: Box<dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync>,
+        chat: Box<dyn Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync>,
     }
 
     impl InferenceStub {
-        pub fn with_completion(
-            result: impl Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + 'static,
-        ) -> Self {
-            let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
-            let join_handle = tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    match msg {
-                        InferenceMessage::Complete { request, send, .. } => {
-                            send.send(result(request)).unwrap();
-                        }
-                        InferenceMessage::CompletionStream { request, send, .. } => {
-                            match result(request) {
-                                Ok(Completion {
-                                    text,
-                                    finish_reason,
-                                    logprobs,
-                                    usage,
-                                }) => {
-                                    send.send(Ok(CompletionEvent::Append { text, logprobs }))
-                                        .await
-                                        .unwrap();
-                                    send.send(Ok(CompletionEvent::End { finish_reason }))
-                                        .await
-                                        .unwrap();
-                                    send.send(Ok(CompletionEvent::Usage { usage }))
-                                        .await
-                                        .unwrap();
-                                }
-                                Err(e) => {
-                                    send.send(Err(e)).await.unwrap();
-                                }
-                            }
-                        }
-                        _ => {
-                            unimplemented!()
-                        }
-                    }
-                }
-            });
+        pub fn new() -> Self {
+            Self {
+                complete: Box::new(|_| Err(anyhow::anyhow!("Not implemented"))),
+                chat: Box::new(|_| Err(anyhow::anyhow!("Not implemented"))),
+            }
+        }
 
-            Self { send, join_handle }
+        pub fn with_complete(
+            mut self,
+            complete: impl Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static,
+        ) -> Self {
+            self.complete = Box::new(complete);
+            self
         }
 
         pub fn with_chat(
-            result: impl Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + 'static,
+            mut self,
+            chat: impl Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync + 'static,
         ) -> Self {
-            let (send, mut recv) = mpsc::channel::<InferenceMessage>(1);
-            let join_handle = tokio::spawn(async move {
-                while let Some(msg) = recv.recv().await {
-                    match msg {
-                        InferenceMessage::Chat { request, send, .. } => {
-                            send.send(result(request)).unwrap();
-                        }
-                        InferenceMessage::ChatStream { request, send, .. } => match result(request)
-                        {
-                            Ok(ChatResponse {
-                                message,
-                                finish_reason,
-                                logprobs,
-                                usage,
-                            }) => {
-                                send.send(Ok(ChatEvent::MessageBegin { role: message.role }))
-                                    .await
-                                    .unwrap();
-                                send.send(Ok(ChatEvent::MessageAppend {
-                                    content: message.content,
-                                    logprobs,
-                                }))
-                                .await
-                                .unwrap();
-                                send.send(Ok(ChatEvent::MessageEnd { finish_reason }))
-                                    .await
-                                    .unwrap();
-                                send.send(Ok(ChatEvent::Usage { usage })).await.unwrap();
-                            }
-                            Err(e) => {
-                                send.send(Err(e)).await.unwrap();
-                            }
-                        },
-                        _ => {
-                            unimplemented!()
-                        }
-                    }
+            self.chat = Box::new(chat);
+            self
+        }
+    }
+
+    impl InferenceApi for InferenceStub {
+        async fn explain(
+            &self,
+            _request: ExplanationRequest,
+            _api_token: String,
+        ) -> anyhow::Result<Explanation> {
+            unimplemented!()
+        }
+
+        async fn complete(
+            &self,
+            request: CompletionRequest,
+            _api_token: String,
+        ) -> anyhow::Result<Completion> {
+            (self.complete)(request)
+        }
+
+        async fn completion_stream(
+            &self,
+            request: CompletionRequest,
+            _api_token: String,
+        ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+            let (send, recv) = mpsc::channel(3);
+            // Load up the receiver with events before returning it
+            match (self.complete)(request) {
+                Ok(Completion {
+                    text,
+                    finish_reason,
+                    logprobs,
+                    usage,
+                }) => {
+                    send.send(Ok(CompletionEvent::Append { text, logprobs }))
+                        .await
+                        .unwrap();
+                    send.send(Ok(CompletionEvent::End { finish_reason }))
+                        .await
+                        .unwrap();
+                    send.send(Ok(CompletionEvent::Usage { usage }))
+                        .await
+                        .unwrap();
                 }
-            });
-
-            Self { send, join_handle }
+                Err(e) => {
+                    send.send(Err(e)).await.unwrap();
+                }
+            };
+            recv
         }
 
-        pub async fn wait_for_shutdown(self) {
-            drop(self.send);
-            self.join_handle.await.unwrap();
+        async fn chat(
+            &self,
+            request: ChatRequest,
+            _api_token: String,
+        ) -> anyhow::Result<ChatResponse> {
+            (self.chat)(request)
         }
 
-        pub fn api(&self) -> InferenceApi {
-            InferenceApi::new(self.send.clone())
+        async fn chat_stream(
+            &self,
+            request: ChatRequest,
+            _api_token: String,
+        ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+            let (send, recv) = mpsc::channel(4);
+            // Load up the receiver with events before returning it
+            match (self.chat)(request) {
+                Ok(ChatResponse {
+                    message,
+                    finish_reason,
+                    logprobs,
+                    usage,
+                }) => {
+                    send.send(Ok(ChatEvent::MessageBegin { role: message.role }))
+                        .await
+                        .unwrap();
+                    send.send(Ok(ChatEvent::MessageAppend {
+                        content: message.content,
+                        logprobs,
+                    }))
+                    .await
+                    .unwrap();
+                    send.send(Ok(ChatEvent::MessageEnd { finish_reason }))
+                        .await
+                        .unwrap();
+                    send.send(Ok(ChatEvent::Usage { usage })).await.unwrap();
+                }
+                Err(e) => {
+                    send.send(Err(e)).await.unwrap();
+                }
+            };
+            recv
         }
     }
 

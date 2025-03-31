@@ -29,9 +29,9 @@ pub struct ChatStreamId(usize);
 ///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
-pub struct CsiDrivers<T> {
+pub struct CsiDrivers<I, T> {
     /// We use the inference Api to complete text
-    pub inference: InferenceApi,
+    pub inference: I,
     pub search: mpsc::Sender<DocumentIndexMessage>,
     pub tokenizers: T,
 }
@@ -152,8 +152,9 @@ impl From<CsiMetrics> for metrics::KeyName {
 }
 
 #[async_trait]
-impl<T> Csi for CsiDrivers<T>
+impl<I, T> Csi for CsiDrivers<I, T>
 where
+    I: InferenceApi + Send + Sync,
     T: TokenizerApi + Send + Sync,
 {
     async fn explain(
@@ -530,10 +531,9 @@ pub mod tests {
     #[tokio::test]
     async fn completion_stream_events() {
         // Given a CSI drivers with stub completion
-        let inference_stub =
-            InferenceStub::with_completion(|r| Ok(Completion::from_text(r.prompt)));
+        let inference = InferenceStub::new().with_complete(|r| Ok(Completion::from_text(r.prompt)));
         let csi_apis = CsiDrivers {
-            inference: inference_stub.api(),
+            inference,
             ..dummy_csi_drivers()
         };
 
@@ -554,7 +554,6 @@ pub mod tests {
         }
 
         drop(csi_apis);
-        inference_stub.wait_for_shutdown().await;
 
         // Then the completion must have the same order as the respective requests
         assert_eq!(events.len(), 3);
@@ -566,7 +565,7 @@ pub mod tests {
     #[tokio::test]
     async fn chat_stream_events() {
         // Given a CSI drivers with stub completion
-        let inference_stub = InferenceStub::with_chat(|_| {
+        let inference = InferenceStub::new().with_chat(|_| {
             Ok(ChatResponse {
                 message: Message {
                     role: "assistant".to_owned(),
@@ -581,7 +580,7 @@ pub mod tests {
             })
         });
         let csi_apis = CsiDrivers {
-            inference: inference_stub.api(),
+            inference,
             ..dummy_csi_drivers()
         };
 
@@ -603,7 +602,6 @@ pub mod tests {
         }
 
         drop(csi_apis);
-        inference_stub.wait_for_shutdown().await;
 
         // Then the completion must have the same order as the respective requests
         assert_eq!(events.len(), 4);
@@ -616,10 +614,9 @@ pub mod tests {
     #[tokio::test]
     async fn completion_requests_in_respective_order() {
         // Given a CSI drivers with stub completion
-        let inference_stub =
-            InferenceStub::with_completion(|r| Ok(Completion::from_text(r.prompt)));
+        let inference = InferenceStub::new().with_complete(|r| Ok(Completion::from_text(r.prompt)));
         let csi_apis = CsiDrivers {
-            inference: inference_stub.api(),
+            inference,
             ..dummy_csi_drivers()
         };
 
@@ -644,7 +641,6 @@ pub mod tests {
             .unwrap();
 
         drop(csi_apis);
-        inference_stub.wait_for_shutdown().await;
 
         // Then the completion must have the same order as the respective requests
         assert_eq!(completions.len(), 2);
@@ -692,10 +688,8 @@ pub mod tests {
         assert!(responses[1].contains("2nd"));
     }
 
-    fn dummy_csi_drivers() -> CsiDrivers<FakeTokenizers> {
-        let (send, _recv) = mpsc::channel(1);
-        let inference = InferenceApi::new(send);
-
+    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, FakeTokenizers> {
+        let inference = InferenceStub::new();
         let (search, _recv) = mpsc::channel(1);
         let tokenizers = FakeTokenizers;
 
