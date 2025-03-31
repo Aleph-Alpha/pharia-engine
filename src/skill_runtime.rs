@@ -351,7 +351,9 @@ fn record_skill_metrics<T>(
             | SkillExecutionError::MessageEndWithoutMessageBegin
             | SkillExecutionError::MessageBeginWhileMessageActive,
         ) => "logic_error",
-        Err(SkillExecutionError::RuntimeError(_)) => "runtime_error",
+        Err(SkillExecutionError::RuntimeError(_) | SkillExecutionError::SkillLoadError(_)) => {
+            "runtime_error"
+        }
     };
 
     let latency = start.elapsed().as_secs_f64();

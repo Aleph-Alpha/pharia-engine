@@ -347,7 +347,8 @@ impl From<SkillExecutionError> for HttpError {
             | SkillExecutionError::MessageAppendWithoutMessageBegin
             | SkillExecutionError::MessageBeginWhileMessageActive
             | SkillExecutionError::MessageEndWithoutMessageBegin
-            | SkillExecutionError::RuntimeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            | SkillExecutionError::SkillLoadError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SkillExecutionError::RuntimeError(_) => StatusCode::SERVICE_UNAVAILABLE,
             // 400 for every error we see an error on the client side of HTTP
             SkillExecutionError::UserCode(_)
             | SkillExecutionError::SkillNotConfigured
