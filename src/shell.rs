@@ -2,15 +2,16 @@ use anyhow::Context;
 use async_stream::try_stream;
 use axum::{
     Json, Router,
+    body::Body,
     extract::{FromRef, MatchedPath, Path, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
-    response::{Html, IntoResponse, Sse, sse::Event},
+    response::{ErrorResponse, Html, IntoResponse, Response, Sse, sse::Event},
     routing::{delete, get, post},
 };
 use axum_extra::{
     TypedHeader,
-    headers::{Authorization, authorization::Bearer},
+    headers::{self, Authorization, authorization::Bearer},
 };
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -36,7 +37,7 @@ use utoipa::{
 use utoipa_scalar::Scalar;
 
 use crate::{
-    authorization::{AuthorizationApi, authorization_middleware},
+    authorization::AuthorizationApi,
     csi::Csi,
     csi_shell,
     feature_set::FeatureSet,
@@ -56,7 +57,7 @@ impl Shell {
     pub async fn new(
         feature_set: FeatureSet,
         addr: impl Into<SocketAddr>,
-        authorization_api: AuthorizationApi,
+        authorization_api: impl AuthorizationApi + Clone + Send + Sync + 'static,
         skill_runtime_api: impl SkillRuntimeApi + Clone + Send + Sync + 'static,
         skill_store_api: impl SkillStoreApi + Clone + Send + Sync + 'static,
         csi_drivers: impl Csi + Clone + Send + Sync + 'static,
@@ -94,26 +95,28 @@ impl Shell {
 
 /// State shared between routes
 #[derive(Clone)]
-pub struct AppState<C, R, S>
+pub struct AppState<A, C, R, S>
 where
+    A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
 {
-    authorization_api: AuthorizationApi,
+    authorization_api: A,
     skill_store_api: S,
     skill_runtime_api: R,
     csi_drivers: C,
 }
 
-impl<C, R, S> AppState<C, R, S>
+impl<A, C, R, S> AppState<A, C, R, S>
 where
+    A: AuthorizationApi + Clone,
     C: Csi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone,
     S: SkillStoreApi + Clone,
 {
     pub fn new(
-        authorization_api: AuthorizationApi,
+        authorization_api: A,
         skill_store_api: S,
         skill_runtime_api: R,
         csi_drivers: C,
@@ -127,27 +130,32 @@ where
     }
 }
 
-impl<C, R, S> FromRef<AppState<C, R, S>> for AuthorizationApi
+/// Wrapper used to extract [`AuthorizationApi`] api from the [`AppState`] using a [`FromRef`] implementation.
+struct AuthorizationState<A>(pub A);
+
+impl<A, C, R, S> FromRef<AppState<A, C, R, S>> for AuthorizationState<A>
 where
+    A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
 {
-    fn from_ref(app_state: &AppState<C, R, S>) -> AuthorizationApi {
-        app_state.authorization_api.clone()
+    fn from_ref(app_state: &AppState<A, C, R, S>) -> AuthorizationState<A> {
+        AuthorizationState(app_state.authorization_api.clone())
     }
 }
 
 /// Wrapper used to extract [`Csi`] api from the [`AppState`] using a [`FromRef`] implementation.
 pub struct CsiState<C>(pub C);
 
-impl<C, R, S> FromRef<AppState<C, R, S>> for CsiState<C>
+impl<A, C, R, S> FromRef<AppState<A, C, R, S>> for CsiState<C>
 where
+    A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
 {
-    fn from_ref(app_state: &AppState<C, R, S>) -> CsiState<C> {
+    fn from_ref(app_state: &AppState<A, C, R, S>) -> CsiState<C> {
         CsiState(app_state.csi_drivers.clone())
     }
 }
@@ -156,13 +164,14 @@ where
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct SkillRuntimeState<R>(pub R);
 
-impl<C, R, S> FromRef<AppState<C, R, S>> for SkillRuntimeState<R>
+impl<A, C, R, S> FromRef<AppState<A, C, R, S>> for SkillRuntimeState<R>
 where
+    A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
 {
-    fn from_ref(app_state: &AppState<C, R, S>) -> SkillRuntimeState<R> {
+    fn from_ref(app_state: &AppState<A, C, R, S>) -> SkillRuntimeState<R> {
         SkillRuntimeState(app_state.skill_runtime_api.clone())
     }
 }
@@ -171,19 +180,21 @@ where
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct SkillStoreState<S>(pub S);
 
-impl<C, R, S> FromRef<AppState<C, R, S>> for SkillStoreState<S>
+impl<A, C, R, S> FromRef<AppState<A, C, R, S>> for SkillStoreState<S>
 where
+    A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
 {
-    fn from_ref(app_state: &AppState<C, R, S>) -> SkillStoreState<S> {
+    fn from_ref(app_state: &AppState<A, C, R, S>) -> SkillStoreState<S> {
         SkillStoreState(app_state.skill_store_api.clone())
     }
 }
 
-fn v1<C, R, S>() -> Router<AppState<C, R, S>>
+fn v1<A, C, R, S>() -> Router<AppState<A, C, R, S>>
 where
+    A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: Csi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
@@ -198,8 +209,9 @@ where
         )
 }
 
-fn http<C, R, S>(feature_set: FeatureSet, app_state: AppState<C, R, S>) -> Router
+fn http<A, C, R, S>(feature_set: FeatureSet, app_state: AppState<A, C, R, S>) -> Router
 where
+    A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: Csi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
@@ -266,6 +278,43 @@ where
                 .layer(DecompressionLayer::new())
                 .layer(CorsLayer::very_permissive()),
         )
+}
+
+async fn authorization_middleware<A>(
+    State(authorization_api): State<AuthorizationState<A>>,
+    bearer: Option<TypedHeader<headers::Authorization<Bearer>>>,
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, ErrorResponse>
+where
+    A: AuthorizationApi,
+{
+    if let Some(bearer) = bearer {
+        if let Ok(allowed) = authorization_api
+            .0
+            .check_permission(bearer.token().to_owned())
+            .await
+        {
+            if !allowed {
+                return Err(ErrorResponse::from((
+                    StatusCode::FORBIDDEN,
+                    "Bearer token invalid".to_owned(),
+                )));
+            }
+        } else {
+            return Err(ErrorResponse::from((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to check permission".to_owned(),
+            )));
+        }
+    } else {
+        return Err(ErrorResponse::from((
+            StatusCode::BAD_REQUEST,
+            "Bearer token expected".to_owned(),
+        )));
+    }
+    let response = next.run(request).await;
+    Ok(response)
 }
 
 struct HttpError {
@@ -717,7 +766,7 @@ mod tests {
     };
 
     use crate::{
-        authorization::{self, tests::StubAuthorization},
+        authorization::tests::StubAuthorization,
         chunking,
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
@@ -741,17 +790,10 @@ mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl AppState<CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
+    impl AppState<StubAuthorization, CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
         pub fn dummy() -> Self {
-            let dummy_authorization = StubAuthorization::new(|msg| {
-                match msg {
-                    authorization::AuthorizationMsg::Auth { api_token: _, send } => {
-                        drop(send.send(Ok(true)));
-                    }
-                };
-            });
             Self::new(
-                dummy_authorization.api(),
+                StubAuthorization::new(true),
                 SkillStoreDummy,
                 SkillRuntimeDummy,
                 CsiDummy,
@@ -759,18 +801,26 @@ mod tests {
         }
     }
 
-    impl<C, R, S> AppState<C, R, S>
+    impl<A, C, R, S> AppState<A, C, R, S>
     where
+        A: AuthorizationApi + Clone + Sync + Send + 'static,
         C: Csi + Clone + Sync + Send + 'static,
         R: SkillRuntimeApi + Clone + Send + Sync + 'static,
         S: SkillStoreApi + Clone + Send + Sync + 'static,
     {
-        pub fn with_authorization_api(mut self, authorization_api: AuthorizationApi) -> Self {
-            self.authorization_api = authorization_api;
-            self
+        pub fn with_authorization_api<A2>(self, authorization_api: A2) -> AppState<A2, C, R, S>
+        where
+            A2: AuthorizationApi + Clone + Sync + Send + 'static,
+        {
+            AppState::new(
+                authorization_api,
+                self.skill_store_api,
+                self.skill_runtime_api,
+                self.csi_drivers,
+            )
         }
 
-        pub fn with_skill_store_api<S2>(self, skill_store_api: S2) -> AppState<C, R, S2>
+        pub fn with_skill_store_api<S2>(self, skill_store_api: S2) -> AppState<A, C, R, S2>
         where
             S2: SkillStoreApi + Clone + Send + Sync + 'static,
         {
@@ -782,7 +832,7 @@ mod tests {
             )
         }
 
-        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppState<C, R2, S>
+        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppState<A, C, R2, S>
         where
             R2: SkillRuntimeApi + Clone + Send + Sync + 'static,
         {
@@ -794,7 +844,7 @@ mod tests {
             )
         }
 
-        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<C2, R, S>
+        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<A, C2, R, S>
         where
             C2: Csi + Clone + Sync + Send + 'static,
         {
@@ -1451,14 +1501,8 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     #[tokio::test]
     async fn api_token_missing_permission() {
         // Given
-        let stub_authorization = StubAuthorization::new(|msg| {
-            match msg {
-                authorization::AuthorizationMsg::Auth { api_token: _, send } => {
-                    drop(send.send(Ok(false)));
-                }
-            };
-        });
-        let app_state = AppState::dummy().with_authorization_api(stub_authorization.api());
+        let stub_authorization = StubAuthorization::new(false);
+        let app_state = AppState::dummy().with_authorization_api(stub_authorization);
 
         // When we want to access an endpoint that requires authentication
         let api_token = api_token();
@@ -1654,14 +1698,8 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn health() {
-        let saboteur_authorization = StubAuthorization::new(|msg| {
-            match msg {
-                authorization::AuthorizationMsg::Auth { api_token: _, send } => {
-                    drop(send.send(Ok(false)));
-                }
-            };
-        });
-        let app_state = AppState::dummy().with_authorization_api(saboteur_authorization.api());
+        let saboteur_authorization = StubAuthorization::new(false);
+        let app_state = AppState::dummy().with_authorization_api(saboteur_authorization);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
@@ -1732,14 +1770,8 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     #[tokio::test]
     async fn cannot_list_skills_without_permissions() {
         // Given we have a saboteur authorization
-        let saboteur_authorization = StubAuthorization::new(|msg| {
-            match msg {
-                authorization::AuthorizationMsg::Auth { api_token: _, send } => {
-                    drop(send.send(Ok(false)));
-                }
-            };
-        });
-        let app_state = AppState::dummy().with_authorization_api(saboteur_authorization.api());
+        let saboteur_authorization = StubAuthorization::new(false);
+        let app_state = AppState::dummy().with_authorization_api(saboteur_authorization);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
