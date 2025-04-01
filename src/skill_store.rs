@@ -28,14 +28,17 @@ struct CachedSkill {
     digest: Digest,
     /// When we last checked the digest
     digest_validated: Instant,
+    /// The weight of the item in the cache, to know if we need to evict something.
+    weight: usize,
 }
 
 impl CachedSkill {
-    fn new(skill: Arc<dyn Skill>, digest: Digest) -> Self {
+    fn new(skill: Arc<dyn Skill>, digest: Digest, weight: usize) -> Self {
         Self {
             skill,
             digest,
             digest_validated: Instant::now(),
+            weight,
         }
     }
 }
@@ -61,7 +64,10 @@ impl SkillCache {
             digest,
             size_loaded_from_registry,
         } = compiled_skill;
-        self.0.insert(skill_path, CachedSkill::new(skill, digest));
+        self.0.insert(
+            skill_path,
+            CachedSkill::new(skill, digest, size_loaded_from_registry),
+        );
     }
 
     fn remove(&mut self, skill_path: &SkillPath) -> bool {
