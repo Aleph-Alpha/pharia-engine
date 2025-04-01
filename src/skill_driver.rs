@@ -60,7 +60,14 @@ impl SkillDriver {
                 // receiver of events before the handler.
                 biased;
 
-                Ok(error) = &mut recv_rt_err => break Err(SkillExecutionError::RuntimeError(error.to_string())),
+                Ok(error) = &mut recv_rt_err => {
+                    let error = SkillExecutionError::RuntimeError(error.to_string());
+                    sender
+                        .send(SkillExecutionEvent::Error(error.clone()))
+                        .await
+                        .unwrap();
+                    break Err(error)
+                }
                 Some(skill_event) = recv_inner.recv() => {
                     let execution_event =
                         translator.translate_to_execution_event(skill_event);
@@ -70,7 +77,17 @@ impl SkillDriver {
                         break Err(error);
                     }
                 }
-                result = &mut execute_skill => break result.map_err(Into::into),
+                result = &mut execute_skill => {
+                    // Skill error to skill execution error
+                    let result = result.map_err(Into::<SkillExecutionError>::into);
+                    if let Err(err) = &result {
+                        sender
+                            .send(SkillExecutionEvent::Error(err.clone()))
+                            .await
+                            .unwrap();
+                    }
+                    break result;
+                }
             }
         };
 
@@ -83,13 +100,6 @@ impl SkillDriver {
             if let Some(error) = maybe_error {
                 return Err(error);
             }
-        }
-
-        if let Err(err) = &result {
-            sender
-                .send(SkillExecutionEvent::Error(err.clone()))
-                .await
-                .unwrap();
         }
 
         result
