@@ -11,7 +11,6 @@ use anyhow::anyhow;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
-use quick_cache::{Weighter, unsync::Cache};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -30,11 +29,11 @@ struct CachedSkill {
     /// When we last checked the digest
     digest_validated: Instant,
     /// The weight of the item in the cache, to know if we need to evict something.
-    weight: usize,
+    weight: u64,
 }
 
 impl CachedSkill {
-    fn new(skill: Arc<dyn Skill>, digest: Digest, weight: usize) -> Self {
+    fn new(skill: Arc<dyn Skill>, digest: Digest, weight: u64) -> Self {
         Self {
             skill,
             digest,
@@ -46,17 +45,28 @@ impl CachedSkill {
 
 struct SkillWeighter;
 
-impl Weighter<SkillPath, CachedSkill> for SkillWeighter {
+impl quick_cache::Weighter<SkillPath, CachedSkill> for SkillWeighter {
     fn weight(&self, _key: &SkillPath, val: &CachedSkill) -> u64 {
-        val.weight as u64
+        val.weight
     }
 }
 
-struct SkillCache(Cache<SkillPath, CachedSkill, SkillWeighter>);
+/// Uses a `quick_cache::unsync::Cache` to store skills.
+/// We can use unsync because we are already managing this in a single-threaded environment.
+/// This means we can use a more performant version without overhead for multiple threads.
+struct SkillCache(quick_cache::unsync::Cache<SkillPath, CachedSkill, SkillWeighter>);
 
 impl SkillCache {
-    fn new() -> Self {
-        Self(Cache::with_weighter(2, 4, SkillWeighter))
+    /// One of our Python Wasm Skills is roughly 60MB in size, on average.
+    const PYTHON_SKILL_SIZE: u64 = 60 * 1024 * 1024;
+
+    /// Create a new `SkillCache` that can hold approximately up to `capacity` skills.
+    fn new(capacity: usize) -> Self {
+        Self(quick_cache::unsync::Cache::with_weighter(
+            capacity,
+            Self::PYTHON_SKILL_SIZE.saturating_mul(capacity as u64),
+            SkillWeighter,
+        ))
     }
 
     fn keys(&self) -> impl Iterator<Item = &SkillPath> + '_ {
@@ -133,10 +143,15 @@ impl<L> SkillStoreState<L>
 where
     L: SkillLoaderApi,
 {
+    /// We predominantly load Python skills, which are quite heavy.
+    /// The first skill is roughly 850MB in memory, and subsequent ones are between 100-150MB.
+    /// Which means, we roughly dedicate 850 + 9 * 150 = 2200MB of RAM to keep 10 warm.
+    const MAX_CACHED_SKILLS: usize = 10;
+
     pub fn new(skill_loader: L) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
-            cached_skills: SkillCache::new(),
+            cached_skills: SkillCache::new(Self::MAX_CACHED_SKILLS),
             invalid_namespaces: HashMap::new(),
             skill_loader,
         }
@@ -1188,15 +1203,26 @@ pub mod tests {
 
     #[test]
     fn cache_invalidation() {
-        let mut cache = SkillCache::new();
-        let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), 2);
+        let capacity = 2;
+        let mut cache = SkillCache::new(capacity);
+        let loaded_skill = LoadedSkill::new(
+            Arc::new(SkillDummy),
+            Digest::new("digest"),
+            SkillCache::PYTHON_SKILL_SIZE,
+        );
+
+        let skill_paths = [SkillPath::dummy(), SkillPath::dummy(), SkillPath::dummy()];
 
         // Insert the skill twice at different paths
-        cache.insert(SkillPath::dummy(), loaded_skill.clone());
-        cache.insert(SkillPath::dummy(), loaded_skill.clone());
-        cache.insert(SkillPath::dummy(), loaded_skill);
+        cache.insert(skill_paths[0].clone(), loaded_skill.clone());
+        cache.insert(skill_paths[1].clone(), loaded_skill.clone());
+        cache.insert(skill_paths[2].clone(), loaded_skill);
 
-        assert_eq!(cache.keys().count(), 2);
+        let keys = cache.keys().collect::<Vec<_>>();
+        // One was evicted
+        assert_eq!(keys.len(), capacity);
+        // Most recent inserted skill should be in the cache
+        assert!(keys.contains(&&skill_paths[2]));
     }
 
     type SkillFactory = Box<dyn FnMut() -> LoadedSkill + Send>;
