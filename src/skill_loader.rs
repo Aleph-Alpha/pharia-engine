@@ -59,11 +59,18 @@ pub struct LoadedSkill {
     pub skill: Arc<dyn Skill>,
     /// The digest at the time of loading from the loader.
     pub digest: Digest,
+    /// How big the skill was in the registry. Used as a proxy for roughly how large a skill was
+    /// and can be used downstream for things like cache eviction.
+    pub size_loaded_from_registry: usize,
 }
 
 impl LoadedSkill {
-    pub fn new(skill: Arc<dyn Skill>, digest: Digest) -> Self {
-        Self { skill, digest }
+    pub fn new(skill: Arc<dyn Skill>, digest: Digest, size_loaded_from_registry: usize) -> Self {
+        Self {
+            skill,
+            digest,
+            size_loaded_from_registry,
+        }
     }
 }
 
@@ -240,10 +247,15 @@ impl SkillLoaderActor {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
             skill_bytes.ok_or_else(|| SkillFetchError::SkillNotFound(skill.clone()))?;
+        let size_loaded_from_registry = bytes.len();
         let skill = spawn_blocking(move || load_skill_from_wasm_bytes(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")?;
-        Ok(LoadedSkill::new(skill.into(), digest))
+        Ok(LoadedSkill::new(
+            skill.into(),
+            digest,
+            size_loaded_from_registry,
+        ))
     }
 
     /// For each new message, create a future that resolves the message and

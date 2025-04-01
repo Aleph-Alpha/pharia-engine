@@ -53,7 +53,11 @@ impl SkillCache {
     }
 
     fn insert(&mut self, skill_path: SkillPath, compiled_skill: LoadedSkill) {
-        let LoadedSkill { skill, digest } = compiled_skill;
+        let LoadedSkill {
+            skill,
+            digest,
+            size_loaded_from_registry,
+        } = compiled_skill;
         self.0.insert(skill_path, CachedSkill::new(skill, digest));
     }
 
@@ -960,7 +964,7 @@ pub mod tests {
         let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
         provider.insert(
             skill_path.clone(),
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy")),
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy"), 1),
         );
 
         // When we remove the skill
@@ -993,10 +997,10 @@ pub mod tests {
         let second_skill_path = SkillPath::local("second_skill");
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&first_skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("first"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("first"), 1)
         });
         skill_loader.add(&second_skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("second"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("second"), 1)
         });
 
         // When
@@ -1057,7 +1061,7 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"), 1)
         });
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let api = skill_store.api();
@@ -1080,7 +1084,7 @@ pub mod tests {
         let greet_skill = SkillPath::local("greet_skill");
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&greet_skill, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy digest"), 1)
         });
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let api = skill_store.api();
@@ -1107,17 +1111,17 @@ pub mod tests {
         let skill_path = SkillPath::local("greet");
         let mut skill_store_state = SkillStoreState::new(skill_loader.clone());
         skill_loader.add(&skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"), 1)
         });
         skill_store_state.upsert_skill(ConfiguredSkill::from_path(&skill_path));
         skill_store_state.insert(
             skill_path.clone(),
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest")),
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"), 1),
         );
 
         // When we update the digest of the "greet" skill and we clear out expired skills
         skill_loader.add(&skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("different-digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("different-digest"), 1)
         });
         skill_store_state
             .validate_digest(skill_path.clone())
@@ -1141,7 +1145,7 @@ pub mod tests {
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&skill_path, || {
             // Skill store always returns the same digest
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("originals-digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("originals-digest"), 1)
         });
         let mut skill_store_state = SkillStoreState::new(skill_loader);
         let configured_skill = ConfiguredSkill::from_path(&skill_path);
