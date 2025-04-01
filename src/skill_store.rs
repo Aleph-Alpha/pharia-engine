@@ -1240,7 +1240,7 @@ pub mod tests {
 
         let skill_paths = [SkillPath::dummy(), SkillPath::dummy(), SkillPath::dummy()];
 
-        // Insert the skill twice at different paths
+        // Insert the skill three times at different paths
         cache.insert(skill_paths[0].clone(), loaded_skill.clone());
         cache.insert(skill_paths[1].clone(), loaded_skill.clone());
         cache.insert(skill_paths[2].clone(), loaded_skill);
@@ -1250,6 +1250,24 @@ pub mod tests {
         assert_eq!(keys.len(), capacity);
         // Most recent inserted skill should be in the cache
         assert!(keys.contains(&&skill_paths[2]));
+    }
+
+    #[test]
+    fn rust_skills_evicted_less() {
+        let capacity = 2;
+        let rust_size = SkillCache::PYTHON_SKILL_SIZE / 10;
+        let mut cache = SkillCache::new(capacity);
+        let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), rust_size);
+
+        let skill_paths = (0..10).map(|_| SkillPath::dummy()).collect::<Vec<_>>();
+
+        for skill_path in &skill_paths {
+            cache.insert(skill_path.clone(), loaded_skill.clone());
+        }
+
+        let keys = cache.keys().collect::<Vec<_>>();
+        // None are evicted
+        assert_eq!(keys.len(), skill_paths.len());
     }
 
     type SkillFactory = Box<dyn FnMut() -> LoadedSkill + Send>;
