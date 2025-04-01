@@ -11,6 +11,7 @@ use anyhow::anyhow;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
+use metrics::Gauge;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -51,10 +52,25 @@ impl quick_cache::Weighter<SkillPath, CachedSkill> for SkillWeighter {
     }
 }
 
+pub enum SkillCacheMetrics {
+    Items,
+}
+
+impl From<SkillCacheMetrics> for metrics::KeyName {
+    fn from(value: SkillCacheMetrics) -> Self {
+        Self::from_const_str(match value {
+            SkillCacheMetrics::Items => "kernel_skill_cache_items",
+        })
+    }
+}
+
 /// Uses a `quick_cache::unsync::Cache` to store skills.
 /// We can use unsync because we are already managing this in a single-threaded environment.
 /// This means we can use a more performant version without overhead for multiple threads.
-struct SkillCache(quick_cache::unsync::Cache<SkillPath, CachedSkill, SkillWeighter>);
+struct SkillCache {
+    cache: quick_cache::unsync::Cache<SkillPath, CachedSkill, SkillWeighter>,
+    gauge: Gauge,
+}
 
 impl SkillCache {
     /// One of our Python Wasm Skills is roughly 60MB in size, on average.
@@ -62,19 +78,27 @@ impl SkillCache {
 
     /// Create a new `SkillCache` that can hold approximately up to `capacity` skills.
     fn new(capacity: usize) -> Self {
-        Self(quick_cache::unsync::Cache::with_weighter(
-            capacity,
-            Self::PYTHON_SKILL_SIZE.saturating_mul(capacity as u64),
-            SkillWeighter,
-        ))
+        Self {
+            cache: quick_cache::unsync::Cache::with_weighter(
+                capacity,
+                Self::PYTHON_SKILL_SIZE.saturating_mul(capacity as u64),
+                SkillWeighter,
+            ),
+            gauge: metrics::gauge!(SkillCacheMetrics::Items),
+        }
     }
 
     fn keys(&self) -> impl Iterator<Item = &SkillPath> + '_ {
-        self.0.iter().map(|(key, _)| key)
+        self.cache.iter().map(|(key, _)| key)
+    }
+
+    fn update_gauge(&self) {
+        #[expect(clippy::cast_precision_loss)]
+        self.gauge.set(self.cache.len() as f64);
     }
 
     fn get(&self, skill_path: &SkillPath) -> Option<Arc<dyn Skill>> {
-        self.0.get(skill_path).map(|skill| skill.skill.clone())
+        self.cache.get(skill_path).map(|skill| skill.skill.clone())
     }
 
     fn insert(&mut self, skill_path: SkillPath, compiled_skill: LoadedSkill) {
@@ -83,20 +107,23 @@ impl SkillCache {
             digest,
             size_loaded_from_registry,
         } = compiled_skill;
-        self.0.insert(
+        self.cache.insert(
             skill_path,
             CachedSkill::new(skill, digest, size_loaded_from_registry),
         );
+        self.update_gauge();
     }
 
     fn remove(&mut self, skill_path: &SkillPath) -> bool {
-        self.0.remove(skill_path).is_some()
+        let removed = self.cache.remove(skill_path).is_some();
+        self.update_gauge();
+        removed
     }
 
     /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
     /// If there are no cached skills, it will return `None`.
     fn oldest_digest(&self) -> Option<(SkillPath, Instant)> {
-        self.0
+        self.cache
             .iter()
             .min_by_key(|(_, c)| c.digest_validated)
             .map(|(skill_path, cached_skill)| (skill_path.clone(), cached_skill.digest_validated))
@@ -106,7 +133,7 @@ impl SkillCache {
     /// Useful in cases where we were unable to retrieve the latest digest from the registry, and we want to update
     /// the timestamp so that we don't try to refresh it again too soon.
     fn update_digest_validated(&mut self, skill_path: &SkillPath) {
-        if let Some(mut cached_skill) = self.0.get_mut(skill_path) {
+        if let Some(mut cached_skill) = self.cache.get_mut(skill_path) {
             cached_skill.digest_validated = Instant::now();
         }
     }
@@ -119,13 +146,13 @@ impl SkillCache {
         latest_digest: &Digest,
     ) -> anyhow::Result<()> {
         let CachedSkill { digest, .. } = self
-            .0
+            .cache
             .get(skill_path)
             .ok_or_else(|| anyhow!("Missing cached skill for {skill_path}"))?;
 
         // There is a new digest behind the tag, delete the cache entry
         if latest_digest != digest {
-            self.0.remove(skill_path);
+            self.cache.remove(skill_path);
         }
         self.update_digest_validated(skill_path);
         Ok(())
