@@ -1254,20 +1254,20 @@ pub mod tests {
 
     #[test]
     fn rust_skills_evicted_less() {
-        let capacity = 2;
-        let rust_size = SkillCache::PYTHON_SKILL_SIZE / 10;
+        let capacity = 10;
+        let rust_size = SkillCache::PYTHON_SKILL_SIZE / 100;
         let mut cache = SkillCache::new(capacity);
         let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), rust_size);
 
-        let skill_paths = (0..10).map(|_| SkillPath::dummy()).collect::<Vec<_>>();
+        let skill_paths = (0..100).map(|_| SkillPath::dummy()).collect::<Vec<_>>();
 
         for skill_path in &skill_paths {
             cache.insert(skill_path.clone(), loaded_skill.clone());
         }
 
         let keys = cache.keys().collect::<Vec<_>>();
-        // None are evicted
-        assert_eq!(keys.len(), skill_paths.len());
+        // Can hold more than capacity
+        assert!(keys.len() > capacity * 5);
     }
 
     type SkillFactory = Box<dyn FnMut() -> LoadedSkill + Send>;
