@@ -53,6 +53,7 @@ pub enum SkillFetchError {
 }
 
 /// A skill that has been fetched, loaded, and is ready to use.
+#[derive(Clone)]
 pub struct LoadedSkill {
     /// The Skill that is ready to use in the Skill Runtime.
     /// If this is a Wasm skill, it is already compiled and linked to the engine.
