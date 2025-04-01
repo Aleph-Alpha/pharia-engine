@@ -11,6 +11,7 @@ use anyhow::anyhow;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
+use quick_cache::{Weighter, unsync::Cache};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -43,15 +44,23 @@ impl CachedSkill {
     }
 }
 
-struct SkillCache(HashMap<SkillPath, CachedSkill>);
+struct SkillWeighter;
+
+impl Weighter<SkillPath, CachedSkill> for SkillWeighter {
+    fn weight(&self, _key: &SkillPath, val: &CachedSkill) -> u64 {
+        val.weight as u64
+    }
+}
+
+struct SkillCache(Cache<SkillPath, CachedSkill, SkillWeighter>);
 
 impl SkillCache {
     fn new() -> Self {
-        Self(HashMap::new())
+        Self(Cache::with_weighter(2, 4, SkillWeighter))
     }
 
     fn keys(&self) -> impl Iterator<Item = &SkillPath> + '_ {
-        self.0.keys()
+        self.0.iter().map(|(key, _)| key)
     }
 
     fn get(&self, skill_path: &SkillPath) -> Option<Arc<dyn Skill>> {
@@ -87,7 +96,7 @@ impl SkillCache {
     /// Useful in cases where we were unable to retrieve the latest digest from the registry, and we want to update
     /// the timestamp so that we don't try to refresh it again too soon.
     fn update_digest_validated(&mut self, skill_path: &SkillPath) {
-        if let Some(cached_skill) = self.0.get_mut(skill_path) {
+        if let Some(mut cached_skill) = self.0.get_mut(skill_path) {
             cached_skill.digest_validated = Instant::now();
         }
     }
@@ -1180,12 +1189,14 @@ pub mod tests {
     #[test]
     fn cache_invalidation() {
         let mut cache = SkillCache::new();
-        let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), 1);
-        let skill_path = SkillPath::dummy();
+        let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), 2);
 
-        cache.insert(skill_path.clone(), loaded_skill);
+        // Insert the skill twice at different paths
+        cache.insert(SkillPath::dummy(), loaded_skill.clone());
+        cache.insert(SkillPath::dummy(), loaded_skill.clone());
+        cache.insert(SkillPath::dummy(), loaded_skill);
 
-        assert_eq!(cache.keys().count(), 1);
+        assert_eq!(cache.keys().count(), 2);
     }
 
     type SkillFactory = Box<dyn FnMut() -> LoadedSkill + Send>;
