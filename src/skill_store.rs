@@ -4,7 +4,7 @@ use crate::{
     hardcoded_skills::hardcoded_skill,
     namespace_watcher::Namespace,
     registries::Digest,
-    skill_loader::{ConfiguredSkill, SkillFetchError, SkillLoaderApi},
+    skill_loader::{ConfiguredSkill, LoadedSkill, SkillFetchError, SkillLoaderApi},
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
@@ -52,9 +52,9 @@ impl SkillCache {
         self.0.get(skill_path).map(|skill| skill.skill.clone())
     }
 
-    fn insert(&mut self, skill_path: SkillPath, skill: Arc<dyn Skill>, digest: Digest) {
-        self.0
-            .insert(skill_path, CachedSkill::new(skill.clone(), digest));
+    fn insert(&mut self, skill_path: SkillPath, compiled_skill: LoadedSkill) {
+        let LoadedSkill { skill, digest } = compiled_skill;
+        self.0.insert(skill_path, CachedSkill::new(skill, digest));
     }
 
     fn remove(&mut self, skill_path: &SkillPath) -> bool {
@@ -169,8 +169,8 @@ where
     }
 
     /// Insert a skill into the cache.
-    pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<dyn Skill>, digest: Digest) {
-        self.cached_skills.insert(skill_path, skill, digest);
+    pub fn insert(&mut self, skill_path: SkillPath, compiled_skill: LoadedSkill) {
+        self.cached_skills.insert(skill_path, compiled_skill);
     }
 
     /// Return the registered tag for a given skill
@@ -404,9 +404,8 @@ struct SkillStoreActor<L> {
     skill_requests: SkillRequests,
 }
 
-type SkillRequest = Pin<
-    Box<dyn Future<Output = (SkillPath, Result<(Arc<dyn Skill>, Digest), SkillFetchError>)> + Send>,
->;
+type SkillRequest =
+    Pin<Box<dyn Future<Output = (SkillPath, Result<LoadedSkill, SkillFetchError>)> + Send>>;
 
 type Recipient = oneshot::Sender<Result<Option<Arc<dyn Skill>>, SkillStoreError>>;
 struct SkillRequests {
@@ -447,17 +446,15 @@ impl SkillRequests {
 
     /// Select the next finished skill request and send the result to the recipients.
     /// Return the skill path and result.
-    pub async fn select_next_some(
-        &mut self,
-    ) -> Result<(SkillPath, (Arc<dyn Skill>, Digest)), SkillFetchError> {
+    pub async fn select_next_some(&mut self) -> Result<(SkillPath, LoadedSkill), SkillFetchError> {
         let (skill_path, result) = self.requests.select_next_some().await;
         let senders = self.recipients.remove(&skill_path).unwrap();
         match result {
-            Ok((skill, digest)) => {
+            Ok(compiled_skill) => {
                 for sender in senders {
-                    drop(sender.send(Ok(Some(skill.clone()))));
+                    drop(sender.send(Ok(Some(compiled_skill.skill.clone()))));
                 }
-                Ok((skill_path, (skill, digest)))
+                Ok((skill_path, compiled_skill))
             }
             Err(e) => {
                 for sender in senders {
@@ -508,8 +505,8 @@ where
                 // FuturesUnordered will let them run in parallel. It will
                 // yield once one of them is completed.
                 result = self.skill_requests.select_next_some(), if !self.skill_requests.is_empty()  => {
-                    if let Ok((skill_path, (skill, digest))) = result {
-                        self.provider.insert(skill_path, skill, digest);
+                    if let Ok((skill_path, compiled_skill)) = result {
+                        self.provider.insert(skill_path, compiled_skill);
                     }
                 }
             }
@@ -539,11 +536,7 @@ where
                         self.skill_requests.push(
                             skill_path,
                             Box::pin(async move {
-                                let result =
-                                    skill_loader.fetch(skill).await.map(|(skill, digest)| {
-                                        let skill: Arc<dyn Skill> = skill.into();
-                                        (skill, digest)
-                                    });
+                                let result = skill_loader.fetch(skill).await;
                                 (cloned_skill_path, result)
                             }),
                             send,
@@ -592,7 +585,7 @@ pub mod tests {
     use crate::{
         namespace_watcher::Namespace,
         registries::RegistryError,
-        skill_loader::{SkillLoader, SkillLoaderMsg},
+        skill_loader::{LoadedSkill, SkillLoader, SkillLoaderMsg},
         skills::{Engine, SkillPath, tests::SkillDummy},
     };
 
@@ -967,8 +960,7 @@ pub mod tests {
         let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
         provider.insert(
             skill_path.clone(),
-            Arc::new(SkillDummy),
-            Digest::new("dummy"),
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy")),
         );
 
         // When we remove the skill
@@ -1001,10 +993,10 @@ pub mod tests {
         let second_skill_path = SkillPath::local("second_skill");
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&first_skill_path, || {
-            (Box::new(SkillDummy), Digest::new("first"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("first"))
         });
         skill_loader.add(&second_skill_path, || {
-            (Box::new(SkillDummy), Digest::new("second"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("second"))
         });
 
         // When
@@ -1065,7 +1057,7 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&skill_path, || {
-            (Box::new(SkillDummy), Digest::new("original-digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"))
         });
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let api = skill_store.api();
@@ -1088,7 +1080,7 @@ pub mod tests {
         let greet_skill = SkillPath::local("greet_skill");
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&greet_skill, || {
-            (Box::new(SkillDummy), Digest::new("dummy digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy digest"))
         });
         let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
         let api = skill_store.api();
@@ -1115,18 +1107,17 @@ pub mod tests {
         let skill_path = SkillPath::local("greet");
         let mut skill_store_state = SkillStoreState::new(skill_loader.clone());
         skill_loader.add(&skill_path, || {
-            (Box::new(SkillDummy), Digest::new("original-digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"))
         });
         skill_store_state.upsert_skill(ConfiguredSkill::from_path(&skill_path));
         skill_store_state.insert(
             skill_path.clone(),
-            Arc::new(SkillDummy),
-            Digest::new("original-digest"),
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest")),
         );
 
         // When we update the digest of the "greet" skill and we clear out expired skills
         skill_loader.add(&skill_path, || {
-            (Box::new(SkillDummy), Digest::new("different-digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("different-digest"))
         });
         skill_store_state
             .validate_digest(skill_path.clone())
@@ -1150,16 +1141,16 @@ pub mod tests {
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&skill_path, || {
             // Skill store always returns the same digest
-            (Box::new(SkillDummy), Digest::new("originals-digest"))
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("originals-digest"))
         });
         let mut skill_store_state = SkillStoreState::new(skill_loader);
         let configured_skill = ConfiguredSkill::from_path(&skill_path);
         skill_store_state.upsert_skill(configured_skill.clone());
-        let (skill, digest) = skill_store_state
+        let compiled_skill = skill_store_state
             .skill_loader
             .fetch(configured_skill)
             .await?;
-        skill_store_state.insert(skill_path.clone(), skill.into(), digest);
+        skill_store_state.insert(skill_path.clone(), compiled_skill);
 
         // When we check it with no changes
         skill_store_state.validate_digest(skill_path).await?;
@@ -1173,7 +1164,7 @@ pub mod tests {
         Ok(())
     }
 
-    type SkillFactory = Box<dyn FnMut() -> (Box<dyn Skill>, Digest) + Send>;
+    type SkillFactory = Box<dyn FnMut() -> LoadedSkill + Send>;
     #[derive(Clone)]
     struct SkillLoaderStub {
         skills: Arc<Mutex<HashMap<ConfiguredSkill, SkillFactory>>>,
@@ -1189,7 +1180,7 @@ pub mod tests {
         pub fn add(
             &self,
             path: &SkillPath,
-            skill_factory: impl FnMut() -> (Box<dyn Skill>, Digest) + Send + 'static,
+            skill_factory: impl FnMut() -> LoadedSkill + Send + 'static,
         ) {
             let skill = ConfiguredSkill::from_path(path);
             self.skills
@@ -1200,10 +1191,7 @@ pub mod tests {
     }
 
     impl SkillLoaderApi for SkillLoaderStub {
-        async fn fetch(
-            &self,
-            skill: ConfiguredSkill,
-        ) -> Result<(Box<dyn Skill>, Digest), SkillFetchError> {
+        async fn fetch(&self, skill: ConfiguredSkill) -> Result<LoadedSkill, SkillFetchError> {
             self.skills
                 .lock()
                 .unwrap()
@@ -1216,7 +1204,12 @@ pub mod tests {
             &self,
             skill: ConfiguredSkill,
         ) -> Result<Option<Digest>, RegistryError> {
-            let maybe_digest = self.skills.lock().unwrap().get_mut(&skill).map(|f| f().1);
+            let maybe_digest = self
+                .skills
+                .lock()
+                .unwrap()
+                .get_mut(&skill)
+                .map(|f| f().digest);
             Ok(maybe_digest)
         }
     }

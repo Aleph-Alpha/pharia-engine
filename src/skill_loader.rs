@@ -52,12 +52,25 @@ pub enum SkillFetchError {
     SkillNotFound(ConfiguredSkill),
 }
 
-type SkillAndDigest = (Box<dyn Skill>, Digest);
+/// A skill that has been fetched, loaded, and is ready to use.
+pub struct LoadedSkill {
+    /// The Skill that is ready to use in the Skill Runtime.
+    /// If this is a Wasm skill, it is already compiled and linked to the engine.
+    pub skill: Arc<dyn Skill>,
+    /// The digest at the time of loading from the loader.
+    pub digest: Digest,
+}
+
+impl LoadedSkill {
+    pub fn new(skill: Arc<dyn Skill>, digest: Digest) -> Self {
+        Self { skill, digest }
+    }
+}
 
 pub enum SkillLoaderMsg {
     Fetch {
         skill: ConfiguredSkill,
-        send: oneshot::Sender<Result<SkillAndDigest, SkillFetchError>>,
+        send: oneshot::Sender<Result<LoadedSkill, SkillFetchError>>,
     },
     FetchDigest {
         skill: ConfiguredSkill,
@@ -145,7 +158,7 @@ pub trait SkillLoaderApi {
     fn fetch(
         &self,
         skill: ConfiguredSkill,
-    ) -> impl Future<Output = Result<(Box<dyn Skill>, Digest), SkillFetchError>> + Send;
+    ) -> impl Future<Output = Result<LoadedSkill, SkillFetchError>> + Send;
 
     fn fetch_digest(
         &self,
@@ -154,10 +167,7 @@ pub trait SkillLoaderApi {
 }
 
 impl SkillLoaderApi for mpsc::Sender<SkillLoaderMsg> {
-    async fn fetch(
-        &self,
-        skill: ConfiguredSkill,
-    ) -> Result<(Box<dyn Skill>, Digest), SkillFetchError> {
+    async fn fetch(&self, skill: ConfiguredSkill) -> Result<LoadedSkill, SkillFetchError> {
         let (send, recv) = oneshot::channel();
         self.send(SkillLoaderMsg::Fetch { skill, send })
             .await
@@ -226,14 +236,14 @@ impl SkillLoaderActor {
         registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
         skill: &ConfiguredSkill,
-    ) -> Result<(Box<dyn Skill>, Digest), SkillFetchError> {
+    ) -> Result<LoadedSkill, SkillFetchError> {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
             skill_bytes.ok_or_else(|| SkillFetchError::SkillNotFound(skill.clone()))?;
         let skill = spawn_blocking(move || load_skill_from_wasm_bytes(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")?;
-        Ok((skill, digest))
+        Ok(LoadedSkill::new(skill.into(), digest))
     }
 
     /// For each new message, create a future that resolves the message and
