@@ -40,10 +40,13 @@ impl CachedSkill {
     }
 }
 
-#[derive(Default)]
 struct SkillCache(HashMap<SkillPath, CachedSkill>);
 
 impl SkillCache {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+
     fn keys(&self) -> impl Iterator<Item = &SkillPath> + '_ {
         self.0.keys()
     }
@@ -118,7 +121,7 @@ where
     pub fn new(skill_loader: L) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
-            cached_skills: SkillCache::default(),
+            cached_skills: SkillCache::new(),
             invalid_namespaces: HashMap::new(),
             skill_loader,
         }
@@ -1166,6 +1169,17 @@ pub mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn cache_invalidation() {
+        let mut cache = SkillCache::new();
+        let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), 1);
+        let skill_path = SkillPath::dummy();
+
+        cache.insert(skill_path.clone(), loaded_skill);
+
+        assert_eq!(cache.keys().count(), 1);
     }
 
     type SkillFactory = Box<dyn FnMut() -> LoadedSkill + Send>;
