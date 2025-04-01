@@ -40,9 +40,69 @@ impl CachedSkill {
     }
 }
 
+#[derive(Default)]
+struct SkillCache(HashMap<SkillPath, CachedSkill>);
+
+impl SkillCache {
+    fn keys(&self) -> impl Iterator<Item = &SkillPath> + '_ {
+        self.0.keys()
+    }
+
+    fn get(&self, skill_path: &SkillPath) -> Option<Arc<dyn Skill>> {
+        self.0.get(skill_path).map(|skill| skill.skill.clone())
+    }
+
+    fn insert(&mut self, skill_path: SkillPath, skill: Arc<dyn Skill>, digest: Digest) {
+        self.0
+            .insert(skill_path, CachedSkill::new(skill.clone(), digest));
+    }
+
+    fn remove(&mut self, skill_path: &SkillPath) -> bool {
+        self.0.remove(skill_path).is_some()
+    }
+
+    /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
+    /// If there are no cached skills, it will return `None`.
+    fn oldest_digest(&self) -> Option<(SkillPath, Instant)> {
+        self.0
+            .iter()
+            .min_by_key(|(_, c)| c.digest_validated)
+            .map(|(skill_path, cached_skill)| (skill_path.clone(), cached_skill.digest_validated))
+    }
+
+    /// Just mark the digest as validated.
+    /// Useful in cases where we were unable to retrieve the latest digest from the registry, and we want to update
+    /// the timestamp so that we don't try to refresh it again too soon.
+    fn update_digest_validated(&mut self, skill_path: &SkillPath) {
+        if let Some(cached_skill) = self.0.get_mut(skill_path) {
+            cached_skill.digest_validated = Instant::now();
+        }
+    }
+
+    /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
+    /// If the digest behind the tag has changed, remove the cache entry.
+    fn compare_latest_digest(
+        &mut self,
+        skill_path: &SkillPath,
+        latest_digest: &Digest,
+    ) -> anyhow::Result<()> {
+        let CachedSkill { digest, .. } = self
+            .0
+            .get(skill_path)
+            .ok_or_else(|| anyhow!("Missing cached skill for {skill_path}"))?;
+
+        // There is a new digest behind the tag, delete the cache entry
+        if latest_digest != digest {
+            self.0.remove(skill_path);
+        }
+        self.update_digest_validated(skill_path);
+        Ok(())
+    }
+}
+
 struct SkillStoreState<L> {
     known_skills: HashMap<SkillPath, ConfiguredSkill>,
-    cached_skills: HashMap<SkillPath, CachedSkill>,
+    cached_skills: SkillCache,
     invalid_namespaces: HashMap<Namespace, anyhow::Error>,
     skill_loader: L,
 }
@@ -54,7 +114,7 @@ where
     pub fn new(skill_loader: L) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
-            cached_skills: HashMap::new(),
+            cached_skills: SkillCache::default(),
             invalid_namespaces: HashMap::new(),
             skill_loader,
         }
@@ -92,7 +152,7 @@ where
     }
 
     pub fn invalidate(&mut self, skill_path: &SkillPath) -> bool {
-        self.cached_skills.remove(skill_path).is_some()
+        self.cached_skills.remove(skill_path)
     }
 
     pub fn add_invalid_namespace(&mut self, namespace: Namespace, e: anyhow::Error) {
@@ -105,15 +165,12 @@ where
 
     /// `Some` if the skill is present in the cache, `None` if not
     pub fn cached_skill(&self, skill_path: &SkillPath) -> Option<Arc<dyn Skill>> {
-        self.cached_skills
-            .get(skill_path)
-            .map(|skill| skill.skill.clone())
+        self.cached_skills.get(skill_path)
     }
 
     /// Insert a skill into the cache.
     pub fn insert(&mut self, skill_path: SkillPath, skill: Arc<dyn Skill>, digest: Digest) {
-        self.cached_skills
-            .insert(skill_path, CachedSkill::new(skill.clone(), digest));
+        self.cached_skills.insert(skill_path, skill, digest);
     }
 
     /// Return the registered tag for a given skill
@@ -127,49 +184,32 @@ where
         Ok(self.known_skills.get(skill_path).map(|s| s.tag.as_str()))
     }
 
-    /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
-    /// If there are no cached skills, it will return `None`.
-    fn oldest_digest(&self) -> Option<(SkillPath, Instant)> {
-        self.cached_skills
-            .iter()
-            .min_by_key(|(_, c)| c.digest_validated)
-            .map(|(skill_path, cached_skill)| (skill_path.clone(), cached_skill.digest_validated))
-    }
-
     /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
     /// If the digest behind the tag has changed, remove the cache entry. Otherwise, update the validation time.
     async fn validate_digest(&mut self, skill_path: SkillPath) -> anyhow::Result<()> {
-        let CachedSkill { digest, .. } = self
-            .cached_skills
-            .get(&skill_path)
-            .ok_or_else(|| anyhow!("Missing cached skill for {skill_path}"))?;
-
         let tag = self
             .tag(&skill_path)
             .expect("Bad namespace configuration for skill")
             .expect("Missing tag for skill");
 
         let skill = ConfiguredSkill::new(skill_path.namespace.clone(), &skill_path.name, tag);
-        match self.skill_loader.fetch_digest(skill).await {
-            // There is a new digest behind the tag, delete the cache entry
-            Ok(Some(new_digest)) if &new_digest != digest => {
-                self.cached_skills.remove(&skill_path);
-                Ok(())
-            }
-            other_case => {
-                let result = match other_case {
-                    // Errors fetching the digest
-                    Ok(None) => Err(anyhow!("Missing digest for skill {skill_path}")),
-                    Err(e) => Err(e.into()),
-                    // Digest has not changed
-                    _ => Ok(()),
-                };
-                // Always update the digest_validated time so we don't loop over errors constantly.
-                self.cached_skills
-                    .entry(skill_path)
-                    .and_modify(|c| c.digest_validated = Instant::now());
 
-                result
+        let result = self
+            .skill_loader
+            .fetch_digest(skill)
+            .await
+            .map_err(Into::into)
+            .and_then(|digest| {
+                digest.ok_or_else(|| anyhow!("Missing digest for skill {skill_path}"))
+            });
+        match result {
+            Ok(latest_digest) => self
+                .cached_skills
+                .compare_latest_digest(&skill_path, &latest_digest),
+            Err(e) => {
+                // Always update the digest_validated time so we don't loop over errors constantly.
+                self.cached_skills.update_digest_validated(&skill_path);
+                Err(e)
             }
         }
     }
@@ -183,7 +223,7 @@ where
     /// This will return immediately if there are no skills to check.
     async fn refresh_oldest_digest(&mut self, update_interval: Duration) -> anyhow::Result<()> {
         // Find the next skill we should refresh
-        let Some((skill_path, last_checked)) = self.oldest_digest() else {
+        let Some((skill_path, last_checked)) = self.cached_skills.oldest_digest() else {
             return Ok(());
         };
         // Wait until is it time to refresh
