@@ -340,7 +340,8 @@ impl IntoResponse for HttpError {
 impl From<SkillExecutionError> for HttpError {
     fn from(value: SkillExecutionError) -> Self {
         let status_code = match &value {
-            // We return 5xx not only for runtime errors, but also for errors we consider Bugs
+            // We return 5xx not only for runtime errors, but also for errors we consider Bugs in
+            // the deployed skills.
             SkillExecutionError::MisconfiguredNamespace { .. }
             | SkillExecutionError::CsiUseFromMetadata
             | SkillExecutionError::InvalidOutput(_)
@@ -348,6 +349,8 @@ impl From<SkillExecutionError> for HttpError {
             | SkillExecutionError::MessageBeginWhileMessageActive
             | SkillExecutionError::MessageEndWithoutMessageBegin
             | SkillExecutionError::SkillLoadError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            // Service unavailable indicates better that the situation is temporary and retrying it
+            // might be worth it.
             SkillExecutionError::RuntimeError(_) => StatusCode::SERVICE_UNAVAILABLE,
             // 400 for every error we see an error on the client side of HTTP
             SkillExecutionError::UserCode(_)

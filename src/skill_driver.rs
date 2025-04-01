@@ -62,8 +62,9 @@ impl SkillDriver {
 
                 Ok(error) = &mut recv_rt_err => break Err(SkillExecutionError::RuntimeError(error.to_string())),
                 Some(skill_event) = recv_inner.recv() => {
-                    let (execution_event, maybe_error) =
+                    let execution_event =
                         translator.translate_to_execution_event(skill_event);
+                    let maybe_error = execution_event.execution_error().cloned();
                     sender.send(execution_event).await.unwrap();
                     if let Some(error) = maybe_error {
                         break Err(error);
@@ -76,8 +77,8 @@ impl SkillDriver {
         // In case the skill invocation finishes faster than we could extract the last event. I.e.
         // the event is placed in the channel, yet the receiver did not pick it up yet.
         if let Ok(skill_event) = recv_inner.try_recv() {
-            let (execution_event, maybe_error) =
-                translator.translate_to_execution_event(skill_event);
+            let execution_event = translator.translate_to_execution_event(skill_event);
+            let maybe_error = execution_event.execution_error().cloned();
             sender.send(execution_event).await.unwrap();
             if let Some(error) = maybe_error {
                 return Err(error);
@@ -432,6 +433,16 @@ pub enum SkillExecutionEvent {
     Error(SkillExecutionError),
 }
 
+impl SkillExecutionEvent {
+    pub fn execution_error(&self) -> Option<&SkillExecutionError> {
+        if let SkillExecutionEvent::Error(e) = self {
+            Some(e)
+        } else {
+            None
+        }
+    }
+}
+
 /// Translates [`SkillEvent`]s emitted by skills to [`SkillExecutionEvent`]s. It also keeps track
 /// of message begin and end in order to detect invalid state transitions.
 struct EventTranslator {
@@ -453,38 +464,31 @@ impl EventTranslator {
     /// [`SkillExecutionEvent`] would contain the information of the error as well, but due to
     /// errors not being [`Clone`] we just need two instances of it. One for the operator, and one
     /// for the user.
-    fn translate_to_execution_event(
-        &mut self,
-        source: SkillEvent,
-    ) -> (SkillExecutionEvent, Option<SkillExecutionError>) {
+    fn translate_to_execution_event(&mut self, source: SkillEvent) -> SkillExecutionEvent {
         match (source, self.message_active) {
             (SkillEvent::MessageBegin, false) => {
                 self.message_active = true;
-                (SkillExecutionEvent::MessageBegin, None)
+                SkillExecutionEvent::MessageBegin
             }
-            (SkillEvent::MessageBegin, true) => (
-                SkillExecutionEvent::Error(SkillExecutionError::MessageBeginWhileMessageActive),
-                Some(SkillExecutionError::MessageBeginWhileMessageActive),
-            ),
+            (SkillEvent::MessageBegin, true) => {
+                SkillExecutionEvent::Error(SkillExecutionError::MessageBeginWhileMessageActive)
+            }
             (SkillEvent::MessageEnd { payload }, true) => {
                 self.message_active = false;
-                (SkillExecutionEvent::MessageEnd { payload }, None)
+                SkillExecutionEvent::MessageEnd { payload }
             }
-            (SkillEvent::MessageEnd { .. }, false) => (
-                SkillExecutionEvent::Error(SkillExecutionError::MessageEndWithoutMessageBegin),
-                Some(SkillExecutionError::MessageEndWithoutMessageBegin),
-            ),
+            (SkillEvent::MessageEnd { .. }, false) => {
+                SkillExecutionEvent::Error(SkillExecutionError::MessageEndWithoutMessageBegin)
+            }
             (SkillEvent::MessageAppend { text }, true) => {
-                (SkillExecutionEvent::MessageAppend { text }, None)
+                SkillExecutionEvent::MessageAppend { text }
             }
-            (SkillEvent::MessageAppend { .. }, false) => (
-                SkillExecutionEvent::Error(SkillExecutionError::MessageAppendWithoutMessageBegin),
-                Some(SkillExecutionError::MessageAppendWithoutMessageBegin),
-            ),
-            (SkillEvent::InvalidBytesInPayload { message }, _) => (
-                SkillExecutionEvent::Error(SkillExecutionError::InvalidOutput(message.clone())),
-                Some(SkillExecutionError::InvalidOutput(message)),
-            ),
+            (SkillEvent::MessageAppend { .. }, false) => {
+                SkillExecutionEvent::Error(SkillExecutionError::MessageAppendWithoutMessageBegin)
+            }
+            (SkillEvent::InvalidBytesInPayload { message }, _) => {
+                SkillExecutionEvent::Error(SkillExecutionError::InvalidOutput(message.clone()))
+            }
         }
     }
 }
