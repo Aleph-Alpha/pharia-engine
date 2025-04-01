@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.11](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.10...v0.11.11)
+
+### Features
+
+- Better error message for SkillLoadError - ([c25155c](https://github.com/Aleph-Alpha/pharia-kernel/commit/c25155cc285b6e15a83139b3aaadb48dab5e6672))
+
+### Fixes
+
+- Simplify controlflow consuming skill events. Resolving an issue which could caused errors to be inserted twice into the execution stream - ([40cc263](https://github.com/Aleph-Alpha/pharia-kernel/commit/40cc2639a316caad812b7350be7ea2e839b18b83))
+
+### Builds
+
+- *(deps)* Bump the minor group with 3 updates - ([b382143](https://github.com/Aleph-Alpha/pharia-kernel/commit/b3821432507472feadf47b4718d359a4835d51cb))
+
+
 ## [0.11.10](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.9...v0.11.10)
 
 ### Features
