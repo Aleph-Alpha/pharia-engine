@@ -14,7 +14,7 @@ use tokio::sync::mpsc;
 use utoipa::ToSchema;
 use wasmtime::{
     Store,
-    component::{InstancePre, Linker as WasmtimeLinker},
+    component::{InstancePre, Linker},
 };
 use wit_parser::{
     WorldKey,
@@ -192,7 +192,7 @@ pub enum SkillLoadError {
 /// our pharia/skill WIT world.
 pub struct Engine {
     engine: engine_room::Engine,
-    linker: WasmtimeLinker<LinkerImpl<Box<dyn CsiForSkills + Send>>>,
+    linker: Linker<LinkerImpl<Box<dyn CsiForSkills + Send>>>,
 }
 
 impl Engine {
@@ -298,7 +298,7 @@ pub enum SupportedSkillWorld {
 
 impl SupportedSkillWorld {
     /// Links all currently supported versions of the skill world to the engine
-    fn add_all_to_linker(linker: &mut WasmtimeLinker<LinkedCtx>) -> anyhow::Result<()> {
+    fn add_all_to_linker(linker: &mut Linker<LinkedCtx>) -> anyhow::Result<()> {
         for version in Self::iter() {
             match version {
                 Self::V0_2Function => {
