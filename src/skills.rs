@@ -192,7 +192,7 @@ pub enum SkillLoadError {
 /// our pharia/skill WIT world.
 pub struct Engine {
     engine: engine_room::Engine,
-    linker: Linker<LinkerImpl<Box<dyn CsiForSkills + Send>>>,
+    linker: Linker<LinkedCtx>,
 }
 
 impl Engine {
