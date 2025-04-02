@@ -1251,6 +1251,7 @@ dependencies = [
  "anyhow",
  "tracing",
  "wasmtime",
+ "wasmtime-wasi",
 ]
 
 [[package]]

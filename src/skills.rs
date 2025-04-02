@@ -199,13 +199,9 @@ impl Engine {
     pub fn new(use_pooling_allocator: bool) -> anyhow::Result<Self> {
         let engine = engine_room::Engine::new(use_pooling_allocator)?;
 
-        let mut linker = engine.new_linker();
         // We currently use the same linker for multiple worlds that use CSI.
-        // This allows them to be hooked up twice, but might also be a clue we might want two linkers to avoid the issue.
-        linker.allow_shadowing(true);
-        // provide host implementation of WASI interfaces required by the component with wit-bindgen
-        wasmtime_wasi::add_to_linker_async(&mut linker)?;
-
+        // Shadowing allows them to be hooked up twice, but might also be a clue we might want two linkers to avoid the issue.
+        let mut linker = engine.new_linker(true)?;
         // Skill world from bindgen
         SupportedSkillWorld::add_all_to_linker(&mut linker)?;
 
