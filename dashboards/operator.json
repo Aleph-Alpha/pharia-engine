@@ -22,6 +22,19 @@
   "links": [],
   "panels": [
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "panels": [],
+      "title": "Metrics",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "datasource",
         "uid": "-- Mixed --"
@@ -40,8 +53,8 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
+            "fillOpacity": 50,
+            "gradientMode": "opacity",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
@@ -49,6 +62,9 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -58,7 +74,7 @@
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -82,9 +98,9 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 1
       },
-      "id": 10,
+      "id": 7,
       "options": {
         "legend": {
           "calcs": [],
@@ -93,7 +109,7 @@
           "showLegend": true
         },
         "tooltip": {
-          "mode": "single",
+          "mode": "multi",
           "sort": "desc"
         }
       },
@@ -106,17 +122,19 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by(cluster, exported_namespace, name, status) (increase(kernel_skill_execution_total[1m]))",
+          "exemplar": false,
+          "expr": "sum by(function) (increase(kernel_csi_requests_total[1m]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{cluster}} {{exported_namespace}}/{{name}} -> {{status}}",
+          "interval": "",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "Skill Executions per Minute",
+      "title": "CSI Usage Per Minute",
       "transparent": true,
       "type": "timeseries"
     },
@@ -127,15 +145,22 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "scaleDistribution": {
-              "type": "linear"
-            }
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
           }
         },
         "overrides": []
@@ -144,54 +169,21 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 1
       },
-      "id": 11,
+      "id": 6,
       "options": {
-        "calculate": false,
-        "calculation": {
-          "xBuckets": {
-            "mode": "size"
-          },
-          "yBuckets": {
-            "mode": "size",
-            "scale": {
-              "type": "linear"
-            }
-          }
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
         },
-        "cellGap": 0,
-        "color": {
-          "exponent": 0.5,
-          "fill": "dark-orange",
-          "mode": "scheme",
-          "reverse": false,
-          "scale": "exponential",
-          "scheme": "Oranges",
-          "steps": 64
-        },
-        "exemplars": {
-          "color": "rgba(255,0,255,0.7)"
-        },
-        "filterValues": {
-          "le": 1e-9
-        },
-        "legend": {
-          "show": false
-        },
-        "rowsFrame": {
-          "layout": "auto"
-        },
-        "tooltip": {
-          "mode": "single",
-          "showColorScale": false,
-          "yHistogram": false
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "reverse": false,
-          "unit": "s"
-        }
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
       },
       "pluginVersion": "11.4.0",
       "targets": [
@@ -201,35 +193,20 @@
             "uid": "${source}"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "exemplar": false,
-          "expr": "sum(rate(kernel_skill_execution_duration_seconds_bucket[1m])) by (le)",
-          "format": "heatmap",
+          "editorMode": "code",
+          "expr": "sum by(cluster) (round(increase(kernel_http_requests_total[1m])))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{cluster}}",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "Skill Execution Duration",
+      "title": "Requests in Last Minute",
       "transparent": true,
-      "type": "heatmap"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      },
-      "id": 4,
-      "panels": [],
-      "title": "Metrics",
-      "type": "row"
+      "type": "gauge"
     },
     {
       "datasource": {
@@ -341,8 +318,42 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -350,10 +361,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -366,19 +373,18 @@
         "x": 12,
         "y": 9
       },
-      "id": 6,
+      "id": 10,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "pluginVersion": "11.4.0",
       "targets": [
@@ -389,19 +395,19 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by(cluster) (round(increase(kernel_http_requests_total[1m])))",
+          "expr": "sum by(cluster, exported_namespace, name, status) (increase(kernel_skill_execution_total[1m]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{cluster}}",
+          "legendFormat": "{{cluster}} {{exported_namespace}}/{{name}} -> {{status}}",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "Requests in Last Minute",
+      "title": "Skill Executions per Minute",
       "transparent": true,
-      "type": "gauge"
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -508,55 +514,15 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 50,
-            "gradientMode": "opacity",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineStyle": {
-              "fill": "solid"
-            },
-            "lineWidth": 1,
-            "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
             }
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
           }
         },
         "overrides": []
@@ -567,17 +533,51 @@
         "x": 12,
         "y": 17
       },
-      "id": 7,
+      "id": 11,
       "options": {
+        "calculate": false,
+        "calculation": {
+          "xBuckets": {
+            "mode": "size"
+          },
+          "yBuckets": {
+            "mode": "size",
+            "scale": {
+              "type": "linear"
+            }
+          }
+        },
+        "cellGap": 0,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "show": false
+        },
+        "rowsFrame": {
+          "layout": "auto"
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": false
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "reverse": false,
+          "unit": "s"
         }
       },
       "pluginVersion": "11.4.0",
@@ -588,22 +588,22 @@
             "uid": "${source}"
           },
           "disableTextWrap": false,
-          "editorMode": "code",
+          "editorMode": "builder",
           "exemplar": false,
-          "expr": "sum by(function) (increase(kernel_csi_requests_total[1m]))",
+          "expr": "sum(rate(kernel_skill_execution_duration_seconds_bucket[1m])) by (le)",
+          "format": "heatmap",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "interval": "",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "CSI Usage Per Minute",
+      "title": "Skill Execution Duration",
       "transparent": true,
-      "type": "timeseries"
+      "type": "heatmap"
     },
     {
       "datasource": {
@@ -668,7 +668,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 25
       },
@@ -699,7 +699,7 @@
           "format": "time_series",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{cluster}}/{{pod}}",
+          "legendFormat": "{{cluster}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -772,8 +772,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 8,
         "y": 25
       },
       "id": 3,
@@ -803,7 +803,7 @@
           "format": "time_series",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{cluster}}/{{pod}}",
+          "legendFormat": "{{cluster}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -814,7 +814,103 @@
       "type": "timeseries"
     },
     {
-      "collapsed": true,
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 25
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (cluster) (rate (kernel_skill_cache_items{}[$__rate_interval]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Skills in Cache",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -822,56 +918,55 @@
         "y": 33
       },
       "id": 9,
-      "panels": [
-        {
-          "datasource": {
-            "type": "datasource",
-            "uid": "-- Mixed --"
-          },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 14,
-            "w": 24,
-            "x": 0,
-            "y": 54
-          },
-          "id": 8,
-          "maxPerRow": 2,
-          "options": {
-            "dedupStrategy": "none",
-            "enableLogDetails": true,
-            "prettifyLogMessage": false,
-            "showCommonLabels": false,
-            "showLabels": false,
-            "showTime": false,
-            "sortOrder": "Descending",
-            "wrapLogMessage": false
-          },
-          "pluginVersion": "11.4.0",
-          "repeat": "logs_source",
-          "repeatDirection": "h",
-          "targets": [
-            {
-              "datasource": {
-                "type": "loki",
-                "uid": "${logs_source}"
-              },
-              "editorMode": "builder",
-              "expr": "{container=\"pharia-kernel\"} !~ `matched_path.+=.+\"/health\"`",
-              "legendFormat": "",
-              "queryType": "range",
-              "refId": "A"
-            }
-          ],
-          "title": "Logs ${logs_source}",
-          "type": "logs"
-        }
-      ],
+      "panels": [],
       "title": "Logs",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 8,
+      "maxPerRow": 2,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": false,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "pluginVersion": "11.4.0",
+      "repeat": "logs_source",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${logs_source}"
+          },
+          "editorMode": "builder",
+          "expr": "{container=\"pharia-kernel\"} !~ `matched_path.+=.+\"/health\"`",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Logs ${logs_source}",
+      "type": "logs"
     }
   ],
   "preload": false,
@@ -906,15 +1001,15 @@
       {
         "current": {
           "text": [
+            "logs_p-prod",
             "logs_aleph-alpha",
             "logs_c-prod",
-            "logs_p-prod",
             "logs_p-stage"
           ],
           "value": [
+            "c3dbf0fa-9e13-4b4a-a525-f24080ee6b6f",
             "98d3287c-5b95-402a-84e7-5bfca69f4107",
             "1b520950-6634-4970-a086-cc30616891d4",
-            "c3dbf0fa-9e13-4b4a-a525-f24080ee6b6f",
             "7d382703-f59d-4a58-b0ab-d5289cd075c8"
           ]
         },
@@ -935,8 +1030,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "PhariaKernel",
+  "title": "Pharia Kernel",
   "uid": "de5pijc6rvbpca",
-  "version": 60,
+  "version": 66,
   "weekStart": ""
 }
