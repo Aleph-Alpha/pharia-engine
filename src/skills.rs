@@ -20,7 +20,11 @@ use wit_parser::{
     decoding::{DecodedWasm, decode},
 };
 
-use crate::{csi::CsiForSkills, namespace_watcher::Namespace, engine_room::{self, LinkerImpl}};
+use crate::{
+    csi::CsiForSkills,
+    engine_room::{self, LinkerImpl},
+    namespace_watcher::Namespace,
+};
 
 pub use self::v0_3::SkillMetadataV0_3;
 
