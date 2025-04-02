@@ -16,6 +16,7 @@ use wasmtime::{
     Store, UpdateDeadline,
     component::{Component, Linker},
 };
+use wasmtime_wasi::WasiView;
 
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
@@ -76,9 +77,22 @@ impl Engine {
 
     /// Creates a new linker for the engine.
     /// This linker can be used to register functions and globals that can be called from WebAssembly code.
-    #[must_use]
-    pub fn new_linker<T>(&self) -> Linker<T> {
-        Linker::new(&self.inner)
+    /// It will already be linked with wasmtime-wasi for wasi implementations.
+    ///
+    /// `allow_shadowing` - Whether to allow shadowing of existing functions and globals. This is helpful
+    /// if you are linking multiple worlds that might share some common interfaces and therefore would be
+    /// defined twice and would error by default. You should only enable this if you are sure the two
+    /// implementations are in fact identical, and therefore this is safe to do.
+    ///
+    /// # Errors
+    ///
+    /// Will error if the linker is unable to link the required WASI interfaces.
+    pub fn new_linker<T: WasiView>(&self, allow_shadowing: bool) -> anyhow::Result<Linker<T>> {
+        let mut linker = Linker::new(&self.inner);
+        linker.allow_shadowing(allow_shadowing);
+        // provide host implementation of WASI interfaces required by the component with wit-bindgen
+        wasmtime_wasi::add_to_linker_async(&mut linker)?;
+        Ok(linker)
     }
 
     /// Create a new component from this engine
