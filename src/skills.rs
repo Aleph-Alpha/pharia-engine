@@ -4,7 +4,6 @@ mod v0_3;
 use std::{fmt, path::Path, sync::LazyLock};
 
 use async_trait::async_trait;
-use engine_room::LinkerImpl;
 use semver::Version;
 use serde::Serialize;
 use serde_json::Value;
@@ -21,7 +20,7 @@ use wit_parser::{
     decoding::{DecodedWasm, decode},
 };
 
-use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
+use crate::{csi::CsiForSkills, namespace_watcher::Namespace, engine_room::{self, LinkerImpl}};
 
 pub use self::v0_3::SkillMetadataV0_3;
 

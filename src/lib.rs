@@ -3,6 +3,7 @@ mod chunking;
 mod config;
 mod csi;
 mod csi_shell;
+mod engine_room;
 mod feature_set;
 mod hardcoded_skills;
 mod http;
