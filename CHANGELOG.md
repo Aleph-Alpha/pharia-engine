@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.12](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.11...v0.11.12)
+
+### Features
+
+- Add skill cache metrics tracking - ([d7c56f9](https://github.com/Aleph-Alpha/pharia-kernel/commit/d7c56f99e7073549e35cb1dc960cb401227cfb33))
+- Improve memory performance for cached skills - ([c4c0f41](https://github.com/Aleph-Alpha/pharia-kernel/commit/c4c0f4102a49bdf09e6bfc449da08fe457ac5f23))
+
+### Builds
+
+- *(deps)* Bump the minor group with 4 updates - ([95f2498](https://github.com/Aleph-Alpha/pharia-kernel/commit/95f2498c207dc7b582a55c862bfed324d4179a09))
+
+
 ## [0.11.11](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.10...v0.11.11)
 
 ### Features
