@@ -52,3 +52,7 @@ commit_parsers = [
 ]
 
 link_parsers = [{ pattern = "#(\\d+)", href = "{{ remote.link }}/issues/$1" }]
+
+[[package]]
+name = "engine-room"
+release = true
