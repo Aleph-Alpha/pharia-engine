@@ -4,6 +4,7 @@ mod v0_3;
 use std::{fmt, path::Path, sync::LazyLock};
 
 use async_trait::async_trait;
+use engine_room::LinkerImpl;
 use semver::Version;
 use serde::Serialize;
 use serde_json::Value;
@@ -15,7 +16,6 @@ use wasmtime::{
     Store,
     component::{InstancePre, Linker as WasmtimeLinker},
 };
-use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wit_parser::{
     WorldKey,
     decoding::{DecodedWasm, decode},
@@ -191,24 +191,20 @@ pub enum SkillLoadError {
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
 pub struct Engine {
-    inner: engine_room::Engine,
-    linker: WasmtimeLinker<LinkedCtx>,
+    engine: engine_room::Engine,
+    linker: WasmtimeLinker<LinkerImpl<Box<dyn CsiForSkills + Send>>>,
 }
 
 impl Engine {
     pub fn new(use_pooling_allocator: bool) -> anyhow::Result<Self> {
         let engine = engine_room::Engine::new(use_pooling_allocator)?;
-
         // We currently use the same linker for multiple worlds that use CSI.
         // Shadowing allows them to be hooked up twice, but might also be a clue we might want two linkers to avoid the issue.
         let mut linker = engine.new_linker(true)?;
         // Skill world from bindgen
         SupportedSkillWorld::add_all_to_linker(&mut linker)?;
 
-        Ok(Self {
-            inner: engine,
-            linker,
-        })
+        Ok(Self { engine, linker })
     }
 
     /// Creates a pre-instantiation of a skill. It resolves the imports and does the linking,
@@ -218,7 +214,7 @@ impl Engine {
         bytes: impl AsRef<[u8]>,
     ) -> Result<InstancePre<LinkedCtx>, SkillLoadError> {
         let component = self
-            .inner
+            .engine
             .new_component(bytes)
             .map_err(|e| SkillLoadError::ComponentError(e.to_string()))?;
         self.linker
@@ -229,9 +225,11 @@ impl Engine {
     /// Generates a store for a specific invocation.
     /// This will yield after every tick, as well as halt execution after `Self::MAX_EXECUTION_TIME`.
     fn store(&self, skill_ctx: Box<dyn CsiForSkills + Send>) -> Store<LinkedCtx> {
-        self.inner.store(LinkedCtx::new(skill_ctx))
+        self.engine.store(skill_ctx)
     }
 }
+
+pub type LinkedCtx = LinkerImpl<Box<dyn CsiForSkills + Send>>;
 
 #[async_trait]
 pub trait Skill: Send + Sync {
@@ -482,37 +480,6 @@ impl SupportedVersion {
     }
 }
 
-/// Linked against the skill by the wasm time. For the most part this gives the skill access to the
-/// CSI.
-pub struct LinkedCtx {
-    wasi_ctx: WasiCtx,
-    resource_table: ResourceTable,
-    skill_ctx: Box<dyn CsiForSkills + Send>,
-}
-
-impl LinkedCtx {
-    fn new(skill_ctx: Box<dyn CsiForSkills + Send>) -> Self {
-        let mut builder = WasiCtxBuilder::new();
-        LinkedCtx {
-            wasi_ctx: builder.build(),
-            resource_table: ResourceTable::new(),
-            skill_ctx,
-        }
-    }
-}
-
-impl WasiView for LinkedCtx {
-    fn ctx(&mut self) -> &mut WasiCtx {
-        &mut self.wasi_ctx
-    }
-}
-
-impl IoView for LinkedCtx {
-    fn table(&mut self) -> &mut ResourceTable {
-        &mut self.resource_table
-    }
-}
-
 /// An event emitted by the business logic living in the skill. As opposed to an event emitted by
 /// executing the skill. The difference is that the former can not contain runtime errors, and is
 /// not checked yet for invalid state transitions. Example of invalid state transition would be
@@ -546,7 +513,6 @@ pub mod tests {
         given_rust_skill_search, given_streaming_output_skill,
     };
     use tokio::sync::oneshot;
-    use v0_2::pharia::skill::csi::{Host, Language};
 
     use crate::{
         chunking::{Chunk, ChunkRequest},
@@ -561,7 +527,6 @@ pub mod tests {
         language_selection::{self, SelectLanguageRequest},
         search::{Document, DocumentPath, SearchRequest, SearchResult},
         skill_driver::SkillInvocationCtx,
-        tests::api_token,
     };
 
     use super::*;
@@ -729,28 +694,6 @@ pub mod tests {
             JsonSchema::try_from(schema).unwrap_err(),
             MetadataError::InvalidJsonSchema
         ));
-    }
-
-    #[tokio::test]
-    async fn language_selection_from_csi() {
-        // Given a linked context
-        let (send_rt_err, _) = oneshot::channel();
-        let skill_ctx = Box::new(SkillInvocationCtx::new(
-            send_rt_err,
-            StubCsi::empty(),
-            api_token().to_owned(),
-        ));
-        let mut ctx = LinkedCtx::new(skill_ctx);
-
-        // When selecting a language based on the provided text
-        let text = "This is a sentence written in German language.";
-        let language = ctx
-            .select_language(text.to_owned(), vec![Language::Eng, Language::Deu])
-            .await;
-
-        // Then English is selected as the language
-        assert!(language.is_some());
-        assert_eq!(language.unwrap(), Language::Eng);
     }
 
     #[tokio::test]
