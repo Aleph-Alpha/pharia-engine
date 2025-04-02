@@ -33,6 +33,13 @@ missing_panics_doc = "allow"
 pedantic = { level = "warn", priority = -1 }
 module-name-repetitions = "allow"
 
+[workspace.dependencies]
+anyhow = "1.0.97"
+thiserror = "2.0.12"
+tracing = "0.1.41"
+wasmtime = "31.0.0"
+wasmtime-wasi = "31.0.0"
+
 [package]
 name = "pharia-kernel"
 version = "0.11.11"
@@ -40,8 +47,9 @@ edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
+engine-room = { path = "./crates/engine-room" }
 aleph-alpha-client = "0.23.0"
-anyhow = "1.0.97"
+anyhow.workspace = true
 async-trait = "0.1.88"
 axum = { version = "0.8.3", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
@@ -76,15 +84,15 @@ tower-http = { version = "0.6.2", features = [
     "sensitive-headers",
     "trace",
 ] }
-tracing = "0.1.41"
+tracing.workspace = true
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.3.0" }
-wasmtime = "31.0.0"
-wasmtime-wasi = "31.0.0"
+wasmtime.workspace = true
+wasmtime-wasi.workspace = true
 wit-parser = "0.228.0"
 url = "2.5.4"
-thiserror = "2.0.12"
+thiserror.workspace = true
 tokenizers = { version = "0.21.1", default-features = false, features = [
     "onig",
     "esaxx_fast",

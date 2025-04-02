@@ -52,12 +52,12 @@ impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
-        let mut linked_ctx = LinkedCtx::new(ctx);
-        let stream_output = linked_ctx
+        let mut store = engine.store(ctx);
+        let stream_output = store
+            .data_mut()
             .resource_table
             .push(sender)
             .expect("Failed to push sender to resource table");
-        let mut store = engine.store(linked_ctx);
         let input = serde_json::to_vec(&input).expect("Json is always serializable");
         let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
             tracing::error!("Failed to instantiate skill: {}", e);

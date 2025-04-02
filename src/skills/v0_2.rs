@@ -36,7 +36,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
     ) -> Result<Value, SkillError> {
-        let mut store = engine.store(LinkedCtx::new(ctx));
+        let mut store = engine.store(ctx);
         let input = serde_json::to_vec(&input).expect("Json is always serializable");
         let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
             tracing::error!("Failed to instantiate skill: {}", e);
