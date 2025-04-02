@@ -16,7 +16,7 @@ use wasmtime::{
     Store, UpdateDeadline,
     component::{Component, Linker},
 };
-use wasmtime_wasi::WasiView;
+use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiView};
 
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
@@ -105,8 +105,12 @@ impl Engine {
 
     /// Generates a store for a specific invocation.
     /// This will yield after every tick, as well as halt execution after `Self::MAX_EXECUTION_TIME`.
-    pub fn store<Data>(&self, data: Data) -> Store<Data> {
-        let mut store = Store::new(&self.inner, data);
+    pub fn store<Ctx>(&self, ctx: Ctx) -> Store<LinkerImpl<Ctx>>
+    where
+        Ctx: Send,
+    {
+        let ctx = LinkerImpl::new(ctx);
+        let mut store = Store::new(&self.inner, ctx);
         // Check after the next tick
         store.set_epoch_deadline(1);
         // Once the deadline is reached, the callback will be called.
@@ -122,6 +126,46 @@ impl Engine {
             }
         });
         store
+    }
+}
+
+/// Implementation for a given linker.
+/// By default, it provides WASI support and a resource table.
+/// But it is generic over a type for custom implementations of WIT interfaces.
+pub struct LinkerImpl<Ctx> {
+    pub ctx: Ctx,
+    pub resource_table: ResourceTable,
+    wasi_ctx: WasiCtx,
+}
+
+impl<Ctx> LinkerImpl<Ctx>
+where
+    Ctx: Send,
+{
+    pub fn new(ctx: Ctx) -> Self {
+        LinkerImpl {
+            ctx,
+            resource_table: ResourceTable::new(),
+            wasi_ctx: WasiCtx::builder().build(),
+        }
+    }
+}
+
+impl<Ctx> WasiView for LinkerImpl<Ctx>
+where
+    Ctx: Send,
+{
+    fn ctx(&mut self) -> &mut WasiCtx {
+        &mut self.wasi_ctx
+    }
+}
+
+impl<Ctx> IoView for LinkerImpl<Ctx>
+where
+    Ctx: Send,
+{
+    fn table(&mut self) -> &mut ResourceTable {
+        &mut self.resource_table
     }
 }
 

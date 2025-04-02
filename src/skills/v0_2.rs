@@ -88,11 +88,7 @@ impl Host for LinkedCtx {
         options: CompletionParams,
     ) -> Completion {
         let request = inference::CompletionRequest::new(prompt, model).with_params(options.into());
-        self.skill_ctx
-            .complete(vec![request])
-            .await
-            .remove(0)
-            .into()
+        self.ctx.complete(vec![request]).await.remove(0).into()
     }
 
     async fn complete_return_special_tokens(
@@ -120,11 +116,7 @@ impl Host for LinkedCtx {
             logprobs: inference::Logprobs::No,
         };
         let request = inference::CompletionRequest::new(prompt, model).with_params(params);
-        self.skill_ctx
-            .complete(vec![request])
-            .await
-            .remove(0)
-            .into()
+        self.ctx.complete(vec![request]).await.remove(0).into()
     }
 
     async fn chat(
@@ -138,7 +130,7 @@ impl Host for LinkedCtx {
             messages: messages.into_iter().map(Into::into).collect(),
             params: params.into(),
         };
-        self.skill_ctx.chat(vec![request]).await.remove(0).into()
+        self.ctx.chat(vec![request]).await.remove(0).into()
     }
 
     async fn chunk(&mut self, text: String, params: ChunkParams) -> Vec<String> {
@@ -147,7 +139,7 @@ impl Host for LinkedCtx {
             params: params.into(),
             character_offsets: false,
         };
-        self.skill_ctx
+        self.ctx
             .chunk(vec![request])
             .await
             .remove(0)
@@ -163,7 +155,7 @@ impl Host for LinkedCtx {
     ) -> Option<Language> {
         let languages = languages.into_iter().map(Into::into).collect::<Vec<_>>();
         let request = SelectLanguageRequest::new(text, languages);
-        self.skill_ctx
+        self.ctx
             .select_language(vec![request])
             .await
             .remove(0)
@@ -173,7 +165,7 @@ impl Host for LinkedCtx {
     async fn complete_all(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
         let requests = requests.into_iter().map(Into::into).collect();
 
-        self.skill_ctx
+        self.ctx
             .complete(requests)
             .await
             .into_iter()
@@ -195,7 +187,7 @@ impl Host for LinkedCtx {
             min_score,
             filters: Vec::new(),
         };
-        self.skill_ctx
+        self.ctx
             .search(vec![request])
             .await
             .remove(0)
@@ -206,7 +198,7 @@ impl Host for LinkedCtx {
 
     async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
         let requests = requests.into_iter().map(Into::into).collect();
-        self.skill_ctx
+        self.ctx
             .documents(requests)
             .await
             .into_iter()
@@ -215,7 +207,7 @@ impl Host for LinkedCtx {
     }
 
     async fn document_metadata(&mut self, document_path: DocumentPath) -> Option<Vec<u8>> {
-        self.skill_ctx
+        self.ctx
             .document_metadata(vec![document_path.into()])
             .await
             .remove(0) // we know there will be exactly one document returned
@@ -482,7 +474,34 @@ impl From<inference::FinishReason> for FinishReason {
 mod tests {
     use std::vec;
 
+    use engine_room::LinkerImpl;
+    use tokio::sync::oneshot;
+
+    use crate::{csi::tests::StubCsi, skill_driver::SkillInvocationCtx, tests::api_token};
+
     use super::*;
+
+    #[tokio::test]
+    async fn language_selection_from_csi() {
+        // Given a linked context
+        let (send_rt_err, _) = oneshot::channel();
+        let skill_ctx: Box<dyn CsiForSkills + Send> = Box::new(SkillInvocationCtx::new(
+            send_rt_err,
+            StubCsi::empty(),
+            api_token().to_owned(),
+        ));
+        let mut ctx = LinkerImpl::new(skill_ctx);
+
+        // When selecting a language based on the provided text
+        let text = "This is a sentence written in German language.";
+        let language = ctx
+            .select_language(text.to_owned(), vec![Language::Eng, Language::Deu])
+            .await;
+
+        // Then English is selected as the language
+        assert!(language.is_some());
+        assert_eq!(language.unwrap(), Language::Eng);
+    }
 
     #[test]
     fn forward_chunk_params() {

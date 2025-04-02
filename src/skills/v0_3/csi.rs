@@ -34,7 +34,7 @@ bindgen!({
 
 impl ChunkingHost for LinkedCtx {
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {
-        self.skill_ctx
+        self.ctx
             .chunk(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
@@ -46,7 +46,7 @@ impl ChunkingHost for LinkedCtx {
         &mut self,
         requests: Vec<ChunkWithOffsetRequest>,
     ) -> Vec<Vec<ChunkWithOffset>> {
-        self.skill_ctx
+        self.ctx
             .chunk(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
@@ -113,7 +113,7 @@ impl From<ChunkParams> for chunking::ChunkParams {
 
 impl DocumentIndexHost for LinkedCtx {
     async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
-        self.skill_ctx
+        self.ctx
             .documents(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
@@ -122,7 +122,7 @@ impl DocumentIndexHost for LinkedCtx {
     }
 
     async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Vec<u8>>> {
-        self.skill_ctx
+        self.ctx
             .document_metadata(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
@@ -135,7 +135,7 @@ impl DocumentIndexHost for LinkedCtx {
     }
 
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-        self.skill_ctx
+        self.ctx
             .search(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
@@ -335,7 +335,7 @@ impl From<MetadataFieldValue> for search::MetadataFieldValue {
 
 impl InferenceHost for LinkedCtx {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Vec<TextScore>> {
-        self.skill_ctx
+        self.ctx
             .explain(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
@@ -343,7 +343,7 @@ impl InferenceHost for LinkedCtx {
             .collect()
     }
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-        self.skill_ctx
+        self.ctx
             .chat(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
@@ -352,7 +352,7 @@ impl InferenceHost for LinkedCtx {
     }
 
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-        self.skill_ctx
+        self.ctx
             .complete(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
@@ -364,7 +364,7 @@ impl InferenceHost for LinkedCtx {
 /// This manages our completion stream within the resource table, allowing us to link to the Resource in the WIT World.
 impl HostCompletionStream for LinkedCtx {
     async fn new(&mut self, init: CompletionRequest) -> Resource<CompletionStream> {
-        let stream_id = self.skill_ctx.completion_stream_new(init.into()).await;
+        let stream_id = self.ctx.completion_stream_new(init.into()).await;
         self.resource_table
             .push(stream_id)
             .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
@@ -378,7 +378,7 @@ impl HostCompletionStream for LinkedCtx {
             .get(&stream)
             .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
             .expect("Failed to get stream from resource table");
-        self.skill_ctx
+        self.ctx
             .completion_stream_next(stream_id)
             .await
             .map(Into::into)
@@ -391,14 +391,14 @@ impl HostCompletionStream for LinkedCtx {
             .delete(stream)
             .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
             .expect("Failed to delete stream from resource table");
-        self.skill_ctx.completion_stream_drop(stream_id).await;
+        self.ctx.completion_stream_drop(stream_id).await;
         Ok(())
     }
 }
 
 impl HostChatStream for LinkedCtx {
     async fn new(&mut self, init: ChatRequest) -> Resource<ChatStream> {
-        let stream_id = self.skill_ctx.chat_stream_new(init.into()).await;
+        let stream_id = self.ctx.chat_stream_new(init.into()).await;
         self.resource_table
             .push(stream_id)
             .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
@@ -412,10 +412,7 @@ impl HostChatStream for LinkedCtx {
             .get(&stream)
             .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
             .expect("Failed to get stream from resource table");
-        self.skill_ctx
-            .chat_stream_next(stream_id)
-            .await
-            .map(Into::into)
+        self.ctx.chat_stream_next(stream_id).await.map(Into::into)
     }
 
     async fn drop(&mut self, stream: Resource<ChatStream>) -> anyhow::Result<()> {
@@ -425,7 +422,7 @@ impl HostChatStream for LinkedCtx {
             .delete(stream)
             .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
             .expect("Failed to delete stream from resource table");
-        self.skill_ctx.chat_stream_drop(stream_id).await;
+        self.ctx.chat_stream_drop(stream_id).await;
         Ok(())
     }
 }
@@ -694,7 +691,7 @@ impl LanguageHost for LinkedCtx {
         &mut self,
         requests: Vec<SelectLanguageRequest>,
     ) -> Vec<Option<String>> {
-        self.skill_ctx
+        self.ctx
             .select_language(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
