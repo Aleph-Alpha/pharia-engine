@@ -30,15 +30,15 @@ impl<L> SkillStoreState<L>
 where
     L: SkillLoaderApi,
 {
-    /// We predominantly load Python skills, which are quite heavy.
+    /// We predominantly load Python skills, which are quite heavy. Python skills are roughly 60MB in size from the registry.
     /// The first skill is roughly 850MB in memory, and subsequent ones are between 100-150MB.
-    /// Which means, we roughly dedicate 850 + 9 * 150 = 2200MB of RAM to keep 10 warm.
-    const MAX_CACHED_SKILLS: usize = 10;
+    /// Which means, we roughly dedicate 850 + 9 * 150 = 2200MB of RAM to keep 10 warm, so 600MB from registry should be within reason.
+    const MAX_CACHED_SKILL_BYTES: u64 = 600 * 1024 * 1024;
 
     pub fn new(skill_loader: L) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
-            cached_skills: SkillCache::new(Self::MAX_CACHED_SKILLS),
+            cached_skills: SkillCache::new(Self::MAX_CACHED_SKILL_BYTES),
             invalid_namespaces: HashMap::new(),
             skill_loader,
         }
@@ -71,7 +71,7 @@ where
         })
     }
 
-    pub fn list_cached_skills(&self) -> impl Iterator<Item = &SkillPath> + '_ {
+    pub fn list_cached_skills(&self) -> impl Iterator<Item = SkillPath> + '_ {
         self.cached_skills.keys()
     }
 
@@ -129,10 +129,10 @@ where
         match result {
             Ok(latest_digest) => self
                 .cached_skills
-                .compare_latest_digest(&skill_path, &latest_digest),
+                .compare_latest_digest(skill_path, &latest_digest),
             Err(e) => {
                 // Always update the digest_validated time so we don't loop over errors constantly.
-                self.cached_skills.update_digest_validated(&skill_path);
+                self.cached_skills.update_digest_validated(skill_path);
                 Err(e)
             }
         }
@@ -152,7 +152,7 @@ where
         };
         // Wait until is it time to refresh
         sleep_until(last_checked + update_interval).await;
-        self.validate_digest(skill_path).await
+        self.validate_digest(skill_path.as_ref().clone()).await
     }
 }
 
@@ -491,7 +491,7 @@ where
                 }
             }
             SkillStoreMsg::ListCached { send } => {
-                drop(send.send(self.provider.list_cached_skills().cloned().collect()));
+                drop(send.send(self.provider.list_cached_skills().collect()));
             }
             SkillStoreMsg::InvalidateCache { skill_path, send } => {
                 let _ = send.send(self.provider.invalidate(&skill_path));
@@ -1082,7 +1082,7 @@ pub mod tests {
         // Then nothing changes
         assert_eq!(
             skill_store_state.list_cached_skills().collect::<Vec<_>>(),
-            skill_store_state.skills().collect::<Vec<_>>(),
+            skill_store_state.skills().cloned().collect::<Vec<_>>(),
         );
 
         Ok(())
