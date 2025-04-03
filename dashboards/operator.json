@@ -821,52 +821,16 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
+          "fieldMinMax": false,
           "mappings": [],
           "thresholds": {
-            "mode": "absolute",
+            "mode": "percentage",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -881,16 +845,19 @@
       },
       "id": 12,
       "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "11.4.0",
       "targets": [
@@ -900,14 +867,18 @@
             "uid": "${source}"
           },
           "editorMode": "code",
-          "expr": "sum by (cluster) (rate (kernel_skill_cache_items{}[$__rate_interval]))",
+          "exemplar": false,
+          "expr": "sum by (cluster) (kernel_skill_cache_items{})",
+          "format": "time_series",
+          "instant": false,
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Skills in Cache",
-      "type": "timeseries"
+      "transparent": true,
+      "type": "stat"
     },
     {
       "collapsed": false,
@@ -1032,6 +1003,6 @@
   "timezone": "browser",
   "title": "Pharia Kernel",
   "uid": "de5pijc6rvbpca",
-  "version": 66,
+  "version": 69,
   "weekStart": ""
 }
