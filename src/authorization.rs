@@ -104,7 +104,7 @@ impl AuthorizationMsg {
                 let result = client.token_valid(api_token).await;
                 drop(send.send(result));
             }
-        };
+        }
     }
 }
 
