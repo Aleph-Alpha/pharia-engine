@@ -15,6 +15,7 @@ mod namespace_watcher;
 mod registries;
 mod search;
 mod shell;
+mod skill_cache;
 mod skill_driver;
 mod skill_loader;
 mod skill_runtime;
