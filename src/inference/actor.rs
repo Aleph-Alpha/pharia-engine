@@ -646,7 +646,7 @@ pub mod tests {
                 Err(e) => {
                     send.send(Err(e)).await.unwrap();
                 }
-            };
+            }
             recv
         }
 
@@ -689,7 +689,7 @@ pub mod tests {
                 Err(e) => {
                     send.send(Err(e)).await.unwrap();
                 }
-            };
+            }
             recv
         }
     }
