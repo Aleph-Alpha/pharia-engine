@@ -597,8 +597,8 @@ where
             body=Value,
             content(("text/event-stream", examples(
                 ("Tell me a joke" = (
-                    summary = "Namespace: `test-beta`, Skill: `tell_me_a_joke`",
-                    description = "The `tell_me_a_joke` Skill in the `test-beta` namespace streams a joke.",
+                    summary = "Namespace: `example`, Skill: `tell_me_a_joke`",
+                    description = "The `tell_me_a_joke` Skill in the `example` namespace streams a joke.",
                     value = json!("\
                         event: message\n\
                         data: {\"type\":\"begin\"}\n\
@@ -611,8 +611,8 @@ where
                     ")
                 )),
                 ("Hello" = (
-                    summary = "Namespace: `test-beta`, Skill: `hello`",
-                    description = "The `hello` Skill in the `test-beta` namespace streams each character of the text \"Hello\".",
+                    summary = "Namespace: `example`, Skill: `hello`",
+                    description = "The `hello` Skill in the `example` namespace streams each character of the text \"Hello\".",
                     value = json!("\
                         event: message\n\
                         data: {\"type\":\"begin\"}\n\
@@ -637,16 +637,16 @@ where
                     ")
                 )),
                 ("Saboteur" = (
-                    summary = "Namespace: `test-beta`, Skill: `saboteur`",
-                    description = "The `saboteur` Skill in the `test-beta` namespace responds with an error.",
+                    summary = "Namespace: `example`, Skill: `saboteur`",
+                    description = "The `saboteur` Skill in the `example` namespace responds with an error.",
                     value = json!("\
                         event: error\n\
                         data: {\"message\":\"The skill you called responded with an error. Maybe you should check your input, if it seems to be correct you may want to contact the skill developer. Error reported by Skill:\\n\\nSkill is a saboteur\"}\n\
                     ")
                 )),
                 ("Non-existing Skill" = (
-                    summary = "Namespace: `test-beta`, Skill: `non-existing-skill`",
-                    description = "The `non-existing-skill` Skill does not exist in the `test-beta` namespace.",
+                    summary = "Namespace: `example`, Skill: `non-existing-skill`",
+                    description = "The `non-existing-skill` Skill does not exist in the `example` namespace.",
                     value = json!("\
                         event: error\n\
                         data: {\"message\":\"Sorry, we could not find the skill you requested in its namespace. This can have three causes:\\n\n1. You sent the wrong skill name.\\n2. You sent the wrong namespace.\\n3. The skill is not configured in the namespace you requested. You may want to check the namespace configuration.\"}\n\
