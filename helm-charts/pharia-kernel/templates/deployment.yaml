@@ -68,6 +68,16 @@ spec:
           command: []
           args: []
           env:
+            - name: MEMORY_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: {{ include "pharia-kernel.fullname" . }}
+                  resource: requests.memory
+            - name: MEMORY_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: {{ include "pharia-kernel.fullname" . }}
+                  resource: limits.memory
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | quote }}
             {{- if .Values.openTelemetryEndpoint }}
