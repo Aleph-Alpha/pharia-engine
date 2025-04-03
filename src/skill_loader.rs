@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bytesize::ByteSize;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinHandle, spawn_blocking};
@@ -62,11 +63,11 @@ pub struct LoadedSkill {
     pub digest: Digest,
     /// How big the skill was in the registry. Used as a proxy for roughly how large a skill was
     /// and can be used downstream for things like cache eviction.
-    pub size_loaded_from_registry: u32,
+    pub size_loaded_from_registry: ByteSize,
 }
 
 impl LoadedSkill {
-    pub fn new(skill: Arc<dyn Skill>, digest: Digest, size_loaded_from_registry: u32) -> Self {
+    pub fn new(skill: Arc<dyn Skill>, digest: Digest, size_loaded_from_registry: ByteSize) -> Self {
         Self {
             skill,
             digest,
@@ -248,7 +249,7 @@ impl SkillLoaderActor {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
             skill_bytes.ok_or_else(|| SkillFetchError::SkillNotFound(skill.clone()))?;
-        let size_loaded_from_registry = u32::try_from(bytes.len()).unwrap_or(u32::MAX);
+        let size_loaded_from_registry = ByteSize(bytes.len() as u64);
         let skill = spawn_blocking(move || load_skill_from_wasm_bytes(engine.as_ref(), bytes))
             .await
             .expect("Spawned linking thread must run to completion without being poisoned.")?;
