@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.13](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.12...v0.11.13)
+
+### Features
+
+- Read memory request and limit configuration options from env - ([bb4ace7](https://github.com/Aleph-Alpha/pharia-kernel/commit/bb4ace7e7c3b06b9cbf846d2c32b21453f17c74a))
+
+### Documentation
+
+- Add examples for message stream response - ([7892cc4](https://github.com/Aleph-Alpha/pharia-kernel/commit/7892cc413bcf12abfd39d4486f3a070757d00e03))
+
+### Builds
+
+- *(deps)* Bump the minor group with 2 updates - ([bd58a7b](https://github.com/Aleph-Alpha/pharia-kernel/commit/bd58a7bbb34fdf4b034593a95082d071558bd52d))
+
+
 ## [0.11.12](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.11...v0.11.12)
 
 ### Features
