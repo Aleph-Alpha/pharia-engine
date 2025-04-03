@@ -2,6 +2,7 @@ use anyhow::Error;
 use tokio::signal;
 
 use pharia_kernel::{AppConfig, Kernel, initialize_metrics, initialize_tracing};
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -10,6 +11,15 @@ async fn main() -> Result<(), Error> {
     initialize_tracing(&app_config)?;
     initialize_metrics(app_config.metrics_address())?;
 
+    info!(
+        "Memory request: {} | limit: {}",
+        app_config
+            .memory_request()
+            .map_or_else(|| "None".to_owned(), |size| size.to_string()),
+        app_config
+            .memory_limit()
+            .map_or_else(|| "None".to_owned(), |size| size.to_string())
+    );
     let kernel = Kernel::new(app_config, shutdown_signal()).await?;
     kernel.wait_for_shutdown().await;
 

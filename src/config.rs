@@ -1,4 +1,5 @@
 use anyhow::Ok;
+use bytesize::ByteSize;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use jiff::SignedDuration;
 use serde::{Deserialize, Deserializer};
@@ -79,6 +80,10 @@ pub struct AppConfig {
     otel_endpoint: Option<String>,
     #[serde(default)]
     use_pooling_allocator: bool,
+    /// Optionally set amount of memory requested from Kubernetes
+    memory_request: Option<ByteSize>,
+    /// Optionally set memory limit for Kubernetes
+    memory_limit: Option<ByteSize>,
 }
 
 /// `jiff::SignedDuration` can parse human readable strings like `1h30m` into `SignedDuration`.
@@ -264,6 +269,28 @@ impl AppConfig {
         self.use_pooling_allocator = use_pooling;
         self
     }
+
+    #[must_use]
+    pub fn memory_request(&self) -> Option<ByteSize> {
+        self.memory_request
+    }
+
+    #[must_use]
+    pub fn with_memory_request(mut self, memory_request: Option<ByteSize>) -> Self {
+        self.memory_request = memory_request;
+        self
+    }
+
+    #[must_use]
+    pub fn memory_limit(&self) -> Option<ByteSize> {
+        self.memory_limit
+    }
+
+    #[must_use]
+    pub fn with_memory_limit(mut self, memory_limit: Option<ByteSize>) -> Self {
+        self.memory_limit = memory_limit;
+        self
+    }
 }
 
 impl Default for AppConfig {
@@ -280,6 +307,8 @@ impl Default for AppConfig {
             log_level: defaults::log_level(),
             otel_endpoint: None,
             use_pooling_allocator: false,
+            memory_request: None,
+            memory_limit: None,
         }
     }
 }

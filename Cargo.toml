@@ -143,6 +143,7 @@ async-stream = "0.3.6"
 jiff = { version = "0.2.5", features = ["serde"] }
 futures-util = "0.3.31"
 moka = { version = "0.12.10", features = ["sync"] }
+bytesize = { version = "2.0.1", features = ["serde"] }
 
 [dev-dependencies]
 test-skills = { path = "./crates/test-skills" }
