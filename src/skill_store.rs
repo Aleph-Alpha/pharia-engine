@@ -8,6 +8,7 @@ use crate::{
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
+use bytesize::ByteSize;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
@@ -30,7 +31,7 @@ impl<L> SkillStoreState<L>
 where
     L: SkillLoaderApi,
 {
-    pub fn new(skill_loader: L, cache_capacity: u64) -> Self {
+    pub fn new(skill_loader: L, cache_capacity: ByteSize) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
             cached_skills: SkillCache::new(cache_capacity),
@@ -160,7 +161,7 @@ impl SkillStore {
     pub fn new(
         skill_loader: impl SkillLoaderApi + Clone + Send + 'static,
         digest_update_interval: Duration,
-        cache_capacity: u64,
+        cache_capacity: ByteSize,
     ) -> Self {
         let (sender, recv) = mpsc::channel(1);
         let mut actor =
@@ -395,7 +396,7 @@ where
         receiver: mpsc::Receiver<SkillStoreMsg>,
         skill_loader: L,
         digest_update_interval: Duration,
-        cache_capacity: u64,
+        cache_capacity: ByteSize,
     ) -> Self {
         SkillStoreActor {
             receiver,
@@ -518,7 +519,7 @@ pub mod tests {
     impl SkillStore {
         /// Easier constuctor for tests.
         fn from_loader(skill_loader: impl SkillLoaderApi + Clone + Send + 'static) -> Self {
-            Self::new(skill_loader, Duration::from_secs(10), u64::MAX)
+            Self::new(skill_loader, Duration::from_secs(10), ByteSize(u64::MAX))
         }
     }
 
@@ -628,7 +629,7 @@ pub mod tests {
             let skill_loader =
                 SkillLoader::with_file_registry(engine, skill_path.namespace.clone()).api();
 
-            let mut provider = SkillStoreState::new(skill_loader, u64::MAX);
+            let mut provider = SkillStoreState::new(skill_loader, ByteSize(u64::MAX));
             let skill = ConfiguredSkill::from_path(skill_path);
             provider.upsert_skill(skill);
             provider
@@ -889,7 +890,7 @@ pub mod tests {
         let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
         provider.insert(
             skill_path.clone(),
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy"), 1),
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy"), ByteSize(1)),
         );
 
         // When we remove the skill
@@ -922,10 +923,10 @@ pub mod tests {
         let second_skill_path = SkillPath::local("second_skill");
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&first_skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("first"), 1)
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("first"), ByteSize(1))
         });
         skill_loader.add(&second_skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("second"), 1)
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("second"), ByteSize(1))
         });
 
         // When
@@ -986,7 +987,11 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"), 1)
+            LoadedSkill::new(
+                Arc::new(SkillDummy),
+                Digest::new("original-digest"),
+                ByteSize(1),
+            )
         });
         let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
@@ -1009,7 +1014,11 @@ pub mod tests {
         let greet_skill = SkillPath::local("greet_skill");
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&greet_skill, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy digest"), 1)
+            LoadedSkill::new(
+                Arc::new(SkillDummy),
+                Digest::new("dummy digest"),
+                ByteSize(1),
+            )
         });
         let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
@@ -1034,19 +1043,31 @@ pub mod tests {
         // Given one cached "greet_skill"
         let skill_loader = SkillLoaderStub::new();
         let skill_path = SkillPath::local("greet");
-        let mut skill_store_state = SkillStoreState::new(skill_loader.clone(), u64::MAX);
+        let mut skill_store_state = SkillStoreState::new(skill_loader.clone(), ByteSize(u64::MAX));
         skill_loader.add(&skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"), 1)
+            LoadedSkill::new(
+                Arc::new(SkillDummy),
+                Digest::new("original-digest"),
+                ByteSize(1),
+            )
         });
         skill_store_state.upsert_skill(ConfiguredSkill::from_path(&skill_path));
         skill_store_state.insert(
             skill_path.clone(),
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"), 1),
+            LoadedSkill::new(
+                Arc::new(SkillDummy),
+                Digest::new("original-digest"),
+                ByteSize(1),
+            ),
         );
 
         // When we update the digest of the "greet" skill and we clear out expired skills
         skill_loader.add(&skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("different-digest"), 1)
+            LoadedSkill::new(
+                Arc::new(SkillDummy),
+                Digest::new("different-digest"),
+                ByteSize(1),
+            )
         });
         skill_store_state
             .validate_digest(skill_path.clone())
@@ -1070,9 +1091,13 @@ pub mod tests {
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&skill_path, || {
             // Skill store always returns the same digest
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("originals-digest"), 1)
+            LoadedSkill::new(
+                Arc::new(SkillDummy),
+                Digest::new("originals-digest"),
+                ByteSize(1),
+            )
         });
-        let mut skill_store_state = SkillStoreState::new(skill_loader, u64::MAX);
+        let mut skill_store_state = SkillStoreState::new(skill_loader, ByteSize(u64::MAX));
         let configured_skill = ConfiguredSkill::from_path(&skill_path);
         skill_store_state.upsert_skill(configured_skill.clone());
         let compiled_skill = skill_store_state

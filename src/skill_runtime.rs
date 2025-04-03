@@ -462,6 +462,7 @@ pub mod tests {
         skills::{AnySkillManifest, Skill, SkillError, SkillEvent},
     };
     use async_trait::async_trait;
+    use bytesize::ByteSize;
     use metrics::Label;
     use metrics_util::debugging::{DebugValue, DebuggingRecorder, Snapshot};
     use serde_json::json;
@@ -496,7 +497,8 @@ pub mod tests {
         let registry_config = RegistryConfig::empty();
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config).api();
 
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10), u64::MAX);
+        let skill_store =
+            SkillStore::new(skill_loader, Duration::from_secs(10), ByteSize(u64::MAX));
         let csi_apis = CsiDummy;
         let executer = SkillRuntime::new(engine, csi_apis, skill_store.api());
         let api = executer.api();

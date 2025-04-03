@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bytesize::ByteSize;
 use metrics::Gauge;
 use moka::{ops::compute::Op, sync::Cache};
 use tokio::time::Instant;
@@ -58,11 +59,11 @@ pub struct SkillCache {
 impl SkillCache {
     /// Create a new `SkillCache` that can hold approximately up to `capacity` weight.
     /// We define weight of a skill as the size of the wasm module loaded from the registry in bytes.
-    pub fn new(capacity: u64) -> Self {
+    pub fn new(capacity: ByteSize) -> Self {
         Self {
             cache: Cache::builder()
                 .weigher(|_, cached_skill: &CachedSkill| cached_skill.weight)
-                .max_capacity(capacity)
+                .max_capacity(capacity.as_u64())
                 .build(),
             gauge: metrics::gauge!(SkillCacheMetrics::Items),
         }
@@ -89,7 +90,11 @@ impl SkillCache {
         } = compiled_skill;
         self.cache.insert(
             skill_path,
-            CachedSkill::new(skill, digest, size_loaded_from_registry),
+            CachedSkill::new(
+                skill,
+                digest,
+                u32::try_from(size_loaded_from_registry.as_u64()).unwrap_or(u32::MAX),
+            ),
         );
         self.update_gauge();
     }
@@ -153,9 +158,10 @@ mod tests {
 
     #[test]
     fn cache_invalidation() {
-        let capacity = 2;
+        let capacity = ByteSize(2);
         let mut cache = SkillCache::new(capacity);
-        let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), 1);
+        let loaded_skill =
+            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), ByteSize(1));
 
         let skill_paths = [SkillPath::dummy(), SkillPath::dummy(), SkillPath::dummy()];
 
@@ -167,13 +173,13 @@ mod tests {
         cache.cache.run_pending_tasks();
         let keys = cache.keys().collect::<Vec<_>>();
         // One was evicted
-        assert_eq!(keys.len() as u64, capacity);
+        assert_eq!(keys.len(), 2);
     }
 
     #[test]
     fn rust_skills_evicted_less() {
-        let capacity = 100;
-        let rust_size = 1;
+        let capacity = ByteSize(100);
+        let rust_size = ByteSize(1);
         let mut cache = SkillCache::new(capacity);
         let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), rust_size);
 
@@ -185,6 +191,6 @@ mod tests {
         cache.cache.run_pending_tasks();
 
         let keys = cache.keys().collect::<Vec<_>>();
-        assert!(keys.len() > (capacity / 2) as usize);
+        assert!(keys.len() > 50);
     }
 }
