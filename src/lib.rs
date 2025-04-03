@@ -56,6 +56,11 @@ pub struct Kernel {
     shell: Shell,
 }
 
+/// We predominantly load Python skills, which are quite heavy. Python skills are roughly 60MB in size from the registry.
+/// The first skill is roughly 850MB in memory, and subsequent ones are between 100-150MB.
+/// Which means, we roughly dedicate 850 + 9 * 150 = 2200MB of RAM to keep 10 warm, so 600MB from registry should be within reason.
+const MAX_CACHED_SKILL_BYTES: u64 = 600 * 1024 * 1024;
+
 impl Kernel {
     /// Boots up all the actors making up the kernel. If completed the binding operation of the
     /// listener is completed, but no requests are actively handled yet.
@@ -88,8 +93,11 @@ impl Kernel {
 
         let registry_config = app_config.namespaces().registry_config();
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config);
-        let skill_store =
-            SkillStore::new(skill_loader.api(), app_config.namespace_update_interval());
+        let skill_store = SkillStore::new(
+            skill_loader.api(),
+            app_config.namespace_update_interval(),
+            MAX_CACHED_SKILL_BYTES,
+        );
 
         // Boot up the runtime we need to execute Skills
         let skill_runtime = SkillRuntime::new(engine, csi_drivers.clone(), skill_store.api());

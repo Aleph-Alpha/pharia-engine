@@ -496,7 +496,7 @@ pub mod tests {
         let registry_config = RegistryConfig::empty();
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config).api();
 
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10), u64::MAX);
         let csi_apis = CsiDummy;
         let executer = SkillRuntime::new(engine, csi_apis, skill_store.api());
         let api = executer.api();

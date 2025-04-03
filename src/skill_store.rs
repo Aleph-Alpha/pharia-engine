@@ -30,15 +30,10 @@ impl<L> SkillStoreState<L>
 where
     L: SkillLoaderApi,
 {
-    /// We predominantly load Python skills, which are quite heavy. Python skills are roughly 60MB in size from the registry.
-    /// The first skill is roughly 850MB in memory, and subsequent ones are between 100-150MB.
-    /// Which means, we roughly dedicate 850 + 9 * 150 = 2200MB of RAM to keep 10 warm, so 600MB from registry should be within reason.
-    const MAX_CACHED_SKILL_BYTES: u64 = 600 * 1024 * 1024;
-
-    pub fn new(skill_loader: L) -> Self {
+    pub fn new(skill_loader: L, cache_capacity: u64) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
-            cached_skills: SkillCache::new(Self::MAX_CACHED_SKILL_BYTES),
+            cached_skills: SkillCache::new(cache_capacity),
             invalid_namespaces: HashMap::new(),
             skill_loader,
         }
@@ -165,9 +160,11 @@ impl SkillStore {
     pub fn new(
         skill_loader: impl SkillLoaderApi + Clone + Send + 'static,
         digest_update_interval: Duration,
+        cache_capacity: u64,
     ) -> Self {
         let (sender, recv) = mpsc::channel(1);
-        let mut actor = SkillStoreActor::new(recv, skill_loader, digest_update_interval);
+        let mut actor =
+            SkillStoreActor::new(recv, skill_loader, digest_update_interval, cache_capacity);
         let handle = tokio::spawn(async move {
             actor.run().await;
         });
@@ -398,10 +395,11 @@ where
         receiver: mpsc::Receiver<SkillStoreMsg>,
         skill_loader: L,
         digest_update_interval: Duration,
+        cache_capacity: u64,
     ) -> Self {
         SkillStoreActor {
             receiver,
-            provider: SkillStoreState::new(skill_loader),
+            provider: SkillStoreState::new(skill_loader, cache_capacity),
             digest_update_interval,
             skill_requests: SkillRequests::new(),
         }
@@ -517,6 +515,13 @@ pub mod tests {
 
     pub use super::SkillStoreMsg;
 
+    impl SkillStore {
+        /// Easier constuctor for tests.
+        fn from_loader(skill_loader: impl SkillLoaderApi + Clone + Send + 'static) -> Self {
+            Self::new(skill_loader, Duration::from_secs(10), u64::MAX)
+        }
+    }
+
     #[derive(Debug, Clone)]
     pub struct SkillStoreDummy;
 
@@ -623,7 +628,7 @@ pub mod tests {
             let skill_loader =
                 SkillLoader::with_file_registry(engine, skill_path.namespace.clone()).api();
 
-            let mut provider = SkillStoreState::new(skill_loader);
+            let mut provider = SkillStoreState::new(skill_loader, u64::MAX);
             let skill = ConfiguredSkill::from_path(skill_path);
             provider.upsert_skill(skill);
             provider
@@ -756,7 +761,7 @@ pub mod tests {
     async fn skill_store_issues_only_one_request_for_a_skill() {
         // Given a skill store with a configured skill
         let (send, mut recv) = mpsc::channel(2);
-        let skill_store = SkillStore::new(send, Duration::from_secs(10)).api();
+        let skill_store = SkillStore::from_loader(send).api();
 
         let skill_path = SkillPath::local("greet_skill_v0_2");
         let skill = ConfiguredSkill::from_path(&skill_path);
@@ -802,7 +807,7 @@ pub mod tests {
         let a = Namespace::new("a").unwrap();
         let b = Namespace::new("b").unwrap();
 
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10)).api();
+        let skill_store = SkillStore::from_loader(skill_loader).api();
         skill_store
             .upsert(ConfiguredSkill::new(a.clone(), "a", "latest"))
             .await;
@@ -834,7 +839,7 @@ pub mod tests {
         let skill_path = SkillPath::dummy();
         let skill = ConfiguredSkill::from_path(&skill_path);
         let skill_loader = SkillLoaderStub::new();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10)).api();
+        let skill_store = SkillStore::from_loader(skill_loader).api();
         skill_store.upsert(skill).await;
 
         // When a fetch request is issued for a skill that is configured but not loadable
@@ -924,7 +929,7 @@ pub mod tests {
         });
 
         // When
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::from_loader(skill_loader);
         let skill = ConfiguredSkill::from_path(&first_skill_path);
         skill_store.api().upsert(skill).await;
         let skill = ConfiguredSkill::from_path(&SkillPath::local("second_skill"));
@@ -953,7 +958,7 @@ pub mod tests {
         let second = SkillPath::local("two");
 
         let skill_loader = SkillLoader::with_file_registry(engine, first.namespace.clone()).api();
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
 
         // When adding two skills
@@ -983,7 +988,7 @@ pub mod tests {
         skill_loader.add(&skill_path, || {
             LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"), 1)
         });
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
         api.upsert(skill).await;
         api.fetch(skill_path.clone()).await.unwrap();
@@ -1006,7 +1011,7 @@ pub mod tests {
         skill_loader.add(&greet_skill, || {
             LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy digest"), 1)
         });
-        let skill_store = SkillStore::new(skill_loader, Duration::from_secs(10));
+        let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
 
         let skill = ConfiguredSkill::from_path(&greet_skill);
@@ -1029,7 +1034,7 @@ pub mod tests {
         // Given one cached "greet_skill"
         let skill_loader = SkillLoaderStub::new();
         let skill_path = SkillPath::local("greet");
-        let mut skill_store_state = SkillStoreState::new(skill_loader.clone());
+        let mut skill_store_state = SkillStoreState::new(skill_loader.clone(), u64::MAX);
         skill_loader.add(&skill_path, || {
             LoadedSkill::new(Arc::new(SkillDummy), Digest::new("original-digest"), 1)
         });
@@ -1067,7 +1072,7 @@ pub mod tests {
             // Skill store always returns the same digest
             LoadedSkill::new(Arc::new(SkillDummy), Digest::new("originals-digest"), 1)
         });
-        let mut skill_store_state = SkillStoreState::new(skill_loader);
+        let mut skill_store_state = SkillStoreState::new(skill_loader, u64::MAX);
         let configured_skill = ConfiguredSkill::from_path(&skill_path);
         skill_store_state.upsert_skill(configured_skill.clone());
         let compiled_skill = skill_store_state
