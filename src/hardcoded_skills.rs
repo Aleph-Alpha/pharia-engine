@@ -58,6 +58,7 @@ impl Skill for SkillHello {
         sender: mpsc::Sender<SkillEvent>,
     ) -> Result<(), SkillError> {
         sender.send(SkillEvent::MessageBegin).await.unwrap();
+
         for c in "Hello".chars() {
             sender
                 .send(SkillEvent::MessageAppend {
@@ -66,6 +67,7 @@ impl Skill for SkillHello {
                 .await
                 .unwrap();
         }
+
         sender
             .send(SkillEvent::MessageEnd {
                 payload: json!(null),

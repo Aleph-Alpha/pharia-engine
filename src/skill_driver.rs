@@ -62,17 +62,16 @@ impl SkillDriver {
 
                 Ok(error) = &mut recv_rt_err => {
                     let error = SkillExecutionError::RuntimeError(error.to_string());
-                    sender
+                    drop(sender
                         .send(SkillExecutionEvent::Error(error.clone()))
-                        .await
-                        .unwrap();
+                        .await);
                     break Err(error)
                 }
                 Some(skill_event) = recv_inner.recv() => {
                     let execution_event =
                         translator.translate_to_execution_event(skill_event);
                     let maybe_error = execution_event.execution_error().cloned();
-                    sender.send(execution_event).await.unwrap();
+                    drop(sender.send(execution_event).await);
                     if let Some(error) = maybe_error {
                         break Err(error);
                     }
@@ -81,10 +80,9 @@ impl SkillDriver {
                     // Skill error to skill execution error
                     let result = result.map_err(Into::<SkillExecutionError>::into);
                     if let Err(err) = &result {
-                        sender
+                        drop(sender
                             .send(SkillExecutionEvent::Error(err.clone()))
-                            .await
-                            .unwrap();
+                            .await);
                     }
                     break result;
                 }
@@ -96,7 +94,7 @@ impl SkillDriver {
         if let Ok(skill_event) = recv_inner.try_recv() {
             let execution_event = translator.translate_to_execution_event(skill_event);
             let maybe_error = execution_event.execution_error().cloned();
-            sender.send(execution_event).await.unwrap();
+            drop(sender.send(execution_event).await);
             if let Some(error) = maybe_error {
                 return Err(error);
             }
@@ -664,6 +662,7 @@ mod test {
     use crate::{
         chunking::ChunkParams,
         csi::tests::{CsiDummy, CsiSaboteur, StubCsi},
+        hardcoded_skills::SkillHello,
         inference::{
             ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, Message, TextScore,
             TokenUsage,
@@ -991,6 +990,123 @@ mod test {
             the situation persists you may want to contact the operators. Original error:\n\n\
             Test error";
         assert_eq!(result.unwrap_err().to_string(), expectet_error_msg);
+    }
+
+    struct MessageStreamSkillWithCsi;
+
+    #[async_trait]
+    impl Skill for MessageStreamSkillWithCsi {
+        async fn run_as_function(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+        ) -> Result<Value, SkillError> {
+            Err(SkillError::IsMessageStream)
+        }
+
+        async fn manifest(
+            &self,
+            _engine: &Engine,
+            _ctx: Box<dyn CsiForSkills + Send>,
+        ) -> Result<AnySkillManifest, SkillError> {
+            panic!("Dummy metadata implementation of Skill Greet Completion")
+        }
+
+        async fn run_as_message_stream(
+            &self,
+            _engine: &Engine,
+            mut ctx: Box<dyn CsiForSkills + Send>,
+            _input: Value,
+            _sender: mpsc::Sender<SkillEvent>,
+        ) -> Result<(), SkillError> {
+            ctx.complete(vec![CompletionRequest {
+                prompt: "Hello".to_owned(),
+                model: "test-model-name".to_owned(),
+                params: CompletionParams {
+                    max_tokens: Some(10),
+                    temperature: Some(0.5),
+                    top_p: Some(1.0),
+                    presence_penalty: Some(0.0),
+                    frequency_penalty: Some(0.0),
+                    stop: Vec::new(),
+                    return_special_tokens: true,
+                    top_k: None,
+                    logprobs: Logprobs::No,
+                },
+            }])
+            .await;
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn should_not_panic_if_receiver_is_dropped() {
+        // Given a skill that emits a JSON error
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let driver = SkillDriver::new(engine);
+
+        // When
+        let skill = Arc::new(MessageStreamSkillWithCsi);
+        let (send, _) = mpsc::channel(1);
+        let result = driver
+            .run_message_stream(
+                skill.clone(),
+                json!({}),
+                CsiSaboteur,
+                "Dummy Token".to_owned(),
+                send,
+            )
+            .await;
+
+        // The result is an error but it doesn't panic
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn should_not_panic_on_skill_error_if_receiver_is_dropped() {
+        // Given a skill that emits a JSON error
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let driver = SkillDriver::new(engine);
+
+        // When
+        let skill = Arc::new(SkillGreetCompletion);
+        let (send, _) = mpsc::channel(1);
+        let result = driver
+            .run_message_stream(
+                skill.clone(),
+                json!({}),
+                CsiDummy,
+                "Dummy Token".to_owned(),
+                send,
+            )
+            .await;
+
+        // The result is an error but it doesn't panic
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn should_not_panic_on_skill_completion_if_receiver_is_dropped() {
+        // Given a skill that emits a JSON error
+        let engine = Arc::new(Engine::new(false).unwrap());
+        let driver = SkillDriver::new(engine);
+
+        // When
+        let skill = Arc::new(SkillHello);
+        let (send, _) = mpsc::channel(1);
+        let result = driver
+            .run_message_stream(
+                skill.clone(),
+                json!({}),
+                CsiDummy,
+                "Dummy Token".to_owned(),
+                send,
+            )
+            .await;
+
+        // The result is ok
+        assert!(result.is_ok());
     }
 
     #[tokio::test]

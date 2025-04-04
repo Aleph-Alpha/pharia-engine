@@ -9,6 +9,7 @@ use std::{
 
 use axum::http;
 use dotenvy::dotenv;
+use futures::StreamExt;
 use pharia_kernel::{AppConfig, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
@@ -16,6 +17,7 @@ use tempfile::{TempDir, tempdir};
 use test_skills::{
     given_chat_stream_skill, given_complete_stream_skill, given_rust_skill_doc_metadata,
     given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
+    given_skill_infinite_streaming,
 };
 use tokio::sync::oneshot;
 
@@ -651,6 +653,38 @@ async fn invoke_function_as_stream() {
         via the /run endpoint.\"}\n\n"
     );
 
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_message_stream_canceled_during_the_skill_execution() {
+    let greet_skill_wasm = given_skill_infinite_streaming().bytes();
+    let mut local_skill_dir = TestFileRegistry::new();
+    local_skill_dir.with_skill("infinite", greet_skill_wasm);
+    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+
+    let req_client = reqwest::Client::new();
+    let mut stream = req_client
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/infinite/message-stream",
+            kernel.port()
+        ))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(json!("").to_string()))
+        .send()
+        .await
+        .unwrap()
+        .bytes_stream();
+
+    // Pull at least once from the stream so that it is sent
+    drop(stream.next().await.unwrap());
+    drop(stream);
+    drop(req_client);
     kernel.shutdown().await;
 }
 
