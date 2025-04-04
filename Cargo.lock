@@ -1333,8 +1333,10 @@ name = "engine-room"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytesize",
  "dashmap",
  "divan",
+ "moka",
  "test-skills",
  "tracing",
  "wasmtime",

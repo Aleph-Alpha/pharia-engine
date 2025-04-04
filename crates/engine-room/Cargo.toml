@@ -10,8 +10,10 @@ wasmtime.workspace = true
 wasmtime-wasi.workspace = true
 
 [dev-dependencies]
+bytesize.workspace = true
 dashmap = "6.1.0"
 divan = "0.1.17"
+moka.workspace = true
 test-skills = { path = "../test-skills" }
 
 [lints]
