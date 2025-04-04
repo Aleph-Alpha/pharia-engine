@@ -899,10 +899,13 @@ dependencies = [
  "gimli",
  "hashbrown 0.15.2",
  "log",
+ "postcard",
  "pulley-interpreter",
  "regalloc2",
  "rustc-hash",
  "serde",
+ "serde_derive",
+ "sha2",
  "smallvec",
  "target-lexicon 0.13.2",
 ]
@@ -4771,6 +4774,7 @@ dependencies = [
  "hashbrown 0.15.2",
  "log",
  "rustc-hash",
+ "serde",
  "smallvec",
 ]
 

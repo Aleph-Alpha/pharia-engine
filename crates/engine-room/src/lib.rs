@@ -6,14 +6,14 @@
 //! of the world it targets, should live here.
 
 use std::{
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
 
 use tracing::info;
 use wasmtime::{
-    Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType, OptLevel,
-    Store, UpdateDeadline,
+    CacheStore, Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType,
+    OptLevel, Store, UpdateDeadline,
     component::{Component, Linker},
 };
 use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiView};
@@ -37,7 +37,10 @@ impl Engine {
     ///
     /// This function will return an error if the engine cannot be created,
     /// or if wasi functionality cannot be linked.
-    pub fn new(use_pooling_allocator: bool) -> anyhow::Result<Self> {
+    pub fn new(
+        use_pooling_allocator: bool,
+        cache_store: Option<Arc<dyn CacheStore>>,
+    ) -> anyhow::Result<Self> {
         let mut config = Config::new();
         config
             .async_support(true)
@@ -50,6 +53,10 @@ impl Engine {
             // For more information on Pooling Allocation, as well as all of possible configuration,
             // read the wasmtime docs: https://docs.rs/wasmtime/latest/wasmtime/struct.PoolingAllocationConfig.html
             config.allocation_strategy(InstanceAllocationStrategy::pooling());
+        }
+
+        if let Some(cache_store) = cache_store {
+            config.enable_incremental_compilation(cache_store)?;
         }
 
         let engine = WasmtimeEngine::new(&config)?;

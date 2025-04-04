@@ -5,15 +5,22 @@ fn main() {
 
 #[divan::bench_group]
 mod compilation_time {
+    use std::sync::Arc;
+
     use divan::{Bencher, counter::BytesCount};
     use engine_room::Engine;
     use test_skills::{given_python_skill_greet_v0_3, given_rust_skill_greet_v0_3};
+    use wasmtime::CacheStore;
 
     /// Shared benchmark setup
     /// Benchmarks creation of a component. Doesn't include instantiation/linking
-    fn bench(bencher: Bencher<'_, '_>, skill: impl Fn() -> Vec<u8> + Sync) {
+    fn bench(
+        bencher: Bencher<'_, '_>,
+        skill: impl Fn() -> Vec<u8> + Sync,
+        cache_store: impl Fn() -> Option<Arc<dyn CacheStore>> + Sync,
+    ) {
         bencher
-            .with_inputs(|| (Engine::new(false).unwrap(), skill()))
+            .with_inputs(|| (Engine::new(false, cache_store()).unwrap(), skill()))
             .input_counter(|(_, bytes)| BytesCount::of_slice(bytes))
             .bench_values(|(engine, bytes)| {
                 engine.new_component(bytes).unwrap();
@@ -22,11 +29,11 @@ mod compilation_time {
 
     #[divan::bench(sample_count = 10)]
     fn python(bencher: Bencher<'_, '_>) {
-        bench(bencher, || given_python_skill_greet_v0_3().bytes());
+        bench(bencher, || given_python_skill_greet_v0_3().bytes(), || None);
     }
 
     #[divan::bench]
     fn rust(bencher: Bencher<'_, '_>) {
-        bench(bencher, || given_rust_skill_greet_v0_3().bytes());
+        bench(bencher, || given_rust_skill_greet_v0_3().bytes(), || None);
     }
 }
