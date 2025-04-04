@@ -1,21 +1,33 @@
 use anyhow::{Context as _, Error, anyhow, bail};
 use std::{
-    fs,
-    path::Path,
+    env, fs,
+    path::{Path, PathBuf},
     process::{Command, Output},
     sync::{LazyLock, OnceLock},
 };
 use tempfile::{TempDir, tempdir};
 
 const WASI_TARGET: &str = "wasm32-wasip2";
-const SKILL_BUILD_CACHE_DIR: &str = "./skill_build_cache";
+static REPO_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    let output = std::process::Command::new(env!("CARGO"))
+        .arg("locate-project")
+        .arg("--workspace")
+        .arg("--message-format=plain")
+        .output()
+        .unwrap()
+        .stdout;
+    let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
+    cargo_path.parent().unwrap().to_path_buf()
+});
+static SKILL_BUILD_CACHE_DIR: LazyLock<PathBuf> =
+    LazyLock::new(|| REPO_DIR.join("skill_build_cache"));
 
 pub struct TestSkill {
-    path: String,
+    path: PathBuf,
 }
 
 impl TestSkill {
-    fn new(path: String) -> Self {
+    fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
@@ -27,49 +39,49 @@ impl TestSkill {
 
 #[must_use]
 pub fn given_rust_skill_greet_v0_3() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("greet-v0_3"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("greet-v0_3"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_rust_skill_greet_v0_2() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("greet-v0_2"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("greet-v0_2"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_rust_skill_explain() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("explain"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("explain"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_rust_skill_search() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("search"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("search"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_rust_skill_doc_metadata() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("doc-metadata"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("doc-metadata"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_rust_skill_chat() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("chat"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("chat"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_python_skill_greet_v0_2() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> =
+    static WASM_BUILD: LazyLock<PathBuf> =
         LazyLock::new(|| given_python_skill("greet-v0_2", "0.2", "skill"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
@@ -77,7 +89,7 @@ pub fn given_python_skill_greet_v0_2() -> TestSkill {
 
 #[must_use]
 pub fn given_python_skill_greet_v0_3() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> =
+    static WASM_BUILD: LazyLock<PathBuf> =
         LazyLock::new(|| given_python_skill("greet-v0_3", "0.3", "skill"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
@@ -85,45 +97,45 @@ pub fn given_python_skill_greet_v0_3() -> TestSkill {
 
 #[must_use]
 pub fn given_invalid_output_skill() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("invalid-output"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("invalid-output"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_complete_stream_skill() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("complete-stream"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("complete-stream"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_chat_stream_skill() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("chat-stream"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("chat-stream"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 #[must_use]
 pub fn given_streaming_output_skill() -> TestSkill {
-    static WASM_BUILD: LazyLock<String> = LazyLock::new(|| given_rust_skill("streaming-output"));
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("streaming-output"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
 
 /// Creates `{package-name}-py.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `python-skills/{package-name}`
-fn given_python_skill(package_name: &str, wit_version: &str, world: &str) -> String {
-    let target_path = format!("{SKILL_BUILD_CACHE_DIR}/{package_name}-py.wasm");
-    if !Path::new(&target_path).exists() {
+fn given_python_skill(package_name: &str, wit_version: &str, world: &str) -> PathBuf {
+    let target_path = SKILL_BUILD_CACHE_DIR.join(format!("{package_name}-py.wasm"));
+    if !target_path.exists() {
         build_python_skill(package_name, &target_path, wit_version, world);
     }
     target_path
 }
 
 /// Creates `{package-name}-rs.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `crates/{package-name}`
-fn given_rust_skill(package_name: &str) -> String {
-    let target_path = format!("{SKILL_BUILD_CACHE_DIR}/{package_name}-rs.wasm");
-    if !Path::new(&target_path).exists() {
+fn given_rust_skill(package_name: &str) -> PathBuf {
+    let target_path = SKILL_BUILD_CACHE_DIR.join(format!("{package_name}-rs.wasm"));
+    if !target_path.exists() {
         build_rust_skill(package_name);
     }
     target_path
@@ -152,31 +164,38 @@ fn build_rust_skill(package_name: &str) {
         .unwrap();
     error_on_status("Building web assembly failed.", output).unwrap();
 
-    fs::create_dir_all(SKILL_BUILD_CACHE_DIR).unwrap();
+    fs::create_dir_all(SKILL_BUILD_CACHE_DIR.as_path()).unwrap();
 
     let snake_case = change_case::snake_case(package_name);
     std::fs::copy(
-        format!("./target/{WASI_TARGET}/release/{snake_case}.wasm"),
-        format!("{SKILL_BUILD_CACHE_DIR}/{package_name}-rs.wasm"),
+        REPO_DIR
+            .join("target")
+            .join(WASI_TARGET)
+            .join("release")
+            .join(format!("{snake_case}.wasm")),
+        SKILL_BUILD_CACHE_DIR.join(format!("{package_name}-rs.wasm")),
     )
     .unwrap();
 }
 
-fn build_python_skill(package_name: &str, target_path: &str, wit_version: &str, world: &str) {
+fn build_python_skill(package_name: &str, target_path: &Path, wit_version: &str, world: &str) {
     let venv = static_venv();
 
-    fs::create_dir_all(SKILL_BUILD_CACHE_DIR).unwrap();
+    fs::create_dir_all(SKILL_BUILD_CACHE_DIR.as_path()).unwrap();
 
     venv.run(&[
         "componentize-py",
         "-d",
-        &format!("wit/skill@{wit_version}/skill.wit"),
+        REPO_DIR
+            .join(format!("wit/skill@{wit_version}/skill.wit"))
+            .to_str()
+            .unwrap(),
         "-w",
         world,
         "componentize",
         &format!("python-skills.{package_name}.app"),
         "-o",
-        target_path,
+        target_path.to_str().unwrap(),
     ])
     .unwrap();
 
@@ -184,7 +203,12 @@ fn build_python_skill(package_name: &str, target_path: &str, wit_version: &str, 
     //
     // wasm-tools strip ./skill_build_cache/greet-py.wasm -o ./skill_build_cache/greet-py.wasm
     Command::new("wasm-tools")
-        .args(["strip", target_path, "-o", target_path])
+        .args([
+            "strip",
+            target_path.to_str().unwrap(),
+            "-o",
+            target_path.to_str().unwrap(),
+        ])
         .status()
         .unwrap();
 }
