@@ -31,10 +31,10 @@ impl<L> SkillStoreState<L>
 where
     L: SkillLoaderApi,
 {
-    pub fn new(skill_loader: L, cache_capacity: ByteSize) -> Self {
+    pub fn new(skill_loader: L, desired_memory_usage: ByteSize) -> Self {
         SkillStoreState {
             known_skills: HashMap::new(),
-            cached_skills: SkillCache::new(cache_capacity),
+            cached_skills: SkillCache::new(desired_memory_usage),
             invalid_namespaces: HashMap::new(),
             skill_loader,
         }
@@ -161,11 +161,15 @@ impl SkillStore {
     pub fn new(
         skill_loader: impl SkillLoaderApi + Clone + Send + 'static,
         digest_update_interval: Duration,
-        cache_capacity: ByteSize,
+        desired_memory_usage: ByteSize,
     ) -> Self {
         let (sender, recv) = mpsc::channel(1);
-        let mut actor =
-            SkillStoreActor::new(recv, skill_loader, digest_update_interval, cache_capacity);
+        let mut actor = SkillStoreActor::new(
+            recv,
+            skill_loader,
+            digest_update_interval,
+            desired_memory_usage,
+        );
         let handle = tokio::spawn(async move {
             actor.run().await;
         });
@@ -396,11 +400,11 @@ where
         receiver: mpsc::Receiver<SkillStoreMsg>,
         skill_loader: L,
         digest_update_interval: Duration,
-        cache_capacity: ByteSize,
+        desired_memory_usage: ByteSize,
     ) -> Self {
         SkillStoreActor {
             receiver,
-            provider: SkillStoreState::new(skill_loader, cache_capacity),
+            provider: SkillStoreState::new(skill_loader, desired_memory_usage),
             digest_update_interval,
             skill_requests: SkillRequests::new(),
         }
