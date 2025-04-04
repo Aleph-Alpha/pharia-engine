@@ -27,7 +27,6 @@ use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use authorization::Authorization;
-use bytesize::ByteSize;
 use csi::CsiDrivers;
 use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
@@ -56,11 +55,6 @@ pub struct Kernel {
     authorization: Authorization,
     shell: Shell,
 }
-
-/// We predominantly load Python skills, which are quite heavy. Python skills are roughly 60MB in size from the registry.
-/// The first skill is roughly 850MB in memory, and subsequent ones are between 100-150MB.
-/// Which means, we roughly dedicate 850 + 9 * 150 = 2200MB of RAM to keep 10 warm, so 600MB from registry should be within reason.
-const DESIRED_CACHE_MEMORY_USAGE: ByteSize = ByteSize::mib(2200);
 
 impl Kernel {
     /// Boots up all the actors making up the kernel. If completed the binding operation of the
@@ -97,7 +91,7 @@ impl Kernel {
         let skill_store = SkillStore::new(
             skill_loader.api(),
             app_config.namespace_update_interval(),
-            DESIRED_CACHE_MEMORY_USAGE,
+            app_config.desired_cache_memory_usage(),
         );
 
         // Boot up the runtime we need to execute Skills
