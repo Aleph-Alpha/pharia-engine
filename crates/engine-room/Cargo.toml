@@ -10,6 +10,7 @@ wasmtime.workspace = true
 wasmtime-wasi.workspace = true
 
 [dev-dependencies]
+dashmap = "6.1.0"
 divan = "0.1.17"
 test-skills = { path = "../test-skills" }
 
