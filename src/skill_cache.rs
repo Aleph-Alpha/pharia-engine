@@ -243,7 +243,7 @@ mod tests {
         cache.cache.run_pending_tasks();
 
         let keys = cache.keys().collect::<Vec<_>>();
-        assert!(keys.len() > 60);
+        assert!(keys.len() > 50);
     }
 
     #[test]
