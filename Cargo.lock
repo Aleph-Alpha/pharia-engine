@@ -2197,6 +2197,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "infinite-streaming"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "instant"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
