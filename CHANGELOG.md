@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.14](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.13...v0.11.14)
+
+### Features
+
+- Automatically determine target cache size - ([c5946a5](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5946a5ab1343cf7595c20259178c569b43f42fc))
+
+### Documentation
+
+- Rename `example` namespace in examples - ([536623b](https://github.com/Aleph-Alpha/pharia-kernel/commit/536623b240ce4169bf988a2ae183f330902ab327))
+
+### Builds
+
+- *(deps)* Bump miniz_oxide from 0.8.5 to 0.8.7 in the minor group - ([1e24d62](https://github.com/Aleph-Alpha/pharia-kernel/commit/1e24d6230b4a5dc741a469cf2ddbb3a30bb67120))
+
+
 ## [0.11.13](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.12...v0.11.13)
 
 ### Features
