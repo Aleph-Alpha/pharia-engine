@@ -4,6 +4,7 @@ use bytesize::ByteSize;
 use metrics::Gauge;
 use moka::{ops::compute::Op, sync::Cache};
 use tokio::time::Instant;
+use tracing::info;
 
 use crate::{
     registries::Digest,
@@ -66,6 +67,11 @@ impl SkillCache {
             cache: Cache::builder()
                 .weigher(|_, cached_skill: &CachedSkill| cached_skill.weight)
                 .max_capacity(capacity.as_u64())
+                .eviction_listener(|key, _, removal_cause| {
+                    if removal_cause.was_evicted() {
+                        info!("Cache: {key} evicted. Cause: {:?}", removal_cause);
+                    }
+                })
                 .build(),
             gauge: metrics::gauge!(SkillCacheMetrics::Items),
         }
