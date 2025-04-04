@@ -57,9 +57,11 @@ pub struct SkillCache {
 }
 
 impl SkillCache {
-    /// Create a new `SkillCache` that can hold approximately up to `capacity` weight.
-    /// We define weight of a skill as the size of the wasm module loaded from the registry in bytes.
-    pub fn new(capacity: ByteSize) -> Self {
+    /// Create a new `SkillCache` that can hold approximately up to `desired_memory_usage`.
+    /// It is really hard to predict the exact memory usage of the cache, so we use a heuristic
+    /// to estimate the capacity based on the desired memory usage.
+    pub fn new(desired_memory_usage: ByteSize) -> Self {
+        let capacity = Self::estimated_capacity(desired_memory_usage);
         Self {
             cache: Cache::builder()
                 .weigher(|_, cached_skill: &CachedSkill| cached_skill.weight)
@@ -67,6 +69,46 @@ impl SkillCache {
                 .build(),
             gauge: metrics::gauge!(SkillCacheMetrics::Items),
         }
+    }
+
+    /// Generates a capacity that should end up around the desired target memory usage.
+    /// We use bytes of wasm modules as a proxy for the memory usage of the cache.
+    /// It isn't perfect, because there appears to be some shared memory if the skills are similar,
+    /// such as using the same Python interpreter.
+    /// This is a best effort estimate and may need to be adjusted based on the actual measurements in production.
+    ///
+    /// The following measurements are based on loading a number of Python skills from our SDK on my Mac (Ben).
+    /// But it also seems to correlate with what we see in production on Linux. So we'll use it as a guide.
+    ///
+    /// 1. 1.01gb
+    /// 2. 1.22gb ~ 0.21gb
+    /// 3. 1.38gb ~ 0.16gb
+    /// 4. 1.46gb ~ 0.08gb
+    /// 5. 1.58gb ~ 0.12gb
+    /// 6. 1.71gb ~ 0.13gb
+    /// 7. 1.82gb ~ 0.11gb
+    /// 8. 1.94gb ~ 0.12gb
+    /// 9. 2.07gb ~ 0.13gb
+    /// 10. 2.21gb ~ 0.14gb
+    ///
+    /// The theory is that wasmtime is somehow reusing native code from similar wasm code, so stuff like the
+    /// interpreter and maybe pydantic-core is shared. But there is always some additional overhead, which is likely
+    /// the memory that is cached by componentize-py when loading the modules that is cached to make invocation faster.
+    ///
+    /// We'll use this as a guide, but these measurements will likely need to be redone over time and adjusted as we
+    /// learn more. Especially once we do things like introduce new Python versions with componentize-py updates.
+    fn estimated_capacity(desired_memory_usage: ByteSize) -> ByteSize {
+        let mut capacity = 0;
+        let mut desired_memory = desired_memory_usage.as_u64();
+        // Skills don't scale linearly. We calculate capacity at a much lower rate for the first gigabyte.
+        // We take the minimum of the desired memory and 1 gigabyte.
+        let first_chunk = ByteSize::gib(1).as_u64().min(desired_memory);
+        desired_memory -= first_chunk;
+        // Rate of 16.6667
+        capacity += first_chunk.saturating_mul(3).saturating_div(50);
+        // Final rate of 2.2
+        capacity += desired_memory.saturating_mul(5).saturating_div(11);
+        ByteSize(capacity)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = SkillPath> + '_ {
@@ -158,10 +200,13 @@ mod tests {
 
     #[test]
     fn cache_invalidation() {
-        let capacity = ByteSize(2);
-        let mut cache = SkillCache::new(capacity);
-        let loaded_skill =
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), ByteSize(1));
+        let desired_memory_usage = ByteSize::mib(1200);
+        let mut cache = SkillCache::new(desired_memory_usage);
+        let loaded_skill = LoadedSkill::new(
+            Arc::new(SkillDummy),
+            Digest::new("digest"),
+            ByteSize::mib(60),
+        );
 
         let skill_paths = [SkillPath::dummy(), SkillPath::dummy(), SkillPath::dummy()];
 
@@ -178,9 +223,9 @@ mod tests {
 
     #[test]
     fn rust_skills_evicted_less() {
-        let capacity = ByteSize(100);
-        let rust_size = ByteSize(1);
-        let mut cache = SkillCache::new(capacity);
+        let desired_memory_usage = ByteSize::mib(1200);
+        let rust_size = ByteSize::kib(500);
+        let mut cache = SkillCache::new(desired_memory_usage);
         let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), rust_size);
 
         let skill_paths = (0..100).map(|_| SkillPath::dummy()).collect::<Vec<_>>();
@@ -191,6 +236,19 @@ mod tests {
         cache.cache.run_pending_tasks();
 
         let keys = cache.keys().collect::<Vec<_>>();
-        assert!(keys.len() > 50);
+        assert!(keys.len() > 60);
+    }
+
+    #[test]
+    fn estimated_capacity() {
+        // How much memory was used with 10 SDK Python Skills on my machine.
+        let desired_memory_usage = ByteSize::mib(2209);
+
+        let capacity = SkillCache::estimated_capacity(desired_memory_usage);
+
+        // 10 Skills at 60 mb each
+        let diff = capacity - ByteSize::mib(600);
+        // We're within 100kb of the desired memory usage.
+        assert!(diff <= ByteSize::kib(100));
     }
 }
