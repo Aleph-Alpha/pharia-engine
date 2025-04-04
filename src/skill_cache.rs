@@ -61,6 +61,7 @@ impl SkillCache {
     /// Create a new `SkillCache` that can hold approximately up to `desired_memory_usage`.
     /// It is really hard to predict the exact memory usage of the cache, so we use a heuristic
     /// to estimate the capacity based on the desired memory usage.
+    /// We define weight of a skill as the size of the wasm module loaded from the registry in bytes.
     pub fn new(desired_memory_usage: ByteSize) -> Self {
         let capacity = Self::estimated_capacity(desired_memory_usage);
         Self {
