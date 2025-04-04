@@ -19,10 +19,10 @@ mod compilation_time {
 
     use crate::DashMapCache;
 
-    const MIN_CACHE_ENTRY: &[usize] = &[0, 8, 64, 512, 4096, 32768];
+    const MIN_CACHE_ENTRY: &[usize] = &[0, 8, 16, 32, 64, 128, 256, 512, 1024];
     const NUM_SKILLS: &[usize] = &[1, 2, 3];
 
-    #[divan::bench(sample_count = 10, consts=NUM_SKILLS)]
+    #[divan::bench(sample_count = 25, consts=NUM_SKILLS)]
     fn python_base<const N: usize>(bencher: Bencher<'_, '_>) {
         bench::<N>(bencher, || given_python_skill_greet_v0_3().bytes(), || None);
     }
@@ -32,7 +32,7 @@ mod compilation_time {
         bench::<N>(bencher, || given_rust_skill_greet_v0_3().bytes(), || None);
     }
 
-    #[divan::bench(sample_count = 10, args=MIN_CACHE_ENTRY, consts=NUM_SKILLS)]
+    #[divan::bench(sample_count = 25, args=MIN_CACHE_ENTRY, consts=NUM_SKILLS)]
     fn python_base_incremental<const N: usize>(bencher: Bencher<'_, '_>, min_cache_entry: usize) {
         bench::<N>(
             bencher,
