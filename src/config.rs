@@ -291,6 +291,22 @@ impl AppConfig {
         self.memory_limit = memory_limit;
         self
     }
+
+    /// We predominantly load Python skills, which are quite heavy. Python skills are roughly 60MB in size from the registry.
+    /// The first skill is roughly 850MB in memory, and subsequent ones are between 100-150MB.
+    /// We aim to use about 1/2 of the available memory.
+    #[must_use]
+    pub fn desired_cache_memory_usage(&self) -> ByteSize {
+        let memory_limit = self
+            // Default to requested memory limit if available. Since this is what we are guaranteed by k8s, we are conservative and use it.
+            .memory_request
+            // Fallback to memory limit if available.
+            .or(self.memory_limit)
+            // Fallback to an assumption of 4GB if no limit is set (our helm chart default request)
+            .unwrap_or(ByteSize::gib(4));
+
+        ByteSize(memory_limit.as_u64() / 2)
+    }
 }
 
 impl Default for AppConfig {

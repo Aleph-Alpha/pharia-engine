@@ -105,9 +105,9 @@ impl SkillCache {
         let first_chunk = ByteSize::gib(1).as_u64().min(desired_memory);
         desired_memory -= first_chunk;
         // Rate of 16.6667
-        capacity += first_chunk.saturating_mul(3).saturating_div(50);
+        capacity += first_chunk.saturating_mul(3) / 50;
         // Final rate of 2.2
-        capacity += desired_memory.saturating_mul(5).saturating_div(11);
+        capacity += desired_memory.saturating_mul(5) / 11;
         ByteSize(capacity)
     }
 
