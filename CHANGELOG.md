@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.15](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.14...v0.11.15)
+
+### Fixes
+
+- Handle request stops listening before completion - ([5345f80](https://github.com/Aleph-Alpha/pharia-kernel/commit/5345f80b22af8ac6d535844975d44d753c12bf0f))
+
+
 ## [0.11.14](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.13...v0.11.14)
 
 ### Features
