@@ -221,3 +221,90 @@ fn pooling_allocator_is_supported() -> bool {
     });
     *USE_POOLING
 }
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+
+    use bytesize::ByteSize;
+    use dashmap::DashMap;
+    use test_skills::given_python_skill_greet_v0_3;
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct DashMapCache {
+        min_cache_entry: usize,
+        cache: DashMap<Vec<u8>, Vec<u8>>,
+    }
+
+    impl DashMapCache {
+        fn new(min_cache_entry: usize) -> Self {
+            Self {
+                cache: DashMap::new(),
+                min_cache_entry,
+            }
+        }
+    }
+
+    impl CacheStore for DashMapCache {
+        fn get(&self, key: &[u8]) -> Option<Cow<'_, [u8]>> {
+            self.cache.get(key).map(|v| v.clone().into())
+        }
+
+        fn insert(&self, key: &[u8], value: Vec<u8>) -> bool {
+            if value.len() >= self.min_cache_entry {
+                self.cache.insert(key.to_vec(), value);
+            }
+            true
+        }
+    }
+
+    #[test]
+    #[expect(clippy::dbg_macro)]
+    fn size_of_cache() {
+        let cache = Arc::new(DashMapCache::new(0));
+        let engine = Engine::new(false, Some(cache.clone())).unwrap();
+        let bytes = given_python_skill_greet_v0_3().bytes();
+        engine.new_component(&bytes).unwrap();
+
+        let total_bytes: usize = cache.cache.iter().map(|r| r.value().len()).sum();
+        dbg!(ByteSize(total_bytes as u64));
+
+        // Greet (No SDK)
+        // 0 == 20.3MB
+        // 256 == 20.1MB
+        // 512 == 18.7MB
+        // 1024 == 16.6 MB
+        // 2048 == 13.2 MB
+        // 4096 == 9.6 MB
+        // 8192 == 6.8 MB
+        // 16384 == 5.2 MB
+        // 32768 == 4.3 MB
+        // 65536 == 3.4 MB
+        // 131072 == 3.0 MB
+        // 262144 == 2.8 MB
+        // 524288 == 2.6 MB
+        // 1048676 == 2.6 MB
+        // 2097352 == 2.6 MB
+        // 4194704 == 0
+        //
+        // Haiku (SDK)
+        // 0 == 31.9 MB
+        // 256 == 31.7MB
+        // 512 == 30.2 MB
+        // 1024 == 27.6 MB
+        // 2048 == 23.1 MB
+        // 4096 == 17.8 MB
+        // 8192 == 17.8 MB
+        // 16384 == 9.5 MB
+        // 32768 == 6.9 MB
+        // 65536 == 5.2 MB
+        // 131072 == 3.8 MB
+        // 262144 == 3.5 MB
+        // 524288 == 3.2 MB
+        // 1048676 == 2.6 MB
+        // 2097352 == 2.6 MB
+        // 4194704 == 0
+    }
+}
