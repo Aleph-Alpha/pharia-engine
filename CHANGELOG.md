@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.16](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.15...v0.11.16)
+
+### Documentation
+
+- Add block diagram Kernel in Pharia AI - ([a273a10](https://github.com/Aleph-Alpha/pharia-kernel/commit/a273a10d68006f5d9403b7959b3e843d6742448b))
+- Updated Block Diagram - ([8b28875](https://github.com/Aleph-Alpha/pharia-kernel/commit/8b2887540fc62a25dcc78b3fec68c455088bfdf4))
+
+### Builds
+
+- *(deps)* Bump the minor group with 10 updates - ([fb309b2](https://github.com/Aleph-Alpha/pharia-kernel/commit/fb309b2cc326e9498b4e8d387edc46c1cecb2c91))
+
+
 ## [0.11.15](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.14...v0.11.15)
 
 ### Fixes
