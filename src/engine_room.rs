@@ -4,6 +4,15 @@
 //! skills within the Pharia Kernel. There will still be bindings and linking that happens outside
 //! of this library, but everything related to efficient execution of wasm components, regardless
 //! of the world it targets, should live here.
+//!
+//! This provides all of the interactions with Wasm in general, and knows nothing about Skills
+//! (and should not) as this should all be consistent across all types of components that run in
+//! the engine, not just skills.
+//!
+//! We don't pull in linkers here, as an Engine can support multiple linkers, and these are likely
+//! tied to specific types of components, and those linker implementations should live closer to the
+//! relevant component definitions. This Engine can create new linkers with custom context for this
+//! purpose.
 
 use std::{
     borrow::Cow,
