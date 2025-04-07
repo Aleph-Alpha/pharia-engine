@@ -128,6 +128,8 @@ impl SkillCache {
     }
 
     pub fn get(&self, skill_path: &SkillPath) -> Option<Arc<dyn Skill>> {
+        // The entry count is estimated, so update on gets as well to avoid stale values.
+        self.update_gauge();
         self.cache.get(skill_path).map(|skill| skill.skill.clone())
     }
 
@@ -157,6 +159,7 @@ impl SkillCache {
     /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
     /// If there are no cached skills, it will return `None`.
     pub fn oldest_digest(&self) -> Option<(Arc<SkillPath>, Instant)> {
+        self.update_gauge();
         self.cache
             .iter()
             .min_by_key(|(_, c)| c.digest_validated)
@@ -176,6 +179,7 @@ impl SkillCache {
                 Op::Nop
             }
         });
+        self.update_gauge();
     }
 
     /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
