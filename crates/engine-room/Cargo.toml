@@ -5,15 +5,14 @@ edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+bytesize.workspace = true
+moka.workspace = true
 tracing.workspace = true
 wasmtime.workspace = true
 wasmtime-wasi.workspace = true
 
 [dev-dependencies]
-bytesize.workspace = true
-dashmap = "6.1.0"
-divan = "0.1.17"
-moka.workspace = true
+divan = "0.1.18"
 test-skills = { path = "../test-skills" }
 
 [lints]
