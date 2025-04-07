@@ -197,17 +197,19 @@ where
 }
 
 pub enum SkillRuntimeMetrics {
-    SkillExecutionTotal,
-    SkillExecutionDurationSeconds,
+    ExecutionTotal,
+    ExecutionDurationSeconds,
+    FetchDurationSeconds,
 }
 
 impl From<SkillRuntimeMetrics> for metrics::KeyName {
     fn from(value: SkillRuntimeMetrics) -> Self {
         Self::from_const_str(match value {
-            SkillRuntimeMetrics::SkillExecutionTotal => "kernel_skill_execution_total",
-            SkillRuntimeMetrics::SkillExecutionDurationSeconds => {
+            SkillRuntimeMetrics::ExecutionTotal => "kernel_skill_execution_total",
+            SkillRuntimeMetrics::ExecutionDurationSeconds => {
                 "kernel_skill_execution_duration_seconds"
             }
+            SkillRuntimeMetrics::FetchDurationSeconds => "kernel_skill_fetch_duration_seconds",
         })
     }
 }
@@ -298,7 +300,7 @@ impl RunMessageStreamMsg {
             .await;
 
         log_skill_result(&skill_path, &result);
-        record_skill_metrics(start, skill_path, &result);
+        record_skill_execution_metrics(start, skill_path, &result);
     }
 }
 
@@ -306,11 +308,22 @@ async fn fetch_skill(
     store: &impl SkillStoreApi,
     skill_path: &SkillPath,
 ) -> Result<Arc<dyn Skill>, SkillExecutionError> {
-    match store.fetch(skill_path.clone()).await {
+    let start = Instant::now();
+
+    let result = match store.fetch(skill_path.clone()).await {
         Ok(Some(skill)) => Ok(skill),
         Ok(None) => Err(SkillExecutionError::SkillNotConfigured),
         Err(e) => Err(e.into()),
-    }
+    };
+
+    let latency = start.elapsed().as_secs_f64();
+    let labels = [
+        ("namespace", Cow::from(skill_path.namespace.to_string())),
+        ("name", Cow::from(skill_path.name.clone())),
+    ];
+    metrics::histogram!(SkillRuntimeMetrics::FetchDurationSeconds, &labels).record(latency);
+
+    result
 }
 
 impl From<SkillStoreError> for SkillExecutionError {
@@ -331,7 +344,7 @@ impl From<SkillStoreError> for SkillExecutionError {
     }
 }
 
-fn record_skill_metrics<T>(
+fn record_skill_execution_metrics<T>(
     start: Instant,
     skill_path: SkillPath,
     result: &Result<T, SkillExecutionError>,
@@ -362,9 +375,8 @@ fn record_skill_metrics<T>(
         ("name", Cow::from(skill_path.name)),
         ("status", status.into()),
     ];
-    metrics::counter!(SkillRuntimeMetrics::SkillExecutionTotal, &labels).increment(1);
-    metrics::histogram!(SkillRuntimeMetrics::SkillExecutionDurationSeconds, &labels)
-        .record(latency);
+    metrics::counter!(SkillRuntimeMetrics::ExecutionTotal, &labels).increment(1);
+    metrics::histogram!(SkillRuntimeMetrics::ExecutionDurationSeconds, &labels).record(latency);
 }
 
 fn log_skill_result<T>(skill_path: &SkillPath, result: &Result<T, SkillExecutionError>) {
@@ -439,7 +451,7 @@ impl RunFunctionMsg {
             .await;
 
         log_skill_result(&skill_path, &result);
-        record_skill_metrics(start, skill_path, &result);
+        record_skill_execution_metrics(start, skill_path, &result);
 
         // Error is expected to happen during shutdown. Ignore result.
         drop(send.send(result));
