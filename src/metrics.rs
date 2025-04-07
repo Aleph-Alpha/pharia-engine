@@ -29,7 +29,15 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
         )?
         .set_buckets_for_metric(
             Matcher::Full(
-                KeyName::from(SkillRuntimeMetrics::SkillExecutionDurationSeconds)
+                KeyName::from(SkillRuntimeMetrics::ExecutionDurationSeconds)
+                    .as_str()
+                    .to_owned(),
+            ),
+            EXPONENTIAL_SECONDS,
+        )?
+        .set_buckets_for_metric(
+            Matcher::Full(
+                KeyName::from(SkillRuntimeMetrics::FetchDurationSeconds)
                     .as_str()
                     .to_owned(),
             ),
