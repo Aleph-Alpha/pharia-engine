@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.17](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.16...v0.11.17)
+
+### Features
+
+- Add metrics for skill fetch duration - ([baecd44](https://github.com/Aleph-Alpha/pharia-kernel/commit/baecd441765365b23ddccd0dde942fb1cabbb3e7))
+
+
 ## [0.11.16](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.15...v0.11.16)
 
 ### Documentation
