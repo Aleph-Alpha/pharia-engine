@@ -335,7 +335,7 @@ pub mod tests {
     #[tokio::test(start_paused = true)]
     async fn test_skill_loader_fetches_multiple_skills_concurrently() {
         // Given a skill loader with two registries, one that never resolves and one that always does
-        let engine = Arc::new(Engine::new(false).unwrap());
+        let engine = Arc::new(Engine::new(false, None).unwrap());
         let mut registries = HashMap::new();
 
         let never_resolving = Namespace::new("never-resolving").unwrap();

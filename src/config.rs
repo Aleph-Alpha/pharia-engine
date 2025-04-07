@@ -307,6 +307,15 @@ impl AppConfig {
 
         ByteSize(memory_limit.as_u64() / 2)
     }
+
+    /// We currently use around ~30MB per skill in the incremental cache.
+    /// This allows for more variety within the skill code to still benefit from caching,
+    /// while not consuming too much memory.
+    /// 128MB seems like a fair tradeoff for the speed up we gain (50-80% for skills after firsts)
+    #[must_use]
+    pub fn max_incremental_cache_size(&self) -> Option<ByteSize> {
+        Some(ByteSize::mib(128))
+    }
 }
 
 impl Default for AppConfig {

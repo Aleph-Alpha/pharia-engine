@@ -73,7 +73,11 @@ impl Kernel {
                 .context("Unable to read the configuration for namespaces")?,
         );
         let engine = Arc::new(
-            Engine::new(app_config.use_pooling_allocator()).context("engine creation failed")?,
+            Engine::new(
+                app_config.use_pooling_allocator(),
+                app_config.max_incremental_cache_size(),
+            )
+            .context("engine creation failed")?,
         );
 
         // Boot up the drivers which power the CSI.

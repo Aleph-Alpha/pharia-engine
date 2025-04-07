@@ -487,7 +487,8 @@ pub mod tests {
         // Given a skill actor connected to an empty skill store
         let mut store = SkillStoreStub::new();
         store.with_fetch_response(None);
-        let skill_actor = SkillRuntime::new(Arc::new(Engine::new(false).unwrap()), CsiDummy, store);
+        let skill_actor =
+            SkillRuntime::new(Arc::new(Engine::new(false, None).unwrap()), CsiDummy, store);
 
         // When asking the skill actor to run the skill
         let result = skill_actor
@@ -505,7 +506,7 @@ pub mod tests {
     #[tokio::test]
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
-        let engine = Arc::new(Engine::new(false).unwrap());
+        let engine = Arc::new(Engine::new(false, None).unwrap());
         let registry_config = RegistryConfig::empty();
         let skill_loader = SkillLoader::from_config(engine.clone(), registry_config).api();
 
@@ -540,7 +541,7 @@ pub mod tests {
         // Given
         let skill = GreetSkill;
         let csi = CsiDummy;
-        let engine = Arc::new(Engine::new(false).unwrap());
+        let engine = Arc::new(Engine::new(false, None).unwrap());
         let mut store = SkillStoreStub::new();
         store.with_fetch_response(Some(Arc::new(skill)));
 
@@ -607,7 +608,7 @@ pub mod tests {
 
         let (send, _recv) = broadcast::channel(2);
         let skill = SkillAssertConcurrent { send: send.clone() };
-        let engine = Arc::new(Engine::new(false).unwrap());
+        let engine = Arc::new(Engine::new(false, None).unwrap());
         let mut store = SkillStoreStub::new();
         store.with_fetch_response(Some(Arc::new(skill)));
         let runtime = SkillRuntime::new(engine, CsiDummy, store);
@@ -639,7 +640,7 @@ pub mod tests {
     #[tokio::test]
     async fn stream_hello_test() {
         // Given
-        let engine = Arc::new(Engine::new(false).unwrap());
+        let engine = Arc::new(Engine::new(false, None).unwrap());
         let mut store = SkillStoreStub::new();
         store.with_fetch_response(Some(Arc::new(SkillHello)));
         let runtime = SkillRuntime::new(engine, CsiDummy, store);
@@ -704,7 +705,7 @@ pub mod tests {
     #[tokio::test]
     async fn stream_saboteur_test() {
         // Given
-        let engine = Arc::new(Engine::new(false).unwrap());
+        let engine = Arc::new(Engine::new(false, None).unwrap());
         let mut store = SkillStoreStub::new();
         store.with_fetch_response(Some(Arc::new(SkillSaboteur)));
         let runtime = SkillRuntime::new(engine, CsiDummy, store);
@@ -737,7 +738,7 @@ pub mod tests {
         let skill_path = SkillPath::local("greet");
         let mut store = SkillStoreStub::new();
         store.with_fetch_response(Some(Arc::new(GreetSkill)));
-        let engine = Arc::new(Engine::new(false).unwrap());
+        let engine = Arc::new(Engine::new(false, None).unwrap());
         let (send, _) = oneshot::channel();
         let msg = RunFunctionMsg {
             skill_path: skill_path.clone(),
@@ -776,7 +777,7 @@ pub mod tests {
     #[tokio::test]
     async fn stream_skill_should_emit_error_in_case_of_runtime_error_in_csi() {
         // Given
-        let engine = Arc::new(Engine::new(false).unwrap());
+        let engine = Arc::new(Engine::new(false, None).unwrap());
         let mut store = SkillStoreStub::new();
         store.with_fetch_response(Some(Arc::new(SkillTellMeAJoke)));
         let runtime = SkillRuntime::new(engine, CsiSaboteur, store);

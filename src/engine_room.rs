@@ -6,14 +6,17 @@
 //! of the world it targets, should live here.
 
 use std::{
-    sync::LazyLock,
+    borrow::Cow,
+    sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
 
+use bytesize::ByteSize;
+use moka::sync::Cache;
 use tracing::info;
 use wasmtime::{
-    Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType, OptLevel,
-    Store, UpdateDeadline,
+    CacheStore, Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType,
+    OptLevel, Store, UpdateDeadline,
     component::{Component, Linker},
 };
 use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiView};
@@ -37,21 +40,15 @@ impl Engine {
     ///
     /// This function will return an error if the engine cannot be created,
     /// or if wasi functionality cannot be linked.
-    pub fn new(use_pooling_allocator: bool) -> anyhow::Result<Self> {
-        let mut config = Config::new();
-        config
-            .async_support(true)
-            .cranelift_opt_level(OptLevel::SpeedAndSize)
-            // Allows for cooperative timeslicing in async mode
-            .epoch_interruption(true)
-            .wasm_component_model(true);
-
-        if use_pooling_allocator && pooling_allocator_is_supported() {
-            // For more information on Pooling Allocation, as well as all of possible configuration,
-            // read the wasmtime docs: https://docs.rs/wasmtime/latest/wasmtime/struct.PoolingAllocationConfig.html
-            config.allocation_strategy(InstanceAllocationStrategy::pooling());
-        }
-
+    pub fn new(
+        use_pooling_allocator: bool,
+        max_incremental_cache_size: Option<ByteSize>,
+    ) -> anyhow::Result<Self> {
+        let cache_store = max_incremental_cache_size.map(|size| {
+            let cache_store: Arc<dyn CacheStore> = Arc::new(IncrementalCompilationCache::new(size));
+            cache_store
+        });
+        let config = Self::config(use_pooling_allocator, cache_store)?;
         let engine = WasmtimeEngine::new(&config)?;
 
         // We only need a weak reference to pass to the loop.
@@ -73,6 +70,31 @@ impl Engine {
         });
 
         Ok(Self { inner: engine })
+    }
+
+    /// Allows for testing the cache store
+    fn config(
+        use_pooling_allocator: bool,
+        cache_store: Option<Arc<dyn CacheStore>>,
+    ) -> anyhow::Result<Config> {
+        let mut config = Config::new();
+        config
+            .async_support(true)
+            .cranelift_opt_level(OptLevel::SpeedAndSize)
+            // Allows for cooperative timeslicing in async mode
+            .epoch_interruption(true)
+            .wasm_component_model(true);
+
+        if use_pooling_allocator && pooling_allocator_is_supported() {
+            // For more information on Pooling Allocation, as well as all of possible configuration,
+            // read the wasmtime docs: https://docs.rs/wasmtime/latest/wasmtime/struct.PoolingAllocationConfig.html
+            config.allocation_strategy(InstanceAllocationStrategy::pooling());
+        }
+
+        if let Some(cache_store) = cache_store {
+            config.enable_incremental_compilation(cache_store)?;
+        }
+        Ok(config)
     }
 
     /// Creates a new linker for the engine.
@@ -169,6 +191,73 @@ where
     }
 }
 
+/// Cranelift has the ability to cache compiled code for a given a wasm function.
+/// This is based on the actual wasm bytecode, not necessarily per module, which means
+/// that this cache can benefit modules that look very similar but came from different places.
+///
+/// This is beneficial to us because we are hosting similar types of components, that have
+/// things like the same Python interpreter or SDK dependencies, which means we can reuse all
+/// of this compilation across instances.
+///
+/// Based on benchmarks and tests, this can lead to a slight overhead (~5%) on the first compilation,
+/// but then save 50-80% of the time for subsequent compilations.
+///
+/// This also only requires ~30MB of memory to store the cache, which seems like a small price to pay
+/// for the benefits we gain in compile time.
+///
+/// We use a moka cache so that we can have an upper bound on the cache size, while also allowing for
+/// automatic eviction of least recently used entries when the cache reaches its maximum capacity.
+/// This hopefully optimizes for the most commonly used entries, as our skills are somewhat dynamic
+/// in content.
+///
+/// Possible future improvements:
+///
+/// **Minimum cache entry size:**
+/// Rustc and other compilers have a minimum size for cache entries, which it may be cheaper to regenerate
+/// than to store in the cache. However, in benchmarking different minimum sizes, there wasn't a noticeable
+/// difference in time saved, so for now we opt to just store everything.
+///
+/// **Cache crate**
+/// Just using `DashMap` was faster, but it didn't provide a way to bound the cache size. There are other crates
+/// that offer lighterweight versions than moka, but we use moka elsewhere and it is also one of the more
+/// popular options and has a nicer API if you want to decide your upper bound without knowing the estimated
+/// number of entries. The performance penalty seems reasonable for what we gain in terms of predictable
+/// performance.
+#[derive(Debug)]
+struct IncrementalCompilationCache {
+    /// Key: the precompiled bytes
+    /// Value: the compiled bytes
+    /// Based on Embark's implementation: <https://github.com/bytecodealliance/wasmtime/issues/4155#issuecomment-2767249113>
+    /// but we use moka's `Cache` with a maximum size instead of an unbounded `DashMap`.
+    cache: Cache<Vec<u8>, Vec<u8>>,
+}
+
+impl IncrementalCompilationCache {
+    /// Create a new cache with the given maximum size.
+    /// We use the stored bytes for key and value to determine the weight of each entry.
+    fn new(max_cache_size: ByteSize) -> Self {
+        Self {
+            cache: Cache::builder()
+                .weigher(|k: &Vec<u8>, v: &Vec<u8>| {
+                    (k.len() + v.len()).try_into().unwrap_or(u32::MAX)
+                })
+                .max_capacity(max_cache_size.as_u64())
+                .build(),
+        }
+    }
+}
+
+impl CacheStore for IncrementalCompilationCache {
+    fn get(&self, key: &[u8]) -> Option<Cow<'_, [u8]>> {
+        self.cache.get(key).map(Into::into)
+    }
+
+    fn insert(&self, key: &[u8], value: Vec<u8>) -> bool {
+        self.cache.insert(key.to_vec(), value);
+        true
+    }
+}
+
 /// The pooling allocator is tailor made for our use case, so
 /// try to use it when we can. The main cost of the pooling allocator, however,
 /// is the virtual memory required to run it. Not all systems support the same
@@ -213,4 +302,36 @@ fn pooling_allocator_is_supported() -> bool {
         }).is_ok()
     });
     *USE_POOLING
+}
+
+#[cfg(test)]
+mod tests {
+    use bytesize::ByteSize;
+    use test_skills::given_python_skill_greet_v0_3;
+
+    use super::*;
+
+    #[test]
+    fn size_of_cache() {
+        let max_cache_size = ByteSize::mib(32);
+        let cache = Arc::new(IncrementalCompilationCache::new(max_cache_size));
+        let config = Engine::config(false, Some(cache.clone())).unwrap();
+        let bytes = given_python_skill_greet_v0_3().bytes();
+        // using lower level engine so we can assert on the cache
+        let engine = WasmtimeEngine::new(&config).unwrap();
+        Component::new(&engine, &bytes).unwrap();
+
+        cache.cache.run_pending_tasks();
+
+        let total_bytes: usize = cache.cache.iter().map(|(k, v)| k.len() + v.len()).sum();
+        let total_bytes = ByteSize(total_bytes as u64);
+
+        eprintln!("Total cache size: {total_bytes}");
+        assert!(total_bytes <= max_cache_size);
+
+        // Greet (No SDK)
+        // 20.7MB
+        // Haiku (SDK)
+        // 31.9 MB
+    }
 }
