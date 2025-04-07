@@ -263,6 +263,7 @@ impl Venv {
         let output = Command::new("uv")
             .args(["run", "--python", venv_path])
             .args(args)
+            .current_dir(REPO_DIR.as_path())
             .output()?;
 
         if !output.status.success() {
