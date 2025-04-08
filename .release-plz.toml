@@ -4,10 +4,13 @@ release_always = false
 
 [[package]]
 name = "pharia-kernel"
+changelog_include = ["engine-room"]
 release = true
 
 [[package]]
 name = "engine-room"
+git_tag_enable = false
+git_release_enable = false
 # We need to publish this for the main release to work
 release = true
 
