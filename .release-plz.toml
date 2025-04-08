@@ -1,21 +1,10 @@
 [workspace]
 release = false
 release_always = false
-# Disable git releases for all packages by default
-git_release_enable = false
-# Disable git tags for all packages by default
-git_tag_enable = false
 
 [[package]]
 name = "pharia-kernel"
 release = true
-# We only do git tags and releases for the main package
-# Customize the git tag name to remove the `pharia-kernel` prefix.
-git_tag_name = "v{{ version }}"
-# Enable git tags for this package
-git_tag_enable = true
-# Enable git releases for this package
-git_release_enable = true
 
 [[package]]
 name = "engine-room"
