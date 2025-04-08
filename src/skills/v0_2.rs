@@ -474,12 +474,10 @@ impl From<inference::FinishReason> for FinishReason {
 mod tests {
     use std::vec;
 
+    use engine_room::LinkerImpl;
     use tokio::sync::oneshot;
 
-    use crate::{
-        csi::tests::StubCsi, engine_room::LinkerImpl, skill_driver::SkillInvocationCtx,
-        tests::api_token,
-    };
+    use crate::{csi::tests::StubCsi, skill_driver::SkillInvocationCtx, tests::api_token};
 
     use super::*;
 
