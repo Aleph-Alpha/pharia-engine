@@ -73,6 +73,7 @@ defaultNamespaces: []
 # NAMESPACES__PLAYGROUND__REGISTRY_PASSWORD
 namespaces: {}
 logLevel: info
+# Address of an OpenTelemetry collector listening for gRPC requests.
 openTelemetryEndpoint: ""
 authorizationAddress: ""
 inferenceAddress: ""
