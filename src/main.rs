@@ -8,7 +8,7 @@ use tracing::info;
 async fn main() -> Result<(), Error> {
     drop(dotenvy::dotenv());
     let app_config = AppConfig::new()?;
-    initialize_tracing(&app_config)?;
+    let _otel_guard = initialize_tracing(&app_config)?;
     initialize_metrics(app_config.metrics_address())?;
 
     info!(
