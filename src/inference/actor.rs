@@ -71,7 +71,7 @@ pub trait InferenceApi {
         &self,
         request: ChatRequest,
         api_token: String,
-    ) -> impl Future<Output = mpsc::Receiver<anyhow::Result<ChatEvent>>> + Send;
+    ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
 }
 
 impl InferenceApi for mpsc::Sender<InferenceMessage> {
@@ -140,15 +140,17 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
-        recv.await
-            .expect("sender must be alive when awaiting for answers")
+        let chat_response = recv
+            .await
+            .expect("sender must be alive when awaiting for answers")?;
+        Ok(chat_response)
     }
 
     async fn chat_stream(
         &self,
         request: ChatRequest,
         api_token: String,
-    ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+    ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
         let (send, recv) = mpsc::channel(1);
         let msg = InferenceMessage::ChatStream {
             request,
@@ -433,12 +435,12 @@ pub enum InferenceMessage {
     },
     Chat {
         request: ChatRequest,
-        send: oneshot::Sender<anyhow::Result<ChatResponse>>,
+        send: oneshot::Sender<Result<ChatResponse, InferenceError>>,
         api_token: String,
     },
     ChatStream {
         request: ChatRequest,
-        send: mpsc::Sender<anyhow::Result<ChatEvent>>,
+        send: mpsc::Sender<Result<ChatEvent, InferenceError>>,
         api_token: String,
     },
     Explain {
@@ -577,14 +579,14 @@ pub mod tests {
     pub struct InferenceStub {
         complete:
             Box<dyn Fn(CompletionRequest) -> Result<Completion, InferenceError> + Send + Sync>,
-        chat: Box<dyn Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync>,
+        chat: Box<dyn Fn(ChatRequest) -> Result<ChatResponse, InferenceError> + Send + Sync>,
     }
 
     impl InferenceStub {
         pub fn new() -> Self {
             Self {
                 complete: Box::new(|_| Err(InferenceError::Other(anyhow!("Not implemented")))),
-                chat: Box::new(|_| Err(anyhow::anyhow!("Not implemented"))),
+                chat: Box::new(|_| Err(InferenceError::Other(anyhow!("Not implemented")))),
             }
         }
 
@@ -601,7 +603,7 @@ pub mod tests {
 
         pub fn with_chat(
             mut self,
-            chat: impl Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync + 'static,
+            chat: impl Fn(ChatRequest) -> Result<ChatResponse, InferenceError> + Send + Sync + 'static,
         ) -> Self {
             self.chat = Box::new(chat);
             self
@@ -662,14 +664,15 @@ pub mod tests {
             request: ChatRequest,
             _api_token: String,
         ) -> anyhow::Result<ChatResponse> {
-            (self.chat)(request)
+            let chat_response = (self.chat)(request)?;
+            Ok(chat_response)
         }
 
         async fn chat_stream(
             &self,
             request: ChatRequest,
             _api_token: String,
-        ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+        ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
             let (send, recv) = mpsc::channel(4);
             // Load up the receiver with events before returning it
             match (self.chat)(request) {

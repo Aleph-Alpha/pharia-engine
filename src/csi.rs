@@ -92,7 +92,7 @@ pub trait Csi {
         &self,
         auth: String,
         request: ChatRequest,
-    ) -> impl Future<Output = mpsc::Receiver<anyhow::Result<ChatEvent>>> + Send;
+    ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
 
     fn chunk(
         &self,
@@ -232,7 +232,7 @@ where
         &self,
         auth: String,
         request: ChatRequest,
-    ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+    ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
             .increment(1);
 
@@ -414,9 +414,11 @@ pub mod tests {
             &self,
             _auth: String,
             _request: ChatRequest,
-        ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+        ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
             let (send, recv) = mpsc::channel(1);
-            send.send(Err(anyhow::anyhow!("Test error"))).await.unwrap();
+            send.send(Err(InferenceError::Other(anyhow!("Test error"))))
+                .await
+                .unwrap();
             recv
         }
 
@@ -752,7 +754,7 @@ pub mod tests {
             &self,
             _auth: String,
             _request: ChatRequest,
-        ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+        ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
             panic!("DummyCsi chat_stream called")
         }
 
@@ -918,7 +920,7 @@ pub mod tests {
             &self,
             _auth: String,
             request: ChatRequest,
-        ) -> mpsc::Receiver<anyhow::Result<ChatEvent>> {
+        ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
             let (sender, receiver) = mpsc::channel(1);
             let ChatResponse {
                 message,

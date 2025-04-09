@@ -148,7 +148,7 @@ pub struct SkillInvocationCtx<C> {
     current_stream_id: usize,
     /// Currently running chat streams. We store them here so that we can easier cancel the running
     /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
-    chat_streams: HashMap<ChatStreamId, mpsc::Receiver<anyhow::Result<ChatEvent>>>,
+    chat_streams: HashMap<ChatStreamId, mpsc::Receiver<Result<ChatEvent, InferenceError>>>,
     /// Currently running completion streams. We store them here so that we can easier cancel the running
     /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
     completion_streams:
@@ -272,7 +272,7 @@ where
             .transpose();
         match event {
             Ok(event) => event,
-            Err(error) => self.send_error(error).await,
+            Err(error) => self.send_error(error.into()).await,
         }
     }
 
