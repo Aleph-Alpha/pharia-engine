@@ -211,7 +211,7 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")])
             .increment(requests.len() as u64);
 
-        try_join_all(
+        let explanations = try_join_all(
             requests
                 .into_iter()
                 .map(|r| {
@@ -227,7 +227,8 @@ where
                 })
                 .collect::<Vec<_>>(),
         )
-        .await
+        .await?;
+        Ok(explanations)
     }
 
     async fn chat_stream(

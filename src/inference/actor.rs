@@ -65,7 +65,7 @@ pub trait InferenceApi {
         &self,
         request: ChatRequest,
         api_token: String,
-    ) -> impl Future<Output = anyhow::Result<ChatResponse>> + Send;
+    ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
 
     fn chat_stream(
         &self,
@@ -132,7 +132,11 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         recv
     }
 
-    async fn chat(&self, request: ChatRequest, api_token: String) -> anyhow::Result<ChatResponse> {
+    async fn chat(
+        &self,
+        request: ChatRequest,
+        api_token: String,
+    ) -> Result<ChatResponse, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Chat {
             request,
@@ -665,7 +669,7 @@ pub mod tests {
             &self,
             request: ChatRequest,
             _api_token: String,
-        ) -> anyhow::Result<ChatResponse> {
+        ) -> Result<ChatResponse, InferenceError> {
             let chat_response = (self.chat)(request)?;
             Ok(chat_response)
         }
