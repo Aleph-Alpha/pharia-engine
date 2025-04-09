@@ -89,8 +89,10 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
-        recv.await
-            .expect("sender must be alive when awaiting for answers")
+        let explanation = recv
+            .await
+            .expect("sender must be alive when awaiting for answers")?;
+        Ok(explanation)
     }
 
     async fn complete(
@@ -445,7 +447,7 @@ pub enum InferenceMessage {
     },
     Explain {
         request: ExplanationRequest,
-        send: oneshot::Sender<anyhow::Result<Explanation>>,
+        send: oneshot::Sender<Result<Explanation, InferenceError>>,
         api_token: String,
     },
 }
