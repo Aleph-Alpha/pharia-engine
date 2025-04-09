@@ -1,16 +1,20 @@
 [workspace]
 release = false
 release_always = false
+git_release_enable = false
+git_tag_enable = false
+changelog_update = false
 
 [[package]]
 name = "pharia-kernel"
 changelog_include = ["engine-room"]
 release = true
+git_release_enable = true
+git_tag_enable = true
+changelog_update = true
 
 [[package]]
 name = "engine-room"
-git_tag_enable = false
-git_release_enable = false
 # We need to publish this for the main release to work
 release = true
 
