@@ -25,29 +25,29 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &CompletionRequest,
         api_token: String,
-    ) -> impl Future<Output = Result<Completion, InferenceClientError>> + Send;
+    ) -> impl Future<Output = Result<Completion, InferenceError>> + Send;
     fn stream_completion(
         &self,
         request: &CompletionRequest,
         api_token: String,
         send: mpsc::Sender<CompletionEvent>,
-    ) -> impl Future<Output = Result<(), InferenceClientError>> + Send;
+    ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn chat(
         &self,
         request: &ChatRequest,
         api_token: String,
-    ) -> impl Future<Output = Result<ChatResponse, InferenceClientError>> + Send;
+    ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
     fn stream_chat(
         &self,
         request: &ChatRequest,
         api_token: String,
         send: mpsc::Sender<ChatEvent>,
-    ) -> impl Future<Output = Result<(), InferenceClientError>> + Send;
+    ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn explain(
         &self,
         request: &ExplanationRequest,
         api_token: String,
-    ) -> impl Future<Output = Result<Explanation, InferenceClientError>> + Send;
+    ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 }
 
 impl InferenceClient for Client {
@@ -55,7 +55,7 @@ impl InferenceClient for Client {
         &self,
         request: &ExplanationRequest,
         api_token: String,
-    ) -> Result<Explanation, InferenceClientError> {
+    ) -> Result<Explanation, InferenceError> {
         let ExplanationRequest {
             prompt,
             target,
@@ -74,13 +74,13 @@ impl InferenceClient for Client {
         retry(|| self.explanation(&task, model, &how))
             .await?
             .try_into()
-            .map_err(InferenceClientError::Other)
+            .map_err(InferenceError::Other)
     }
     async fn chat(
         &self,
         request: &ChatRequest,
         api_token: String,
-    ) -> Result<ChatResponse, InferenceClientError> {
+    ) -> Result<ChatResponse, InferenceError> {
         let task = request.to_task_chat();
         let how = How {
             api_token: Some(api_token),
@@ -89,7 +89,7 @@ impl InferenceClient for Client {
         retry(|| self.chat(&task, &request.model, &how))
             .await?
             .try_into()
-            .map_err(InferenceClientError::Other)
+            .map_err(InferenceError::Other)
     }
 
     async fn stream_chat(
@@ -97,7 +97,7 @@ impl InferenceClient for Client {
         request: &ChatRequest,
         api_token: String,
         send: mpsc::Sender<ChatEvent>,
-    ) -> Result<(), InferenceClientError> {
+    ) -> Result<(), InferenceError> {
         let task = request.to_task_chat();
         let how = How {
             api_token: Some(api_token),
@@ -116,7 +116,7 @@ impl InferenceClient for Client {
         &self,
         request: &CompletionRequest,
         api_token: String,
-    ) -> Result<Completion, InferenceClientError> {
+    ) -> Result<Completion, InferenceError> {
         let CompletionRequest {
             model,
             prompt,
@@ -158,7 +158,7 @@ impl InferenceClient for Client {
         retry(|| self.completion(&task, model, &how))
             .await?
             .try_into()
-            .map_err(InferenceClientError::Other)
+            .map_err(InferenceError::Other)
     }
 
     async fn stream_completion(
@@ -166,7 +166,7 @@ impl InferenceClient for Client {
         request: &CompletionRequest,
         api_token: String,
         send: mpsc::Sender<CompletionEvent>,
-    ) -> Result<(), InferenceClientError> {
+    ) -> Result<(), InferenceError> {
         let CompletionRequest {
             model,
             prompt,
@@ -471,20 +471,18 @@ where
 }
 
 #[derive(Error, Debug)]
-pub enum InferenceClientError {
+pub enum InferenceError {
     #[error("Unauthorized")]
     Unauthorized,
     #[error(transparent)]
     Other(#[from] anyhow::Error), // default is an anyhow error
 }
 
-impl From<aleph_alpha_client::Error> for InferenceClientError {
+impl From<aleph_alpha_client::Error> for InferenceError {
     fn from(err: aleph_alpha_client::Error) -> Self {
         match err {
-            aleph_alpha_client::Error::Http { status: 401, .. } => {
-                InferenceClientError::Unauthorized
-            }
-            _ => InferenceClientError::Other(err.into()),
+            aleph_alpha_client::Error::Http { status: 401, .. } => InferenceError::Unauthorized,
+            _ => InferenceError::Other(err.into()),
         }
     }
 }
@@ -638,7 +636,7 @@ mod tests {
         assert!(chat_result.is_err());
         assert!(matches!(
             chat_result.unwrap_err(),
-            InferenceClientError::Unauthorized
+            InferenceError::Unauthorized
         ));
     }
 
