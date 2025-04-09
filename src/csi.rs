@@ -9,7 +9,7 @@ use crate::{
     chunking::{self, Chunk, ChunkRequest},
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-        Explanation, ExplanationRequest, InferenceApi,
+        Explanation, ExplanationRequest, InferenceApi, InferenceError,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
@@ -80,7 +80,7 @@ pub trait Csi {
         &self,
         auth: String,
         request: CompletionRequest,
-    ) -> impl Future<Output = mpsc::Receiver<anyhow::Result<CompletionEvent>>> + Send;
+    ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send;
 
     fn chat(
         &self,
@@ -191,7 +191,7 @@ where
         &self,
         auth: String,
         request: CompletionRequest,
-    ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+    ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
         metrics::counter!(
             CsiMetrics::CsiRequestsTotal,
             &[("function", "completion_stream")]
@@ -347,7 +347,7 @@ pub mod tests {
         sync::{Arc, Mutex},
     };
 
-    use anyhow::bail;
+    use anyhow::{anyhow, bail};
     use serde_json::json;
 
     use crate::{
@@ -386,9 +386,11 @@ pub mod tests {
             &self,
             _auth: String,
             _request: CompletionRequest,
-        ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+        ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
             let (send, recv) = mpsc::channel(1);
-            send.send(Err(anyhow::anyhow!("Test error"))).await.unwrap();
+            send.send(Err(InferenceError::Other(anyhow!("Test error"))))
+                .await
+                .unwrap();
             recv
         }
 
@@ -726,7 +728,7 @@ pub mod tests {
             &self,
             _auth: String,
             _request: CompletionRequest,
-        ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+        ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
             panic!("DummyCsi completion_stream called")
         }
 
@@ -871,7 +873,7 @@ pub mod tests {
             &self,
             _auth: String,
             request: CompletionRequest,
-        ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+        ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
             let (sender, receiver) = mpsc::channel(1);
             let Completion {
                 text,

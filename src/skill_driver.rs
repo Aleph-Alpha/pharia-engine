@@ -14,7 +14,7 @@ use crate::{
     csi::{ChatStreamId, CompletionStreamId, Csi, CsiForSkills},
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-        Explanation, ExplanationRequest,
+        Explanation, ExplanationRequest, InferenceError,
     },
     language_selection::{Language, SelectLanguageRequest},
     namespace_watcher::Namespace,
@@ -152,7 +152,7 @@ pub struct SkillInvocationCtx<C> {
     /// Currently running completion streams. We store them here so that we can easier cancel the running
     /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
     completion_streams:
-        HashMap<CompletionStreamId, mpsc::Receiver<anyhow::Result<CompletionEvent>>>,
+        HashMap<CompletionStreamId, mpsc::Receiver<Result<CompletionEvent, InferenceError>>>,
 }
 
 impl<C> SkillInvocationCtx<C> {
@@ -237,7 +237,7 @@ where
             .transpose();
         match event {
             Ok(event) => event,
-            Err(error) => self.send_error(error).await,
+            Err(error) => self.send_error(error.into()).await,
         }
     }
 

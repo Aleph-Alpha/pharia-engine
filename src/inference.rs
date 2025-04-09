@@ -1,11 +1,14 @@
 mod actor;
 mod client;
 
-pub use actor::{
-    ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
-    CompletionParams, CompletionRequest, Distribution, Explanation, ExplanationRequest,
-    FinishReason, Granularity, Inference, InferenceApi, Logprob, Logprobs, Message, TextScore,
-    TokenUsage,
+pub use self::{
+    actor::{
+        ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
+        CompletionParams, CompletionRequest, Distribution, Explanation, ExplanationRequest,
+        FinishReason, Granularity, Inference, InferenceApi, Logprob, Logprobs, Message, TextScore,
+        TokenUsage,
+    },
+    client::InferenceError,
 };
 
 #[cfg(test)]
