@@ -8,7 +8,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use super::client::InferenceClient;
+use super::client::{InferenceClient, InferenceError};
 
 /// Handle to the inference actor. Spin this up in order to use the inference API.
 pub struct Inference {
@@ -59,7 +59,7 @@ pub trait InferenceApi {
         &self,
         request: CompletionRequest,
         api_token: String,
-    ) -> impl Future<Output = mpsc::Receiver<anyhow::Result<CompletionEvent>>> + Send;
+    ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send;
 
     fn chat(
         &self,
@@ -107,15 +107,17 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
-        recv.await
-            .expect("sender must be alive when awaiting for answers")
+        let completion = recv
+            .await
+            .expect("sender must be alive when awaiting for answers")?;
+        Ok(completion)
     }
 
     async fn completion_stream(
         &self,
         request: CompletionRequest,
         api_token: String,
-    ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+    ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
         let (send, recv) = mpsc::channel(1);
         let msg = InferenceMessage::CompletionStream {
             request,
@@ -421,12 +423,12 @@ impl<C: InferenceClient> InferenceActor<C> {
 pub enum InferenceMessage {
     Complete {
         request: CompletionRequest,
-        send: oneshot::Sender<anyhow::Result<Completion>>,
+        send: oneshot::Sender<Result<Completion, InferenceError>>,
         api_token: String,
     },
     CompletionStream {
         request: CompletionRequest,
-        send: mpsc::Sender<anyhow::Result<CompletionEvent>>,
+        send: mpsc::Sender<Result<CompletionEvent, InferenceError>>,
         api_token: String,
     },
     Chat {
@@ -455,7 +457,7 @@ impl InferenceMessage {
                 api_token,
             } => {
                 let result = client.complete(&request, api_token.clone()).await;
-                drop(send.send(result.map_err(Into::into)));
+                drop(send.send(result));
             }
             Self::CompletionStream {
                 request,
@@ -573,21 +575,25 @@ pub mod tests {
     }
 
     pub struct InferenceStub {
-        complete: Box<dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync>,
+        complete:
+            Box<dyn Fn(CompletionRequest) -> Result<Completion, InferenceError> + Send + Sync>,
         chat: Box<dyn Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync>,
     }
 
     impl InferenceStub {
         pub fn new() -> Self {
             Self {
-                complete: Box::new(|_| Err(anyhow::anyhow!("Not implemented"))),
+                complete: Box::new(|_| Err(InferenceError::Other(anyhow!("Not implemented")))),
                 chat: Box::new(|_| Err(anyhow::anyhow!("Not implemented"))),
             }
         }
 
         pub fn with_complete(
             mut self,
-            complete: impl Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static,
+            complete: impl Fn(CompletionRequest) -> Result<Completion, InferenceError>
+            + Send
+            + Sync
+            + 'static,
         ) -> Self {
             self.complete = Box::new(complete);
             self
@@ -616,14 +622,15 @@ pub mod tests {
             request: CompletionRequest,
             _api_token: String,
         ) -> anyhow::Result<Completion> {
-            (self.complete)(request)
+            let completion = (self.complete)(request)?;
+            Ok(completion)
         }
 
         async fn completion_stream(
             &self,
             request: CompletionRequest,
             _api_token: String,
-        ) -> mpsc::Receiver<anyhow::Result<CompletionEvent>> {
+        ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
             let (send, recv) = mpsc::channel(3);
             // Load up the receiver with events before returning it
             match (self.complete)(request) {
