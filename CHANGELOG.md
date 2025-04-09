@@ -7,17 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.18](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.11.17...pharia-kernel-v0.11.18)
-
-### Features
-
-- Add incremental compilation cache for WebAssembly components - ([80b5a00](https://github.com/Aleph-Alpha/pharia-kernel/commit/80b5a0051d8eb0f597603ad22addcc8f5f3e873a))
-
-### Fixes
-
-- Do not drop otel guard to prevent early shutdown - ([c1fcbc5](https://github.com/Aleph-Alpha/pharia-kernel/commit/c1fcbc5d54167a40d4d3781150fea9ff384465ff))
-
-
 ## [0.11.17](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.16...v0.11.17)
 
 ### Features
