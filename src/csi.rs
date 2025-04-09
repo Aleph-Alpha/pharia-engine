@@ -151,14 +151,15 @@ where
     ) -> anyhow::Result<Vec<Explanation>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "explain")])
             .increment(requests.len() as u64);
-        try_join_all(requests.into_iter().map(|r| {
+        let explanations = try_join_all(requests.into_iter().map(|r| {
             trace!(
                 "explain: request.model={} request.granularity={}",
                 r.model, r.granularity,
             );
             self.inference.explain(r, auth.clone())
         }))
-        .await
+        .await?;
+        Ok(explanations)
     }
 
     async fn complete(

@@ -47,7 +47,7 @@ pub trait InferenceApi {
         &self,
         request: ExplanationRequest,
         api_token: String,
-    ) -> impl Future<Output = anyhow::Result<Explanation>> + Send;
+    ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 
     fn complete(
         &self,
@@ -79,7 +79,7 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         &self,
         request: ExplanationRequest,
         api_token: String,
-    ) -> anyhow::Result<Explanation> {
+    ) -> Result<Explanation, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Explain {
             request,
@@ -617,7 +617,7 @@ pub mod tests {
             &self,
             _request: ExplanationRequest,
             _api_token: String,
-        ) -> anyhow::Result<Explanation> {
+        ) -> Result<Explanation, InferenceError> {
             unimplemented!()
         }
 
