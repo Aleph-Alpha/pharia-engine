@@ -169,7 +169,7 @@ where
     ) -> anyhow::Result<Vec<Completion>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "complete")])
             .increment(requests.len() as u64);
-        try_join_all(
+        let completions = try_join_all(
             requests
                 .into_iter()
                 .map(|r| {
@@ -185,7 +185,8 @@ where
                 })
                 .collect::<Vec<_>>(),
         )
-        .await
+        .await?;
+        Ok(completions)
     }
 
     async fn completion_stream(

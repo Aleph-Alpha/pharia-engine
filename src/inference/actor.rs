@@ -53,7 +53,7 @@ pub trait InferenceApi {
         &self,
         request: CompletionRequest,
         api_token: String,
-    ) -> impl Future<Output = anyhow::Result<Completion>> + Send;
+    ) -> impl Future<Output = Result<Completion, InferenceError>> + Send;
 
     fn completion_stream(
         &self,
@@ -99,7 +99,7 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         &self,
         request: CompletionRequest,
         api_token: String,
-    ) -> anyhow::Result<Completion> {
+    ) -> Result<Completion, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Complete {
             request,
@@ -625,7 +625,7 @@ pub mod tests {
             &self,
             request: CompletionRequest,
             _api_token: String,
-        ) -> anyhow::Result<Completion> {
+        ) -> Result<Completion, InferenceError> {
             let completion = (self.complete)(request)?;
             Ok(completion)
         }
