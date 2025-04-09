@@ -554,7 +554,7 @@ pub mod tests {
     use anyhow::anyhow;
     use tokio::{sync::mpsc, time::sleep, try_join};
 
-    use crate::inference::client::{InferenceClient, InferenceClientError};
+    use crate::inference::client::{InferenceClient, InferenceError};
 
     use super::*;
 
@@ -711,14 +711,14 @@ pub mod tests {
             &self,
             _request: &ExplanationRequest,
             _api_token: String,
-        ) -> Result<Explanation, InferenceClientError> {
+        ) -> Result<Explanation, InferenceError> {
             unimplemented!()
         }
         async fn complete(
             &self,
             _params: &super::CompletionRequest,
             _api_token: String,
-        ) -> Result<Completion, InferenceClientError> {
+        ) -> Result<Completion, InferenceError> {
             let remaining = self
                 .remaining_failures
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |f| {
@@ -727,7 +727,7 @@ pub mod tests {
                 .unwrap();
 
             if remaining == 0 {
-                Err(InferenceClientError::Other(anyhow!("Inference error")))
+                Err(InferenceError::Other(anyhow!("Inference error")))
             } else {
                 Ok(Completion::from_text("Completion succeeded"))
             }
@@ -737,14 +737,14 @@ pub mod tests {
             _request: &CompletionRequest,
             _api_token: String,
             _send: mpsc::Sender<CompletionEvent>,
-        ) -> Result<(), InferenceClientError> {
+        ) -> Result<(), InferenceError> {
             unimplemented!()
         }
         async fn chat(
             &self,
             _request: &ChatRequest,
             _api_token: String,
-        ) -> Result<ChatResponse, InferenceClientError> {
+        ) -> Result<ChatResponse, InferenceError> {
             unimplemented!()
         }
         async fn stream_chat(
@@ -752,7 +752,7 @@ pub mod tests {
             _request: &ChatRequest,
             _api_token: String,
             _send: mpsc::Sender<ChatEvent>,
-        ) -> Result<(), InferenceClientError> {
+        ) -> Result<(), InferenceError> {
             unimplemented!()
         }
     }
@@ -803,14 +803,14 @@ pub mod tests {
             &self,
             _request: &ExplanationRequest,
             _api_token: String,
-        ) -> Result<Explanation, InferenceClientError> {
+        ) -> Result<Explanation, InferenceError> {
             unimplemented!()
         }
         async fn complete(
             &self,
             request: &CompletionRequest,
             _api_token: String,
-        ) -> Result<Completion, InferenceClientError> {
+        ) -> Result<Completion, InferenceError> {
             self.expected_concurrent_requests
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |e| {
                     Some(e.saturating_sub(1))
@@ -828,7 +828,7 @@ pub mod tests {
             _request: &CompletionRequest,
             _api_token: String,
             _send: mpsc::Sender<CompletionEvent>,
-        ) -> Result<(), InferenceClientError> {
+        ) -> Result<(), InferenceError> {
             unimplemented!()
         }
 
@@ -836,7 +836,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
-        ) -> Result<ChatResponse, InferenceClientError> {
+        ) -> Result<ChatResponse, InferenceError> {
             unimplemented!()
         }
 
@@ -845,7 +845,7 @@ pub mod tests {
             _request: &ChatRequest,
             _api_token: String,
             _send: mpsc::Sender<ChatEvent>,
-        ) -> Result<(), InferenceClientError> {
+        ) -> Result<(), InferenceError> {
             unimplemented!()
         }
     }
