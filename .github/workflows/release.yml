@@ -45,7 +45,7 @@ jobs:
     concurrency:
       group: release-plz-${{ github.ref }}
       cancel-in-progress: false
-    if: "!startsWith(github.event.head_commit.message, 'chore(pharia-kernel): release v')"
+    if: "!startsWith(github.event.head_commit.message, 'chore: release')"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
