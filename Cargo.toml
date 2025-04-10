@@ -147,8 +147,6 @@ jiff = { version = "0.2.6", features = ["serde"] }
 futures-util = "0.3.31"
 moka.workspace = true
 bytesize.workspace = true
-axum-tracing-opentelemetry = "0.28.0"
-tracing-opentelemetry-instrumentation-sdk = { version = "0.28.0", features = ["http"] }
 
 [dev-dependencies]
 test-skills = { path = "./crates/test-skills" }
@@ -162,6 +160,8 @@ tokio-test = "0.4.4"
 wat = "1.228.0"
 metrics-util = "0.19.0"
 reqwest = { version = "0.12.15", features = ["stream"] }
+axum-tracing-opentelemetry = "0.28.0"
+tracing-opentelemetry-instrumentation-sdk = { version = "0.28.0", features = ["http"] }
 
 [features]
 test_inference = []

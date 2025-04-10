@@ -948,7 +948,7 @@ mod tests {
             Router::new()
                 .route("/", get(index)) // request processed inside span
                 // include trace context as header into the response
-                .layer(OtelInResponseLayer::default())
+                .layer(OtelInResponseLayer)
                 //start OpenTelemetry trace on incoming request
                 .layer(OtelAxumLayer::default())
         }
