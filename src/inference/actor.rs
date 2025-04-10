@@ -488,7 +488,7 @@ impl InferenceMessage {
                         },
                         result = &mut stream =>  {
                             if let Err(err) = result {
-                                drop(send.send(Err(err.into())).await);
+                                drop(send.send(Err(err)).await);
                             }
                             // Break out of the loop once the stream is done
                             break;
@@ -507,7 +507,7 @@ impl InferenceMessage {
                 api_token,
             } => {
                 let result = client.chat(&request, api_token.clone()).await;
-                drop(send.send(result.map_err(Into::into)));
+                drop(send.send(result));
             }
             Self::ChatStream {
                 request,
@@ -529,7 +529,7 @@ impl InferenceMessage {
                         },
                         result = &mut stream =>  {
                             if let Err(err) = result {
-                                drop(send.send(Err(err.into())).await);
+                                drop(send.send(Err(err)).await);
                             }
                             // Break out of the loop once the stream is done
                             break;
@@ -548,7 +548,7 @@ impl InferenceMessage {
                 api_token,
             } => {
                 let result = client.explain(&request, api_token.clone()).await;
-                drop(send.send(result.map_err(Into::into)));
+                drop(send.send(result));
             }
         }
     }
