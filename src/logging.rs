@@ -53,7 +53,9 @@ impl Drop for OtelGuard {
 
 fn init_otel_tracer_provider(endpoint: &str) -> anyhow::Result<SdkTracerProvider> {
     Ok(SdkTracerProvider::builder() // Customize sampling strategy
-        .with_sampler(Sampler::ParentBased(Box::new(Sampler::AlwaysOn)))
+        .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
+            0.1,
+        ))))
         // If export trace to AWS X-Ray, you can use XrayIdGenerator
         .with_id_generator(RandomIdGenerator::default())
         .with_resource(resource())
