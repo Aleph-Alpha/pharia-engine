@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use derive_more::{Constructor, From};
 use futures::future::try_join_all;
 use serde_json::Value;
+use thiserror::Error;
 use tokio::sync::mpsc;
 use tracing::trace;
 
@@ -68,7 +69,7 @@ pub trait Csi {
         &self,
         auth: String,
         requests: Vec<ExplanationRequest>,
-    ) -> impl Future<Output = anyhow::Result<Vec<Explanation>>> + Send;
+    ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send;
 
     fn complete(
         &self,
@@ -126,6 +127,15 @@ pub trait Csi {
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send;
 }
 
+/// Errors which occurr during interacting with the outside world via CSIs.
+#[derive(Debug, Error)]
+pub enum CsiError {
+    #[error("We got an error from our inference driver:\n\n{0}")]
+    Inference(#[from] InferenceError),
+    #[error(transparent)]
+    Any(#[from] anyhow::Error),
+}
+
 pub enum CsiMetrics {
     CsiRequestsTotal,
 }
@@ -148,7 +158,7 @@ where
         &self,
         auth: String,
         requests: Vec<ExplanationRequest>,
-    ) -> anyhow::Result<Vec<Explanation>> {
+    ) -> Result<Vec<Explanation>, CsiError> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "explain")])
             .increment(requests.len() as u64);
         let explanations = try_join_all(requests.into_iter().map(|r| {
@@ -374,8 +384,8 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<ExplanationRequest>,
-        ) -> anyhow::Result<Vec<Explanation>> {
-            bail!("Test error")
+        ) -> Result<Vec<Explanation>, CsiError> {
+            Err(CsiError::Any(anyhow!("Test error")))
         }
         async fn complete(
             &self,
@@ -718,7 +728,7 @@ pub mod tests {
             &self,
             _auth: String,
             _requests: Vec<ExplanationRequest>,
-        ) -> anyhow::Result<Vec<Explanation>> {
+        ) -> Result<Vec<Explanation>, CsiError> {
             panic!("DummyCsi explain called")
         }
         async fn complete(
@@ -802,7 +812,7 @@ pub mod tests {
         dyn Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> + Send + Sync + 'static;
 
     type ExplainFn =
-        dyn Fn(ExplanationRequest) -> anyhow::Result<Explanation> + Send + Sync + 'static;
+        dyn Fn(ExplanationRequest) -> Result<Explanation, CsiError> + Send + Sync + 'static;
 
     #[derive(Clone)]
     pub struct StubCsi {
@@ -818,7 +828,7 @@ pub mod tests {
                 chat: Arc::new(Box::new(|_| bail!("Chat not set in StubCsi"))),
                 completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
                 chunking: Arc::new(Box::new(|_| bail!("Chunking not set in StubCsi"))),
-                explain: Arc::new(Box::new(|_| bail!("Explain not set in StubCsi"))),
+                explain: Arc::new(Box::new(|_| unimplemented!("Explain not set in StubCsi"))),
             }
         }
 
@@ -860,7 +870,7 @@ pub mod tests {
             &self,
             _auth: String,
             requests: Vec<ExplanationRequest>,
-        ) -> anyhow::Result<Vec<Explanation>> {
+        ) -> Result<Vec<Explanation>, CsiError> {
             requests.into_iter().map(|r| (*self.explain)(r)).collect()
         }
         async fn complete(

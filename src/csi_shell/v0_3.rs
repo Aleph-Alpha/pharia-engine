@@ -54,20 +54,22 @@ impl CsiRequest {
         C: Csi + Sync,
     {
         let response = match self {
-            CsiRequest::Explain { requests } => drivers
-                .explain(auth, requests.into_iter().map(Into::into).collect())
-                .await
-                .map(|v| {
-                    CsiResponse::Explain(
-                        v.into_iter()
-                            .map(|r| r.into_iter().map(Into::into).collect())
-                            .collect(),
-                    )
-                }),
+            CsiRequest::Explain { requests } => {
+                let explanations = drivers
+                    .explain(auth, requests.into_iter().map(Into::into).collect())
+                    .await
+                    .map_err(CsiShellError::from_csi_error)?;
+                CsiResponse::Explain(
+                    explanations
+                        .into_iter()
+                        .map(|r| r.into_iter().map(Into::into).collect())
+                        .collect(),
+                )
+            }
             CsiRequest::Chat { requests } => drivers
                 .chat(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect())),
+                .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect()))?,
             CsiRequest::Chunk { requests } => drivers
                 .chunk(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -77,7 +79,7 @@ impl CsiRequest {
                             .map(|c| c.into_iter().map(|c| c.text).collect())
                             .collect(),
                     )
-                }),
+                })?,
             CsiRequest::ChunkWithOffsets { requests } => drivers
                 .chunk(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -87,19 +89,19 @@ impl CsiRequest {
                             .map(|c| c.into_iter().map(Into::into).collect())
                             .collect(),
                     )
-                }),
+                })?,
             CsiRequest::Complete { requests } => drivers
                 .complete(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|v| CsiResponse::Complete(v.into_iter().map(Into::into).collect())),
+                .map(|v| CsiResponse::Complete(v.into_iter().map(Into::into).collect()))?,
             CsiRequest::Documents { requests } => drivers
                 .documents(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect())),
+                .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect()))?,
             CsiRequest::DocumentMetadata { requests } => drivers
                 .document_metadata(auth, requests.into_iter().map(Into::into).collect())
                 .await
-                .map(CsiResponse::DocumentMetadata),
+                .map(CsiResponse::DocumentMetadata)?,
             CsiRequest::Search { requests } => drivers
                 .search(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -109,19 +111,19 @@ impl CsiRequest {
                             .map(|r| r.into_iter().map(Into::into).collect())
                             .collect(),
                     )
-                }),
+                })?,
             CsiRequest::SelectLanguage { requests } => drivers
                 .select_language(requests.into_iter().map(Into::into).collect())
                 .await
                 .map(|r| {
                     CsiResponse::SelectLanguage(r.into_iter().map(|m| m.map(Into::into)).collect())
-                }),
+                })?,
             CsiRequest::Unknown { function } => {
                 return Err(CsiShellError::UnknownFunction(
                     function.unwrap_or_else(|| "specified".to_owned()),
                 ));
             }
-        }?;
+        };
         Ok(json!(response))
     }
 }
