@@ -25,6 +25,7 @@ pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<OtelGuard> {
         .with(tracing_subscriber::fmt::layer());
     let tracer_provider = if let Some(endpoint) = app_config.otel_endpoint() {
         let tracer_provider = init_otel_tracer_provider(endpoint)?;
+        // Sets otel.scope.name, a logical unit within the application code, see https://opentelemetry.io/docs/concepts/instrumentation-scope/
         let tracer = tracer_provider.tracer("pharia-kernel");
         registry.with(OpenTelemetryLayer::new(tracer)).init();
         Some(tracer_provider)
