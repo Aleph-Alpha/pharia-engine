@@ -13,6 +13,7 @@ use axum_extra::{
     TypedHeader,
     headers::{self, Authorization, authorization::Bearer},
 };
+use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -282,7 +283,10 @@ where
                 // Compress responses
                 .layer(CompressionLayer::new())
                 .layer(DecompressionLayer::new())
-                .layer(CorsLayer::very_permissive()),
+                .layer(CorsLayer::very_permissive())
+                .layer(OtelInResponseLayer)
+                //start OpenTelemetry trace on incoming request
+                .layer(OtelAxumLayer::default()),
         )
 }
 
@@ -971,70 +975,6 @@ mod tests {
                 csi_drivers,
             )
         }
-    }
-
-    fn init_test_tracing() {
-        use tracing_opentelemetry::OpenTelemetryLayer;
-        use tracing_subscriber::{Registry, layer::SubscriberExt};
-
-        use opentelemetry::trace::TracerProvider;
-
-        // This gives you a tracer that does *nothing* with the spans
-        let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder()
-            .build()
-            .tracer("test");
-
-        let otel_layer = OpenTelemetryLayer::new(tracer);
-
-        let subscriber = Registry::default().with(otel_layer);
-        tracing::subscriber::set_global_default(subscriber).expect("set tracing subscriber");
-    }
-
-    #[tokio::test]
-    #[ignore = "Does not work yet, as the index function needs to report the trace id"]
-    async fn trace_parent_is_read_from_incoming_request() {
-        use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-        use tracing_opentelemetry_instrumentation_sdk::find_current_trace_id;
-
-        // Given an app with an instrumented index endpoint
-        fn app() -> Router {
-            // build our application with a route
-            Router::new()
-                .route("/", get(index)) // request processed inside span
-                // include trace context as header into the response
-                .layer(OtelInResponseLayer)
-                //start OpenTelemetry trace on incoming request
-                .layer(OtelAxumLayer::default())
-        }
-
-        #[tracing::instrument]
-        async fn index() -> impl IntoResponse {
-            // Instead of the current trace id, we should return the parent trace id here
-            let trace_id = find_current_trace_id().unwrap();
-            axum::Json(json!({ "my_trace_id": trace_id }))
-        }
-
-        // And given a tracing subscriber
-        init_test_tracing();
-
-        // When doing a request with a traceparent header
-        let traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01";
-        let resp = app()
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .uri("/")
-                    .header("traceparent", traceparent)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then we get the traceparent header in the response
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let json_value: Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json_value["my_trace_id"].as_str().unwrap(), traceparent);
     }
 
     #[tokio::test]
@@ -2265,5 +2205,68 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         ) -> Result<AnySkillManifest, SkillExecutionError> {
             unimplemented!("Not needed in any test for now")
         }
+    }
+}
+
+#[cfg(test)]
+mod library_tests {
+    use axum::{Router, response::IntoResponse, routing::get};
+    use axum::{
+        body::Body,
+        http::{Method, Request},
+    };
+    use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
+    use http_body_util::BodyExt;
+    use serde_json::Value;
+    use serde_json::json;
+    use tower::ServiceExt;
+    use tracing_opentelemetry_instrumentation_sdk::find_current_trace_id;
+
+    fn app() -> Router {
+        // build our application with a route
+        Router::new()
+            .route("/", get(index)) // request processed inside span
+            // include trace context as header into the response
+            .layer(OtelInResponseLayer)
+            //start OpenTelemetry trace on incoming request
+            .layer(OtelAxumLayer::default())
+    }
+
+    #[tracing::instrument]
+    async fn index() -> impl IntoResponse {
+        let trace_id = find_current_trace_id();
+        axum::Json(json!({ "my_trace_id": trace_id }))
+    }
+
+    #[tokio::test]
+    async fn trace_parent_is_read_from_incoming_request() {
+        let guard = init_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers().unwrap();
+        let app = app();
+
+        // When doing a request with a traceparent header
+        let trace_id = "0af7651916cd43dd8448eb211c80319c";
+        let span_id = "b7ad6b7169203331";
+        let traceparent = format!("00-{trace_id}-{span_id}-01");
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/")
+                    .header("traceparent", traceparent)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get the traceparent header in the response
+        let traceparent = resp.headers().get("traceparent").unwrap();
+        assert!(traceparent.to_str().unwrap().contains(trace_id));
+
+        // And the original trace_id is part of the response body
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json_value: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json_value["my_trace_id"].as_str().unwrap(), trace_id);
+        drop(guard);
     }
 }
