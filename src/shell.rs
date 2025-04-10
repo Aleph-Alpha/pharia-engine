@@ -21,13 +21,10 @@ use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
-    compression::CompressionLayer,
-    cors::CorsLayer,
-    decompression::DecompressionLayer,
+    compression::CompressionLayer, cors::CorsLayer, decompression::DecompressionLayer,
     sensitive_headers::SetSensitiveRequestHeadersLayer,
-    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
-use tracing::{Level, error, info, info_span};
+use tracing::{error, info};
 use utoipa::{
     Modify, OpenApi, ToSchema,
     openapi::{
@@ -260,34 +257,14 @@ where
             ServiceBuilder::new()
                 // Mark the `Authorization` request header as sensitive so it doesn't show in logs
                 .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION)))
-                // High level logging of requests and responses
-                .layer(
-                    TraceLayer::new_for_http()
-                        .make_span_with(|request: &Request<_>| {
-                            // Log the matched route's path (with placeholders not filled in).
-                            // Use request.uri() or OriginalUri if you want the real path.
-                            let matched_path = request
-                                .extensions()
-                                .get::<MatchedPath>()
-                                .map(MatchedPath::as_str);
-                            info_span!(
-                                target: "http",
-                                "request",
-                                method = ?request.method(),
-                                matched_path,
-                            )
-                        })
-                        .on_request(DefaultOnRequest::new().level(Level::INFO))
-                        .on_response(DefaultOnResponse::new().level(Level::INFO)),
-                )
                 // Compress responses
                 .layer(CompressionLayer::new())
                 .layer(DecompressionLayer::new())
-                .layer(CorsLayer::very_permissive())
-                .layer(OtelInResponseLayer)
-                //start OpenTelemetry trace on incoming request
-                .layer(OtelAxumLayer::default()),
+                .layer(CorsLayer::very_permissive()),
         )
+        // For some reason, these layers do not work when added to the ServiceBuilder
+        .layer(OtelInResponseLayer)
+        .layer(OtelAxumLayer::default())
 }
 
 async fn authorization_middleware<A>(
@@ -453,6 +430,7 @@ impl Modify for SecurityAddon {
     }
 }
 
+#[tracing::instrument]
 async fn index() -> Html<&'static str> {
     const INDEX: &str = include_str!("./shell/index.html");
     Html(INDEX)
@@ -2206,48 +2184,18 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             unimplemented!("Not needed in any test for now")
         }
     }
-}
-
-#[cfg(test)]
-mod library_tests {
-    use axum::{Router, response::IntoResponse, routing::get};
-    use axum::{
-        body::Body,
-        http::{Method, Request},
-    };
-    use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-    use http_body_util::BodyExt;
-    use serde_json::Value;
-    use serde_json::json;
-    use tower::ServiceExt;
-    use tracing_opentelemetry_instrumentation_sdk::find_current_trace_id;
-
-    fn app() -> Router {
-        // build our application with a route
-        Router::new()
-            .route("/", get(index)) // request processed inside span
-            // include trace context as header into the response
-            .layer(OtelInResponseLayer)
-            //start OpenTelemetry trace on incoming request
-            .layer(OtelAxumLayer::default())
-    }
-
-    #[tracing::instrument]
-    async fn index() -> impl IntoResponse {
-        let trace_id = find_current_trace_id();
-        axum::Json(json!({ "my_trace_id": trace_id }))
-    }
 
     #[tokio::test]
     async fn trace_parent_is_read_from_incoming_request() {
         let guard = init_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers().unwrap();
-        let app = app();
+        let app_state = AppState::dummy();
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When doing a request with a traceparent header
         let trace_id = "0af7651916cd43dd8448eb211c80319c";
         let span_id = "b7ad6b7169203331";
         let traceparent = format!("00-{trace_id}-{span_id}-01");
-        let resp = app
+        let resp = http
             .oneshot(
                 Request::builder()
                     .method(Method::GET)
@@ -2259,14 +2207,11 @@ mod library_tests {
             .await
             .unwrap();
 
+        assert_eq!(resp.status(), StatusCode::OK);
+
         // Then we get the traceparent header in the response
         let traceparent = resp.headers().get("traceparent").unwrap();
         assert!(traceparent.to_str().unwrap().contains(trace_id));
-
-        // And the original trace_id is part of the response body
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let json_value: Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json_value["my_trace_id"].as_str().unwrap(), trace_id);
         drop(guard);
     }
 }
