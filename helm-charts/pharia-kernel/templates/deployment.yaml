@@ -73,11 +73,13 @@ spec:
                 resourceFieldRef:
                   containerName: {{ include "pharia-kernel.fullname" . }}
                   resource: requests.memory
+                  divisor: "1"
             - name: MEMORY_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ include "pharia-kernel.fullname" . }}
                   resource: limits.memory
+                  divisor: "1"
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | quote }}
             {{- if .Values.openTelemetryEndpoint }}
