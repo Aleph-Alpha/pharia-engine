@@ -80,6 +80,6 @@ fn resource() -> Resource {
         // When providing a `SERVICE_NAME` as part of the attributes to `with_schema_url`, these attributes get merged with the existing
         // resource inside the builder. As the service name is already set to `unknown_service`, the newly provided service name will be ignored.
         // We therefore need to explicitly set the service name by using `with_service_name`.
-        .with_service_name(env!("CARGO_PKG_NAME"))
+        .with_service_name("pharia-kernel")
         .build()
 }
