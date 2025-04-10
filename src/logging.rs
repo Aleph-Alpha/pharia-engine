@@ -6,10 +6,7 @@ use opentelemetry_sdk::{
     Resource,
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
-use opentelemetry_semantic_conventions::{
-    SCHEMA_URL,
-    resource::{DEPLOYMENT_ENVIRONMENT_NAME, SERVICE_NAME, SERVICE_VERSION},
-};
+use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -28,7 +25,7 @@ pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<OtelGuard> {
         .with(tracing_subscriber::fmt::layer());
     let tracer_provider = if let Some(endpoint) = app_config.otel_endpoint() {
         let tracer_provider = init_otel_tracer_provider(endpoint)?;
-        let tracer = tracer_provider.tracer("tracing-otel-subscriber");
+        let tracer = tracer_provider.tracer("pharia-kernel");
         registry.with(OpenTelemetryLayer::new(tracer)).init();
         Some(tracer_provider)
     } else {
@@ -55,9 +52,7 @@ impl Drop for OtelGuard {
 
 fn init_otel_tracer_provider(endpoint: &str) -> anyhow::Result<SdkTracerProvider> {
     Ok(SdkTracerProvider::builder() // Customize sampling strategy
-        .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
-            0.1,
-        ))))
+        .with_sampler(Sampler::ParentBased(Box::new(Sampler::AlwaysOn)))
         // If export trace to AWS X-Ray, you can use XrayIdGenerator
         .with_id_generator(RandomIdGenerator::default())
         .with_resource(resource())
@@ -74,12 +69,14 @@ fn init_otel_tracer_provider(endpoint: &str) -> anyhow::Result<SdkTracerProvider
 fn resource() -> Resource {
     Resource::builder()
         .with_schema_url(
-            [
-                KeyValue::new(SERVICE_NAME, env!("CARGO_PKG_NAME")),
-                KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION")),
-                KeyValue::new(DEPLOYMENT_ENVIRONMENT_NAME, "develop"),
-            ],
+            [KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION"))],
             SCHEMA_URL,
         )
+        // When calling [Resource::builder], the resource name get's read from the env variable `OTEL_SERVICE_NAME`.
+        // We don't set this, and per default the service name of the resource inside Resource::builder is then set to `unknown_service`.
+        // When providing a `SERVICE_NAME` as part of the attributes to `with_schema_url`, these attributes get merged with the existing
+        // resource inside the builder. As the service name is already set to `unknown_service`, the newly provided service name will be ignored.
+        // We therefore need to explicitly set the service name by using `with_service_name`.
+        .with_service_name(env!("CARGO_PKG_NAME"))
         .build()
 }
