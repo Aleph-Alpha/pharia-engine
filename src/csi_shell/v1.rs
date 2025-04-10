@@ -41,6 +41,10 @@ impl IntoResponse for CsiShellError {
     }
 }
 
+// Questionable wether these transformations for CsiShellError should live here, since only one
+// implementation can exist. Which means either in the Future we need different version of the
+// `CsiShellError` or we will move it out of a version specific module.
+
 // This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into
 // `Result<_, CsiShellError>`. That way you don't need to do that manually.
 impl<E> From<E> for CsiShellError

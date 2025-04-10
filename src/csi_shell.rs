@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 
 use crate::{
     authorization::AuthorizationApi,
-    csi::Csi,
+    csi::{Csi, CsiError},
     shell::{AppState, CsiState},
     skill_runtime::SkillRuntimeApi,
     skill_store::SkillStoreApi,
@@ -95,6 +95,14 @@ enum CsiShellError {
 }
 
 impl CsiShellError {
+    fn from_csi_error(csi_error: CsiError) -> Self {
+        match csi_error {
+            error @ (CsiError::Inference(_) | CsiError::Any(_)) => {
+                CsiShellError::Internal(error.into())
+            }
+        }
+    }
+
     fn status_code(&self) -> StatusCode {
         match self {
             CsiShellError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,

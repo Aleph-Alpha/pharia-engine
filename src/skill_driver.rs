@@ -202,7 +202,7 @@ where
             .await
         {
             Ok(value) => value,
-            Err(error) => self.send_error(error).await,
+            Err(error) => self.send_error(error.into()).await,
         }
     }
 
