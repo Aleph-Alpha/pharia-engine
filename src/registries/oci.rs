@@ -110,7 +110,7 @@ impl SkillRegistry for OciRegistry {
                     if is_skill_not_found(&e) {
                         Ok(None)
                     } else {
-                        error!("Error retrieving digest from registry: {e}");
+                        error!("Error retrieving digest from registry:\n{e:?}");
                         Err(RegistryError::DigestRetrievalError(e.to_string()))
                     }
                 }
