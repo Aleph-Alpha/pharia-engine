@@ -12,7 +12,7 @@ wasmtime.workspace = true
 wasmtime-wasi.workspace = true
 
 [dev-dependencies]
-divan = "0.1.18"
+divan = "0.1.21"
 test-skills = { path = "../test-skills" }
 
 [lints]
