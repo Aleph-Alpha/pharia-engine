@@ -257,14 +257,14 @@ where
             ServiceBuilder::new()
                 // Mark the `Authorization` request header as sensitive so it doesn't show in logs
                 .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION)))
+                .layer(OtelAxumLayer::default())
+                // Inject the current context into the response, therefore needs to be nested inside the OtelAxumLayer
+                .layer(OtelInResponseLayer)
                 // Compress responses
                 .layer(CompressionLayer::new())
                 .layer(DecompressionLayer::new())
                 .layer(CorsLayer::very_permissive()),
         )
-        // For some reason, these layers do not work when added to the ServiceBuilder
-        .layer(OtelInResponseLayer)
-        .layer(OtelAxumLayer::default())
 }
 
 async fn authorization_middleware<A>(
