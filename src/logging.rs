@@ -1,9 +1,10 @@
 use std::{env, str::FromStr};
 
-use opentelemetry::{KeyValue, trace::TracerProvider};
+use opentelemetry::{KeyValue, propagation::TextMapCompositePropagator, trace::TracerProvider};
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::{
     Resource,
+    propagation::{BaggagePropagator, TraceContextPropagator},
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
@@ -27,6 +28,7 @@ pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<OtelGuard> {
         let tracer_provider = init_otel_tracer_provider(endpoint)?;
         // Sets otel.scope.name, a logical unit within the application code, see https://opentelemetry.io/docs/concepts/instrumentation-scope/
         let tracer = tracer_provider.tracer("pharia-kernel");
+        init_propagator();
         registry.with(OpenTelemetryLayer::new(tracer)).init();
         Some(tracer_provider)
     } else {
@@ -49,6 +51,19 @@ impl Drop for OtelGuard {
             }
         }
     }
+}
+
+/// Set propagators that extract traceparent and tracestate from incoming requests.
+/// Setting these (globally) is required for the `axum_tracing_opentelemetry` middleware to work.
+pub fn init_propagator() {
+    let context_propagator = TraceContextPropagator::new();
+    let baggage_propagator = BaggagePropagator::new();
+
+    let propagator = TextMapCompositePropagator::new(vec![
+        Box::new(context_propagator),
+        Box::new(baggage_propagator),
+    ]);
+    opentelemetry::global::set_text_map_propagator(propagator);
 }
 
 fn init_otel_tracer_provider(endpoint: &str) -> anyhow::Result<SdkTracerProvider> {

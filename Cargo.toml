@@ -161,6 +161,7 @@ tracing-opentelemetry-instrumentation-sdk = { version = "0.28.0", features = [
 init-tracing-opentelemetry = { version = "0.28.0", features = [
     "tracing_subscriber_ext",
 ] }
+opentelemetry-stdout = "0.29.0"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
