@@ -43,6 +43,10 @@ mod defaults {
     pub fn log_level() -> String {
         "info".to_owned()
     }
+
+    pub fn otel_sampling_ratio() -> f64 {
+        0.1
+    }
 }
 
 fn deserialize_feature_set<'de, D>(deserializer: D) -> Result<FeatureSet, D::Error>
@@ -52,6 +56,19 @@ where
     let buf = String::deserialize(deserializer)?;
 
     FeatureSet::from_str(&buf).map_err(serde::de::Error::custom)
+}
+
+fn deserialize_sampling_ratio<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let ratio = f64::deserialize(deserializer)?;
+    (0.0..=1.0)
+        .contains(&ratio)
+        .then_some(ratio)
+        .ok_or_else(|| {
+            serde::de::Error::custom("otel_sampling_ratio must be between 0.0 and 1.0 inclusive")
+        })
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -84,6 +101,12 @@ pub struct AppConfig {
     #[serde(default = "defaults::log_level")]
     log_level: String,
     otel_endpoint: Option<String>,
+    /// OTEL sampling ratio between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all traces
+    #[serde(
+        default = "defaults::otel_sampling_ratio",
+        deserialize_with = "deserialize_sampling_ratio"
+    )]
+    otel_sampling_ratio: f64,
     #[serde(default)]
     use_pooling_allocator: bool,
     /// Optionally set amount of memory requested from Kubernetes
@@ -272,6 +295,24 @@ impl AppConfig {
     }
 
     #[must_use]
+    pub fn otel_sampling_ratio(&self) -> f64 {
+        self.otel_sampling_ratio
+    }
+
+    /// # Errors
+    ///
+    /// Returns an error if the sampling ratio is not between 0.0 and 1.0 inclusive.
+    pub fn with_otel_sampling_ratio(mut self, ratio: f64) -> anyhow::Result<Self> {
+        if !(0.0..=1.0).contains(&ratio) {
+            return Err(anyhow::anyhow!(
+                "otel_sampling_ratio must be between 0.0 and 1.0 inclusive"
+            ));
+        }
+        self.otel_sampling_ratio = ratio;
+        Ok(self)
+    }
+
+    #[must_use]
     pub fn use_pooling_allocator(&self) -> bool {
         self.use_pooling_allocator
     }
@@ -409,6 +450,7 @@ impl Default for AppConfig {
             namespace_update_interval: defaults::namespace_update_interval(),
             log_level: defaults::log_level(),
             otel_endpoint: None,
+            otel_sampling_ratio: defaults::otel_sampling_ratio(),
             use_pooling_allocator: false,
             memory_request: None,
             memory_limit: None,
@@ -520,6 +562,7 @@ mod tests {
         assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
         assert_eq!(config.log_level(), "info");
         assert!(config.otel_endpoint().is_none());
+        assert!((config.otel_sampling_ratio() - 0.1).abs() < 1e-6);
         assert!(!config.use_pooling_allocator());
         assert!(config.namespaces().is_empty());
         Ok(())
@@ -705,5 +748,45 @@ registry-password =  \"{password}\"
         let config = AppConfig::new().unwrap();
         let namespace = Namespace::new("pharia-kernel-team").unwrap();
         assert!(config.namespaces().contains_key(&namespace));
+    }
+
+    #[test]
+    fn otel_sampling_ratio_from_env() -> anyhow::Result<()> {
+        // Given environment variables with a sampling ratio
+        let dir = tempdir()?;
+        let file_path = dir.path().join("config.toml");
+        fs::File::create_new(&file_path)?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
+        let env_vars = HashMap::from([("OTEL_SAMPLING_RATIO".to_owned(), "0.25".to_owned())]);
+        let env_source = AppConfig::environment().source(Some(env_vars));
+
+        // When we load the config
+        let config = AppConfig::from_sources(file_source, env_source)?;
+
+        // Then the sampling ratio is set from the environment variable
+        assert!((config.otel_sampling_ratio() - 0.25).abs() < 1e-6);
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_otel_sampling_ratio_is_rejected() -> anyhow::Result<()> {
+        // Given a config with an invalid sampling ratio
+        let dir = tempdir()?;
+        let file_path = dir.path().join("config.toml");
+        fs::File::create_new(&file_path)?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
+        let env_vars = HashMap::from([("OTEL_SAMPLING_RATIO".to_owned(), "1.1".to_owned())]);
+        let env_source = AppConfig::environment().source(Some(env_vars));
+
+        // When we load the config
+        let error = AppConfig::from_sources(file_source, env_source).unwrap_err();
+
+        // Then we receive an error
+        assert!(
+            error
+                .to_string()
+                .contains("otel_sampling_ratio must be between 0.0 and 1.0 inclusive")
+        );
+        Ok(())
     }
 }
