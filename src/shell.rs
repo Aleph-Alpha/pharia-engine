@@ -870,6 +870,7 @@ mod tests {
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference::{self, Explanation, TextScore},
+        logging::init_propagator,
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
@@ -882,11 +883,15 @@ mod tests {
         http::{Method, Request, header},
     };
     use http_body_util::BodyExt;
+    use init_tracing_opentelemetry::resource::DetectResource;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
+    use opentelemetry::trace::TracerProvider;
+    use opentelemetry_sdk::trace::{BatchSpanProcessor, Sampler, SdkTracerProvider};
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
+    use tracing_subscriber::layer::SubscriberExt;
 
     impl AppState<StubAuthorization, CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
         pub fn dummy() -> Self {
@@ -2185,33 +2190,56 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    #[tokio::test]
-    async fn trace_parent_is_read_from_incoming_request() {
-        let guard = init_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers().unwrap();
-        let app_state = AppState::dummy();
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
+    /// Construct a subscriber that logs to stdout and allows to retrieve the traceparent
+    fn tracing_subscriber() -> impl tracing::Subscriber {
+        let exporter = opentelemetry_stdout::SpanExporter::default();
+        let processor = BatchSpanProcessor::builder(exporter).build();
+        let provider = SdkTracerProvider::builder()
+            .with_span_processor(processor)
+            .with_resource(DetectResource::default().build())
+            .with_sampler(Sampler::AlwaysOn)
+            .build();
 
-        // When doing a request with a traceparent header
-        let trace_id = "0af7651916cd43dd8448eb211c80319c";
-        let span_id = "b7ad6b7169203331";
-        let traceparent = format!("00-{trace_id}-{span_id}-01");
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .uri("/")
-                    .header("traceparent", traceparent)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
+        // Allows to retrieve the traceparent
+        init_propagator();
 
-        assert_eq!(resp.status(), StatusCode::OK);
+        let tracer = provider.tracer("test");
+        let layer = tracing_opentelemetry::layer().with_tracer(tracer);
+        tracing_subscriber::registry().with(layer)
+    }
 
-        // Then we get the traceparent header in the response
-        let traceparent = resp.headers().get("traceparent").unwrap();
-        assert!(traceparent.to_str().unwrap().contains(trace_id));
-        drop(guard);
+    #[test]
+    fn trace_parent_is_read_from_incoming_request() {
+        tracing::subscriber::with_default(tracing_subscriber(), || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .build()
+                .unwrap();
+            runtime.block_on(async {
+                let app_state = AppState::dummy();
+                let http = http(PRODUCTION_FEATURE_SET, app_state);
+
+                // When doing a request with a traceparent header
+                let trace_id = "0af7651916cd43dd8448eb211c80319c";
+                let span_id = "b7ad6b7169203331";
+                let traceparent = format!("00-{trace_id}-{span_id}-01");
+                let resp = http
+                    .oneshot(
+                        Request::builder()
+                            .method(Method::GET)
+                            .uri("/")
+                            .header("traceparent", traceparent)
+                            .body(Body::empty())
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+
+                assert_eq!(resp.status(), StatusCode::OK);
+
+                // Then we get the traceparent header in the response
+                let traceparent = resp.headers().get("traceparent").unwrap();
+                assert!(traceparent.to_str().unwrap().contains(trace_id));
+            });
+        });
     }
 }
