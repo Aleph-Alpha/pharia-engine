@@ -430,7 +430,6 @@ impl Modify for SecurityAddon {
     }
 }
 
-#[tracing::instrument]
 async fn index() -> Html<&'static str> {
     const INDEX: &str = include_str!("./shell/index.html");
     Html(INDEX)

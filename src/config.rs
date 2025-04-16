@@ -121,6 +121,16 @@ pub struct AppConfig {
     wasmtime_cache_size_limit: Option<ByteSize>,
 }
 
+#[derive(Clone, Deserialize, Debug)]
+pub struct OtelConfig<'a> {
+    /// Endpoint that traces are sent to. If set to None, no traces are emitted
+    pub endpoint: Option<&'a str>,
+    /// ratio between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all traces
+    pub sampling_ratio: f64,
+    /// Minimum log level for traces.
+    pub log_level: &'a str,
+}
+
 /// `jiff::SignedDuration` can parse human readable strings like `1h30m` into `SignedDuration`.
 /// However, we want to ensure for this config that the duration is positive.
 fn positive_duration_from_str<'de, D>(deserializer: D) -> Result<Duration, D::Error>
@@ -292,6 +302,15 @@ impl AppConfig {
     pub fn with_otel_endpoint(mut self, endpoint: Option<String>) -> Self {
         self.otel_endpoint = endpoint;
         self
+    }
+
+    #[must_use]
+    pub fn as_otel_config(&self) -> OtelConfig<'_> {
+        OtelConfig {
+            endpoint: self.otel_endpoint.as_deref(),
+            sampling_ratio: self.otel_sampling_ratio,
+            log_level: self.log_level.as_str(),
+        }
     }
 
     #[must_use]

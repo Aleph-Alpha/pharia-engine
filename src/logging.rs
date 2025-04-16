@@ -8,10 +8,10 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
-use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing::info;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::AppConfig;
+use crate::config::OtelConfig;
 
 /// Set up two tracing subscribers:
 /// * Simple env logger
@@ -19,17 +19,23 @@ use crate::AppConfig;
 ///
 /// # Errors
 /// Failed to parse the log level provided by the configuration.
-pub fn initialize_tracing(app_config: &AppConfig) -> anyhow::Result<OtelGuard> {
-    let env_filter = EnvFilter::from_str(app_config.log_level())?;
+pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGuard> {
+    let env_filter = EnvFilter::from_str(otel_config.log_level)?;
     let registry = tracing_subscriber::registry()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer());
-    let tracer_provider = if let Some(endpoint) = app_config.otel_endpoint() {
-        let tracer_provider = init_otel_tracer_provider(endpoint)?;
+    let tracer_provider = if let Some(endpoint) = otel_config.endpoint {
+        let tracer_provider = init_otel_tracer_provider(endpoint, otel_config.sampling_ratio)?;
+        init_propagator();
+
         // Sets otel.scope.name, a logical unit within the application code, see https://opentelemetry.io/docs/concepts/instrumentation-scope/
         let tracer = tracer_provider.tracer("pharia-kernel");
-        init_propagator();
-        registry.with(OpenTelemetryLayer::new(tracer)).init();
+        let layer = tracing_opentelemetry::layer().with_tracer(tracer);
+        registry.with(layer).init();
+        info!(
+            "Initialized OpenTelemetry tracer provider with endpoint: {}",
+            endpoint
+        );
         Some(tracer_provider)
     } else {
         registry.init();
@@ -66,10 +72,13 @@ pub fn init_propagator() {
     opentelemetry::global::set_text_map_propagator(propagator);
 }
 
-fn init_otel_tracer_provider(endpoint: &str) -> anyhow::Result<SdkTracerProvider> {
+fn init_otel_tracer_provider(
+    endpoint: &str,
+    sampling_ratio: f64,
+) -> anyhow::Result<SdkTracerProvider> {
     Ok(SdkTracerProvider::builder() // Customize sampling strategy
         .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
-            0.1,
+            sampling_ratio,
         ))))
         // If export trace to AWS X-Ray, you can use XrayIdGenerator
         .with_id_generator(RandomIdGenerator::default())
