@@ -22,9 +22,10 @@ pub enum NamespaceDescriptionError {
 type NamespaceDescriptionResult = Result<NamespaceDescription, NamespaceDescriptionError>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct SkillDescription {
-    pub name: String,
-    pub tag: Option<String>,
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum SkillDescription {
+    #[serde(untagged)]
+    Programmable { name: String, tag: Option<String> },
 }
 
 impl SkillDescription {
@@ -36,7 +37,7 @@ impl SkillDescription {
             .to_str()
             .ok_or_else(|| anyhow!("Invalid UTF-8 name for skill."))?
             .to_owned();
-        Ok(Self { name, tag: None })
+        Ok(Self::Programmable { name, tag: None })
     }
 }
 
@@ -45,7 +46,7 @@ impl SkillDescription {
 // but could also load skills
 #[async_trait]
 pub trait NamespaceDescriptionLoader {
-    async fn description(&self) -> NamespaceDescriptionResult;
+    async fn description(&self, beta: bool) -> NamespaceDescriptionResult;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -54,8 +55,33 @@ pub struct NamespaceDescription {
 }
 
 impl NamespaceDescription {
-    pub fn from_str(config: &str) -> anyhow::Result<Self> {
-        let tc = toml::from_str(config)?;
+    pub fn from_str(config: &str, beta: bool) -> anyhow::Result<Self> {
+        let tc = if beta {
+            toml::from_str(config)?
+        } else {
+            #[derive(Deserialize)]
+            struct SkillDescriptionStable {
+                name: String,
+                tag: Option<String>,
+            }
+
+            #[derive(Deserialize)]
+            struct NamespaceDescriptionStable {
+                skills: Vec<SkillDescriptionStable>,
+            }
+
+            let tc = toml::from_str::<NamespaceDescriptionStable>(config)?;
+            NamespaceDescription {
+                skills: tc
+                    .skills
+                    .into_iter()
+                    .map(|s| SkillDescription::Programmable {
+                        name: s.name,
+                        tag: s.tag,
+                    })
+                    .collect(),
+            }
+        };
         Ok(tc)
     }
 }
@@ -72,7 +98,7 @@ impl WatchLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for WatchLoader {
-    async fn description(&self) -> NamespaceDescriptionResult {
+    async fn description(&self, _beta: bool) -> NamespaceDescriptionResult {
         if !self.directory.is_dir() {
             return Err(NamespaceDescriptionError::Unrecoverable(anyhow!(
                 "The directory to watch '{:?}' is not a directory.",
@@ -103,11 +129,11 @@ impl FileLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for FileLoader {
-    async fn description(&self) -> NamespaceDescriptionResult {
+    async fn description(&self, beta: bool) -> NamespaceDescriptionResult {
         let config = std::fs::read_to_string(&self.path)
             .with_context(|| format!("Unable to read file {}", self.path.to_string_lossy()))
             .map_err(NamespaceDescriptionError::Unrecoverable)?;
-        let desc = NamespaceDescription::from_str(&config)
+        let desc = NamespaceDescription::from_str(&config, beta)
             .with_context(|| {
                 format!(
                 "Unable to parse file {} into a valid configuration for a team owned namespace.",
@@ -135,7 +161,7 @@ impl HttpLoader {
 }
 #[async_trait]
 impl NamespaceDescriptionLoader for HttpLoader {
-    async fn description(&self) -> NamespaceDescriptionResult {
+    async fn description(&self, beta: bool) -> NamespaceDescriptionResult {
         let mut req_builder = self.client.get(&self.url);
         if let Some(token) = &self.token {
             let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}"))
@@ -168,7 +194,7 @@ impl NamespaceDescriptionLoader for HttpLoader {
             .text()
             .await
             .map_err(|e| NamespaceDescriptionError::Recoverable(e.into()))?;
-        let desc = NamespaceDescription::from_str(&content).with_context(|| {
+        let desc = NamespaceDescription::from_str(&content, beta).with_context(|| {
             format!(
                 "Unable to parse file at '{}' into a valid configuration for a team owned namespace.",
                 self.url
@@ -180,7 +206,7 @@ impl NamespaceDescriptionLoader for HttpLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for NamespaceDescription {
-    async fn description(&self) -> NamespaceDescriptionResult {
+    async fn description(&self, _beta: bool) -> NamespaceDescriptionResult {
         Ok(self.clone())
     }
 }
@@ -202,8 +228,15 @@ pub mod tests {
         )
         .unwrap();
         assert_eq!(tc.skills.len(), 3);
-        assert_eq!(tc.skills[0].tag.as_ref().unwrap(), "v1.0.0-rc");
-        assert!(tc.skills[1].tag.is_none());
+        assert!(
+            matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag.as_ref().unwrap() == "v1.0.0-rc")
+        );
+        assert!(
+            matches!(&tc.skills[1], SkillDescription::Programmable { name, tag } if name == "Pluto" && tag.is_none())
+        );
+        assert!(
+            matches!(&tc.skills[2], SkillDescription::Programmable { name, tag } if name == "Gamma" && tag.is_none())
+        );
     }
 
     #[test]
@@ -221,7 +254,14 @@ pub mod tests {
         )
         .unwrap();
         assert_eq!(tc.skills.len(), 3);
-        assert_eq!(tc.skills[0].tag.as_ref().unwrap(), "v1.0.0-rc");
-        assert!(tc.skills[1].tag.is_none());
+        assert!(
+            matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag.as_ref().unwrap() == "v1.0.0-rc")
+        );
+        assert!(
+            matches!(&tc.skills[1], SkillDescription::Programmable { name, tag } if name == "Pluto" && tag.is_none())
+        );
+        assert!(
+            matches!(&tc.skills[2], SkillDescription::Programmable { name, tag } if name == "Gamma" && tag.is_none())
+        );
     }
 }

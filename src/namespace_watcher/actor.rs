@@ -23,10 +23,11 @@ pub trait ObservableConfig {
 
 pub struct NamespaceDescriptionLoaders {
     namespaces: HashMap<Namespace, Box<dyn NamespaceDescriptionLoader + Send + Sync>>,
+    beta: bool,
 }
 
 impl NamespaceDescriptionLoaders {
-    pub fn new(deserialized: NamespaceConfigs) -> anyhow::Result<Self> {
+    pub fn new(deserialized: NamespaceConfigs, beta: bool) -> anyhow::Result<Self> {
         let namespaces = deserialized
             .into_iter()
             .map(|(namespace, config)| {
@@ -38,7 +39,7 @@ impl NamespaceDescriptionLoaders {
                     .map(|loader| (namespace, loader))
             })
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
-        Ok(Self { namespaces })
+        Ok(Self { namespaces, beta })
     }
 }
 
@@ -56,7 +57,7 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
             .namespaces
             .get(namespace)
             .expect("namespace must exist.")
-            .description()
+            .description(self.beta)
             .await?
             .skills;
         Ok(skills)
@@ -133,11 +134,17 @@ impl Diff {
         // Do not list skills as removed if only the tag changed.
         let removed = removed
             .into_iter()
-            .filter_map(|r| {
-                if added.iter().all(|a| a.name != r.name) {
-                    Some(r.name)
-                } else {
-                    None
+            .filter_map(|r| match r {
+                SkillDescription::Programmable { name, .. } => {
+                    if added.iter().all(|a| match a {
+                        SkillDescription::Programmable { name: a_name, .. } => {
+                            a_name != name.as_str()
+                        }
+                    }) {
+                        Some(name)
+                    } else {
+                        None
+                    }
                 }
             })
             .collect();
@@ -252,9 +259,13 @@ where
         let incoming = self.skills.get(namespace).unwrap();
         let diff = Self::compute_diff(&existing, incoming);
         for skill in diff.added_or_changed {
-            let tag = skill.tag.as_deref().unwrap_or("latest");
-            let skill = ConfiguredSkill::new(namespace.clone(), skill.name, tag);
-            self.skill_store_api.upsert(skill).await;
+            match skill {
+                SkillDescription::Programmable { name, tag } => {
+                    let tag = tag.as_deref().unwrap_or("latest");
+                    let skill = ConfiguredSkill::new(namespace.clone(), name, tag);
+                    self.skill_store_api.upsert(skill).await;
+                }
+            }
         }
 
         for skill_name in diff.removed {
@@ -361,7 +372,7 @@ pub mod tests {
         }
 
         fn new(name: &str, tag: Option<&str>) -> Self {
-            Self {
+            Self::Programmable {
                 name: name.to_owned(),
                 tag: tag.map(ToOwned::to_owned),
             }
@@ -433,7 +444,7 @@ pub mod tests {
         .collect();
         let config = NamespaceConfigs::new(namespaces);
 
-        let loaders = NamespaceDescriptionLoaders::new(config).unwrap();
+        let loaders = NamespaceDescriptionLoaders::new(config, false).unwrap();
 
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);
@@ -456,17 +467,15 @@ pub mod tests {
         .collect();
         let config = NamespaceConfigs::new(namespaces);
 
-        let loaders = NamespaceDescriptionLoaders::new(config).unwrap();
+        let loaders = NamespaceDescriptionLoaders::new(config, false).unwrap();
 
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);
         let skills = loaders.skills(&namespaces[0]).await.unwrap();
         assert_eq!(skills.len(), 2);
-        assert!(
-            skills
-                .iter()
-                .all(|s| s.name == "skill_1" || s.name == "skill_2")
-        );
+        assert!(skills.iter().all(|s| match s {
+            SkillDescription::Programmable { name, .. } => name == "skill_1" || name == "skill_2",
+        }));
     }
 
     #[tokio::test]

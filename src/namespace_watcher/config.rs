@@ -72,7 +72,7 @@ impl NamespaceConfigs {
                 NamespaceConfig::InPlace {
                     skills: skills
                         .iter()
-                        .map(|&name| SkillDescription {
+                        .map(|&name| SkillDescription::Programmable {
                             name: name.to_owned(),
                             tag: None,
                         })
