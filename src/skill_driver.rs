@@ -880,7 +880,7 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let skill_driver = SkillDriver::new(engine);
 
         // When metadata for a skill is requested
@@ -942,7 +942,7 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
@@ -971,7 +971,7 @@ mod test {
         // Given a skill using csi and a csi that fails
         // Note we are using a skill which actually invokes the csi
         let skill = Arc::new(SkillGreetCompletion);
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
         // When trying to generate a greeting for Homer using the greet skill
@@ -1043,7 +1043,7 @@ mod test {
     #[tokio::test]
     async fn should_not_panic_if_receiver_is_dropped() {
         // Given a skill that emits a JSON error
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
         // When
@@ -1066,7 +1066,7 @@ mod test {
     #[tokio::test]
     async fn should_not_panic_on_skill_error_if_receiver_is_dropped() {
         // Given a skill that emits a JSON error
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
         // When
@@ -1089,7 +1089,7 @@ mod test {
     #[tokio::test]
     async fn should_not_panic_on_skill_completion_if_receiver_is_dropped() {
         // Given a skill that emits a JSON error
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
         // When
@@ -1112,7 +1112,7 @@ mod test {
     #[tokio::test]
     async fn should_translate_json_errors_emitted_by_message_stream() {
         // Given a skill that emits a JSON error
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
         // When
@@ -1183,7 +1183,7 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
         // When

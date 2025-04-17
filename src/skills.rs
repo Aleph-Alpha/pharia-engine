@@ -4,7 +4,6 @@ mod v0_3;
 use std::{fmt, path::Path, sync::LazyLock};
 
 use async_trait::async_trait;
-use bytesize::ByteSize;
 use engine_room::LinkerImpl;
 use semver::Version;
 use serde::Serialize;
@@ -196,12 +195,15 @@ pub struct Engine {
     linker: Linker<LinkedCtx>,
 }
 
+impl Default for Engine {
+    fn default() -> Self {
+        Self::new(engine_room::EngineConfig::default()).expect("Failed to create default engine")
+    }
+}
+
 impl Engine {
-    pub fn new(
-        use_pooling_allocator: bool,
-        max_incremental_cache_size: Option<ByteSize>,
-    ) -> anyhow::Result<Self> {
-        let engine = engine_room::Engine::new(use_pooling_allocator, max_incremental_cache_size)?;
+    pub fn new(engine_config: engine_room::EngineConfig) -> anyhow::Result<Self> {
+        let engine = engine_room::Engine::new(engine_config)?;
         // We currently use the same linker for multiple worlds that use CSI.
         // Shadowing allows them to be hooked up twice, but might also be a clue we might want two linkers to avoid the issue.
         let mut linker = engine.new_linker(true)?;
@@ -572,7 +574,7 @@ pub mod tests {
     async fn python_greeting_skill() {
         let skill = given_python_skill_greet_v0_3();
         let skill_ctx = Box::new(CsiGreetingMock);
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
 
         let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
         let actual = skill
@@ -586,7 +588,7 @@ pub mod tests {
     #[tokio::test]
     async fn rust_greeting_skill() {
         let skill_bytes = given_rust_skill_greet_v0_2().bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
 
         let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
         let actual = skill
@@ -600,7 +602,7 @@ pub mod tests {
     #[tokio::test]
     async fn explain_skill_component() {
         let skill_bytes = given_rust_skill_explain().bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let (send, _) = oneshot::channel();
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
@@ -627,7 +629,7 @@ pub mod tests {
     async fn skill_metadata_v0_2_is_empty() {
         // Given a skill is linked againts skill package v0.2
         let test_skill = given_rust_skill_greet_v0_2();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, test_skill.bytes()).unwrap();
 
         // When metadata for a skill is requested
@@ -644,7 +646,7 @@ pub mod tests {
     async fn skill_metadata_invalid_output() {
         // Given a skill runtime that always returns an invalid output skill
         let skill_bytes = given_invalid_output_skill().bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
 
         // When metadata for a skill is requested
@@ -705,7 +707,7 @@ pub mod tests {
         // Given a skill loaded by our engine
         let test_skill = given_rust_skill_greet_v0_3();
         let wasm = test_skill.bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -722,7 +724,7 @@ pub mod tests {
         // Given a skill loaded by our engine
         let test_skills = given_rust_skill_greet_v0_2();
         let wasm = test_skills.bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -738,7 +740,7 @@ pub mod tests {
     async fn can_load_and_run_search_skill() {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_search().bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -771,7 +773,7 @@ pub mod tests {
         ];
         let test_skill = given_complete_stream_skill();
         let wasm = test_skill.bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiCompleteStreamStub::new(events));
 
@@ -809,7 +811,7 @@ pub mod tests {
         ];
         let test_skill = given_chat_stream_skill();
         let wasm = test_skill.bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiChatStreamStub::new(events));
 
@@ -854,7 +856,7 @@ pub mod tests {
         ];
         let test_skill = given_streaming_output_skill();
         let wasm = test_skill.bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiChatStreamStub::new(events));
         let (send, mut recv) = mpsc::channel(3);
@@ -887,7 +889,7 @@ pub mod tests {
     async fn can_load_and_run_chat_skill() {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_chat().bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -904,7 +906,7 @@ pub mod tests {
     async fn can_load_and_run_v0_2_py_module() {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_2();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -920,7 +922,7 @@ pub mod tests {
     async fn can_load_and_run_v0_3_py_module() {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_3();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -980,7 +982,7 @@ pub mod tests {
     async fn can_call_pre_instantiated_multiple_times() {
         let test_skill = given_rust_skill_greet_v0_2();
         let wasm = test_skill.bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
@@ -1006,7 +1008,7 @@ pub mod tests {
     async fn skill_metadata_v0_3() {
         // Given a skill runtime api that always returns a v0.3 skill
         let skill_bytes = given_rust_skill_greet_v0_3().bytes();
-        let engine = Engine::new(false, None).unwrap();
+        let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
 
         // When metadata for a skill is requested

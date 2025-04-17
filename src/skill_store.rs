@@ -863,7 +863,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
         let result = provider.tag(&SkillPath::new(skill_path.namespace, "non_existing_skill"));
@@ -875,7 +875,7 @@ pub mod tests {
         // Given a provider with a skill in a particular namespace
         let namespace = Namespace::new("non-existing").unwrap();
         let existing = SkillPath::new(namespace.clone(), "existing_skill");
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let provider = SkillStoreState::with_namespace_and_skill(engine, &existing);
 
         // When requesting a different, non-existing skill in the same namespace
@@ -890,7 +890,7 @@ pub mod tests {
     async fn cached_skill_removed() {
         // Given one cached skill
         let skill_path = SkillPath::local("greet");
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
         provider.insert(
             skill_path.clone(),
@@ -908,7 +908,7 @@ pub mod tests {
     async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::local("greet_skill_v0_2");
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
 
@@ -958,7 +958,7 @@ pub mod tests {
     #[tokio::test]
     async fn should_list_skills_that_have_been_added() {
         // Given an empty provider
-        let engine = Arc::new(Engine::new(false, None).unwrap());
+        let engine = Arc::new(Engine::default());
         let first = SkillPath::local("one");
         let second = SkillPath::local("two");
 

@@ -1,6 +1,7 @@
 use anyhow::Ok;
 use bytesize::ByteSize;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
+use engine_room::EngineConfig;
 use jiff::SignedDuration;
 use serde::{Deserialize, Deserializer};
 use std::{
@@ -365,6 +366,13 @@ impl AppConfig {
     #[must_use]
     pub fn max_incremental_cache_size(&self) -> Option<ByteSize> {
         Some(ByteSize::mib(128))
+    }
+
+    #[must_use]
+    pub fn engine_config(&self) -> EngineConfig {
+        EngineConfig::default()
+            .use_pooling_allocator(self.use_pooling_allocator())
+            .with_max_incremental_cache_size(self.max_incremental_cache_size())
     }
 }
 

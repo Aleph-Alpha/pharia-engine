@@ -85,13 +85,8 @@ impl Kernel {
             )
             .context("Unable to read the configuration for namespaces")?,
         );
-        let engine = Arc::new(
-            Engine::new(
-                app_config.use_pooling_allocator(),
-                app_config.max_incremental_cache_size(),
-            )
-            .context("engine creation failed")?,
-        );
+        let engine =
+            Arc::new(Engine::new(app_config.engine_config()).context("engine creation failed")?);
 
         // Boot up the drivers which power the CSI.
         let tokenizers = Tokenizers::new(app_config.inference_url().to_owned()).unwrap();

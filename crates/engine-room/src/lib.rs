@@ -21,6 +21,31 @@ use wasmtime::{
 };
 use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiView};
 
+#[derive(Default)]
+pub struct EngineConfig {
+    /// How much memory you are willing to allocate for an incremental cache, in any.
+    max_incremental_cache_size: Option<ByteSize>,
+    /// Whether or not to use a pooling allocator for invocation memory.
+    use_pooling_allocator: bool,
+}
+
+impl EngineConfig {
+    #[must_use]
+    pub fn with_max_incremental_cache_size(
+        mut self,
+        max_incremental_cache_size: Option<ByteSize>,
+    ) -> Self {
+        self.max_incremental_cache_size = max_incremental_cache_size;
+        self
+    }
+
+    #[must_use]
+    pub fn use_pooling_allocator(mut self, use_pooling_allocator: bool) -> Self {
+        self.use_pooling_allocator = use_pooling_allocator;
+        self
+    }
+}
+
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
 /// our pharia/skill WIT world.
 pub struct Engine {
@@ -40,15 +65,12 @@ impl Engine {
     ///
     /// This function will return an error if the engine cannot be created,
     /// or if wasi functionality cannot be linked.
-    pub fn new(
-        use_pooling_allocator: bool,
-        max_incremental_cache_size: Option<ByteSize>,
-    ) -> anyhow::Result<Self> {
-        let cache_store = max_incremental_cache_size.map(|size| {
+    pub fn new(config: EngineConfig) -> anyhow::Result<Self> {
+        let cache_store = config.max_incremental_cache_size.map(|size| {
             let cache_store: Arc<dyn CacheStore> = Arc::new(IncrementalCompilationCache::new(size));
             cache_store
         });
-        let config = Self::config(use_pooling_allocator, cache_store)?;
+        let config = Self::config(config.use_pooling_allocator, cache_store)?;
         let engine = WasmtimeEngine::new(&config)?;
 
         // We only need a weak reference to pass to the loop.
