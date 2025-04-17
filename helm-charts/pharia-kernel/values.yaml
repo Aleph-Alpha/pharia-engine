@@ -100,18 +100,25 @@ resources:
   limits:
     cpu: "4"
     memory: 8Gi
+    ephemeral-storage: 8Gi
   requests:
     cpu: "2"
     memory: 4Gi
+    ephemeral-storage: 4Gi
 volumes:
   - name: config-volume
     configMap:
       name: pharia-kernel-config
+  - name: ephemeral
+    emptyDir:
+      sizeLimit: 4Gi
 volumeMounts:
   - name: config-volume
     mountPath: /app/config.toml
     subPath: config.toml
     readOnly: true
+  - name: ephemeral
+    mountPath: /app/.cache
 nodeSelector: {}
 tolerations: []
 affinity: {}
