@@ -43,6 +43,16 @@ pub use logging::initialize_tracing;
 pub use metrics::initialize_metrics;
 pub use namespace_watcher::NamespaceConfigs;
 
+/// Wasmtime + Cranelift do a lot of small allocations for compilation,
+/// which can lead to heap fragmentation. Jemalloc does better at handling this,
+/// so we use this instead to make it easier to give the memory back to the OS.
+///
+/// This is in the lib.rs not main.rs so that we can use it for all of our tests,
+/// to make sure that we test it as thoroughly as possible.
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 pub struct Kernel {
     inference: Inference,
     tokenizers: Tokenizers,

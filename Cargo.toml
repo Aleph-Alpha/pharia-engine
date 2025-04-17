@@ -161,7 +161,12 @@ wat = "1.228.0"
 metrics-util = "0.19.0"
 reqwest = { version = "0.12.15", features = ["stream"] }
 axum-tracing-opentelemetry = "0.28.0"
-tracing-opentelemetry-instrumentation-sdk = { version = "0.28.0", features = ["http"] }
+tracing-opentelemetry-instrumentation-sdk = { version = "0.28.0", features = [
+    "http",
+] }
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.6"
 
 [features]
 test_inference = []
