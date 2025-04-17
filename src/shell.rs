@@ -862,6 +862,7 @@ fn skill_wit() -> &'static str {
 mod tests {
     use std::{
         panic,
+        str::FromStr,
         sync::{Arc, Mutex},
     };
 
@@ -891,7 +892,7 @@ mod tests {
     use serde_json::json;
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
-    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
 
     impl AppState<StubAuthorization, CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
         pub fn dummy() -> Self {
@@ -2192,6 +2193,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     /// Construct a subscriber that logs to stdout and allows to retrieve the traceparent
     fn tracing_subscriber() -> impl tracing::Subscriber {
+        // This matches the setup in `logging`, but exporting to stdout instead of an OTLP endpoint
         let provider = SdkTracerProvider::builder()
             .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
                 1.0,
@@ -2206,7 +2208,9 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
         let tracer = provider.tracer("test");
         let layer = tracing_opentelemetry::layer().with_tracer(tracer);
-        tracing_subscriber::registry().with(layer)
+        tracing_subscriber::registry()
+            .with(EnvFilter::from_str("info").unwrap())
+            .with(layer)
     }
 
     #[test]
