@@ -9,7 +9,6 @@ use axum::{
     response::{ErrorResponse, Html, IntoResponse, Response, Sse, sse::Event},
     routing::{delete, get, post},
 };
-
 use axum_extra::{
     TypedHeader,
     headers::{self, Authorization, authorization::Bearer},
@@ -872,7 +871,7 @@ mod tests {
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference::{self, Explanation, TextScore},
-        logging::init_propagator,
+        logging::{init_propagator, resource},
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
@@ -885,10 +884,9 @@ mod tests {
         http::{Method, Request, header},
     };
     use http_body_util::BodyExt;
-    use init_tracing_opentelemetry::resource::DetectResource;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
     use opentelemetry::trace::TracerProvider;
-    use opentelemetry_sdk::trace::{Sampler, SdkTracerProvider};
+    use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler, SdkTracerProvider};
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
     use tokio::sync::mpsc;
@@ -2195,9 +2193,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     /// Construct a subscriber that logs to stdout and allows to retrieve the traceparent
     fn tracing_subscriber() -> impl tracing::Subscriber {
         let provider = SdkTracerProvider::builder()
+            .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
+                1.0,
+            ))))
+            .with_id_generator(RandomIdGenerator::default())
+            .with_resource(resource())
             .with_batch_exporter(opentelemetry_stdout::SpanExporter::default())
-            .with_resource(DetectResource::default().build())
-            .with_sampler(Sampler::AlwaysOn)
             .build();
 
         // Allows to retrieve the traceparent

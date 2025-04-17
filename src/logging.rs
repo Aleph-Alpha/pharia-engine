@@ -80,7 +80,6 @@ fn init_otel_tracer_provider(
         .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
             sampling_ratio,
         ))))
-        // If export trace to AWS X-Ray, you can use XrayIdGenerator
         .with_id_generator(RandomIdGenerator::default())
         .with_resource(resource())
         .with_batch_exporter(
@@ -93,7 +92,7 @@ fn init_otel_tracer_provider(
 }
 
 // Create a Resource that captures information about the entity for which telemetry is recorded.
-fn resource() -> Resource {
+pub fn resource() -> Resource {
     Resource::builder()
         .with_schema_url(
             [KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION"))],
