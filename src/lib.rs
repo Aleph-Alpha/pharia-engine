@@ -108,7 +108,7 @@ impl Kernel {
         let skill_store = SkillStore::new(
             skill_loader.api(),
             app_config.namespace_update_interval(),
-            app_config.desired_cache_memory_usage(),
+            app_config.desired_skill_cache_memory_usage(),
         );
 
         // Boot up the runtime we need to execute Skills

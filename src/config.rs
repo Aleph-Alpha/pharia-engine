@@ -3,7 +3,12 @@ use bytesize::ByteSize;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use jiff::SignedDuration;
 use serde::{Deserialize, Deserializer};
-use std::{net::SocketAddr, str::FromStr, time::Duration};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    str::FromStr,
+    time::Duration,
+};
 
 use crate::{feature_set::FeatureSet, namespace_watcher::NamespaceConfigs};
 
@@ -84,6 +89,12 @@ pub struct AppConfig {
     memory_request: Option<ByteSize>,
     /// Optionally set memory limit for Kubernetes
     memory_limit: Option<ByteSize>,
+    /// Optionally set directory for wasmtime cache
+    wasmtime_cache_dir: Option<PathBuf>,
+    /// Optionally set amount of storage requested from Kubernetes for wasmtime cache
+    wasmtime_cache_size_request: Option<ByteSize>,
+    /// Optionally set storage limit for Kubernetes for wasmtime cache
+    wasmtime_cache_size_limit: Option<ByteSize>,
 }
 
 /// `jiff::SignedDuration` can parse human readable strings like `1h30m` into `SignedDuration`.
@@ -292,11 +303,50 @@ impl AppConfig {
         self
     }
 
+    #[must_use]
+    pub fn wasmtime_cache_dir(&self) -> Option<&Path> {
+        self.wasmtime_cache_dir.as_deref()
+    }
+
+    #[must_use]
+    pub fn with_wasmtime_cache_dir(mut self, wasmtime_cache_dir: Option<PathBuf>) -> Self {
+        self.wasmtime_cache_dir = wasmtime_cache_dir;
+        self
+    }
+
+    #[must_use]
+    pub fn wasmtime_cache_size_request(&self) -> Option<ByteSize> {
+        self.wasmtime_cache_size_request
+    }
+
+    #[must_use]
+    pub fn with_wasmtime_cache_size_request(
+        mut self,
+        wasmtime_cache_size_request: Option<ByteSize>,
+    ) -> Self {
+        self.wasmtime_cache_size_request = wasmtime_cache_size_request;
+        self
+    }
+
+    #[must_use]
+    pub fn wasmtime_cache_size_limit(&self) -> Option<ByteSize> {
+        self.wasmtime_cache_size_limit
+    }
+
+    #[must_use]
+    pub fn with_wasmtime_cache_size_limit(
+        mut self,
+        wasmtime_cache_size_limit: Option<ByteSize>,
+    ) -> Self {
+        self.wasmtime_cache_size_limit = wasmtime_cache_size_limit;
+        self
+    }
+
     /// We predominantly load Python skills, which are quite heavy. Python skills are roughly 60MB in size from the registry.
     /// The first skill is roughly 850MB in memory, and subsequent ones are between 100-150MB.
     /// We aim to use about 1/2 of the available memory.
     #[must_use]
-    pub fn desired_cache_memory_usage(&self) -> ByteSize {
+    pub fn desired_skill_cache_memory_usage(&self) -> ByteSize {
         let memory_limit = self
             // Default to requested memory limit if available. Since this is what we are guaranteed by k8s, we are conservative and use it.
             .memory_request
@@ -334,6 +384,9 @@ impl Default for AppConfig {
             use_pooling_allocator: false,
             memory_request: None,
             memory_limit: None,
+            wasmtime_cache_dir: None,
+            wasmtime_cache_size_limit: None,
+            wasmtime_cache_size_request: None,
         }
     }
 }
