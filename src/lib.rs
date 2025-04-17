@@ -27,6 +27,7 @@ use std::sync::Arc;
 use anyhow::{Context, Error};
 use authorization::Authorization;
 use csi::CsiDrivers;
+use feature_set::FeatureSet;
 use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use search::Search;
@@ -78,8 +79,11 @@ impl Kernel {
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, Error> {
         let loaders = Box::new(
-            NamespaceDescriptionLoaders::new(app_config.namespaces().clone())
-                .context("Unable to read the configuration for namespaces")?,
+            NamespaceDescriptionLoaders::new(
+                app_config.namespaces().clone(),
+                app_config.pharia_ai_feature_set() == FeatureSet::Beta,
+            )
+            .context("Unable to read the configuration for namespaces")?,
         );
         let engine = Arc::new(
             Engine::new(
