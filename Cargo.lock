@@ -4085,7 +4085,7 @@ checksum = "a7e27d446dabd68610ef0b77d07b102ecde827a4596ea9c01a4d3811e945b286"
 dependencies = [
  "chrono",
  "futures-util",
- "opentelemetry 0.29.0",
+ "opentelemetry 0.29.1",
  "opentelemetry_sdk 0.29.0",
 ]
 
