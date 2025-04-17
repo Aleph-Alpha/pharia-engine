@@ -7,7 +7,7 @@ fn main() {
 mod compilation_time {
     use bytesize::ByteSize;
     use divan::{Bencher, counter::BytesCount};
-    use engine_room::Engine;
+    use engine_room::{Engine, EngineConfig};
     use test_skills::{given_python_skill_greet_v0_3, given_rust_skill_greet_v0_3};
 
     const MAX_CACHE_SIZE: &[Option<ByteSize>] = &[
@@ -46,7 +46,15 @@ mod compilation_time {
         max_cache_size: Option<ByteSize>,
     ) {
         bencher
-            .with_inputs(|| (Engine::new(false, max_cache_size).unwrap(), skill()))
+            .with_inputs(|| {
+                (
+                    Engine::new(
+                        EngineConfig::default().with_max_incremental_cache_size(max_cache_size),
+                    )
+                    .unwrap(),
+                    skill(),
+                )
+            })
             .input_counter(|(_, bytes)| BytesCount::new(bytes.len() * N))
             .bench_values(|(engine, bytes)| {
                 for _ in 0..N {
