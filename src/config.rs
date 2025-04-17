@@ -1,7 +1,7 @@
 use anyhow::Ok;
 use bytesize::ByteSize;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
-use engine_room::EngineConfig;
+use engine_room::{EngineConfig, WasmtimeCache};
 use jiff::SignedDuration;
 use serde::{Deserialize, Deserializer};
 use std::{
@@ -368,11 +368,24 @@ impl AppConfig {
         Some(ByteSize::mib(128))
     }
 
+    fn wasmtime_cache(&self) -> Option<WasmtimeCache> {
+        let cache_size = self
+            // Default to requested limit if available. Since this is what we are guaranteed by k8s, we are conservative and use it.
+            .wasmtime_cache_size_request
+            // Fallback to limit if available.
+            .or(self.wasmtime_cache_size_limit);
+
+        cache_size
+            .zip(self.wasmtime_cache_dir())
+            .map(|(size, dir)| WasmtimeCache::new(dir, size))
+    }
+
     #[must_use]
     pub fn engine_config(&self) -> EngineConfig {
         EngineConfig::default()
             .use_pooling_allocator(self.use_pooling_allocator())
             .with_max_incremental_cache_size(self.max_incremental_cache_size())
+            .with_wasmtime_cache(self.wasmtime_cache())
     }
 }
 

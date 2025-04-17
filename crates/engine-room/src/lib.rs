@@ -7,6 +7,7 @@
 
 use std::{
     borrow::Cow,
+    path::PathBuf,
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
@@ -27,6 +28,8 @@ pub struct EngineConfig {
     max_incremental_cache_size: Option<ByteSize>,
     /// Whether or not to use a pooling allocator for invocation memory.
     use_pooling_allocator: bool,
+    /// Optional wasmtime cache settings for storing compilation artifacts on disk
+    wasmtime_cache: Option<WasmtimeCache>,
 }
 
 impl EngineConfig {
@@ -43,6 +46,29 @@ impl EngineConfig {
     pub fn use_pooling_allocator(mut self, use_pooling_allocator: bool) -> Self {
         self.use_pooling_allocator = use_pooling_allocator;
         self
+    }
+
+    #[must_use]
+    pub fn with_wasmtime_cache(mut self, wasmtime_cache: Option<WasmtimeCache>) -> Self {
+        self.wasmtime_cache = wasmtime_cache;
+        self
+    }
+}
+
+/// Settings for wasmtime file-based cache
+pub struct WasmtimeCache {
+    /// Where the cache should live
+    _directory: PathBuf,
+    /// How large the cache is allowed to be
+    _size_limit: ByteSize,
+}
+
+impl WasmtimeCache {
+    pub fn new(directory: impl Into<PathBuf>, size_limit: ByteSize) -> Self {
+        Self {
+            _directory: directory.into(),
+            _size_limit: size_limit,
+        }
     }
 }
 
@@ -66,11 +92,17 @@ impl Engine {
     /// This function will return an error if the engine cannot be created,
     /// or if wasi functionality cannot be linked.
     pub fn new(config: EngineConfig) -> anyhow::Result<Self> {
-        let cache_store = config.max_incremental_cache_size.map(|size| {
+        let EngineConfig {
+            max_incremental_cache_size,
+            use_pooling_allocator,
+            wasmtime_cache: _,
+        } = config;
+
+        let cache_store = max_incremental_cache_size.map(|size| {
             let cache_store: Arc<dyn CacheStore> = Arc::new(IncrementalCompilationCache::new(size));
             cache_store
         });
-        let config = Self::config(config.use_pooling_allocator, cache_store)?;
+        let config = Self::config(use_pooling_allocator, cache_store)?;
         let engine = WasmtimeEngine::new(&config)?;
 
         // We only need a weak reference to pass to the loop.
