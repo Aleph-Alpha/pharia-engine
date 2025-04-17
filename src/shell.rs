@@ -885,7 +885,7 @@ mod tests {
     use init_tracing_opentelemetry::resource::DetectResource;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
     use opentelemetry::trace::TracerProvider;
-    use opentelemetry_sdk::trace::{BatchSpanProcessor, Sampler, SdkTracerProvider};
+    use opentelemetry_sdk::trace::{Sampler, SdkTracerProvider};
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
     use tokio::sync::mpsc;
@@ -2191,10 +2191,8 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     /// Construct a subscriber that logs to stdout and allows to retrieve the traceparent
     fn tracing_subscriber() -> impl tracing::Subscriber {
-        let exporter = opentelemetry_stdout::SpanExporter::default();
-        let processor = BatchSpanProcessor::builder(exporter).build();
         let provider = SdkTracerProvider::builder()
-            .with_span_processor(processor)
+            .with_batch_exporter(opentelemetry_stdout::SpanExporter::default())
             .with_resource(DetectResource::default().build())
             .with_sampler(Sampler::AlwaysOn)
             .build();
