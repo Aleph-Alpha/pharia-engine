@@ -21,10 +21,13 @@ use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
-    compression::CompressionLayer, cors::CorsLayer, decompression::DecompressionLayer,
+    compression::CompressionLayer,
+    cors::CorsLayer,
+    decompression::DecompressionLayer,
     sensitive_headers::SetSensitiveRequestHeadersLayer,
+    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
-use tracing::{error, info};
+use tracing::{Level, error, info};
 use utoipa::{
     Modify, OpenApi, ToSchema,
     openapi::{
@@ -262,6 +265,14 @@ where
                 // Inject the current context into the response, therefore needs to be nested below
                 // the OtelAxumLayer for the span to still be active.
                 .layer(OtelInResponseLayer)
+                // Spans are created by the `OtelAxumLayer`. The `TraceLayer` adds on_request and
+                // on_response events to the span, which allows us to see the duration of a
+                // request in the logs.
+                .layer(
+                    TraceLayer::new_for_http()
+                        .on_request(DefaultOnRequest::new().level(Level::INFO))
+                        .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                )
                 // Compress responses
                 .layer(CompressionLayer::new())
                 .layer(DecompressionLayer::new())
