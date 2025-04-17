@@ -80,6 +80,20 @@ spec:
                   containerName: {{ include "pharia-kernel.fullname" . }}
                   resource: limits.memory
                   divisor: "1"
+            - name: WASMTIME_CACHE_DIR
+              value: /app/.cache
+            - name: WASMTIME_CACHE_SIZE_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: {{ include "pharia-kernel.fullname" . }}
+                  resource: requests.ephemeral-storage
+                  divisor: "1"
+            - name: WASMTIME_CACHE_SIZE_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: {{ include "pharia-kernel.fullname" . }}
+                  resource: limits.ephemeral-storage
+                  divisor: "1"
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | quote }}
             {{- if .Values.openTelemetryEndpoint }}
