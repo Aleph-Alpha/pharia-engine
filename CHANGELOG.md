@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.20](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.11.19...pharia-kernel-v0.11.20)
+
+### Features
+
+- Be more verbose than logging a request error connecting to an OCI registry - ([c9bff4e](https://github.com/Aleph-Alpha/pharia-kernel/commit/c9bff4ecb6c36471d8872d8e40e3dcf978f36203))
+- Specify service name instead of reading from env - ([cda8372](https://github.com/Aleph-Alpha/pharia-kernel/commit/cda8372d191c2094ab155d772059e42246916500))
+
+### Fixes
+
+- Do not add instrument macro on index endpoint - ([ea66fdf](https://github.com/Aleph-Alpha/pharia-kernel/commit/ea66fdf14c1cd5917c5b48e2b7b04576b2ed36df))
+- Do not set sampling to always on - ([4c81530](https://github.com/Aleph-Alpha/pharia-kernel/commit/4c815300a22e76f3af0826785253968770f28b7b))
+- Explicitly set service name for ressource - ([ca9487a](https://github.com/Aleph-Alpha/pharia-kernel/commit/ca9487adbc7e2c6b413f3b838ea171f56c03a0db))
+
+### Documentation
+
+- Fix arrow direction in block diagram - ([0a9c923](https://github.com/Aleph-Alpha/pharia-kernel/commit/0a9c923fffe5e55559c333f84190fa19c3d5056a))
+- Specify that otel scope name is set when creating a tracer - ([d23f958](https://github.com/Aleph-Alpha/pharia-kernel/commit/d23f958867566f10f8feb9b9c279d9884ca66982))
+
+### Builds
+
+- *(deps)* Bump the minor group with 3 updates - ([0e523de](https://github.com/Aleph-Alpha/pharia-kernel/commit/0e523dea1beb177b40710783c3b46e611104347c))
+- *(deps)* Bump libc from 0.2.171 to 0.2.172 in the minor group - ([c77f531](https://github.com/Aleph-Alpha/pharia-kernel/commit/c77f5313be2b3c04d4bae7d5deb405d573a4e96a))
+- *(deps)* Bump the minor group with 5 updates - ([054fd7a](https://github.com/Aleph-Alpha/pharia-kernel/commit/054fd7a3b48c4a907417d587c0a238594dce7491))
+- *(deps)* Axum tracing is a dev-dependency only - ([29be6fd](https://github.com/Aleph-Alpha/pharia-kernel/commit/29be6fd82f87a4885fa5bf89263b4aebd12f750b))
+
+
 ## [0.11.19](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.11.18...pharia-kernel-v0.11.19)
 
 ### Builds
