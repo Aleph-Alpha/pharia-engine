@@ -9,6 +9,7 @@ use axum::{
     response::{ErrorResponse, Html, IntoResponse, Response, Sse, sse::Event},
     routing::{delete, get, post},
 };
+
 use axum_extra::{
     TypedHeader,
     headers::{self, Authorization, authorization::Bearer},
@@ -254,11 +255,13 @@ where
         .route("/health", get(async || "ok"))
         .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
+            // ServiceBuilder nests layers unlike the router, the first layer is the outermost.
             ServiceBuilder::new()
                 // Mark the `Authorization` request header as sensitive so it doesn't show in logs
                 .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION)))
                 .layer(OtelAxumLayer::default())
-                // Inject the current context into the response, therefore needs to be nested inside the OtelAxumLayer
+                // Inject the current context into the response, therefore needs to be nested below
+                // the OtelAxumLayer for the span to still be active.
                 .layer(OtelInResponseLayer)
                 // Compress responses
                 .layer(CompressionLayer::new())
