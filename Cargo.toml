@@ -140,6 +140,10 @@ bytesize = { version = "2.0.1", features = ["serde"] }
 tracing-opentelemetry-instrumentation-sdk = { version = "0.28.0", features = [
     "http",
 ] }
+# We use this middleware to extract tracing information in our shell and start spans for each incoming request.
+# The `tracing_level_info` feature determines the level at which spans are created by the middleware.
+# If this feature is emitted, the default span level is `trace`, which will not be picked up, as the minimum
+# log level for external crates is `info`.
 axum-tracing-opentelemetry = { version = "0.28.0", features = [
     "tracing_level_info",
 ] }
@@ -156,13 +160,6 @@ tokio-test = "0.4.4"
 wat = "1.229.0"
 metrics-util = "0.19.1"
 reqwest = { version = "0.12.15", features = ["stream"] }
-axum-tracing-opentelemetry = "0.28.0"
-tracing-opentelemetry-instrumentation-sdk = { version = "0.28.0", features = [
-    "http",
-] }
-init-tracing-opentelemetry = { version = "0.28.0", features = [
-    "tracing_subscriber_ext",
-] }
 opentelemetry-stdout = "0.29.0"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]

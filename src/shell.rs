@@ -2226,6 +2226,8 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[test]
     fn trace_parent_is_read_from_incoming_request() {
+        // We need to setup a tracing subscriber to actually get spans. If there is no subscriber
+        // spans will not be created as no one is interested in them.
         tracing::subscriber::with_default(tracing_subscriber(), || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .build()
