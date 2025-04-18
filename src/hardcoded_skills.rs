@@ -1,8 +1,9 @@
-//! Contains hardcoded skills that are available in beta systems for testing.
+//! Contains hardcoded skills with defined behavior.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
@@ -10,9 +11,13 @@ use crate::{
     csi::CsiForSkills,
     inference::{ChatEvent, ChatParams, ChatRequest, Message},
     namespace_watcher::Namespace,
-    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillPath},
+    skills::{
+        AnySkillManifest, Engine, JsonSchema, Signature, Skill, SkillError, SkillEvent,
+        SkillMetadataV0_3, SkillPath,
+    },
 };
 
+/// Hardcoded skills are provided in beta systems for testing.
 /// If the path designates a hardcoded skill, return it.
 pub fn hardcoded_skill(path: &SkillPath) -> Option<Arc<dyn Skill>> {
     if path.namespace == Namespace::new("test-beta").unwrap() {
@@ -149,6 +154,116 @@ impl Skill for SkillTellMeAJoke {
                 logprobs: crate::inference::Logprobs::No,
             },
         };
+        let stream_id = ctx.chat_stream_new(request).await;
+        while let Some(event) = ctx.chat_stream_next(&stream_id).await {
+            let event = match event {
+                ChatEvent::MessageBegin { .. } => Some(SkillEvent::MessageBegin),
+                ChatEvent::MessageAppend { content, .. } => {
+                    Some(SkillEvent::MessageAppend { text: content })
+                }
+                ChatEvent::MessageEnd { finish_reason } => Some(SkillEvent::MessageEnd {
+                    payload: json!(format!("{finish_reason:?}")),
+                }),
+                ChatEvent::Usage { .. } => None,
+            };
+            if let Some(event) = event {
+                drop(sender.send(event).await);
+            }
+        }
+        ctx.chat_stream_drop(stream_id).await;
+        Ok(())
+    }
+}
+
+#[derive(Deserialize)]
+struct SkillChatInput {
+    messages: Vec<Message>,
+}
+
+pub struct SkillChat {
+    model: String,
+    system_prompt: String,
+}
+
+impl SkillChat {
+    pub fn new(model: impl Into<String>, system_prompt: impl Into<String>) -> Self {
+        Self {
+            model: model.into(),
+            system_prompt: system_prompt.into(),
+        }
+    }
+}
+
+#[async_trait]
+impl Skill for SkillChat {
+    async fn manifest(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+    ) -> Result<AnySkillManifest, SkillError> {
+        Ok(AnySkillManifest::V0_3(SkillMetadataV0_3 {
+            description: Some("A chat skill".to_owned()),
+            signature: Signature::MessageStream {
+                input_schema: JsonSchema::try_from(json!(
+                    {
+                        "properties": {
+                            "messages": {
+                                "title": "Messages",
+                                "type": "array"
+                            }
+                        },
+                        "required": ["messages"],
+                        "title": "SkillInput",
+                        "type": "object"
+                    }
+                ))
+                .unwrap(),
+            },
+        }))
+    }
+
+    async fn run_as_function(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn CsiForSkills + Send>,
+        _input: Value,
+    ) -> Result<Value, SkillError> {
+        Err(SkillError::IsMessageStream)
+    }
+
+    async fn run_as_message_stream(
+        &self,
+        _engine: &Engine,
+        mut ctx: Box<dyn CsiForSkills + Send>,
+        input: Value,
+        sender: mpsc::Sender<SkillEvent>,
+    ) -> Result<(), SkillError> {
+        let result = serde_json::from_value::<SkillChatInput>(input);
+
+        if let Err(e) = result {
+            return Err(SkillError::InvalidInput(e.to_string()));
+        }
+
+        let messages = result.unwrap().messages;
+        let mut all_messages = vec![Message {
+            role: "system".to_owned(),
+            content: self.system_prompt.clone(),
+        }];
+        all_messages.extend(messages);
+
+        let request = ChatRequest {
+            model: self.model.clone(),
+            messages: all_messages,
+            params: ChatParams {
+                max_tokens: None,
+                temperature: None,
+                top_p: None,
+                frequency_penalty: None,
+                presence_penalty: None,
+                logprobs: crate::inference::Logprobs::No,
+            },
+        };
+
         let stream_id = ctx.chat_stream_new(request).await;
         while let Some(event) = ctx.chat_stream_next(&stream_id).await {
             let event = match event {

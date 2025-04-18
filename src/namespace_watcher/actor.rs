@@ -135,9 +135,11 @@ impl Diff {
         let removed = removed
             .into_iter()
             .filter_map(|r| match r {
-                SkillDescription::Programmable { name, .. } => {
+                SkillDescription::Chat { name, .. }
+                | SkillDescription::Programmable { name, .. } => {
                     if added.iter().all(|a| match a {
-                        SkillDescription::Programmable { name: a_name, .. } => {
+                        SkillDescription::Chat { name: a_name, .. }
+                        | SkillDescription::Programmable { name: a_name, .. } => {
                             a_name != name.as_str()
                         }
                     }) {
@@ -259,13 +261,8 @@ where
         let incoming = self.skills.get(namespace).unwrap();
         let diff = Self::compute_diff(&existing, incoming);
         for skill in diff.added_or_changed {
-            match skill {
-                SkillDescription::Programmable { name, tag } => {
-                    let tag = tag.as_deref().unwrap_or("latest");
-                    let skill = ConfiguredSkill::new(namespace.clone(), name, tag);
-                    self.skill_store_api.upsert(skill).await;
-                }
-            }
+            let skill = ConfiguredSkill::new(namespace.clone(), skill);
+            self.skill_store_api.upsert(skill).await;
         }
 
         for skill_name in diff.removed {
@@ -366,28 +363,27 @@ pub mod tests {
         }
     }
 
-    impl SkillDescription {
-        fn with_name(name: &str) -> Self {
-            Self::new(name, None)
-        }
-
-        fn new(name: &str, tag: Option<&str>) -> Self {
-            Self::Programmable {
-                name: name.to_owned(),
-                tag: tag.map(ToOwned::to_owned),
-            }
-        }
-    }
-
     #[test]
     fn diff_is_computed() {
         let incoming = vec![
-            SkillDescription::with_name("new_skill"),
-            SkillDescription::with_name("existing_skill"),
+            SkillDescription::Programmable {
+                name: "new_skill".to_owned(),
+                tag: "latest".to_owned(),
+            },
+            SkillDescription::Programmable {
+                name: "existing_skill".to_owned(),
+                tag: "latest".to_owned(),
+            },
         ];
         let existing = vec![
-            SkillDescription::with_name("existing_skill"),
-            SkillDescription::with_name("old_skill"),
+            SkillDescription::Programmable {
+                name: "existing_skill".to_owned(),
+                tag: "latest".to_owned(),
+            },
+            SkillDescription::Programmable {
+                name: "old_skill".to_owned(),
+                tag: "latest".to_owned(),
+            },
         ];
 
         let diff = NamespaceWatcherActor::<SkillStoreDummy>::compute_diff(&existing, &incoming);
@@ -395,7 +391,10 @@ pub mod tests {
         // when the observer checks for new skills
         assert_eq!(
             diff.added_or_changed,
-            vec![SkillDescription::with_name("new_skill")]
+            vec![SkillDescription::Programmable {
+                name: "new_skill".to_owned(),
+                tag: "latest".to_owned()
+            }]
         );
         assert_eq!(diff.removed, vec!["old_skill"]);
     }
@@ -403,8 +402,14 @@ pub mod tests {
     #[test]
     fn diff_is_computed_over_versions() {
         // Given a skill has a new version
-        let existing = SkillDescription::new("existing_skill", Some("v1"));
-        let incoming = SkillDescription::new("existing_skill", Some("v2"));
+        let existing = SkillDescription::Programmable {
+            name: "existing_skill".to_owned(),
+            tag: "v1".to_owned(),
+        };
+        let incoming = SkillDescription::Programmable {
+            name: "existing_skill".to_owned(),
+            tag: "v2".to_owned(),
+        };
 
         // When the observer checks for new skills
         let diff = NamespaceWatcherActor::<SkillStoreDummy>::compute_diff(
@@ -471,11 +476,11 @@ pub mod tests {
 
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);
+
         let skills = loaders.skills(&namespaces[0]).await.unwrap();
         assert_eq!(skills.len(), 2);
-        assert!(skills.iter().all(|s| match s {
-            SkillDescription::Programmable { name, .. } => name == "skill_1" || name == "skill_2",
-        }));
+        assert!(matches!(&skills[0], SkillDescription::Programmable { .. }));
+        assert!(matches!(&skills[1], SkillDescription::Programmable { .. }));
     }
 
     #[tokio::test]
@@ -486,7 +491,10 @@ pub mod tests {
         let update_interval_ms = 1;
         let namespaces = HashMap::from([(
             dummy_namespace.clone(),
-            vec![SkillDescription::with_name(dummy_skill)],
+            vec![SkillDescription::Programmable {
+                name: dummy_skill.to_owned(),
+                tag: "latest".to_owned(),
+            }],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
@@ -504,7 +512,10 @@ pub mod tests {
             SkillStoreMsg::Upsert {
                 skill,
             }
-            if skill == ConfiguredSkill::new(dummy_namespace, dummy_skill, "latest")
+            if skill == ConfiguredSkill::new(
+                dummy_namespace,
+                SkillDescription::Programmable { name: dummy_skill.to_owned(), tag: "latest".to_owned() }
+            )
         ));
 
         observer.wait_for_shutdown().await;
@@ -566,7 +577,10 @@ pub mod tests {
         let dummy_skill = "dummy_skill";
         let namespaces = HashMap::from([(
             dummy_namespace.clone(),
-            vec![SkillDescription::with_name(dummy_skill)],
+            vec![SkillDescription::Programmable {
+                name: dummy_skill.to_owned(),
+                tag: "latest".to_owned(),
+            }],
         )]);
 
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(2);
@@ -610,7 +624,10 @@ pub mod tests {
         let update_interval_ms = 1;
         let namespaces = HashMap::from([(
             dummy_namespace,
-            vec![SkillDescription::with_name(dummy_skill)],
+            vec![SkillDescription::Programmable {
+                name: dummy_skill.to_owned(),
+                tag: "latest".to_owned(),
+            }],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
 
@@ -654,7 +671,10 @@ pub mod tests {
         let dummy_skill = "dummy_skill";
         let namespaces = HashMap::from([(
             dummy_namespace.clone(),
-            vec![SkillDescription::with_name(dummy_skill)],
+            vec![SkillDescription::Programmable {
+                name: dummy_skill.to_owned(),
+                tag: "latest".to_owned(),
+            }],
         )]);
         let stub_config = Box::new(StubConfig::new(namespaces));
         *config_arc_clone.lock().await = stub_config;
@@ -689,7 +709,10 @@ pub mod tests {
             SkillStoreMsg::Upsert {
                 skill,
             }
-            if skill == ConfiguredSkill::new(dummy_namespace, dummy_skill, "latest")
+            if skill == ConfiguredSkill::new(
+                dummy_namespace,
+                SkillDescription::Programmable { name: dummy_skill.to_owned(), tag: "latest".to_owned() }
+            )
         ));
     }
 }

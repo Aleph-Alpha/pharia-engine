@@ -24,8 +24,22 @@ type NamespaceDescriptionResult = Result<NamespaceDescription, NamespaceDescript
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SkillDescription {
+    Chat {
+        name: String,
+        version: String,
+        model: String,
+        system_prompt: String,
+    },
     #[serde(untagged)]
-    Programmable { name: String, tag: Option<String> },
+    Programmable {
+        name: String,
+        #[serde(default = "default_tag")]
+        tag: String,
+    },
+}
+
+fn default_tag() -> String {
+    "latest".to_owned()
 }
 
 impl SkillDescription {
@@ -37,7 +51,10 @@ impl SkillDescription {
             .to_str()
             .ok_or_else(|| anyhow!("Invalid UTF-8 name for skill."))?
             .to_owned();
-        Ok(Self::Programmable { name, tag: None })
+        Ok(Self::Programmable {
+            name,
+            tag: default_tag(),
+        })
     }
 }
 
@@ -56,32 +73,33 @@ pub struct NamespaceDescription {
 
 impl NamespaceDescription {
     pub fn from_str(config: &str, beta: bool) -> anyhow::Result<Self> {
-        let tc = if beta {
-            toml::from_str(config)?
-        } else {
-            #[derive(Deserialize)]
-            struct SkillDescriptionStable {
-                name: String,
-                tag: Option<String>,
-            }
+        let tc =
+            if beta {
+                toml::from_str(config)?
+            } else {
+                #[derive(Deserialize)]
+                struct SkillDescriptionStable {
+                    name: String,
+                    #[serde(default = "default_tag")]
+                    tag: String,
+                }
 
-            #[derive(Deserialize)]
-            struct NamespaceDescriptionStable {
-                skills: Vec<SkillDescriptionStable>,
-            }
+                #[derive(Deserialize)]
+                struct NamespaceDescriptionStable {
+                    skills: Vec<SkillDescriptionStable>,
+                }
 
-            let tc = toml::from_str::<NamespaceDescriptionStable>(config)?;
-            NamespaceDescription {
-                skills: tc
-                    .skills
-                    .into_iter()
-                    .map(|s| SkillDescription::Programmable {
-                        name: s.name,
-                        tag: s.tag,
-                    })
-                    .collect(),
-            }
-        };
+                let tc = toml::from_str::<NamespaceDescriptionStable>(config)?;
+                NamespaceDescription {
+                    skills: tc
+                        .skills
+                        .into_iter()
+                        .map(|SkillDescriptionStable { name, tag }| {
+                            SkillDescription::Programmable { name, tag }
+                        })
+                        .collect(),
+                }
+            };
         Ok(tc)
     }
 }
@@ -221,7 +239,7 @@ pub mod tests {
             r#"
             skills = [
                 {name = "Goofy", tag = "v1.0.0-rc"},
-                {name = "Pluto"},
+                {type = "chat",name = "Pluto", version = "1", model = "pharia-1-llm-7b-control", system_prompt = "You are a helpful assistant."},
                 {name = "Gamma"}
             ]
             "#,
@@ -229,13 +247,13 @@ pub mod tests {
         .unwrap();
         assert_eq!(tc.skills.len(), 3);
         assert!(
-            matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag.as_ref().unwrap() == "v1.0.0-rc")
+            matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag == "v1.0.0-rc")
         );
         assert!(
-            matches!(&tc.skills[1], SkillDescription::Programmable { name, tag } if name == "Pluto" && tag.is_none())
+            matches!(&tc.skills[1], SkillDescription::Chat { name, version, model, system_prompt } if name == "Pluto" && version == "1" && model == "pharia-1-llm-7b-control" && system_prompt == "You are a helpful assistant.")
         );
         assert!(
-            matches!(&tc.skills[2], SkillDescription::Programmable { name, tag } if name == "Gamma" && tag.is_none())
+            matches!(&tc.skills[2], SkillDescription::Programmable { name, tag } if name == "Gamma" && tag == "latest")
         );
     }
 
@@ -247,7 +265,11 @@ pub mod tests {
             name = "Goofy"
             tag = "v1.0.0-rc"
             [[skills]]
+            type = "chat"
             name = "Pluto"
+            version = "1"
+            model = "pharia-1-llm-7b-control"
+            system_prompt = "You are a helpful assistant."
             [[skills]]
             name = "Gamma"
             "#,
@@ -255,13 +277,13 @@ pub mod tests {
         .unwrap();
         assert_eq!(tc.skills.len(), 3);
         assert!(
-            matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag.as_ref().unwrap() == "v1.0.0-rc")
+            matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag == "v1.0.0-rc")
         );
         assert!(
-            matches!(&tc.skills[1], SkillDescription::Programmable { name, tag } if name == "Pluto" && tag.is_none())
+            matches!(&tc.skills[1], SkillDescription::Chat { name, version, model, system_prompt } if name == "Pluto" && version == "1" && model == "pharia-1-llm-7b-control" && system_prompt == "You are a helpful assistant.")
         );
         assert!(
-            matches!(&tc.skills[2], SkillDescription::Programmable { name, tag } if name == "Gamma" && tag.is_none())
+            matches!(&tc.skills[2], SkillDescription::Programmable { name, tag } if name == "Gamma" && tag == "latest")
         );
     }
 }

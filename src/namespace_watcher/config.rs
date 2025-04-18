@@ -74,7 +74,7 @@ impl NamespaceConfigs {
                         .iter()
                         .map(|&name| SkillDescription::Programmable {
                             name: name.to_owned(),
-                            tag: None,
+                            tag: "latest".to_owned(),
                         })
                         .collect(),
                     registry: Registry::File {

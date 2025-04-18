@@ -1,10 +1,12 @@
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::{
-    hardcoded_skills::hardcoded_skill,
-    namespace_watcher::Namespace,
+    hardcoded_skills::{SkillChat, hardcoded_skill},
+    namespace_watcher::{Namespace, SkillDescription},
     skill_cache::SkillCache,
-    skill_loader::{ConfiguredSkill, LoadedSkill, SkillFetchError, SkillLoaderApi},
+    skill_loader::{
+        ConfiguredSkill, LoadedSkill, ProgrammableSkill, SkillFetchError, SkillLoaderApi,
+    },
     skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
@@ -93,27 +95,36 @@ where
         self.cached_skills.insert(skill_path, compiled_skill);
     }
 
-    /// Return the registered tag for a given skill
-    fn tag(&self, skill_path: &SkillPath) -> Result<Option<&str>, SkillStoreError> {
+    /// Return the configuration for a given skill
+    fn skill_description(
+        &self,
+        skill_path: &SkillPath,
+    ) -> Result<Option<&SkillDescription>, SkillStoreError> {
         if let Some(error) = self.invalid_namespaces.get(&skill_path.namespace) {
             return Err(SkillStoreError::InvalidNamespaceError(
                 skill_path.namespace.clone(),
                 error.to_string(),
             ));
         }
-        Ok(self.known_skills.get(skill_path).map(|s| s.tag.as_str()))
+        Ok(self.known_skills.get(skill_path).map(|s| &s.description))
     }
 
     /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
     /// If the digest behind the tag has changed, remove the cache entry. Otherwise, update the validation time.
     async fn validate_digest(&mut self, skill_path: SkillPath) -> anyhow::Result<()> {
-        let tag = self
-            .tag(&skill_path)
+        let SkillDescription::Programmable { tag, .. } = self
+            .skill_description(&skill_path)
             .expect("Bad namespace configuration for skill")
-            .expect("Missing tag for skill");
+            .expect("Cached skill must be known")
+        else {
+            return Err(anyhow!("Skill {skill_path} is not a programmable skill"));
+        };
 
-        let skill = ConfiguredSkill::new(skill_path.namespace.clone(), &skill_path.name, tag);
-
+        let skill = ProgrammableSkill::new(
+            skill_path.namespace.clone(),
+            skill_path.name.clone(),
+            tag.to_owned(),
+        );
         let result = self
             .skill_loader
             .fetch_digest(skill)
@@ -451,24 +462,34 @@ where
                     drop(send.send(Ok(Some(skill))));
                     return;
                 }
-                match self.provider.tag(&skill_path) {
-                    Ok(Some(tag)) => {
-                        let skill_loader = self.provider.skill_loader.clone();
-                        let skill = ConfiguredSkill::new(
-                            skill_path.namespace.clone(),
-                            &skill_path.name,
-                            tag,
-                        );
-                        let cloned_skill_path = skill_path.clone();
-                        self.skill_requests.push(
-                            skill_path,
-                            Box::pin(async move {
-                                let result = skill_loader.fetch(skill).await;
-                                (cloned_skill_path, result)
-                            }),
-                            send,
-                        );
-                    }
+                match self.provider.skill_description(&skill_path) {
+                    Ok(Some(description)) => match description {
+                        SkillDescription::Chat {
+                            model,
+                            system_prompt,
+                            ..
+                        } => {
+                            let skill = SkillChat::new(model, system_prompt);
+                            drop(send.send(Ok(Some(Arc::new(skill)))));
+                        }
+                        SkillDescription::Programmable { tag, .. } => {
+                            let skill_loader = self.provider.skill_loader.clone();
+                            let skill = ProgrammableSkill::new(
+                                skill_path.namespace.clone(),
+                                skill_path.name.clone(),
+                                tag.to_owned(),
+                            );
+                            let cloned_skill_path = skill_path.clone();
+                            self.skill_requests.push(
+                                skill_path,
+                                Box::pin(async move {
+                                    let result = skill_loader.fetch(skill).await;
+                                    (cloned_skill_path, result)
+                                }),
+                                send,
+                            );
+                        }
+                    },
                     Ok(None) => {
                         drop(send.send(Ok(None)));
                     }
@@ -646,9 +667,10 @@ pub mod tests {
         let mut requests = SkillRequests::new();
         let first_skill = SkillPath::local("first_skill");
         let second_skill = SkillPath::local("second_skill");
-        let first_error = SkillFetchError::SkillNotFound(ConfiguredSkill::from_path(&first_skill));
+        let first_error =
+            SkillFetchError::SkillNotFound(ProgrammableSkill::from_path(&first_skill));
         let second_error =
-            SkillFetchError::SkillNotFound(ConfiguredSkill::from_path(&second_skill));
+            SkillFetchError::SkillNotFound(ProgrammableSkill::from_path(&second_skill));
 
         // When pushing two requests for the same skill to the cache (but their futures return different errors)
         let first_skill_clone = first_skill.clone();
@@ -710,9 +732,9 @@ pub mod tests {
             Box::pin(async move {
                 (
                     first_skill_clone.clone(),
-                    Err(SkillFetchError::SkillNotFound(ConfiguredSkill::from_path(
-                        &first_skill_clone,
-                    ))),
+                    Err(SkillFetchError::SkillNotFound(
+                        ProgrammableSkill::from_path(&first_skill_clone),
+                    )),
                 )
             }),
             first_send,
@@ -725,9 +747,9 @@ pub mod tests {
             Box::pin(async move {
                 (
                     second_skill_clone.clone(),
-                    Err(SkillFetchError::SkillNotFound(ConfiguredSkill::from_path(
-                        &second_skill_clone,
-                    ))),
+                    Err(SkillFetchError::SkillNotFound(
+                        ProgrammableSkill::from_path(&second_skill_clone),
+                    )),
                 )
             }),
             second_send,
@@ -773,12 +795,14 @@ pub mod tests {
         skill_store.upsert(skill.clone()).await;
 
         // And given two pending fetch requests
-        let cloned_skill_path = skill_path.clone();
         let cloned_skill_store = skill_store.clone();
+        let cloned_skill_path = skill_path.clone();
         let first_request =
             tokio::spawn(async move { cloned_skill_store.fetch(cloned_skill_path).await });
 
-        let second_request = tokio::spawn(async move { skill_store.fetch(skill_path).await });
+        let cloned_skill_path2 = skill_path.clone();
+        let second_request =
+            tokio::spawn(async move { skill_store.fetch(cloned_skill_path2).await });
 
         // And waiting for 10 ms for both requests to be issued
         sleep(Duration::from_millis(10)).await;
@@ -786,7 +810,9 @@ pub mod tests {
         // When answering the first request with an error message
         match recv.recv().await.unwrap() {
             SkillLoaderMsg::Fetch { send, .. } => {
-                drop(send.send(Err(SkillFetchError::SkillNotFound(skill))));
+                drop(send.send(Err(SkillFetchError::SkillNotFound(
+                    ProgrammableSkill::from_path(&skill_path),
+                ))));
             }
             SkillLoaderMsg::FetchDigest { .. } => unreachable!(),
         }
@@ -814,16 +840,40 @@ pub mod tests {
 
         let skill_store = SkillStore::from_loader(skill_loader).api();
         skill_store
-            .upsert(ConfiguredSkill::new(a.clone(), "a", "latest"))
+            .upsert(ConfiguredSkill::new(
+                a.clone(),
+                SkillDescription::Programmable {
+                    name: "a".to_owned(),
+                    tag: "latest".to_owned(),
+                },
+            ))
             .await;
         skill_store
-            .upsert(ConfiguredSkill::new(a, "b", "latest"))
+            .upsert(ConfiguredSkill::new(
+                a,
+                SkillDescription::Programmable {
+                    name: "b".to_owned(),
+                    tag: "latest".to_owned(),
+                },
+            ))
             .await;
         skill_store
-            .upsert(ConfiguredSkill::new(b.clone(), "a", "latest"))
+            .upsert(ConfiguredSkill::new(
+                b.clone(),
+                SkillDescription::Programmable {
+                    name: "a".to_owned(),
+                    tag: "latest".to_owned(),
+                },
+            ))
             .await;
         skill_store
-            .upsert(ConfiguredSkill::new(b, "b", "latest"))
+            .upsert(ConfiguredSkill::new(
+                b,
+                SkillDescription::Programmable {
+                    name: "b".to_owned(),
+                    tag: "latest".to_owned(),
+                },
+            ))
             .await;
 
         // When skills are listed
@@ -866,7 +916,8 @@ pub mod tests {
         let engine = Arc::new(Engine::default());
         let provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
 
-        let result = provider.tag(&SkillPath::new(skill_path.namespace, "non_existing_skill"));
+        let result =
+            provider.skill_description(&SkillPath::new(skill_path.namespace, "non_existing_skill"));
         assert!(matches!(result, Ok(None)));
     }
 
@@ -880,7 +931,7 @@ pub mod tests {
 
         // When requesting a different, non-existing skill in the same namespace
         let non_existing = SkillPath::new(namespace, "non_existing_skill");
-        let result = provider.tag(&non_existing);
+        let result = provider.skill_description(&non_existing);
 
         // Then the skill is not found
         assert!(matches!(result, Ok(None)));
@@ -913,7 +964,7 @@ pub mod tests {
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
 
         // when fetching the tag
-        let result = provider.tag(&skill_path);
+        let result = provider.skill_description(&skill_path);
 
         // then it returns an error
         assert!(result.is_err());
@@ -1104,9 +1155,10 @@ pub mod tests {
         let mut skill_store_state = SkillStoreState::new(skill_loader, ByteSize(u64::MAX));
         let configured_skill = ConfiguredSkill::from_path(&skill_path);
         skill_store_state.upsert_skill(configured_skill.clone());
+        let programmable_skill = ProgrammableSkill::from_path(&skill_path);
         let compiled_skill = skill_store_state
             .skill_loader
-            .fetch(configured_skill)
+            .fetch(programmable_skill)
             .await?;
         skill_store_state.insert(skill_path.clone(), compiled_skill);
 
@@ -1125,7 +1177,7 @@ pub mod tests {
     type SkillFactory = Box<dyn FnMut() -> LoadedSkill + Send>;
     #[derive(Clone)]
     struct SkillLoaderStub {
-        skills: Arc<Mutex<HashMap<ConfiguredSkill, SkillFactory>>>,
+        skills: Arc<Mutex<HashMap<ProgrammableSkill, SkillFactory>>>,
     }
 
     impl SkillLoaderStub {
@@ -1140,7 +1192,7 @@ pub mod tests {
             path: &SkillPath,
             skill_factory: impl FnMut() -> LoadedSkill + Send + 'static,
         ) {
-            let skill = ConfiguredSkill::from_path(path);
+            let skill = ProgrammableSkill::from_path(path);
             self.skills
                 .lock()
                 .unwrap()
@@ -1149,7 +1201,7 @@ pub mod tests {
     }
 
     impl SkillLoaderApi for SkillLoaderStub {
-        async fn fetch(&self, skill: ConfiguredSkill) -> Result<LoadedSkill, SkillFetchError> {
+        async fn fetch(&self, skill: ProgrammableSkill) -> Result<LoadedSkill, SkillFetchError> {
             self.skills
                 .lock()
                 .unwrap()
@@ -1160,7 +1212,7 @@ pub mod tests {
 
         async fn fetch_digest(
             &self,
-            skill: ConfiguredSkill,
+            skill: ProgrammableSkill,
         ) -> Result<Option<Digest>, RegistryError> {
             let maybe_digest = self
                 .skills
