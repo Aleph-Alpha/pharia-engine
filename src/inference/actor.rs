@@ -1,6 +1,7 @@
 use aleph_alpha_client::Client;
 use derive_more::{Constructor, Deref, Display, IntoIterator};
 use futures::{StreamExt, stream::FuturesUnordered};
+use serde::Deserialize;
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
@@ -253,7 +254,7 @@ pub struct ChatParams {
     pub logprobs: Logprobs,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Message {
     pub role: String,
     pub content: String,

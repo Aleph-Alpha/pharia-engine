@@ -5,7 +5,7 @@ use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinHandle, spawn_blocking};
 
-use crate::namespace_watcher::{Namespace, Registry};
+use crate::namespace_watcher::{Namespace, Registry, SkillDescription};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
@@ -19,27 +19,59 @@ use std::{future::Future, pin::Pin};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConfiguredSkill {
     pub namespace: Namespace,
+    pub description: SkillDescription,
+}
+
+impl std::fmt::Display for ConfiguredSkill {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.description {
+            SkillDescription::Programmable { name, tag } => {
+                write!(f, "{}/{}:{}", self.namespace, name, tag)
+            }
+            SkillDescription::Chat { name, version, .. } => {
+                write!(f, "{}/{}:{}", self.namespace, name, version)
+            }
+        }
+    }
+}
+
+impl ConfiguredSkill {
+    pub fn new(namespace: Namespace, description: SkillDescription) -> Self {
+        Self {
+            namespace,
+            description,
+        }
+    }
+
+    pub fn path(&self) -> SkillPath {
+        match &self.description {
+            SkillDescription::Programmable { name, .. } | SkillDescription::Chat { name, .. } => {
+                SkillPath::new(self.namespace.clone(), name)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ProgrammableSkill {
+    pub namespace: Namespace,
     pub name: String,
     pub tag: String,
 }
 
-impl std::fmt::Display for ConfiguredSkill {
+impl std::fmt::Display for ProgrammableSkill {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}/{}:{}", self.namespace, self.name, self.tag)
     }
 }
 
-impl ConfiguredSkill {
-    pub fn new(namespace: Namespace, name: impl Into<String>, tag: impl Into<String>) -> Self {
+impl ProgrammableSkill {
+    pub fn new(namespace: Namespace, name: String, tag: String) -> Self {
         Self {
             namespace,
-            name: name.into(),
-            tag: tag.into(),
+            name,
+            tag,
         }
-    }
-
-    pub fn path(&self) -> SkillPath {
-        SkillPath::new(self.namespace.clone(), &self.name)
     }
 }
 
@@ -50,7 +82,7 @@ pub enum SkillFetchError {
     #[error(transparent)]
     SkillLoadingError(#[from] SkillLoadError),
     #[error("Skill {0} not found in registry.")]
-    SkillNotFound(ConfiguredSkill),
+    SkillNotFound(ProgrammableSkill),
 }
 
 /// A skill that has been fetched, loaded, and is ready to use.
@@ -78,11 +110,11 @@ impl LoadedSkill {
 
 pub enum SkillLoaderMsg {
     Fetch {
-        skill: ConfiguredSkill,
+        skill: ProgrammableSkill,
         send: oneshot::Sender<Result<LoadedSkill, SkillFetchError>>,
     },
     FetchDigest {
-        skill: ConfiguredSkill,
+        skill: ProgrammableSkill,
         send: oneshot::Sender<Result<Option<Digest>, RegistryError>>,
     },
 }
@@ -166,17 +198,17 @@ impl SkillLoader {
 pub trait SkillLoaderApi {
     fn fetch(
         &self,
-        skill: ConfiguredSkill,
+        skill: ProgrammableSkill,
     ) -> impl Future<Output = Result<LoadedSkill, SkillFetchError>> + Send;
 
     fn fetch_digest(
         &self,
-        skill: ConfiguredSkill,
+        skill: ProgrammableSkill,
     ) -> impl Future<Output = Result<Option<Digest>, RegistryError>> + Send;
 }
 
 impl SkillLoaderApi for mpsc::Sender<SkillLoaderMsg> {
-    async fn fetch(&self, skill: ConfiguredSkill) -> Result<LoadedSkill, SkillFetchError> {
+    async fn fetch(&self, skill: ProgrammableSkill) -> Result<LoadedSkill, SkillFetchError> {
         let (send, recv) = oneshot::channel();
         self.send(SkillLoaderMsg::Fetch { skill, send })
             .await
@@ -184,7 +216,10 @@ impl SkillLoaderApi for mpsc::Sender<SkillLoaderMsg> {
         recv.await.unwrap()
     }
 
-    async fn fetch_digest(&self, skill: ConfiguredSkill) -> Result<Option<Digest>, RegistryError> {
+    async fn fetch_digest(
+        &self,
+        skill: ProgrammableSkill,
+    ) -> Result<Option<Digest>, RegistryError> {
         let (send, recv) = oneshot::channel();
         self.send(SkillLoaderMsg::FetchDigest { skill, send })
             .await
@@ -244,7 +279,7 @@ impl SkillLoaderActor {
     async fn fetch(
         registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
-        skill: &ConfiguredSkill,
+        skill: &ProgrammableSkill,
     ) -> Result<LoadedSkill, SkillFetchError> {
         let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
         let SkillImage { bytes, digest } =
@@ -298,7 +333,23 @@ pub mod tests {
 
     impl ConfiguredSkill {
         pub fn from_path(skill_path: &SkillPath) -> Self {
-            Self::new(skill_path.namespace.clone(), &skill_path.name, "latest")
+            Self::new(
+                skill_path.namespace.clone(),
+                SkillDescription::Programmable {
+                    name: skill_path.name.clone(),
+                    tag: "latest".to_owned(),
+                },
+            )
+        }
+    }
+
+    impl ProgrammableSkill {
+        pub fn from_path(skill_path: &SkillPath) -> Self {
+            Self::new(
+                skill_path.namespace.clone(),
+                skill_path.name.clone(),
+                "latest".to_owned(),
+            )
         }
     }
 
@@ -353,7 +404,7 @@ pub mod tests {
 
         // When we fetch the never resolving skill
         let api = skill_loader.api();
-        let skill = ConfiguredSkill::from_path(&never_resolving_skill_path);
+        let skill = ProgrammableSkill::from_path(&never_resolving_skill_path);
         let handle = tokio::spawn(async move {
             drop(api.fetch(skill).await);
         });
@@ -362,7 +413,7 @@ pub mod tests {
         sleep(Duration::from_millis(10)).await;
 
         // Then the other skill can still be fetched
-        let skill = ConfiguredSkill::from_path(&ready_skill_path);
+        let skill = ProgrammableSkill::from_path(&ready_skill_path);
         let result = timeout(Duration::from_millis(5), skill_loader.api().fetch(skill)).await;
         assert!(result.is_ok());
         drop(handle);
