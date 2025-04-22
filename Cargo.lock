@@ -1376,6 +1376,7 @@ dependencies = [
  "bytesize",
  "divan",
  "moka",
+ "tempfile",
  "test-skills",
  "tracing",
  "wasmtime",
@@ -4285,7 +4286,6 @@ dependencies = [
  "utoipa",
  "utoipa-scalar",
  "wasmtime",
- "wasmtime-wasi",
  "wat",
  "wit-parser 0.229.0",
 ]

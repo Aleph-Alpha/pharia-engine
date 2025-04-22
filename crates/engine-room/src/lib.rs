@@ -7,6 +7,7 @@
 
 use std::{
     borrow::Cow,
+    io::Write,
     path::PathBuf,
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
@@ -14,6 +15,7 @@ use std::{
 
 use bytesize::ByteSize;
 use moka::sync::Cache;
+use tempfile::TempPath;
 use tracing::info;
 use wasmtime::{
     CacheStore, Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType,
@@ -55,20 +57,77 @@ impl EngineConfig {
     }
 }
 
+impl TryFrom<EngineConfig> for Config {
+    type Error = anyhow::Error;
+
+    fn try_from(value: EngineConfig) -> Result<Self, Self::Error> {
+        let EngineConfig {
+            max_incremental_cache_size,
+            use_pooling_allocator,
+            wasmtime_cache,
+        } = value;
+
+        let mut config = Self::new();
+        config
+            .async_support(true)
+            .cranelift_opt_level(OptLevel::SpeedAndSize)
+            // Allows for cooperative timeslicing in async mode
+            .epoch_interruption(true)
+            .wasm_component_model(true);
+
+        if use_pooling_allocator && pooling_allocator_is_supported() {
+            // For more information on Pooling Allocation, as well as all of possible configuration,
+            // read the wasmtime docs: https://docs.rs/wasmtime/latest/wasmtime/struct.PoolingAllocationConfig.html
+            config.allocation_strategy(InstanceAllocationStrategy::pooling());
+        }
+
+        if let Some(size) = max_incremental_cache_size {
+            config
+                .enable_incremental_compilation(Arc::new(IncrementalCompilationCache::new(size)))?;
+        }
+
+        if let Some(wasmtime_cache) = wasmtime_cache {
+            let path = wasmtime_cache.config()?;
+            config.cache_config_load(path)?;
+        }
+
+        Ok(config)
+    }
+}
+
 /// Settings for wasmtime file-based cache
 pub struct WasmtimeCache {
     /// Where the cache should live
-    _directory: PathBuf,
+    directory: PathBuf,
     /// How large the cache is allowed to be
-    _size_limit: ByteSize,
+    size_limit: ByteSize,
 }
 
 impl WasmtimeCache {
     pub fn new(directory: impl Into<PathBuf>, size_limit: ByteSize) -> Self {
         Self {
-            _directory: directory.into(),
-            _size_limit: size_limit,
+            directory: directory.into(),
+            size_limit,
         }
+    }
+
+    /// For now, wasmtime only supports cache config from a file.
+    /// It will be able to be configured programatically once [this issue is resolved](https://github.com/bytecodealliance/wasmtime/issues/10638):
+    ///
+    /// Until then, we write it to a local file and return the path it was at.
+    fn config(&self) -> anyhow::Result<TempPath> {
+        let config = format!(
+            r#"[cache]
+enabled = true
+directory = "{}"
+files-total-size-soft-limit = "{}"
+"#,
+            self.directory.display(),
+            self.size_limit.as_u64()
+        );
+        let mut file = tempfile::NamedTempFile::new()?;
+        file.write_all(config.as_bytes())?;
+        Ok(file.into_temp_path())
     }
 }
 
@@ -92,18 +151,7 @@ impl Engine {
     /// This function will return an error if the engine cannot be created,
     /// or if wasi functionality cannot be linked.
     pub fn new(config: EngineConfig) -> anyhow::Result<Self> {
-        let EngineConfig {
-            max_incremental_cache_size,
-            use_pooling_allocator,
-            wasmtime_cache: _,
-        } = config;
-
-        let cache_store = max_incremental_cache_size.map(|size| {
-            let cache_store: Arc<dyn CacheStore> = Arc::new(IncrementalCompilationCache::new(size));
-            cache_store
-        });
-        let config = Self::config(use_pooling_allocator, cache_store)?;
-        let engine = WasmtimeEngine::new(&config)?;
+        let engine = WasmtimeEngine::new(&config.try_into()?)?;
 
         // We only need a weak reference to pass to the loop.
         let engine_ref = engine.weak();
@@ -124,31 +172,6 @@ impl Engine {
         });
 
         Ok(Self { inner: engine })
-    }
-
-    /// Allows for testing the cache store
-    fn config(
-        use_pooling_allocator: bool,
-        cache_store: Option<Arc<dyn CacheStore>>,
-    ) -> anyhow::Result<Config> {
-        let mut config = Config::new();
-        config
-            .async_support(true)
-            .cranelift_opt_level(OptLevel::SpeedAndSize)
-            // Allows for cooperative timeslicing in async mode
-            .epoch_interruption(true)
-            .wasm_component_model(true);
-
-        if use_pooling_allocator && pooling_allocator_is_supported() {
-            // For more information on Pooling Allocation, as well as all of possible configuration,
-            // read the wasmtime docs: https://docs.rs/wasmtime/latest/wasmtime/struct.PoolingAllocationConfig.html
-            config.allocation_strategy(InstanceAllocationStrategy::pooling());
-        }
-
-        if let Some(cache_store) = cache_store {
-            config.enable_incremental_compilation(cache_store)?;
-        }
-        Ok(config)
     }
 
     /// Creates a new linker for the engine.
@@ -366,26 +389,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn size_of_cache() {
-        let max_cache_size = ByteSize::mib(32);
-        let cache = Arc::new(IncrementalCompilationCache::new(max_cache_size));
-        let config = Engine::config(false, Some(cache.clone())).unwrap();
+    fn file_cache() -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let wasmtime_cache = WasmtimeCache::new(temp_dir.path(), ByteSize::mib(512));
+        let engine_config = EngineConfig::default().with_wasmtime_cache(Some(wasmtime_cache));
         let bytes = given_python_skill_greet_v0_3().bytes();
-        // using lower level engine so we can assert on the cache
-        let engine = WasmtimeEngine::new(&config).unwrap();
-        Component::new(&engine, &bytes).unwrap();
+        let engine = WasmtimeEngine::new(&engine_config.try_into()?)?;
+        Component::new(&engine, &bytes)?;
 
-        cache.cache.run_pending_tasks();
+        assert!(std::fs::read_dir(temp_dir.path())?.count() > 0);
 
-        let total_bytes: usize = cache.cache.iter().map(|(k, v)| k.len() + v.len()).sum();
-        let total_bytes = ByteSize(total_bytes as u64);
-
-        eprintln!("Total cache size: {total_bytes}");
-        assert!(total_bytes <= max_cache_size);
-
-        // Greet (No SDK)
-        // 20.7MB
-        // Haiku (SDK)
-        // 31.9 MB
+        Ok(())
     }
 }
