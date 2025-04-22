@@ -378,9 +378,13 @@ impl AppConfig {
     }
 
     fn wasmtime_cache(&self) -> Option<WasmtimeCache> {
-        self.wasmtime_cache_size()
-            .zip(self.wasmtime_cache_dir())
-            .map(|(size, dir)| WasmtimeCache::new(dir, size))
+        if let FeatureSet::Beta = self.pharia_ai_feature_set {
+            self.wasmtime_cache_size()
+                .zip(self.wasmtime_cache_dir())
+                .map(|(size, dir)| WasmtimeCache::new(dir, size))
+        } else {
+            None
+        }
     }
 
     #[must_use]
