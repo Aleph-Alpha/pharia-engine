@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.11.20...pharia-kernel-v0.12.0)
+
+### Features
+
+- Add wasmtime cache configuration options - ([43e319a](https://github.com/Aleph-Alpha/pharia-kernel/commit/43e319a61f88ac57c86e12f1fb0e4072d9cbd057))
+
+### Builds
+
+- *(deps)* Bump the minor group with 6 updates - ([40338bf](https://github.com/Aleph-Alpha/pharia-kernel/commit/40338bfad79fed7e23361e71205502a15417c22b))
+- *(deps)* Bump brotli-decompressor from 4.0.2 to 4.0.3 - ([2cf79a7](https://github.com/Aleph-Alpha/pharia-kernel/commit/2cf79a760c664de31ffdea56b79b3c9775242dc2))
+- *(deps)* Bump the minor group with 9 updates - ([217dd72](https://github.com/Aleph-Alpha/pharia-kernel/commit/217dd722ebb4404ce1d34975d3c226a9f584e971))
+- *(deps)* Bump the minor group with 3 updates - ([b8798e1](https://github.com/Aleph-Alpha/pharia-kernel/commit/b8798e142eced4d662bde0def0f403d97715633d))
+
+
 ## [0.11.20](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.11.19...pharia-kernel-v0.11.20)
 
 ### Features
