@@ -143,7 +143,7 @@ jsonschema = "0.30.0"
 rayon = "1.10.0"
 serde-bool = "0.1.3"
 async-stream = "0.3.6"
-jiff = { version = "0.2.9", features = ["serde"] }
+jiff = { version = "0.2.10", features = ["serde"] }
 futures-util = "0.3.31"
 moka.workspace = true
 bytesize.workspace = true
