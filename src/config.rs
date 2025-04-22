@@ -368,14 +368,17 @@ impl AppConfig {
         Some(ByteSize::mib(128))
     }
 
-    fn wasmtime_cache(&self) -> Option<WasmtimeCache> {
-        let cache_size = self
+    #[must_use]
+    pub fn wasmtime_cache_size(&self) -> Option<ByteSize> {
+        self
             // Default to requested limit if available. Since this is what we are guaranteed by k8s, we are conservative and use it.
             .wasmtime_cache_size_request
             // Fallback to limit if available.
-            .or(self.wasmtime_cache_size_limit);
+            .or(self.wasmtime_cache_size_limit)
+    }
 
-        cache_size
+    fn wasmtime_cache(&self) -> Option<WasmtimeCache> {
+        self.wasmtime_cache_size()
             .zip(self.wasmtime_cache_dir())
             .map(|(size, dir)| WasmtimeCache::new(dir, size))
     }
