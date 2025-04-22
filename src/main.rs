@@ -12,26 +12,11 @@ async fn main() -> Result<(), Error> {
     initialize_metrics(app_config.metrics_address())?;
 
     info!(
-        "Memory request: {} | limit: {}",
-        app_config
-            .memory_request()
-            .map_or_else(|| "None".to_owned(), |size| size.to_string()),
-        app_config
-            .memory_limit()
-            .map_or_else(|| "None".to_owned(), |size| size.to_string())
+        "Cache Configuration: Skill Cache = {} | Wasmtime Cache = {}",
+        app_config.desired_skill_cache_memory_usage(),
+        app_config.wasmtime_cache_size().unwrap_or_default()
     );
-    info!(
-        "Wasmtime Cache dir: {} | request: {} | limit: {}",
-        app_config
-            .wasmtime_cache_dir()
-            .map_or_else(|| "None".to_owned(), |path| path.display().to_string()),
-        app_config
-            .wasmtime_cache_size_request()
-            .map_or_else(|| "None".to_owned(), |size| size.to_string()),
-        app_config
-            .wasmtime_cache_size_limit()
-            .map_or_else(|| "None".to_owned(), |size| size.to_string())
-    );
+
     let kernel = Kernel::new(app_config, shutdown_signal()).await?;
     kernel.wait_for_shutdown().await;
 
