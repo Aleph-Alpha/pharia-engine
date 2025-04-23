@@ -44,7 +44,7 @@ wasmtime-wasi = "31.0.0"
 
 [package]
 name = "pharia-kernel"
-version = "0.12.0"
+version = "0.12.1"
 edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
