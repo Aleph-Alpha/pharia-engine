@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.0...pharia-kernel-v0.12.1)
+
+### Features
+
+- Fit more skills in cache with new measurements - ([235d274](https://github.com/Aleph-Alpha/pharia-kernel/commit/235d274c43be4a34ee736560bbbabed776bd256d))
+
+
 ## [0.12.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.11.20...pharia-kernel-v0.12.0)
 
 ### Features
