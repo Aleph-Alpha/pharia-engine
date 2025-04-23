@@ -27,7 +27,6 @@ use std::sync::Arc;
 use anyhow::{Context, Error};
 use authorization::Authorization;
 use csi::CsiDrivers;
-use feature_set::FeatureSet;
 use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use search::Search;
@@ -40,6 +39,7 @@ use tokenizers::Tokenizers;
 use self::{inference::Inference, skill_runtime::SkillRuntime};
 
 pub use config::AppConfig;
+pub use feature_set::FeatureSet;
 pub use logging::initialize_tracing;
 pub use metrics::initialize_metrics;
 pub use namespace_watcher::NamespaceConfigs;

@@ -21,3 +21,4 @@ target/
 **/.DS_Store
 .venv
 **/*.wasm
+.wasmtime-cache

@@ -21,3 +21,4 @@ target/
 .venv
 **/*.wasm
 !wasi_snapshot*.wasm
+.wasmtime-cache
