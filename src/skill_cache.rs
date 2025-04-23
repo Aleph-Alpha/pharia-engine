@@ -79,43 +79,44 @@ impl SkillCache {
     }
 
     /// Generates a capacity that should end up around the desired target memory usage.
-    /// We use bytes of wasm modules as a proxy for the memory usage of the cache.
-    /// It isn't perfect, because there appears to be some shared memory if the skills are similar,
-    /// such as using the same Python interpreter.
+    /// We use bytes of wasm modules as a proxy for the memory usage of the cache, since we can't see exactly
+    /// how much memory a skill is using.
+    ///
+    /// It isn't perfect, because compilation artifacts can lead to some heap fragmentation, so we are roughly
+    /// measuring not only how much the skill takes in memory, but what the memory pressure is after compiling it.
+    /// (This is why we switched to jemalloc, to help with this).
+    ///
     /// This is a best effort estimate and may need to be adjusted based on the actual measurements in production.
     ///
     /// The following measurements are based on loading a number of Python skills from our SDK on my Mac (Ben).
     /// But it also seems to correlate with what we see in production on Linux. So we'll use it as a guide.
+    /// Incremental compilation and jemalloc were used.
     ///
-    /// 1. 1.01gb
-    /// 2. 1.22gb ~ 0.21gb
-    /// 3. 1.38gb ~ 0.16gb
-    /// 4. 1.46gb ~ 0.08gb
-    /// 5. 1.58gb ~ 0.12gb
-    /// 6. 1.71gb ~ 0.13gb
-    /// 7. 1.82gb ~ 0.11gb
-    /// 8. 1.94gb ~ 0.12gb
-    /// 9. 2.07gb ~ 0.13gb
-    /// 10. 2.21gb ~ 0.14gb
+    /// 01. 0.73GB
+    /// 02. 0.85GB ~ 0.12GB
+    /// 03. 0.97GB ~ 0.12GB
+    /// 04. 1.03GB ~ 0.06GB
+    /// 05. 1.08GB ~ 0.05GB
+    /// 06. 1.16GB ~ 0.08GB
+    /// 07. 1.23GB ~ 0.07GB
+    /// 08. 1.29GB ~ 0.06GB
+    /// 09. 1.35GB ~ 0.06GB
+    /// 10. 1.42GB - 0.07GB
+    /// 11. 1.50GB - 0.08GB
+    /// 12. 1.60GB - 0.10GB
+    /// 13. 1.69GB - 0.09GB
     ///
-    /// The theory is that wasmtime is somehow reusing native code from similar wasm code, so stuff like the
-    /// interpreter and maybe pydantic-core is shared. But there is always some additional overhead, which is likely
-    /// the memory that is cached by componentize-py when loading the modules that is cached to make invocation faster.
+    /// Assuming the large initial allocation is from compilation artifacts (validated the theory with Joel Dice and
+    /// Alex Chrichton), it is possible this memory will get reused later. So the actual memory pressure from the
+    /// cache is closer to skill 2+ and beyond.
     ///
-    /// We'll use this as a guide, but these measurements will likely need to be redone over time and adjusted as we
-    /// learn more. Especially once we do things like introduce new Python versions with componentize-py updates.
+    /// The skill used for my test was 38.5MB on disk, so this would be roughly a factor of ~2x memory vs bytes of
+    /// the component.
+    ///
+    /// Given this, for 2GB of desired memory, we can store roughly 17 skills. Which, extrapolating from the data out
+    /// to 17 skills, this lines up.
     fn estimated_capacity(desired_memory_usage: ByteSize) -> ByteSize {
-        let mut capacity = 0;
-        let mut desired_memory = desired_memory_usage.as_u64();
-        // Skills don't scale linearly. We calculate capacity at a much lower rate for the first gigabyte.
-        // We take the minimum of the desired memory and 1 gigabyte.
-        let first_chunk = ByteSize::gib(1).as_u64().min(desired_memory);
-        desired_memory -= first_chunk;
-        // Rate of 16.6667
-        capacity += first_chunk.saturating_mul(3) / 50;
-        // Final rate of 2.2
-        capacity += desired_memory.saturating_mul(5) / 11;
-        ByteSize(capacity)
+        ByteSize(desired_memory_usage.as_u64() / 2)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = SkillPath> + '_ {
@@ -211,7 +212,7 @@ mod tests {
 
     #[test]
     fn cache_invalidation() {
-        let desired_memory_usage = ByteSize::mib(1200);
+        let desired_memory_usage = ByteSize::mib(240);
         let mut cache = SkillCache::new(desired_memory_usage);
         let loaded_skill = LoadedSkill::new(
             Arc::new(SkillDummy),
@@ -252,8 +253,7 @@ mod tests {
 
     #[test]
     fn estimated_capacity() {
-        // How much memory was used with 10 SDK Python Skills on my machine.
-        let desired_memory_usage = ByteSize::mib(2209);
+        let desired_memory_usage = ByteSize::mib(1200);
 
         let capacity = SkillCache::estimated_capacity(desired_memory_usage);
 
