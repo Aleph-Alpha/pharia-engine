@@ -8,9 +8,10 @@ use std::{
 };
 
 use axum::http;
+use bytesize::ByteSize;
 use dotenvy::dotenv;
 use futures::StreamExt;
-use pharia_kernel::{AppConfig, Kernel, NamespaceConfigs};
+use pharia_kernel::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
@@ -63,11 +64,21 @@ struct TestKernel {
 }
 
 impl TestKernel {
-    async fn new(app_config: AppConfig) -> Self {
+    async fn new(namespaces: NamespaceConfigs) -> Self {
         let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
+        let port = free_test_port();
+        let metrics_port = free_test_port();
+        let app_config = AppConfig::default()
+            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
+            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
+            .with_namespaces(namespaces)
+            .with_pharia_ai_feature_set(FeatureSet::Beta)
+            .with_wasmtime_cache_size_request(Some(ByteSize::mib(512)))
+            .with_wasmtime_cache_dir(Some(std::path::absolute("./.wasmtime-cache").unwrap()))
+            .with_pooling_allocator(true);
         let port = app_config.kernel_address().port();
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
@@ -79,29 +90,12 @@ impl TestKernel {
         }
     }
 
-    async fn with_namespace_config(namespaces: NamespaceConfigs) -> Self {
-        let port = free_test_port();
-        let metrics_port = free_test_port();
-        let app_config = AppConfig::default()
-            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
-            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
-            .with_namespaces(namespaces)
-            .with_pooling_allocator(true);
-        Self::new(app_config).await
-    }
-
     async fn with_skills(skills: &[&str]) -> Self {
-        let port = free_test_port();
-        let metrics_port = free_test_port();
-        let app_config = AppConfig::default()
-            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
-            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
-            .with_namespaces(namespace_config(
-                &PathBuf::from_str("./skills").unwrap(),
-                skills,
-            ))
-            .with_pooling_allocator(true);
-        Self::new(app_config).await
+        Self::new(namespace_config(
+            &PathBuf::from_str("./skills").unwrap(),
+            skills,
+        ))
+        .await
     }
 
     fn port(&self) -> u16 {
@@ -132,7 +126,7 @@ async fn run_skill() {
     let greet_skill_wasm = given_rust_skill_greet_v0_2().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("greet", greet_skill_wasm);
-    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -165,7 +159,7 @@ async fn run_search_skill() {
     let wasm_bytes = given_rust_skill_search().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("search", wasm_bytes);
-    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -199,7 +193,7 @@ async fn run_doc_metadata_skill() {
     let wasm_bytes = given_rust_skill_doc_metadata().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("doc_metadata", wasm_bytes);
-    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -231,7 +225,7 @@ async fn run_complete_stream_skill() {
     let wasm_bytes = given_complete_stream_skill().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("complete_stream", wasm_bytes);
-    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -269,7 +263,7 @@ async fn run_chat_stream_skill() {
     let wasm_bytes = given_chat_stream_skill().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("chat_stream", wasm_bytes);
-    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -624,7 +618,7 @@ async fn invoke_function_as_stream() {
     let greet_skill_wasm = given_rust_skill_greet_v0_3().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("greet", greet_skill_wasm);
-    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -661,7 +655,7 @@ async fn test_message_stream_canceled_during_the_skill_execution() {
     let greet_skill_wasm = given_skill_infinite_streaming().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("infinite", greet_skill_wasm);
-    let kernel = TestKernel::with_namespace_config(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
