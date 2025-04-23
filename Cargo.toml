@@ -45,12 +45,12 @@ wasmtime-wasi = "31.0.0"
 
 [package]
 name = "pharia-kernel"
-version = "0.12.1"
+version = "0.12.2"
 edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.0" }
+engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.1" }
 aleph-alpha-client = "0.23.1"
 anyhow.workspace = true
 async-trait = "0.1.88"

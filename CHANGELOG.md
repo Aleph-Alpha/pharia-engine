@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.1...pharia-kernel-v0.12.2)
+
+### Features
+
+- Add wasmtime file-based cache support if enabled from config - ([6d4489f](https://github.com/Aleph-Alpha/pharia-kernel/commit/6d4489f17c2b07d3a41d1c9c072be9ee3d02ff79))
+
+
 ## [0.12.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.0...pharia-kernel-v0.12.1)
 
 ### Features
