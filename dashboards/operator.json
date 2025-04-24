@@ -490,9 +490,9 @@
             "uid": "${source}"
           },
           "disableTextWrap": false,
-          "editorMode": "code",
+          "editorMode": "builder",
           "exemplar": false,
-          "expr": "sum(rate(kernel_http_requests_duration_seconds_bucket[1m])) by (le)",
+          "expr": "sum by(le) (rate(kernel_http_requests_duration_seconds_bucket[$__rate_interval]))",
           "format": "heatmap",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
@@ -590,7 +590,7 @@
           "disableTextWrap": false,
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "sum by(le) (rate(kernel_skill_fetch_duration_seconds_bucket[1m]))",
+          "expr": "sum by(le) (rate(kernel_skill_fetch_duration_seconds_bucket[$__rate_interval]))",
           "format": "heatmap",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
@@ -688,7 +688,7 @@
           "disableTextWrap": false,
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "sum(rate(kernel_skill_execution_duration_seconds_bucket[1m])) by (le)",
+          "expr": "sum by(le) (rate(kernel_skill_execution_duration_seconds_bucket[$__rate_interval]))",
           "format": "heatmap",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
@@ -1045,17 +1045,11 @@
     "list": [
       {
         "current": {
-          "text": [
-            "metrics_p-prod",
-            "metrics_aleph-alpha",
-            "metrics_c-prod",
-            "metrics_p-stage"
-          ],
+          "text": ["metrics_p-stage", "metrics_p-prod", "metrics_c-prod"],
           "value": [
+            "7779b300-8db2-4e60-97d1-f14e929e0a88",
             "07cd00b9-e314-47da-bec7-9fecb69e40f7",
-            "24bbea77-004d-4797-8c85-71b5499661ad",
-            "a706829a-d426-4847-a2b7-4e44f03b0258",
-            "7779b300-8db2-4e60-97d1-f14e929e0a88"
+            "a706829a-d426-4847-a2b7-4e44f03b0258"
           ]
         },
         "label": "Metrics Source",
@@ -1069,17 +1063,11 @@
       },
       {
         "current": {
-          "text": [
-            "logs_p-prod",
-            "logs_aleph-alpha",
-            "logs_c-prod",
-            "logs_p-stage"
-          ],
+          "text": ["logs_p-prod", "logs_p-stage", "logs_c-prod"],
           "value": [
             "c3dbf0fa-9e13-4b4a-a525-f24080ee6b6f",
-            "98d3287c-5b95-402a-84e7-5bfca69f4107",
-            "1b520950-6634-4970-a086-cc30616891d4",
-            "7d382703-f59d-4a58-b0ab-d5289cd075c8"
+            "7d382703-f59d-4a58-b0ab-d5289cd075c8",
+            "1b520950-6634-4970-a086-cc30616891d4"
           ]
         },
         "label": "Logs Source",
@@ -1101,6 +1089,6 @@
   "timezone": "browser",
   "title": "Pharia Kernel",
   "uid": "de5pijc6rvbpca",
-  "version": 71,
+  "version": 75,
   "weekStart": ""
 }
