@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.3...pharia-kernel-v0.12.4)
+
+### Features
+
+- Support filtering for skill type when listing skills - ([a81477b](https://github.com/Aleph-Alpha/pharia-kernel/commit/a81477b4a0f1f900d161a25f17cfc6c2728fb669))
+- Add native chat skill - ([587a290](https://github.com/Aleph-Alpha/pharia-kernel/commit/587a2908c81b51b19e64d3f64ed91a1056946e4a))
+
+### Builds
+
+- *(deps)* Bump winnow from 0.7.6 to 0.7.7 in the minor group - ([7e49248](https://github.com/Aleph-Alpha/pharia-kernel/commit/7e49248755ef5a2e3acdea8eedbd8b113139a9d1))
+- *(deps)* Bump astral-sh/setup-uv from 5 to 6 - ([8922f7a](https://github.com/Aleph-Alpha/pharia-kernel/commit/8922f7aa4eb780cdcbc0678a904c2a17b0af0013))
+
+
 ## [0.12.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.1...pharia-kernel-v0.12.2)
 
 ### Features
