@@ -15,6 +15,12 @@ use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
 use std::{future::Future, pin::Pin};
 
+#[derive(Debug)]
+pub enum SkillDescriptionFilterType {
+    Chat,
+    Programmable,
+}
+
 // A skill that has been configured and may be fetched and executed.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConfiguredSkill {
