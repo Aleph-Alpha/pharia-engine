@@ -5,7 +5,8 @@ use crate::{
     namespace_watcher::{Namespace, SkillDescription},
     skill_cache::SkillCache,
     skill_loader::{
-        ConfiguredSkill, LoadedSkill, ProgrammableSkill, SkillFetchError, SkillLoaderApi,
+        ConfiguredSkill, LoadedSkill, ProgrammableSkill, SkillDescriptionFilterType,
+        SkillFetchError, SkillLoaderApi,
     },
     skills::{Skill, SkillPath},
 };
@@ -61,12 +62,33 @@ where
     }
 
     /// All configured skills, sorted by namespace and name
-    pub fn skills(&self) -> impl Iterator<Item = &SkillPath> {
-        self.known_skills.keys().sorted_by(|a, b| {
-            a.namespace
-                .cmp(&b.namespace)
-                .then_with(|| a.name.cmp(&b.name))
-        })
+    pub fn skills(
+        &self,
+        skill_type: Option<&SkillDescriptionFilterType>,
+    ) -> impl Iterator<Item = &SkillPath> {
+        self.known_skills
+            .iter()
+            .filter_map(|(path, skill)| {
+                if let Some(skill_type) = skill_type {
+                    match (skill_type, &skill.description) {
+                        (SkillDescriptionFilterType::Chat, SkillDescription::Chat { .. }) => {
+                            Some(path)
+                        }
+                        (
+                            SkillDescriptionFilterType::Programmable,
+                            SkillDescription::Programmable { .. },
+                        ) => Some(path),
+                        _ => None,
+                    }
+                } else {
+                    Some(path)
+                }
+            })
+            .sorted_by(|a, b| {
+                a.namespace
+                    .cmp(&b.namespace)
+                    .then_with(|| a.name.cmp(&b.name))
+            })
     }
 
     pub fn list_cached_skills(&self) -> impl Iterator<Item = SkillPath> + '_ {
@@ -222,7 +244,10 @@ pub trait SkillStoreApi {
     fn list_cached(&self) -> impl Future<Output = Vec<SkillPath>> + Send;
 
     /// List all skills from all namespaces
-    fn list(&self) -> impl Future<Output = Vec<SkillPath>> + Send;
+    fn list(
+        &self,
+        skill_type: Option<SkillDescriptionFilterType>,
+    ) -> impl Future<Output = Vec<SkillPath>> + Send;
 
     /// Drops a skill from the cache in case it has been cached before. `true` if the skill has been
     /// in the cache before, `false` otherwise .
@@ -278,9 +303,9 @@ impl SkillStoreApi for mpsc::Sender<SkillStoreMsg> {
     }
 
     /// List all skills from all namespaces
-    async fn list(&self) -> Vec<SkillPath> {
+    async fn list(&self, skill_type: Option<SkillDescriptionFilterType>) -> Vec<SkillPath> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillStoreMsg::List { send };
+        let msg = SkillStoreMsg::List { send, skill_type };
         self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
@@ -306,6 +331,7 @@ pub enum SkillStoreMsg {
     },
     List {
         send: oneshot::Sender<Vec<SkillPath>>,
+        skill_type: Option<SkillDescriptionFilterType>,
     },
     ListCached {
         send: oneshot::Sender<Vec<SkillPath>>,
@@ -498,8 +524,8 @@ where
                     }
                 }
             }
-            SkillStoreMsg::List { send } => {
-                drop(send.send(self.provider.skills().cloned().collect()));
+            SkillStoreMsg::List { send, skill_type } => {
+                drop(send.send(self.provider.skills(skill_type.as_ref()).cloned().collect()));
             }
             SkillStoreMsg::Remove { skill_path } => {
                 self.provider.remove_skill(&skill_path);
@@ -575,7 +601,7 @@ pub mod tests {
             panic!("Skill store dummy called.")
         }
 
-        async fn list(&self) -> Vec<SkillPath> {
+        async fn list(&self, _skill_type: Option<SkillDescriptionFilterType>) -> Vec<SkillPath> {
             panic!("Skill store dummy called.")
         }
 
@@ -640,8 +666,12 @@ pub mod tests {
             self.list_cached.clone()
         }
 
-        async fn list(&self) -> Vec<SkillPath> {
-            self.list.clone()
+        async fn list(&self, skill_type: Option<SkillDescriptionFilterType>) -> Vec<SkillPath> {
+            if let Some(skill_type) = skill_type {
+                panic!("Skill store stub called with skill type: {skill_type:?}");
+            } else {
+                self.list.clone()
+            }
         }
 
         async fn invalidate_cache(&self, _skill_path: SkillPath) -> bool {
@@ -878,7 +908,7 @@ pub mod tests {
 
         // When skills are listed
         let skills: Vec<String> = skill_store
-            .list()
+            .list(None)
             .await
             .iter()
             .map(ToString::to_string)
@@ -1023,7 +1053,7 @@ pub mod tests {
 
         let skill = ConfiguredSkill::from_path(&second);
         api.upsert(skill).await;
-        let skills = api.list().await;
+        let skills = api.list(None).await;
 
         // Then the skills are listed by the skill runtime api
         assert_eq!(skills.len(), 2);
@@ -1060,7 +1090,7 @@ pub mod tests {
         // list of all skills
         assert!(skill_had_been_in_cache);
         assert!(api.list_cached().await.is_empty());
-        assert_eq!(api.list().await, vec![skill_path]);
+        assert_eq!(api.list(None).await, vec![skill_path]);
     }
 
     #[tokio::test]
@@ -1087,10 +1117,39 @@ pub mod tests {
         // Then greet skill is of course still available in the list of all skills. The return value
         // indicates that greet skill never had been in the cache to begin with
         assert!(!skill_had_been_in_cache);
-        assert_eq!(api.list().await, vec![greet_skill]);
+        assert_eq!(api.list(None).await, vec![greet_skill]);
         // Cleanup
         drop(api);
         skill_store.wait_for_shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn list_skills_with_skill_type() {
+        // Given two skills
+        let skill_loader = SkillLoaderStub::new();
+        let mut skill_store_state = SkillStoreState::new(skill_loader.clone(), ByteSize(u64::MAX));
+        let skill_path = SkillPath::local("foo");
+        skill_store_state.upsert_skill(ConfiguredSkill::from_path(&skill_path));
+        let skill_path = SkillPath::local("bar");
+        let skill = ConfiguredSkill::new(
+            skill_path.namespace.clone(),
+            SkillDescription::Chat {
+                name: skill_path.name.clone(),
+                version: "1.0.0".to_owned(),
+                model: "pharia-1-llm-7b-control".to_owned(),
+                system_prompt: "You are a helpful assistant.".to_owned(),
+            },
+        );
+        skill_store_state.upsert_skill(skill);
+
+        // When listing the skills with Chat skill type
+        let skills = skill_store_state
+            .skills(Some(&SkillDescriptionFilterType::Chat))
+            .collect::<Vec<_>>();
+
+        // Then only the Chat skill is returned
+        assert_eq!(skills.len(), 1);
+        assert!(skills.contains(&&skill_path));
     }
 
     #[tokio::test]
@@ -1132,7 +1191,7 @@ pub mod tests {
         // list of all skills
         assert_eq!(skill_store_state.list_cached_skills().count(), 0);
         assert_eq!(
-            skill_store_state.skills().collect::<Vec<_>>(),
+            skill_store_state.skills(None).collect::<Vec<_>>(),
             vec![&skill_path]
         );
 
@@ -1168,7 +1227,7 @@ pub mod tests {
         // Then nothing changes
         assert_eq!(
             skill_store_state.list_cached_skills().collect::<Vec<_>>(),
-            skill_store_state.skills().cloned().collect::<Vec<_>>(),
+            skill_store_state.skills(None).cloned().collect::<Vec<_>>(),
         );
 
         Ok(())

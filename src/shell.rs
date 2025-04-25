@@ -3,7 +3,7 @@ use async_stream::try_stream;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{FromRef, MatchedPath, Path, Request, State},
+    extract::{FromRef, MatchedPath, Path, Query, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
     response::{ErrorResponse, Html, IntoResponse, Response, Sse, sse::Event},
@@ -42,6 +42,7 @@ use crate::{
     csi_shell,
     feature_set::FeatureSet,
     namespace_watcher::Namespace,
+    skill_loader::SkillDescriptionFilterType,
     skill_runtime::{SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi},
     skill_store::SkillStoreApi,
     skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
@@ -192,15 +193,21 @@ where
     }
 }
 
-fn v1<A, C, R, S>() -> Router<AppState<A, C, R, S>>
+fn v1<A, C, R, S>(feature_set: FeatureSet) -> Router<AppState<A, C, R, S>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: Csi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
+    let skills_route = if feature_set == FeatureSet::Beta {
+        get(skills_beta)
+    } else {
+        get(skills)
+    };
+
     Router::new()
-        .route("/skills", get(skills))
+        .route("/skills", skills_route)
         .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
         .route("/skills/{namespace}/{name}/run", post(run_skill))
         .route(
@@ -225,7 +232,7 @@ where
 
     Router::new()
         // Authenticated routes
-        .nest("/v1", v1())
+        .nest("/v1", v1(feature_set))
         .merge(csi_shell::http())
         // Hidden routes for cache for internal use
         .route("/cached_skills", get(cached_skills))
@@ -415,7 +422,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, skills, run_skill, message_stream_skill, skill_wit, skill_metadata),
+    paths(serve_docs, skills_beta, run_skill, message_stream_skill, skill_wit, skill_metadata),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -720,6 +727,54 @@ struct SseErrorEvent {
     message: String,
 }
 
+#[derive(Deserialize, ToSchema)]
+struct SkillListParams {
+    #[serde(rename = "type")]
+    skill_type: Option<SkillDescriptionSchemaType>,
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillDescriptionSchemaType {
+    Chat,
+    Programmable,
+}
+
+impl From<SkillDescriptionSchemaType> for SkillDescriptionFilterType {
+    fn from(value: SkillDescriptionSchemaType) -> Self {
+        match value {
+            SkillDescriptionSchemaType::Chat => SkillDescriptionFilterType::Chat,
+            SkillDescriptionSchemaType::Programmable => SkillDescriptionFilterType::Programmable,
+        }
+    }
+}
+
+/// List
+///
+/// List of configured Skills (Beta).
+#[utoipa::path(
+    get,
+    operation_id = "skills",
+    path = "/v1/skills",
+    tag = "skills",
+    security(("api_token" = [])),
+    params(("type" = Option<SkillDescriptionSchemaType>, Query, nullable, description = "The type of skills to list. Can be `chat` or `null`.")),
+    responses(
+        (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
+    ),
+)]
+async fn skills_beta<S>(
+    State(SkillStoreState(skill_store_api)): State<SkillStoreState<S>>,
+    Query(SkillListParams { skill_type }): Query<SkillListParams>,
+) -> Json<Vec<String>>
+where
+    S: SkillStoreApi,
+{
+    let response = skill_store_api.list(skill_type.map(Into::into)).await;
+    let response = response.iter().map(ToString::to_string).collect();
+    Json(response)
+}
+
 /// List
 ///
 /// List of configured Skills.
@@ -739,7 +794,7 @@ async fn skills<S>(
 where
     S: SkillStoreApi,
 {
-    let response = skill_store_api.list().await;
+    let response = skill_store_api.list(None).await;
     let response = response.iter().map(ToString::to_string).collect();
     Json(response)
 }
