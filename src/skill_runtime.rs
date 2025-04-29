@@ -7,7 +7,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{error, info, warn};
+use tracing::{error, info, span::Id, warn};
 
 use crate::{
     csi::Csi,
@@ -72,6 +72,7 @@ pub trait SkillRuntimeApi {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
+        span_id: Id,
     ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send;
 
     fn run_message_stream(
@@ -93,6 +94,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
+        _span_id: Id,
     ) -> Result<Value, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Function(RunFunctionMsg {
@@ -492,7 +494,12 @@ pub mod tests {
         // When asking the skill actor to run the skill
         let result = skill_actor
             .api()
-            .run_function(SkillPath::dummy(), json!(""), "dummy_token".to_owned())
+            .run_function(
+                SkillPath::dummy(),
+                json!(""),
+                "dummy_token".to_owned(),
+                Id::from_u64(1),
+            )
             .await;
 
         // Then the skill actor should return an error
@@ -521,6 +528,7 @@ pub mod tests {
                 SkillPath::local("my_skill"),
                 json!("Any input"),
                 "Dummy api token".to_owned(),
+                Id::from_u64(1),
             )
             .await;
 
@@ -552,6 +560,7 @@ pub mod tests {
                 SkillPath::local("greet"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
+                Id::from_u64(1),
             )
             .await;
         runtime.wait_for_shutdown().await;
@@ -618,13 +627,23 @@ pub mod tests {
         let api_first = runtime.api();
         let first = tokio::spawn(async move {
             api_first
-                .run_function(SkillPath::local("any_path"), json!({}), token.to_owned())
+                .run_function(
+                    SkillPath::local("any_path"),
+                    json!({}),
+                    token.to_owned(),
+                    Id::from_u64(1),
+                )
                 .await
         });
         let api_second = runtime.api();
         let second = tokio::spawn(async move {
             api_second
-                .run_function(SkillPath::local("any_path"), json!({}), token.to_owned())
+                .run_function(
+                    SkillPath::local("any_path"),
+                    json!({}),
+                    token.to_owned(),
+                    Id::from_u64(1),
+                )
                 .await
         });
         let result_first = tokio::time::timeout(Duration::from_secs(1), first).await;
