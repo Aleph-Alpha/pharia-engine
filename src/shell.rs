@@ -972,6 +972,13 @@ mod tests {
         }
     }
 
+    fn dummy_auth_value() -> header::HeaderValue {
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        auth_value
+    }
+
     #[tokio::test]
     async fn skill_metadata() {
         // Given
@@ -984,18 +991,14 @@ mod tests {
         });
         let runtime = SkillRuntimeStub::with_metadata(metadata);
         let app_state = AppState::dummy().with_skill_runtime_api(runtime);
-        let api_token = "dummy auth token";
 
         // When
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
         let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(Method::GET)
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/v1/skills/local/greet_skill/metadata")
                     .body(Body::empty())
                     .unwrap(),
@@ -1036,9 +1039,6 @@ mod tests {
         });
 
         // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
         let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
         let app_state = AppState::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -1048,7 +1048,7 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -1077,9 +1077,6 @@ mod tests {
         });
 
         // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
         let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
         let app_state = AppState::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -1089,7 +1086,7 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/completion_stream")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -1132,9 +1129,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
         let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
         let app_state = AppState::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -1144,7 +1138,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/complete")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -1175,9 +1169,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         });
 
         // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
         let csi = StubCsi::with_chat(|_| inference::ChatResponse {
             message: inference::Message {
                 role: "assistant".to_owned(),
@@ -1198,7 +1189,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/chat_stream")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -1237,9 +1228,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             "granularity": "auto"
         }]);
 
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
         let csi = StubCsi::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
@@ -1255,7 +1243,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/explain")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -1285,9 +1273,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
         let csi = StubCsi::with_chat(|_| inference::ChatResponse {
             message: inference::Message {
                 role: "assistant".to_owned(),
@@ -1308,7 +1293,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/chat")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -1333,9 +1318,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             },
         }]);
 
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
         let mut csi = StubCsi::empty();
         csi.set_chunking(|r| {
             Ok(r.into_iter()
@@ -1357,7 +1339,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/chunk")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -1383,9 +1365,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             "character_offsets": true
         }]);
 
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
         let mut csi = StubCsi::empty();
         csi.set_chunking(|r| {
             Ok(r.into_iter()
@@ -1407,7 +1386,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/chunk_with_offsets")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -1429,16 +1408,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri(format!("/v1/skills/{bad_namespace}/greet_skill/run"))
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -1460,16 +1435,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/v1/skills/local/greet_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -1492,16 +1463,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
         let _resp = http
             .oneshot(
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/v1/skills/local/greet_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -1531,16 +1498,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a message stream
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/v1/skills/local/hello/message-stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
@@ -1583,16 +1546,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a message stream from a skill that does not exist
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
         let resp = http
             .oneshot(
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/v1/skills/local/saboteur/message-stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
@@ -1743,7 +1702,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 Request::builder()
                     .method(Method::DELETE)
                     .uri(format!("/cached_skills/{namespace}/haiku_skill"))
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -1870,7 +1829,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             .oneshot(
                 Request::builder()
                     .uri("/v1/skills")
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -1900,7 +1859,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             .oneshot(
                 Request::builder()
                     .uri("/v1/skills")
-                    .header(header::AUTHORIZATION, auth_value)
+                    .header(AUTHORIZATION, auth_value)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -2314,10 +2273,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 let skill_runtime = SpySkillRuntime::new();
                 let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
                 let http = http(PRODUCTION_FEATURE_SET, app_state);
-                let api_token = "dummy auth token";
-                let mut auth_value =
-                    header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-                auth_value.set_sensitive(true);
 
                 // When a request with a trace id comes in
                 let trace_id = "0af7651916cd43dd8448eb211c80319c";
@@ -2328,7 +2283,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                         Request::builder()
                             .method(Method::POST)
                             .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                            .header(AUTHORIZATION, auth_value)
+                            .header(AUTHORIZATION, dummy_auth_value())
                             .header("traceparent", traceparent)
                             .uri("/v1/skills/acme/summarize/run")
                             .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
