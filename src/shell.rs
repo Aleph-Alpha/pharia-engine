@@ -42,6 +42,7 @@ use crate::{
     csi::Csi,
     csi_shell,
     feature_set::FeatureSet,
+    logging::TracingContext,
     namespace_watcher::Namespace,
     skill_loader::SkillDescriptionFilterType,
     skill_runtime::{SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi},
@@ -570,17 +571,15 @@ async fn run_skill<R>(
 where
     R: SkillRuntimeApi,
 {
-    // The `OtelAxumLayer` middlewards adds a span to the request.
-    // Before polling it's inner future (other middlewares, or the handler itself),
-    // it makes sure the span is entered.
-    // Therefore, we can extract the span id from the global scope here.
-    let span_id = tracing::Span::current()
-        .id()
-        .expect("Span must exist as it is always created by the `OtelAxumLayer` middleware.");
-
+    let tracing_context = TracingContext::current();
     let skill_path = SkillPath::new(namespace, name);
     let response = skill_runtime_api
-        .run_function(skill_path, input, bearer.token().to_owned(), span_id)
+        .run_function(
+            skill_path,
+            input,
+            bearer.token().to_owned(),
+            tracing_context,
+        )
         .await?;
     Ok(Json(response))
 }
@@ -905,16 +904,12 @@ mod tests {
     };
     use http_body_util::BodyExt;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
-    use opentelemetry::{
-        TraceId,
-        trace::{TraceContextExt, TracerProvider},
-    };
+    use opentelemetry::trace::TracerProvider;
     use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler, SdkTracerProvider};
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
-    use tracing::span::Id;
     use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
 
     impl AppState<StubAuthorization, CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
@@ -1971,7 +1966,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-            _span_id: Id,
+            _tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             panic!("Skill runtime dummy called")
         }
@@ -2013,7 +2008,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-            _span_id: Id,
+            _tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             Err((*self.make_error)())
         }
@@ -2078,7 +2073,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-            _span_id: Id,
+            _tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             Ok(self.function_result.clone())
         }
@@ -2146,7 +2141,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             skill_path: SkillPath,
             input: Value,
             api_token: String,
-            _span_id: Id,
+            _tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             let mut inner = self.inner.lock().unwrap();
             inner.api_token = api_token;
@@ -2237,14 +2232,14 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[derive(Clone)]
-    struct SpySkillRuntime(Arc<Mutex<Vec<TraceId>>>);
+    struct SpySkillRuntime(Arc<Mutex<Vec<TracingContext>>>);
 
     impl SpySkillRuntime {
         pub fn new() -> Self {
             Self(Arc::new(Mutex::new(Vec::new())))
         }
 
-        pub fn trace_ids(&self) -> Vec<TraceId> {
+        pub fn tracing_contexts(&self) -> Vec<TracingContext> {
             self.0.lock().unwrap().clone()
         }
     }
@@ -2255,21 +2250,9 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
-            span_id: Id,
+            tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
-            use tracing_subscriber::registry::LookupSpan;
-            let trace_id = tracing::dispatcher::get_default(|subscriber| {
-                let registry = subscriber
-                    .downcast_ref::<tracing_subscriber::Registry>()
-                    .unwrap();
-
-                let span = registry.span(&span_id).unwrap();
-                let extensions = span.extensions();
-                let otel_context = extensions.get::<opentelemetry::Context>().unwrap();
-                otel_context.span().span_context().trace_id()
-            });
-
-            self.0.lock().unwrap().push(trace_id);
+            self.0.lock().unwrap().push(tracing_context);
             Ok(Value::default())
         }
 
@@ -2323,7 +2306,10 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
                 // Then the skill runtime receives the trace id
                 assert_eq!(resp.status(), StatusCode::OK);
-                assert_eq!(skill_runtime.trace_ids()[0].to_string(), trace_id);
+                assert_eq!(
+                    skill_runtime.tracing_contexts()[0].trace_id().to_string(),
+                    trace_id
+                );
             });
         });
     }

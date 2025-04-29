@@ -7,10 +7,11 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{error, info, span::Id, warn};
+use tracing::{error, info, warn};
 
 use crate::{
     csi::Csi,
+    logging::TracingContext,
     skill_driver::SkillDriver,
     skill_store::{SkillStoreApi, SkillStoreError},
     skills::{AnySkillManifest, Engine, Skill, SkillPath},
@@ -72,7 +73,7 @@ pub trait SkillRuntimeApi {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-        span_id: Id,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send;
 
     fn run_message_stream(
@@ -94,7 +95,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-        _span_id: Id,
+        _tracing_context: TracingContext,
     ) -> Result<Value, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Function(RunFunctionMsg {
@@ -498,7 +499,7 @@ pub mod tests {
                 SkillPath::dummy(),
                 json!(""),
                 "dummy_token".to_owned(),
-                Id::from_u64(1),
+                TracingContext::dummy(),
             )
             .await;
 
@@ -528,7 +529,7 @@ pub mod tests {
                 SkillPath::local("my_skill"),
                 json!("Any input"),
                 "Dummy api token".to_owned(),
-                Id::from_u64(1),
+                TracingContext::dummy(),
             )
             .await;
 
@@ -560,7 +561,7 @@ pub mod tests {
                 SkillPath::local("greet"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
-                Id::from_u64(1),
+                TracingContext::dummy(),
             )
             .await;
         runtime.wait_for_shutdown().await;
@@ -631,7 +632,7 @@ pub mod tests {
                     SkillPath::local("any_path"),
                     json!({}),
                     token.to_owned(),
-                    Id::from_u64(1),
+                    TracingContext::dummy(),
                 )
                 .await
         });
@@ -642,7 +643,7 @@ pub mod tests {
                     SkillPath::local("any_path"),
                     json!({}),
                     token.to_owned(),
-                    Id::from_u64(1),
+                    TracingContext::dummy(),
                 )
                 .await
         });

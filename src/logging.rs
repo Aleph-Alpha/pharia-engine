@@ -1,6 +1,10 @@
 use std::{env, str::FromStr};
 
-use opentelemetry::{KeyValue, propagation::TextMapCompositePropagator, trace::TracerProvider};
+use opentelemetry::{
+    KeyValue, TraceId,
+    propagation::TextMapCompositePropagator,
+    trace::{TraceContextExt, TracerProvider},
+};
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::{
     Resource,
@@ -8,10 +12,51 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
-use tracing::info;
+use tracing::{info, span::Id};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::OtelConfig;
+
+/// Context that is needed to situate certain actions in the overall context.
+///
+/// In this opaque type we specify decisions on what context needs to be passed
+/// within actors to correlate actions that belong together.
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub struct TracingContext {
+    /// This is the id from the `tracing` ecosystem. Within each trace there is a hierarchy
+    /// of span. the `span_id` allows to situate spans in this hierarchy.
+    span_id: Option<Id>,
+    /// The opentelemetry trace id. We store this separately from the span id, because
+    /// it seems very hard to lookup a trace id for a span id without relying on
+    /// some current span thread-local magic. And we can only use this magic in the handler,
+    /// not in other actors. So providing the trace id allows other actors to include them
+    /// in outgoing requests.
+    trace_id: TraceId,
+}
+
+impl TracingContext {
+    /// Retrieve the current thread-local tracing context.
+    ///
+    /// This method MUST ONLY be invoked in an axum handler, and not in a different actor.
+    /// We know that the `AxumOtelLayer` middleware makes sure to create a span, provide the
+    /// opentelemetry context, and enter the span when polling its inner future (other middleware
+    /// or the handlers).
+    pub fn current() -> Self {
+        let span = tracing::Span::current();
+        let trace_id = span.context().span().span_context().trace_id();
+        Self {
+            span_id: span.id(),
+            trace_id,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn trace_id(&self) -> TraceId {
+        self.trace_id
+    }
+}
 
 /// Set up two tracing subscribers:
 /// * Simple env logger
@@ -105,4 +150,18 @@ pub fn resource() -> Resource {
         // We therefore need to explicitly set the service name by using `with_service_name`.
         .with_service_name("pharia-kernel")
         .build()
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    impl TracingContext {
+        pub fn dummy() -> Self {
+            Self {
+                span_id: None,
+                trace_id: TraceId::INVALID,
+            }
+        }
+    }
 }
