@@ -2260,4 +2260,87 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             });
         });
     }
+
+    #[derive(Clone)]
+    struct SpySkillRuntime(Arc<Mutex<Vec<SkillPath>>>);
+
+    impl SpySkillRuntime {
+        pub fn new() -> Self {
+            Self(Arc::new(Mutex::new(Vec::new())))
+        }
+
+        pub fn messages(&self) -> Vec<SkillPath> {
+            self.0.lock().unwrap().clone()
+        }
+    }
+
+    impl SkillRuntimeApi for SpySkillRuntime {
+        async fn run_function(
+            &self,
+            skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+        ) -> Result<Value, SkillExecutionError> {
+            self.0.lock().unwrap().push(skill_path);
+            Ok(Value::default())
+        }
+
+        async fn run_message_stream(
+            &self,
+            _skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+        ) -> mpsc::Receiver<SkillExecutionEvent> {
+            panic!("SpySkillRuntime does not support streaming")
+        }
+
+        async fn skill_metadata(
+            &self,
+            _skill_path: SkillPath,
+        ) -> Result<AnySkillManifest, SkillExecutionError> {
+            panic!("SpySkillRuntime does not support metadata")
+        }
+    }
+
+    #[test]
+    fn skill_runtime_gets_tracecontext_from_incoming_request() {
+        tracing::subscriber::with_default(tracing_subscriber(), || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .build()
+                .unwrap();
+
+            runtime.block_on(async {
+                // Given a shell
+                let skill_runtime = SpySkillRuntime::new();
+                let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
+                let http = http(PRODUCTION_FEATURE_SET, app_state);
+                let api_token = "dummy auth token";
+                let mut auth_value =
+                    header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+                auth_value.set_sensitive(true);
+
+                // When a request with a trace id comes in
+                let trace_id = "0af7651916cd43dd8448eb211c80319c";
+                let span_id = "b7ad6b7169203331";
+                let traceparent = format!("00-{trace_id}-{span_id}-01");
+                let resp = http
+                    .oneshot(
+                        Request::builder()
+                            .method(Method::POST)
+                            .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                            .header(AUTHORIZATION, auth_value)
+                            .header("traceparent", traceparent)
+                            .uri("/v1/skills/acme/summarize/run")
+                            .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+
+                // Then the skill runtime receives the trace id
+                assert_eq!(resp.status(), StatusCode::OK);
+                assert_eq!(skill_runtime.messages().len(), 1);
+            });
+        });
+    }
 }
