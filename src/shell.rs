@@ -2258,15 +2258,16 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             span_id: Id,
         ) -> Result<Value, SkillExecutionError> {
             use tracing_subscriber::registry::LookupSpan;
-            let subscriber = tracing::dispatcher::get_default(|d| d);
-            let registry = subscriber
-                .downcast_ref::<tracing_subscriber::Registry>()
-                .unwrap();
+            let trace_id = tracing::dispatcher::get_default(|subscriber| {
+                let registry = subscriber
+                    .downcast_ref::<tracing_subscriber::Registry>()
+                    .unwrap();
 
-            let span = registry.span(&span_id).unwrap();
-            let extensions = span.extensions();
-            let otel_context = extensions.get::<opentelemetry::Context>().unwrap();
-            let trace_id = otel_context.span().span_context().trace_id();
+                let span = registry.span(&span_id).unwrap();
+                let extensions = span.extensions();
+                let otel_context = extensions.get::<opentelemetry::Context>().unwrap();
+                otel_context.span().span_context().trace_id()
+            });
 
             self.0.lock().unwrap().push(trace_id);
             Ok(Value::default())
@@ -2322,7 +2323,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
                 // Then the skill runtime receives the trace id
                 assert_eq!(resp.status(), StatusCode::OK);
-                assert_eq!(skill_runtime.trace_ids()[0], trace_id);
+                assert_eq!(skill_runtime.trace_ids()[0].to_string(), trace_id);
             });
         });
     }
