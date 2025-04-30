@@ -8,7 +8,6 @@ use tracing::trace;
 
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
-    context_event,
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
         Explanation, ExplanationRequest, InferenceApi, InferenceError,
@@ -229,16 +228,8 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    context_event!(
-                        context: tracing_context,
-                        level: Level::INFO,
-                        "chat: request.model={} request.params.max_tokens={}",
-                        r.model,
-                        r.params
-                            .max_tokens
-                            .map_or_else(|| "None".to_owned(), |val| val.to_string()),
-                    );
-                    self.inference.chat(r, auth.clone())
+                    self.inference
+                        .chat(r, auth.clone(), tracing_context.clone())
                 })
                 .collect::<Vec<_>>(),
         )
