@@ -1,5 +1,4 @@
 use std::{borrow::Cow, future::Future, pin::Pin, sync::Arc, time::Instant};
-use tracing::Level;
 
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde_json::Value;
@@ -417,25 +416,13 @@ fn log_skill_result<T>(
             );
         }
         Err(error) => {
-            match error.tracing_level() {
-                Level::ERROR => {
-                    error!(
-                        target: "pharia_kernel::skill_execution",
-                        skill=%skill_path,
-                        message=%error,
-                        "Skill invocation failed"
-                    );
-                }
-                // Currently only Error and Warn are returned by tracing_level
-                _ => {
-                    warn!(
-                        target: "pharia_kernel::skill_execution",
-                        skill=%skill_path,
-                        message=%error,
-                        "Skill invocation failed"
-                    );
-                }
-            }
+            context_event!(
+                context: tracing_context,
+                level: error.tracing_level(),
+                target: "pharia_kernel::skill_execution",
+                skill=%skill_path,
+                message="Skill invocation failed"
+            );
         }
     }
 }

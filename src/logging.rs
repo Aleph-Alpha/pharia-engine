@@ -22,13 +22,29 @@ use crate::config::OtelConfig;
 macro_rules! context_event {
     // If target is provided, it must be specified before the parent.
     (context: $tracing_context:expr, level: $lvl:expr, target: $target:literal, $($fields:tt)*) => {
+        use tracing::{Level, info, warn, error};
+
         if let Some(span_id) = $tracing_context.span_id() {
-            tracing::event!(target: $target, parent: span_id, $lvl, $($fields)*);
+            match $lvl {
+                Level::INFO => info!(target: $target, parent: span_id, $($fields)*),
+                Level::WARN => warn!(target: $target, parent: span_id, $($fields)*),
+                Level::ERROR => error!(target: $target, parent: span_id, $($fields)*),
+                _ => (
+                    panic!("Do not use this macro for debugging, as the logs are intended for the operator.")
+                )
+            }
         }
     };
     (context: $tracing_context:expr, level: $lvl:expr, $($fields:tt)*) => {
         if let Some(span_id) = $tracing_context.span_id() {
-            tracing::event!(parent: span_id, $lvl, $($fields)*);
+            match $lvl {
+                Level::INFO => info!(parent: span_id, $($fields)*),
+                Level::WARN => warn!(parent: span_id, $($fields)*),
+                Level::ERROR => error!(parent: span_id, $($fields)*),
+                _ => (
+                    panic!("Do not use this macro for debugging, as the logs are intended for the operator.")
+                )
+            }
         }
     };
 }
