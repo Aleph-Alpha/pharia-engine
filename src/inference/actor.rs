@@ -9,6 +9,8 @@ use tokio::{
     task::JoinHandle,
 };
 
+use crate::logging::TracingContext;
+
 use super::client::{InferenceClient, InferenceError};
 
 /// Handle to the inference actor. Spin this up in order to use the inference API.
@@ -66,6 +68,7 @@ pub trait InferenceApi {
         &self,
         request: ChatRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
 
     fn chat_stream(
@@ -137,12 +140,14 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         &self,
         request: ChatRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Chat {
             request,
             send,
             api_token,
+            tracing_context,
         };
         self.send(msg)
             .await
@@ -444,6 +449,7 @@ pub enum InferenceMessage {
         request: ChatRequest,
         send: oneshot::Sender<Result<ChatResponse, InferenceError>>,
         api_token: String,
+        tracing_context: TracingContext,
     },
     ChatStream {
         request: ChatRequest,
@@ -506,8 +512,9 @@ impl InferenceMessage {
                 request,
                 send,
                 api_token,
+                tracing_context,
             } => {
-                let result = client.chat(&request, api_token.clone()).await;
+                let result = client.chat(&request, api_token, tracing_context).await;
                 drop(send.send(result));
             }
             Self::ChatStream {
@@ -670,6 +677,7 @@ pub mod tests {
             &self,
             request: ChatRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<ChatResponse, InferenceError> {
             let chat_response = (self.chat)(request)?;
             Ok(chat_response)
@@ -761,6 +769,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<ChatResponse, InferenceError> {
             unimplemented!()
         }
@@ -853,6 +862,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<ChatResponse, InferenceError> {
             unimplemented!()
         }

@@ -10,9 +10,11 @@ use aleph_alpha_client::{
 use futures::StreamExt;
 use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 use tokio::sync::mpsc;
-use tracing::{error, warn};
+use tracing::{Level, error, span, warn};
 
 use thiserror::Error;
+
+use crate::logging::TracingContext;
 
 use super::{
     ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
@@ -36,6 +38,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &ChatRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
     fn stream_chat(
         &self,
@@ -80,12 +83,18 @@ impl InferenceClient for Client {
         &self,
         request: &ChatRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let task = request.to_task_chat();
         let how = How {
             api_token: Some(api_token),
             ..Default::default()
         };
+        // We never need to actually enter the span, as we do not require it to be set as active
+        // since we pass the tracing context around and always refer to the parent span_id.
+        // It is enough to simply create a span (this will register it with the subscriber) and
+        // set a start time. The span will be closed when it is dropped.
+        let _span = span!(target: "pharia-kernel::inference", parent: tracing_context.span_id().unwrap(), Level::INFO, "chat", model = request.model);
         retry(|| self.chat(&task, &request.model, &how))
             .await?
             .try_into()
@@ -606,9 +615,14 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token)
-            .await
-            .unwrap();
+        let chat_response = <Client as InferenceClient>::chat(
+            &client,
+            &chat_request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then a chat response is returned
         assert!(!chat_response.message.content.is_empty());
@@ -629,8 +643,13 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_result =
-            <Client as InferenceClient>::chat(&client, &chat_request, bad_api_token).await;
+        let chat_result = <Client as InferenceClient>::chat(
+            &client,
+            &chat_request,
+            bad_api_token,
+            TracingContext::dummy(),
+        )
+        .await;
 
         // Then an InferenceClientError Unauthorized is returned
         assert!(chat_result.is_err());
@@ -688,9 +707,14 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };
-        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token)
-            .await
-            .unwrap();
+        let chat_response = <Client as InferenceClient>::chat(
+            &client,
+            &chat_request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then we expect the word oat, to appear at least five times
         let number_oat_mentioned = chat_response
@@ -759,9 +783,14 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 ..Default::default()
             },
         };
-        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token)
-            .await
-            .unwrap();
+        let chat_response = <Client as InferenceClient>::chat(
+            &client,
+            &chat_request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then
         assert_eq!(chat_response.logprobs.len(), 1);
@@ -842,9 +871,14 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 ..Default::default()
             },
         };
-        let chat_response = <Client as InferenceClient>::chat(&client, &chat_request, api_token)
-            .await
-            .unwrap();
+        let chat_response = <Client as InferenceClient>::chat(
+            &client,
+            &chat_request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then
         assert_eq!(chat_response.usage.prompt, 20);
