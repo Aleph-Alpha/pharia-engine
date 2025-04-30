@@ -1,4 +1,5 @@
 use std::{borrow::Cow, future::Future, pin::Pin, sync::Arc, time::Instant};
+use tracing::Level;
 
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde_json::Value;
@@ -7,7 +8,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{error, info, warn};
+use tracing::{error, warn};
 
 use crate::{
     context_info,
@@ -292,7 +293,7 @@ impl RunMessageStreamMsg {
             input,
             send,
             api_token,
-            tracing_context: _tracing_context,
+            tracing_context,
         } = self;
 
         let skill_result = fetch_skill(store, &skill_path).await;
@@ -304,12 +305,13 @@ impl RunMessageStreamMsg {
             }
         };
 
+        log_skill_start(&tracing_context, &skill_path);
         let start = Instant::now();
         let result = runtime
             .run_message_stream(skill, input, csi_apis, api_token, send.clone())
             .await;
 
-        log_skill_result(&skill_path, &result);
+        log_skill_result(&tracing_context, &skill_path, &result);
         record_skill_execution_metrics(start, skill_path, &result);
     }
 }
@@ -389,11 +391,24 @@ fn record_skill_execution_metrics<T>(
     metrics::histogram!(SkillRuntimeMetrics::ExecutionDurationSeconds, &labels).record(latency);
 }
 
-fn log_skill_result<T>(skill_path: &SkillPath, result: &Result<T, SkillExecutionError>) {
-    use tracing::Level;
+fn log_skill_start(tracing_context: &TracingContext, skill_path: &SkillPath) {
+    context_info!(
+        tracing_context,
+        target: "pharia_kernel::skill_execution",
+        skill=%skill_path,
+        message="Starting skill execution"
+    );
+}
+
+fn log_skill_result<T>(
+    tracing_context: &TracingContext,
+    skill_path: &SkillPath,
+    result: &Result<T, SkillExecutionError>,
+) {
     match result {
         Ok(_) => {
-            info!(
+            context_info!(
+                tracing_context,
                 target: "pharia_kernel::skill_execution",
                 skill=%skill_path,
                 message="Skill executed successfully"
@@ -447,7 +462,6 @@ impl RunFunctionMsg {
             api_token,
             tracing_context,
         } = self;
-        context_info!(tracing_context, "Starting execution of skill {skill_path}");
         let skill_result = fetch_skill(store, &skill_path).await;
         let skill = match skill_result {
             Ok(skill) => skill,
@@ -457,12 +471,13 @@ impl RunFunctionMsg {
             }
         };
 
+        log_skill_start(&tracing_context, &skill_path);
         let start = Instant::now();
         let result = runtime
             .run_function(skill, input, csi_apis, api_token)
             .await;
 
-        log_skill_result(&skill_path, &result);
+        log_skill_result(&tracing_context, &skill_path, &result);
         record_skill_execution_metrics(start, skill_path, &result);
 
         // Error is expected to happen during shutdown. Ignore result.

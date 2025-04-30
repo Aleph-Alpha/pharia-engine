@@ -20,9 +20,15 @@ use crate::config::OtelConfig;
 
 #[macro_export]
 macro_rules! context_info {
-    ($tracing_context:expr, $message:literal) => {
+    // If target is provided, it must be specified before the parent.
+    ($tracing_context:expr, target: $target:literal, $($fields:tt)*) => {
         if let Some(span_id) = $tracing_context.span_id() {
-            tracing::info!(parent: span_id, $message);
+            tracing::info!(target: $target, parent: span_id, $($fields)*);
+        }
+    };
+    ($tracing_context:expr, $($fields:tt)*) => {
+        if let Some(span_id) = $tracing_context.span_id() {
+            tracing::info!(parent: span_id, $($fields)*);
         }
     };
 }
