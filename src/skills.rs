@@ -530,6 +530,7 @@ pub mod tests {
             Explanation, ExplanationRequest, FinishReason, TextScore, TokenUsage,
         },
         language_selection::{self, SelectLanguageRequest},
+        logging::TracingContext,
         search::{Document, DocumentPath, SearchRequest, SearchResult},
         skill_driver::SkillInvocationCtx,
     };
@@ -610,7 +611,12 @@ pub mod tests {
                 length: 2,
             }])
         });
-        let ctx = Box::new(SkillInvocationCtx::new(send, csi, "dummy token".to_owned()));
+        let ctx = Box::new(SkillInvocationCtx::new(
+            send,
+            csi,
+            "dummy token".to_owned(),
+            TracingContext::dummy(),
+        ));
         let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
         let actual = skill
             .run_as_function(

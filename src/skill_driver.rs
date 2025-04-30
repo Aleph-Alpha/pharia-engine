@@ -17,6 +17,7 @@ use crate::{
         Explanation, ExplanationRequest, InferenceError,
     },
     language_selection::{Language, SelectLanguageRequest},
+    logging::TracingContext,
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
@@ -39,10 +40,16 @@ impl SkillDriver {
         input: Value,
         csi: impl Csi + Send + Sync + 'static,
         api_token: String,
+        tracing_context: TracingContext,
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
         let (send_rt_err, mut recv_rt_err) = oneshot::channel();
-        let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi, api_token));
+        let csi_for_skills = Box::new(SkillInvocationCtx::new(
+            send_rt_err,
+            csi,
+            api_token,
+            tracing_context,
+        ));
 
         let (send_inner, mut recv_inner) = mpsc::channel(1);
 
@@ -109,9 +116,15 @@ impl SkillDriver {
         input: Value,
         csi_apis: impl Csi + Send + Sync + 'static,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> Result<Value, SkillExecutionError> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let csi_for_skills = Box::new(SkillInvocationCtx::new(send_rt_err, csi_apis, api_token));
+        let csi_for_skills = Box::new(SkillInvocationCtx::new(
+            send_rt_err,
+            csi_apis,
+            api_token,
+            tracing_context,
+        ));
         select! {
             result = skill.run_as_function(&self.engine, csi_for_skills, input) => result.map_err(Into::into),
             // An error occurred during skill execution.
@@ -144,6 +157,8 @@ pub struct SkillInvocationCtx<C> {
     csi_apis: C,
     // How the user authenticates with us
     api_token: String,
+    /// Context that is used to situate certain actions in the overall context.
+    tracing_context: TracingContext,
     /// ID counter for stored streams.
     current_stream_id: usize,
     /// Currently running chat streams. We store them here so that we can easier cancel the running
@@ -160,11 +175,13 @@ impl<C> SkillInvocationCtx<C> {
         send_rt_err: oneshot::Sender<anyhow::Error>,
         csi_apis: C,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> Self {
         SkillInvocationCtx {
             send_rt_error: Some(send_rt_err),
             csi_apis,
             api_token,
+            tracing_context,
             current_stream_id: 0,
             chat_streams: HashMap::new(),
             completion_streams: HashMap::new(),
@@ -689,7 +706,8 @@ mod test {
                 .collect())
         });
 
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned());
+        let mut invocation_ctx =
+            SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), TracingContext::dummy());
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -722,7 +740,8 @@ mod test {
         let (send, recv) = oneshot::channel();
         let mut csi = StubCsi::empty();
         csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
-        let mut invocation_ctx = SkillInvocationCtx::new(send, csi, "dummy token".to_owned());
+        let mut invocation_ctx =
+            SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), TracingContext::dummy());
 
         // When chunking a short text
         let model = "Pharia-1-LLM-7B-control".to_owned();
@@ -759,7 +778,8 @@ mod test {
         };
         let resp = completion.clone();
         let csi = StubCsi::with_completion(move |_| resp.clone());
-        let mut ctx = SkillInvocationCtx::new(send, csi, "dummy".to_owned());
+        let mut ctx =
+            SkillInvocationCtx::new(send, csi, "dummy".to_owned(), TracingContext::dummy());
         let request = CompletionRequest::new("prompt", "model");
 
         let stream_id = ctx.completion_stream_new(request).await;
@@ -804,7 +824,8 @@ mod test {
         };
         let stub_response = response.clone();
         let csi = StubCsi::with_chat(move |_| stub_response.clone());
-        let mut ctx = SkillInvocationCtx::new(send, csi, "dummy".to_owned());
+        let mut ctx =
+            SkillInvocationCtx::new(send, csi, "dummy".to_owned(), TracingContext::dummy());
         let request = ChatRequest {
             model: "model".to_owned(),
             messages: vec![],
@@ -958,6 +979,7 @@ mod test {
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
                 csi,
                 "dummy token".to_owned(),
+                TracingContext::dummy(),
             )
             .await;
 
@@ -981,6 +1003,7 @@ mod test {
                 json!("Homer"),
                 CsiSaboteur,
                 "TOKEN_NOT_REQUIRED".to_owned(),
+                TracingContext::dummy(),
             )
             .await;
 
@@ -1055,6 +1078,7 @@ mod test {
                 json!({}),
                 CsiSaboteur,
                 "Dummy Token".to_owned(),
+                TracingContext::dummy(),
                 send,
             )
             .await;
@@ -1078,6 +1102,7 @@ mod test {
                 json!({}),
                 CsiDummy,
                 "Dummy Token".to_owned(),
+                TracingContext::dummy(),
                 send,
             )
             .await;
@@ -1101,6 +1126,7 @@ mod test {
                 json!({}),
                 CsiDummy,
                 "Dummy Token".to_owned(),
+                TracingContext::dummy(),
                 send,
             )
             .await;
@@ -1124,6 +1150,7 @@ mod test {
                 json!({}),
                 CsiDummy,
                 "Dummy Token".to_owned(),
+                TracingContext::dummy(),
                 send,
             )
             .await;
@@ -1195,6 +1222,7 @@ mod test {
                 json!({}),
                 CsiDummy,
                 "Dummy Token".to_owned(),
+                TracingContext::dummy(),
                 send,
             )
             .await;
