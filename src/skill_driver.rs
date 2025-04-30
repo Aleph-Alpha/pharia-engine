@@ -263,7 +263,15 @@ where
     }
 
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-        match self.csi_apis.chat(self.api_token.clone(), requests).await {
+        match self
+            .csi_apis
+            .chat(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                requests,
+            )
+            .await
+        {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
