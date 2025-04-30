@@ -307,7 +307,14 @@ impl RunMessageStreamMsg {
         log_skill_start(&tracing_context, &skill_path);
         let start = Instant::now();
         let result = driver
-            .run_message_stream(skill, input, csi_apis, api_token, send.clone())
+            .run_message_stream(
+                skill,
+                input,
+                csi_apis,
+                api_token,
+                tracing_context.clone(),
+                send.clone(),
+            )
             .await;
 
         log_skill_result(&tracing_context, &skill_path, &result);
@@ -463,7 +470,7 @@ impl RunFunctionMsg {
         log_skill_start(&tracing_context, &skill_path);
         let start = Instant::now();
         let result = driver
-            .run_function(skill, input, csi_apis, api_token)
+            .run_function(skill, input, csi_apis, api_token, tracing_context.clone())
             .await;
 
         log_skill_result(&tracing_context, &skill_path, &result);
