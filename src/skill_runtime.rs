@@ -11,7 +11,7 @@ use tokio::{
 use tracing::{error, warn};
 
 use crate::{
-    context_info,
+    context_event,
     csi::Csi,
     logging::TracingContext,
     skill_driver::SkillDriver,
@@ -392,8 +392,9 @@ fn record_skill_execution_metrics<T>(
 }
 
 fn log_skill_start(tracing_context: &TracingContext, skill_path: &SkillPath) {
-    context_info!(
-        tracing_context,
+    context_event!(
+        context: tracing_context,
+        level: Level::INFO,
         target: "pharia_kernel::skill_execution",
         skill=%skill_path,
         message="Starting skill execution"
@@ -407,8 +408,9 @@ fn log_skill_result<T>(
 ) {
     match result {
         Ok(_) => {
-            context_info!(
-                tracing_context,
+            context_event!(
+                context: tracing_context,
+                level: Level::INFO,
                 target: "pharia_kernel::skill_execution",
                 skill=%skill_path,
                 message="Skill executed successfully"
