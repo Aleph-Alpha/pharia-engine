@@ -19,16 +19,16 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 use crate::config::OtelConfig;
 
 #[macro_export]
-macro_rules! context_info {
+macro_rules! context_event {
     // If target is provided, it must be specified before the parent.
-    ($tracing_context:expr, target: $target:literal, $($fields:tt)*) => {
+    (context: $tracing_context:expr, level: $lvl:expr, target: $target:literal, $($fields:tt)*) => {
         if let Some(span_id) = $tracing_context.span_id() {
-            tracing::info!(target: $target, parent: span_id, $($fields)*);
+            tracing::event!(target: $target, parent: span_id, $lvl, $($fields)*);
         }
     };
-    ($tracing_context:expr, $($fields:tt)*) => {
+    (context: $tracing_context:expr, level: $lvl:expr, $($fields:tt)*) => {
         if let Some(span_id) = $tracing_context.span_id() {
-            tracing::info!(parent: span_id, $($fields)*);
+            tracing::event!(parent: span_id, $lvl, $($fields)*);
         }
     };
 }
