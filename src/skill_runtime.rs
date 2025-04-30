@@ -42,10 +42,10 @@ impl SkillRuntime {
     where
         C: Csi + Clone + Send + Sync + 'static,
     {
-        let runtime = SkillDriver::new(engine);
+        let driver = SkillDriver::new(engine);
         let (send, recv) = mpsc::channel::<SkillRuntimeMsg>(1);
         let handle = tokio::spawn(async {
-            SkillRuntimeActor::new(runtime, store, recv, csi_apis)
+            SkillRuntimeActor::new(driver, store, recv, csi_apis)
                 .run()
                 .await;
         });
@@ -150,7 +150,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
 }
 
 struct SkillRuntimeActor<C, S> {
-    runtime: Arc<SkillDriver>,
+    driver: Arc<SkillDriver>,
     store: Arc<S>,
     recv: mpsc::Receiver<SkillRuntimeMsg>,
     csi_apis: C,
@@ -164,13 +164,13 @@ where
     S: SkillStoreApi + Send + Sync + 'static,
 {
     fn new(
-        runtime: SkillDriver,
+        driver: SkillDriver,
         store: S,
         recv: mpsc::Receiver<SkillRuntimeMsg>,
         csi_apis: C,
     ) -> Self {
         SkillRuntimeActor {
-            runtime: Arc::new(runtime),
+            driver: Arc::new(driver),
             store: Arc::new(store),
             recv,
             csi_apis,
@@ -187,10 +187,10 @@ where
                 msg = self.recv.recv() => match msg {
                     Some(msg) => {
                         let csi_apis = self.csi_apis.clone();
-                        let runtime = self.runtime.clone();
+                        let driver = self.driver.clone();
                         let store = self.store.clone();
                         self.running_requests.push(Box::pin(async move {
-                            msg.act(csi_apis, runtime.as_ref(), store.as_ref()).await;
+                            msg.act(csi_apis, driver.as_ref(), store.as_ref()).await;
                         }));
                     },
                     // Senders are gone, break out of the loop for shutdown.
@@ -233,18 +233,18 @@ impl SkillRuntimeMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &SkillDriver,
+        driver: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {
         match self {
             SkillRuntimeMsg::MessageStream(msg) => {
-                msg.act(csi_apis, runtime, store).await;
+                msg.act(csi_apis, driver, store).await;
             }
             SkillRuntimeMsg::Function(msg) => {
-                msg.act(csi_apis, runtime, store).await;
+                msg.act(csi_apis, driver, store).await;
             }
             SkillRuntimeMsg::Metadata(msg) => {
-                msg.act(runtime, store).await;
+                msg.act(driver, store).await;
             }
         }
     }
@@ -257,7 +257,7 @@ pub struct MetadataMsg {
 }
 
 impl MetadataMsg {
-    pub async fn act(self, runtime: &SkillDriver, store: &impl SkillStoreApi) {
+    pub async fn act(self, driver: &SkillDriver, store: &impl SkillStoreApi) {
         let skill_result = fetch_skill(store, &self.skill_path).await;
         let skill = match skill_result {
             Ok(skill) => skill,
@@ -266,7 +266,7 @@ impl MetadataMsg {
                 return;
             }
         };
-        let result = runtime.metadata(skill).await;
+        let result = driver.metadata(skill).await;
         drop(self.send.send(result));
     }
 }
@@ -284,7 +284,7 @@ impl RunMessageStreamMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &SkillDriver,
+        driver: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {
         let RunMessageStreamMsg {
@@ -306,7 +306,7 @@ impl RunMessageStreamMsg {
 
         log_skill_start(&tracing_context, &skill_path);
         let start = Instant::now();
-        let result = runtime
+        let result = driver
             .run_message_stream(skill, input, csi_apis, api_token, send.clone())
             .await;
 
@@ -441,7 +441,7 @@ impl RunFunctionMsg {
     async fn act(
         self,
         csi_apis: impl Csi + Send + Sync + 'static,
-        runtime: &SkillDriver,
+        driver: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {
         let RunFunctionMsg {
@@ -462,7 +462,7 @@ impl RunFunctionMsg {
 
         log_skill_start(&tracing_context, &skill_path);
         let start = Instant::now();
-        let result = runtime
+        let result = driver
             .run_function(skill, input, csi_apis, api_token)
             .await;
 
