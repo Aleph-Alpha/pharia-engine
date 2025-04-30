@@ -18,6 +18,15 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 
 use crate::config::OtelConfig;
 
+#[macro_export]
+macro_rules! context_info {
+    ($tracing_context:expr, $message:literal) => {
+        if let Some(span_id) = $tracing_context.span_id() {
+            tracing::info!(parent: span_id, $message);
+        }
+    };
+}
+
 /// Context that is needed to situate certain actions in the overall context.
 ///
 /// In this opaque type we specify decisions on what context needs to be passed
@@ -27,6 +36,10 @@ use crate::config::OtelConfig;
 pub struct TracingContext {
     /// This is the id from the `tracing` ecosystem. Within each trace there is a hierarchy
     /// of span. the `span_id` allows to situate spans in this hierarchy.
+    ///
+    /// If the subscriber indicates that it does not track the current span, or
+    /// that the thread from which this function is called is not currently
+    /// inside a span, we will have a `None` here.
     span_id: Option<Id>,
     /// The opentelemetry trace id. We store this separately from the span id, because
     /// it seems very hard to lookup a trace id for a span id without relying on
@@ -50,6 +63,10 @@ impl TracingContext {
             span_id: span.id(),
             trace_id,
         }
+    }
+
+    pub fn span_id(&self) -> Option<&Id> {
+        self.span_id.as_ref()
     }
 
     #[allow(dead_code)]

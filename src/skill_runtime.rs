@@ -10,6 +10,7 @@ use tokio::{
 use tracing::{error, info, warn};
 
 use crate::{
+    context_info,
     csi::Csi,
     logging::TracingContext,
     skill_driver::SkillDriver,
@@ -95,7 +96,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
-        _tracing_context: TracingContext,
+        tracing_context: TracingContext,
     ) -> Result<Value, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Function(RunFunctionMsg {
@@ -103,6 +104,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             input,
             send,
             api_token,
+            tracing_context,
         });
         self.send(msg)
             .await
@@ -423,6 +425,7 @@ pub struct RunFunctionMsg {
     pub input: Value,
     pub send: oneshot::Sender<Result<Value, SkillExecutionError>>,
     pub api_token: String,
+    pub tracing_context: TracingContext,
 }
 
 impl RunFunctionMsg {
@@ -437,8 +440,9 @@ impl RunFunctionMsg {
             input,
             send,
             api_token,
+            tracing_context,
         } = self;
-
+        context_info!(tracing_context, "Starting execution of skill {skill_path}");
         let skill_result = fetch_skill(store, &skill_path).await;
         let skill = match skill_result {
             Ok(skill) => skill,
@@ -764,6 +768,7 @@ pub mod tests {
             input: json!("Hello"),
             send,
             api_token: "dummy".to_owned(),
+            tracing_context: TracingContext::dummy(),
         };
 
         // Metrics requires sync, so all of the async parts are moved into this closure.
