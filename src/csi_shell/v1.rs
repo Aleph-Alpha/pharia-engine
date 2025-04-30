@@ -21,7 +21,9 @@ use crate::{
     authorization::AuthorizationApi,
     chunking,
     csi::Csi,
-    inference, language_selection, search,
+    inference, language_selection,
+    logging::TracingContext,
+    search,
     shell::{AppState, CsiState},
     skill_runtime::SkillRuntimeApi,
     skill_store::SkillStoreApi,
@@ -157,9 +159,11 @@ async fn chat<C>(
 where
     C: Csi,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
         .chat(
             bearer.token().to_owned(),
+            tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
         .await

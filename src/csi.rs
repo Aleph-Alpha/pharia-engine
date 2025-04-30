@@ -8,11 +8,13 @@ use tracing::trace;
 
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
+    context_event,
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
         Explanation, ExplanationRequest, InferenceApi, InferenceError,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
+    logging::TracingContext,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
 };
@@ -86,6 +88,7 @@ pub trait Csi {
     fn chat(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<ChatRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
 
@@ -216,29 +219,31 @@ where
     async fn chat(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<ChatRequest>,
     ) -> anyhow::Result<Vec<ChatResponse>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")])
             .increment(requests.len() as u64);
 
-        let explanations = try_join_all(
+        let responses = try_join_all(
             requests
                 .into_iter()
                 .map(|r| {
-                    trace!(
+                    context_event!(
+                        context: tracing_context,
+                        level: Level::INFO,
                         "chat: request.model={} request.params.max_tokens={}",
                         r.model,
                         r.params
                             .max_tokens
                             .map_or_else(|| "None".to_owned(), |val| val.to_string()),
                     );
-
                     self.inference.chat(r, auth.clone())
                 })
                 .collect::<Vec<_>>(),
         )
         .await?;
-        Ok(explanations)
+        Ok(responses)
     }
 
     async fn chat_stream(
@@ -418,6 +423,7 @@ pub mod tests {
         async fn chat(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<ChatRequest>,
         ) -> anyhow::Result<Vec<ChatResponse>> {
             bail!("Test error")
@@ -490,7 +496,11 @@ pub mod tests {
             },
         });
         let result = csi
-            .chat("dummy-token".to_owned(), vec![chat_request])
+            .chat(
+                "dummy-token".to_owned(),
+                TracingContext::dummy(),
+                vec![chat_request],
+            )
             .await
             .unwrap();
 
@@ -758,6 +768,7 @@ pub mod tests {
         async fn chat(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<ChatRequest>,
         ) -> anyhow::Result<Vec<ChatResponse>> {
             panic!("DummyCsi chat called")
@@ -924,6 +935,7 @@ pub mod tests {
         async fn chat(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             requests: Vec<ChatRequest>,
         ) -> anyhow::Result<Vec<ChatResponse>> {
             requests.into_iter().map(|r| (*self.chat)(r)).collect()

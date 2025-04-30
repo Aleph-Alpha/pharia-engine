@@ -5,7 +5,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection, search};
+use crate::{
+    chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection,
+    logging::TracingContext, search,
+};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
@@ -36,10 +39,13 @@ impl CsiRequest {
         C: Csi + Sync,
     {
         let response = match self {
-            CsiRequest::Chat(chat_request) => drivers
-                .chat(auth, vec![chat_request.into()])
-                .await
-                .map(|mut r| CsiResponse::Chat(r.remove(0).into())),
+            CsiRequest::Chat(chat_request) => {
+                let tracing_context = TracingContext::current();
+                drivers
+                    .chat(auth, tracing_context, vec![chat_request.into()])
+                    .await
+                    .map(|mut r| CsiResponse::Chat(r.remove(0).into()))
+            }
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await

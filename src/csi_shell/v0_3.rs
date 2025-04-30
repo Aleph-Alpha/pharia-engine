@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::csi_shell::CsiShellError;
+use crate::logging::TracingContext;
 use crate::{chunking, csi::Csi, inference, language_selection, search};
 
 #[derive(Deserialize)]
@@ -66,10 +67,17 @@ impl CsiRequest {
                         .collect(),
                 )
             }
-            CsiRequest::Chat { requests } => drivers
-                .chat(auth, requests.into_iter().map(Into::into).collect())
-                .await
-                .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect()))?,
+            CsiRequest::Chat { requests } => {
+                let tracing_context = TracingContext::current();
+                drivers
+                    .chat(
+                        auth,
+                        tracing_context,
+                        requests.into_iter().map(Into::into).collect(),
+                    )
+                    .await
+                    .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect()))?
+            }
             CsiRequest::Chunk { requests } => drivers
                 .chunk(auth, requests.into_iter().map(Into::into).collect())
                 .await

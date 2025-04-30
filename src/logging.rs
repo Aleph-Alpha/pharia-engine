@@ -36,6 +36,8 @@ macro_rules! context_event {
         }
     };
     (context: $tracing_context:expr, level: $lvl:expr, $($fields:tt)*) => {
+        use tracing::{Level, info, warn, error};
+
         if let Some(span_id) = $tracing_context.span_id() {
             match $lvl {
                 Level::INFO => info!(parent: span_id, $($fields)*),
