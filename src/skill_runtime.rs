@@ -82,6 +82,7 @@ pub trait SkillRuntimeApi {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = mpsc::Receiver<SkillExecutionEvent>> + Send;
 
     fn skill_metadata(
@@ -117,6 +118,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         skill_path: SkillPath,
         input: Value,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> mpsc::Receiver<SkillExecutionEvent> {
         let (send, recv) = mpsc::channel::<SkillExecutionEvent>(1);
 
@@ -125,6 +127,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             input,
             send,
             api_token,
+            tracing_context,
         };
 
         self.send(SkillRuntimeMsg::MessageStream(msg))
@@ -274,6 +277,7 @@ pub struct RunMessageStreamMsg {
     pub input: Value,
     pub send: mpsc::Sender<SkillExecutionEvent>,
     pub api_token: String,
+    pub tracing_context: TracingContext,
 }
 
 impl RunMessageStreamMsg {
@@ -288,6 +292,7 @@ impl RunMessageStreamMsg {
             input,
             send,
             api_token,
+            tracing_context: _tracing_context,
         } = self;
 
         let skill_result = fetch_skill(store, &skill_path).await;
@@ -675,6 +680,7 @@ pub mod tests {
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "hello"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
+                TracingContext::dummy(),
             )
             .await;
 
@@ -740,6 +746,7 @@ pub mod tests {
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "saboteur"),
                 json!(""),
                 "TOKEN_NOT_REQUIRED".to_owned(),
+                TracingContext::dummy(),
             )
             .await;
 
@@ -810,7 +817,12 @@ pub mod tests {
         // When
         let mut recv = runtime
             .api()
-            .run_message_stream(skill_path, json!({}), "dumm_token".to_owned())
+            .run_message_stream(
+                skill_path,
+                json!({}),
+                "dumm_token".to_owned(),
+                TracingContext::dummy(),
+            )
             .await;
 
         // Then
