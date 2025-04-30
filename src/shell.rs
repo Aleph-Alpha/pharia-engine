@@ -672,8 +672,9 @@ where
     R: SkillRuntimeApi,
 {
     let path = SkillPath::new(namespace, name);
+    let tracing_context = TracingContext::current();
     let mut stream_events = skill_runtime_api
-        .run_message_stream(path, input, bearer.token().to_owned())
+        .run_message_stream(path, input, bearer.token().to_owned(), tracing_context)
         .await;
 
     // We need to use `try_stream!` instead of `stream!`, because `stream!` does not implement the
@@ -1976,6 +1977,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             panic!("Skill runtime dummy called")
         }
@@ -2018,6 +2020,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             panic!(
                 "Use the `SkillRuntimeStub`, to simulate errors during streaming instead of the \
@@ -2083,6 +2086,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             let (send, recv) = mpsc::channel(self.stream_events.len());
             for ce in &self.stream_events {
@@ -2155,6 +2159,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             skill_path: SkillPath,
             input: Value,
             api_token: String,
+            _tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             let mut inner = self.inner.lock().unwrap();
             inner.api_token = api_token;
@@ -2261,6 +2266,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _skill_path: SkillPath,
             _input: Value,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             panic!("SpySkillRuntime does not support streaming")
         }
