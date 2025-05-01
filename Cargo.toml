@@ -44,7 +44,7 @@ engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.
 aleph-alpha-client = "0.23.1"
 anyhow = "1.0.98"
 async-trait = "0.1.88"
-axum = { version = "0.8.3", features = ["macros"] }
+axum = { version = "0.8.4", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
 dotenvy = "0.15.7"
 futures = "0.3.31"
