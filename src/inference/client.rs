@@ -86,8 +86,10 @@ impl InferenceClient for Client {
         tracing_context: TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let task = request.to_task_chat();
+
         let how = How {
             api_token: Some(api_token),
+            trace_context: tracing_context.as_inference_client_context(),
             ..Default::default()
         };
         // We never need to actually enter the span, as we do not require it to be set as active
