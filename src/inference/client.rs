@@ -94,7 +94,9 @@ impl InferenceClient for Client {
         // since we pass the tracing context around and always refer to the parent span_id.
         // It is enough to simply create a span (this will register it with the subscriber) and
         // set a start time. The span will be closed when it is dropped.
-        let _span = span!(target: "pharia-kernel::inference", parent: tracing_context.span_id().unwrap(), Level::INFO, "chat", model = request.model);
+        let _span = tracing_context.span_id().map(|span_id| {
+            span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "chat", model = request.model)
+        });
         retry(|| self.chat(&task, &request.model, &how))
             .await?
             .try_into()
