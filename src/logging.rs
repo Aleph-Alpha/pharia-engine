@@ -97,6 +97,21 @@ impl TracingContext {
     pub fn trace_id(&self) -> TraceId {
         self.trace_id
     }
+
+    /// Convert the tracing context to what the inference client expects.
+    pub fn as_inference_client_context(&self) -> Option<aleph_alpha_client::TraceContext> {
+        self.span_id().map(|id| {
+            aleph_alpha_client::TraceContext::new_sampled(self.trace_id_u128(), id.into_u64())
+        })
+    }
+
+    /// Get the inner u128 of the trace id.
+    ///
+    /// `TraceId` is a new type around u128. While it would be nice to access the inner value
+    /// directly, it is private, so we need to convert to bytes first.
+    fn trace_id_u128(&self) -> u128 {
+        u128::from_be_bytes(self.trace_id().to_bytes())
+    }
 }
 
 /// Set up two tracing subscribers:
