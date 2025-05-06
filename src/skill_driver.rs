@@ -293,7 +293,11 @@ where
         let id = self.next_stream_id();
         let recv = self
             .csi_apis
-            .chat_stream(self.api_token.clone(), request)
+            .chat_stream(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                request,
+            )
             .await;
         self.chat_streams.insert(id, recv);
         id

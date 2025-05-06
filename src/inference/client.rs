@@ -46,6 +46,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &ChatRequest,
         api_token: String,
+        tracing_context: TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn explain(
@@ -117,14 +118,18 @@ impl InferenceClient for Client {
         &self,
         request: &ChatRequest,
         api_token: String,
+        tracing_context: TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let task = request.to_task_chat();
         let how = How {
             api_token: Some(api_token),
+            trace_context: tracing_context.as_inference_client_context(),
             ..Default::default()
         };
-
+        let _span = tracing_context.span_id().map(|span_id| {
+            span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "stream_chat", model = request.model)
+        });
         let mut stream = retry(|| self.stream_chat(&task, &request.model, &how)).await?;
 
         while let Some(event) = stream.next().await {
@@ -996,9 +1001,15 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <Client as InferenceClient>::stream_chat(&client, &chat_request, api_token, send)
-                .await
-                .unwrap();
+            <Client as InferenceClient>::stream_chat(
+                &client,
+                &chat_request,
+                api_token,
+                TracingContext::dummy(),
+                send,
+            )
+            .await
+            .unwrap();
         });
 
         let mut events = vec![];
