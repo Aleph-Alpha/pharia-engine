@@ -65,15 +65,19 @@ impl CsiRequest {
                 .await
                 .map(|r| CsiResponse::CompleteAll(r.into_iter().map(Into::into).collect())),
             CsiRequest::Documents { requests } => drivers
-                .documents(auth, requests.into_iter().map(Into::into).collect())
+                .documents(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
                 .await
                 .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect())),
             CsiRequest::DocumentMetadata { document_path } => drivers
-                .document_metadata(auth, vec![document_path.into()])
+                .document_metadata(auth, tracing_context, vec![document_path.into()])
                 .await
                 .map(|mut r| CsiResponse::DocumentMetadata(r.remove(0))),
             CsiRequest::Search(search_request) => drivers
-                .search(auth, vec![search_request.into()])
+                .search(auth, tracing_context, vec![search_request.into()])
                 .await
                 .map(|mut r| {
                     CsiResponse::Search(r.remove(0).into_iter().map(Into::into).collect())

@@ -3,7 +3,7 @@ use std::future::Future;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::http::HttpClient;
+use crate::{http::HttpClient, logging::TracingContext};
 
 pub trait SearchClient: Send + Sync + 'static {
     fn search(
@@ -11,18 +11,21 @@ pub trait SearchClient: Send + Sync + 'static {
         index: IndexPath,
         request: SearchRequest,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
 
     fn document_metadata(
         &self,
         document_path: DocumentPath,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
 
     fn document(
         &self,
         document_path: DocumentPath,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
 
@@ -194,6 +197,7 @@ impl SearchClient for Client {
         index: IndexPath,
         request: SearchRequest,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let IndexPath {
             namespace,
@@ -223,13 +227,15 @@ impl SearchClient for Client {
 
         // Namespaces, collections and indexes must match regex ^[a-zA-Z0-9\-\.]+$
         // therefore, we do not need to url encode them
-        Ok(self
-            .http
-            .post(format!(
-                "{}/collections/{namespace}/{collection}/indexes/{index}/search",
-                &self.host
-            ))
-            .bearer_auth(api_token)
+        let url = format!(
+            "{}/collections/{namespace}/{collection}/indexes/{index}/search",
+            &self.host
+        );
+        let mut builder = self.http.post(url).bearer_auth(api_token);
+        if let Some(traceparent) = tracing_context.traceparent() {
+            builder = builder.header("traceparent", traceparent);
+        }
+        Ok(builder
             .json(&body)
             .send()
             .await?
@@ -242,6 +248,7 @@ impl SearchClient for Client {
         &self,
         document_path: DocumentPath,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         #[derive(Deserialize)]
         struct Document {
@@ -258,13 +265,15 @@ impl SearchClient for Client {
         // therefore, we do not need to url encode them
         // A document name can contain characters like `/`, which need to be url encoded
         let encoded_name = urlencoding::encode(&name);
-        let document = self
-            .http
-            .get(format!(
-                "{}/collections/{namespace}/{collection}/docs/{encoded_name}",
-                &self.host
-            ))
-            .bearer_auth(api_token)
+        let url = format!(
+            "{}/collections/{namespace}/{collection}/docs/{encoded_name}",
+            &self.host
+        );
+        let mut builder = self.http.get(url).bearer_auth(api_token);
+        if let Some(traceparent) = tracing_context.traceparent() {
+            builder = builder.header("traceparent", traceparent);
+        }
+        let document = builder
             .send()
             .await?
             .error_for_status()?
@@ -278,6 +287,7 @@ impl SearchClient for Client {
         &self,
         document_path: DocumentPath,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Document> {
         #[derive(Deserialize)]
         struct JsonDocument {
@@ -295,13 +305,15 @@ impl SearchClient for Client {
         // therefore, we do not need to url encode them
         // A document name can contain characters like `/`, which need to be url encoded
         let encoded_name = urlencoding::encode(name);
-        let document = self
-            .http
-            .get(format!(
-                "{}/collections/{namespace}/{collection}/docs/{encoded_name}",
-                &self.host
-            ))
-            .bearer_auth(api_token)
+        let url = format!(
+            "{}/collections/{namespace}/{collection}/docs/{encoded_name}",
+            &self.host
+        );
+        let mut builder = self.http.get(url).bearer_auth(api_token);
+        if let Some(traceparent) = tracing_context.traceparent() {
+            builder = builder.header("traceparent", traceparent);
+        }
+        let document = builder
             .send()
             .await?
             .error_for_status()?
@@ -342,6 +354,7 @@ pub mod tests {
             _index: IndexPath,
             _request: SearchRequest,
             _api_token: &str,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Vec<SearchResult>> {
             Ok(vec![])
         }
@@ -350,6 +363,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Option<Value>> {
             Ok(None)
         }
@@ -358,6 +372,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Document> {
             Ok(Document::dummy())
         }
@@ -400,7 +415,10 @@ pub mod tests {
 
         // When requesting a document
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
-        let document = client.document(document_path, api_token).await.unwrap();
+        let document = client
+            .document(document_path, api_token, TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then we get the expected document
         assert!(!document.contents.is_empty());
@@ -415,7 +433,9 @@ pub mod tests {
 
         // When requesting a document that does not exist
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs-not-found");
-        let maybe_document = client.document(document_path, api_token).await;
+        let maybe_document = client
+            .document(document_path, api_token, TracingContext::dummy())
+            .await;
 
         // Then we get no document
         assert!(maybe_document.is_err());
@@ -439,7 +459,10 @@ pub mod tests {
             true,
             Vec::new(),
         );
-        let results = client.search(index, request, api_token).await.unwrap();
+        let results = client
+            .search(index, request, api_token, TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then we get at least one result
         assert_eq!(results.len(), 1);
@@ -466,7 +489,7 @@ pub mod tests {
         // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel/docs");
         let maybe_metadata = client
-            .document_metadata(document_path, api_token)
+            .document_metadata(document_path, api_token, TracingContext::dummy())
             .await
             .unwrap();
 
@@ -501,7 +524,10 @@ pub mod tests {
             true,
             Vec::new(),
         );
-        let results = client.search(index, request, api_token).await.unwrap();
+        let results = client
+            .search(index, request, api_token, TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then we don't get any results
         assert!(results.is_empty());
@@ -530,7 +556,10 @@ pub mod tests {
             true,
             vec![filter],
         );
-        let results = client.search(index, request, api_token).await.unwrap();
+        let results = client
+            .search(index, request, api_token, TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then we don't get any results
         assert!(results.is_empty());
@@ -559,7 +588,10 @@ pub mod tests {
             true,
             vec![filter],
         );
-        let results = client.search(index, request, api_token).await.unwrap();
+        let results = client
+            .search(index, request, api_token, TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then we don't get any results
         assert!(results.is_empty());

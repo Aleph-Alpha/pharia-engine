@@ -4,7 +4,7 @@ use futures::future::try_join_all;
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::mpsc;
-use tracing::{Level, span, trace};
+use tracing::{Level, span};
 
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
@@ -119,18 +119,21 @@ pub trait Csi {
     fn search(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<SearchRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send;
 
     fn documents(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send;
 
     fn document_metadata(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send;
 }
@@ -298,6 +301,7 @@ where
     async fn search(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<SearchRequest>,
     ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "search")])
@@ -305,16 +309,11 @@ where
 
         try_join_all(requests.into_iter().map(|request| {
             let index_path = &request.index_path;
-            trace!(
-                "search: namespace={} collection={} max_results={} min_score={}",
-                index_path.namespace,
-                index_path.collection,
-                request.max_results,
-                request
-                    .min_score
-                    .map_or_else(|| "None".to_owned(), |val| val.to_string())
-            );
-            self.search.search(request, auth.clone())
+            let span = tracing_context.span_id().map(|span_id| {
+                span!(target: "pharia-kernel::search", parent: span_id, Level::INFO, "search", namespace = index_path.namespace, collection = index_path.collection, max_results = request.max_results, min_score = request.min_score.map_or_else(|| "None".to_owned(), |val| val.to_string()))
+            });
+            let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+            self.search.search(request, auth.clone(), child_context)
         }))
         .await
     }
@@ -322,14 +321,20 @@ where
     async fn documents(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> anyhow::Result<Vec<Document>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "documents")]).increment(1);
-        trace!("documents: requests.len()={}", requests.len());
         try_join_all(
             requests
                 .into_iter()
-                .map(|r| self.search.document(r, auth.clone()))
+                .map(|r| {
+                    let span = tracing_context.span_id().map(|span_id| {
+                        span!(target: "pharia-kernel::search", parent: span_id, Level::INFO, "document", namespace = r.namespace, collection = r.collection, name = r.name)
+                    });
+                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+                    self.search.document(r, auth.clone(), child_context)
+                })
                 .collect::<Vec<_>>(),
         )
         .await
@@ -338,6 +343,7 @@ where
     async fn document_metadata(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> anyhow::Result<Vec<Option<Value>>> {
         metrics::counter!(
@@ -345,11 +351,16 @@ where
             &[("function", "document_metadata")]
         )
         .increment(1);
-        trace!("document_metadata: requests.len()={}", requests.len());
         try_join_all(
             requests
                 .into_iter()
-                .map(|r| self.search.document_metadata(r, auth.clone()))
+                .map(|r| {
+                    let span = tracing_context.span_id().map(|span_id| {
+                        span!(target: "pharia-kernel::search", parent: span_id, Level::INFO, "document_metadata", namespace = r.namespace, collection = r.collection, name = r.name)
+                    });
+                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+                    self.search.document_metadata(r, auth.clone(), child_context)
+                })
                 .collect::<Vec<_>>(),
         )
         .await
@@ -456,6 +467,7 @@ pub mod tests {
         async fn search(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<SearchRequest>,
         ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
             bail!("Test error")
@@ -464,6 +476,7 @@ pub mod tests {
         async fn documents(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Document>> {
             bail!("Test error")
@@ -472,6 +485,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _document_paths: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Option<Value>>> {
             bail!("Test error")
@@ -563,7 +577,7 @@ pub mod tests {
             name: "docs".to_owned(),
         }];
         let documents = csi_apis
-            .documents("dummy_token".to_owned(), request)
+            .documents("dummy_token".to_owned(), TracingContext::dummy(), request)
             .await
             .unwrap();
 
@@ -721,7 +735,11 @@ pub mod tests {
         };
 
         let responses = csi_apis
-            .document_metadata(api_token().to_owned(), vec![request_1, request_2])
+            .document_metadata(
+                api_token().to_owned(),
+                TracingContext::dummy(),
+                vec![request_1, request_2],
+            )
             .await
             .unwrap();
 
@@ -814,6 +832,7 @@ pub mod tests {
         async fn search(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<SearchRequest>,
         ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
             panic!("DummyCsi search called")
@@ -822,6 +841,7 @@ pub mod tests {
         async fn documents(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Document>> {
             panic!("DummyCsi documents called")
@@ -830,6 +850,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _document_paths: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Option<Value>>> {
             panic!("DummyCsi metadata_document called")
@@ -1004,6 +1025,7 @@ pub mod tests {
         async fn search(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<SearchRequest>,
         ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
             unimplemented!()
@@ -1027,6 +1049,7 @@ pub mod tests {
         async fn documents(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Document>> {
             unimplemented!()
@@ -1035,6 +1058,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _document_paths: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Option<Value>>> {
             unimplemented!()

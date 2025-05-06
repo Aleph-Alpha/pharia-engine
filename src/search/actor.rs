@@ -9,6 +9,8 @@ use tokio::{
 };
 use tracing::error;
 
+use crate::logging::TracingContext;
+
 use super::client::{
     Client, Cursor, Document, DocumentPath, Filter, IndexPath, Modality, SearchClient,
     SearchRequest as ClientSearchRequest, SearchResult as ClientSearchResult,
@@ -54,16 +56,19 @@ pub trait SearchApi {
         &self,
         request: SearchRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
     fn document_metadata(
         &self,
         document_path: DocumentPath,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
     fn document(
         &self,
         document_path: DocumentPath,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
 
@@ -72,12 +77,14 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         &self,
         request: SearchRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let (send, recv) = oneshot::channel();
         let msg = DocumentIndexMessage::Search {
             request,
             send,
             api_token,
+            tracing_context,
         };
         self.send(msg)
             .await
@@ -90,12 +97,14 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         &self,
         document_path: DocumentPath,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         let (send, recv) = oneshot::channel();
         let msg = DocumentIndexMessage::Metadata {
             document_path,
             send,
             api_token,
+            tracing_context,
         };
         self.send(msg)
             .await
@@ -108,12 +117,14 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         &self,
         document_path: DocumentPath,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Document> {
         let (send, recv) = oneshot::channel();
         let msg = DocumentIndexMessage::Document {
             document_path,
             send,
             api_token,
+            tracing_context,
         };
         self.send(msg)
             .await
@@ -213,16 +224,19 @@ pub enum DocumentIndexMessage {
         request: SearchRequest,
         send: oneshot::Sender<anyhow::Result<Vec<SearchResult>>>,
         api_token: String,
+        tracing_context: TracingContext,
     },
     Metadata {
         document_path: DocumentPath,
         send: oneshot::Sender<anyhow::Result<Option<Value>>>,
         api_token: String,
+        tracing_context: TracingContext,
     },
     Document {
         document_path: DocumentPath,
         send: oneshot::Sender<anyhow::Result<Document>>,
         api_token: String,
+        tracing_context: TracingContext,
     },
 }
 
@@ -233,24 +247,30 @@ impl DocumentIndexMessage {
                 request,
                 send,
                 api_token,
+                tracing_context,
             } => {
-                let results = Self::search(client, request, &api_token).await;
+                let results = Self::search(client, request, &api_token, tracing_context).await;
                 drop(send.send(results));
             }
             Self::Metadata {
                 document_path,
                 send,
                 api_token,
+                tracing_context,
             } => {
-                let results = Self::document_metadata(client, document_path, &api_token).await;
+                let results =
+                    Self::document_metadata(client, document_path, &api_token, tracing_context)
+                        .await;
                 drop(send.send(results));
             }
             Self::Document {
                 document_path,
                 send,
                 api_token,
+                tracing_context,
             } => {
-                let results = Self::document(client, document_path, &api_token).await;
+                let results =
+                    Self::document(client, document_path, &api_token, tracing_context).await;
                 drop(send.send(results));
             }
         }
@@ -260,6 +280,7 @@ impl DocumentIndexMessage {
         client: &impl SearchClient,
         request: SearchRequest,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let SearchRequest {
             index_path: index,
@@ -280,6 +301,7 @@ impl DocumentIndexMessage {
                     filters,
                 ),
                 api_token,
+                tracing_context,
             )
             .await?
             .into_iter()
@@ -335,16 +357,22 @@ impl DocumentIndexMessage {
         client: &impl SearchClient,
         document_path: DocumentPath,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Option<Value>> {
-        client.document_metadata(document_path, api_token).await
+        client
+            .document_metadata(document_path, api_token, tracing_context)
+            .await
     }
 
     async fn document(
         client: &impl SearchClient,
         document_path: DocumentPath,
         api_token: &str,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Document> {
-        client.document(document_path, api_token).await
+        client
+            .document(document_path, api_token, tracing_context)
+            .await
     }
 }
 
@@ -404,6 +432,7 @@ pub mod tests {
             &self,
             _request: SearchRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Vec<SearchResult>> {
             unimplemented!()
         }
@@ -412,6 +441,7 @@ pub mod tests {
             &self,
             document_path: DocumentPath,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Option<Value>> {
             (self.document_metadata)(document_path)
         }
@@ -420,6 +450,7 @@ pub mod tests {
             &self,
             document_path: DocumentPath,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Document> {
             (self.document)(document_path)
         }
@@ -462,7 +493,11 @@ pub mod tests {
         // When making a query on an existing collection
         let index = IndexPath::new("Kernel", "test", "asym-64");
         let request = SearchRequest::new(index, "What is the Pharia Kernel?");
-        let results = search.api().search(request, api_token).await.unwrap();
+        let results = search
+            .api()
+            .search(request, api_token, TracingContext::dummy())
+            .await
+            .unwrap();
         search.wait_for_shutdown().await;
 
         // Then we get at least one result
@@ -488,7 +523,7 @@ pub mod tests {
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
         let result = search
             .api()
-            .document_metadata(document_path, api_token)
+            .document_metadata(document_path, api_token, TracingContext::dummy())
             .await
             .unwrap();
         search.wait_for_shutdown().await;
@@ -518,7 +553,11 @@ pub mod tests {
         let request = SearchRequest::new(index, "What is the Pharia Kernel?")
             .with_max_results(max_results)
             .with_min_score(min_score);
-        let results = search.api().search(request, api_token).await.unwrap();
+        let results = search
+            .api()
+            .search(request, api_token, TracingContext::dummy())
+            .await
+            .unwrap();
         search.wait_for_shutdown().await;
 
         // Then we don't get any results
@@ -540,7 +579,11 @@ pub mod tests {
         });
         let filter = Filter::Without(vec![filter_condition]);
         let request = SearchRequest::new(index, "What is the Pharia Kernel?").with_filter(filter);
-        let results = search.api().search(request, api_token).await.unwrap();
+        let results = search
+            .api()
+            .search(request, api_token, TracingContext::dummy())
+            .await
+            .unwrap();
         search.wait_for_shutdown().await;
 
         // Then we don't get any results
@@ -568,6 +611,7 @@ pub mod tests {
             _index: IndexPath,
             _request: ClientSearchRequest,
             _api_token: &str,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Vec<ClientSearchResult>> {
             self.expected_concurrent_requests
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |e| {
@@ -585,6 +629,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Option<Value>> {
             unimplemented!()
         }
@@ -593,6 +638,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Document> {
             unimplemented!()
         }
@@ -613,9 +659,14 @@ pub mod tests {
         let resp = try_join!(
             api.search(
                 SearchRequest::new(index_path.clone(), "query"),
-                "0".to_owned()
+                "0".to_owned(),
+                TracingContext::dummy(),
             ),
-            api.search(SearchRequest::new(index_path, "query"), "1".to_owned()),
+            api.search(
+                SearchRequest::new(index_path, "query"),
+                "1".to_owned(),
+                TracingContext::dummy(),
+            ),
         );
 
         // We need to drop the sender in order for `actor.run` to terminate

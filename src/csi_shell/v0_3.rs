@@ -50,6 +50,7 @@ pub enum CsiRequest {
 }
 
 impl CsiRequest {
+    #[allow(clippy::too_many_lines)]
     pub async fn respond<C>(
         self,
         drivers: &C,
@@ -121,15 +122,27 @@ impl CsiRequest {
                 .await
                 .map(|v| CsiResponse::Complete(v.into_iter().map(Into::into).collect()))?,
             CsiRequest::Documents { requests } => drivers
-                .documents(auth, requests.into_iter().map(Into::into).collect())
+                .documents(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
                 .await
                 .map(|r| CsiResponse::Documents(r.into_iter().map(Into::into).collect()))?,
             CsiRequest::DocumentMetadata { requests } => drivers
-                .document_metadata(auth, requests.into_iter().map(Into::into).collect())
+                .document_metadata(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
                 .await
                 .map(CsiResponse::DocumentMetadata)?,
             CsiRequest::Search { requests } => drivers
-                .search(auth, requests.into_iter().map(Into::into).collect())
+                .search(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
                 .await
                 .map(|v| {
                     CsiResponse::SearchResult(

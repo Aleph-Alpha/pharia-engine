@@ -351,7 +351,15 @@ where
     }
 
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-        match self.csi_apis.search(self.api_token.clone(), requests).await {
+        match self
+            .csi_apis
+            .search(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                requests,
+            )
+            .await
+        {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
@@ -360,7 +368,11 @@ where
     async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
         match self
             .csi_apis
-            .documents(self.api_token.clone(), requests)
+            .documents(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                requests,
+            )
             .await
         {
             Ok(value) => value,
@@ -371,7 +383,11 @@ where
     async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
         match self
             .csi_apis
-            .document_metadata(self.api_token.clone(), requests)
+            .document_metadata(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                requests,
+            )
             .await
         {
             // We know there will always be exactly one element in the vector
