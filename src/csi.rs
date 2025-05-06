@@ -97,6 +97,7 @@ pub trait Csi {
     fn chat_stream(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         request: ChatRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
 
@@ -238,12 +239,15 @@ where
     async fn chat_stream(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         request: ChatRequest,
     ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
             .increment(1);
 
-        self.inference.chat_stream(request, auth).await
+        self.inference
+            .chat_stream(request, auth, tracing_context)
+            .await
     }
 
     async fn chunk(
@@ -424,6 +428,7 @@ pub mod tests {
         async fn chat_stream(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _request: ChatRequest,
         ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
             let (send, recv) = mpsc::channel(1);
@@ -624,7 +629,9 @@ pub mod tests {
             params: ChatParams::default(),
         };
 
-        let mut chat = csi_apis.chat_stream(api_token().to_owned(), chat_req).await;
+        let mut chat = csi_apis
+            .chat_stream(api_token().to_owned(), TracingContext::dummy(), chat_req)
+            .await;
 
         let mut events = vec![];
         while let Some(Ok(event)) = chat.recv().await {
@@ -777,6 +784,7 @@ pub mod tests {
         async fn chat_stream(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _request: ChatRequest,
         ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
             panic!("DummyCsi chat_stream called")
@@ -947,6 +955,7 @@ pub mod tests {
         async fn chat_stream(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             request: ChatRequest,
         ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
             let (sender, receiver) = mpsc::channel(1);
