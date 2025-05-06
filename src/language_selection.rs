@@ -1,7 +1,8 @@
 use derive_more::{Constructor, Deref, From, Into};
 use lingua::LanguageDetectorBuilder;
 use thiserror::Error;
-use tracing::trace;
+
+use crate::{context_event, logging::TracingContext};
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum LanguageError {
@@ -116,7 +117,10 @@ impl SelectLanguageRequest {
     }
 }
 
-pub fn select_language(request: SelectLanguageRequest) -> Result<Option<Language>, LanguageError> {
+pub fn select_language(
+    request: SelectLanguageRequest,
+    tracing_context: TracingContext,
+) -> Result<Option<Language>, LanguageError> {
     let languages = request
         .languages
         .into_iter()
@@ -126,10 +130,7 @@ pub fn select_language(request: SelectLanguageRequest) -> Result<Option<Language
         .with_minimum_relative_distance(0.5) // empirical value that makes the tests pass ;-)
         .build();
     let language = detector.detect_language_of(&request.text).map(Into::into);
-    trace!(
-        "select_language: text.len()={} languages={languages:?} selected_language={language:?}",
-        request.text.len()
-    );
+    context_event!(context: tracing_context, level: Level::INFO, message="selected language {language:?}");
     Ok(language)
 }
 
@@ -143,7 +144,7 @@ mod tests {
         let text = "A little bit is better than nothing.".to_owned();
         let languages = vec![Language("eng".to_owned()), Language("deu".to_owned())];
         let request = SelectLanguageRequest { text, languages };
-        let language = select_language(request).unwrap();
+        let language = select_language(request, TracingContext::dummy()).unwrap();
 
         assert!(language.is_some());
         assert_eq!(language.unwrap(), Language("eng".to_owned()));
@@ -154,7 +155,7 @@ mod tests {
         let text = "Ich spreche Deutsch nur ein bisschen.".to_owned();
         let languages = vec![Language("eng".to_owned()), Language("deu".to_owned())];
         let request = SelectLanguageRequest { text, languages };
-        let language = select_language(request).unwrap();
+        let language = select_language(request, TracingContext::dummy()).unwrap();
 
         assert!(language.is_some());
         assert_eq!(language.unwrap(), Language("deu".to_owned()));
@@ -165,7 +166,7 @@ mod tests {
         let text = "Parlez-vous français?".to_owned();
         let languages = vec![Language("eng".to_owned()), Language("deu".to_owned())];
         let request = SelectLanguageRequest { text, languages };
-        let language = select_language(request).unwrap();
+        let language = select_language(request, TracingContext::dummy()).unwrap();
         assert!(language.is_none());
     }
 
@@ -174,7 +175,7 @@ mod tests {
         let text = "A little bit is better than nothing.".to_owned();
         let languages = vec![Language("foo".to_owned()), Language("deu".to_owned())];
         let request = SelectLanguageRequest { text, languages };
-        let error = select_language(request).unwrap_err();
+        let error = select_language(request, TracingContext::dummy()).unwrap_err();
 
         assert_eq!(error, LanguageError::Unsupported("foo".to_owned()));
     }

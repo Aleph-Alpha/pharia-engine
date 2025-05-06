@@ -340,7 +340,11 @@ where
         &mut self,
         requests: Vec<SelectLanguageRequest>,
     ) -> Vec<Option<Language>> {
-        match self.csi_apis.select_language(requests).await {
+        match self
+            .csi_apis
+            .select_language(requests, self.tracing_context.clone())
+            .await
+        {
             Ok(language) => language,
             Err(error) => self.send_error(error).await,
         }

@@ -113,6 +113,7 @@ pub trait Csi {
     fn select_language(
         &self,
         requests: Vec<SelectLanguageRequest>,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Language>>>> + Send;
 
     fn search(
@@ -276,11 +277,18 @@ where
     async fn select_language(
         &self,
         requests: Vec<SelectLanguageRequest>,
+        tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<Option<Language>>> {
         Ok(try_join_all(
             requests
                 .into_iter()
-                .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
+                .map(|request| {
+                    let span = tracing_context.span_id().map(|span_id| {
+                        span!(target: "pharia-kernel::select_language", parent: span_id, Level::INFO, "select_language", text_len = request.text.len(), languages = request.languages.len())
+                    });
+                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+                    tokio::task::spawn_blocking(move || select_language(request, child_context))
+                })
         )
         .await?
         .into_iter()
@@ -440,6 +448,7 @@ pub mod tests {
         async fn select_language(
             &self,
             _requests: Vec<SelectLanguageRequest>,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Vec<Option<Language>>> {
             bail!("Test error")
         }
@@ -797,6 +806,7 @@ pub mod tests {
         async fn select_language(
             &self,
             _requests: Vec<SelectLanguageRequest>,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Vec<Option<Language>>> {
             panic!("DummyCsi select_language called")
         }
@@ -1002,12 +1012,13 @@ pub mod tests {
         async fn select_language(
             &self,
             requests: Vec<SelectLanguageRequest>,
+            _tracing_context: TracingContext,
         ) -> anyhow::Result<Vec<Option<Language>>> {
-            Ok(try_join_all(
-                requests
-                    .into_iter()
-                    .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
-            )
+            Ok(try_join_all(requests.into_iter().map(|request| {
+                tokio::task::spawn_blocking(move || {
+                    select_language(request, TracingContext::dummy())
+                })
+            }))
             .await?
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?)
@@ -1267,11 +1278,11 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             &mut self,
             requests: Vec<SelectLanguageRequest>,
         ) -> Vec<Option<Language>> {
-            try_join_all(
-                requests
-                    .into_iter()
-                    .map(|request| tokio::task::spawn_blocking(move || select_language(request))),
-            )
+            try_join_all(requests.into_iter().map(|request| {
+                tokio::task::spawn_blocking(move || {
+                    select_language(request, TracingContext::dummy())
+                })
+            }))
             .await
             .unwrap()
             .into_iter()

@@ -139,7 +139,10 @@ impl CsiRequest {
                     )
                 })?,
             CsiRequest::SelectLanguage { requests } => drivers
-                .select_language(requests.into_iter().map(Into::into).collect())
+                .select_language(
+                    requests.into_iter().map(Into::into).collect(),
+                    tracing_context,
+                )
                 .await
                 .map(|r| {
                     CsiResponse::SelectLanguage(r.into_iter().map(|m| m.map(Into::into)).collect())
