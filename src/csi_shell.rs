@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use crate::{
     authorization::AuthorizationApi,
     csi::{Csi, CsiError},
+    logging::TracingContext,
     shell::{AppState, CsiState},
     skill_runtime::SkillRuntimeApi,
     skill_store::SkillStoreApi,
@@ -46,12 +47,17 @@ where
     C: Csi + Clone + Sync,
 {
     let drivers = csi;
+    let tracing_context = TracingContext::current();
     let result = match args {
         VersionedCsiRequest::V0_2(request) => {
-            request.respond(&drivers, bearer.token().to_owned()).await
+            request
+                .respond(&drivers, bearer.token().to_owned(), tracing_context)
+                .await
         }
         VersionedCsiRequest::V0_3(request) => {
-            request.respond(&drivers, bearer.token().to_owned()).await
+            request
+                .respond(&drivers, bearer.token().to_owned(), tracing_context)
+                .await
         }
         VersionedCsiRequest::Unknown(request) => Err(request.into()),
     };

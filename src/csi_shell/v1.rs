@@ -245,9 +245,11 @@ async fn complete<C>(
 where
     C: Csi,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
         .complete(
             bearer.token().to_owned(),
+            tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
         .await

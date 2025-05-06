@@ -56,6 +56,7 @@ pub trait InferenceApi {
         &self,
         request: CompletionRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Completion, InferenceError>> + Send;
 
     fn completion_stream(
@@ -103,12 +104,14 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         &self,
         request: CompletionRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> Result<Completion, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Complete {
             request,
             send,
             api_token,
+            tracing_context,
         };
         self.send(msg)
             .await
@@ -439,6 +442,7 @@ pub enum InferenceMessage {
         request: CompletionRequest,
         send: oneshot::Sender<Result<Completion, InferenceError>>,
         api_token: String,
+        tracing_context: TracingContext,
     },
     CompletionStream {
         request: CompletionRequest,
@@ -470,8 +474,11 @@ impl InferenceMessage {
                 request,
                 send,
                 api_token,
+                tracing_context,
             } => {
-                let result = client.complete(&request, api_token.clone()).await;
+                let result = client
+                    .complete(&request, api_token.clone(), tracing_context)
+                    .await;
                 drop(send.send(result));
             }
             Self::CompletionStream {
@@ -637,6 +644,7 @@ pub mod tests {
             &self,
             request: CompletionRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<Completion, InferenceError> {
             let completion = (self.complete)(request)?;
             Ok(completion)
@@ -743,6 +751,7 @@ pub mod tests {
             &self,
             _params: &super::CompletionRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<Completion, InferenceError> {
             let remaining = self
                 .remaining_failures
@@ -797,7 +806,7 @@ pub mod tests {
 
         // when
         let result = inference_api
-            .complete(request, "dummy_api".to_owned())
+            .complete(request, "dummy_api".to_owned(), TracingContext::dummy())
             .await;
 
         // then
@@ -836,6 +845,7 @@ pub mod tests {
             &self,
             request: &CompletionRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<Completion, InferenceError> {
             self.expected_concurrent_requests
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |e| {
@@ -889,8 +899,16 @@ pub mod tests {
         // When
         // Schedule two tasks
         let resp = try_join!(
-            api.complete(complete_text_params_dummy(), "0".to_owned()),
-            api.complete(complete_text_params_dummy(), "1".to_owned())
+            api.complete(
+                complete_text_params_dummy(),
+                "0".to_owned(),
+                TracingContext::dummy()
+            ),
+            api.complete(
+                complete_text_params_dummy(),
+                "1".to_owned(),
+                TracingContext::dummy()
+            )
         );
 
         // Then: Both run concurrently and only return once both are completed.
