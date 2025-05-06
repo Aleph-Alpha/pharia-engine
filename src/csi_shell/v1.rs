@@ -223,9 +223,11 @@ async fn explain<C>(
 where
     C: Csi,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
         .explain(
             bearer.token().to_owned(),
+            tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
         .await
