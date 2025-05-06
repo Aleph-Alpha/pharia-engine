@@ -50,6 +50,7 @@ pub trait InferenceApi {
         &self,
         request: ExplanationRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 
     fn complete(
@@ -84,12 +85,14 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         &self,
         request: ExplanationRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> Result<Explanation, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMessage::Explain {
             request,
             send,
             api_token,
+            tracing_context,
         };
         self.send(msg)
             .await
@@ -464,6 +467,7 @@ pub enum InferenceMessage {
         request: ExplanationRequest,
         send: oneshot::Sender<Result<Explanation, InferenceError>>,
         api_token: String,
+        tracing_context: TracingContext,
     },
 }
 
@@ -561,8 +565,11 @@ impl InferenceMessage {
                 request,
                 send,
                 api_token,
+                tracing_context,
             } => {
-                let result = client.explain(&request, api_token.clone()).await;
+                let result = client
+                    .explain(&request, api_token.clone(), tracing_context)
+                    .await;
                 drop(send.send(result));
             }
         }
@@ -636,6 +643,7 @@ pub mod tests {
             &self,
             _request: ExplanationRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<Explanation, InferenceError> {
             unimplemented!()
         }
@@ -744,6 +752,7 @@ pub mod tests {
             &self,
             _request: &ExplanationRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<Explanation, InferenceError> {
             unimplemented!()
         }
@@ -838,6 +847,7 @@ pub mod tests {
             &self,
             _request: &ExplanationRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> Result<Explanation, InferenceError> {
             unimplemented!()
         }

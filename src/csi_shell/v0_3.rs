@@ -62,7 +62,11 @@ impl CsiRequest {
         let response = match self {
             CsiRequest::Explain { requests } => {
                 let explanations = drivers
-                    .explain(auth, requests.into_iter().map(Into::into).collect())
+                    .explain(
+                        auth,
+                        tracing_context,
+                        requests.into_iter().map(Into::into).collect(),
+                    )
                     .await
                     .map_err(CsiShellError::from_csi_error)?;
                 CsiResponse::Explain(

@@ -51,6 +51,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &ExplanationRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 }
 
@@ -59,6 +60,7 @@ impl InferenceClient for Client {
         &self,
         request: &ExplanationRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> Result<Explanation, InferenceError> {
         let ExplanationRequest {
             prompt,
@@ -73,8 +75,12 @@ impl InferenceClient for Client {
         };
         let how = How {
             api_token: Some(api_token),
+            trace_context: tracing_context.as_inference_client_context(),
             ..Default::default()
         };
+        let _span = tracing_context.span_id().map(|span_id| {
+            span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "explain", model = model)
+        });
         retry(|| self.explanation(&task, model, &how))
             .await?
             .try_into()
@@ -533,9 +539,14 @@ mod tests {
             model: "pharia-1-llm-7b-control".to_string(),
             granularity: Granularity::Auto,
         };
-        let explanation = <Client as InferenceClient>::explain(&client, &request, api_token)
-            .await
-            .unwrap();
+        let explanation = <Client as InferenceClient>::explain(
+            &client,
+            &request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then we explanation of five items
         assert_eq!(explanation.len(), 5);

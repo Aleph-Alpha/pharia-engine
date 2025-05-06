@@ -215,7 +215,11 @@ where
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
         match self
             .csi_apis
-            .explain(self.api_token.clone(), requests)
+            .explain(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                requests,
+            )
             .await
         {
             Ok(value) => value,

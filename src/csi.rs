@@ -69,6 +69,7 @@ pub trait Csi {
     fn explain(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<ExplanationRequest>,
     ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send;
 
@@ -160,16 +161,14 @@ where
     async fn explain(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<ExplanationRequest>,
     ) -> Result<Vec<Explanation>, CsiError> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "explain")])
             .increment(requests.len() as u64);
         let explanations = try_join_all(requests.into_iter().map(|r| {
-            trace!(
-                "explain: request.model={} request.granularity={}",
-                r.model, r.granularity,
-            );
-            self.inference.explain(r, auth.clone())
+            self.inference
+                .explain(r, auth.clone(), tracing_context.clone())
         }))
         .await?;
         Ok(explanations)
@@ -374,6 +373,7 @@ pub mod tests {
         async fn explain(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<ExplanationRequest>,
         ) -> Result<Vec<Explanation>, CsiError> {
             Err(CsiError::Any(anyhow!("Test error")))
@@ -725,6 +725,7 @@ pub mod tests {
         async fn explain(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<ExplanationRequest>,
         ) -> Result<Vec<Explanation>, CsiError> {
             panic!("DummyCsi explain called")
@@ -869,6 +870,7 @@ pub mod tests {
         async fn explain(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             requests: Vec<ExplanationRequest>,
         ) -> Result<Vec<Explanation>, CsiError> {
             requests.into_iter().map(|r| (*self.explain)(r)).collect()
