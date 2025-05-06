@@ -267,8 +267,9 @@ async fn completion_stream<C>(
 where
     C: Csi + Clone + Sync,
 {
+    let tracing_context = TracingContext::current();
     let mut recv = csi
-        .completion_stream(bearer.token().to_owned(), request.into())
+        .completion_stream(bearer.token().to_owned(), tracing_context, request.into())
         .await;
 
     let stream = try_stream! {

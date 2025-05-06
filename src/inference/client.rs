@@ -33,6 +33,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &CompletionRequest,
         api_token: String,
+        tracing_context: TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn chat(
@@ -190,6 +191,7 @@ impl InferenceClient for Client {
         &self,
         request: &CompletionRequest,
         api_token: String,
+        tracing_context: TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> Result<(), InferenceError> {
         let CompletionRequest {
@@ -227,9 +229,12 @@ impl InferenceClient for Client {
         };
         let how = How {
             api_token: Some(api_token),
+            trace_context: tracing_context.as_inference_client_context(),
             ..Default::default()
         };
-
+        let _span = tracing_context.span_id().map(|span_id| {
+            span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "stream_completion", model = model)
+        });
         let mut stream = retry(|| self.stream_completion(&task, model, &how)).await?;
 
         while let Some(event) = stream.next().await {
@@ -945,6 +950,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 &client,
                 &completion_request,
                 api_token,
+                TracingContext::dummy(),
                 send,
             )
             .await

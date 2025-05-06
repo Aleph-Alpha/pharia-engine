@@ -64,6 +64,7 @@ pub trait InferenceApi {
         &self,
         request: CompletionRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send;
 
     fn chat(
@@ -129,12 +130,14 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
         &self,
         request: CompletionRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
         let (send, recv) = mpsc::channel(1);
         let msg = InferenceMessage::CompletionStream {
             request,
             send,
             api_token,
+            tracing_context,
         };
         self.send(msg)
             .await
@@ -451,6 +454,7 @@ pub enum InferenceMessage {
         request: CompletionRequest,
         send: mpsc::Sender<Result<CompletionEvent, InferenceError>>,
         api_token: String,
+        tracing_context: TracingContext,
     },
     Chat {
         request: ChatRequest,
@@ -489,10 +493,15 @@ impl InferenceMessage {
                 request,
                 send,
                 api_token,
+                tracing_context,
             } => {
                 let (event_send, mut event_recv) = mpsc::channel(1);
-                let mut stream =
-                    Box::pin(client.stream_completion(&request, api_token, event_send));
+                let mut stream = Box::pin(client.stream_completion(
+                    &request,
+                    api_token,
+                    tracing_context,
+                    event_send,
+                ));
 
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
@@ -662,6 +671,7 @@ pub mod tests {
             &self,
             request: CompletionRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
         ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
             let (send, recv) = mpsc::channel(3);
             // Load up the receiver with events before returning it
@@ -779,6 +789,7 @@ pub mod tests {
             &self,
             _request: &CompletionRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
             _send: mpsc::Sender<CompletionEvent>,
         ) -> Result<(), InferenceError> {
             unimplemented!()
@@ -873,6 +884,7 @@ pub mod tests {
             &self,
             _request: &CompletionRequest,
             _api_token: String,
+            _tracing_context: TracingContext,
             _send: mpsc::Sender<CompletionEvent>,
         ) -> Result<(), InferenceError> {
             unimplemented!()

@@ -246,7 +246,11 @@ where
         let id = self.next_stream_id();
         let recv = self
             .csi_apis
-            .completion_stream(self.api_token.clone(), request)
+            .completion_stream(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                request,
+            )
             .await;
         self.completion_streams.insert(id, recv);
         id
