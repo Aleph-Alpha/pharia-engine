@@ -96,6 +96,17 @@ impl TracingContext {
         }
     }
 
+    /// Create a new tracing context that is a child of the current one.
+    ///
+    /// This method would be invoked if the caller has created a new span, and now
+    /// wants to create a new trace context that is associated with that span.
+    pub fn new_child(&self, span_id: Option<Id>) -> Self {
+        Self {
+            span_id,
+            trace_id: self.trace_id,
+        }
+    }
+
     pub fn span_id(&self) -> Option<&Id> {
         self.span_id.as_ref()
     }

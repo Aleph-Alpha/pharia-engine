@@ -1,7 +1,7 @@
 use text_splitter::{ChunkCharIndex, ChunkConfig, TextSplitter};
 use tokio::sync::oneshot;
 
-use crate::tokenizers::TokenizerApi;
+use crate::{logging::TracingContext, tokenizers::TokenizerApi};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ChunkRequest {
@@ -28,6 +28,7 @@ pub async fn chunking(
     request: ChunkRequest,
     tokenizers: &impl TokenizerApi,
     auth: String,
+    tracing_context: TracingContext,
 ) -> anyhow::Result<Vec<Chunk>> {
     let ChunkRequest {
         text,
@@ -40,7 +41,9 @@ pub async fn chunking(
         character_offsets,
     } = request;
 
-    let tokenizer = tokenizers.tokenizer_by_model(auth, model).await?;
+    let tokenizer = tokenizers
+        .tokenizer_by_model(auth, tracing_context, model)
+        .await?;
 
     // Push into the blocking thread pool because this can be expensive for long documents
     let (send, recv) = oneshot::channel();
@@ -114,9 +117,14 @@ mod tests {
         };
 
         // When we chunk the text
-        let chunks = chunking(request, &FakeTokenizers, "dummy".to_owned())
-            .await
-            .unwrap();
+        let chunks = chunking(
+            request,
+            &FakeTokenizers,
+            "dummy".to_owned(),
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
         assert_eq!(chunks.len(), 5);
         assert_eq!(
             chunks[1].text,
@@ -142,9 +150,14 @@ mod tests {
         };
 
         // When we chunk the text
-        let chunks = chunking(request, &FakeTokenizers, "dummy".to_owned())
-            .await
-            .unwrap();
+        let chunks = chunking(
+            request,
+            &FakeTokenizers,
+            "dummy".to_owned(),
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
         assert_eq!(
             chunks,
             [
@@ -186,9 +199,14 @@ mod tests {
         };
 
         // When we chunk the text
-        let chunks = chunking(request, &FakeTokenizers, "dummy".to_owned())
-            .await
-            .unwrap();
+        let chunks = chunking(
+            request,
+            &FakeTokenizers,
+            "dummy".to_owned(),
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
         assert_eq!(
             chunks,
             [

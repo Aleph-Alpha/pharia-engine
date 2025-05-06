@@ -4,7 +4,7 @@ use futures::future::try_join_all;
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::mpsc;
-use tracing::trace;
+use tracing::{Level, span, trace};
 
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
@@ -104,6 +104,7 @@ pub trait Csi {
     fn chunk(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<ChunkRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send;
 
@@ -253,6 +254,7 @@ where
     async fn chunk(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<ChunkRequest>,
     ) -> anyhow::Result<Vec<Vec<Chunk>>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chunk")])
@@ -261,15 +263,11 @@ where
         try_join_all(requests.into_iter().map(async |request| {
             let text_len = request.text.len();
             let max_tokens = request.params.max_tokens;
-
-            let chunks = chunking::chunking(request, &self.tokenizers, auth.clone()).await?;
-
-            trace!(
-                "chunk: text_len={} max_tokens={} -> chunks.len()={}",
-                text_len,
-                max_tokens,
-                chunks.len()
-            );
+            let span = tracing_context.span_id().map(|span_id| {
+                span!(target: "pharia-kernel::chunk", parent: span_id, Level::INFO, "chunk", text_len = text_len, max_tokens = max_tokens)
+            });
+            let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+            let chunks = chunking::chunking(request, &self.tokenizers, auth.clone(), child_context).await?;
             Ok(chunks)
         }))
         .await
@@ -411,6 +409,7 @@ pub mod tests {
         async fn chunk(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<ChunkRequest>,
         ) -> anyhow::Result<Vec<Vec<Chunk>>> {
             bail!("Test error")
@@ -527,7 +526,11 @@ pub mod tests {
             character_offsets: false,
         };
         let chunks = csi_apis
-            .chunk("dummy_token".to_owned(), vec![request])
+            .chunk(
+                "dummy_token".to_owned(),
+                TracingContext::dummy(),
+                vec![request],
+            )
             .await
             .unwrap();
 
@@ -767,6 +770,7 @@ pub mod tests {
         async fn chunk(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<ChunkRequest>,
         ) -> anyhow::Result<Vec<Vec<Chunk>>> {
             panic!("DummyCsi complete called");
@@ -938,6 +942,7 @@ pub mod tests {
         async fn chunk(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             requests: Vec<ChunkRequest>,
         ) -> anyhow::Result<Vec<Vec<Chunk>>> {
             (*self.chunking)(requests)

@@ -322,7 +322,15 @@ where
     }
 
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-        match self.csi_apis.chunk(self.api_token.clone(), requests).await {
+        match self
+            .csi_apis
+            .chunk(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                requests,
+            )
+            .await
+        {
             Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
         }
