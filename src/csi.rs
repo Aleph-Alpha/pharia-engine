@@ -75,6 +75,7 @@ pub trait Csi {
     fn complete(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<CompletionRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send;
 
@@ -177,6 +178,7 @@ where
     async fn complete(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         requests: Vec<CompletionRequest>,
     ) -> anyhow::Result<Vec<Completion>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "complete")])
@@ -185,15 +187,8 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    trace!(
-                        "complete: request.model={} request.params.max_tokens={}",
-                        r.model,
-                        r.params
-                            .max_tokens
-                            .map_or_else(|| "None".to_owned(), |val| val.to_string()),
-                    );
-
-                    self.inference.complete(r, auth.clone())
+                    self.inference
+                        .complete(r, auth.clone(), tracing_context.clone())
                 })
                 .collect::<Vec<_>>(),
         )
@@ -386,6 +381,7 @@ pub mod tests {
         async fn complete(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<CompletionRequest>,
         ) -> anyhow::Result<Vec<Completion>> {
             bail!("Test error")
@@ -660,6 +656,7 @@ pub mod tests {
         let completions = csi_apis
             .complete(
                 api_token().to_owned(),
+                TracingContext::dummy(),
                 vec![completion_req_1, completion_req_2],
             )
             .await
@@ -735,6 +732,7 @@ pub mod tests {
         async fn complete(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _requests: Vec<CompletionRequest>,
         ) -> anyhow::Result<Vec<Completion>> {
             panic!("DummyCsi complete called")
@@ -878,6 +876,7 @@ pub mod tests {
         async fn complete(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             requests: Vec<CompletionRequest>,
         ) -> anyhow::Result<Vec<Completion>> {
             requests

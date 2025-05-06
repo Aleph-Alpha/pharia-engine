@@ -34,28 +34,34 @@ pub enum CsiRequest {
 }
 
 impl CsiRequest {
-    pub async fn respond<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
+    pub async fn respond<C>(
+        self,
+        drivers: &C,
+        auth: String,
+        tracing_context: TracingContext,
+    ) -> Result<Value, CsiShellError>
     where
         C: Csi + Sync,
     {
         let response = match self {
-            CsiRequest::Chat(chat_request) => {
-                let tracing_context = TracingContext::current();
-                drivers
-                    .chat(auth, tracing_context, vec![chat_request.into()])
-                    .await
-                    .map(|mut r| CsiResponse::Chat(r.remove(0).into()))
-            }
+            CsiRequest::Chat(chat_request) => drivers
+                .chat(auth, tracing_context, vec![chat_request.into()])
+                .await
+                .map(|mut r| CsiResponse::Chat(r.remove(0).into())),
             CsiRequest::Chunk(chunk_request) => drivers
                 .chunk(auth, vec![chunk_request.into()])
                 .await
                 .map(|mut r| CsiResponse::Chunk(r.remove(0).into_iter().map(|c| c.text).collect())),
             CsiRequest::Complete(completion_request) => drivers
-                .complete(auth, vec![completion_request.into()])
+                .complete(auth, tracing_context, vec![completion_request.into()])
                 .await
                 .map(|mut r| CsiResponse::Complete(r.remove(0).into())),
             CsiRequest::CompleteAll { requests } => drivers
-                .complete(auth, requests.into_iter().map(Into::into).collect())
+                .complete(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
                 .await
                 .map(|r| CsiResponse::CompleteAll(r.into_iter().map(Into::into).collect())),
             CsiRequest::Documents { requests } => drivers

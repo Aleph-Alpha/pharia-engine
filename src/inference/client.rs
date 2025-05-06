@@ -27,6 +27,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         &self,
         request: &CompletionRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Completion, InferenceError>> + Send;
     fn stream_completion(
         &self,
@@ -129,6 +130,7 @@ impl InferenceClient for Client {
         &self,
         request: &CompletionRequest,
         api_token: String,
+        tracing_context: TracingContext,
     ) -> Result<Completion, InferenceError> {
         let CompletionRequest {
             model,
@@ -165,8 +167,12 @@ impl InferenceClient for Client {
         };
         let how = How {
             api_token: Some(api_token),
+            trace_context: tracing_context.as_inference_client_context(),
             ..Default::default()
         };
+        let _span = tracing_context.span_id().map(|span_id| {
+            span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "complete", model = model)
+        });
 
         retry(|| self.completion(&task, model, &how))
             .await?
@@ -682,10 +688,14 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         };
 
         // When completing text with inference client
-        let completion_response =
-            <Client as InferenceClient>::complete(&client, &completion_request, api_token)
-                .await
-                .unwrap();
+        let completion_response = <Client as InferenceClient>::complete(
+            &client,
+            &completion_request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then a completion response is returned
         assert!(completion_response.text.contains("<|python_tag|>"));
@@ -754,10 +764,14 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 logprobs: Logprobs::No,
             },
         };
-        let completion_response =
-            <Client as InferenceClient>::complete(&client, &completion_request, api_token)
-                .await
-                .unwrap();
+        let completion_response = <Client as InferenceClient>::complete(
+            &client,
+            &completion_request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then we expect the word oat, to appear at least five times
         let completion = completion_response.text;
@@ -821,10 +835,14 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 ..Default::default()
             },
         };
-        let completion_response =
-            <Client as InferenceClient>::complete(&client, &completion_request, api_token)
-                .await
-                .unwrap();
+        let completion_response = <Client as InferenceClient>::complete(
+            &client,
+            &completion_request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then
         assert_eq!(completion_response.logprobs.len(), 1);
@@ -849,10 +867,14 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 ..Default::default()
             },
         };
-        let completion_response =
-            <Client as InferenceClient>::complete(&client, &completion_request, api_token)
-                .await
-                .unwrap();
+        let completion_response = <Client as InferenceClient>::complete(
+            &client,
+            &completion_request,
+            api_token,
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then
         assert_eq!(completion_response.usage.prompt, 6);

@@ -226,7 +226,11 @@ where
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
         match self
             .csi_apis
-            .complete(self.api_token.clone(), requests)
+            .complete(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                requests,
+            )
             .await
         {
             Ok(value) => value,

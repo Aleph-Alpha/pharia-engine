@@ -50,7 +50,12 @@ pub enum CsiRequest {
 }
 
 impl CsiRequest {
-    pub async fn respond<C>(self, drivers: &C, auth: String) -> Result<Value, CsiShellError>
+    pub async fn respond<C>(
+        self,
+        drivers: &C,
+        auth: String,
+        tracing_context: TracingContext,
+    ) -> Result<Value, CsiShellError>
     where
         C: Csi + Sync,
     {
@@ -67,17 +72,14 @@ impl CsiRequest {
                         .collect(),
                 )
             }
-            CsiRequest::Chat { requests } => {
-                let tracing_context = TracingContext::current();
-                drivers
-                    .chat(
-                        auth,
-                        tracing_context,
-                        requests.into_iter().map(Into::into).collect(),
-                    )
-                    .await
-                    .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect()))?
-            }
+            CsiRequest::Chat { requests } => drivers
+                .chat(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
+                .await
+                .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect()))?,
             CsiRequest::Chunk { requests } => drivers
                 .chunk(auth, requests.into_iter().map(Into::into).collect())
                 .await
@@ -99,7 +101,11 @@ impl CsiRequest {
                     )
                 })?,
             CsiRequest::Complete { requests } => drivers
-                .complete(auth, requests.into_iter().map(Into::into).collect())
+                .complete(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
                 .await
                 .map(|v| CsiResponse::Complete(v.into_iter().map(Into::into).collect()))?,
             CsiRequest::Documents { requests } => drivers
