@@ -83,6 +83,7 @@ pub trait Csi {
     fn completion_stream(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         request: CompletionRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send;
 
@@ -198,6 +199,7 @@ where
     async fn completion_stream(
         &self,
         auth: String,
+        tracing_context: TracingContext,
         request: CompletionRequest,
     ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
         metrics::counter!(
@@ -206,7 +208,9 @@ where
         )
         .increment(1);
 
-        self.inference.completion_stream(request, auth).await
+        self.inference
+            .completion_stream(request, auth, tracing_context)
+            .await
     }
 
     async fn chat(
@@ -390,6 +394,7 @@ pub mod tests {
         async fn completion_stream(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _request: CompletionRequest,
         ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
             let (send, recv) = mpsc::channel(1);
@@ -566,7 +571,11 @@ pub mod tests {
         };
 
         let mut completion = csi_apis
-            .completion_stream(api_token().to_owned(), completion_req)
+            .completion_stream(
+                api_token().to_owned(),
+                TracingContext::dummy(),
+                completion_req,
+            )
             .await;
 
         let mut events = vec![];
@@ -742,6 +751,7 @@ pub mod tests {
         async fn completion_stream(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             _request: CompletionRequest,
         ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
             panic!("DummyCsi completion_stream called")
@@ -890,6 +900,7 @@ pub mod tests {
         async fn completion_stream(
             &self,
             _auth: String,
+            _tracing_context: TracingContext,
             request: CompletionRequest,
         ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
             let (sender, receiver) = mpsc::channel(1);
