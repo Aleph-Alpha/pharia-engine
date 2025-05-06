@@ -106,9 +106,11 @@ async fn search<C>(
 where
     C: Csi,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
         .search(
             bearer.token().to_owned(),
+            tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
         .await
@@ -128,9 +130,11 @@ async fn documents<C>(
 where
     C: Csi,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
         .documents(
             bearer.token().to_owned(),
+            tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
         .await
@@ -146,9 +150,11 @@ async fn document_metadata<C>(
 where
     C: Csi,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
         .document_metadata(
             bearer.token().to_owned(),
+            tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
         .await?;

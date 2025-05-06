@@ -130,6 +130,28 @@ impl TracingContext {
     fn trace_id_u128(&self) -> u128 {
         u128::from_be_bytes(self.trace_id().to_bytes())
     }
+
+    /// The version of the trace context specification that we support.
+    ///
+    /// <https://www.w3.org/TR/trace-context-2/#version>
+    const SUPPORTED_VERSION: u8 = 0;
+
+    /// Render the context as a traceparent header.
+    ///
+    /// <https://www.w3.org/TR/trace-context-2/#traceparent-header>
+    pub fn traceparent(&self) -> Option<String> {
+        self.span_id().map(|id| {
+            format!(
+                "{:02x}-{:032x}-{:016x}-{:02x}",
+                Self::SUPPORTED_VERSION,
+                self.trace_id_u128(),
+                id.into_u64(),
+                // Currently, we always regard the trace as sampled. However, for compliance with the spec,
+                // we should take this from the traceparent header.
+                opentelemetry::trace::TraceFlags::SAMPLED.to_u8(),
+            )
+        })
+    }
 }
 
 /// Set up two tracing subscribers:
@@ -237,5 +259,20 @@ pub mod tests {
                 trace_id: TraceId::INVALID,
             }
         }
+    }
+
+    #[test]
+    #[allow(clippy::unreadable_literal)]
+    fn traceparent_rendering() {
+        let trace_id = 0x4bf92f3577b34da6a3ce929d0e0e4736;
+        let span_id = 0x00f067aa0ba902b7;
+        let trace_context = TracingContext {
+            span_id: Some(Id::from_u64(span_id)),
+            trace_id: trace_id.into(),
+        };
+        assert_eq!(
+            trace_context.traceparent().unwrap(),
+            "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        );
     }
 }
