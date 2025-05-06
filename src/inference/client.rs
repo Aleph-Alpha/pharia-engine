@@ -57,6 +57,15 @@ pub trait InferenceClient: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 }
 
+/// Create a new [`aleph_alpha_client::How`] based on the given api token and tracing context.
+fn how(api_token: String, tracing_context: TracingContext) -> How {
+    How {
+        api_token: Some(api_token),
+        trace_context: tracing_context.as_inference_client_context(),
+        ..Default::default()
+    }
+}
+
 impl InferenceClient for Client {
     async fn explain(
         &self,
@@ -79,11 +88,7 @@ impl InferenceClient for Client {
             span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "explain", model = model)
         });
         let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
-        let how = How {
-            api_token: Some(api_token),
-            trace_context: child_context.as_inference_client_context(),
-            ..Default::default()
-        };
+        let how = how(api_token, child_context);
         retry(|| self.explanation(&task, model, &how))
             .await?
             .try_into()
@@ -105,11 +110,7 @@ impl InferenceClient for Client {
             span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "chat", model = request.model)
         });
         let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
-        let how = How {
-            api_token: Some(api_token),
-            trace_context: child_context.as_inference_client_context(),
-            ..Default::default()
-        };
+        let how = how(api_token, child_context);
         retry(|| self.chat(&task, &request.model, &how))
             .await?
             .try_into()
@@ -128,11 +129,7 @@ impl InferenceClient for Client {
             span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "stream_chat", model = request.model)
         });
         let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
-        let how = How {
-            api_token: Some(api_token),
-            trace_context: child_context.as_inference_client_context(),
-            ..Default::default()
-        };
+        let how = how(api_token, child_context);
         let mut stream = retry(|| self.stream_chat(&task, &request.model, &how)).await?;
 
         while let Some(event) = stream.next().await {
@@ -184,12 +181,7 @@ impl InferenceClient for Client {
             span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "complete", model = model)
         });
         let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
-        let how = How {
-            api_token: Some(api_token),
-            trace_context: child_context.as_inference_client_context(),
-            ..Default::default()
-        };
-
+        let how = how(api_token, child_context);
         retry(|| self.completion(&task, model, &how))
             .await?
             .try_into()
@@ -240,11 +232,7 @@ impl InferenceClient for Client {
             span!(target: "pharia-kernel::inference", parent: span_id, Level::INFO, "stream_completion", model = model)
         });
         let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
-        let how = How {
-            api_token: Some(api_token),
-            trace_context: child_context.as_inference_client_context(),
-            ..Default::default()
-        };
+        let how = how(api_token, child_context);
         let mut stream = retry(|| self.stream_completion(&task, model, &how)).await?;
 
         while let Some(event) = stream.next().await {
