@@ -18,6 +18,13 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 
 use crate::config::OtelConfig;
 
+/// Log an event to a given span/context.
+///
+/// In case the context is not associated with a span, nothing will be logged.
+/// This macro abstracts two things over the [`tracing::info`] macro:
+///
+/// * The caller can not forget to provide the context.
+/// * The caller does not need to check if the span id from the context is none.
 #[macro_export]
 macro_rules! context_event {
     // If target is provided, it must be specified before the parent.
