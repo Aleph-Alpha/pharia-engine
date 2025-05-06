@@ -79,7 +79,7 @@ impl CsiRequest {
                     CsiResponse::Search(r.remove(0).into_iter().map(Into::into).collect())
                 }),
             CsiRequest::SelectLanguage(select_language_request) => drivers
-                .select_language(vec![select_language_request.into()])
+                .select_language(vec![select_language_request.into()], tracing_context)
                 .await
                 .map(|mut r| {
                     r.remove(0)

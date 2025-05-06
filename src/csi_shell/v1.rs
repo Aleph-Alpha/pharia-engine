@@ -87,8 +87,12 @@ async fn select_language<C>(
 where
     C: Csi + Sync,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
-        .select_language(requests.into_iter().map(Into::into).collect())
+        .select_language(
+            requests.into_iter().map(Into::into).collect(),
+            tracing_context,
+        )
         .await
         .map(|v| v.into_iter().map(|m| m.map(Into::into)).collect())?;
     Ok(Json(results))
