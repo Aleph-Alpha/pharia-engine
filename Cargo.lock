@@ -43,9 +43,9 @@ dependencies = [
 
 [[package]]
 name = "aleph-alpha-client"
-version = "0.24.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e67ba0dabe9433606357c5f78093fe99a77d7acdb54eac36f36343d5412d49e3"
+checksum = "536592074dbb45b451e8ce59ff92501d5cdbd06139e44ca388051cd2f7c545d1"
 dependencies = [
  "async-stream",
  "base64 0.22.1",

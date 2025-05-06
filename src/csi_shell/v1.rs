@@ -179,9 +179,11 @@ async fn chunk<C>(
 where
     C: Csi,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
         .chunk(
             bearer.token().to_owned(),
+            tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
         .await
@@ -201,9 +203,11 @@ async fn chunk_with_offsets<C>(
 where
     C: Csi,
 {
+    let tracing_context = TracingContext::current();
     let results = csi
         .chunk(
             bearer.token().to_owned(),
+            tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
         .await

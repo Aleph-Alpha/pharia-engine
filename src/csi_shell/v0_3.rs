@@ -85,7 +85,11 @@ impl CsiRequest {
                 .await
                 .map(|v| CsiResponse::Chat(v.into_iter().map(Into::into).collect()))?,
             CsiRequest::Chunk { requests } => drivers
-                .chunk(auth, requests.into_iter().map(Into::into).collect())
+                .chunk(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
                 .await
                 .map(|c| {
                     CsiResponse::Chunk(
@@ -95,7 +99,11 @@ impl CsiRequest {
                     )
                 })?,
             CsiRequest::ChunkWithOffsets { requests } => drivers
-                .chunk(auth, requests.into_iter().map(Into::into).collect())
+                .chunk(
+                    auth,
+                    tracing_context,
+                    requests.into_iter().map(Into::into).collect(),
+                )
                 .await
                 .map(|c| {
                     CsiResponse::ChunkWithOffsets(

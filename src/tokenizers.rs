@@ -8,10 +8,13 @@ use tokio::{
     task::JoinHandle,
 };
 
+use crate::logging::TracingContext;
+
 pub trait TokenizerApi {
     fn tokenizer_by_model(
         &self,
         api_token: String,
+        tracing_context: TracingContext,
         model_name: String,
     ) -> impl Future<Output = anyhow::Result<Arc<Tokenizer>>> + Send;
 }
@@ -20,11 +23,13 @@ impl TokenizerApi for mpsc::Sender<TokenizersMsg> {
     async fn tokenizer_by_model(
         &self,
         api_token: String,
+        tracing_context: TracingContext,
         model_name: String,
     ) -> anyhow::Result<Arc<Tokenizer>> {
         let (send, recv) = oneshot::channel();
         let msg = TokenizersMsg::TokenizerByModel {
             api_token,
+            tracing_context,
             model_name,
             send,
         };
@@ -63,6 +68,7 @@ impl Tokenizers {
 pub enum TokenizersMsg {
     TokenizerByModel {
         api_token: String,
+        tracing_context: TracingContext,
         model_name: String,
         send: oneshot::Sender<anyhow::Result<Arc<Tokenizer>>>,
     },
@@ -97,6 +103,7 @@ impl TokenizersActor {
         match msg {
             TokenizersMsg::TokenizerByModel {
                 api_token,
+                tracing_context,
                 model_name,
                 send,
             } => {
@@ -108,7 +115,11 @@ impl TokenizersActor {
                     // Miss, we need to request and insert it first
                     match self
                         .client
-                        .tokenizer_by_model(&model_name, Some(api_token))
+                        .tokenizer_by_model(
+                            &model_name,
+                            Some(api_token),
+                            tracing_context.as_inference_client_context(),
+                        )
                         .await
                     {
                         Ok(tokenizer) => {
@@ -139,6 +150,7 @@ pub mod tests {
     use super::{Tokenizer, TokenizerApi};
 
     use crate::{
+        logging::TracingContext,
         tests::{api_token, inference_url},
         tokenizers::Tokenizers,
     };
@@ -157,6 +169,7 @@ pub mod tests {
         async fn tokenizer_by_model(
             &self,
             _api_token: String,
+            _tracing_context: TracingContext,
             model_name: String,
         ) -> anyhow::Result<Arc<Tokenizer>> {
             if model_name == "Pharia-1-LLM-7B-control" {
@@ -181,7 +194,7 @@ pub mod tests {
         let actor = Tokenizers::new(base_url.to_owned()).unwrap();
         let api = actor.api();
         let tokenizer = api
-            .tokenizer_by_model(api_token, model_name.to_owned())
+            .tokenizer_by_model(api_token, TracingContext::dummy(), model_name.to_owned())
             .await
             .unwrap();
 
