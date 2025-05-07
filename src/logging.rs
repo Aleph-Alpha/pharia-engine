@@ -250,6 +250,13 @@ pub fn resource() -> Resource {
 
 #[cfg(test)]
 pub mod tests {
+    use std::{
+        io::{LineWriter, Write},
+        sync::{Arc, Mutex},
+    };
+
+    use tracing::{Level, span};
+
     use super::*;
 
     impl TracingContext {
@@ -258,6 +265,34 @@ pub mod tests {
                 span_id: None,
                 trace_id: TraceId::INVALID,
             }
+        }
+    }
+
+    /// Allows to inspect captured logs.
+    ///
+    /// This Writer must be wrapped inside a [`LineWriter`] to work properly.
+    #[derive(Clone)]
+    pub struct SpyWriter {
+        buffer: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl SpyWriter {
+        pub fn new(buffer: Arc<Mutex<Vec<String>>>) -> impl Write {
+            LineWriter::new(Self { buffer })
+        }
+    }
+
+    impl std::io::Write for SpyWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            // We can only know these are complete lines, if we are wrapped inside a [LineWriter].
+            let written_bytes = buf.len();
+            let line = String::from_utf8(buf.to_vec()).unwrap();
+            self.buffer.lock().unwrap().push(line);
+            Ok(written_bytes)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
         }
     }
 
@@ -274,5 +309,26 @@ pub mod tests {
             trace_context.traceparent().unwrap(),
             "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
         );
+    }
+
+    /// This is a learning test around the tracing crate.
+    ///
+    /// In our actor model, we originally intended to send span id across messages to
+    /// different actors, such that other actors could reference a parent span.
+    /// However, we then can not guarantee that the parent span has not been dropped in the
+    /// sending actor, so we risk that the subscriber panics.
+    #[test]
+    #[should_panic(expected = "tried to clone Id(1), but no span exists with that ID")]
+    fn parent_span_needs_to_be_in_scope_when_creating_child_span() {
+        let config = OtelConfig {
+            endpoint: None,
+            log_level: "info",
+            sampling_ratio: 1.0,
+        };
+        let _guard = initialize_tracing(config).unwrap();
+        let span = span!(Level::INFO, "test");
+        let parent_id = span.id().unwrap();
+        drop(span);
+        span!(parent: parent_id, Level::INFO, "child");
     }
 }
