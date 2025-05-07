@@ -174,10 +174,8 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "explain")])
             .increment(requests.len() as u64);
         let explanations = try_join_all(requests.into_iter().map(|r| {
-            let span = tracing_context.span_id().map(|span_id| {
-                span!(target: "pharia-kernel::explain", parent: span_id, Level::INFO, "explain", model = r.model)
-            });
-            let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+            let child = span!(target: "pharia-kernel::explain", parent: tracing_context.span(), Level::INFO, "explain", model = r.model);
+            let child_context = TracingContext::new(child);
             self.inference
                 .explain(r, auth.clone(), child_context)
         }))
@@ -197,10 +195,8 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let span = tracing_context.span_id().map(|span_id| {
-                        span!(target: "pharia-kernel::complete", parent: span_id, Level::INFO, "complete", model = r.model)
-                    });
-                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+                    let child = span!(target: "pharia-kernel::complete", parent: tracing_context.span(), Level::INFO, "complete", model = r.model);
+                    let child_context = TracingContext::new(child);
                     self.inference
                         .complete(r, auth.clone(), child_context)
                 })
@@ -221,12 +217,8 @@ where
             &[("function", "completion_stream")]
         )
         .increment(1);
-
-        let span = tracing_context.span_id().map(|span_id| {
-            span!(target: "pharia-kernel::completion_stream", parent: span_id, Level::INFO, "completion_stream", model = request.model)
-        });
-        let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
-
+        let child = span!(target: "pharia-kernel::completion_stream", parent: tracing_context.span(), Level::INFO, "completion_stream", model = request.model);
+        let child_context = TracingContext::new(child);
         self.inference
             .completion_stream(request, auth, child_context)
             .await
@@ -245,10 +237,8 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let span = tracing_context.span_id().map(|span_id| {
-                        span!(target: "pharia-kernel::chat", parent: span_id, Level::INFO, "chat", model = r.model)
-                    });
-                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+                    let child = span!(target: "pharia-kernel::chat", parent: tracing_context.span(), Level::INFO, "chat", model = r.model);
+                    let child_context = TracingContext::new(child);
                     self.inference
                         .chat(r, auth.clone(), child_context)
                 })
@@ -266,10 +256,8 @@ where
     ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
             .increment(1);
-        let span = tracing_context.span_id().map(|span_id| {
-            span!(target: "pharia-kernel::chat", parent: span_id, Level::INFO, "chat_stream", model = request.model)
-        });
-        let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+        let child = span!(target: "pharia-kernel::chat_stream", parent: tracing_context.span(), Level::INFO, "chat_stream", model = request.model);
+        let child_context = TracingContext::new(child);
         self.inference
             .chat_stream(request, auth, child_context)
             .await
@@ -287,10 +275,8 @@ where
         try_join_all(requests.into_iter().map(async |request| {
             let text_len = request.text.len();
             let max_tokens = request.params.max_tokens;
-            let span = tracing_context.span_id().map(|span_id| {
-                span!(target: "pharia-kernel::chunk", parent: span_id, Level::INFO, "chunk", text_len = text_len, max_tokens = max_tokens)
-            });
-            let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+            let child = span!(target: "pharia-kernel::chunk", parent: tracing_context.span(), Level::INFO, "chunk", text_len = text_len, max_tokens = max_tokens);
+            let child_context = TracingContext::new(child);
             let chunks = chunking::chunking(request, &self.tokenizers, auth.clone(), child_context).await?;
             Ok(chunks)
         }))
@@ -306,10 +292,8 @@ where
             requests
                 .into_iter()
                 .map(|request| {
-                    let span = tracing_context.span_id().map(|span_id| {
-                        span!(target: "pharia-kernel::select_language", parent: span_id, Level::INFO, "select_language", text_len = request.text.len(), languages = request.languages.len())
-                    });
-                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+                    let child = span!(target: "pharia-kernel::select_language", parent: tracing_context.span(), Level::INFO, "select_language", text_len = request.text.len(), languages = request.languages.len());
+                    let child_context = TracingContext::new(child);
                     tokio::task::spawn_blocking(move || select_language(request, child_context))
                 })
         )
@@ -329,10 +313,8 @@ where
 
         try_join_all(requests.into_iter().map(|request| {
             let index_path = &request.index_path;
-            let span = tracing_context.span_id().map(|span_id| {
-                span!(target: "pharia-kernel::search", parent: span_id, Level::INFO, "search", namespace = index_path.namespace, collection = index_path.collection, max_results = request.max_results, min_score = request.min_score.map_or_else(|| "None".to_owned(), |val| val.to_string()))
-            });
-            let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+            let child = span!(target: "pharia-kernel::search", parent: tracing_context.span(), Level::INFO, "search", namespace = index_path.namespace, collection = index_path.collection, max_results = request.max_results, min_score = request.min_score.map_or_else(|| "None".to_owned(), |val| val.to_string()));
+            let child_context = TracingContext::new(child);
             self.search.search(request, auth.clone(), child_context)
         }))
         .await
@@ -349,10 +331,8 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let span = tracing_context.span_id().map(|span_id| {
-                        span!(target: "pharia-kernel::search", parent: span_id, Level::INFO, "document", namespace = r.namespace, collection = r.collection, name = r.name)
-                    });
-                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+                    let child = span!(target: "pharia-kernel::search", parent: tracing_context.span(), Level::INFO, "document", namespace = r.namespace, collection = r.collection, name = r.name);
+                    let child_context = TracingContext::new(child);
                     self.search.document(r, auth.clone(), child_context)
                 })
                 .collect::<Vec<_>>(),
@@ -375,10 +355,8 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let span = tracing_context.span_id().map(|span_id| {
-                        span!(target: "pharia-kernel::search", parent: span_id, Level::INFO, "document_metadata", namespace = r.namespace, collection = r.collection, name = r.name)
-                    });
-                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+                    let child = span!(target: "pharia-kernel::search", parent: tracing_context.span(), Level::INFO, "document_metadata", namespace = r.namespace, collection = r.collection, name = r.name);
+                    let child_context = TracingContext::new(child);
                     self.search.document_metadata(r, auth.clone(), child_context)
                 })
                 .collect::<Vec<_>>(),

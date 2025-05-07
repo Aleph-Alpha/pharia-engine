@@ -232,7 +232,7 @@ impl SearchClient for Client {
             &self.host
         );
         let mut builder = self.http.post(url).bearer_auth(api_token);
-        if let Some(traceparent) = tracing_context.traceparent() {
+        if let Some(traceparent) = tracing_context.as_traceparent() {
             builder = builder.header("traceparent", traceparent);
         }
         Ok(builder
@@ -270,7 +270,7 @@ impl SearchClient for Client {
             &self.host
         );
         let mut builder = self.http.get(url).bearer_auth(api_token);
-        if let Some(traceparent) = tracing_context.traceparent() {
+        if let Some(traceparent) = tracing_context.as_traceparent() {
             builder = builder.header("traceparent", traceparent);
         }
         let document = builder
@@ -310,7 +310,7 @@ impl SearchClient for Client {
             &self.host
         );
         let mut builder = self.http.get(url).bearer_auth(api_token);
-        if let Some(traceparent) = tracing_context.traceparent() {
+        if let Some(traceparent) = tracing_context.as_traceparent() {
             builder = builder.header("traceparent", traceparent);
         }
         let document = builder
