@@ -277,7 +277,7 @@ pub mod tests {
     }
 
     impl SpyWriter {
-        pub fn new(buffer: Arc<Mutex<Vec<String>>>) -> impl Write {
+        pub fn new_in_line_writer(buffer: Arc<Mutex<Vec<String>>>) -> impl Write {
             LineWriter::new(Self { buffer })
         }
     }

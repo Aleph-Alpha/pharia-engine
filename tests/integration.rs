@@ -11,6 +11,8 @@ use axum::http;
 use bytesize::ByteSize;
 use dotenvy::dotenv;
 use futures::StreamExt;
+use opentelemetry::trace::TracerProvider;
+use opentelemetry_sdk::trace::{SdkTracerProvider, Tracer};
 use pharia_kernel::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
@@ -18,9 +20,10 @@ use tempfile::{TempDir, tempdir};
 use test_skills::{
     given_chat_stream_skill, given_complete_stream_skill, given_rust_skill_doc_metadata,
     given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
-    given_skill_infinite_streaming,
+    given_skill_infinite_streaming, given_streaming_output_skill,
 };
 use tokio::sync::oneshot;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 struct TestFileRegistry {
     skills: Vec<String>,
@@ -610,6 +613,54 @@ async fn metadata_via_remote_csi() {
             .starts_with("https://pharia-kernel")
     );
 
+    kernel.shutdown().await;
+}
+
+fn tracing_subscriber(tracer: Tracer) -> impl tracing::Subscriber {
+    let layer = tracing_opentelemetry::layer().with_tracer(tracer);
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_str("info").unwrap())
+        .with(layer)
+}
+
+#[tokio::test]
+async fn invoke_message_stream_skill_with_tracing() {
+    let provider = SdkTracerProvider::builder().build();
+    let tracer = provider.tracer("test");
+    tracing_subscriber(tracer).init();
+
+    let streaming_output_skill_wasm = given_streaming_output_skill().bytes();
+    let mut local_skill_dir = TestFileRegistry::new();
+    local_skill_dir.with_skill("streaming-output", streaming_output_skill_wasm);
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let req_client = reqwest::Client::new();
+    let mut stream = req_client
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/streaming-output/message-stream",
+            kernel.port()
+        ))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value)
+        .body(Body::from(json!("Say one word: Homer").to_string()))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap()
+        .bytes_stream();
+
+    let mut events = vec![];
+    while let Some(event) = stream.next().await {
+        events.push(event.unwrap());
+    }
+    assert_eq!(events[0], "event: message\ndata: {\"type\":\"begin\"}\n\n");
+    assert_eq!(
+        events[1],
+        "event: message\ndata: {\"type\":\"append\",\"text\":\"Homer\"}\n\n"
+    );
     kernel.shutdown().await;
 }
 
