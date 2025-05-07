@@ -2192,7 +2192,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         // Allows to retrieve the traceparent
         init_propagator();
 
-        let writer = BoxMakeWriter::new(move || SpyWriter::new(buffer.clone()));
+        let writer = BoxMakeWriter::new(move || SpyWriter::new_in_line_writer(buffer.clone()));
         let fmt_layer = tracing_subscriber::fmt::layer()
             .with_writer(writer)
             // we are not interested in the ANSI colors in the logs

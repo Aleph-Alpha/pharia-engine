@@ -38,7 +38,7 @@ use tokenizers::Tokenizers;
 
 use self::{inference::Inference, skill_runtime::SkillRuntime};
 
-pub use config::AppConfig;
+pub use config::{AppConfig, OtelConfig};
 pub use feature_set::FeatureSet;
 pub use logging::initialize_tracing;
 pub use metrics::initialize_metrics;
