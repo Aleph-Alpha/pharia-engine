@@ -891,7 +891,7 @@ mod tests {
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference::{self, Explanation, TextScore},
-        logging::{init_propagator, resource},
+        logging::{init_propagator, resource, tests::SpyWriter},
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
@@ -911,7 +911,7 @@ mod tests {
     use serde_json::json;
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
-    use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
+    use tracing_subscriber::{EnvFilter, fmt::writer::BoxMakeWriter, layer::SubscriberExt};
 
     impl AppState<StubAuthorization, CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
         pub fn dummy() -> Self {
@@ -2178,7 +2178,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     /// Construct a subscriber that logs to stdout and allows to retrieve the traceparent
-    fn tracing_subscriber() -> impl tracing::Subscriber {
+    fn tracing_subscriber(buffer: Arc<Mutex<Vec<String>>>) -> impl tracing::Subscriber {
         // This matches the setup in `logging`, but exporting to stdout instead of an OTLP endpoint
         let provider = SdkTracerProvider::builder()
             .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
@@ -2192,18 +2192,30 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         // Allows to retrieve the traceparent
         init_propagator();
 
+        let writer = BoxMakeWriter::new(move || SpyWriter::new(buffer.clone()));
+        let fmt_layer = tracing_subscriber::fmt::layer()
+            .with_writer(writer)
+            // we are not interested in the ANSI colors in the logs
+            .with_ansi(false);
+
         let tracer = provider.tracer("test");
         let layer = tracing_opentelemetry::layer().with_tracer(tracer);
         tracing_subscriber::registry()
             .with(EnvFilter::from_str("info").unwrap())
             .with(layer)
+            .with(fmt_layer)
     }
 
     #[test]
     fn trace_parent_is_read_from_incoming_request() {
+        let trace_id = "0af7651916cd43dd8448eb211c80319c";
+        let span_id = "b7ad6b7169203331";
+        let traceparent = format!("00-{trace_id}-{span_id}-01");
+
         // We need to setup a tracing subscriber to actually get spans. If there is no subscriber
         // spans will not be created as no one is interested in them.
-        tracing::subscriber::with_default(tracing_subscriber(), || {
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        tracing::subscriber::with_default(tracing_subscriber(buffer.clone()), || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .build()
                 .unwrap();
@@ -2212,9 +2224,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 let http = http(PRODUCTION_FEATURE_SET, app_state);
 
                 // When doing a request with a traceparent header
-                let trace_id = "0af7651916cd43dd8448eb211c80319c";
-                let span_id = "b7ad6b7169203331";
-                let traceparent = format!("00-{trace_id}-{span_id}-01");
                 let resp = http
                     .oneshot(
                         Request::builder()
@@ -2234,6 +2243,10 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 assert!(traceparent.to_str().unwrap().contains(trace_id));
             });
         });
+
+        // And two logs are created
+        let logs = buffer.lock().unwrap().clone();
+        assert_eq!(logs.len(), 2);
     }
 
     #[derive(Clone)]
@@ -2281,7 +2294,8 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[test]
     fn skill_runtime_gets_tracecontext_from_incoming_request() {
-        tracing::subscriber::with_default(tracing_subscriber(), || {
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        tracing::subscriber::with_default(tracing_subscriber(buffer), || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .build()
                 .unwrap();
