@@ -174,8 +174,12 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "explain")])
             .increment(requests.len() as u64);
         let explanations = try_join_all(requests.into_iter().map(|r| {
+            let span = tracing_context.span_id().map(|span_id| {
+                span!(target: "pharia-kernel::explain", parent: span_id, Level::INFO, "explain", model = r.model)
+            });
+            let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
             self.inference
-                .explain(r, auth.clone(), tracing_context.clone())
+                .explain(r, auth.clone(), child_context)
         }))
         .await?;
         Ok(explanations)
@@ -193,8 +197,12 @@ where
             requests
                 .into_iter()
                 .map(|r| {
+                    let span = tracing_context.span_id().map(|span_id| {
+                        span!(target: "pharia-kernel::complete", parent: span_id, Level::INFO, "complete", model = r.model)
+                    });
+                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
                     self.inference
-                        .complete(r, auth.clone(), tracing_context.clone())
+                        .complete(r, auth.clone(), child_context)
                 })
                 .collect::<Vec<_>>(),
         )
@@ -214,8 +222,13 @@ where
         )
         .increment(1);
 
+        let span = tracing_context.span_id().map(|span_id| {
+            span!(target: "pharia-kernel::completion_stream", parent: span_id, Level::INFO, "completion_stream", model = request.model)
+        });
+        let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
+
         self.inference
-            .completion_stream(request, auth, tracing_context)
+            .completion_stream(request, auth, child_context)
             .await
     }
 
@@ -232,8 +245,12 @@ where
             requests
                 .into_iter()
                 .map(|r| {
+                    let span = tracing_context.span_id().map(|span_id| {
+                        span!(target: "pharia-kernel::chat", parent: span_id, Level::INFO, "chat", model = r.model)
+                    });
+                    let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
                     self.inference
-                        .chat(r, auth.clone(), tracing_context.clone())
+                        .chat(r, auth.clone(), child_context)
                 })
                 .collect::<Vec<_>>(),
         )
@@ -249,9 +266,12 @@ where
     ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
             .increment(1);
-
+        let span = tracing_context.span_id().map(|span_id| {
+            span!(target: "pharia-kernel::chat", parent: span_id, Level::INFO, "chat_stream", model = request.model)
+        });
+        let child_context = tracing_context.new_child(span.and_then(|s| s.id()));
         self.inference
-            .chat_stream(request, auth, tracing_context)
+            .chat_stream(request, auth, child_context)
             .await
     }
 
