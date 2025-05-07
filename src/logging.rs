@@ -12,7 +12,7 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
-use tracing::{info, span::Id};
+use tracing::{Span, info, span::Id};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -65,19 +65,20 @@ macro_rules! context_event {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct TracingContext {
-    /// This is the id from the `tracing` ecosystem. Within each trace there is a hierarchy
-    /// of span. the `span_id` allows to situate spans in this hierarchy.
-    ///
-    /// If the subscriber indicates that it does not track the current span, or
-    /// that the thread from which this function is called is not currently
-    /// inside a span, we will have a `None` here.
-    span_id: Option<Id>,
-    /// The opentelemetry trace id. We store this separately from the span id, because
-    /// it seems very hard to lookup a trace id for a span id without relying on
-    /// some current span thread-local magic. And we can only use this magic in the handler,
-    /// not in other actors. So providing the trace id allows other actors to include them
-    /// in outgoing requests.
-    trace_id: TraceId,
+    span: Span,
+    // /// This is the id from the `tracing` ecosystem. Within each trace there is a hierarchy
+    // /// of span. the `span_id` allows to situate spans in this hierarchy.
+    // ///
+    // /// If the subscriber indicates that it does not track the current span, or
+    // /// that the thread from which this function is called is not currently
+    // /// inside a span, we will have a `None` here.
+    // span_id: Option<Id>,
+    // /// The opentelemetry trace id. We store this separately from the span id, because
+    // /// it seems very hard to lookup a trace id for a span id without relying on
+    // /// some current span thread-local magic. And we can only use this magic in the handler,
+    // /// not in other actors. So providing the trace id allows other actors to include them
+    // /// in outgoing requests.
+    // trace_id: TraceId,
 }
 
 impl TracingContext {
@@ -89,31 +90,28 @@ impl TracingContext {
     /// or the handlers).
     pub fn current() -> Self {
         let span = tracing::Span::current();
-        let trace_id = span.context().span().span_context().trace_id();
-        Self {
-            span_id: span.id(),
-            trace_id,
-        }
+        Self { span }
     }
 
     /// Create a new tracing context that is a child of the current one.
     ///
     /// This method would be invoked if the caller has created a new span, and now
     /// wants to create a new trace context that is associated with that span.
-    pub fn new_child(&self, span_id: Option<Id>) -> Self {
-        Self {
-            span_id,
-            trace_id: self.trace_id,
-        }
+    pub fn new(span: Span) -> Self {
+        Self { span }
     }
 
-    pub fn span_id(&self) -> Option<&Id> {
-        self.span_id.as_ref()
+    pub fn span_id(&self) -> Option<Id> {
+        self.span.id()
+    }
+
+    pub fn span(&self) -> &Span {
+        &self.span
     }
 
     #[allow(dead_code)]
     pub fn trace_id(&self) -> TraceId {
-        self.trace_id
+        self.span.context().span().span_context().trace_id()
     }
 
     /// Convert the tracing context to what the inference client expects.
@@ -139,18 +137,21 @@ impl TracingContext {
     /// Render the context as a traceparent header.
     ///
     /// <https://www.w3.org/TR/trace-context-2/#traceparent-header>
-    pub fn traceparent(&self) -> Option<String> {
-        self.span_id().map(|id| {
-            format!(
-                "{:02x}-{:032x}-{:016x}-{:02x}",
-                Self::SUPPORTED_VERSION,
-                self.trace_id_u128(),
-                id.into_u64(),
-                // Currently, we always regard the trace as sampled. However, for compliance with the spec,
-                // we should take this from the traceparent header.
-                opentelemetry::trace::TraceFlags::SAMPLED.to_u8(),
-            )
-        })
+    pub fn as_traceparent(&self) -> Option<String> {
+        self.span_id()
+            .map(|span_id| Self::traceparent(span_id.into_u64(), self.trace_id_u128()))
+    }
+
+    fn traceparent(span_id: u64, trace_id: u128) -> String {
+        format!(
+            "{:02x}-{:032x}-{:016x}-{:02x}",
+            Self::SUPPORTED_VERSION,
+            trace_id,
+            span_id,
+            // Currently, we always regard the trace as sampled. However, for compliance with the spec,
+            // we should take this from the traceparent header.
+            opentelemetry::trace::TraceFlags::SAMPLED.to_u8(),
+        )
     }
 }
 
@@ -250,50 +251,52 @@ pub fn resource() -> Resource {
 
 #[cfg(test)]
 pub mod tests {
-    use std::{
-        io::{LineWriter, Write},
-        sync::{Arc, Mutex},
-    };
-
     use tracing::{Level, span};
 
     use super::*;
+    use std::sync::LazyLock;
 
     impl TracingContext {
         pub fn dummy() -> Self {
-            Self {
-                span_id: None,
-                trace_id: TraceId::INVALID,
-            }
+            Self { span: Span::none() }
         }
     }
 
-    /// Allows to inspect captured logs.
+    static INITIALIZE_TRACING_SUBSCRIBER: LazyLock<SdkTracerProvider> =
+        LazyLock::new(tracing_subscriber);
+
+    /// Ensure a tracing subscriber is initialized.
     ///
-    /// This Writer must be wrapped inside a [`LineWriter`] to work properly.
-    #[derive(Clone)]
-    pub struct SpyWriter {
-        buffer: Arc<Mutex<Vec<String>>>,
+    /// This is useful for tests that are testing logging/tracing related functionality.
+    /// While we would like to use [`tracing::subscriber::with_default`] to set the subscriber for
+    /// the scope of the test, this only applies to a single thread, and proved to be flaky as
+    /// tokio may choose to run certain actors on a different thread.
+    pub fn given_tracing_subscriber() -> &'static SdkTracerProvider {
+        &INITIALIZE_TRACING_SUBSCRIBER
     }
 
-    impl SpyWriter {
-        pub fn new_in_line_writer(buffer: Arc<Mutex<Vec<String>>>) -> impl Write {
-            LineWriter::new(Self { buffer })
-        }
-    }
+    /// Construct a subscriber that logs to stdout and allows to retrieve the traceparent
+    fn tracing_subscriber() -> SdkTracerProvider {
+        // This matches the setup in `logging`, but exporting to stdout instead of an OTLP endpoint
+        let provider = SdkTracerProvider::builder()
+            .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
+                1.0,
+            ))))
+            .with_id_generator(RandomIdGenerator::default())
+            .with_resource(resource())
+            .with_batch_exporter(opentelemetry_stdout::SpanExporter::default())
+            .build();
 
-    impl std::io::Write for SpyWriter {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            // We can only know these are complete lines, if we are wrapped inside a [LineWriter].
-            let written_bytes = buf.len();
-            let line = String::from_utf8(buf.to_vec()).unwrap();
-            self.buffer.lock().unwrap().push(line);
-            Ok(written_bytes)
-        }
+        // Allows to retrieve the traceparent
+        init_propagator();
 
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
+        let tracer = provider.tracer("test");
+        let layer = tracing_opentelemetry::layer().with_tracer(tracer);
+        tracing_subscriber::registry()
+            .with(EnvFilter::from_str("info").unwrap())
+            .with(layer)
+            .init();
+        provider
     }
 
     #[test]
@@ -301,12 +304,8 @@ pub mod tests {
     fn traceparent_rendering() {
         let trace_id = 0x4bf92f3577b34da6a3ce929d0e0e4736;
         let span_id = 0x00f067aa0ba902b7;
-        let trace_context = TracingContext {
-            span_id: Some(Id::from_u64(span_id)),
-            trace_id: trace_id.into(),
-        };
         assert_eq!(
-            trace_context.traceparent().unwrap(),
+            TracingContext::traceparent(span_id, trace_id),
             "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
         );
     }
@@ -320,12 +319,8 @@ pub mod tests {
     #[test]
     #[should_panic(expected = "tried to clone Id(1), but no span exists with that ID")]
     fn parent_span_needs_to_be_in_scope_when_creating_child_span() {
-        let config = OtelConfig {
-            endpoint: None,
-            log_level: "info",
-            sampling_ratio: 1.0,
-        };
-        let _guard = initialize_tracing(config).unwrap();
+        given_tracing_subscriber();
+
         let span = span!(Level::INFO, "test");
         let parent_id = span.id().unwrap();
         drop(span);

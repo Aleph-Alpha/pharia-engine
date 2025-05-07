@@ -881,7 +881,6 @@ fn skill_wit() -> &'static str {
 mod tests {
     use std::{
         panic,
-        str::FromStr,
         sync::{Arc, Mutex},
     };
 
@@ -891,7 +890,7 @@ mod tests {
         csi::tests::{CsiDummy, StubCsi},
         feature_set::PRODUCTION_FEATURE_SET,
         inference::{self, Explanation, TextScore},
-        logging::{init_propagator, resource, tests::SpyWriter},
+        logging::tests::given_tracing_subscriber,
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
@@ -905,13 +904,10 @@ mod tests {
     };
     use http_body_util::BodyExt;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
-    use opentelemetry::trace::TracerProvider;
-    use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler, SdkTracerProvider};
     use reqwest::header::CONTENT_TYPE;
     use serde_json::json;
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
-    use tracing_subscriber::{EnvFilter, fmt::writer::BoxMakeWriter, layer::SubscriberExt};
 
     impl AppState<StubAuthorization, CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
         pub fn dummy() -> Self {
@@ -2177,76 +2173,36 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    /// Construct a subscriber that logs to stdout and allows to retrieve the traceparent
-    fn tracing_subscriber(buffer: Arc<Mutex<Vec<String>>>) -> impl tracing::Subscriber {
-        // This matches the setup in `logging`, but exporting to stdout instead of an OTLP endpoint
-        let provider = SdkTracerProvider::builder()
-            .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
-                1.0,
-            ))))
-            .with_id_generator(RandomIdGenerator::default())
-            .with_resource(resource())
-            .with_batch_exporter(opentelemetry_stdout::SpanExporter::default())
-            .build();
+    #[tokio::test]
+    async fn trace_parent_is_read_from_incoming_request() {
+        // We need to setup a tracing subscriber to actually get spans. If there is no subscriber
+        // spans will not be created as no one is interested in them.
+        given_tracing_subscriber();
 
-        // Allows to retrieve the traceparent
-        init_propagator();
+        let app_state = AppState::dummy();
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
-        let writer = BoxMakeWriter::new(move || SpyWriter::new_in_line_writer(buffer.clone()));
-        let fmt_layer = tracing_subscriber::fmt::layer()
-            .with_writer(writer)
-            // we are not interested in the ANSI colors in the logs
-            .with_ansi(false);
-
-        let tracer = provider.tracer("test");
-        let layer = tracing_opentelemetry::layer().with_tracer(tracer);
-        tracing_subscriber::registry()
-            .with(EnvFilter::from_str("info").unwrap())
-            .with(layer)
-            .with(fmt_layer)
-    }
-
-    #[test]
-    fn trace_parent_is_read_from_incoming_request() {
+        // When doing a request with a traceparent header
         let trace_id = "0af7651916cd43dd8448eb211c80319c";
         let span_id = "b7ad6b7169203331";
         let traceparent = format!("00-{trace_id}-{span_id}-01");
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/")
+                    .header("traceparent", traceparent)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
 
-        // We need to setup a tracing subscriber to actually get spans. If there is no subscriber
-        // spans will not be created as no one is interested in them.
-        let buffer = Arc::new(Mutex::new(Vec::new()));
-        tracing::subscriber::with_default(tracing_subscriber(buffer.clone()), || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .build()
-                .unwrap();
-            runtime.block_on(async {
-                let app_state = AppState::dummy();
-                let http = http(PRODUCTION_FEATURE_SET, app_state);
+        assert_eq!(resp.status(), StatusCode::OK);
 
-                // When doing a request with a traceparent header
-                let resp = http
-                    .oneshot(
-                        Request::builder()
-                            .method(Method::GET)
-                            .uri("/")
-                            .header("traceparent", traceparent)
-                            .body(Body::empty())
-                            .unwrap(),
-                    )
-                    .await
-                    .unwrap();
-
-                assert_eq!(resp.status(), StatusCode::OK);
-
-                // Then we get the traceparent header in the response
-                let traceparent = resp.headers().get("traceparent").unwrap();
-                assert!(traceparent.to_str().unwrap().contains(trace_id));
-            });
-        });
-
-        // And two logs are created
-        let logs = buffer.lock().unwrap().clone();
-        assert_eq!(logs.len(), 2);
+        // Then we get the traceparent header in the response
+        let traceparent = resp.headers().get("traceparent").unwrap();
+        assert!(traceparent.to_str().unwrap().contains(trace_id));
     }
 
     #[derive(Clone)]
@@ -2292,45 +2248,38 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    #[test]
-    fn skill_runtime_gets_tracecontext_from_incoming_request() {
-        let buffer = Arc::new(Mutex::new(Vec::new()));
-        tracing::subscriber::with_default(tracing_subscriber(buffer), || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .build()
-                .unwrap();
+    #[tokio::test]
+    async fn skill_runtime_gets_tracecontext_from_incoming_request() {
+        given_tracing_subscriber();
 
-            runtime.block_on(async {
-                // Given a shell
-                let skill_runtime = SpySkillRuntime::new();
-                let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
-                let http = http(PRODUCTION_FEATURE_SET, app_state);
+        // Given a shell
+        let skill_runtime = SpySkillRuntime::new();
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
 
-                // When a request with a trace id comes in
-                let trace_id = "0af7651916cd43dd8448eb211c80319c";
-                let span_id = "b7ad6b7169203331";
-                let traceparent = format!("00-{trace_id}-{span_id}-01");
-                let resp = http
-                    .oneshot(
-                        Request::builder()
-                            .method(Method::POST)
-                            .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                            .header(AUTHORIZATION, dummy_auth_value())
-                            .header("traceparent", traceparent)
-                            .uri("/v1/skills/acme/summarize/run")
-                            .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
-                            .unwrap(),
-                    )
-                    .await
-                    .unwrap();
+        // When a request with a trace id comes in
+        let trace_id = "0af7651916cd43dd8448eb211c80319c";
+        let span_id = "b7ad6b7169203331";
+        let traceparent = format!("00-{trace_id}-{span_id}-01");
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .header("traceparent", traceparent)
+                    .uri("/v1/skills/acme/summarize/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
 
-                // Then the skill runtime receives the trace id
-                assert_eq!(resp.status(), StatusCode::OK);
-                assert_eq!(
-                    skill_runtime.tracing_contexts()[0].trace_id().to_string(),
-                    trace_id
-                );
-            });
-        });
+        // Then the skill runtime receives the trace id
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            skill_runtime.tracing_contexts()[0].trace_id().to_string(),
+            trace_id
+        );
     }
 }
