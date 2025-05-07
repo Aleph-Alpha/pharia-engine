@@ -12,74 +12,23 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
-use tracing::{Span, info, span::Id};
+use tracing::{Span, info};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::OtelConfig;
 
-/// Log an event to a given span/context.
-///
-/// In case the context is not associated with a span, nothing will be logged.
-/// This macro abstracts two things over the [`tracing::info`] macro:
-///
-/// * The caller can not forget to provide the context.
-/// * The caller does not need to check if the span id from the context is none.
-#[macro_export]
-macro_rules! context_event {
-    // If target is provided, it must be specified before the parent.
-    (context: $tracing_context:expr, level: $lvl:expr, target: $target:literal, $($fields:tt)*) => {
-        use tracing::{Level, info, warn, error};
-
-        if let Some(span_id) = $tracing_context.span_id() {
-            match $lvl {
-                Level::INFO => info!(target: $target, parent: span_id, $($fields)*),
-                Level::WARN => warn!(target: $target, parent: span_id, $($fields)*),
-                Level::ERROR => error!(target: $target, parent: span_id, $($fields)*),
-                _ => (
-                    panic!("Do not use this macro for debugging, as the logs are intended for the operator.")
-                )
-            }
-        }
-    };
-    (context: $tracing_context:expr, level: $lvl:expr, $($fields:tt)*) => {
-        use tracing::{Level, info, warn, error};
-
-        if let Some(span_id) = $tracing_context.span_id() {
-            match $lvl {
-                Level::INFO => info!(parent: span_id, $($fields)*),
-                Level::WARN => warn!(parent: span_id, $($fields)*),
-                Level::ERROR => error!(parent: span_id, $($fields)*),
-                _ => (
-                    panic!("Do not use this macro for debugging, as the logs are intended for the operator.")
-                )
-            }
-        }
-    };
-}
-
 /// Context that is needed to situate certain actions in the overall context.
 ///
 /// In this opaque type we specify decisions on what context needs to be passed
 /// within actors to correlate actions that belong together.
+/// While we originally wanted to pass span and trace ids across actors, we
+/// found that this is not possible in a safe way, as the span might be dropped
+/// in the meantime. Therefore, we now pass the span itself, assuring it is not
+/// dropped while someone is creating a child span.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
-pub struct TracingContext {
-    span: Span,
-    // /// This is the id from the `tracing` ecosystem. Within each trace there is a hierarchy
-    // /// of span. the `span_id` allows to situate spans in this hierarchy.
-    // ///
-    // /// If the subscriber indicates that it does not track the current span, or
-    // /// that the thread from which this function is called is not currently
-    // /// inside a span, we will have a `None` here.
-    // span_id: Option<Id>,
-    // /// The opentelemetry trace id. We store this separately from the span id, because
-    // /// it seems very hard to lookup a trace id for a span id without relying on
-    // /// some current span thread-local magic. And we can only use this magic in the handler,
-    // /// not in other actors. So providing the trace id allows other actors to include them
-    // /// in outgoing requests.
-    // trace_id: TraceId,
-}
+pub struct TracingContext(Span);
 
 impl TracingContext {
     /// Retrieve the current thread-local tracing context.
@@ -89,34 +38,29 @@ impl TracingContext {
     /// opentelemetry context, and enter the span when polling its inner future (other middleware
     /// or the handlers).
     pub fn current() -> Self {
-        let span = tracing::Span::current();
-        Self { span }
+        Self(tracing::Span::current())
     }
 
-    /// Create a new tracing context that is a child of the current one.
+    /// Create a new tracing context.
     ///
     /// This method would be invoked if the caller has created a new span, and now
     /// wants to create a new trace context that is associated with that span.
     pub fn new(span: Span) -> Self {
-        Self { span }
-    }
-
-    pub fn span_id(&self) -> Option<Id> {
-        self.span.id()
+        Self(span)
     }
 
     pub fn span(&self) -> &Span {
-        &self.span
+        &self.0
     }
 
     #[allow(dead_code)]
     pub fn trace_id(&self) -> TraceId {
-        self.span.context().span().span_context().trace_id()
+        self.0.context().span().span_context().trace_id()
     }
 
     /// Convert the tracing context to what the inference client expects.
     pub fn as_inference_client_context(&self) -> Option<aleph_alpha_client::TraceContext> {
-        self.span_id().map(|id| {
+        self.0.id().map(|id| {
             aleph_alpha_client::TraceContext::new_sampled(self.trace_id_u128(), id.into_u64())
         })
     }
@@ -138,7 +82,8 @@ impl TracingContext {
     ///
     /// <https://www.w3.org/TR/trace-context-2/#traceparent-header>
     pub fn as_traceparent(&self) -> Option<String> {
-        self.span_id()
+        self.0
+            .id()
             .map(|span_id| Self::traceparent(span_id.into_u64(), self.trace_id_u128()))
     }
 
@@ -258,7 +203,7 @@ pub mod tests {
 
     impl TracingContext {
         pub fn dummy() -> Self {
-            Self { span: Span::none() }
+            Self(Span::none())
         }
     }
 

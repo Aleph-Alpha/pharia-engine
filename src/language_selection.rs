@@ -1,8 +1,9 @@
 use derive_more::{Constructor, Deref, From, Into};
 use lingua::LanguageDetectorBuilder;
 use thiserror::Error;
+use tracing::info;
 
-use crate::{context_event, logging::TracingContext};
+use crate::logging::TracingContext;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum LanguageError {
@@ -130,7 +131,7 @@ pub fn select_language(
         .with_minimum_relative_distance(0.5) // empirical value that makes the tests pass ;-)
         .build();
     let language = detector.detect_language_of(&request.text).map(Into::into);
-    context_event!(context: tracing_context, level: Level::INFO, message="selected language {language:?}");
+    info!(parent: tracing_context.span(), message="selected language {language:?}");
     Ok(language)
 }
 
