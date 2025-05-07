@@ -7,10 +7,9 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{error, warn};
+use tracing::{Level, error, info, warn};
 
 use crate::{
-    context_event,
     csi::Csi,
     logging::TracingContext,
     skill_driver::SkillDriver,
@@ -398,10 +397,9 @@ fn record_skill_execution_metrics<T>(
 }
 
 fn log_skill_start(tracing_context: &TracingContext, skill_path: &SkillPath) {
-    context_event!(
-        context: tracing_context,
-        level: Level::INFO,
+    info!(
         target: "pharia_kernel::skill_execution",
+        parent: tracing_context.span(),
         skill=%skill_path,
         message="Starting skill execution"
     );
@@ -414,23 +412,34 @@ fn log_skill_result<T>(
 ) {
     match result {
         Ok(_) => {
-            context_event!(
-                context: tracing_context,
-                level: Level::INFO,
+            info!(
                 target: "pharia_kernel::skill_execution",
+                parent: tracing_context.span(),
                 skill=%skill_path,
                 message="Skill executed successfully"
             );
         }
-        Err(error) => {
-            context_event!(
-                context: tracing_context,
-                level: error.tracing_level(),
+        Err(error) => match error.tracing_level() {
+            Level::ERROR => error!(
                 target: "pharia_kernel::skill_execution",
+                parent: tracing_context.span(),
                 skill=%skill_path,
                 message="Skill invocation failed"
-            );
-        }
+            ),
+            Level::WARN => warn!(
+                target: "pharia_kernel::skill_execution",
+                parent: tracing_context.span(),
+                skill=%skill_path,
+                message="Skill invocation failed"
+            ),
+            Level::INFO => info!(
+                target: "pharia_kernel::skill_execution",
+                parent: tracing_context.span(),
+                skill=%skill_path,
+                message="Skill invocation failed"
+            ),
+            _ => {}
+        },
     }
 }
 
