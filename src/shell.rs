@@ -290,10 +290,11 @@ async fn authorization_middleware<A>(
 where
     A: AuthorizationApi,
 {
+    let context = TracingContext::current();
     if let Some(bearer) = bearer {
         if let Ok(allowed) = authorization_api
             .0
-            .check_permission(bearer.token().to_owned())
+            .check_permission(bearer.token().to_owned(), context)
             .await
         {
             if !allowed {

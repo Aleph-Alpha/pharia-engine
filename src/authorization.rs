@@ -1,12 +1,11 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::StatusCode;
 use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
-use reqwest::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 use tokio::{select, sync::mpsc, task::JoinHandle};
 
-use crate::http::HttpClient;
+use crate::{http::HttpClient, logging::TracingContext};
 
 pub struct Authorization {
     send: mpsc::Sender<AuthorizationMsg>,
@@ -75,13 +74,22 @@ pub trait AuthorizationApi {
     fn check_permission(
         &self,
         api_token: String,
+        context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<bool>> + Send;
 }
 
 impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
-    async fn check_permission(&self, api_token: String) -> anyhow::Result<bool> {
+    async fn check_permission(
+        &self,
+        api_token: String,
+        context: TracingContext,
+    ) -> anyhow::Result<bool> {
         let (send, recv) = oneshot::channel();
-        let msg = AuthorizationMsg::Auth { api_token, send };
+        let msg = AuthorizationMsg::Auth {
+            api_token,
+            context,
+            send,
+        };
         self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
@@ -93,6 +101,7 @@ impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
 pub enum AuthorizationMsg {
     Auth {
         api_token: String,
+        context: TracingContext,
         send: oneshot::Sender<anyhow::Result<bool>>,
     },
 }
@@ -100,8 +109,12 @@ pub enum AuthorizationMsg {
 impl AuthorizationMsg {
     async fn act(self, client: &impl AuthorizationClient) {
         match self {
-            AuthorizationMsg::Auth { api_token, send } => {
-                let result = client.token_valid(api_token).await;
+            AuthorizationMsg::Auth {
+                api_token,
+                context,
+                send,
+            } => {
+                let result = client.token_valid(api_token, context).await;
                 drop(send.send(result));
             }
         }
@@ -109,7 +122,11 @@ impl AuthorizationMsg {
 }
 
 pub trait AuthorizationClient: Send + Sync + 'static {
-    fn token_valid(&self, api_token: String) -> impl Future<Output = anyhow::Result<bool>> + Send;
+    fn token_valid(
+        &self,
+        api_token: String,
+        context: TracingContext,
+    ) -> impl Future<Output = anyhow::Result<bool>> + Send;
 }
 
 struct HttpAuthorizationClient {
@@ -127,7 +144,11 @@ impl HttpAuthorizationClient {
 }
 
 impl AuthorizationClient for HttpAuthorizationClient {
-    async fn token_valid(&self, api_token: String) -> anyhow::Result<bool> {
+    async fn token_valid(
+        &self,
+        api_token: String,
+        context: TracingContext,
+    ) -> anyhow::Result<bool> {
         #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
         #[serde(tag = "permission")]
         enum Permission {
@@ -135,16 +156,16 @@ impl AuthorizationClient for HttpAuthorizationClient {
         }
 
         let required_permissions = [Permission::KernelAccess];
-        let response = self
+        let mut builder = self
             .client
             .post(format!("{}/check_privileges", self.url))
-            .headers(HeaderMap::from_iter([(
-                AUTHORIZATION,
-                format!("Bearer {api_token}").parse().unwrap(),
-            )]))
-            .json(&required_permissions)
-            .send()
-            .await?;
+            .bearer_auth(api_token);
+
+        if let Some(traceparent) = context.as_traceparent() {
+            builder = builder.header("traceparent", traceparent);
+        }
+
+        let response = builder.json(&required_permissions).send().await?;
 
         // Response succeeded, but not allowed
         if [StatusCode::FORBIDDEN, StatusCode::UNAUTHORIZED].contains(&response.status()) {
@@ -185,7 +206,11 @@ pub mod tests {
     }
 
     impl AuthorizationApi for StubAuthorization {
-        async fn check_permission(&self, _api_token: String) -> anyhow::Result<bool> {
+        async fn check_permission(
+            &self,
+            _api_token: String,
+            _context: TracingContext,
+        ) -> anyhow::Result<bool> {
             Ok(self.response)
         }
     }
@@ -197,7 +222,9 @@ pub mod tests {
         let client = HttpAuthorizationClient::new(url.to_owned());
 
         // When the client is used to check a valid api token
-        let result = client.token_valid(api_token().to_owned()).await;
+        let result = client
+            .token_valid(api_token().to_owned(), TracingContext::dummy())
+            .await;
 
         // Then the result is true
         assert!(result.unwrap());
@@ -210,7 +237,9 @@ pub mod tests {
         let client = HttpAuthorizationClient::new(url.to_owned());
 
         // When the client is used to check an invalid api token
-        let result = client.token_valid("invalid".to_owned()).await;
+        let result = client
+            .token_valid("invalid".to_owned(), TracingContext::dummy())
+            .await;
 
         // Then the result is false
         assert!(!result.unwrap());
@@ -219,7 +248,11 @@ pub mod tests {
     struct StubAuthorizationClient;
 
     impl AuthorizationClient for StubAuthorizationClient {
-        async fn token_valid(&self, _api_token: String) -> anyhow::Result<bool> {
+        async fn token_valid(
+            &self,
+            _api_token: String,
+            _context: TracingContext,
+        ) -> anyhow::Result<bool> {
             Ok(true)
         }
     }
@@ -233,7 +266,8 @@ pub mod tests {
         // When checking permissions for a token
         let result = timeout(
             Duration::from_millis(10),
-            auth.api().check_permission("valid".to_owned()),
+            auth.api()
+                .check_permission("valid".to_owned(), TracingContext::dummy()),
         )
         .await;
 
