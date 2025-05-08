@@ -75,6 +75,7 @@ pub struct LogRecorder {
 
 impl LogRecorder {
     /// Inspect all spans that have been recorded.
+    #[must_use]
     pub fn spans(&self) -> Vec<SpanData> {
         // Force flush the tracer provider to ensure spans are exported
         self.guard.force_flush().unwrap();
