@@ -27,7 +27,7 @@ use tower_http::{
     sensitive_headers::SetSensitiveRequestHeadersLayer,
     trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
-use tracing::{Level, error, info};
+use tracing::{Level, error, info, span};
 use utoipa::{
     Modify, OpenApi, ToSchema,
     openapi::{
@@ -292,9 +292,16 @@ where
 {
     let context = TracingContext::current();
     if let Some(bearer) = bearer {
+        let span = span!(
+            target: "pharia_kernel::authorization",
+            parent: context.span(),
+            Level::INFO,
+            "check_permissions"
+        );
+        let child_context = TracingContext::new(span);
         if let Ok(allowed) = authorization_api
             .0
-            .check_permission(bearer.token().to_owned(), context)
+            .check_permission(bearer.token().to_owned(), child_context)
             .await
         {
             if !allowed {

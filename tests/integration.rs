@@ -638,24 +638,32 @@ async fn traceparent_is_respected() {
     while stream.next().await.is_some() {}
     kernel.shutdown().await;
 
-    // Then we should have recorded three spans that all belong to the same trace id
-    let spans = log_recorder.spans();
-    assert_eq!(spans.len(), 3);
+    // Then we should have recorded four spans that all belong to the same trace id
+    let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
+    assert_eq!(spans.len(), 4);
     let trace_ids = spans
         .iter()
         .map(|s| s.span_context.trace_id())
         .collect::<Vec<_>>();
     assert!(trace_ids.iter().all(|id| id == &TraceId::from(trace_id)));
 
-    let span_ids = spans
-        .iter()
-        .map(|s| s.span_context.span_id())
-        .collect::<Vec<_>>();
-    let parent_span_ids = spans.iter().map(|s| s.parent_span_id).collect::<Vec<_>>();
+    let outer_span = &spans[0];
+    let skill_span = &spans[1];
+    let csi_span = &spans[2];
+    let auth_span = &spans[3];
 
-    assert_eq!(parent_span_ids[0], span_ids[1]);
-    assert_eq!(parent_span_ids[1], span_ids[2]);
-    assert_eq!(parent_span_ids[2], SpanId::from(parent_span_id));
+    assert_eq!(
+        outer_span.name,
+        "POST /v1/skills/{namespace}/{name}/message-stream"
+    );
+    assert_eq!(skill_span.name, "skill_execution");
+    assert_eq!(csi_span.name, "chat_stream");
+    assert_eq!(auth_span.name, "check_permissions");
+
+    assert_eq!(outer_span.parent_span_id, SpanId::from(parent_span_id));
+    assert_eq!(skill_span.parent_span_id, outer_span.span_context.span_id());
+    assert_eq!(auth_span.parent_span_id, outer_span.span_context.span_id());
+    assert_eq!(csi_span.parent_span_id, skill_span.span_context.span_id());
 }
 
 #[tokio::test]

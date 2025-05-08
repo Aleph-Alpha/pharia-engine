@@ -307,7 +307,7 @@ impl RunMessageStreamMsg {
             target: "pharia_kernel::skill_runtime",
             parent: tracing_context.span(),
             Level::INFO,
-            "skill execution",
+            "skill_execution",
             skill=%skill_path,
         );
         let child_context = TracingContext::new(span);
@@ -479,7 +479,7 @@ impl RunFunctionMsg {
             target: "pharia_kernel::skill_runtime",
             parent: tracing_context.span(),
             Level::INFO,
-            "skill execution",
+            "skill_execution",
             skill=%skill_path,
         );
         let child_context = TracingContext::new(span);
