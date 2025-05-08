@@ -233,6 +233,7 @@ where
             &[("function", "completion_stream")]
         )
         .increment(1);
+
         let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "completion_stream", model = request.model);
         let child_context = TracingContext::new(child);
         self.inference
@@ -279,6 +280,7 @@ where
     ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
             .increment(1);
+
         let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "chat_stream", model = request.model);
         let child_context = TracingContext::new(child);
         self.inference
@@ -318,6 +320,12 @@ where
         requests: Vec<SelectLanguageRequest>,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<Option<Language>>> {
+        metrics::counter!(
+            CsiMetrics::CsiRequestsTotal,
+            &[("function", "select_language")]
+        )
+        .increment(requests.len() as u64);
+
         let tracing_context = if requests.len() > 1 {
             let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "select_language_concurrent", requests = requests.len());
             TracingContext::new(child)
@@ -370,7 +378,8 @@ where
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> anyhow::Result<Vec<Document>> {
-        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "documents")]).increment(1);
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "documents")])
+            .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
             let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "document_concurrent", requests = requests.len());
@@ -402,7 +411,7 @@ where
             CsiMetrics::CsiRequestsTotal,
             &[("function", "document_metadata")]
         )
-        .increment(1);
+        .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
             let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "document_metadata_concurrent", requests = requests.len());
