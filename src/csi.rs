@@ -4,10 +4,10 @@ use futures::future::try_join_all;
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::mpsc;
-use tracing::{Level, span};
 
 use crate::{
     chunking::{self, Chunk, ChunkRequest},
+    context,
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
         Explanation, ExplanationRequest, InferenceApi, InferenceError,
@@ -175,17 +175,24 @@ where
             .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "explain_concurrent", requests = requests.len());
-            TracingContext::new(child)
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "explain_concurrent",
+                requests = requests.len()
+            )
         } else {
             tracing_context
         };
 
         let explanations = try_join_all(requests.into_iter().map(|r| {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "explain", model = r.model);
-            let child_context = TracingContext::new(child);
-            self.inference
-                .explain(r, auth.clone(), child_context)
+            let child_context = context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "explain",
+                model = r.model
+            );
+            self.inference.explain(r, auth.clone(), child_context)
         }))
         .await?;
         Ok(explanations)
@@ -201,8 +208,12 @@ where
             .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "complete_concurrent", requests = requests.len());
-            TracingContext::new(child)
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "complete_concurrent",
+                requests = requests.len()
+            )
         } else {
             tracing_context
         };
@@ -211,10 +222,13 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "complete", model = r.model);
-                    let child_context = TracingContext::new(child);
-                    self.inference
-                        .complete(r, auth.clone(), child_context)
+                    let child_context = context!(
+                        tracing_context,
+                        "pharia-kernel::csi",
+                        "complete",
+                        model = r.model
+                    );
+                    self.inference.complete(r, auth.clone(), child_context)
                 })
                 .collect::<Vec<_>>(),
         )
@@ -234,10 +248,14 @@ where
         )
         .increment(1);
 
-        let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "completion_stream", model = request.model);
-        let child_context = TracingContext::new(child);
+        let context = context!(
+            tracing_context,
+            "pharia-kernel::csi",
+            "completion_stream",
+            model = request.model
+        );
         self.inference
-            .completion_stream(request, auth, child_context)
+            .completion_stream(request, auth, context)
             .await
     }
 
@@ -251,8 +269,12 @@ where
             .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "chat_concurrent", requests = requests.len());
-            TracingContext::new(child)
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "chat_concurrent",
+                requests = requests.len()
+            )
         } else {
             tracing_context
         };
@@ -261,10 +283,13 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "chat", model = r.model);
-                    let child_context = TracingContext::new(child);
-                    self.inference
-                        .chat(r, auth.clone(), child_context)
+                    let context = context!(
+                        tracing_context,
+                        "pharia-kernel::csi",
+                        "chat",
+                        model = r.model
+                    );
+                    self.inference.chat(r, auth.clone(), context)
                 })
                 .collect::<Vec<_>>(),
         )
@@ -281,11 +306,13 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
             .increment(1);
 
-        let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "chat_stream", model = request.model);
-        let child_context = TracingContext::new(child);
-        self.inference
-            .chat_stream(request, auth, child_context)
-            .await
+        let context = context!(
+            tracing_context,
+            "pharia-kernel::csi",
+            "chat_stream",
+            model = request.model
+        );
+        self.inference.chat_stream(request, auth, context).await
     }
 
     async fn chunk(
@@ -298,8 +325,12 @@ where
             .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "chunk_concurrent", requests = requests.len());
-            TracingContext::new(child)
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "chunk_concurrent",
+                requests = requests.len()
+            )
         } else {
             tracing_context
         };
@@ -307,9 +338,15 @@ where
         try_join_all(requests.into_iter().map(async |request| {
             let text_len = request.text.len();
             let max_tokens = request.params.max_tokens;
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "chunk", text_len = text_len, max_tokens = max_tokens);
-            let child_context = TracingContext::new(child);
-            let chunks = chunking::chunking(request, &self.tokenizers, auth.clone(), child_context).await?;
+            let context = context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "chunk",
+                text_len = text_len,
+                max_tokens = max_tokens
+            );
+            let chunks =
+                chunking::chunking(request, &self.tokenizers, auth.clone(), context).await?;
             Ok(chunks)
         }))
         .await
@@ -327,21 +364,26 @@ where
         .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "select_language_concurrent", requests = requests.len());
-            TracingContext::new(child)
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "select_language_concurrent",
+                requests = requests.len()
+            )
         } else {
             tracing_context
         };
 
-        Ok(try_join_all(
-            requests
-                .into_iter()
-                .map(|request| {
-                    let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "select_language", text_len = request.text.len(), languages = request.languages.len());
-                    let child_context = TracingContext::new(child);
-                    tokio::task::spawn_blocking(move || select_language(request, child_context))
-                })
-        )
+        Ok(try_join_all(requests.into_iter().map(|request| {
+            let context = context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "select_language",
+                text_len = request.text.len(),
+                languages = request.languages.len()
+            );
+            tokio::task::spawn_blocking(move || select_language(request, context))
+        }))
         .await?
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?)
@@ -357,17 +399,30 @@ where
             .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "search_concurrent", requests = requests.len());
-            TracingContext::new(child)
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "search_concurrent",
+                requests = requests.len()
+            )
         } else {
             tracing_context
         };
 
         try_join_all(requests.into_iter().map(|request| {
             let index_path = &request.index_path;
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "search", namespace = index_path.namespace, collection = index_path.collection, max_results = request.max_results, min_score = request.min_score.map_or_else(|| "None".to_owned(), |val| val.to_string()));
-            let child_context = TracingContext::new(child);
-            self.search.search(request, auth.clone(), child_context)
+            let context = context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "search",
+                namespace = index_path.namespace,
+                collection = index_path.collection,
+                max_results = request.max_results,
+                min_score = request
+                    .min_score
+                    .map_or_else(|| "None".to_owned(), |val| val.to_string())
+            );
+            self.search.search(request, auth.clone(), context)
         }))
         .await
     }
@@ -382,8 +437,12 @@ where
             .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "document_concurrent", requests = requests.len());
-            TracingContext::new(child)
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "document_concurrent",
+                requests = requests.len()
+            )
         } else {
             tracing_context
         };
@@ -392,9 +451,15 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "document", namespace = r.namespace, collection = r.collection, name = r.name);
-                    let child_context = TracingContext::new(child);
-                    self.search.document(r, auth.clone(), child_context)
+                    let context = context!(
+                        tracing_context,
+                        "pharia-kernel::csi",
+                        "document",
+                        namespace = r.namespace,
+                        collection = r.collection,
+                        name = r.name
+                    );
+                    self.search.document(r, auth.clone(), context)
                 })
                 .collect::<Vec<_>>(),
         )
@@ -414,8 +479,12 @@ where
         .increment(requests.len() as u64);
 
         let tracing_context = if requests.len() > 1 {
-            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "document_metadata_concurrent", requests = requests.len());
-            TracingContext::new(child)
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "document_metadata_concurrent",
+                requests = requests.len()
+            )
         } else {
             tracing_context
         };
@@ -424,9 +493,15 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "document_metadata", namespace = r.namespace, collection = r.collection, name = r.name);
-                    let child_context = TracingContext::new(child);
-                    self.search.document_metadata(r, auth.clone(), child_context)
+                    let context = context!(
+                        tracing_context,
+                        "pharia-kernel::csi",
+                        "document_metadata",
+                        namespace = r.namespace,
+                        collection = r.collection,
+                        name = r.name
+                    );
+                    self.search.document_metadata(r, auth.clone(), context)
                 })
                 .collect::<Vec<_>>(),
         )

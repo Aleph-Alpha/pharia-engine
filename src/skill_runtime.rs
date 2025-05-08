@@ -7,9 +7,10 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{Level, error, info, span, warn};
+use tracing::{Level, error, info, warn};
 
 use crate::{
+    context,
     csi::Csi,
     logging::TracingContext,
     skill_driver::SkillDriver,
@@ -303,15 +304,7 @@ impl RunMessageStreamMsg {
             }
         };
 
-        let span = span!(
-            target: "pharia_kernel::skill_runtime",
-            parent: tracing_context.span(),
-            Level::INFO,
-            "skill_execution",
-            skill=%skill_path,
-        );
-        let child_context = TracingContext::new(span);
-
+        let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
         let start = Instant::now();
         let result = driver
             .run_message_stream(
@@ -319,12 +312,12 @@ impl RunMessageStreamMsg {
                 input,
                 csi_apis,
                 api_token,
-                child_context.clone(),
+                context.clone(),
                 send.clone(),
             )
             .await;
 
-        log_skill_result(&child_context, &skill_path, &result);
+        log_skill_result(&context, &skill_path, &result);
         record_skill_execution_metrics(start, skill_path, &result);
     }
 }
@@ -475,21 +468,14 @@ impl RunFunctionMsg {
             }
         };
 
-        let span = span!(
-            target: "pharia_kernel::skill_runtime",
-            parent: tracing_context.span(),
-            Level::INFO,
-            "skill_execution",
-            skill=%skill_path,
-        );
-        let child_context = TracingContext::new(span);
+        let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
 
         let start = Instant::now();
         let result = driver
-            .run_function(skill, input, csi_apis, api_token, child_context.clone())
+            .run_function(skill, input, csi_apis, api_token, context.clone())
             .await;
 
-        log_skill_result(&child_context, &skill_path, &result);
+        log_skill_result(&context, &skill_path, &result);
         record_skill_execution_metrics(start, skill_path, &result);
 
         // Error is expected to happen during shutdown. Ignore result.
