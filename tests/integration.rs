@@ -135,9 +135,6 @@ async fn run_skill() {
     local_skill_dir.with_skill("greet", greet_skill_wasm);
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
@@ -145,7 +142,7 @@ async fn run_skill() {
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!("Homer").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -171,9 +168,6 @@ async fn run_search_skill() {
     local_skill_dir.with_skill("search", wasm_bytes);
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
@@ -181,7 +175,7 @@ async fn run_search_skill() {
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!("What is the Pharia Kernel?").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -208,9 +202,6 @@ async fn run_doc_metadata_skill() {
     local_skill_dir.with_skill("doc_metadata", wasm_bytes);
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
@@ -218,7 +209,7 @@ async fn run_doc_metadata_skill() {
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!("ignore for now").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -243,9 +234,6 @@ async fn run_complete_stream_skill() {
     local_skill_dir.with_skill("complete_stream", wasm_bytes);
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
@@ -253,7 +241,7 @@ async fn run_complete_stream_skill() {
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!("ignore for now").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -284,9 +272,6 @@ async fn run_chat_stream_skill() {
     local_skill_dir.with_skill("chat_stream", wasm_bytes);
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
@@ -294,7 +279,7 @@ async fn run_chat_stream_skill() {
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!("ignore for now").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -327,14 +312,11 @@ async fn completion_via_remote_csi() {
 
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(
             json!({
                 "version": "0.2",
@@ -377,14 +359,11 @@ async fn chat_v0_2_via_remote_csi() {
 
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(
             json!({
                 "version": "0.2",
@@ -425,14 +404,11 @@ async fn chat_v0_2_via_remote_csi() {
 async fn unsupported_csi_function() {
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(
             json!({"version": "0.2", "function": "foo"}).to_string(),
         ))
@@ -453,14 +429,11 @@ async fn unsupported_csi_function() {
 async fn unsupported_old_csi_version() {
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!({"version": "0.1"}).to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -479,14 +452,11 @@ async fn unsupported_old_csi_version() {
 async fn error_for_lack_of_version() {
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!({}).to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -505,14 +475,11 @@ async fn error_for_lack_of_version() {
 async fn unsupported_newer_csi_version() {
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(
             json!({"version": u32::MAX.to_string() }).to_string(),
         ))
@@ -533,14 +500,11 @@ async fn unsupported_newer_csi_version() {
 async fn unsupported_newer_minor_csi_version() {
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(
             json!({"version": format!("0.{}", u32::MAX) }).to_string(),
         ))
@@ -565,14 +529,11 @@ async fn search_via_remote_csi() {
 
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(
             json!({
                 "version": "0.2",
@@ -608,14 +569,11 @@ async fn metadata_via_remote_csi() {
 
     let kernel = TestKernel::with_skills(&[]).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(
             json!({
                 "version": "0.2",
@@ -660,9 +618,6 @@ async fn traceparent_is_respected() {
     let parent_span_id: u64 = 0xb7ad6b7169203331;
     let traceparent = format!("00-{trace_id:032x}-{parent_span_id:016x}-01");
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let mut stream = req_client
         .post(format!(
@@ -670,7 +625,7 @@ async fn traceparent_is_respected() {
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .header("traceparent", traceparent)
         .body(Body::from(json!("Say one word: Homer").to_string()))
         .timeout(Duration::from_secs(30))
@@ -713,9 +668,6 @@ async fn invoke_function_as_stream() {
     local_skill_dir.with_skill("greet", greet_skill_wasm);
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
     let req_client = reqwest::Client::new();
     let resp = req_client
         .post(format!(
@@ -723,7 +675,7 @@ async fn invoke_function_as_stream() {
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!("Homer").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -752,10 +704,6 @@ async fn test_message_stream_canceled_during_the_skill_execution() {
     local_skill_dir.with_skill("infinite", greet_skill_wasm);
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
-    let api_token = api_token();
-    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-    auth_value.set_sensitive(true);
-
     let req_client = reqwest::Client::new();
     let mut stream = req_client
         .post(format!(
@@ -763,7 +711,7 @@ async fn test_message_stream_canceled_during_the_skill_execution() {
             kernel.port()
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value)
+        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(json!("").to_string()))
         .send()
         .await
@@ -775,6 +723,14 @@ async fn test_message_stream_canceled_during_the_skill_execution() {
     drop(stream);
     drop(req_client);
     kernel.shutdown().await;
+}
+
+/// Create an authenticated header value for the API token
+fn auth_value() -> header::HeaderValue {
+    let api_token = api_token();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    auth_value
 }
 
 /// API Token used by tests to authenticate requests
