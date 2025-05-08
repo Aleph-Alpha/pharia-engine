@@ -4,12 +4,10 @@ use derive_more::Deref;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
-use reqwest_tracing::TracingMiddleware;
 
 /// A common implementation of an HTTP Client.
 /// A wrapper around a reqwest client with common middleware applicable to most services.
 /// Includes:
-/// - Tracing
 /// - Retries
 /// - Timeout
 #[derive(Deref)]
@@ -33,7 +31,7 @@ impl HttpClient {
             );
             client = client.with(retry_middleware);
         }
-        Self(client.with(TracingMiddleware::default()).build())
+        Self(client.build())
     }
 }
 
