@@ -31,6 +31,21 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 
 use crate::config::OtelConfig;
 
+/// Create new child context.
+///
+/// This macro creates a new child span and returns a new `TracingContext` that
+/// is associated with the new span.
+#[macro_export]
+macro_rules! context {
+    ($parent:expr, $target:expr, $($field:tt)+) => {
+        {
+            use tracing::Level;
+            let parent_span = $parent.span();
+            let new_span = tracing::span!(target: $target, parent: parent_span, Level::INFO, $($field)*);
+            TracingContext::new(new_span)
+        }
+    };
+}
 /// Context that is needed to situate certain actions in the overall context.
 ///
 /// In this opaque type we specify decisions on what context needs to be passed
