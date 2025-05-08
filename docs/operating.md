@@ -111,7 +111,7 @@ OTEL_ENDPOINT=http://127.0.0.1:4317
 For local testing, a supported collector like the Jaeger [All in One](https://www.jaegertracing.io/docs/1.60/getting-started/#all-in-one) executable can be used:
 
 ```shell
-podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
+podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
 ## Local PhariaKernel Setup
@@ -171,7 +171,7 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
 You can monitor your Skill by connecting the PhariaKernel to an OpenTelemetry collector, e.g. Jaeger:
 
 ```shell
-    podman run -d -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
+    podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
 Specify the collector endpoint via the environment variable `OTEL_ENDPOINT`:
