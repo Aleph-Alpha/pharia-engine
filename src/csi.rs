@@ -173,6 +173,14 @@ where
     ) -> Result<Vec<Explanation>, CsiError> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "explain")])
             .increment(requests.len() as u64);
+
+        let tracing_context = if requests.len() > 1 {
+            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "explain_concurrent", requests = requests.len());
+            TracingContext::new(child)
+        } else {
+            tracing_context
+        };
+
         let explanations = try_join_all(requests.into_iter().map(|r| {
             let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "explain", model = r.model);
             let child_context = TracingContext::new(child);
@@ -191,6 +199,14 @@ where
     ) -> anyhow::Result<Vec<Completion>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "complete")])
             .increment(requests.len() as u64);
+
+        let tracing_context = if requests.len() > 1 {
+            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "complete_concurrent", requests = requests.len());
+            TracingContext::new(child)
+        } else {
+            tracing_context
+        };
+
         let completions = try_join_all(
             requests
                 .into_iter()
@@ -233,6 +249,13 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")])
             .increment(requests.len() as u64);
 
+        let tracing_context = if requests.len() > 1 {
+            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "chat_concurrent", requests = requests.len());
+            TracingContext::new(child)
+        } else {
+            tracing_context
+        };
+
         let responses = try_join_all(
             requests
                 .into_iter()
@@ -272,6 +295,13 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chunk")])
             .increment(requests.len() as u64);
 
+        let tracing_context = if requests.len() > 1 {
+            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "chunk_concurrent", requests = requests.len());
+            TracingContext::new(child)
+        } else {
+            tracing_context
+        };
+
         try_join_all(requests.into_iter().map(async |request| {
             let text_len = request.text.len();
             let max_tokens = request.params.max_tokens;
@@ -288,6 +318,13 @@ where
         requests: Vec<SelectLanguageRequest>,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<Option<Language>>> {
+        let tracing_context = if requests.len() > 1 {
+            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "select_language_concurrent", requests = requests.len());
+            TracingContext::new(child)
+        } else {
+            tracing_context
+        };
+
         Ok(try_join_all(
             requests
                 .into_iter()
@@ -311,6 +348,13 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "search")])
             .increment(requests.len() as u64);
 
+        let tracing_context = if requests.len() > 1 {
+            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "search_concurrent", requests = requests.len());
+            TracingContext::new(child)
+        } else {
+            tracing_context
+        };
+
         try_join_all(requests.into_iter().map(|request| {
             let index_path = &request.index_path;
             let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "search", namespace = index_path.namespace, collection = index_path.collection, max_results = request.max_results, min_score = request.min_score.map_or_else(|| "None".to_owned(), |val| val.to_string()));
@@ -327,6 +371,14 @@ where
         requests: Vec<DocumentPath>,
     ) -> anyhow::Result<Vec<Document>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "documents")]).increment(1);
+
+        let tracing_context = if requests.len() > 1 {
+            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "document_concurrent", requests = requests.len());
+            TracingContext::new(child)
+        } else {
+            tracing_context
+        };
+
         try_join_all(
             requests
                 .into_iter()
@@ -351,6 +403,14 @@ where
             &[("function", "document_metadata")]
         )
         .increment(1);
+
+        let tracing_context = if requests.len() > 1 {
+            let child = span!(target: "pharia-kernel::csi", parent: tracing_context.span(), Level::INFO, "document_metadata_concurrent", requests = requests.len());
+            TracingContext::new(child)
+        } else {
+            tracing_context
+        };
+
         try_join_all(
             requests
                 .into_iter()
