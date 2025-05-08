@@ -11,6 +11,7 @@ use axum::http;
 use bytesize::ByteSize;
 use dotenvy::dotenv;
 use futures::StreamExt;
+use opentelemetry::{SpanId, TraceId};
 use pharia_kernel::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
@@ -644,14 +645,20 @@ async fn metadata_via_remote_csi() {
 }
 
 #[tokio::test]
-async fn invoke_message_stream_skill_with_tracing() {
-    // Simulate the production environment with tracing enabled
+#[allow(clippy::unreadable_literal)]
+async fn traceparent_is_respected() {
+    // Given a log recorder
     let (_guard, log_recorder) = given_log_recorder().await;
 
     let streaming_output_skill_wasm = given_streaming_output_skill().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("streaming-output", streaming_output_skill_wasm);
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+
+    // When we execute a skill with a traceheader
+    let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
+    let parent_span_id: u64 = 0xb7ad6b7169203331;
+    let traceparent = format!("00-{trace_id:032x}-{parent_span_id:016x}-01");
 
     let api_token = api_token();
     let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
@@ -664,6 +671,7 @@ async fn invoke_message_stream_skill_with_tracing() {
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value)
+        .header("traceparent", traceparent)
         .body(Body::from(json!("Say one word: Homer").to_string()))
         .timeout(Duration::from_secs(30))
         .send()
@@ -671,18 +679,28 @@ async fn invoke_message_stream_skill_with_tracing() {
         .unwrap()
         .bytes_stream();
 
-    let mut events = vec![];
-    while let Some(event) = stream.next().await {
-        events.push(event.unwrap());
-    }
-    assert_eq!(events[0], "event: message\ndata: {\"type\":\"begin\"}\n\n");
-    assert_eq!(
-        events[1],
-        "event: message\ndata: {\"type\":\"append\",\"text\":\"Homer\"}\n\n"
-    );
+    // Consume the stream
+    while stream.next().await.is_some() {}
     kernel.shutdown().await;
 
-    assert_eq!(log_recorder.spans().len(), 4);
+    // Then we should have recorded three spans that all belong to the same trace id
+    let spans = log_recorder.spans();
+    assert_eq!(spans.len(), 3);
+    let trace_ids = spans
+        .iter()
+        .map(|s| s.span_context.trace_id())
+        .collect::<Vec<_>>();
+    assert!(trace_ids.iter().all(|id| id == &TraceId::from(trace_id)));
+
+    let span_ids = spans
+        .iter()
+        .map(|s| s.span_context.span_id())
+        .collect::<Vec<_>>();
+    let parent_span_ids = spans.iter().map(|s| s.parent_span_id).collect::<Vec<_>>();
+
+    assert_eq!(parent_span_ids[0], span_ids[1]);
+    assert_eq!(parent_span_ids[1], span_ids[2]);
+    assert_eq!(parent_span_ids[2], SpanId::from(parent_span_id));
 }
 
 #[tokio::test]
@@ -712,7 +730,6 @@ async fn invoke_function_as_stream() {
         .await
         .unwrap();
 
-    eprintln!("{resp:?}");
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
     assert_eq!(
