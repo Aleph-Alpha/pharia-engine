@@ -480,6 +480,7 @@ pub enum InferenceMessage {
 }
 
 impl InferenceMessage {
+    #[allow(clippy::too_many_lines)]
     async fn act(self, client: &impl InferenceClient) {
         match self {
             Self::Complete {
@@ -503,7 +504,7 @@ impl InferenceMessage {
                 let mut stream = Box::pin(client.stream_completion(
                     &request,
                     api_token,
-                    tracing_context,
+                    tracing_context.clone(),
                     event_send,
                 ));
 
@@ -531,6 +532,9 @@ impl InferenceMessage {
                 while let Some(msg) = event_recv.recv().await {
                     drop(send.send(Ok(msg)).await);
                 }
+
+                // Ensure the tracing context is only dropped once the stream is done, otherwise the span will be dropped prematurely
+                drop(tracing_context);
             }
             Self::Chat {
                 request,
@@ -548,8 +552,12 @@ impl InferenceMessage {
                 tracing_context,
             } => {
                 let (event_send, mut event_recv) = mpsc::channel(1);
-                let mut stream =
-                    Box::pin(client.stream_chat(&request, api_token, tracing_context, event_send));
+                let mut stream = Box::pin(client.stream_chat(
+                    &request,
+                    api_token,
+                    tracing_context.clone(),
+                    event_send,
+                ));
 
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
@@ -575,6 +583,9 @@ impl InferenceMessage {
                 while let Some(msg) = event_recv.recv().await {
                     drop(send.send(Ok(msg)).await);
                 }
+
+                // Ensure the tracing context is only dropped once the stream is done, otherwise the span will be dropped prematurely
+                drop(tracing_context);
             }
             Self::Explain {
                 request,
