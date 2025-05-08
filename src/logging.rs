@@ -1,3 +1,16 @@
+//! Logging and tracing utilities.
+//!
+//! This module encapsulates our decisions on how we want to do logging and tracing in the Kernel.
+//! Since the Kernel is written in an actor model, certain assumptions of the [`tracing`] crate
+//! do not hold. For example, it relies on thread local storage to store the current active span.
+//! All [`tracing::event!`] macro calls will then use this thread local storage to situate an event
+//! in the right span. This still works for async code, where then some middleware will make sure
+//! to set the corresponding span as active whenever polling the inner future.
+//!
+//! However, in an actor model, we loose the acountability. Imagine different actors running in
+//! different threads, and reacting to messages. If we want them to situate events in the right
+//! context, we need to pass that context along with the messages, similar to how tracing context
+//! is passed along as part of requests in distributed systems.
 use std::{env, str::FromStr};
 
 use opentelemetry::{
@@ -49,13 +62,39 @@ impl TracingContext {
         Self(span)
     }
 
+    /// Get the inner span object.
+    ///
+    /// Most likely use case is the caller wanting to specify the parent for a new span
+    /// or event.
     pub fn span(&self) -> &Span {
         &self.0
     }
 
-    #[allow(dead_code)]
-    pub fn trace_id(&self) -> TraceId {
-        self.0.context().span().span_context().trace_id()
+    /// The version of the trace context specification that we support.
+    ///
+    /// <https://www.w3.org/TR/trace-context-2/#version>
+    const SUPPORTED_VERSION: u8 = 0;
+
+    /// Render the context as a traceparent header.
+    ///
+    /// <https://www.w3.org/TR/trace-context-2/#traceparent-header>
+    pub fn as_traceparent(&self) -> Option<String> {
+        self.0
+            .id()
+            .map(|span_id| Self::traceparent(span_id.into_u64(), self.trace_id_u128()))
+    }
+
+    /// Construct a traceparent header from a span id and trace id.
+    fn traceparent(span_id: u64, trace_id: u128) -> String {
+        format!(
+            "{:02x}-{:032x}-{:016x}-{:02x}",
+            Self::SUPPORTED_VERSION,
+            trace_id,
+            span_id,
+            // Currently, we always regard the trace as sampled. However, for compliance with the spec,
+            // we should take this from the traceparent header.
+            opentelemetry::trace::TraceFlags::SAMPLED.to_u8(),
+        )
     }
 
     /// Convert the tracing context to what the inference client expects.
@@ -73,30 +112,9 @@ impl TracingContext {
         u128::from_be_bytes(self.trace_id().to_bytes())
     }
 
-    /// The version of the trace context specification that we support.
-    ///
-    /// <https://www.w3.org/TR/trace-context-2/#version>
-    const SUPPORTED_VERSION: u8 = 0;
-
-    /// Render the context as a traceparent header.
-    ///
-    /// <https://www.w3.org/TR/trace-context-2/#traceparent-header>
-    pub fn as_traceparent(&self) -> Option<String> {
-        self.0
-            .id()
-            .map(|span_id| Self::traceparent(span_id.into_u64(), self.trace_id_u128()))
-    }
-
-    fn traceparent(span_id: u64, trace_id: u128) -> String {
-        format!(
-            "{:02x}-{:032x}-{:016x}-{:02x}",
-            Self::SUPPORTED_VERSION,
-            trace_id,
-            span_id,
-            // Currently, we always regard the trace as sampled. However, for compliance with the spec,
-            // we should take this from the traceparent header.
-            opentelemetry::trace::TraceFlags::SAMPLED.to_u8(),
-        )
+    #[allow(dead_code)]
+    pub fn trace_id(&self) -> TraceId {
+        self.0.context().span().span_context().trace_id()
     }
 }
 
