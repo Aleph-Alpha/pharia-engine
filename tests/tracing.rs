@@ -1,6 +1,5 @@
 //! Utilities for testing logging/tracing related functionality.
 use std::{
-    io::{LineWriter, Write},
     str::FromStr,
     sync::{Arc, LazyLock, Mutex},
 };
@@ -11,9 +10,7 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider, SpanData, SpanExporter},
 };
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use tracing_subscriber::{
-    EnvFilter, fmt::writer::BoxMakeWriter, layer::SubscriberExt, util::SubscriberInitExt,
-};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// A span exporter that allows to inspect spans that have been recorded.
 #[derive(Clone, Debug)]
@@ -34,40 +31,7 @@ impl SpanExporter for SpySpanExporter {
     }
 }
 
-/// A writer that allows to inspect log lines that have been recorded.
-struct SpyWriter {
-    lines: Arc<Mutex<Vec<String>>>,
-}
-
-impl SpyWriter {
-    /// Create a new [`SpyWriter`] and wrap it in a [`std::io::LineWriter`].
-    pub fn new_wrapped_in_line_writer(lines: Arc<Mutex<Vec<String>>>) -> impl Write {
-        LineWriter::new(Self::new(lines))
-    }
-
-    /// This method is private as [`SpyWriter`] is not intended to be used directly.
-    fn new(lines: Arc<Mutex<Vec<String>>>) -> Self {
-        Self { lines }
-    }
-}
-
-impl Write for SpyWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        // We can assume that the buffer is a complete line, because we are wrapped inside a [`std::io::LineWriter`].
-        self.lines
-            .lock()
-            .unwrap()
-            .push(String::from_utf8_lossy(buf).to_string());
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
 pub struct LogRecorder {
-    lines: Arc<Mutex<Vec<String>>>,
     spans: Arc<Mutex<Vec<SpanData>>>,
     // Ensure the provider is not dropped
     guard: SdkTracerProvider,
@@ -84,7 +48,6 @@ impl LogRecorder {
 
     fn clear(&self) {
         self.spans.lock().unwrap().clear();
-        self.lines.lock().unwrap().clear();
     }
 }
 
@@ -149,27 +112,15 @@ fn tracing_subscriber() -> LogRecorder {
 
     init_propagator();
 
-    let lines = Arc::new(Mutex::new(Vec::new()));
-    let cloned_lines = lines.clone();
-    let writer =
-        BoxMakeWriter::new(move || SpyWriter::new_wrapped_in_line_writer(cloned_lines.clone()));
-
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_writer(writer)
-        .with_ansi(false) // Disable ANSI colors for easier parsing
-        .with_test_writer(); // Use a compact format suitable for tests
-
     let tracer = provider.tracer("test");
     let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
     tracing_subscriber::registry()
         .with(EnvFilter::from_str("info").unwrap())
         .with(otel_layer)
-        .with(fmt_layer)
         .init();
 
     LogRecorder {
         spans,
-        lines,
         guard: provider,
     }
 }
