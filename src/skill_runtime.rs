@@ -7,7 +7,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::{Level, error, info, warn};
+use tracing::{Level, error, info, span, warn};
 
 use crate::{
     csi::Csi,
@@ -303,7 +303,15 @@ impl RunMessageStreamMsg {
             }
         };
 
-        log_skill_start(&tracing_context, &skill_path);
+        let span = span!(
+            target: "pharia_kernel::skill_runtime",
+            parent: tracing_context.span(),
+            Level::INFO,
+            "skill execution",
+            skill=%skill_path,
+        );
+        let child_context = TracingContext::new(span);
+
         let start = Instant::now();
         let result = driver
             .run_message_stream(
@@ -311,12 +319,12 @@ impl RunMessageStreamMsg {
                 input,
                 csi_apis,
                 api_token,
-                tracing_context.clone(),
+                child_context.clone(),
                 send.clone(),
             )
             .await;
 
-        log_skill_result(&tracing_context, &skill_path, &result);
+        log_skill_result(&child_context, &skill_path, &result);
         record_skill_execution_metrics(start, skill_path, &result);
     }
 }
