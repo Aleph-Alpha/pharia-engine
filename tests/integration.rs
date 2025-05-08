@@ -3,7 +3,7 @@ use std::{
     net::TcpListener,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::{LazyLock, OnceLock},
+    sync::OnceLock,
     time::Duration,
 };
 
@@ -11,11 +11,6 @@ use axum::http;
 use bytesize::ByteSize;
 use dotenvy::dotenv;
 use futures::StreamExt;
-use opentelemetry::{propagation::TextMapCompositePropagator, trace::TracerProvider};
-use opentelemetry_sdk::{
-    propagation::{BaggagePropagator, TraceContextPropagator},
-    trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
-};
 use pharia_kernel::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
@@ -26,7 +21,9 @@ use test_skills::{
     given_skill_infinite_streaming, given_streaming_output_skill,
 };
 use tokio::sync::oneshot;
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+
+mod tracing;
+use tracing::{given_log_recorder, given_tracing_subscriber};
 
 struct TestFileRegistry {
     skills: Vec<String>,
@@ -126,58 +123,11 @@ fn namespace_config(dir_path: &Path, skills: &[&str]) -> NamespaceConfigs {
     .unwrap()
 }
 
-static INITIALIZE_TRACING_SUBSCRIBER: LazyLock<SdkTracerProvider> =
-    LazyLock::new(tracing_subscriber);
-
-/// Ensure a tracing subscriber is initialized.
-///
-/// This is useful for tests that are testing logging/tracing related functionality.
-/// While we would like to use [`tracing::subscriber::with_default`] to set the subscriber for
-/// the scope of the test, this only applies to a single thread, and proved to be flaky as
-/// tokio may choose to run certain actors on a different thread.
-fn given_tracing_subscriber() -> &'static SdkTracerProvider {
-    &INITIALIZE_TRACING_SUBSCRIBER
-}
-
-/// Construct a subscriber that logs to stdout and allows to retrieve the traceparent
-fn tracing_subscriber() -> SdkTracerProvider {
-    // This matches the setup in `logging`, but exporting to stdout instead of an OTLP endpoint
-    let provider = SdkTracerProvider::builder()
-        .with_sampler(Sampler::AlwaysOn)
-        .with_id_generator(RandomIdGenerator::default())
-        .with_batch_exporter(opentelemetry_stdout::SpanExporter::default())
-        .build();
-
-    // Allows to retrieve the traceparent
-    init_propagator();
-
-    let tracer = provider.tracer("test");
-    let layer = tracing_opentelemetry::layer().with_tracer(tracer);
-    tracing_subscriber::registry()
-        .with(EnvFilter::from_str("info").unwrap())
-        .with(layer)
-        .init();
-    provider
-}
-
-/// Set propagators that extract traceparent and tracestate from incoming requests.
-/// Setting these (globally) is required for the `axum_tracing_opentelemetry` middleware to work.
-pub fn init_propagator() {
-    let context_propagator = TraceContextPropagator::new();
-    let baggage_propagator = BaggagePropagator::new();
-
-    let propagator = TextMapCompositePropagator::new(vec![
-        Box::new(context_propagator),
-        Box::new(baggage_propagator),
-    ]);
-    opentelemetry::global::set_text_map_propagator(propagator);
-}
-
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn run_skill() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let greet_skill_wasm = given_rust_skill_greet_v0_2().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
@@ -213,7 +163,7 @@ async fn run_skill() {
 #[tokio::test]
 async fn run_search_skill() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let wasm_bytes = given_rust_skill_search().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
@@ -250,7 +200,7 @@ async fn run_search_skill() {
 #[tokio::test]
 async fn run_doc_metadata_skill() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let wasm_bytes = given_rust_skill_doc_metadata().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
@@ -285,7 +235,7 @@ async fn run_doc_metadata_skill() {
 #[tokio::test]
 async fn run_complete_stream_skill() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let wasm_bytes = given_complete_stream_skill().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
@@ -326,7 +276,7 @@ async fn run_complete_stream_skill() {
 #[tokio::test]
 async fn run_chat_stream_skill() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let wasm_bytes = given_chat_stream_skill().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
@@ -372,7 +322,7 @@ async fn run_chat_stream_skill() {
 #[tokio::test]
 async fn completion_via_remote_csi() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let kernel = TestKernel::with_skills(&[]).await;
 
@@ -422,7 +372,7 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
 #[tokio::test]
 async fn chat_v0_2_via_remote_csi() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let kernel = TestKernel::with_skills(&[]).await;
 
@@ -610,7 +560,7 @@ async fn unsupported_newer_minor_csi_version() {
 #[tokio::test]
 async fn search_via_remote_csi() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let kernel = TestKernel::with_skills(&[]).await;
 
@@ -653,7 +603,7 @@ async fn search_via_remote_csi() {
 #[tokio::test]
 async fn metadata_via_remote_csi() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let kernel = TestKernel::with_skills(&[]).await;
 
@@ -696,7 +646,7 @@ async fn metadata_via_remote_csi() {
 #[tokio::test]
 async fn invoke_message_stream_skill_with_tracing() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let (_guard, log_recorder) = given_log_recorder().await;
 
     let streaming_output_skill_wasm = given_streaming_output_skill().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
@@ -731,12 +681,14 @@ async fn invoke_message_stream_skill_with_tracing() {
         "event: message\ndata: {\"type\":\"append\",\"text\":\"Homer\"}\n\n"
     );
     kernel.shutdown().await;
+
+    assert_eq!(log_recorder.spans().len(), 4);
 }
 
 #[tokio::test]
 async fn invoke_function_as_stream() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let greet_skill_wasm = given_rust_skill_greet_v0_3().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
@@ -776,7 +728,7 @@ async fn invoke_function_as_stream() {
 #[tokio::test]
 async fn test_message_stream_canceled_during_the_skill_execution() {
     // Simulate the production environment with tracing enabled
-    given_tracing_subscriber();
+    let _guard = given_tracing_subscriber().await;
 
     let greet_skill_wasm = given_skill_infinite_streaming().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
