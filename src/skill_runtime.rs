@@ -404,15 +404,6 @@ fn record_skill_execution_metrics<T>(
     metrics::histogram!(SkillRuntimeMetrics::ExecutionDurationSeconds, &labels).record(latency);
 }
 
-fn log_skill_start(tracing_context: &TracingContext, skill_path: &SkillPath) {
-    info!(
-        target: "pharia_kernel::skill_execution",
-        parent: tracing_context.span(),
-        skill=%skill_path,
-        message="Starting skill execution"
-    );
-}
-
 fn log_skill_result<T>(
     tracing_context: &TracingContext,
     skill_path: &SkillPath,
@@ -484,13 +475,21 @@ impl RunFunctionMsg {
             }
         };
 
-        log_skill_start(&tracing_context, &skill_path);
+        let span = span!(
+            target: "pharia_kernel::skill_runtime",
+            parent: tracing_context.span(),
+            Level::INFO,
+            "skill execution",
+            skill=%skill_path,
+        );
+        let child_context = TracingContext::new(span);
+
         let start = Instant::now();
         let result = driver
-            .run_function(skill, input, csi_apis, api_token, tracing_context.clone())
+            .run_function(skill, input, csi_apis, api_token, child_context.clone())
             .await;
 
-        log_skill_result(&tracing_context, &skill_path, &result);
+        log_skill_result(&child_context, &skill_path, &result);
         record_skill_execution_metrics(start, skill_path, &result);
 
         // Error is expected to happen during shutdown. Ignore result.
