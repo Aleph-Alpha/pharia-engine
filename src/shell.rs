@@ -526,8 +526,11 @@ async fn skill_metadata<R>(
 where
     R: SkillRuntimeApi,
 {
+    let tracing_context = TracingContext::current();
     let skill_path = SkillPath::new(namespace, name);
-    let response = skill_runtime_api.skill_metadata(skill_path).await?;
+    let response = skill_runtime_api
+        .skill_metadata(skill_path, tracing_context)
+        .await?;
     Ok(Json(response.into()))
 }
 
@@ -1987,6 +1990,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
+            _tracing_context: TracingContext,
         ) -> Result<AnySkillManifest, SkillExecutionError> {
             panic!("Skill runtime dummy called")
         }
@@ -2033,6 +2037,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
+            _tracing_context: TracingContext,
         ) -> Result<AnySkillManifest, SkillExecutionError> {
             Err((*self.make_error)())
         }
@@ -2100,6 +2105,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
+            _tracing_context: TracingContext,
         ) -> Result<AnySkillManifest, SkillExecutionError> {
             Ok(self.metadata.clone())
         }
@@ -2174,6 +2180,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
+            _tracing_context: TracingContext,
         ) -> Result<AnySkillManifest, SkillExecutionError> {
             unimplemented!("Not needed in any test for now")
         }
@@ -2249,6 +2256,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         async fn skill_metadata(
             &self,
             _skill_path: SkillPath,
+            _tracing_context: TracingContext,
         ) -> Result<AnySkillManifest, SkillExecutionError> {
             panic!("SpySkillRuntime does not support metadata")
         }
