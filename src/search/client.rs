@@ -11,21 +11,21 @@ pub trait SearchClient: Send + Sync + 'static {
         index: IndexPath,
         request: SearchRequest,
         api_token: &str,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
 
     fn document_metadata(
         &self,
         document_path: DocumentPath,
         api_token: &str,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
 
     fn document(
         &self,
         document_path: DocumentPath,
         api_token: &str,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
 
@@ -197,7 +197,7 @@ impl SearchClient for Client {
         index: IndexPath,
         request: SearchRequest,
         api_token: &str,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let IndexPath {
             namespace,
@@ -248,7 +248,7 @@ impl SearchClient for Client {
         &self,
         document_path: DocumentPath,
         api_token: &str,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         #[derive(Deserialize)]
         struct Document {
@@ -287,7 +287,7 @@ impl SearchClient for Client {
         &self,
         document_path: DocumentPath,
         api_token: &str,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> anyhow::Result<Document> {
         #[derive(Deserialize)]
         struct JsonDocument {
@@ -354,7 +354,7 @@ pub mod tests {
             _index: IndexPath,
             _request: SearchRequest,
             _api_token: &str,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> anyhow::Result<Vec<SearchResult>> {
             Ok(vec![])
         }
@@ -363,7 +363,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> anyhow::Result<Option<Value>> {
             Ok(None)
         }
@@ -372,7 +372,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> anyhow::Result<Document> {
             Ok(Document::dummy())
         }
@@ -416,7 +416,7 @@ pub mod tests {
         // When requesting a document
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
         let document = client
-            .document(document_path, api_token, TracingContext::dummy())
+            .document(document_path, api_token, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -434,7 +434,7 @@ pub mod tests {
         // When requesting a document that does not exist
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs-not-found");
         let maybe_document = client
-            .document(document_path, api_token, TracingContext::dummy())
+            .document(document_path, api_token, &TracingContext::dummy())
             .await;
 
         // Then we get no document
@@ -460,7 +460,7 @@ pub mod tests {
             Vec::new(),
         );
         let results = client
-            .search(index, request, api_token, TracingContext::dummy())
+            .search(index, request, api_token, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -489,7 +489,7 @@ pub mod tests {
         // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel/docs");
         let maybe_metadata = client
-            .document_metadata(document_path, api_token, TracingContext::dummy())
+            .document_metadata(document_path, api_token, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -525,7 +525,7 @@ pub mod tests {
             Vec::new(),
         );
         let results = client
-            .search(index, request, api_token, TracingContext::dummy())
+            .search(index, request, api_token, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -557,7 +557,7 @@ pub mod tests {
             vec![filter],
         );
         let results = client
-            .search(index, request, api_token, TracingContext::dummy())
+            .search(index, request, api_token, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -589,7 +589,7 @@ pub mod tests {
             vec![filter],
         );
         let results = client
-            .search(index, request, api_token, TracingContext::dummy())
+            .search(index, request, api_token, &TracingContext::dummy())
             .await
             .unwrap();
 
