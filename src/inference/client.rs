@@ -90,7 +90,7 @@ impl InferenceClient for Client {
             granularity: granularity.into(),
         };
         let how = how(api_token, tracing_context);
-        retry(|| self.explanation(&task, model, &how))
+        retry(|| self.explanation(&task, model, &how), tracing_context)
             .await?
             .try_into()
             .map_err(InferenceError::Other)
@@ -104,7 +104,7 @@ impl InferenceClient for Client {
         let task = request.to_task_chat();
 
         let how = how(api_token, tracing_context);
-        retry(|| self.chat(&task, &request.model, &how))
+        retry(|| self.chat(&task, &request.model, &how), tracing_context)
             .await?
             .try_into()
             .map_err(InferenceError::Other)
@@ -119,7 +119,11 @@ impl InferenceClient for Client {
     ) -> Result<(), InferenceError> {
         let task = request.to_task_chat();
         let how = how(api_token, tracing_context);
-        let mut stream = retry(|| self.stream_chat(&task, &request.model, &how)).await?;
+        let mut stream = retry(
+            || self.stream_chat(&task, &request.model, &how),
+            tracing_context,
+        )
+        .await?;
 
         while let Some(event) = stream.next().await {
             drop(send.send(ChatEvent::try_from(event?)?).await);
@@ -167,7 +171,7 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
         };
         let how = how(api_token, tracing_context);
-        retry(|| self.completion(&task, model, &how))
+        retry(|| self.completion(&task, model, &how), tracing_context)
             .await?
             .try_into()
             .map_err(InferenceError::Other)
@@ -214,7 +218,11 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
         };
         let how = how(api_token, tracing_context);
-        let mut stream = retry(|| self.stream_completion(&task, model, &how)).await?;
+        let mut stream = retry(
+            || self.stream_completion(&task, model, &how),
+            tracing_context,
+        )
+        .await?;
 
         while let Some(event) = stream.next().await {
             drop(send.send(CompletionEvent::try_from(event?)?).await);
@@ -432,7 +440,10 @@ impl From<Logprobs> for aleph_alpha_client::Logprobs {
     }
 }
 
-async fn retry<T, F, Fut>(mut f: F) -> Result<T, aleph_alpha_client::Error>
+async fn retry<T, F, Fut>(
+    mut f: F,
+    tracing_context: &TracingContext,
+) -> Result<T, aleph_alpha_client::Error>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, aleph_alpha_client::Error>>,
@@ -455,13 +466,14 @@ where
                         .duration_since(SystemTime::now())
                         .unwrap_or_else(|_| Duration::default());
                     warn!(
+                        parent: tracing_context.span(),
                         "Retrying operation: {e} attempt #{n_past_retries}. Sleeping {duration:?} before the next attempt"
                     );
                     tokio::time::sleep(duration).await;
                     n_past_retries += 1;
                 }
                 RetryDecision::DoNotRetry => {
-                    error!("Error after all retries: {e}");
+                    error!(parent: tracing_context.span(), "Error after all retries: {e}");
                     return Err(e);
                 }
             },
@@ -472,7 +484,7 @@ where
                 | aleph_alpha_client::Error::InvalidStream { .. }
                 | aleph_alpha_client::Error::InvalidTokenizer { .. }),
             ) => {
-                error!("Unrecoverable inference error: {e}");
+                error!(parent: tracing_context.span(), "Unrecoverable inference error: {e}");
                 return Err(e);
             }
         }
@@ -554,7 +566,7 @@ mod tests {
         };
 
         // When retrying the future
-        let result = retry(future).await;
+        let result = retry(future, &TracingContext::dummy()).await;
 
         // Then the future is invoked only once
         assert!(result.is_ok());
@@ -576,7 +588,7 @@ mod tests {
         };
 
         // When retrying the future
-        let result = retry(future).await;
+        let result = retry(future, &TracingContext::dummy()).await;
 
         // Then the future is invoked three times and returns okay
         assert!(result.is_ok());
@@ -595,7 +607,7 @@ mod tests {
 
         // When retrying the future
         let start = Instant::now();
-        let result = retry(future).await;
+        let result = retry(future, &TracingContext::dummy()).await;
         let duration = start.elapsed();
 
         // Then the future is invoked six times and returns an error
