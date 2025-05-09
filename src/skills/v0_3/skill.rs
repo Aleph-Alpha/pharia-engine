@@ -56,10 +56,11 @@ impl crate::skills::Skill for SkillPre<LinkedCtx> {
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
+        tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         let mut store = engine.store(ctx);
         let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
-            tracing::error!("Failed to instantiate skill: {}", e);
+            error!(parent: tracing_context.span(), "Failed to instantiate skill: {}", e);
             SkillError::RuntimeError(e)
         })?;
         let manifest = bindings

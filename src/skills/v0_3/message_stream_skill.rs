@@ -32,6 +32,7 @@ impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
+        _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         // Still need to define metadata for streaming skills
         Ok(AnySkillManifest::V0)

@@ -28,6 +28,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
+        _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
     }

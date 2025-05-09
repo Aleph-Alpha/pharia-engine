@@ -273,7 +273,7 @@ impl MetadataMsg {
                 return;
             }
         };
-        let result = driver.metadata(skill).await;
+        let result = driver.metadata(skill, &self.tracing_context).await;
         drop(self.send.send(result));
     }
 }
@@ -644,6 +644,7 @@ pub mod tests {
                 &self,
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
+                _tracing_context: &TracingContext,
             ) -> Result<AnySkillManifest, SkillError> {
                 panic!("Dummy metadata implementation of Assert concurrency skill")
             }
@@ -896,6 +897,7 @@ pub mod tests {
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
+            _tracing_context: &TracingContext,
         ) -> Result<AnySkillManifest, SkillError> {
             panic!("Dummy metadata implementation of Greet Skill")
         }
