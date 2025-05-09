@@ -599,6 +599,7 @@ pub mod tests {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
+                _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {
                 let mut recv = self.send.subscribe();
                 self.send.send(()).unwrap();
@@ -625,6 +626,7 @@ pub mod tests {
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
                 _mpsc: mpsc::Sender<SkillEvent>,
+                _tracing_context: &TracingContext,
             ) -> Result<(), SkillError> {
                 panic!("Dummy message stream implementation of Assert concurrency skill")
             }
@@ -857,6 +859,7 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
+            _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
             Ok(json!("Hello"))
         }
@@ -875,6 +878,7 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
+            _tracing_context: &TracingContext,
         ) -> Result<(), SkillError> {
             Err(SkillError::IsFunction)
         }

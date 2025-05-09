@@ -53,8 +53,13 @@ impl SkillDriver {
 
         let (send_inner, mut recv_inner) = mpsc::channel(1);
 
-        let mut execute_skill =
-            skill.run_as_message_stream(&self.engine, csi_for_skills, input, send_inner);
+        let mut execute_skill = skill.run_as_message_stream(
+            &self.engine,
+            csi_for_skills,
+            input,
+            send_inner,
+            tracing_context,
+        );
 
         let mut translator = EventTranslator::new();
 
@@ -126,7 +131,7 @@ impl SkillDriver {
             tracing_context.clone(),
         ));
         select! {
-            result = skill.run_as_function(&self.engine, csi_for_skills, input) => result.map_err(Into::into),
+            result = skill.run_as_function(&self.engine, csi_for_skills, input, tracing_context) => result.map_err(Into::into),
             // An error occurred during skill execution.
             Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error.to_string()))
         }
@@ -938,6 +943,7 @@ mod test {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
+                _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {
                 unreachable!("This won't be invoked during the test")
             }
@@ -948,6 +954,7 @@ mod test {
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
                 _sender: mpsc::Sender<SkillEvent>,
+                _tracing_context: &TracingContext,
             ) -> Result<(), SkillError> {
                 unreachable!("This won't be invoked during the test")
             }
@@ -978,6 +985,7 @@ mod test {
                 _engine: &Engine,
                 mut ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
+                _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {
                 let explanation = ctx
                     .explain(vec![ExplanationRequest {
@@ -1010,6 +1018,7 @@ mod test {
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
                 _sender: mpsc::Sender<SkillEvent>,
+                _tracing_context: &TracingContext,
             ) -> Result<(), SkillError> {
                 panic!("Dummy message stream implementation of SkillDoubleUsingExplain")
             }
@@ -1076,6 +1085,7 @@ mod test {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
+            _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
             Err(SkillError::IsMessageStream)
         }
@@ -1094,6 +1104,7 @@ mod test {
             mut ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
+            _tracing_context: &TracingContext,
         ) -> Result<(), SkillError> {
             ctx.complete(vec![CompletionRequest {
                 prompt: "Hello".to_owned(),
@@ -1233,6 +1244,7 @@ mod test {
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
+                _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {
                 panic!("This function should not be called");
             }
@@ -1251,6 +1263,7 @@ mod test {
                 _ctx: Box<dyn CsiForSkills + Send>,
                 _input: Value,
                 sender: mpsc::Sender<SkillEvent>,
+                _tracing_context: &TracingContext,
             ) -> Result<(), SkillError> {
                 sender
                     .send(SkillEvent::MessageEnd {
@@ -1300,6 +1313,7 @@ mod test {
             _engine: &Engine,
             mut ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
+            _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
             let mut completions = ctx
                 .complete(vec![CompletionRequest {
@@ -1336,6 +1350,7 @@ mod test {
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
+            _tracing_context: &TracingContext,
         ) -> Result<(), SkillError> {
             Err(SkillError::IsFunction)
         }
@@ -1351,6 +1366,7 @@ mod test {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
+            _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
             panic!("Dummy, not invoked in test")
         }
@@ -1369,6 +1385,7 @@ mod test {
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
             sender: mpsc::Sender<SkillEvent>,
+            _tracing_context: &TracingContext,
         ) -> Result<(), SkillError> {
             sender
                 .send(SkillEvent::InvalidBytesInPayload {

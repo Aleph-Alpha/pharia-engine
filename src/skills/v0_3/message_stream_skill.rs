@@ -7,6 +7,7 @@ use wasmtime::component::{Resource, bindgen};
 
 use crate::{
     csi::CsiForSkills,
+    logging::TracingContext,
     skills::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent},
 };
 
@@ -41,6 +42,7 @@ impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
+        _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
         Err(SkillError::IsMessageStream)
     }
@@ -51,6 +53,7 @@ impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
+        tracing_context: &TracingContext,
     ) -> Result<(), SkillError> {
         let mut store = engine.store(ctx);
         let stream_output = store
@@ -60,7 +63,7 @@ impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
             .expect("Failed to push sender to resource table");
         let input = serde_json::to_vec(&input).expect("Json is always serializable");
         let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
-            tracing::error!("Failed to instantiate skill: {}", e);
+            error!(parent: tracing_context.span(), "Failed to instantiate skill: {}", e);
             SkillError::RuntimeError(e)
         })?;
         bindings
@@ -68,7 +71,7 @@ impl crate::skills::Skill for MessageStreamSkillPre<LinkedCtx> {
             .call_run(store, &input, stream_output)
             .await
             .map_err(|e| {
-                tracing::error!("Failed to execute skill handler: {}", e);
+                error!(parent: tracing_context.span(), "Failed to execute skill handler: {}", e);
                 SkillError::RuntimeError(e)
             })?
             .map_err(|e| match e {

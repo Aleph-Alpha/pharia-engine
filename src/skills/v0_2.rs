@@ -6,6 +6,7 @@ use pharia::skill::csi::{
 };
 use serde_json::Value;
 use tokio::sync::mpsc;
+use tracing::{error, warn};
 use wasmtime::component::bindgen;
 
 use crate::{
@@ -13,6 +14,7 @@ use crate::{
     csi::CsiForSkills,
     inference,
     language_selection::{self, SelectLanguageRequest},
+    logging::TracingContext,
     search::{self, SearchRequest},
 };
 
@@ -35,18 +37,22 @@ impl super::Skill for SkillPre<LinkedCtx> {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
+        tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
         let mut store = engine.store(ctx);
         let input = serde_json::to_vec(&input).expect("Json is always serializable");
         let bindings = self.instantiate_async(&mut store).await.map_err(|e| {
-            tracing::error!("Failed to instantiate skill: {}", e);
+            error!(parent: tracing_context.span(), "Failed to instantiate skill: {}", e);
             SkillError::RuntimeError(e)
         })?;
         let result = bindings
             .pharia_skill_skill_handler()
             .call_run(store, &input)
             .await
-            .map_err(SkillError::RuntimeError)?;
+            .map_err(|e| {
+                error!(parent: tracing_context.span(), "Failed to execute skill handler: {}", e);
+                SkillError::RuntimeError(e)
+            })?;
         let result = match result {
             Ok(result) => result,
             Err(e) => match e {
@@ -62,7 +68,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
             Ok(result) => Ok(result),
             Err(e) => {
                 // An operator might want to know that there is a buggy skill deployed.
-                tracing::warn!("A skill returned invalid output: {}", e);
+                warn!(parent: tracing_context.span(), "A skill returned invalid output: {}", e);
                 Err(SkillError::InvalidOutput(e.to_string()))
             }
         }
@@ -74,6 +80,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
         _sender: mpsc::Sender<SkillEvent>,
+        _tracing_context: &TracingContext,
     ) -> Result<(), SkillError> {
         Err(SkillError::IsFunction)
     }
