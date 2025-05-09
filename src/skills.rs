@@ -22,6 +22,7 @@ use wit_parser::{
 };
 
 use crate::{csi::CsiForSkills, logging::TracingContext, namespace_watcher::Namespace};
+use tracing::error;
 
 pub use self::v0_3::SkillMetadataV0_3;
 
@@ -217,14 +218,16 @@ impl Engine {
     pub fn instantiate_pre(
         &self,
         bytes: impl AsRef<[u8]>,
+        tracing_context: &TracingContext,
     ) -> Result<InstancePre<LinkedCtx>, SkillLoadError> {
-        let component = self
-            .engine
-            .new_component(bytes)
-            .map_err(|e| SkillLoadError::ComponentError(e.to_string()))?;
-        self.linker
-            .instantiate_pre(&component)
-            .map_err(|e| SkillLoadError::LinkerError(e.to_string()))
+        let component = self.engine.new_component(bytes).map_err(|e| {
+            error!(parent: tracing_context.span(), "Failed to create component: {}", e);
+            SkillLoadError::ComponentError(e.to_string())
+        })?;
+        self.linker.instantiate_pre(&component).map_err(|e| {
+            error!(parent: tracing_context.span(), "Failed to instantiate component: {}", e);
+            SkillLoadError::LinkerError(e.to_string())
+        })
     }
 
     /// Generates a store for a specific invocation.
@@ -269,14 +272,17 @@ pub trait Skill: Send + Sync {
 pub fn load_skill_from_wasm_bytes(
     engine: &Engine,
     bytes: impl AsRef<[u8]>,
+    tracing_context: TracingContext,
 ) -> Result<Box<dyn Skill>, SkillLoadError> {
     let skill_world = SupportedSkillWorld::extract(&bytes)?;
-    let pre = engine.instantiate_pre(&bytes)?;
+    let pre = engine.instantiate_pre(&bytes, &tracing_context)?;
 
     match skill_world {
         SupportedSkillWorld::V0_2Function => {
-            let skill = v0_2::SkillPre::new(pre)
-                .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
+            let skill = v0_2::SkillPre::new(pre).map_err(|e| {
+                error!(parent: tracing_context.span(), "Failed to create skill from pre-instantiation");
+                SkillLoadError::SkillPreError(e.to_string())
+            })?;
             Ok(Box::new(skill))
         }
         SupportedSkillWorld::V0_3Function => {
@@ -578,7 +584,8 @@ pub mod tests {
         let skill_ctx = Box::new(CsiGreetingMock);
         let engine = Engine::default();
 
-        let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, skill.bytes(), TracingContext::dummy()).unwrap();
         let actual = skill
             .run_as_function(&engine, skill_ctx, json!("Homer"), &TracingContext::dummy())
             .await
@@ -592,7 +599,8 @@ pub mod tests {
         let skill_bytes = given_rust_skill_greet_v0_2().bytes();
         let engine = Engine::default();
 
-        let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
         let actual = skill
             .run_as_function(
                 &engine,
@@ -624,7 +632,8 @@ pub mod tests {
             "dummy token".to_owned(),
             TracingContext::dummy(),
         ));
-        let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
         let actual = skill
             .run_as_function(
                 &engine,
@@ -643,7 +652,9 @@ pub mod tests {
         // Given a skill is linked againts skill package v0.2
         let test_skill = given_rust_skill_greet_v0_2();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, test_skill.bytes()).unwrap();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, test_skill.bytes(), TracingContext::dummy())
+                .unwrap();
 
         // When metadata for a skill is requested
         let metadata = skill
@@ -660,7 +671,8 @@ pub mod tests {
         // Given a skill runtime that always returns an invalid output skill
         let skill_bytes = given_invalid_output_skill().bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
 
         // When metadata for a skill is requested
         let metadata_result = skill.manifest(&engine, Box::new(CsiForSkillsDummy)).await;
@@ -721,7 +733,7 @@ pub mod tests {
         let test_skill = given_rust_skill_greet_v0_3();
         let wasm = test_skill.bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -741,7 +753,7 @@ pub mod tests {
         let test_skills = given_rust_skill_greet_v0_2();
         let wasm = test_skills.bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -760,7 +772,7 @@ pub mod tests {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_search().bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -796,7 +808,7 @@ pub mod tests {
         let test_skill = given_complete_stream_skill();
         let wasm = test_skill.bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiCompleteStreamStub::new(events));
 
         // When invoked with a json string
@@ -837,7 +849,7 @@ pub mod tests {
         let test_skill = given_chat_stream_skill();
         let wasm = test_skill.bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiChatStreamStub::new(events));
 
         // When invoked with a json string
@@ -882,7 +894,7 @@ pub mod tests {
         let test_skill = given_streaming_output_skill();
         let wasm = test_skill.bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiChatStreamStub::new(events));
         let (send, mut recv) = mpsc::channel(3);
 
@@ -915,7 +927,7 @@ pub mod tests {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_chat().bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -935,7 +947,8 @@ pub mod tests {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_2();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, skill.bytes(), TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -954,7 +967,8 @@ pub mod tests {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_3();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, skill.bytes(), TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1017,7 +1031,7 @@ pub mod tests {
         let test_skill = given_rust_skill_greet_v0_2();
         let wasm = test_skill.bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm).unwrap();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1056,7 +1070,8 @@ pub mod tests {
         // Given a skill runtime api that always returns a v0.3 skill
         let skill_bytes = given_rust_skill_greet_v0_3().bytes();
         let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
 
         // When metadata for a skill is requested
         let metadata = skill

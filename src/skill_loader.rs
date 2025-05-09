@@ -4,6 +4,7 @@ use bytesize::ByteSize;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinHandle, spawn_blocking};
+use tracing::warn;
 
 use crate::context;
 use crate::logging::TracingContext;
@@ -300,22 +301,29 @@ impl SkillLoaderActor {
         skill: &ProgrammableSkill,
         tracing_context: TracingContext,
     ) -> Result<LoadedSkill, SkillFetchError> {
-        let load_skill_context = context!(
+        let registry_context = context!(
             &tracing_context,
             "pharia-kernel::skill-loader",
-            "load_skill",
-            skill_name = skill.name,
-            skill_tag = skill.tag
+            "load_bytes_from_registry"
         );
         let skill_bytes = registry
-            .load_skill(&skill.name, &skill.tag, load_skill_context)
+            .load_skill(&skill.name, &skill.tag, registry_context)
             .await?;
-        let SkillImage { bytes, digest } =
-            skill_bytes.ok_or_else(|| SkillFetchError::SkillNotFound(skill.clone()))?;
+        let SkillImage { bytes, digest } = skill_bytes.ok_or_else(|| {
+            warn!(parent: tracing_context.span(), "Skill not found in registry.");
+            SkillFetchError::SkillNotFound(skill.clone())
+        })?;
         let size_loaded_from_registry = ByteSize(bytes.len() as u64);
-        let skill = spawn_blocking(move || load_skill_from_wasm_bytes(engine.as_ref(), bytes))
-            .await
-            .expect("Spawned linking thread must run to completion without being poisoned.")?;
+        let skill = spawn_blocking(move || {
+            let load_context = context!(
+                &tracing_context,
+                "pharia-kernel::skill-loader",
+                "load_skill_from_bytes",
+            );
+            load_skill_from_wasm_bytes(engine.as_ref(), bytes, load_context)
+        })
+        .await
+        .expect("Spawned linking thread must run to completion without being poisoned.")?;
         Ok(LoadedSkill::new(
             skill.into(),
             digest,

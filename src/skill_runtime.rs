@@ -302,7 +302,15 @@ impl RunMessageStreamMsg {
             tracing_context,
         } = self;
 
-        let skill_result = fetch_skill(store, &skill_path, &tracing_context).await;
+        let skill_result = {
+            let load_context = context!(
+                &tracing_context,
+                "pharia-kernel::skill-runtime",
+                "load_skill"
+            );
+            fetch_skill(store, &skill_path, &load_context).await
+        };
+
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {
@@ -310,14 +318,16 @@ impl RunMessageStreamMsg {
                 return;
             }
         };
-
-        let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
         let start = Instant::now();
-        let result = driver
-            .run_message_stream(skill, input, csi_apis, api_token, &context, send.clone())
-            .await;
+        let result = {
+            let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
+            let result = driver
+                .run_message_stream(skill, input, csi_apis, api_token, &context, send.clone())
+                .await;
 
-        log_skill_result(&context, &skill_path, &result);
+            log_skill_result(&context, &skill_path, &result);
+            result
+        };
         record_skill_execution_metrics(start, skill_path, &result);
     }
 }
@@ -460,7 +470,15 @@ impl RunFunctionMsg {
             api_token,
             tracing_context,
         } = self;
-        let skill_result = fetch_skill(store, &skill_path, &tracing_context).await;
+
+        let skill_result = {
+            let load_context = context!(
+                &tracing_context,
+                "pharia-kernel::skill-runtime",
+                "load_skill"
+            );
+            fetch_skill(store, &skill_path, &load_context).await
+        };
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {
@@ -469,14 +487,16 @@ impl RunFunctionMsg {
             }
         };
 
-        let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
-
         let start = Instant::now();
-        let result = driver
-            .run_function(skill, input, csi_apis, api_token, &context)
-            .await;
+        let result = {
+            let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
+            let result = driver
+                .run_function(skill, input, csi_apis, api_token, &context)
+                .await;
 
-        log_skill_result(&context, &skill_path, &result);
+            log_skill_result(&context, &skill_path, &result);
+            result
+        };
         record_skill_execution_metrics(start, skill_path, &result);
 
         // Error is expected to happen during shutdown. Ignore result.
