@@ -155,7 +155,6 @@ impl AuthorizationClient for HttpAuthorizationClient {
             KernelAccess,
         }
 
-        let required_permissions = [Permission::KernelAccess];
         let mut builder = self
             .client
             .post(format!("{}/check_privileges", self.url))
@@ -165,6 +164,7 @@ impl AuthorizationClient for HttpAuthorizationClient {
             builder = builder.header("traceparent", traceparent);
         }
 
+        let required_permissions = [Permission::KernelAccess];
         let response = builder.json(&required_permissions).send().await?;
 
         // Response succeeded, but not allowed
