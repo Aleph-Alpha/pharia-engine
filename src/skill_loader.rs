@@ -5,6 +5,8 @@ use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinHandle, spawn_blocking};
 
+use crate::context;
+use crate::logging::TracingContext;
 use crate::namespace_watcher::{Namespace, Registry, SkillDescription};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
@@ -117,6 +119,7 @@ impl LoadedSkill {
 pub enum SkillLoaderMsg {
     Fetch {
         skill: ProgrammableSkill,
+        tracing_context: TracingContext,
         send: oneshot::Sender<Result<LoadedSkill, SkillFetchError>>,
     },
     FetchDigest {
@@ -205,6 +208,7 @@ pub trait SkillLoaderApi {
     fn fetch(
         &self,
         skill: ProgrammableSkill,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<LoadedSkill, SkillFetchError>> + Send;
 
     fn fetch_digest(
@@ -214,11 +218,19 @@ pub trait SkillLoaderApi {
 }
 
 impl SkillLoaderApi for mpsc::Sender<SkillLoaderMsg> {
-    async fn fetch(&self, skill: ProgrammableSkill) -> Result<LoadedSkill, SkillFetchError> {
+    async fn fetch(
+        &self,
+        skill: ProgrammableSkill,
+        tracing_context: TracingContext,
+    ) -> Result<LoadedSkill, SkillFetchError> {
         let (send, recv) = oneshot::channel();
-        self.send(SkillLoaderMsg::Fetch { skill, send })
-            .await
-            .expect("all api handlers must be shutdown before actors");
+        self.send(SkillLoaderMsg::Fetch {
+            skill,
+            tracing_context,
+            send,
+        })
+        .await
+        .expect("all api handlers must be shutdown before actors");
         recv.await.unwrap()
     }
 
@@ -286,8 +298,18 @@ impl SkillLoaderActor {
         registry: &(dyn SkillRegistry + Send + Sync),
         engine: Arc<Engine>,
         skill: &ProgrammableSkill,
+        tracing_context: TracingContext,
     ) -> Result<LoadedSkill, SkillFetchError> {
-        let skill_bytes = registry.load_skill(&skill.name, &skill.tag).await?;
+        let load_skill_context = context!(
+            &tracing_context,
+            "pharia-kernel::skill-loader",
+            "load_skill",
+            skill_name = skill.name,
+            skill_tag = skill.tag
+        );
+        let skill_bytes = registry
+            .load_skill(&skill.name, &skill.tag, load_skill_context)
+            .await?;
         let SkillImage { bytes, digest } =
             skill_bytes.ok_or_else(|| SkillFetchError::SkillNotFound(skill.clone()))?;
         let size_loaded_from_registry = ByteSize(bytes.len() as u64);
@@ -306,11 +328,16 @@ impl SkillLoaderActor {
     /// of multiple requests.
     fn act(&self, msg: SkillLoaderMsg) {
         match msg {
-            SkillLoaderMsg::Fetch { skill, send } => {
+            SkillLoaderMsg::Fetch {
+                skill,
+                tracing_context,
+                send,
+            } => {
                 let registry = self.registry(&skill.namespace);
                 let engine = self.engine.clone();
                 self.running_requests.push(Box::pin(async move {
-                    let result = Self::fetch(registry.as_ref(), engine, &skill).await;
+                    let result =
+                        Self::fetch(registry.as_ref(), engine, &skill, tracing_context).await;
                     drop(send.send(result));
                 }));
             }
@@ -412,7 +439,7 @@ pub mod tests {
         let api = skill_loader.api();
         let skill = ProgrammableSkill::from_path(&never_resolving_skill_path);
         let handle = tokio::spawn(async move {
-            drop(api.fetch(skill).await);
+            drop(api.fetch(skill, TracingContext::dummy()).await);
         });
 
         // And waiting 10ms to ensure the message has been received
@@ -420,7 +447,11 @@ pub mod tests {
 
         // Then the other skill can still be fetched
         let skill = ProgrammableSkill::from_path(&ready_skill_path);
-        let result = timeout(Duration::from_millis(5), skill_loader.api().fetch(skill)).await;
+        let result = timeout(
+            Duration::from_millis(5),
+            skill_loader.api().fetch(skill, TracingContext::dummy()),
+        )
+        .await;
         assert!(result.is_ok());
         drop(handle);
     }

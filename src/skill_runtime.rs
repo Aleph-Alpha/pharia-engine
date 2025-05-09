@@ -140,10 +140,14 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
-        _tracing_context: TracingContext,
+        tracing_context: TracingContext,
     ) -> Result<AnySkillManifest, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillRuntimeMsg::Metadata(MetadataMsg { skill_path, send });
+        let msg = SkillRuntimeMsg::Metadata(MetadataMsg {
+            skill_path,
+            send,
+            tracing_context,
+        });
         self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
@@ -256,11 +260,12 @@ impl SkillRuntimeMsg {
 pub struct MetadataMsg {
     pub skill_path: SkillPath,
     pub send: oneshot::Sender<Result<AnySkillManifest, SkillExecutionError>>,
+    pub tracing_context: TracingContext,
 }
 
 impl MetadataMsg {
     pub async fn act(self, driver: &SkillDriver, store: &impl SkillStoreApi) {
-        let skill_result = fetch_skill(store, &self.skill_path).await;
+        let skill_result = fetch_skill(store, &self.skill_path, &self.tracing_context).await;
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {
@@ -297,7 +302,7 @@ impl RunMessageStreamMsg {
             tracing_context,
         } = self;
 
-        let skill_result = fetch_skill(store, &skill_path).await;
+        let skill_result = fetch_skill(store, &skill_path, &tracing_context).await;
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {
@@ -320,10 +325,11 @@ impl RunMessageStreamMsg {
 async fn fetch_skill(
     store: &impl SkillStoreApi,
     skill_path: &SkillPath,
+    tracing_context: &TracingContext,
 ) -> Result<Arc<dyn Skill>, SkillExecutionError> {
     let start = Instant::now();
 
-    let result = match store.fetch(skill_path.clone()).await {
+    let result = match store.fetch(skill_path.clone(), tracing_context).await {
         Ok(Some(skill)) => Ok(skill),
         Ok(None) => Err(SkillExecutionError::SkillNotConfigured),
         Err(e) => Err(e.into()),
@@ -454,7 +460,7 @@ impl RunFunctionMsg {
             api_token,
             tracing_context,
         } = self;
-        let skill_result = fetch_skill(store, &skill_path).await;
+        let skill_result = fetch_skill(store, &skill_path, &tracing_context).await;
         let skill = match skill_result {
             Ok(skill) => skill,
             Err(e) => {

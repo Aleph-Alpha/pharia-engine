@@ -6,6 +6,8 @@ mod oci;
 pub use file::FileRegistry;
 pub use oci::OciRegistry;
 
+use crate::logging::TracingContext;
+
 type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Used to check if a skill image has changed
@@ -53,6 +55,7 @@ pub trait SkillRegistry {
         &'a self,
         name: &'a str,
         tag: &'a str,
+        tracing_context: TracingContext,
     ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>>;
 
     /// Retrieve the current digest value for the name and tag
@@ -68,8 +71,9 @@ impl SkillRegistry for Box<dyn SkillRegistry + Send + Sync> {
         &'a self,
         name: &'a str,
         tag: &'a str,
+        tracing_context: TracingContext,
     ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
-        self.as_ref().load_skill(name, tag)
+        self.as_ref().load_skill(name, tag, tracing_context)
     }
 
     fn fetch_digest<'a>(
@@ -88,7 +92,7 @@ pub mod tests {
     use futures::future::{pending, ready};
     use tempfile::tempdir;
 
-    use crate::registries::FileRegistry;
+    use crate::{logging::TracingContext, registries::FileRegistry};
 
     use super::{Digest, DynFuture, RegistryError, SkillImage, SkillRegistry};
 
@@ -97,6 +101,7 @@ pub mod tests {
             &'a self,
             name: &'a str,
             tag: &'a str,
+            _tracing_context: TracingContext,
         ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
             if let Some(bytes) = self.get(name) {
                 Box::pin(async move { Ok(Some(SkillImage::new(bytes.clone(), Digest::new(tag)))) })
@@ -121,6 +126,7 @@ pub mod tests {
             &'a self,
             _name: &'a str,
             _tag: &'a str,
+            _tracing_context: TracingContext,
         ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
             Box::pin(pending::<Result<Option<SkillImage>, RegistryError>>())
         }
@@ -140,6 +146,7 @@ pub mod tests {
             &'a self,
             _name: &'a str,
             _tag: &'a str,
+            _tracing_context: TracingContext,
         ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
             Box::pin(ready(Ok(None)))
         }
@@ -156,7 +163,9 @@ pub mod tests {
     async fn empty_file_registry() {
         let skill_dir = tempdir().unwrap();
         let registry = FileRegistry::with_dir(skill_dir.path());
-        let result = registry.load_skill("dummy skill name", "dummy tag").await;
+        let result = registry
+            .load_skill("dummy skill name", "dummy tag", TracingContext::dummy())
+            .await;
         let bytes = result.unwrap();
         assert!(bytes.is_none());
     }
@@ -164,7 +173,9 @@ pub mod tests {
     #[tokio::test]
     async fn empty_skill_registries() {
         let registries = HashMap::new();
-        let result = registries.load_skill("dummy skill name", "dummy tag").await;
+        let result = registries
+            .load_skill("dummy skill name", "dummy tag", TracingContext::dummy())
+            .await;
         let bytes = result.unwrap();
         assert!(bytes.is_none());
     }

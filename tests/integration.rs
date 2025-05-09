@@ -640,7 +640,7 @@ async fn traceparent_is_respected() {
 
     // Then we should have recorded four spans that all belong to the same trace id
     let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
-    assert_eq!(spans.len(), 4);
+    assert_eq!(spans.len(), 5);
     let trace_ids = spans
         .iter()
         .map(|s| s.span_context.trace_id())
@@ -650,7 +650,8 @@ async fn traceparent_is_respected() {
     let outer_span = &spans[0];
     let skill_span = &spans[1];
     let csi_span = &spans[2];
-    let auth_span = &spans[3];
+    let load_span = &spans[3];
+    let auth_span = &spans[4];
 
     assert_eq!(
         outer_span.name,
@@ -659,10 +660,12 @@ async fn traceparent_is_respected() {
     assert_eq!(skill_span.name, "skill_execution");
     assert_eq!(csi_span.name, "chat_stream");
     assert_eq!(auth_span.name, "check_permissions");
+    assert_eq!(load_span.name, "load_skill");
 
     assert_eq!(outer_span.parent_span_id, SpanId::from(parent_span_id));
     assert_eq!(skill_span.parent_span_id, outer_span.span_context.span_id());
     assert_eq!(auth_span.parent_span_id, outer_span.span_context.span_id());
+    assert_eq!(load_span.parent_span_id, outer_span.span_context.span_id());
     assert_eq!(csi_span.parent_span_id, skill_span.span_context.span_id());
 }
 
