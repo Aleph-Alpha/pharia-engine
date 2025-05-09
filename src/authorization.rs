@@ -150,9 +150,9 @@ impl HttpAuthorizationClient {
 pub enum AuthorizationClientError {
     #[error(
         "Failed to check token validity against the authorization service. You should try again later,
-        if the problem persists you may want to contact the operators.\n\nOriginal error: {0}"
+        if the problem persists you may want to contact the operators."
     )]
-    RequestError(anyhow::Error),
+    Recoverable,
 }
 
 impl AuthorizationClient for HttpAuthorizationClient {
@@ -183,7 +183,7 @@ impl AuthorizationClient for HttpAuthorizationClient {
             .await
             .map_err(|e| {
                 error!(parent: context.span(), error = %e, "Failed to send authorization request.");
-                AuthorizationClientError::RequestError(e.into())
+                AuthorizationClientError::Recoverable
             })?;
 
         // Response succeeded, but not allowed
@@ -196,13 +196,13 @@ impl AuthorizationClient for HttpAuthorizationClient {
             .error_for_status()
             .map_err(|e| {
                 error!(parent: context.span(), error = %e, "Unexpected status code from authorization service.");
-                AuthorizationClientError::RequestError(e.into())
+                AuthorizationClientError::Recoverable
             })?
             .json::<Vec<Permission>>()
             .await
             .map_err(|e| {
                 error!(parent: context.span(), error = %e, "Failed to deserialize the response from the authorization service.");
-                AuthorizationClientError::RequestError(e.into())
+                AuthorizationClientError::Recoverable
             })?;
 
         // Check that we got the same list back
