@@ -1,14 +1,14 @@
+use crate::{
+    chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection,
+    logging::TracingContext, search,
+};
 /// CSI Shell version 0.2
 ///
 /// See [v0_3.rs](v0_3.rs) for a more detailed explanation on the reasoning for introducing
 /// serializable/user-facing structs in here and for not serializing our "internal" representations.
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-
-use crate::{
-    chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection,
-    logging::TracingContext, search,
-};
+use tracing::error;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
@@ -83,11 +83,14 @@ impl CsiRequest {
                     CsiResponse::Search(r.remove(0).into_iter().map(Into::into).collect())
                 }),
             CsiRequest::SelectLanguage(select_language_request) => drivers
-                .select_language(vec![select_language_request.into()], tracing_context)
+                .select_language(
+                    vec![select_language_request.into()],
+                    tracing_context.clone(),
+                )
                 .await
                 .map(|mut r| {
                     r.remove(0)
-                        .map(TryInto::try_into)
+                        .map(|l| Language::try_from(l, &tracing_context))
                         .transpose()
                         .map(CsiResponse::Language)
                 })?,
@@ -377,16 +380,17 @@ impl From<Language> for language_selection::Language {
     }
 }
 
-impl TryFrom<language_selection::Language> for Language {
-    type Error = anyhow::Error;
-
-    fn try_from(value: language_selection::Language) -> Result<Self, Self::Error> {
+impl Language {
+    fn try_from(
+        value: language_selection::Language,
+        context: &TracingContext,
+    ) -> Result<Self, anyhow::Error> {
         let language = match value {
             language_selection::Language(s) if s == "eng" => Self::Eng,
             language_selection::Language(s) if s == "deu" => Self::Deu,
             _ => {
                 let err = anyhow::anyhow!("Unsupported language: {:?}", value);
-                tracing::error!("{}", err);
+                error!(parent: context.span(), "{}", err);
                 return Err(err);
             }
         };
@@ -651,9 +655,11 @@ pub mod tests {
     #[test]
     fn language_response() {
         let response = CsiResponse::Language(Some(
-            language_selection::Language::new("eng".to_owned())
-                .try_into()
-                .unwrap(),
+            Language::try_from(
+                language_selection::Language::new("eng".to_owned()),
+                &TracingContext::dummy(),
+            )
+            .unwrap(),
         ));
 
         let serialized = serde_json::to_value(response).unwrap();
