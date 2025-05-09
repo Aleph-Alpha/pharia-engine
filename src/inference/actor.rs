@@ -490,7 +490,7 @@ impl InferenceMessage {
                 tracing_context,
             } => {
                 let result = client
-                    .complete(&request, api_token.clone(), tracing_context)
+                    .complete(&request, api_token.clone(), &tracing_context)
                     .await;
                 drop(send.send(result));
             }
@@ -504,7 +504,7 @@ impl InferenceMessage {
                 let mut stream = Box::pin(client.stream_completion(
                     &request,
                     api_token,
-                    tracing_context.clone(),
+                    &tracing_context,
                     event_send,
                 ));
 
@@ -532,9 +532,6 @@ impl InferenceMessage {
                 while let Some(msg) = event_recv.recv().await {
                     drop(send.send(Ok(msg)).await);
                 }
-
-                // Ensure the tracing context is only dropped once the stream is done, otherwise the span will be dropped prematurely
-                drop(tracing_context);
             }
             Self::Chat {
                 request,
@@ -542,7 +539,7 @@ impl InferenceMessage {
                 api_token,
                 tracing_context,
             } => {
-                let result = client.chat(&request, api_token, tracing_context).await;
+                let result = client.chat(&request, api_token, &tracing_context).await;
                 drop(send.send(result));
             }
             Self::ChatStream {
@@ -552,12 +549,8 @@ impl InferenceMessage {
                 tracing_context,
             } => {
                 let (event_send, mut event_recv) = mpsc::channel(1);
-                let mut stream = Box::pin(client.stream_chat(
-                    &request,
-                    api_token,
-                    tracing_context.clone(),
-                    event_send,
-                ));
+                let mut stream =
+                    Box::pin(client.stream_chat(&request, api_token, &tracing_context, event_send));
 
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
@@ -583,9 +576,6 @@ impl InferenceMessage {
                 while let Some(msg) = event_recv.recv().await {
                     drop(send.send(Ok(msg)).await);
                 }
-
-                // Ensure the tracing context is only dropped once the stream is done, otherwise the span will be dropped prematurely
-                drop(tracing_context);
             }
             Self::Explain {
                 request,
@@ -594,7 +584,7 @@ impl InferenceMessage {
                 tracing_context,
             } => {
                 let result = client
-                    .explain(&request, api_token.clone(), tracing_context)
+                    .explain(&request, api_token.clone(), &tracing_context)
                     .await;
                 drop(send.send(result));
             }
@@ -780,7 +770,7 @@ pub mod tests {
             &self,
             _request: &ExplanationRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> Result<Explanation, InferenceError> {
             unimplemented!()
         }
@@ -788,7 +778,7 @@ pub mod tests {
             &self,
             _params: &super::CompletionRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> Result<Completion, InferenceError> {
             let remaining = self
                 .remaining_failures
@@ -807,7 +797,7 @@ pub mod tests {
             &self,
             _request: &CompletionRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
             _send: mpsc::Sender<CompletionEvent>,
         ) -> Result<(), InferenceError> {
             unimplemented!()
@@ -816,7 +806,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> Result<ChatResponse, InferenceError> {
             unimplemented!()
         }
@@ -824,7 +814,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
             _send: mpsc::Sender<ChatEvent>,
         ) -> Result<(), InferenceError> {
             unimplemented!()
@@ -877,7 +867,7 @@ pub mod tests {
             &self,
             _request: &ExplanationRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> Result<Explanation, InferenceError> {
             unimplemented!()
         }
@@ -885,7 +875,7 @@ pub mod tests {
             &self,
             request: &CompletionRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> Result<Completion, InferenceError> {
             self.expected_concurrent_requests
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |e| {
@@ -903,7 +893,7 @@ pub mod tests {
             &self,
             _request: &CompletionRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
             _send: mpsc::Sender<CompletionEvent>,
         ) -> Result<(), InferenceError> {
             unimplemented!()
@@ -913,7 +903,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> Result<ChatResponse, InferenceError> {
             unimplemented!()
         }
@@ -922,7 +912,7 @@ pub mod tests {
             &self,
             _request: &ChatRequest,
             _api_token: String,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
             _send: mpsc::Sender<ChatEvent>,
         ) -> Result<(), InferenceError> {
             unimplemented!()
