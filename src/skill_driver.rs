@@ -140,11 +140,12 @@ impl SkillDriver {
     pub async fn metadata(
         &self,
         skill: Arc<dyn Skill>,
+        tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillExecutionError> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillMetadataCtx::new(send_rt_err));
         select! {
-            result = skill.manifest(self.engine.as_ref(), ctx) => result.map_err(Into::into),
+            result = skill.manifest(self.engine.as_ref(), ctx, tracing_context) => result.map_err(Into::into),
             // An error occurred during skill execution.
             Ok(_error) = recv_rt_err => Err(SkillExecutionError::CsiUseFromMetadata)
         }
@@ -927,6 +928,7 @@ mod test {
                 &self,
                 _engine: &Engine,
                 mut ctx: Box<dyn CsiForSkills + Send>,
+                _tracing_context: &TracingContext,
             ) -> Result<AnySkillManifest, SkillError> {
                 ctx.select_language(vec![SelectLanguageRequest {
                     text: "Hello, good sir!".to_owned(),
@@ -964,7 +966,9 @@ mod test {
         let skill_driver = SkillDriver::new(engine);
 
         // When metadata for a skill is requested
-        let metadata = skill_driver.metadata(Arc::new(CsiFromMetadataSkill)).await;
+        let metadata = skill_driver
+            .metadata(Arc::new(CsiFromMetadataSkill), &TracingContext::dummy())
+            .await;
 
         // Then the metadata is None
         assert_eq!(
@@ -1008,6 +1012,7 @@ mod test {
                 &self,
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
+                _tracing_context: &TracingContext,
             ) -> Result<AnySkillManifest, SkillError> {
                 panic!("Dummy metadata implementation of SkillDoubleUsingExplain")
             }
@@ -1094,6 +1099,7 @@ mod test {
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
+            _tracing_context: &TracingContext,
         ) -> Result<AnySkillManifest, SkillError> {
             panic!("Dummy metadata implementation of Skill Greet Completion")
         }
@@ -1253,6 +1259,7 @@ mod test {
                 &self,
                 _engine: &Engine,
                 _ctx: Box<dyn CsiForSkills + Send>,
+                _tracing_context: &TracingContext,
             ) -> Result<AnySkillManifest, SkillError> {
                 panic!("This function should not be called");
             }
@@ -1340,6 +1347,7 @@ mod test {
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
+            _tracing_context: &TracingContext,
         ) -> Result<AnySkillManifest, SkillError> {
             panic!("Dummy metadata implementation of Skill Greet Completion")
         }
@@ -1375,6 +1383,7 @@ mod test {
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
+            _tracing_context: &TracingContext,
         ) -> Result<AnySkillManifest, SkillError> {
             panic!("Dummy, not invoked in test")
         }

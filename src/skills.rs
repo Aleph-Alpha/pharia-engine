@@ -245,6 +245,7 @@ pub trait Skill: Send + Sync {
         &self,
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
+        tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError>;
 
     async fn run_as_function(
@@ -658,7 +659,11 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata = skill
-            .manifest(&engine, Box::new(CsiForSkillsDummy))
+            .manifest(
+                &engine,
+                Box::new(CsiForSkillsDummy),
+                &TracingContext::dummy(),
+            )
             .await
             .unwrap();
 
@@ -675,7 +680,13 @@ pub mod tests {
             load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
 
         // When metadata for a skill is requested
-        let metadata_result = skill.manifest(&engine, Box::new(CsiForSkillsDummy)).await;
+        let metadata_result = skill
+            .manifest(
+                &engine,
+                Box::new(CsiForSkillsDummy),
+                &TracingContext::dummy(),
+            )
+            .await;
 
         // Then the metadata gives an error
         assert!(metadata_result.is_err());
@@ -1075,7 +1086,11 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata = skill
-            .manifest(&engine, Box::new(CsiForSkillsDummy))
+            .manifest(
+                &engine,
+                Box::new(CsiForSkillsDummy),
+                &TracingContext::dummy(),
+            )
             .await
             .unwrap();
 
@@ -1103,6 +1118,7 @@ pub mod tests {
             &self,
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
+            _tracing_context: &TracingContext,
         ) -> Result<AnySkillManifest, SkillError> {
             panic!("I am a dummy Skill")
         }

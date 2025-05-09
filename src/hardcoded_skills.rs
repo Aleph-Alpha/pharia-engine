@@ -43,6 +43,7 @@ impl Skill for SkillHello {
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
+        _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
     }
@@ -92,6 +93,7 @@ impl Skill for SkillSaboteur {
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
+        _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
     }
@@ -124,6 +126,7 @@ impl Skill for SkillTellMeAJoke {
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
+        _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
@@ -207,6 +210,7 @@ impl Skill for SkillChat {
         &self,
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
+        _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0_3(SkillMetadataV0_3 {
             description: Some("A chat skill".to_owned()),
