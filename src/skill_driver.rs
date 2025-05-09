@@ -40,7 +40,7 @@ impl SkillDriver {
         input: Value,
         csi: impl Csi + Send + Sync + 'static,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
         let (send_rt_err, mut recv_rt_err) = oneshot::channel();
@@ -48,7 +48,7 @@ impl SkillDriver {
             send_rt_err,
             csi,
             api_token,
-            tracing_context,
+            tracing_context.clone(),
         ));
 
         let (send_inner, mut recv_inner) = mpsc::channel(1);
@@ -116,14 +116,14 @@ impl SkillDriver {
         input: Value,
         csi_apis: impl Csi + Send + Sync + 'static,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> Result<Value, SkillExecutionError> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let csi_for_skills = Box::new(SkillInvocationCtx::new(
             send_rt_err,
             csi_apis,
             api_token,
-            tracing_context,
+            tracing_context.clone(),
         ));
         select! {
             result = skill.run_as_function(&self.engine, csi_for_skills, input) => result.map_err(Into::into),
@@ -1031,7 +1031,7 @@ mod test {
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
                 csi,
                 "dummy token".to_owned(),
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
             )
             .await;
 
@@ -1055,7 +1055,7 @@ mod test {
                 json!("Homer"),
                 CsiSaboteur,
                 "TOKEN_NOT_REQUIRED".to_owned(),
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
             )
             .await;
 
@@ -1130,7 +1130,7 @@ mod test {
                 json!({}),
                 CsiSaboteur,
                 "Dummy Token".to_owned(),
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
                 send,
             )
             .await;
@@ -1154,7 +1154,7 @@ mod test {
                 json!({}),
                 CsiDummy,
                 "Dummy Token".to_owned(),
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
                 send,
             )
             .await;
@@ -1178,7 +1178,7 @@ mod test {
                 json!({}),
                 CsiDummy,
                 "Dummy Token".to_owned(),
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
                 send,
             )
             .await;
@@ -1202,7 +1202,7 @@ mod test {
                 json!({}),
                 CsiDummy,
                 "Dummy Token".to_owned(),
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
                 send,
             )
             .await;
@@ -1274,7 +1274,7 @@ mod test {
                 json!({}),
                 CsiDummy,
                 "Dummy Token".to_owned(),
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
                 send,
             )
             .await;
