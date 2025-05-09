@@ -22,43 +22,48 @@ use super::{
     Granularity, Logprob, Logprobs, Message, TextScore, TokenUsage,
 };
 
+/// The inference client only takes references to the tracing context. Methods like
+/// `stream_chat` return a future that in which the tracing context is dropped after
+/// making the initial request. However, the lifespan of the tracing context matches
+/// the length of the created span, so it may only be dropped after the stream is
+/// finished. By taking only a reference, we manifest this fact in the type system.
 pub trait InferenceClient: Send + Sync + 'static {
     fn complete(
         &self,
         request: &CompletionRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<Completion, InferenceError>> + Send;
     fn stream_completion(
         &self,
         request: &CompletionRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn chat(
         &self,
         request: &ChatRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
     fn stream_chat(
         &self,
         request: &ChatRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn explain(
         &self,
         request: &ExplanationRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 }
 
 /// Create a new [`aleph_alpha_client::How`] based on the given api token and tracing context.
-fn how(api_token: String, tracing_context: TracingContext) -> How {
+fn how(api_token: String, tracing_context: &TracingContext) -> How {
     How {
         api_token: Some(api_token),
         trace_context: tracing_context.as_inference_client_context(),
@@ -71,7 +76,7 @@ impl InferenceClient for Client {
         &self,
         request: &ExplanationRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> Result<Explanation, InferenceError> {
         let ExplanationRequest {
             prompt,
@@ -94,7 +99,7 @@ impl InferenceClient for Client {
         &self,
         request: &ChatRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let task = request.to_task_chat();
 
@@ -109,7 +114,7 @@ impl InferenceClient for Client {
         &self,
         request: &ChatRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let task = request.to_task_chat();
@@ -126,7 +131,7 @@ impl InferenceClient for Client {
         &self,
         request: &CompletionRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
     ) -> Result<Completion, InferenceError> {
         let CompletionRequest {
             model,
@@ -172,7 +177,7 @@ impl InferenceClient for Client {
         &self,
         request: &CompletionRequest,
         api_token: String,
-        tracing_context: TracingContext,
+        tracing_context: &TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> Result<(), InferenceError> {
         let CompletionRequest {
@@ -522,7 +527,7 @@ mod tests {
             &client,
             &request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -619,7 +624,7 @@ mod tests {
             &client,
             &chat_request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -647,7 +652,7 @@ mod tests {
             &client,
             &chat_request,
             bad_api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await;
 
@@ -682,7 +687,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             &client,
             &completion_request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -715,7 +720,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             &client,
             &chat_request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -758,7 +763,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             &client,
             &completion_request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -795,7 +800,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             &client,
             &chat_request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -829,7 +834,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             &client,
             &completion_request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -861,7 +866,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             &client,
             &completion_request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -891,7 +896,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
             &client,
             &chat_request,
             api_token,
-            TracingContext::dummy(),
+            &TracingContext::dummy(),
         )
         .await
         .unwrap();
@@ -924,7 +929,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 &client,
                 &completion_request,
                 api_token,
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
                 send,
             )
             .await
@@ -974,7 +979,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 &client,
                 &chat_request,
                 api_token,
-                TracingContext::dummy(),
+                &TracingContext::dummy(),
                 send,
             )
             .await
