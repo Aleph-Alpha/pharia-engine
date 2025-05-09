@@ -651,8 +651,8 @@ async fn traceparent_is_respected() {
     let skill_execution = &spans[1];
     let chat_stream = &spans[2];
     let load_skill = &spans[3];
-    let load_skill_from_bytes = &spans[4];
-    let load_bytes_from_registry = &spans[5];
+    let compile = &spans[4];
+    let download = &spans[5];
     let auth = &spans[6];
 
     assert_eq!(
@@ -661,17 +661,14 @@ async fn traceparent_is_respected() {
     );
     assert_eq!(skill_execution.name, "skill_execution");
     assert_eq!(chat_stream.name, "chat_stream");
-    assert_eq!(load_skill_from_bytes.name, "load_skill_from_bytes");
+    assert_eq!(compile.name, "compile");
     assert_eq!(load_skill.name, "load_skill");
-    assert_eq!(load_bytes_from_registry.name, "load_bytes_from_registry");
+    assert_eq!(download.name, "download");
     assert_eq!(auth.name, "check_permissions");
 
     assert_eq!(outer_span.parent_span_id, SpanId::from(parent_span_id));
     assert_eq!(load_skill.parent_span_id, outer_span.span_context.span_id());
-    assert_eq!(
-        load_skill_from_bytes.parent_span_id,
-        load_skill.span_context.span_id()
-    );
+    assert_eq!(compile.parent_span_id, load_skill.span_context.span_id());
 }
 
 #[tokio::test]

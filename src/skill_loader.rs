@@ -301,11 +301,8 @@ impl SkillLoaderActor {
         skill: &ProgrammableSkill,
         tracing_context: TracingContext,
     ) -> Result<LoadedSkill, SkillFetchError> {
-        let registry_context = context!(
-            &tracing_context,
-            "pharia-kernel::skill-loader",
-            "load_bytes_from_registry"
-        );
+        let registry_context =
+            context!(&tracing_context, "pharia-kernel::skill-loader", "download");
         let skill_bytes = registry
             .load_skill(&skill.name, &skill.tag, registry_context)
             .await?;
@@ -315,11 +312,8 @@ impl SkillLoaderActor {
         })?;
         let size_loaded_from_registry = ByteSize(bytes.len() as u64);
         let skill = spawn_blocking(move || {
-            let load_context = context!(
-                &tracing_context,
-                "pharia-kernel::skill-loader",
-                "load_skill_from_bytes",
-            );
+            let load_context =
+                context!(&tracing_context, "pharia-kernel::skill-loader", "compile",);
             load_skill_from_wasm_bytes(engine.as_ref(), bytes, load_context)
         })
         .await
