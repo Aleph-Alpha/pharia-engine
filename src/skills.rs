@@ -21,7 +21,7 @@ use wit_parser::{
     decoding::{DecodedWasm, decode},
 };
 
-use crate::{csi::CsiForSkills, namespace_watcher::Namespace};
+use crate::{csi::CsiForSkills, logging::TracingContext, namespace_watcher::Namespace};
 
 pub use self::v0_3::SkillMetadataV0_3;
 
@@ -249,6 +249,7 @@ pub trait Skill: Send + Sync {
         engine: &Engine,
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
+        tracing_context: &TracingContext,
     ) -> Result<Value, SkillError>;
 
     async fn run_as_message_stream(
@@ -257,6 +258,7 @@ pub trait Skill: Send + Sync {
         ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
+        tracing_context: &TracingContext,
     ) -> Result<(), SkillError>;
 }
 
@@ -578,7 +580,7 @@ pub mod tests {
 
         let skill = load_skill_from_wasm_bytes(&engine, skill.bytes()).unwrap();
         let actual = skill
-            .run_as_function(&engine, skill_ctx, json!("Homer"))
+            .run_as_function(&engine, skill_ctx, json!("Homer"), &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -592,7 +594,12 @@ pub mod tests {
 
         let skill = load_skill_from_wasm_bytes(&engine, skill_bytes).unwrap();
         let actual = skill
-            .run_as_function(&engine, Box::new(CsiGreetingMock), json!("Homer"))
+            .run_as_function(
+                &engine,
+                Box::new(CsiGreetingMock),
+                json!("Homer"),
+                &TracingContext::dummy(),
+            )
             .await
             .unwrap();
 
@@ -623,6 +630,7 @@ pub mod tests {
                 &engine,
                 ctx,
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
+                &TracingContext::dummy(),
             )
             .await
             .unwrap();
@@ -718,7 +726,10 @@ pub mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+        let result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -735,7 +746,10 @@ pub mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+        let result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -752,7 +766,10 @@ pub mod tests {
         // When invoked with a json string
         let content = "42";
         let input = json!(content);
-        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+        let result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then it returns a json string array
         assert_eq!(result, json!([content]));
@@ -784,7 +801,10 @@ pub mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+        let result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then it returns a json string
         assert_eq!(
@@ -822,7 +842,7 @@ pub mod tests {
 
         // When invoked with a json string
         let result = skill
-            .run_as_function(&engine, ctx, json!("Homer"))
+            .run_as_function(&engine, ctx, json!("Homer"), &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -868,7 +888,7 @@ pub mod tests {
 
         // When invoked with a json string
         skill
-            .run_as_message_stream(&engine, ctx, json!("Homer"), send)
+            .run_as_message_stream(&engine, ctx, json!("Homer"), send, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -901,7 +921,10 @@ pub mod tests {
         // When invoked with a json string
         let content = "Hello, how are you?";
         let input = json!(content);
-        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+        let result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then it returns a json string array
         assert_eq!(result["content"], "dummy-content");
@@ -917,7 +940,10 @@ pub mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+        let result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -933,7 +959,10 @@ pub mod tests {
 
         // When invoked with a json string
         let input = json!("Homer");
-        let result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+        let result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
@@ -994,14 +1023,27 @@ pub mod tests {
         // When invoked with a json string
         let input = json!("Homer");
         let first_result = skill
-            .run_as_function(&engine, ctx.clone(), input.clone())
+            .run_as_function(
+                &engine,
+                ctx.clone(),
+                input.clone(),
+                &TracingContext::dummy(),
+            )
             .await
             .unwrap();
         let second_result = skill
-            .run_as_function(&engine, ctx.clone(), input.clone())
+            .run_as_function(
+                &engine,
+                ctx.clone(),
+                input.clone(),
+                &TracingContext::dummy(),
+            )
             .await
             .unwrap();
-        let third_result = skill.run_as_function(&engine, ctx, input).await.unwrap();
+        let third_result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then it returns a json string
         assert_eq!(first_result, json!("Hello Homer"));
@@ -1055,6 +1097,7 @@ pub mod tests {
             _engine: &Engine,
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
+            _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
             panic!("I am a dummy Skill")
         }
@@ -1065,6 +1108,7 @@ pub mod tests {
             _ctx: Box<dyn CsiForSkills + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
+            _tracing_context: &TracingContext,
         ) -> Result<(), SkillError> {
             panic!("I am a dummy Skill")
         }

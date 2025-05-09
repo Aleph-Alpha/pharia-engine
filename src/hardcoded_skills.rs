@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 use crate::{
     csi::CsiForSkills,
     inference::{ChatEvent, ChatParams, ChatRequest, Message},
+    logging::TracingContext,
     namespace_watcher::Namespace,
     skills::{
         AnySkillManifest, Engine, JsonSchema, Signature, Skill, SkillError, SkillEvent,
@@ -51,6 +52,7 @@ impl Skill for SkillHello {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
+        _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
@@ -61,6 +63,7 @@ impl Skill for SkillHello {
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
+        _tracing_context: &TracingContext,
     ) -> Result<(), SkillError> {
         sender.send(SkillEvent::MessageBegin).await.unwrap();
 
@@ -98,6 +101,7 @@ impl Skill for SkillSaboteur {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
+        _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
         Err(SkillError::IsMessageStream)
     }
@@ -108,6 +112,7 @@ impl Skill for SkillSaboteur {
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
         _sender: mpsc::Sender<SkillEvent>,
+        _tracing_context: &TracingContext,
     ) -> Result<(), SkillError> {
         Err(SkillError::UserCode("Skill is a saboteur".to_owned()))
     }
@@ -128,6 +133,7 @@ impl Skill for SkillTellMeAJoke {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
+        _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
     }
@@ -138,6 +144,7 @@ impl Skill for SkillTellMeAJoke {
         mut ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
+        _tracing_context: &TracingContext,
     ) -> Result<(), SkillError> {
         let request = ChatRequest {
             model: "llama-3.1-8b-instruct".to_owned(),
@@ -227,6 +234,7 @@ impl Skill for SkillChat {
         _engine: &Engine,
         _ctx: Box<dyn CsiForSkills + Send>,
         _input: Value,
+        _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
         Err(SkillError::IsMessageStream)
     }
@@ -237,6 +245,7 @@ impl Skill for SkillChat {
         mut ctx: Box<dyn CsiForSkills + Send>,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
+        _tracing_context: &TracingContext,
     ) -> Result<(), SkillError> {
         let result = serde_json::from_value::<SkillChatInput>(input);
 
