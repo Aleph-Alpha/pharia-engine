@@ -638,9 +638,9 @@ async fn traceparent_is_respected() {
     while stream.next().await.is_some() {}
     kernel.shutdown().await;
 
-    // Then we should have recorded four spans that all belong to the same trace id
+    // Then we should have recorded spans that all belong to the same trace id
     let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
-    assert_eq!(spans.len(), 5);
+    assert_eq!(spans.len(), 7);
     let trace_ids = spans
         .iter()
         .map(|s| s.span_context.trace_id())
@@ -648,25 +648,30 @@ async fn traceparent_is_respected() {
     assert!(trace_ids.iter().all(|id| id == &TraceId::from(trace_id)));
 
     let outer_span = &spans[0];
-    let skill_span = &spans[1];
-    let csi_span = &spans[2];
-    let load_span = &spans[3];
-    let auth_span = &spans[4];
+    let skill_execution = &spans[1];
+    let chat_stream = &spans[2];
+    let load_skill = &spans[3];
+    let load_skill_from_bytes = &spans[4];
+    let load_bytes_from_registry = &spans[5];
+    let auth = &spans[6];
 
     assert_eq!(
         outer_span.name,
         "POST /v1/skills/{namespace}/{name}/message-stream"
     );
-    assert_eq!(skill_span.name, "skill_execution");
-    assert_eq!(csi_span.name, "chat_stream");
-    assert_eq!(auth_span.name, "check_permissions");
-    assert_eq!(load_span.name, "load_skill");
+    assert_eq!(skill_execution.name, "skill_execution");
+    assert_eq!(chat_stream.name, "chat_stream");
+    assert_eq!(load_skill_from_bytes.name, "load_skill_from_bytes");
+    assert_eq!(load_skill.name, "load_skill");
+    assert_eq!(load_bytes_from_registry.name, "load_bytes_from_registry");
+    assert_eq!(auth.name, "check_permissions");
 
     assert_eq!(outer_span.parent_span_id, SpanId::from(parent_span_id));
-    assert_eq!(skill_span.parent_span_id, outer_span.span_context.span_id());
-    assert_eq!(auth_span.parent_span_id, outer_span.span_context.span_id());
-    assert_eq!(load_span.parent_span_id, outer_span.span_context.span_id());
-    assert_eq!(csi_span.parent_span_id, skill_span.span_context.span_id());
+    assert_eq!(load_skill.parent_span_id, outer_span.span_context.span_id());
+    assert_eq!(
+        load_skill_from_bytes.parent_span_id,
+        load_skill.span_context.span_id()
+    );
 }
 
 #[tokio::test]
