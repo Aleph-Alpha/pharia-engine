@@ -301,7 +301,7 @@ impl DocumentIndexMessage {
                     filters,
                 ),
                 api_token,
-                tracing_context,
+                &tracing_context,
             )
             .await?
             .into_iter()
@@ -315,9 +315,11 @@ impl DocumentIndexMessage {
                 } = result;
                 // Current behavior is that chunking only ever happens within an item
                 if section.len() > 1 {
-                    return Err(anyhow::anyhow!(
+                    let err = anyhow::anyhow!(
                         "Document Index result has more than one item in a section."
-                    ));
+                    );
+                    error!(parent: tracing_context.span(), "{}", err);
+                    return Err(err);
                 }
 
                 if let (
@@ -346,8 +348,9 @@ impl DocumentIndexMessage {
                         },
                     })
                 } else {
-                    error!("Unexpected image result in Document Index results");
-                    Err(anyhow::anyhow!("Invalid search result"))
+                    let err = anyhow::anyhow!("Invalid search result");
+                    error!(parent: tracing_context.span(), "{}", err);
+                    Err(err)
                 }
             })
             .collect()
@@ -360,7 +363,7 @@ impl DocumentIndexMessage {
         tracing_context: TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         client
-            .document_metadata(document_path, api_token, tracing_context)
+            .document_metadata(document_path, api_token, &tracing_context)
             .await
     }
 
@@ -371,7 +374,7 @@ impl DocumentIndexMessage {
         tracing_context: TracingContext,
     ) -> anyhow::Result<Document> {
         client
-            .document(document_path, api_token, tracing_context)
+            .document(document_path, api_token, &tracing_context)
             .await
     }
 }
@@ -611,7 +614,7 @@ pub mod tests {
             _index: IndexPath,
             _request: ClientSearchRequest,
             _api_token: &str,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> anyhow::Result<Vec<ClientSearchResult>> {
             self.expected_concurrent_requests
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |e| {
@@ -629,7 +632,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> anyhow::Result<Option<Value>> {
             unimplemented!()
         }
@@ -638,7 +641,7 @@ pub mod tests {
             &self,
             _document_path: DocumentPath,
             _api_token: &str,
-            _tracing_context: TracingContext,
+            _tracing_context: &TracingContext,
         ) -> anyhow::Result<Document> {
             unimplemented!()
         }
