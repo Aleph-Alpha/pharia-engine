@@ -88,6 +88,7 @@ pub trait SkillRuntimeApi {
     fn skill_metadata(
         &self,
         skill_path: SkillPath,
+        tracing_context: TracingContext,
     ) -> impl Future<Output = Result<AnySkillManifest, SkillExecutionError>> + Send;
 }
 
@@ -139,6 +140,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
     async fn skill_metadata(
         &self,
         skill_path: SkillPath,
+        _tracing_context: TracingContext,
     ) -> Result<AnySkillManifest, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
         let msg = SkillRuntimeMsg::Metadata(MetadataMsg { skill_path, send });
