@@ -1,3 +1,5 @@
+use crate::logging::TracingContext;
+
 use super::{Digest, DynFuture, RegistryError, SkillImage, SkillRegistry};
 
 use std::{
@@ -39,6 +41,7 @@ impl SkillRegistry for FileRegistry {
         &'a self,
         name: &'a str,
         _tag: &'a str,
+        _tracing_context: TracingContext,
     ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
         Box::pin(async move {
             let skill_path = self.skill_path(name);
@@ -135,7 +138,7 @@ mod test {
         // When loading a skill
         let registry = FileRegistry::with_dir(skill_dir.path());
         let skill_image = registry
-            .load_skill("my_skill", "latest")
+            .load_skill("my_skill", "latest", TracingContext::dummy())
             .await
             .unwrap()
             .unwrap();
@@ -154,7 +157,7 @@ mod test {
         // When fetching a digest and loading a skill
         let registry = FileRegistry::with_dir(skill_dir.path());
         let skill_image = registry
-            .load_skill("my_skill", "latest")
+            .load_skill("my_skill", "latest", TracingContext::dummy())
             .await
             .unwrap()
             .unwrap();

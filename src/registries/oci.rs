@@ -8,7 +8,7 @@ use oci_wasm::WasmClient;
 use tracing::{error, warn};
 
 use super::{Digest, DynFuture, RegistryError, SkillImage};
-use crate::registries::SkillRegistry;
+use crate::{logging::TracingContext, registries::SkillRegistry};
 
 pub struct OciRegistry {
     client: WasmClient,
@@ -56,6 +56,7 @@ impl SkillRegistry for OciRegistry {
         &'a self,
         name: &'a str,
         tag: &'a str,
+        tracing_context: TracingContext,
     ) -> DynFuture<'a, Result<Option<SkillImage>, RegistryError>> {
         let image = self.reference(name, tag);
 
@@ -69,7 +70,7 @@ impl SkillRegistry for OciRegistry {
                     let digest = if let Some(digest) = image.digest {
                         Digest::new(digest)
                     } else {
-                        warn!("Registry doesn't return digests. Fetching manually.");
+                        warn!(parent: tracing_context.span(), "Registry doesn't return digests. Fetching manually.");
                         self.fetch_digest(name, tag).await?.ok_or_else(|| {
                             RegistryError::DigestShouldExist {
                                 name: name.to_owned(),
@@ -85,7 +86,7 @@ impl SkillRegistry for OciRegistry {
                     if anyhow_is_skill_not_found(&e) {
                         Ok(None)
                     } else {
-                        error!("Error retrieving skill from registry: {e}");
+                        error!(parent: tracing_context.span(), "Error retrieving skill from registry: {e}");
                         Err(RegistryError::SkillRetrievalError(e.to_string()))
                     }
                 }
@@ -150,7 +151,7 @@ mod tests {
 
     use super::OciRegistry;
 
-    use crate::registries::SkillRegistry;
+    use crate::{logging::TracingContext, registries::SkillRegistry};
 
     impl OciRegistry {
         fn from_env() -> Option<Self> {
@@ -206,7 +207,7 @@ mod tests {
         let engine = Engine::new(Config::new().async_support(true).wasm_component_model(true))
             .expect("config must be valid");
         let skill = registry
-            .load_skill("greet_skill", tag)
+            .load_skill("greet_skill", tag, TracingContext::dummy())
             .await
             .expect("must return okay")
             .expect("component binaries must be found");
@@ -231,7 +232,11 @@ mod tests {
 
         // when loading a skill that does not exist
         let bytes = registry
-            .load_skill("not-existing-skill", "not-existing-tag")
+            .load_skill(
+                "not-existing-skill",
+                "not-existing-tag",
+                TracingContext::dummy(),
+            )
             .await
             .unwrap();
 
@@ -267,7 +272,11 @@ mod tests {
 
         // when loading a skill that does not exist
         let bytes = registry
-            .load_skill("not-existing-skill", "not-existing-tag")
+            .load_skill(
+                "not-existing-skill",
+                "not-existing-tag",
+                TracingContext::dummy(),
+            )
             .await;
 
         // then skill can not be found

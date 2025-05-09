@@ -2,6 +2,7 @@ use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Durat
 
 use crate::{
     hardcoded_skills::{SkillChat, hardcoded_skill},
+    logging::TracingContext,
     namespace_watcher::{Namespace, SkillDescription},
     skill_cache::SkillCache,
     skill_loader::{
@@ -237,6 +238,7 @@ pub trait SkillStoreApi {
     fn fetch(
         &self,
         skill_path: SkillPath,
+        tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<Option<Arc<dyn Skill>>, SkillStoreError>> + Send;
 
     /// List all skills which are currently cached and can be executed without fetching the wasm
@@ -282,9 +284,14 @@ impl SkillStoreApi for mpsc::Sender<SkillStoreMsg> {
     async fn fetch(
         &self,
         skill_path: SkillPath,
+        tracing_context: &TracingContext,
     ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
         let (send, recv) = oneshot::channel();
-        let msg = SkillStoreMsg::Fetch { skill_path, send };
+        let msg = SkillStoreMsg::Fetch {
+            skill_path,
+            send,
+            tracing_context: tracing_context.clone(),
+        };
         self.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
@@ -328,6 +335,7 @@ pub enum SkillStoreMsg {
     Fetch {
         skill_path: SkillPath,
         send: oneshot::Sender<Result<Option<Arc<dyn Skill>>, SkillStoreError>>,
+        tracing_context: TracingContext,
     },
     List {
         send: oneshot::Sender<Vec<SkillPath>>,
@@ -479,7 +487,11 @@ where
 
     pub fn act(&mut self, msg: SkillStoreMsg) {
         match msg {
-            SkillStoreMsg::Fetch { skill_path, send } => {
+            SkillStoreMsg::Fetch {
+                skill_path,
+                send,
+                tracing_context,
+            } => {
                 if let Some(skill) = self.provider.cached_skill(&skill_path) {
                     drop(send.send(Ok(Some(skill))));
                     return;
@@ -509,7 +521,7 @@ where
                             self.skill_requests.push(
                                 skill_path,
                                 Box::pin(async move {
-                                    let result = skill_loader.fetch(skill).await;
+                                    let result = skill_loader.fetch(skill, tracing_context).await;
                                     (cloned_skill_path, result)
                                 }),
                                 send,
@@ -593,6 +605,7 @@ pub mod tests {
         async fn fetch(
             &self,
             _skill_path: SkillPath,
+            _tracing_context: &TracingContext,
         ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
             panic!("Skill store dummy called.");
         }
@@ -658,6 +671,7 @@ pub mod tests {
         async fn fetch(
             &self,
             _skill_path: SkillPath,
+            _tracing_context: &TracingContext,
         ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
             Ok(self.fetch.clone())
         }
@@ -827,12 +841,18 @@ pub mod tests {
         // And given two pending fetch requests
         let cloned_skill_store = skill_store.clone();
         let cloned_skill_path = skill_path.clone();
-        let first_request =
-            tokio::spawn(async move { cloned_skill_store.fetch(cloned_skill_path).await });
+        let first_request = tokio::spawn(async move {
+            cloned_skill_store
+                .fetch(cloned_skill_path, &TracingContext::dummy())
+                .await
+        });
 
         let cloned_skill_path2 = skill_path.clone();
-        let second_request =
-            tokio::spawn(async move { skill_store.fetch(cloned_skill_path2).await });
+        let second_request = tokio::spawn(async move {
+            skill_store
+                .fetch(cloned_skill_path2, &TracingContext::dummy())
+                .await
+        });
 
         // And waiting for 10 ms for both requests to be issued
         sleep(Duration::from_millis(10)).await;
@@ -928,7 +948,9 @@ pub mod tests {
         skill_store.upsert(skill).await;
 
         // When a fetch request is issued for a skill that is configured but not loadable
-        let result = skill_store.fetch(skill_path).await;
+        let result = skill_store
+            .fetch(skill_path, &TracingContext::dummy())
+            .await;
 
         // Then a good error message is returned
         assert!(
@@ -1023,7 +1045,7 @@ pub mod tests {
         // When fetching "greet_skill" but not "greet-py"
         skill_store
             .api()
-            .fetch(first_skill_path.clone())
+            .fetch(first_skill_path.clone(), &TracingContext::dummy())
             .await
             .unwrap();
         // and listing all cached skills
@@ -1081,7 +1103,9 @@ pub mod tests {
         let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
         api.upsert(skill).await;
-        api.fetch(skill_path.clone()).await.unwrap();
+        api.fetch(skill_path.clone(), &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // When we invalidate "greet_skill"
         let skill_had_been_in_cache = api.invalidate_cache(skill_path.clone()).await;
@@ -1217,7 +1241,7 @@ pub mod tests {
         let programmable_skill = ProgrammableSkill::from_path(&skill_path);
         let compiled_skill = skill_store_state
             .skill_loader
-            .fetch(programmable_skill)
+            .fetch(programmable_skill, TracingContext::dummy())
             .await?;
         skill_store_state.insert(skill_path.clone(), compiled_skill);
 
@@ -1260,7 +1284,11 @@ pub mod tests {
     }
 
     impl SkillLoaderApi for SkillLoaderStub {
-        async fn fetch(&self, skill: ProgrammableSkill) -> Result<LoadedSkill, SkillFetchError> {
+        async fn fetch(
+            &self,
+            skill: ProgrammableSkill,
+            _tracing_context: TracingContext,
+        ) -> Result<LoadedSkill, SkillFetchError> {
             self.skills
                 .lock()
                 .unwrap()
