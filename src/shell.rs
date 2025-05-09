@@ -294,22 +294,25 @@ where
     let context = TracingContext::current();
     if let Some(bearer) = bearer {
         let context = context!(context, "pharia_kernel::authorization", "check_permissions");
-        if let Ok(allowed) = authorization_api
+        match authorization_api
             .0
             .check_permission(bearer.token().to_owned(), context)
             .await
         {
-            if !allowed {
+            Ok(allowed) => {
+                if !allowed {
+                    return Err(ErrorResponse::from((
+                        StatusCode::FORBIDDEN,
+                        "Bearer token invalid".to_owned(),
+                    )));
+                }
+            }
+            Err(e) => {
                 return Err(ErrorResponse::from((
-                    StatusCode::FORBIDDEN,
-                    "Bearer token invalid".to_owned(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
                 )));
             }
-        } else {
-            return Err(ErrorResponse::from((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to check permission".to_owned(),
-            )));
         }
     } else {
         return Err(ErrorResponse::from((

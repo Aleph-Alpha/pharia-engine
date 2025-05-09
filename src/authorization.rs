@@ -3,7 +3,9 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use axum::http::StatusCode;
 use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::{select, sync::mpsc, task::JoinHandle};
+use tracing::error;
 
 use crate::{http::HttpClient, logging::TracingContext};
 
@@ -75,7 +77,7 @@ pub trait AuthorizationApi {
         &self,
         api_token: String,
         context: TracingContext,
-    ) -> impl Future<Output = anyhow::Result<bool>> + Send;
+    ) -> impl Future<Output = Result<bool, AuthorizationClientError>> + Send;
 }
 
 impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
@@ -83,7 +85,7 @@ impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
         &self,
         api_token: String,
         context: TracingContext,
-    ) -> anyhow::Result<bool> {
+    ) -> Result<bool, AuthorizationClientError> {
         let (send, recv) = oneshot::channel();
         let msg = AuthorizationMsg::Auth {
             api_token,
@@ -102,7 +104,7 @@ pub enum AuthorizationMsg {
     Auth {
         api_token: String,
         context: TracingContext,
-        send: oneshot::Sender<anyhow::Result<bool>>,
+        send: oneshot::Sender<Result<bool, AuthorizationClientError>>,
     },
 }
 
@@ -126,7 +128,7 @@ pub trait AuthorizationClient: Send + Sync + 'static {
         &self,
         api_token: String,
         context: TracingContext,
-    ) -> impl Future<Output = anyhow::Result<bool>> + Send;
+    ) -> impl Future<Output = Result<bool, AuthorizationClientError>> + Send;
 }
 
 struct HttpAuthorizationClient {
@@ -143,12 +145,22 @@ impl HttpAuthorizationClient {
     }
 }
 
+/// Failures which occur when checking token validity.
+#[derive(Debug, Error)]
+pub enum AuthorizationClientError {
+    #[error(
+        "Failed to check token validity against the authorization service. You should try again later,
+        if the problem persists you may want to contact the operators.\n\nOriginal error: {0}"
+    )]
+    RequestError(anyhow::Error),
+}
+
 impl AuthorizationClient for HttpAuthorizationClient {
     async fn token_valid(
         &self,
         api_token: String,
         context: TracingContext,
-    ) -> anyhow::Result<bool> {
+    ) -> Result<bool, AuthorizationClientError> {
         #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
         #[serde(tag = "permission")]
         enum Permission {
@@ -165,7 +177,14 @@ impl AuthorizationClient for HttpAuthorizationClient {
         }
 
         let required_permissions = [Permission::KernelAccess];
-        let response = builder.json(&required_permissions).send().await?;
+        let response = builder
+            .json(&required_permissions)
+            .send()
+            .await
+            .map_err(|e| {
+                error!(parent: context.span(), error = %e, "Failed to send authorization request.");
+                AuthorizationClientError::RequestError(e.into())
+            })?;
 
         // Response succeeded, but not allowed
         if [StatusCode::FORBIDDEN, StatusCode::UNAUTHORIZED].contains(&response.status()) {
@@ -174,9 +193,17 @@ impl AuthorizationClient for HttpAuthorizationClient {
 
         let allowed_permissions = response
             // Error for any other status
-            .error_for_status()?
+            .error_for_status()
+            .map_err(|e| {
+                error!(parent: context.span(), error = %e, "Unexpected status code from authorization service.");
+                AuthorizationClientError::RequestError(e.into())
+            })?
             .json::<Vec<Permission>>()
-            .await?;
+            .await
+            .map_err(|e| {
+                error!(parent: context.span(), error = %e, "Failed to deserialize the response from the authorization service.");
+                AuthorizationClientError::RequestError(e.into())
+            })?;
 
         // Check that we got the same list back
         Ok(allowed_permissions == required_permissions)
@@ -210,7 +237,7 @@ pub mod tests {
             &self,
             _api_token: String,
             _context: TracingContext,
-        ) -> anyhow::Result<bool> {
+        ) -> Result<bool, AuthorizationClientError> {
             Ok(self.response)
         }
     }
@@ -252,7 +279,7 @@ pub mod tests {
             &self,
             _api_token: String,
             _context: TracingContext,
-        ) -> anyhow::Result<bool> {
+        ) -> Result<bool, AuthorizationClientError> {
             Ok(true)
         }
     }
