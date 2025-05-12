@@ -13,6 +13,7 @@
 //! is passed along as part of requests in distributed systems.
 use std::{env, str::FromStr};
 
+use axum::http::{HeaderMap, HeaderValue};
 use opentelemetry::{
     KeyValue, TraceId,
     propagation::TextMapCompositePropagator,
@@ -25,6 +26,7 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
+use reqwest::header::InvalidHeaderValue;
 use tracing::{Span, info};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
@@ -85,19 +87,37 @@ impl TracingContext {
         &self.0
     }
 
-    /// The version of the trace context specification that we support.
+    /// Standard HTTP headers to propagate context information and enable distributed tracing.
     ///
-    /// <https://www.w3.org/TR/trace-context-2/#version>
-    const SUPPORTED_VERSION: u8 = 0;
+    /// <https://www.w3.org/TR/trace-context-2/#http-headers>
+    pub fn w3c_headers(&self) -> Result<HeaderMap, InvalidHeaderValue> {
+        let mut headers = HeaderMap::new();
+        if let Some(traceparent) = self.traceparent_header() {
+            if let Ok(header) = HeaderValue::from_str(&traceparent) {
+                headers.insert("traceparent", header);
+
+                // The tracestate header is a companion header to the traceparent header.
+                if let Some(tracestate) = self.tracestate_header() {
+                    headers.insert("tracestate", HeaderValue::from_str(&tracestate)?);
+                }
+            }
+        }
+        Ok(headers)
+    }
 
     /// Render the context as a traceparent header.
     ///
     /// <https://www.w3.org/TR/trace-context-2/#traceparent-header>
-    pub fn traceparent_header(&self) -> Option<String> {
+    fn traceparent_header(&self) -> Option<String> {
         self.0.id().map(|span_id| {
             Self::format_traceparent_header(span_id.into_u64(), self.trace_id_u128())
         })
     }
+
+    /// The version of the trace context specification that we support.
+    ///
+    /// <https://www.w3.org/TR/trace-context-2/#version>
+    const SUPPORTED_VERSION: u8 = 0;
 
     /// Construct a traceparent header from a span id and trace id.
     fn format_traceparent_header(span_id: u64, trace_id: u128) -> String {
@@ -117,7 +137,7 @@ impl TracingContext {
     /// Trace state includes additional, vendor-specific key value pairs.
     /// The header will be empty if no data is provided.
     /// <https://www.w3.org/TR/trace-context/#tracestate-header>
-    pub fn tracestate_header(&self) -> Option<String> {
+    fn tracestate_header(&self) -> Option<String> {
         let header = self
             .0
             .context()
