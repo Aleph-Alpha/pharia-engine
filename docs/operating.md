@@ -171,19 +171,19 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
 You can monitor your Skill by connecting the PhariaKernel to an OpenTelemetry collector, e.g. Jaeger:
 
 ```shell
-    podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
+podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
 Specify the collector endpoint via the environment variable `OTEL_ENDPOINT`:
 
 ```shell
-    podman run \
-        -v ./skills:/app/skills \
-        -e NAMESPACES__DEV__DIRECTORY="skills" \
-        -e NAMESPACE_UPDATE_INTERVAL=1s \
-        -e OTEL_ENDPOINT=http://host.containers.internal:4317 \
-        -p 8081:8081 \
-        pharia-kernel
+podman run \
+    -v ./skills:/app/skills \
+    -e NAMESPACES__DEV__DIRECTORY="skills" \
+    -e NAMESPACE_UPDATE_INTERVAL=1s \
+    -e OTEL_ENDPOINT=http://host.containers.internal:4317 \
+    -p 8081:8081 \
+    pharia-kernel
 ```
 
 You can view the monitoring via your local Jaeger instance at <http://localhost:16686>.
