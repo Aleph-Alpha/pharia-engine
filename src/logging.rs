@@ -187,6 +187,7 @@ impl TracingContext {
                 self.trace_id_u128(),
                 id.into_u64(),
                 self.sampled(),
+                self.tracestate_header(),
             )
         })
     }
