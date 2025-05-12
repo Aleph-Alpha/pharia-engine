@@ -112,6 +112,20 @@ impl TracingContext {
         )
     }
 
+    /// Render the provided trace state as a header.
+    ///
+    /// Trace state includes additional, vendor-specific key value pairs.
+    /// The header will be empty if no data is provided.
+    /// <https://www.w3.org/TR/trace-context/#tracestate-header>
+    pub fn tracestate(&self) -> String {
+        self.0
+            .context()
+            .span()
+            .span_context()
+            .trace_state()
+            .header()
+    }
+
     /// Convert the tracing context to what the inference client expects.
     pub fn as_inference_client_context(&self) -> Option<aleph_alpha_client::TraceContext> {
         self.0.id().map(|id| {
@@ -229,6 +243,7 @@ pub fn resource() -> Resource {
 
 #[cfg(test)]
 pub mod tests {
+    use opentelemetry::trace::TraceState;
     use tracing::{Level, span};
 
     use super::*;
@@ -303,5 +318,25 @@ pub mod tests {
         let parent_id = span.id().unwrap();
         drop(span);
         span!(parent: parent_id, Level::INFO, "child");
+    }
+
+    #[test]
+    fn empty_tracestate() {
+        // Given a context containing a span with an empty tracestate
+        let context = TracingContext::dummy();
+
+        // When
+        let tracestate = context.tracestate();
+
+        // Then
+        assert_eq!(tracestate, "");
+    }
+
+    #[test]
+    fn tracestate_header_includes_attributes() {
+        let trace_state = TraceState::default().insert("foo", "bar").unwrap();
+
+        let header = trace_state.header();
+        assert_eq!(header, "foo=bar");
     }
 }
