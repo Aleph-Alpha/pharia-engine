@@ -2295,4 +2295,38 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             trace_id
         );
     }
+
+    #[tokio::test]
+    async fn tracestate_is_extracted_from_incoming_request() {
+        given_tracing_subscriber();
+
+        // Given a shell
+        let skill_runtime = SpySkillRuntime::new();
+        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
+        let http = http(PRODUCTION_FEATURE_SET, app_state);
+
+        // When a request with a tracestate header comes in
+        let trace_id = "0af7651916cd43dd8448eb211c80319c";
+        let span_id = "b7ad6b7169203331";
+        let traceparent = format!("00-{trace_id}-{span_id}-01");
+        let tracestate = "foo=bar";
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .header("traceparent", traceparent)
+                    .header("tracestate", tracestate)
+                    .uri("/v1/skills/acme/summarize/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the tracestate can be reconstructed from the tracing context
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(skill_runtime.tracing_contexts()[0].tracestate(), tracestate);
+    }
 }

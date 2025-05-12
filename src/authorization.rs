@@ -173,7 +173,9 @@ impl AuthorizationClient for HttpAuthorizationClient {
             .bearer_auth(api_token);
 
         if let Some(traceparent) = context.as_traceparent() {
-            builder = builder.header("traceparent", traceparent);
+            builder = builder
+                .header("traceparent", traceparent)
+                .header("tracestate", context.tracestate());
         }
 
         let required_permissions = [Permission::KernelAccess];

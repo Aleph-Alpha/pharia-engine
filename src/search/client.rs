@@ -233,7 +233,9 @@ impl SearchClient for Client {
         );
         let mut builder = self.http.post(url).bearer_auth(api_token);
         if let Some(traceparent) = tracing_context.as_traceparent() {
-            builder = builder.header("traceparent", traceparent);
+            builder = builder
+                .header("traceparent", traceparent)
+                .header("tracestate", tracing_context.tracestate());
         }
         Ok(builder
             .json(&body)
@@ -271,7 +273,9 @@ impl SearchClient for Client {
         );
         let mut builder = self.http.get(url).bearer_auth(api_token);
         if let Some(traceparent) = tracing_context.as_traceparent() {
-            builder = builder.header("traceparent", traceparent);
+            builder = builder
+                .header("traceparent", traceparent)
+                .header("tracestate", tracing_context.tracestate());
         }
         let document = builder
             .send()
@@ -311,7 +315,9 @@ impl SearchClient for Client {
         );
         let mut builder = self.http.get(url).bearer_auth(api_token);
         if let Some(traceparent) = tracing_context.as_traceparent() {
-            builder = builder.header("traceparent", traceparent);
+            builder = builder
+                .header("traceparent", traceparent)
+                .header("tracestate", tracing_context.tracestate());
         }
         let document = builder
             .send()
