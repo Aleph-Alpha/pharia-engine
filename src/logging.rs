@@ -117,13 +117,21 @@ impl TracingContext {
     /// Trace state includes additional, vendor-specific key value pairs.
     /// The header will be empty if no data is provided.
     /// <https://www.w3.org/TR/trace-context/#tracestate-header>
-    pub fn tracestate_header(&self) -> String {
-        self.0
+    pub fn tracestate_header(&self) -> Option<String> {
+        let header = self
+            .0
             .context()
             .span()
             .span_context()
             .trace_state()
-            .header()
+            .header();
+
+        // Vendors MUST accept empty tracestate headers but SHOULD avoid sending them.
+        if header.is_empty() {
+            None
+        } else {
+            Some(header)
+        }
     }
 
     /// Convert the tracing context to what the inference client expects.
@@ -329,7 +337,7 @@ pub mod tests {
         let tracestate = context.tracestate_header();
 
         // Then
-        assert_eq!(tracestate, "");
+        assert!(tracestate.is_none());
     }
 
     #[test]
