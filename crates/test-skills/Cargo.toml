@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 anyhow = "1.0.98"
 change-case = "0.2.0"
-tempfile = "3.19.1"
+tempfile = "3.20.0"
 
 [lints]
 workspace = true
