@@ -26,8 +26,7 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
-use reqwest::header::InvalidHeaderValue;
-use tracing::{Span, info};
+use tracing::{Span, error, info};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -90,19 +89,35 @@ impl TracingContext {
     /// Standard HTTP headers to propagate context information and enable distributed tracing.
     ///
     /// <https://www.w3.org/TR/trace-context-2/#http-headers>
-    pub fn w3c_headers(&self) -> Result<HeaderMap, InvalidHeaderValue> {
+    ///
+    /// In case we end up with an invalid header value, we do not return a result, but rather
+    /// take the decision for the caller and return an empty header map. This comes down to
+    /// the fact that we do not want to allow tracing information to alter the execution flow.
+    pub fn w3c_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         if let Some(traceparent) = self.traceparent_header() {
-            if let Ok(header) = HeaderValue::from_str(&traceparent) {
-                headers.insert("traceparent", header);
+            match HeaderValue::from_str(&traceparent) {
+                Ok(value) => {
+                    headers.insert("traceparent", value);
 
-                // The tracestate header is a companion header to the traceparent header.
-                if let Some(tracestate) = self.tracestate_header() {
-                    headers.insert("tracestate", HeaderValue::from_str(&tracestate)?);
+                    // The tracestate header is a companion header to the traceparent header.
+                    if let Some(tracestate) = self.tracestate_header() {
+                        match HeaderValue::from_str(&tracestate) {
+                            Ok(value) => {
+                                headers.insert("tracestate", value);
+                            }
+                            Err(err) => {
+                                error!(parent: self.span(), "Found invalid header value: {err}");
+                            }
+                        };
+                    }
+                }
+                Err(err) => {
+                    error!(parent: self.span(), "Found invalid header value: {err}");
                 }
             }
         }
-        Ok(headers)
+        headers
     }
 
     /// Is the current span sampled?
@@ -168,7 +183,11 @@ impl TracingContext {
     /// Convert the tracing context to what the inference client expects.
     pub fn as_inference_client_context(&self) -> Option<aleph_alpha_client::TraceContext> {
         self.0.id().map(|id| {
-            aleph_alpha_client::TraceContext::new_sampled(self.trace_id_u128(), id.into_u64())
+            aleph_alpha_client::TraceContext::new(
+                self.trace_id_u128(),
+                id.into_u64(),
+                self.sampled(),
+            )
         })
     }
 
@@ -327,6 +346,31 @@ pub mod tests {
             .with(layer)
             .init();
         provider
+    }
+
+    #[test]
+    fn w3c_headers_are_empty_if_no_trace_context_is_present() {
+        let context = TracingContext::dummy();
+        let headers = context.w3c_headers();
+        assert!(headers.is_empty());
+    }
+
+    #[test]
+    fn tracestate_is_not_included_if_none() {
+        let subscriber = tracing_subscriber::registry();
+
+        tracing::subscriber::with_default(subscriber, || {
+            // Given a trace context with no specific trace state set
+            let span = span!(Level::INFO, "test");
+            let context = TracingContext::new(span);
+
+            // When we render the W3C headers
+            let headers = context.w3c_headers();
+
+            // Then the traceparent is present, but the tracestate is not
+            assert!(headers.get("traceparent").is_some());
+            assert!(headers.get("tracestate").is_none());
+        });
     }
 
     #[test]

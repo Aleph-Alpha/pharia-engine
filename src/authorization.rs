@@ -172,9 +172,7 @@ impl AuthorizationClient for HttpAuthorizationClient {
             .post(format!("{}/check_privileges", self.url))
             .bearer_auth(api_token);
 
-        if let Ok(headers) = context.w3c_headers() {
-            builder = builder.headers(headers);
-        }
+        builder = builder.headers(context.w3c_headers());
 
         let required_permissions = [Permission::KernelAccess];
         let response = builder
