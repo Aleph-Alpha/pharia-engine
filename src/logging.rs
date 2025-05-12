@@ -93,14 +93,14 @@ impl TracingContext {
     /// Render the context as a traceparent header.
     ///
     /// <https://www.w3.org/TR/trace-context-2/#traceparent-header>
-    pub fn as_traceparent(&self) -> Option<String> {
-        self.0
-            .id()
-            .map(|span_id| Self::traceparent(span_id.into_u64(), self.trace_id_u128()))
+    pub fn traceparent_header(&self) -> Option<String> {
+        self.0.id().map(|span_id| {
+            Self::format_traceparent_header(span_id.into_u64(), self.trace_id_u128())
+        })
     }
 
     /// Construct a traceparent header from a span id and trace id.
-    fn traceparent(span_id: u64, trace_id: u128) -> String {
+    fn format_traceparent_header(span_id: u64, trace_id: u128) -> String {
         format!(
             "{:02x}-{:032x}-{:016x}-{:02x}",
             Self::SUPPORTED_VERSION,
@@ -117,7 +117,7 @@ impl TracingContext {
     /// Trace state includes additional, vendor-specific key value pairs.
     /// The header will be empty if no data is provided.
     /// <https://www.w3.org/TR/trace-context/#tracestate-header>
-    pub fn tracestate(&self) -> String {
+    pub fn tracestate_header(&self) -> String {
         self.0
             .context()
             .span()
@@ -298,7 +298,7 @@ pub mod tests {
         let trace_id = 0x4bf92f3577b34da6a3ce929d0e0e4736;
         let span_id = 0x00f067aa0ba902b7;
         assert_eq!(
-            TracingContext::traceparent(span_id, trace_id),
+            TracingContext::format_traceparent_header(span_id, trace_id),
             "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
         );
     }
@@ -326,7 +326,7 @@ pub mod tests {
         let context = TracingContext::dummy();
 
         // When
-        let tracestate = context.tracestate();
+        let tracestate = context.tracestate_header();
 
         // Then
         assert_eq!(tracestate, "");
