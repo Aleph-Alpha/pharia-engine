@@ -105,12 +105,25 @@ impl TracingContext {
         Ok(headers)
     }
 
+    /// Is the current span sampled?
+    ///
+    /// The open telemetry span context holds information whether the current span is sampled.
+    /// This is based up on the chosen sampler which could be probability-based. It can also be
+    /// dependant on whether the incoming trace context specifies the span as sampled.
+    fn sampled(&self) -> bool {
+        self.0.context().span().span_context().is_sampled()
+    }
+
     /// Render the context as a traceparent header.
     ///
     /// <https://www.w3.org/TR/trace-context-2/#traceparent-header>
     fn traceparent_header(&self) -> Option<String> {
         self.0.id().map(|span_id| {
-            Self::format_traceparent_header(span_id.into_u64(), self.trace_id_u128())
+            Self::format_traceparent_header(
+                span_id.into_u64(),
+                self.trace_id_u128(),
+                self.sampled(),
+            )
         })
     }
 
@@ -120,15 +133,13 @@ impl TracingContext {
     const SUPPORTED_VERSION: u8 = 0;
 
     /// Construct a traceparent header from a span id and trace id.
-    fn format_traceparent_header(span_id: u64, trace_id: u128) -> String {
+    fn format_traceparent_header(span_id: u64, trace_id: u128, sampled: bool) -> String {
         format!(
             "{:02x}-{:032x}-{:016x}-{:02x}",
             Self::SUPPORTED_VERSION,
             trace_id,
             span_id,
-            // Currently, we always regard the trace as sampled. However, for compliance with the spec,
-            // we should take this from the traceparent header.
-            opentelemetry::trace::TraceFlags::SAMPLED.to_u8(),
+            u8::from(sampled),
         )
     }
 
@@ -300,9 +311,7 @@ pub mod tests {
     fn tracing_subscriber() -> SdkTracerProvider {
         // This matches the setup in `logging`, but exporting to stdout instead of an OTLP endpoint
         let provider = SdkTracerProvider::builder()
-            .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
-                1.0,
-            ))))
+            .with_sampler(Sampler::ParentBased(Box::new(Sampler::AlwaysOn)))
             .with_id_generator(RandomIdGenerator::default())
             .with_resource(resource())
             .with_batch_exporter(opentelemetry_stdout::SpanExporter::default())
@@ -322,12 +331,25 @@ pub mod tests {
 
     #[test]
     #[allow(clippy::unreadable_literal)]
-    fn traceparent_rendering() {
+    fn traceparent_rendering_of_sampled_span() {
         let trace_id = 0x4bf92f3577b34da6a3ce929d0e0e4736;
         let span_id = 0x00f067aa0ba902b7;
+        let sampled = true;
         assert_eq!(
-            TracingContext::format_traceparent_header(span_id, trace_id),
+            TracingContext::format_traceparent_header(span_id, trace_id, sampled),
             "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        );
+    }
+
+    #[test]
+    #[allow(clippy::unreadable_literal)]
+    fn traceparent_rendering_of_unsampled_span() {
+        let trace_id = 0x4bf92f3577b34da6a3ce929d0e0e4736;
+        let span_id = 0x00f067aa0ba902b7;
+        let sampled = false;
+        assert_eq!(
+            TracingContext::format_traceparent_header(span_id, trace_id, sampled),
+            "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00"
         );
     }
 
@@ -338,14 +360,19 @@ pub mod tests {
     /// However, we then can not guarantee that the parent span has not been dropped in the
     /// sending actor, so we risk that the subscriber panics.
     #[test]
-    #[should_panic(expected = "tried to clone Id(1), but no span exists with that ID")]
+    #[should_panic(expected = "tried to clone")]
     fn parent_span_needs_to_be_in_scope_when_creating_child_span() {
-        given_tracing_subscriber();
+        let subscriber = tracing_subscriber::registry();
 
-        let span = span!(Level::INFO, "test");
-        let parent_id = span.id().unwrap();
-        drop(span);
-        span!(parent: parent_id, Level::INFO, "child");
+        tracing::subscriber::with_default(subscriber, || {
+            // When we create a span and drop it
+            let span = span!(Level::INFO, "test");
+            let parent_id = span.id().unwrap();
+            drop(span);
+
+            // Then referring to the dropped span as parent will lead to a panic
+            span!(parent: parent_id, Level::INFO, "child");
+        });
     }
 
     #[test]
@@ -366,5 +393,45 @@ pub mod tests {
 
         let header = trace_state.header();
         assert_eq!(header, "foo=bar");
+    }
+
+    #[test]
+    fn span_with_always_on_sampler_knows_it_is_sampled() {
+        // Given a subscriber that is interested in all spans
+        let provider = SdkTracerProvider::builder()
+            .with_sampler(Sampler::AlwaysOn)
+            .build();
+
+        let layer = tracing_opentelemetry::layer().with_tracer(provider.tracer("test"));
+        let subscriber = tracing_subscriber::registry().with(layer);
+
+        tracing::subscriber::with_default(subscriber, || {
+            // When creating a new span
+            let span = span!(Level::INFO, "foo");
+            let context = TracingContext::new(span);
+
+            // Then the span says that it is sampled
+            assert!(context.sampled());
+        });
+    }
+
+    #[test]
+    fn span_with_always_off_sampler_knows_it_is_not_sampled() {
+        // Given a subscriber that is interested in no spans
+        let provider = SdkTracerProvider::builder()
+            .with_sampler(Sampler::AlwaysOff)
+            .build();
+
+        let layer = tracing_opentelemetry::layer().with_tracer(provider.tracer("test"));
+        let subscriber = tracing_subscriber::registry().with(layer);
+
+        tracing::subscriber::with_default(subscriber, || {
+            // When creating a new span
+            let span = span!(Level::INFO, "foo");
+            let context = TracingContext::new(span);
+
+            // Then the span says that it is sampled
+            assert!(!context.sampled());
+        });
     }
 }
