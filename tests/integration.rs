@@ -602,6 +602,67 @@ async fn metadata_via_remote_csi() {
     kernel.shutdown().await;
 }
 
+/// We are testing that sampling information from a traceparent header is respected.
+#[tokio::test]
+#[allow(clippy::unreadable_literal)]
+async fn span_sampled_when_requested() {
+    // Given a log recorder with a parent based sampler
+    let (_guard, log_recorder) = given_log_recorder().await;
+
+    let local_skill_dir = TestFileRegistry::new();
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+
+    // When we do a request with a parent span that is sampled
+    let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
+    let parent_span_id: u64 = 0xb7ad6b7169203331;
+    let sampled: u8 = 1;
+    let traceparent = format!("00-{trace_id:032x}-{parent_span_id:016x}-{sampled:02x}");
+
+    let req_client = reqwest::Client::new();
+    drop(
+        req_client
+            .post(format!("http://127.0.0.1:{}/health", kernel.port()))
+            .header("traceparent", traceparent)
+            .send()
+            .await
+            .unwrap(),
+    );
+
+    // Then a span is sampled
+    let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
+    assert_eq!(spans.len(), 1);
+}
+
+#[tokio::test]
+#[allow(clippy::unreadable_literal)]
+async fn span_not_sampled_when_not_requested() {
+    // Given a log recorder with a parent based sampler
+    let (_guard, log_recorder) = given_log_recorder().await;
+
+    let local_skill_dir = TestFileRegistry::new();
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+
+    // When we do a request with a parent span that is not sampled
+    let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
+    let parent_span_id: u64 = 0xb7ad6b7169203331;
+    let sampled: u8 = 0;
+    let traceparent = format!("00-{trace_id:032x}-{parent_span_id:016x}-{sampled:02x}");
+
+    let req_client = reqwest::Client::new();
+    drop(
+        req_client
+            .post(format!("http://127.0.0.1:{}/health", kernel.port()))
+            .header("traceparent", traceparent)
+            .send()
+            .await
+            .unwrap(),
+    );
+
+    // Then no span is recorded
+    let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
+    assert_eq!(spans.len(), 0);
+}
+
 #[tokio::test]
 #[allow(clippy::unreadable_literal)]
 async fn traceparent_is_respected() {

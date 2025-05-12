@@ -7,8 +7,9 @@ use std::{
 use opentelemetry::{propagation::TextMapCompositePropagator, trace::TracerProvider};
 use opentelemetry_sdk::{
     propagation::{BaggagePropagator, TraceContextPropagator},
-    trace::{RandomIdGenerator, Sampler, SdkTracerProvider, SpanData, SpanExporter},
+    trace::{SdkTracerProvider, SpanData, SpanExporter},
 };
+use pharia_kernel::tracer_provider;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -47,6 +48,7 @@ impl LogRecorder {
     }
 
     fn clear(&self) {
+        self.guard.force_flush().unwrap();
         self.spans.lock().unwrap().clear();
     }
 }
@@ -99,16 +101,14 @@ pub async fn given_log_recorder() -> (SequentialTestGuard, &'static LogRecorder)
     // Aquire an exclusive guard and clear the log recorder
     let guard = SequentialTestGuard::exclusive().await;
     log_recorder.clear();
+    assert!(log_recorder.spans().is_empty());
     (guard, log_recorder)
 }
 
 fn tracing_subscriber() -> LogRecorder {
     let spans = Arc::new(Mutex::new(Vec::new()));
-    let provider = SdkTracerProvider::builder()
-        .with_sampler(Sampler::AlwaysOn)
-        .with_id_generator(RandomIdGenerator::default())
-        .with_batch_exporter(SpySpanExporter::new(spans.clone()))
-        .build();
+    let exporter = SpySpanExporter::new(spans.clone());
+    let provider = tracer_provider(exporter, 1.0).unwrap();
 
     init_propagator();
 
