@@ -231,11 +231,14 @@ impl SearchClient for Client {
             "{}/collections/{namespace}/{collection}/indexes/{index}/search",
             &self.host
         );
+
+        // The traceparent header only makes sense if the traceparent header is also set
         let mut builder = self.http.post(url).bearer_auth(api_token);
         if let Some(traceparent) = tracing_context.traceparent_header() {
-            builder = builder
-                .header("traceparent", traceparent)
-                .header("tracestate", tracing_context.tracestate_header());
+            builder = builder.header("traceparent", traceparent);
+            if let Some(tracestate) = tracing_context.tracestate_header() {
+                builder = builder.header("tracestate", tracestate);
+            }
         }
         Ok(builder
             .json(&body)
@@ -271,11 +274,14 @@ impl SearchClient for Client {
             "{}/collections/{namespace}/{collection}/docs/{encoded_name}",
             &self.host
         );
+
+        // The tracestate header only makes sense if the traceparent header is also set
         let mut builder = self.http.get(url).bearer_auth(api_token);
         if let Some(traceparent) = tracing_context.traceparent_header() {
-            builder = builder
-                .header("traceparent", traceparent)
-                .header("tracestate", tracing_context.tracestate_header());
+            builder = builder.header("traceparent", traceparent);
+            if let Some(tracestate) = tracing_context.tracestate_header() {
+                builder = builder.header("tracestate", tracestate);
+            }
         }
         let document = builder
             .send()
@@ -313,11 +319,14 @@ impl SearchClient for Client {
             "{}/collections/{namespace}/{collection}/docs/{encoded_name}",
             &self.host
         );
+
+        // The tracestate header only makes sense if the traceparent header is also set
         let mut builder = self.http.get(url).bearer_auth(api_token);
         if let Some(traceparent) = tracing_context.traceparent_header() {
-            builder = builder
-                .header("traceparent", traceparent)
-                .header("tracestate", tracing_context.tracestate_header());
+            builder = builder.header("traceparent", traceparent);
+            if let Some(tracestate) = tracing_context.tracestate_header() {
+                builder = builder.header("tracestate", tracestate);
+            }
         }
         let document = builder
             .send()

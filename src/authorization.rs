@@ -172,10 +172,12 @@ impl AuthorizationClient for HttpAuthorizationClient {
             .post(format!("{}/check_privileges", self.url))
             .bearer_auth(api_token);
 
+        // The traceparent header only makes sense if the traceparent header is also set
         if let Some(traceparent) = context.traceparent_header() {
-            builder = builder
-                .header("traceparent", traceparent)
-                .header("tracestate", context.tracestate_header());
+            builder = builder.header("traceparent", traceparent);
+            if let Some(tracestate) = context.tracestate_header() {
+                builder = builder.header("tracestate", tracestate);
+            }
         }
 
         let required_permissions = [Permission::KernelAccess];
