@@ -20,6 +20,7 @@ use opentelemetry::{
     trace::{TraceContextExt, TracerProvider},
 };
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry_sdk::trace::SpanExporter as SpanExporterTrait;
 use opentelemetry_sdk::{
     Resource,
     propagation::{BaggagePropagator, TraceContextPropagator},
@@ -109,7 +110,7 @@ impl TracingContext {
                             Err(err) => {
                                 error!(parent: self.span(), "Found invalid header value: {err}");
                             }
-                        };
+                        }
                     }
                 }
                 Err(err) => {
@@ -123,8 +124,9 @@ impl TracingContext {
     /// Is the current span sampled?
     ///
     /// The open telemetry span context holds information whether the current span is sampled.
-    /// This is based up on the chosen sampler which could be probability-based. It can also be
-    /// dependant on whether the incoming trace context specifies the span as sampled.
+    /// By respecting the parent's span decision for sampling, we allow remote services to decide
+    /// whether a span is sampled or not. If no information is provided, our probability-based
+    /// sampler will decide whether to sample the span or not.
     fn sampled(&self) -> bool {
         self.0.context().span().span_context().is_sampled()
     }
@@ -218,7 +220,11 @@ pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGua
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer());
     let tracer_provider = if let Some(endpoint) = otel_config.endpoint {
-        let tracer_provider = init_otel_tracer_provider(endpoint, otel_config.sampling_ratio)?;
+        let exporter = SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint(endpoint)
+            .build()?;
+        let tracer_provider = tracer_provider(exporter, otel_config.sampling_ratio)?;
         init_propagator();
 
         // Sets otel.scope.name, a logical unit within the application code, see https://opentelemetry.io/docs/concepts/instrumentation-scope/
@@ -265,22 +271,25 @@ pub fn init_propagator() {
     opentelemetry::global::set_text_map_propagator(propagator);
 }
 
-fn init_otel_tracer_provider(
-    endpoint: &str,
+/// Construct an opentelemetry tracer provider.
+///
+/// This method is public so we can use the same provider and sampler for out integration tests.
+///
+/// # Errors
+/// Failed to build the tracer provider.
+pub fn tracer_provider(
+    exporter: impl SpanExporterTrait + 'static,
     sampling_ratio: f64,
 ) -> anyhow::Result<SdkTracerProvider> {
-    Ok(SdkTracerProvider::builder() // Customize sampling strategy
+    Ok(SdkTracerProvider::builder()
+        // We respect the parent span's sampling decision, even if it is coming from
+        // a remote service.
         .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
             sampling_ratio,
         ))))
         .with_id_generator(RandomIdGenerator::default())
         .with_resource(resource())
-        .with_batch_exporter(
-            SpanExporter::builder()
-                .with_tonic()
-                .with_endpoint(endpoint)
-                .build()?,
-        )
+        .with_batch_exporter(exporter)
         .build())
 }
 
