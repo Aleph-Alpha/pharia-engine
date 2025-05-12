@@ -234,11 +234,8 @@ impl SearchClient for Client {
 
         // The traceparent header only makes sense if the traceparent header is also set
         let mut builder = self.http.post(url).bearer_auth(api_token);
-        if let Some(traceparent) = tracing_context.traceparent_header() {
-            builder = builder.header("traceparent", traceparent);
-            if let Some(tracestate) = tracing_context.tracestate_header() {
-                builder = builder.header("tracestate", tracestate);
-            }
+        if let Ok(headers) = tracing_context.w3c_headers() {
+            builder = builder.headers(headers);
         }
         Ok(builder
             .json(&body)
@@ -277,12 +274,10 @@ impl SearchClient for Client {
 
         // The tracestate header only makes sense if the traceparent header is also set
         let mut builder = self.http.get(url).bearer_auth(api_token);
-        if let Some(traceparent) = tracing_context.traceparent_header() {
-            builder = builder.header("traceparent", traceparent);
-            if let Some(tracestate) = tracing_context.tracestate_header() {
-                builder = builder.header("tracestate", tracestate);
-            }
+        if let Ok(headers) = tracing_context.w3c_headers() {
+            builder = builder.headers(headers);
         }
+
         let document = builder
             .send()
             .await?
@@ -322,11 +317,8 @@ impl SearchClient for Client {
 
         // The tracestate header only makes sense if the traceparent header is also set
         let mut builder = self.http.get(url).bearer_auth(api_token);
-        if let Some(traceparent) = tracing_context.traceparent_header() {
-            builder = builder.header("traceparent", traceparent);
-            if let Some(tracestate) = tracing_context.tracestate_header() {
-                builder = builder.header("tracestate", tracestate);
-            }
+        if let Ok(headers) = tracing_context.w3c_headers() {
+            builder = builder.headers(headers);
         }
         let document = builder
             .send()

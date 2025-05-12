@@ -2329,7 +2329,11 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
             skill_runtime.tracing_contexts()[0]
-                .tracestate_header()
+                .w3c_headers()
+                .unwrap()
+                .get("tracestate")
+                .unwrap()
+                .to_str()
                 .unwrap(),
             tracestate
         );
