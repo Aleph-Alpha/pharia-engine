@@ -1787,8 +1787,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn health() {
-        let saboteur_authorization = StubAuthorization::new(false);
-        let app_state = AppState::dummy().with_authorization_api(saboteur_authorization);
+        let app_state = AppState::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
