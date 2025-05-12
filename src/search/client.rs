@@ -232,12 +232,11 @@ impl SearchClient for Client {
             &self.host
         );
 
-        // The traceparent header only makes sense if the traceparent header is also set
-        let mut builder = self.http.post(url).bearer_auth(api_token);
-        if let Ok(headers) = tracing_context.w3c_headers() {
-            builder = builder.headers(headers);
-        }
-        Ok(builder
+        Ok(self
+            .http
+            .post(url)
+            .bearer_auth(api_token)
+            .headers(tracing_context.w3c_headers())
             .json(&body)
             .send()
             .await?
@@ -272,13 +271,11 @@ impl SearchClient for Client {
             &self.host
         );
 
-        // The tracestate header only makes sense if the traceparent header is also set
-        let mut builder = self.http.get(url).bearer_auth(api_token);
-        if let Ok(headers) = tracing_context.w3c_headers() {
-            builder = builder.headers(headers);
-        }
-
-        let document = builder
+        let document = self
+            .http
+            .get(url)
+            .bearer_auth(api_token)
+            .headers(tracing_context.w3c_headers())
             .send()
             .await?
             .error_for_status()?
@@ -315,12 +312,11 @@ impl SearchClient for Client {
             &self.host
         );
 
-        // The tracestate header only makes sense if the traceparent header is also set
-        let mut builder = self.http.get(url).bearer_auth(api_token);
-        if let Ok(headers) = tracing_context.w3c_headers() {
-            builder = builder.headers(headers);
-        }
-        let document = builder
+        let document = self
+            .http
+            .get(url)
+            .bearer_auth(api_token)
+            .headers(tracing_context.w3c_headers())
             .send()
             .await?
             .error_for_status()?
