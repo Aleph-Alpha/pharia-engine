@@ -108,6 +108,12 @@ PhariaKernel can be configured to use an OpenTelemetry Collector endpoint by set
 OTEL_ENDPOINT=http://127.0.0.1:4317
 ```
 
+The ratio of traces that are being sampled can be configured by setting the `OTEL_SAMPLING_RATIO` to a value between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all traces.
+
+```shell
+OTEL_SAMPLING_RATIO=0.1
+```
+
 For local testing, a supported collector like the Jaeger [All in One](https://www.jaegertracing.io/docs/1.60/getting-started/#all-in-one) executable can be used:
 
 ```shell

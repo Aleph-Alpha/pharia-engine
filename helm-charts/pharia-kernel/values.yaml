@@ -75,6 +75,8 @@ namespaces: {}
 logLevel: info
 # Address of an OpenTelemetry collector listening for gRPC requests.
 openTelemetryEndpoint: ""
+# Sampling ratio between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all traces
+openTelemetrySamplingRatio: ""
 authorizationAddress: ""
 inferenceAddress: ""
 documentIndexAddress: ""

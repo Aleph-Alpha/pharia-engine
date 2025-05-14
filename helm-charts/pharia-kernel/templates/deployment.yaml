@@ -100,6 +100,10 @@ spec:
             - name: OTEL_ENDPOINT
               value: {{ .Values.openTelemetryEndpoint | quote }}
             {{- end }}
+            {{- if .Values.openTelemetrySamplingRatio }}
+            - name: OTEL_SAMPLING_RATIO
+              value: {{ .Values.openTelemetrySamplingRatio | quote }}
+            {{- end }}
             {{- if .Values.global.phariaAiFeatureSet }}
             - name: PHARIA_AI_FEATURE_SET
               value: {{ .Values.global.phariaAiFeatureSet | quote }}
