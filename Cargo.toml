@@ -127,19 +127,14 @@ reqwest-middleware = { version = "0.4.2", features = [
     "json",
     "rustls-tls",
 ] }
-reqwest-tracing = { version = "0.5.7", features = ["opentelemetry_0_27"] }
 reqwest-retry = "0.7.0"
 jsonschema = "0.30.0"
 rayon = "1.10.0"
 serde-bool = "0.1.3"
 async-stream = "0.3.6"
 jiff = { version = "0.2.13", features = ["serde"] }
-futures-util = "0.3.31"
 moka = { version = "0.12.10", features = ["sync"] }
 bytesize = { version = "2.0.1", features = ["serde"] }
-tracing-opentelemetry-instrumentation-sdk = { version = "0.28.0", features = [
-    "http",
-] }
 # We use this middleware to extract tracing information in our shell and start spans for each incoming request.
 # The `tracing_level_info` feature determines the level at which spans are created by the middleware.
 # If this feature is emitted, the default span level is `trace`, which will not be picked up, as the minimum
