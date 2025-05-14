@@ -61,6 +61,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt -- --check
       - run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+      - run: |
+          cargo install cargo-shear
+          cargo shear
 
   test-and-deploy-if-main-or-tag:
     runs-on: ubuntu-latest
