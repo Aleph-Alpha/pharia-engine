@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.4...pharia-kernel-v0.12.5)
+
+### Features
+
+- Expose otel sampling ratio in values.yaml - ([5ba0aa7](https://github.com/Aleph-Alpha/pharia-kernel/commit/5ba0aa79642c93395d94e467593d44acdbe13480))
+- Pass tracestate to aleph alpha client - ([900617e](https://github.com/Aleph-Alpha/pharia-kernel/commit/900617eb7d06620c9473a7f85e4c0af5ec4d7d0b))
+- Pass sampled flag to downstream services - ([e2f02c0](https://github.com/Aleph-Alpha/pharia-kernel/commit/e2f02c09cc8e412cbffa1d51e16f2ce812ad474c))
+- Only include tracestate header if not empty - ([6c4cd07](https://github.com/Aleph-Alpha/pharia-kernel/commit/6c4cd074be045dba6c6a044835b33e8b44d1d7b8))
+- Include tracestate in outgoing requests - ([a00e91d](https://github.com/Aleph-Alpha/pharia-kernel/commit/a00e91dcd2fcb8f01b73e4be527953c3062a8c3d))
+- Better trace names - ([375e146](https://github.com/Aleph-Alpha/pharia-kernel/commit/375e14645359b73b74051bfd9c804fc05f306ebe))
+- Do not include original error in auth error message - ([161cf9a](https://github.com/Aleph-Alpha/pharia-kernel/commit/161cf9a6a45f4d6d17b26f4130eb7ff91134d381))
+- Skill loader gets tracing context - ([58d0959](https://github.com/Aleph-Alpha/pharia-kernel/commit/58d0959682d43b63a677f56c59304bb0f5e8e68c))
+- New tracing span for skill loading - ([67f27c8](https://github.com/Aleph-Alpha/pharia-kernel/commit/67f27c8e79185b1ec0fbeecea4705d03247a928b))
+- Expose better error message for auth errors - ([55cf006](https://github.com/Aleph-Alpha/pharia-kernel/commit/55cf006e9fec443f9a0004532da0f66059853bab))
+- Create span for auth calls - ([dc5ab4d](https://github.com/Aleph-Alpha/pharia-kernel/commit/dc5ab4d201d860388b2c339b57a5a2dac3cea669))
+- Forward traceparent to iam service - ([bb655d7](https://github.com/Aleph-Alpha/pharia-kernel/commit/bb655d79234878d5aa99b74212901035e97388fa))
+- Nest concurrent requests into span - ([9c00b81](https://github.com/Aleph-Alpha/pharia-kernel/commit/9c00b81f6e0cf4a291bb02b1c26b8801412b9acd))
+- Start a new span for run_function - ([98474fd](https://github.com/Aleph-Alpha/pharia-kernel/commit/98474fddc30ea23ac936e071ee6337653efe41aa))
+- Update span target to "pharia-kernel::csi" - ([c599f6e](https://github.com/Aleph-Alpha/pharia-kernel/commit/c599f6ef2612fd4e61c70931bceb46fa1f0c1c09))
+- Start span for skill execution - ([461eb8e](https://github.com/Aleph-Alpha/pharia-kernel/commit/461eb8e5380fd2093279192a409de387e3c86180))
+- Traceheader is forwarded to document index - ([04c702c](https://github.com/Aleph-Alpha/pharia-kernel/commit/04c702c973ff7e4a4c94a484de9ea45af1801960))
+- Pass trace context to inference client - ([c66e9af](https://github.com/Aleph-Alpha/pharia-kernel/commit/c66e9af321d380ad9f1e4ea7ea4cc79ebdf0c30a))
+- Create child span for chat request - ([296c839](https://github.com/Aleph-Alpha/pharia-kernel/commit/296c8395240769cb1ed31b4b10e3cc9ee2f0d70d))
+- Context event emitted for chat request - ([39b6bc4](https://github.com/Aleph-Alpha/pharia-kernel/commit/39b6bc4ddb74364a473855180d62c188ef0c90cb))
+- Enable file-based caching for wasmtime to reduce cold starts even - ([6637093](https://github.com/Aleph-Alpha/pharia-kernel/commit/6637093bc99d65023f7675d4b522f43c97066855))
+- Add trace layer to see response start and end events - ([28e0fa8](https://github.com/Aleph-Alpha/pharia-kernel/commit/28e0fa87d0f4b4cb3fdb32bf448fe0ea6deae113))
+- Otel sampling ratio is taken from env - ([4727fea](https://github.com/Aleph-Alpha/pharia-kernel/commit/4727fea6722845351a68e1802cc2ab7c63a742dc))
+
+### Fixes
+
+- Situate language conversion in tracing context - ([e0561e1](https://github.com/Aleph-Alpha/pharia-kernel/commit/e0561e179f8798207ab3110382337c969600f6d2))
+- Search actor logs to trace context - ([0c99656](https://github.com/Aleph-Alpha/pharia-kernel/commit/0c9965682e7b8bf297cce5f9ff54421e4f191466))
+- Remove tracing from http client - ([fc578b5](https://github.com/Aleph-Alpha/pharia-kernel/commit/fc578b51fcc0b0966eb44bf3cc71b3d00144c159))
+- Only drop tracing context on stream end - ([99ca7a0](https://github.com/Aleph-Alpha/pharia-kernel/commit/99ca7a0c469929322f6fd1c23f41336ff3325577))
+- Increment csi request metrics by total requests - ([0f20aba](https://github.com/Aleph-Alpha/pharia-kernel/commit/0f20aba3e3c26922cbc33eacd3dc999b9a2ba450))
+- Pass correct child context to inference requests - ([0fa118c](https://github.com/Aleph-Alpha/pharia-kernel/commit/0fa118cbeefea10b1c766ff13fbdf78ad7aba785))
+- Do not unwrap if span id is not set - ([86d260c](https://github.com/Aleph-Alpha/pharia-kernel/commit/86d260cbc15496a8a80ec17a38f0599137a68ea8))
+- Set log level to info on traces - ([b90ce37](https://github.com/Aleph-Alpha/pharia-kernel/commit/b90ce372f079d06354a63301e4e21fa64067cf8e))
+- Define axum otel middleware outside of service builder - ([0edccf4](https://github.com/Aleph-Alpha/pharia-kernel/commit/0edccf4e5fdb59d02e5f22d695feab84bed04d6f))
+
+### Documentation
+
+- Remove unneeded spaces before shell cmds - ([e5c0344](https://github.com/Aleph-Alpha/pharia-kernel/commit/e5c034475e0a89f18fa4b3fdd46333f3b6b704f1))
+- Remove detach option when starting jaeger - ([94b9843](https://github.com/Aleph-Alpha/pharia-kernel/commit/94b9843a02175a63cb2c06ecb49704d0d200d7ee))
+- Specify why we need to do tracing differently - ([c7e1331](https://github.com/Aleph-Alpha/pharia-kernel/commit/c7e1331bfa3ac211f51adc8c36a805d0b073410d))
+- Specify purpose of context_event macro - ([4f74a0f](https://github.com/Aleph-Alpha/pharia-kernel/commit/4f74a0f1fadb498eafdb63e50fd0593ce35cf602))
+- Specify why we use tracing_level_info feature for axum middleware - ([c44c9ff](https://github.com/Aleph-Alpha/pharia-kernel/commit/c44c9ff48953eaa3f644fda47a8fbc1a44c6a1bb))
+- Explain servicebuilder nesting - ([a3f4cd3](https://github.com/Aleph-Alpha/pharia-kernel/commit/a3f4cd3195d2f982dfe3fd0465b0dbee3083d6d1))
+
+### Builds
+
+- *(deps)* Bump webpki-roots from 0.26.9 to 0.26.11 - ([e1f9f61](https://github.com/Aleph-Alpha/pharia-kernel/commit/e1f9f611f9f419d1d4fa00364e39cff86b8468e7))
+- *(deps)* Bump the minor group with 9 updates - ([ec40ee9](https://github.com/Aleph-Alpha/pharia-kernel/commit/ec40ee913b8cf4ad3cfcb7490c99ccee30621b1d))
+- *(deps)* Remove unused dependencies found by cargo shear - ([21c23b1](https://github.com/Aleph-Alpha/pharia-kernel/commit/21c23b1cb33fd751ce37ce940b44cfa470feda06))
+- *(deps)* Bump the minor group with 20 updates - ([692d39e](https://github.com/Aleph-Alpha/pharia-kernel/commit/692d39e0aca3c9700d4c048eac7dad1b75a6ff4e))
+- *(deps)* Bump the minor group across 1 directory with 27 updates - ([dc95088](https://github.com/Aleph-Alpha/pharia-kernel/commit/dc95088c7c854e3ba5d68a95dde3b2933d43b965))
+- *(deps)* Update aleph alpha client to 0.24 - ([4dba514](https://github.com/Aleph-Alpha/pharia-kernel/commit/4dba514c215c567fa40ea5167668bee3f7976bd3))
+- *(deps)* Bump the minor group with 4 updates - ([3e3059c](https://github.com/Aleph-Alpha/pharia-kernel/commit/3e3059c3229a4b361edeb7f449a25cd09749ed05))
+- *(deps)* Bump the minor group with 8 updates - ([2a08c40](https://github.com/Aleph-Alpha/pharia-kernel/commit/2a08c40fc174965fd5b5b4a08165803531a90b60))
+
+
 ## [0.12.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.3...pharia-kernel-v0.12.4)
 
 ### Features
