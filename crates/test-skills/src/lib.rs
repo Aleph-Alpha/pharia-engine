@@ -301,7 +301,7 @@ fn install_componentize_py(venv_path: &Path) -> Result<(), Error> {
             "install",
             "--python",
             venv_path.to_str().unwrap(),
-            "componentize-py",
+            "componentize-py==0.16.0",
         ])
         .output()?;
     error_on_status(
