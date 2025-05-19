@@ -35,12 +35,12 @@ module-name-repetitions = "allow"
 
 [package]
 name = "pharia-kernel"
-version = "0.12.5"
+version = "0.12.6"
 edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.3" }
+engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.4" }
 aleph-alpha-client = "0.26.0"
 anyhow = "1.0.98"
 async-trait = "0.1.88"

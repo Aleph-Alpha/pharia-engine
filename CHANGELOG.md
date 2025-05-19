@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.5...pharia-kernel-v0.12.6)
+
+### Fixes
+
+- Downgrade wasmtime to prevent rustix panic - ([4308274](https://github.com/Aleph-Alpha/pharia-kernel/commit/4308274941c0a9d59e12ca8783514338e3ad0d57))
+
+
 ## [0.12.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.4...pharia-kernel-v0.12.5)
 
 ### Features
