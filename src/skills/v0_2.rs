@@ -88,7 +88,6 @@ impl super::Skill for SkillPre<LinkedCtx> {
 }
 
 impl Host for LinkedCtx {
-    #[must_use]
     async fn complete(
         &mut self,
         model: String,
