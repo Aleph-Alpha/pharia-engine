@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.6...pharia-kernel-v0.12.7)
+
+### Features
+
+- Write errors to stderr in case app init fails - ([5235b66](https://github.com/Aleph-Alpha/pharia-kernel/commit/5235b66a3398f37f57ee357c8c686c6b68022fab))
+
+
 ## [0.12.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.5...pharia-kernel-v0.12.6)
 
 ### Fixes
