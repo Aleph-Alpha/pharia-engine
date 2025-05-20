@@ -160,11 +160,18 @@ impl AppConfig {
         file: File<FileSourceFile, FileFormat>,
         env: Environment,
     ) -> anyhow::Result<Self> {
+        // We write the errors to stderr as logging/tracing is not yet initialized
         let mut config = Config::builder()
             .add_source(file)
             .add_source(env)
-            .build()?
-            .try_deserialize::<Self>()?;
+            .build()
+            .inspect_err(|e| {
+                eprintln!("Error building app config: {e}");
+            })?
+            .try_deserialize::<Self>()
+            .inspect_err(|e| {
+                eprintln!("Error deserializing app config: {e}");
+            })?;
 
         assert!(
             !config.inference_url.is_empty(),

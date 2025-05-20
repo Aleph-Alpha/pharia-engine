@@ -1,13 +1,15 @@
 use std::net::SocketAddr;
 
+use crate::{shell::ShellMetrics, skill_runtime::SkillRuntimeMetrics};
 use metrics::KeyName;
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
-
-use crate::{shell::ShellMetrics, skill_runtime::SkillRuntimeMetrics};
+use tracing::error;
 
 /// Initializes a recorder for metrics macros and exposes a Prometheus exporter
 /// and exposes it over port 9000 (by default). Any GET request at the port
 /// will return metrics.
+///
+/// We expect logging to be initialized already, so we may use error macros.
 ///
 /// # Errors
 /// Returns an error if:
@@ -26,7 +28,10 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
                     .to_owned(),
             ),
             EXPONENTIAL_SECONDS,
-        )?
+        )
+        .inspect_err(|e| {
+            error!("Error setting buckets for metric: {e}");
+        })?
         .set_buckets_for_metric(
             Matcher::Full(
                 KeyName::from(SkillRuntimeMetrics::ExecutionDurationSeconds)
@@ -34,7 +39,10 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
                     .to_owned(),
             ),
             EXPONENTIAL_SECONDS,
-        )?
+        )
+        .inspect_err(|e| {
+            error!("Error setting buckets for metric: {e}");
+        })?
         .set_buckets_for_metric(
             Matcher::Full(
                 KeyName::from(SkillRuntimeMetrics::FetchDurationSeconds)
@@ -42,9 +50,15 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
                     .to_owned(),
             ),
             EXPONENTIAL_SECONDS,
-        )?
+        )
+        .inspect_err(|e| {
+            error!("Error setting buckets for metric: {e}");
+        })?
         .with_http_listener(addr)
-        .install()?;
+        .install()
+        .inspect_err(|e| {
+            error!("Error installing metrics: {e}");
+        })?;
 
     Ok(())
 }

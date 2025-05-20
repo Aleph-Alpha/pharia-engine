@@ -215,7 +215,10 @@ impl TracingContext {
 /// # Errors
 /// Failed to parse the log level provided by the configuration.
 pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGuard> {
-    let env_filter = EnvFilter::from_str(otel_config.log_level)?;
+    // We write the errors to stderr as logging/tracing is not yet initialized
+    let env_filter = EnvFilter::from_str(otel_config.log_level).inspect_err(|e| {
+        eprintln!("Error parsing log level: {e}");
+    })?;
     let registry = tracing_subscriber::registry()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer());
@@ -223,7 +226,10 @@ pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGua
         let exporter = SpanExporter::builder()
             .with_tonic()
             .with_endpoint(endpoint)
-            .build()?;
+            .build()
+            .inspect_err(|e| {
+                eprintln!("Error building span exporter: {e}");
+            })?;
         let tracer_provider = tracer_provider(exporter, otel_config.sampling_ratio)?;
         init_propagator();
 
