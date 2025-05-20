@@ -35,6 +35,7 @@ use skill_loader::SkillLoader;
 use skill_store::SkillStore;
 use skills::Engine;
 use tokenizers::Tokenizers;
+use tracing::error;
 
 use self::{inference::Inference, skill_runtime::SkillRuntime};
 
@@ -83,10 +84,14 @@ impl Kernel {
                 app_config.namespaces().clone(),
                 app_config.pharia_ai_feature_set() == FeatureSet::Beta,
             )
-            .context("Unable to read the configuration for namespaces")?,
+            .context("Unable to read the configuration for namespaces")
+            .inspect_err(|e| error!("{e}"))?,
         );
-        let engine =
-            Arc::new(Engine::new(app_config.engine_config()).context("engine creation failed")?);
+        let engine = Arc::new(
+            Engine::new(app_config.engine_config())
+                .context("engine creation failed")
+                .inspect_err(|e| error!("{e}"))?,
+        );
 
         // Boot up the drivers which power the CSI.
         let tokenizers = Tokenizers::new(app_config.inference_url().to_owned()).unwrap();
