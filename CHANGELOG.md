@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.8](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.7...pharia-kernel-v0.12.8)
+
+### Documentation
+
+- Update links for standalone deployment - ([2285c41](https://github.com/Aleph-Alpha/pharia-kernel/commit/2285c412efc06a2bb48d882a6eb15bcb771a9105))
+
+
 ## [0.12.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.6...pharia-kernel-v0.12.7)
 
 ### Features
