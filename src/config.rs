@@ -1,4 +1,4 @@
-use anyhow::Ok;
+use anyhow::{Ok, anyhow};
 use bytesize::ByteSize;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use engine_room::{EngineConfig, WasmtimeCache};
@@ -173,15 +173,15 @@ impl AppConfig {
                 eprintln!("Error deserializing app config: {e}");
             })?;
 
-        assert!(
-            !config.inference_url.is_empty(),
-            "The inference address must be available."
-        );
+        if config.inference_url.is_empty() {
+            Err(anyhow!("The inference address must be available."))
+                .inspect_err(|e| eprintln!("{e}"))?;
+        }
 
-        assert!(
-            !config.authorization_url.is_empty(),
-            "The authorization address must be available."
-        );
+        if config.authorization_url.is_empty() {
+            Err(anyhow!("The authorization address must be available."))
+                .inspect_err(|e| eprintln!("{e}"))?;
+        }
 
         if ["debug", "trace"].contains(&config.log_level.as_str()) {
             // Don't allow third-party crates to go below info unless they user passed in a
