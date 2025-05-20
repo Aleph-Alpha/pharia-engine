@@ -35,7 +35,7 @@ module-name-repetitions = "allow"
 
 [package]
 name = "pharia-kernel"
-version = "0.12.6"
+version = "0.12.7"
 edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
