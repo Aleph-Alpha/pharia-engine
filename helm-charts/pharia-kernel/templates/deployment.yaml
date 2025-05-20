@@ -102,7 +102,7 @@ spec:
             {{- end }}
             {{- if .Values.openTelemetrySamplingRatio }}
             - name: OTEL_SAMPLING_RATIO
-              value: {{ .Values.openTelemetrySamplingRatio | quote }}
+              value: {{ .Values.openTelemetrySamplingRatio }}
             {{- end }}
             {{- if .Values.global.phariaAiFeatureSet }}
             - name: PHARIA_AI_FEATURE_SET
