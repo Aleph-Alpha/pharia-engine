@@ -174,13 +174,15 @@ impl AppConfig {
             })?;
 
         if config.inference_url.is_empty() {
-            Err(anyhow!("The inference address must be available."))
-                .inspect_err(|e| eprintln!("{e}"))?;
+            let message = "The inference address must not be empty.";
+            eprintln!("{message}");
+            return Err(anyhow!(message));
         }
 
         if config.authorization_url.is_empty() {
-            Err(anyhow!("The authorization address must be available."))
-                .inspect_err(|e| eprintln!("{e}"))?;
+            let message = "The authorization address must not be empty.";
+            eprintln!("{message}");
+            return Err(anyhow!(message));
         }
 
         if ["debug", "trace"].contains(&config.log_level.as_str()) {
