@@ -122,6 +122,15 @@ jobs:
 
       - name: Export image to tarball
         run: podman save localhost/pharia-kernel:latest -o /tmp/pharia-kernel.tar
+
+      - name: Extract SBOM from tarball
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          format: "cyclonedx"
+          input: "/tmp/pharia-kernel.tar"
+          output: "sbom.json"
+          scan-type: "fs"
+
       - name: Vulnerability scanning with Trivy
         uses: aquasecurity/trivy-action@0.30.0
         with:
@@ -129,6 +138,7 @@ jobs:
           trivyignores: ".trivyignore"
           severity: "MEDIUM,HIGH,CRITICAL"
           exit-code: "1"
+          output: "report.json"
 
       - name: Create kind cluster with registry
         id: kind
@@ -220,6 +230,17 @@ jobs:
           image: ${{ steps.build-image.outputs.image }}
           tags: ${{ steps.build-image.outputs.tags }}
           registry: ${{ env.ARTIFACTORY_REPOSITORY }}
+
+      - if: github.event_name != 'pull_request'
+        uses: oras-project/setup-oras@v1
+
+      - if: github.event_name != 'pull_request'
+        name: Attach Trivy report to Image
+        run: |
+          oras login ${{ env.ARTIFACTORY_HOST }} -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} -p ${{ env.JFROG_ACCESS_TOKEN }}
+          oras attach --artifact-type "application/aa.trivy.report" --annotation "created-by=Github-CI" --annotation "content=report.json" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID report.json
+          oras attach --artifact-type "application/aa.trivy.sbom"   --annotation "created-by=Github-CI" --annotation "content=sbom.json" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID sbom.json
+          oras attach --artifact-type "application/aa.trivy.triage" --annotation "created-by=Github-CI" --annotation "content=triage.toml" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID triage.toml
 
       - if: github.event_name != 'pull_request'
         name: Print image URL
