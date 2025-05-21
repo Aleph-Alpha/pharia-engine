@@ -5936,6 +5936,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tool-invocation"
+version = "0.1.0"
+dependencies = [
+ "wit-bindgen",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
