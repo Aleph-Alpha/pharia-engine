@@ -14,7 +14,9 @@ use pharia::skill::{
         HostCompletionStream, Logprob, Logprobs, Message, MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
+    tool::{Host as ToolHost, InvokeRequest},
 };
+use serde_json::json;
 use tracing::error;
 use wasmtime::component::{Resource, bindgen};
 
@@ -31,6 +33,15 @@ bindgen!({
         "pharia:skill/inference/completion-stream": csi::CompletionStreamId
     },
 });
+
+impl ToolHost for LinkedCtx {
+    async fn invoke_tool(
+        &mut self,
+        _request: wasmtime::component::__internal::Vec<InvokeRequest>,
+    ) -> Vec<Vec<u8>> {
+        vec![json!("hello").to_string().into_bytes()]
+    }
+}
 
 impl ChunkingHost for LinkedCtx {
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<String>> {

@@ -16,11 +16,12 @@ bindgen!({
     path: "./wit/skill@0.3",
     async: true,
     with: {
+        "pharia:skill/tool": super::csi::pharia::skill::tool,
         "pharia:skill/chunking": super::csi::pharia::skill::chunking,
         "pharia:skill/document-index": super::csi::pharia::skill::document_index,
         "pharia:skill/inference": super::csi::pharia::skill::inference,
         "pharia:skill/language": super::csi::pharia::skill::language,
-    },
+    }
 });
 
 /// Metadata for a skill at wit version 0.3
