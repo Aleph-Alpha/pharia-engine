@@ -1,3 +1,4 @@
+use crate::{chunking, csi, inference, language_selection, search, tool};
 use pharia::skill::{
     chunking::{
         ChunkParams, ChunkRequest, ChunkWithOffset, ChunkWithOffsetRequest, Host as ChunkingHost,
@@ -14,13 +15,10 @@ use pharia::skill::{
         HostCompletionStream, Logprob, Logprobs, Message, MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
-    tool::{Host as ToolHost, InvokeRequest},
+    tool::{Argument, Host as ToolHost, InvokeRequest},
 };
-use serde_json::json;
 use tracing::error;
 use wasmtime::component::{Resource, bindgen};
-
-use crate::{chunking, csi, inference, language_selection, search};
 
 use super::super::LinkedCtx;
 
@@ -35,11 +33,30 @@ bindgen!({
 });
 
 impl ToolHost for LinkedCtx {
-    async fn invoke_tool(
-        &mut self,
-        _request: wasmtime::component::__internal::Vec<InvokeRequest>,
-    ) -> Vec<Vec<u8>> {
-        vec![json!("hello").to_string().into_bytes()]
+    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+        self.ctx
+            .invoke_tool(request.into_iter().map(Into::into).collect())
+            .await
+    }
+}
+
+impl From<InvokeRequest> for tool::InvokeRequest {
+    fn from(
+        InvokeRequest {
+            tool_name,
+            arguments,
+        }: InvokeRequest,
+    ) -> Self {
+        Self {
+            tool_name,
+            arguments: arguments.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<Argument> for tool::Argument {
+    fn from(Argument { name, value }: Argument) -> Self {
+        Self { name, value }
     }
 }
 
