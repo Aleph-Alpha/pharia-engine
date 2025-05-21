@@ -21,6 +21,7 @@ mod skill_runtime;
 mod skill_store;
 mod skills;
 mod tokenizers;
+mod tool;
 
 use std::sync::Arc;
 
