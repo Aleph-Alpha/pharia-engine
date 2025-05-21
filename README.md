@@ -94,7 +94,7 @@ curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill \
 
 ## Deploying PhariaKernel on Customer side
 
-**PhariaKernel** is intended to be installed **on premise** by the customer it. It is deployed, as are all other modules of the **PhariaOS**, to the JFrog Artifactory. Our colleagues at the PhariaOS Team are going to develop tooling for deploying tooling for rolling it out. Until they come up with a name it is here called "Pharia Up".
+**PhariaKernel** is intended to be installed as part of **PhariaAI** on premise by the customer it. It is deployed, as are all other modules of the **PhariaAI**, to the JFrog Artifactory.
 
 ![Block Diagram Pharia OS deploy][deployment]
 
