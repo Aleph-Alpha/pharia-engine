@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use derive_more::{Constructor, From};
 use futures::future::try_join_all;
-use serde_json::Value;
+use serde_json::{Value, json};
 use thiserror::Error;
 use tokio::sync::mpsc;
 
@@ -16,6 +16,7 @@ use crate::{
     logging::TracingContext,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
+    tool::InvokeRequest,
 };
 
 /// `CompletionStreamId` is a unique identifier for a completion stream.
@@ -59,6 +60,24 @@ pub trait CsiForSkills {
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>>;
     async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;
     async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
+    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+        request
+            .into_iter()
+            .map(|r| {
+                // Determine the value to use based on the arguments provided.
+                // - If no arguments are provided, use the tool name.
+                // - If exactly one argument is provided, use its value.
+                // - If multiple arguments are provided, fall back to using the first argument's name.
+                let value = match r.arguments.len() {
+                    0 => r.tool_name,
+                    1 => String::from_utf8(r.arguments[0].value.clone()).unwrap(),
+                    _ => r.arguments[0].name.clone(),
+                };
+                let response = format!("Hello {value}");
+                json!(response).to_string().into_bytes()
+            })
+            .collect()
+    }
 }
 
 /// Cognitive System Interface (CSI) as consumed internally by `PhariaKernel`, before the CSI is

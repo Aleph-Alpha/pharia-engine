@@ -319,11 +319,16 @@ impl SupportedSkillWorld {
                     v0_2::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
                 }
                 Self::V0_3Function => {
-                    v0_3::skill::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
+                    v0_3::skill::Skill::add_to_linker(
+                        linker,
+                        v0_3::skill::LinkOptions::default().tool(true),
+                        |state: &mut LinkedCtx| state,
+                    )?;
                 }
                 Self::V0_3MessageStream => {
                     v0_3::message_stream_skill::MessageStreamSkill::add_to_linker(
                         linker,
+                        v0_3::message_stream_skill::LinkOptions::default().tool(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
@@ -524,7 +529,7 @@ pub mod tests {
         given_chat_stream_skill, given_complete_stream_skill, given_invalid_output_skill,
         given_python_skill_greet_v0_2, given_python_skill_greet_v0_3, given_rust_skill_chat,
         given_rust_skill_explain, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
-        given_rust_skill_search, given_streaming_output_skill,
+        given_rust_skill_search, given_skill_tool_invocation, given_streaming_output_skill,
     };
     use tokio::sync::oneshot;
 
@@ -1074,6 +1079,30 @@ pub mod tests {
         assert_eq!(first_result, json!("Hello Homer"));
         assert_eq!(second_result, json!("Hello Homer"));
         assert_eq!(third_result, json!("Hello Homer"));
+    }
+
+    #[tokio::test]
+    async fn tool_invocation_skill() {
+        // given a skill that calls a tool
+        let skill_bytes = given_skill_tool_invocation().bytes();
+        let engine = Engine::default();
+        let skill =
+            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
+
+        // when the skill is run
+        let response = skill
+            .run_as_function(
+                &engine,
+                Box::new(CsiForSkillsDummy),
+                json!("Manu"),
+                &TracingContext::dummy(),
+            )
+            .await
+            .unwrap();
+        let text = response.as_str().unwrap();
+
+        // then the response is equal to expected text
+        assert_eq!(text, "Hello Manu");
     }
 
     #[tokio::test]

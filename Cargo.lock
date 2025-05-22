@@ -4206,7 +4206,7 @@ dependencies = [
 
 [[package]]
 name = "pharia-kernel"
-version = "0.12.9"
+version = "0.12.10"
 dependencies = [
  "aleph-alpha-client",
  "anyhow",
@@ -5926,6 +5926,14 @@ dependencies = [
  "tracing",
  "webpki-roots 0.26.11",
  "zstd",
+]
+
+[[package]]
+name = "tool-invocation"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "wit-bindgen",
 ]
 
 [[package]]
