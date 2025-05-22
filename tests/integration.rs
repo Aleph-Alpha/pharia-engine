@@ -17,9 +17,10 @@ use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
 use test_skills::{
-    given_chat_stream_skill, given_complete_stream_skill, given_rust_skill_doc_metadata,
-    given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
-    given_skill_infinite_streaming, given_skill_tool_invocation, given_streaming_output_skill,
+    given_chat_stream_skill, given_complete_stream_skill, given_mcp_server,
+    given_rust_skill_doc_metadata, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
+    given_rust_skill_search, given_skill_infinite_streaming, given_skill_tool_invocation,
+    given_streaming_output_skill,
 };
 use tokio::sync::oneshot;
 
@@ -194,6 +195,8 @@ async fn run_search_skill() {
 
 #[tokio::test]
 async fn run_skill_with_tool_call() {
+    given_mcp_server();
+
     // Simulate the production environment with tracing enabled
     let _guard = given_tracing_subscriber().await;
 
