@@ -6,7 +6,7 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 wit-bindgen = "0.42.1"
-
+serde_json = "1.0.139"
 
 [lib]
 crate-type = ["cdylib"]
