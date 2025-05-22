@@ -6,7 +6,7 @@
 
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("KernelDummy")
+mcp = FastMCP("KernelDummy", stateless_http=True)
 
 
 @mcp.tool()
