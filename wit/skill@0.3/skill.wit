@@ -100,6 +100,10 @@ world csi {
     import tool;
 }
 
+// The tool interface allows Skills to interact with the outside world.
+// We run into issues making the interface itself unstable, so only
+// all members are marked as unstable.
+@since(version = 0.3.7)
 interface tool {
     @unstable(feature = tool)
     record invoke-request {
