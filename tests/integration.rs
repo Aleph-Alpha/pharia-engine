@@ -19,7 +19,7 @@ use tempfile::{TempDir, tempdir};
 use test_skills::{
     given_chat_stream_skill, given_complete_stream_skill, given_rust_skill_doc_metadata,
     given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
-    given_skill_infinite_streaming, given_streaming_output_skill,
+    given_skill_infinite_streaming, given_skill_tool_invocation, given_streaming_output_skill,
 };
 use tokio::sync::oneshot;
 
@@ -188,6 +188,37 @@ async fn run_search_skill() {
     assert!(!value.as_array().unwrap().is_empty());
     let first_text = value[0].clone().to_string();
     assert!(first_text.to_ascii_lowercase().contains("kernel"));
+
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn run_skill_with_tool_call() {
+    // Simulate the production environment with tracing enabled
+    let _guard = given_tracing_subscriber().await;
+
+    let wasm_bytes = given_skill_tool_invocation().bytes();
+    let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
+    local_skill_dir.with_skill("tool-invocation-rs", wasm_bytes);
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/tool-invocation-rs/run",
+            kernel.port()
+        ))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value())
+        .body(Body::from(json!("Homer").to_string()))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let body = resp.text().await.unwrap();
+    assert_eq!(body, "\"Hello Homer\"");
 
     kernel.shutdown().await;
 }
