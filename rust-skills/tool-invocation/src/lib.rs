@@ -6,12 +6,13 @@ wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill", features: 
 struct Skill;
 
 impl Guest for Skill {
-    fn run(_input: Vec<u8>) -> Result<Vec<u8>, Error> {
+    fn run(input: Vec<u8>) -> Result<Vec<u8>, Error> {
+        let name = serde_json::from_slice::<String>(&input).unwrap();
         let request = InvokeRequest {
             tool_name: "current_weather".to_owned(),
             arguments: vec![Argument {
                 name: "city".to_owned(),
-                value: b"\"Heidelberg\"".to_vec(),
+                value: name.as_bytes().to_vec(),
             }],
         };
         let result = invoke_tool(&[request]).pop().unwrap();

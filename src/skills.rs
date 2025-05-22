@@ -1083,20 +1083,26 @@ pub mod tests {
 
     #[tokio::test]
     async fn tool_invocation_skill() {
+        // given a skill that calls a tool
         let skill_bytes = given_skill_tool_invocation().bytes();
         let engine = Engine::default();
         let skill =
             load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
 
-        let result = skill
+        // when the skill is run
+        let response = skill
             .run_as_function(
                 &engine,
                 Box::new(CsiForSkillsDummy),
-                json!(""),
+                json!("Manu"),
                 &TracingContext::dummy(),
             )
-            .await;
-        assert!(result.is_ok());
+            .await
+            .unwrap();
+        let text = response.as_str().unwrap();
+
+        // then the response is equal to expected text
+        assert_eq!(text, "Hello Manu");
     }
 
     #[tokio::test]

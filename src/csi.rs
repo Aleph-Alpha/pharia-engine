@@ -63,7 +63,17 @@ pub trait CsiForSkills {
     async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
         request
             .into_iter()
-            .map(|_| json!("hello").to_string().into_bytes())
+            .map(|r| {
+                let value = if r.arguments.len() == 0 {
+                    r.tool_name
+                } else if r.arguments.len() == 1 {
+                    String::from_utf8(r.arguments[0].value.clone()).unwrap()
+                } else {
+                    r.arguments[0].name.clone()
+                };
+                let response = format!("Hello {}", value);
+                json!(response).to_string().into_bytes()
+            })
             .collect()
     }
 }
