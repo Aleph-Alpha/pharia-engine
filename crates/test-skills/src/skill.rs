@@ -7,6 +7,8 @@ use std::{
 };
 use tempfile::{TempDir, tempdir};
 
+use crate::assert_uv_installed;
+
 const WASI_TARGET: &str = "wasm32-wasip2";
 static REPO_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let output = std::process::Command::new(env!("CARGO"))
@@ -239,17 +241,7 @@ struct Venv {
 
 impl Venv {
     pub fn new() -> Result<Self, Error> {
-        // Assert UV is installed. Return an error otherwise
-        let status = Command::new("uv")
-            .args(["--version"])
-            .status()
-            .context("UV must be available for testing with Python Skills. Please install it")?;
-        if !status.success() {
-            bail!(
-                "uv command exited with an error. Make sure it works in order to test Python \
-                Skills."
-            );
-        }
+        assert_uv_installed();
 
         let directory = tempdir().expect("Must be able to create temporary directory");
         let venv_path = directory.path().join("venv");
