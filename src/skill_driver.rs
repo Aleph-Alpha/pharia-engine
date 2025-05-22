@@ -2,7 +2,7 @@ use std::{collections::HashMap, future::pending, sync::Arc};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use serde_json::Value;
+use serde_json::{Value, json};
 use thiserror::Error;
 use tokio::{
     select,
@@ -21,6 +21,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
+    tool::InvokeRequest,
 };
 
 pub struct SkillDriver {
@@ -401,6 +402,25 @@ where
             Err(error) => self.send_error(error).await,
         }
     }
+
+    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+        request
+            .into_iter()
+            .map(|r| {
+                // Determine the value to use based on the arguments provided.
+                // - If no arguments are provided, use the tool name.
+                // - If exactly one argument is provided, use its value.
+                // - If multiple arguments are provided, fall back to using the first argument's name.
+                let value = match r.arguments.len() {
+                    0 => r.tool_name,
+                    1 => String::from_utf8(r.arguments[0].value.clone()).unwrap(),
+                    _ => r.arguments[0].name.clone(),
+                };
+                let response = format!("Hello {value}");
+                json!(response).to_string().into_bytes()
+            })
+            .collect()
+    }
 }
 
 /// We know that skill metadata will not invoke any csi functions, but still need to provide an
@@ -491,6 +511,10 @@ impl CsiForSkills for SkillMetadataCtx {
     }
 
     async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
+        self.send_error().await
+    }
+
+    async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
         self.send_error().await
     }
 }
