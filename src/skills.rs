@@ -543,10 +543,11 @@ pub mod tests {
             ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
             Explanation, ExplanationRequest, FinishReason, TextScore, TokenUsage,
         },
-        language_selection::{self, SelectLanguageRequest},
+        language_selection::{self, Language, SelectLanguageRequest},
         logging::TracingContext,
         search::{Document, DocumentPath, SearchRequest, SearchResult},
         skill_driver::SkillInvocationCtx,
+        tool::InvokeRequest,
     };
 
     use super::*;
@@ -1081,6 +1082,71 @@ pub mod tests {
         assert_eq!(third_result, json!("Hello Homer"));
     }
 
+    struct CsiHelloToolFake;
+
+    #[async_trait]
+    impl CsiForSkills for CsiHelloToolFake {
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+            unimplemented!()
+        }
+        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            unimplemented!()
+        }
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            unimplemented!()
+        }
+        async fn completion_stream_next(
+            &mut self,
+            _id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            unimplemented!()
+        }
+        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
+            unimplemented!()
+        }
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            unimplemented!()
+        }
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            unimplemented!()
+        }
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            unimplemented!()
+        }
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            unimplemented!()
+        }
+        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+            unimplemented!()
+        }
+        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
+            unimplemented!()
+        }
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            unimplemented!()
+        }
+        async fn document_metadata(
+            &mut self,
+            _document_paths: Vec<DocumentPath>,
+        ) -> Vec<Option<Value>> {
+            unimplemented!()
+        }
+        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
+            unimplemented!()
+        }
+        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+            let name = String::from_utf8(requests[0].arguments[0].value.clone()).unwrap();
+            let response = json!(format!("Hello {}", name)).to_string().into_bytes();
+            vec![response]
+        }
+    }
+
     #[tokio::test]
     async fn tool_invocation_skill() {
         // given a skill that calls a tool
@@ -1093,7 +1159,7 @@ pub mod tests {
         let response = skill
             .run_as_function(
                 &engine,
-                Box::new(CsiForSkillsDummy),
+                Box::new(CsiHelloToolFake),
                 json!("Manu"),
                 &TracingContext::dummy(),
             )
@@ -1230,6 +1296,10 @@ pub mod tests {
             panic!("I am a dummy CsiForSkills")
         }
         async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
+            panic!("I am a dummy CsiForSkills")
+        }
+
+        async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
             panic!("I am a dummy CsiForSkills")
         }
     }
