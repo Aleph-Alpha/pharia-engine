@@ -1082,10 +1082,10 @@ pub mod tests {
         assert_eq!(third_result, json!("Hello Homer"));
     }
 
-    struct CsiHelloToolFake;
+    struct CsiAddToolFake;
 
     #[async_trait]
-    impl CsiForSkills for CsiHelloToolFake {
+    impl CsiForSkills for CsiAddToolFake {
         async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
             unimplemented!()
         }
@@ -1141,8 +1141,16 @@ pub mod tests {
             unimplemented!()
         }
         async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
-            let name = String::from_utf8(requests[0].arguments[0].value.clone()).unwrap();
-            let response = json!(format!("Hello {}", name)).to_string().into_bytes();
+            let a = String::from_utf8(requests[0].arguments[0].value.clone())
+                .unwrap()
+                .parse::<i32>()
+                .unwrap();
+            let b = String::from_utf8(requests[0].arguments[1].value.clone())
+                .unwrap()
+                .parse::<i32>()
+                .unwrap();
+            let sum = a + b;
+            let response = json!(sum).to_string().into_bytes();
             vec![response]
         }
     }
@@ -1159,16 +1167,19 @@ pub mod tests {
         let response = skill
             .run_as_function(
                 &engine,
-                Box::new(CsiHelloToolFake),
-                json!("Manu"),
+                Box::new(CsiAddToolFake),
+                json!({
+                    "a": 1,
+                    "b": 2
+                }),
                 &TracingContext::dummy(),
             )
             .await
             .unwrap();
-        let text = response.as_str().unwrap();
+        let sum = response.as_number().unwrap().as_i64().unwrap();
 
         // then the response is equal to expected text
-        assert_eq!(text, "Hello Manu");
+        assert_eq!(sum, 3);
     }
 
     #[tokio::test]

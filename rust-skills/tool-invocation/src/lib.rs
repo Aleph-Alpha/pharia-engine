@@ -1,19 +1,33 @@
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::tool::{Argument, InvokeRequest, invoke_tool};
+use serde::Deserialize;
+use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill", features: ["tool"] });
+
+#[derive(Deserialize)]
+struct Arguments {
+    a: i32,
+    b: i32,
+}
 
 struct Skill;
 
 impl Guest for Skill {
     fn run(input: Vec<u8>) -> Result<Vec<u8>, Error> {
-        let name = serde_json::from_slice::<String>(&input).unwrap();
+        let arguments = serde_json::from_slice::<Arguments>(&input).unwrap();
         let request = InvokeRequest {
-            tool_name: "current_weather".to_owned(),
-            arguments: vec![Argument {
-                name: "city".to_owned(),
-                value: name.as_bytes().to_vec(),
-            }],
+            tool_name: "add".to_owned(),
+            arguments: vec![
+                Argument {
+                    name: "a".to_owned(),
+                    value: json!(arguments.a).to_string().into_bytes(),
+                },
+                Argument {
+                    name: "b".to_owned(),
+                    value: json!(arguments.b).to_string().into_bytes(),
+                },
+            ],
         };
         let result = invoke_tool(&[request]).pop().unwrap();
         Ok(result)

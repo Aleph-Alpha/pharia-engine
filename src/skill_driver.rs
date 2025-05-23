@@ -408,16 +408,29 @@ where
             .into_iter()
             .map(|r| {
                 // Determine the value to use based on the arguments provided.
-                // - If no arguments are provided, use the tool name.
-                // - If exactly one argument is provided, use its value.
-                // - If multiple arguments are provided, fall back to using the first argument's name.
+                // - If exactly two arguments are provided as expected, use its value.
+                // - Otherwise, response with the expectation.
                 let value = match r.arguments.len() {
-                    0 => r.tool_name,
-                    1 => String::from_utf8(r.arguments[0].value.clone()).unwrap(),
-                    _ => r.arguments[0].name.clone(),
+                    2 if r.arguments[0].name == "a" && r.arguments[1].name == "b" => {
+                        let a = String::from_utf8(r.arguments[0].value.clone())
+                            .unwrap()
+                            .parse::<i32>()
+                            .unwrap();
+                        let b = String::from_utf8(r.arguments[1].value.clone())
+                            .unwrap()
+                            .parse::<i32>()
+                            .unwrap();
+                        let sum = a + b;
+                        json!(sum)
+                    }
+                    _ => {
+                        json!(format!(
+                            "Arguments a and b expected for the tool '{}'",
+                            r.tool_name
+                        ))
+                    }
                 };
-                let response = format!("Hello {value}");
-                json!(response).to_string().into_bytes()
+                value.to_string().into_bytes()
             })
             .collect()
     }
