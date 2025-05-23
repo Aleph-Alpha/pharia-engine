@@ -195,7 +195,7 @@ async fn run_search_skill() {
 
 #[tokio::test]
 async fn run_skill_with_tool_call() {
-    given_mcp_server();
+    let _mcp = given_mcp_server().await;
 
     // Simulate the production environment with tracing enabled
     let _guard = given_tracing_subscriber().await;
