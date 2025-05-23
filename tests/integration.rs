@@ -213,7 +213,7 @@ async fn run_skill_with_tool_call() {
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value())
-        .body(Body::from(json!("Homer").to_string()))
+        .body(Body::from(json!({"a": 1, "b": 2}).to_string()))
         .timeout(Duration::from_secs(30))
         .send()
         .await
@@ -221,7 +221,7 @@ async fn run_skill_with_tool_call() {
 
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
-    assert_eq!(body, "\"Hello Homer\"");
+    assert_eq!(body, "3");
 
     kernel.shutdown().await;
 }
