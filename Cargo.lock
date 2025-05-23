@@ -5621,7 +5621,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "change-case",
+ "futures-util",
+ "reqwest",
+ "serde_json",
  "tempfile",
+ "tokio",
+ "tokio-test",
 ]
 
 [[package]]
