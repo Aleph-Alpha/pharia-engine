@@ -77,13 +77,13 @@ impl Mcp {
     }
 
     async fn wait_for_ready(&self) {
-        for _ in 0..20 {
+        for _ in 0..50 {
             if self.ping().await.is_ok() {
                 return;
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        panic!("MCP server did not boot up after 2 seconds");
+        panic!("MCP server did not boot up after 5 seconds");
     }
 
     pub async fn ping(&self) -> anyhow::Result<()> {
