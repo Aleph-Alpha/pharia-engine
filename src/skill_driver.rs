@@ -2,7 +2,7 @@ use std::{collections::HashMap, future::pending, sync::Arc};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::Value;
 use thiserror::Error;
 use tokio::{
     select,
@@ -21,7 +21,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
-    tool::InvokeRequest,
+    tool::{InvokeRequest, invoke_tool},
 };
 
 pub struct SkillDriver {
@@ -403,36 +403,13 @@ where
         }
     }
 
-    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
-        request
-            .into_iter()
-            .map(|r| {
-                // Determine the value to use based on the arguments provided.
-                // - If exactly two arguments are provided as expected, use its value.
-                // - Otherwise, response with the expectation.
-                let value = match r.arguments.len() {
-                    2 if r.arguments[0].name == "a" && r.arguments[1].name == "b" => {
-                        let a = String::from_utf8(r.arguments[0].value.clone())
-                            .unwrap()
-                            .parse::<i32>()
-                            .unwrap();
-                        let b = String::from_utf8(r.arguments[1].value.clone())
-                            .unwrap()
-                            .parse::<i32>()
-                            .unwrap();
-                        let sum = a + b;
-                        json!(sum)
-                    }
-                    _ => {
-                        json!(format!(
-                            "Arguments a and b expected for the tool '{}'",
-                            r.tool_name
-                        ))
-                    }
-                };
-                value.to_string().into_bytes()
-            })
-            .collect()
+    async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+        let mut responses = vec![];
+        for request in requests {
+            let response = invoke_tool(request).await;
+            responses.push(response);
+        }
+        responses
     }
 }
 
