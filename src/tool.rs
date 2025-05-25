@@ -78,6 +78,12 @@ pub async fn invoke_tool(request: InvokeRequest) -> Result<Vec<u8>, ToolError> {
         .send()
         .await
         .map_err(anyhow::Error::from)?
+        // We also need to handle application/json responses here:
+        // If the input contains any number of JSON-RPC requests, the server MUST either return
+        // Content-Type: text/event-stream, to initiate an SSE stream, or
+        // Content-Type: application/json, to return one JSON object.
+        // The client MUST support both these cases.
+        // See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#sending-messages-to-the-server>
         .bytes_stream();
     let item = stream
         .next()
@@ -162,6 +168,12 @@ pub async fn initialize() -> Result<(), ToolError> {
         .send()
         .await
         .unwrap()
+        // We also need to handle application/json responses here:
+        // If the input contains any number of JSON-RPC requests, the server MUST either return
+        // Content-Type: text/event-stream, to initiate an SSE stream, or
+        // Content-Type: application/json, to return one JSON object.
+        // The client MUST support both these cases.
+        // See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#sending-messages-to-the-server>
         .bytes_stream();
 
     let item = stream
