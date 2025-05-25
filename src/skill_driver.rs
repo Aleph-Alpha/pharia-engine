@@ -406,8 +406,16 @@ where
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
         let mut responses = vec![];
         for request in requests {
-            let response = invoke_tool(request).await;
-            responses.push(response);
+            match invoke_tool(request).await {
+                Ok(response) => responses.push(response),
+                Err(error) => {
+                    // Stop Skill execution if a tool call fails, as we do not have the concept of
+                    // tool call errors in the WIT world (yet). However, at a later point we
+                    // might want to expose certain errors to the Skill, as the model may very
+                    // well move on without the tool being available.
+                    self.send_error::<()>(error.into()).await;
+                }
+            }
         }
         responses
     }
