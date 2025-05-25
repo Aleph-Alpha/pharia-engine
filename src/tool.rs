@@ -152,4 +152,49 @@ mod test {
             "Error executing tool saboteur: Out of cheese."
         );
     }
+
+    #[tokio::test]
+    async fn initialize_request() {
+        let _mcp = given_mcp_server().await;
+
+        let client = Client::new();
+        let body = json!({
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "id": 1,
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "PhariaKernel",
+                    "version": "1.0.0"
+                }
+            }
+        });
+        let mut stream = client
+            .post(MCP_SERVER_ADDRESS)
+            .header("accept", "application/json,text/event-stream")
+            .json(&body)
+            .send()
+            .await
+            .unwrap()
+            .bytes_stream();
+
+        let item = stream
+            .next()
+            .await
+            .unwrap()
+            .map(|item| String::from_utf8(item.to_vec()))
+            .unwrap()
+            .unwrap();
+
+        let data = item.split("data: ").nth(1).unwrap();
+
+        let value = serde_json::from_str::<Value>(data).unwrap();
+        assert_eq!(value["id"], 1);
+        assert_eq!(
+            value["result"]["capabilities"]["tools"],
+            json!({"listChanged": false})
+        );
+    }
 }
