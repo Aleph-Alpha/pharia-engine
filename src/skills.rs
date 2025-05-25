@@ -539,7 +539,8 @@ pub mod tests {
         csi::{
             ChatStreamId, CompletionStreamId,
             tests::{
-                CsiChatStreamStub, CsiCompleteStreamStub, CsiGreetingMock, CsiSearchMock, StubCsi,
+                CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiGreetingMock,
+                CsiSearchMock, StubCsi,
             },
         },
         inference::{
@@ -948,7 +949,7 @@ pub mod tests {
         let wasm = given_rust_skill_chat().bytes();
         let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
-        let ctx = Box::new(CsiGreetingMock);
+        let ctx = Box::new(CsiChatStub);
 
         // When invoked with a json string
         let content = "Hello, how are you?";
