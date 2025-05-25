@@ -240,6 +240,18 @@ mod test {
     }
 
     #[tokio::test]
+    async fn invoke_unknown_tool_gives_error() {
+        let _mcp = given_mcp_server().await;
+
+        let request = InvokeRequest {
+            tool_name: "unknown".to_owned(),
+            arguments: vec![],
+        };
+        let response = invoke_tool(request).await.unwrap_err();
+        assert!(matches!(response, ToolError::ToolCallFailed(_)));
+    }
+
+    #[tokio::test]
     async fn invoke_saboteur_tool_results_in_error() {
         let _mcp = given_mcp_server().await;
 
