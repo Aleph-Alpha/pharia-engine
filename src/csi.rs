@@ -513,6 +513,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
+    use csi_double::csi_double;
 
     use std::{
         collections::HashMap,
@@ -1614,5 +1615,50 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
             unimplemented!()
         }
+    }
+
+    struct CsiAddToolFake;
+
+    #[csi_double]
+    impl CsiForSkills for CsiAddToolFake {
+        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+            requests
+                .iter()
+                .map(|request| {
+                    let a = String::from_utf8(request.arguments[0].value.clone())
+                        .unwrap()
+                        .parse::<i32>()
+                        .unwrap();
+                    let b = String::from_utf8(request.arguments[1].value.clone())
+                        .unwrap()
+                        .parse::<i32>()
+                        .unwrap();
+                    let sum = a + b;
+                    json!(sum).to_string().into_bytes()
+                })
+                .collect()
+        }
+    }
+
+    #[tokio::test]
+    async fn csi_double_generates_unimplemented_methods() {
+        let mut mock = CsiAddToolFake;
+
+        // Test that invoke_tool works (implemented)
+        let request = InvokeRequest {
+            tool_name: "add".to_string(),
+            arguments: vec![
+                crate::tool::Argument {
+                    name: "a".to_string(),
+                    value: b"5".to_vec(),
+                },
+                crate::tool::Argument {
+                    name: "b".to_string(),
+                    value: b"3".to_vec(),
+                },
+            ],
+        };
+        let result = mock.invoke_tool(vec![request]).await;
+        assert_eq!(String::from_utf8(result[0].clone()).unwrap(), "8");
     }
 }
