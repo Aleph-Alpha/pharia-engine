@@ -1335,7 +1335,13 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 })
                 .collect()
         }
+    }
 
+    /// Return the content of the query as a search result
+    pub struct CsiSearchMock;
+
+    #[csi_double]
+    impl CsiForSkills for CsiSearchMock {
         async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             requests
                 .into_iter()

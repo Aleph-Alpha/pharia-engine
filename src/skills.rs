@@ -538,7 +538,9 @@ pub mod tests {
         chunking::{Chunk, ChunkRequest},
         csi::{
             ChatStreamId, CompletionStreamId,
-            tests::{CsiChatStreamStub, CsiCompleteStreamStub, CsiGreetingMock, StubCsi},
+            tests::{
+                CsiChatStreamStub, CsiCompleteStreamStub, CsiGreetingMock, CsiSearchMock, StubCsi,
+            },
         },
         inference::{
             ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
@@ -791,7 +793,7 @@ pub mod tests {
         let wasm = given_rust_skill_search().bytes();
         let engine = Engine::default();
         let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
-        let ctx = Box::new(CsiGreetingMock);
+        let ctx = Box::new(CsiSearchMock);
 
         // When invoked with a json string
         let content = "42";
