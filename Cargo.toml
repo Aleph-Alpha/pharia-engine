@@ -145,6 +145,7 @@ axum-tracing-opentelemetry = { version = "0.28.0", features = [
 
 [dev-dependencies]
 test-skills = { path = "./crates/test-skills" }
+csi-double = { path = "./crates/csi-double" }
 fake = { version = "4.3.0", features = ["derive"] }
 http-body-util = "0.1.3"
 mime = "0.3.17"
