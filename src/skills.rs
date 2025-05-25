@@ -1141,17 +1141,21 @@ pub mod tests {
             unimplemented!()
         }
         async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
-            let a = String::from_utf8(requests[0].arguments[0].value.clone())
-                .unwrap()
-                .parse::<i32>()
-                .unwrap();
-            let b = String::from_utf8(requests[0].arguments[1].value.clone())
-                .unwrap()
-                .parse::<i32>()
-                .unwrap();
-            let sum = a + b;
-            let response = json!(sum).to_string().into_bytes();
-            vec![response]
+            requests
+                .iter()
+                .map(|request| {
+                    let a = String::from_utf8(request.arguments[0].value.clone())
+                        .unwrap()
+                        .parse::<i32>()
+                        .unwrap();
+                    let b = String::from_utf8(request.arguments[1].value.clone())
+                        .unwrap()
+                        .parse::<i32>()
+                        .unwrap();
+                    let sum = a + b;
+                    json!(sum).to_string().into_bytes()
+                })
+                .collect()
         }
     }
 
