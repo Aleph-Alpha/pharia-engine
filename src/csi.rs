@@ -527,7 +527,7 @@ pub mod tests {
         chunking::ChunkParams,
         inference::{
             ChatEvent, ChatParams, CompletionEvent, CompletionParams, FinishReason, Message,
-            TextScore, TokenUsage, tests::InferenceStub,
+            TokenUsage, tests::InferenceStub,
         },
         search::{TextCursor, tests::SearchStub},
         tests::api_token,
@@ -1317,32 +1317,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
     #[csi_double]
     impl CsiForSkills for CsiGreetingMock {
-        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-            vec![Explanation::new(vec![TextScore {
-                score: 0.0,
-                start: 0,
-                length: 0,
-            }])]
-        }
-
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests.into_iter().map(Self::complete_text).collect()
-        }
-
-        async fn select_language(
-            &mut self,
-            requests: Vec<SelectLanguageRequest>,
-        ) -> Vec<Option<Language>> {
-            try_join_all(requests.into_iter().map(|request| {
-                tokio::task::spawn_blocking(move || {
-                    select_language(request, TracingContext::dummy())
-                })
-            }))
-            .await
-            .unwrap()
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap()
         }
 
         async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
@@ -1388,10 +1364,6 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
         async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
             vec![Document::dummy()]
-        }
-
-        async fn document_metadata(&mut self, _requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
-            vec![Some(json!({ "url": "http://example.de" }))]
         }
     }
 
