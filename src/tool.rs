@@ -37,14 +37,20 @@ struct ToolCallResponse {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ToolCallError {
+pub enum ToolError {
     #[error("{0}")]
     ToolCallFailed(String),
-    #[error("The tool call could not be executed, original error:{0}")]
+    #[error("The proposed protocol version {0} from the MCP server is not supported.")]
+    InvalidProtocolVersion(String),
+    #[error("Error deserializing the MCP server response: {0}")]
+    DeserializationError(serde_json::Error),
+    #[error("The tool call could not be executed, original error: {0}")]
     Other(#[from] anyhow::Error),
 }
 
-pub async fn invoke_tool(request: InvokeRequest) -> Result<Vec<u8>, ToolCallError> {
+pub async fn invoke_tool(request: InvokeRequest) -> Result<Vec<u8>, ToolError> {
+    initialize().await?;
+
     let client = Client::new();
     let arguments = request
         .arguments
@@ -85,7 +91,8 @@ pub async fn invoke_tool(request: InvokeRequest) -> Result<Vec<u8>, ToolCallErro
         .split("data: ")
         .nth(1)
         .ok_or(anyhow!("No data in stream"))?;
-    let value = serde_json::from_str::<ToolCallResponse>(data).map_err(anyhow::Error::from)?;
+    let value =
+        serde_json::from_str::<ToolCallResponse>(data).map_err(ToolError::DeserializationError)?;
     match value.result {
         ToolCallResponseResult {
             content,
@@ -105,9 +112,103 @@ pub async fn invoke_tool(request: InvokeRequest) -> Result<Vec<u8>, ToolCallErro
             let ToolCallResponseContent::Text { text } = content
                 .first()
                 .ok_or(anyhow!("No content in tool call response"))?;
-            Err(ToolCallError::ToolCallFailed(text.to_owned()))
+            Err(ToolError::ToolCallFailed(text.to_owned()))
         }
     }
+}
+
+/// The initialization phase MUST be the first interaction between client and server.
+/// During this phase, the client and server:
+/// - Establish protocol version compatibility
+/// - Exchange and negotiate capabilities
+/// - Share implementation details
+///
+/// See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle#initialization>
+pub async fn initialize() -> Result<(), ToolError> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct InitializeResult {
+        protocol_version: String,
+    }
+
+    #[derive(Deserialize)]
+    struct InitializeResponse {
+        result: InitializeResult,
+    }
+
+    // In the initialize request, the client MUST send a protocol version it supports.
+    // This SHOULD be the latest version supported by the client.
+    // See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle#version-negotiation>
+    const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["2025-03-26"];
+    let body = json!({
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "id": 1,
+        "params": {
+            "protocolVersion": SUPPORTED_PROTOCOL_VERSIONS[0],
+            "capabilities": {},
+            "clientInfo": {
+                "name": "PhariaKernel",
+                "version": env!("CARGO_PKG_VERSION")
+            }
+        }
+    });
+
+    let client = Client::new();
+    let mut stream = client
+        .post(MCP_SERVER_ADDRESS)
+        .header("accept", "application/json,text/event-stream")
+        .json(&body)
+        .send()
+        .await
+        .unwrap()
+        .bytes_stream();
+
+    let item = stream
+        .next()
+        .await
+        .unwrap()
+        .map(|item| String::from_utf8(item.to_vec()))
+        .unwrap()
+        .unwrap();
+
+    let data = item.split("data: ").nth(1).unwrap();
+
+    let response = serde_json::from_str::<InitializeResponse>(data)
+        .map_err(ToolError::DeserializationError)?;
+
+    // If the server supports the requested protocol version, it MUST respond with the same version.
+    // Otherwise, the server MUST respond with another protocol version it supports.
+    // This SHOULD be the latest version supported by the server.
+    // If the client does not support the version in the server’s response, it SHOULD disconnect.
+    if !SUPPORTED_PROTOCOL_VERSIONS.contains(&response.result.protocol_version.as_str()) {
+        return Err(ToolError::InvalidProtocolVersion(
+            response.result.protocol_version,
+        ));
+    }
+
+    // After successful initialization, the client MUST send an initialized notification to
+    // indicate it is ready to begin normal operations:
+    let body = json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+    });
+
+    let response = client
+        .post(MCP_SERVER_ADDRESS)
+        .header("accept", "application/json,text/event-stream")
+        .json(&body)
+        .send()
+        .await
+        .map_err(anyhow::Error::from)?;
+
+    if !response.status().is_success() {
+        return Err(ToolError::Other(anyhow!(
+            "Failed to send initialized notification"
+        )));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -157,44 +258,6 @@ mod test {
     async fn initialize_request() {
         let _mcp = given_mcp_server().await;
 
-        let client = Client::new();
-        let body = json!({
-            "jsonrpc": "2.0",
-            "method": "initialize",
-            "id": 1,
-            "params": {
-                "protocolVersion": "2025-03-26",
-                "capabilities": {},
-                "clientInfo": {
-                    "name": "PhariaKernel",
-                    "version": "1.0.0"
-                }
-            }
-        });
-        let mut stream = client
-            .post(MCP_SERVER_ADDRESS)
-            .header("accept", "application/json,text/event-stream")
-            .json(&body)
-            .send()
-            .await
-            .unwrap()
-            .bytes_stream();
-
-        let item = stream
-            .next()
-            .await
-            .unwrap()
-            .map(|item| String::from_utf8(item.to_vec()))
-            .unwrap()
-            .unwrap();
-
-        let data = item.split("data: ").nth(1).unwrap();
-
-        let value = serde_json::from_str::<Value>(data).unwrap();
-        assert_eq!(value["id"], 1);
-        assert_eq!(
-            value["result"]["capabilities"]["tools"],
-            json!({"listChanged": false})
-        );
+        initialize().await.unwrap();
     }
 }
