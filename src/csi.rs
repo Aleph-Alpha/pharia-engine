@@ -1320,7 +1320,13 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests.into_iter().map(Self::complete_text).collect()
         }
+    }
 
+    /// Always return a hardcoded dummy response
+    pub struct CsiChatStub;
+
+    #[csi_double]
+    impl CsiForSkills for CsiChatStub {
         async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
             requests
                 .iter()
