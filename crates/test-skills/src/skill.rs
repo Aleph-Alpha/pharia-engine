@@ -61,6 +61,13 @@ pub fn given_rust_skill_greet_v0_3() -> TestSkill {
 }
 
 #[must_use]
+pub fn given_rust_skill_complete_with_echo() -> TestSkill {
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("complete-with-echo"));
+    let target_path = WASM_BUILD.clone();
+    TestSkill::new(target_path)
+}
+
+#[must_use]
 pub fn given_rust_skill_greet_v0_2() -> TestSkill {
     static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("greet-v0_2"));
     let target_path = WASM_BUILD.clone();

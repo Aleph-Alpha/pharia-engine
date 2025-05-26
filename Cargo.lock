@@ -779,6 +779,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "complete-with-echo"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "condtype"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

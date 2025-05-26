@@ -1411,6 +1411,25 @@ pub mod tests {
         }
     }
 
+    /// Assert that the echo parameter is set to true and return the prompt as the completion.
+    pub struct CsiCompleteWithEchoMock;
+
+    #[async_trait]
+    impl CsiForSkillsDouble for CsiCompleteWithEchoMock {
+        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            requests
+                .into_iter()
+                .map(|request| {
+                    assert!(
+                        request.params.echo,
+                        "`CsiCompleteWithEchoMock` requires the `echo` parameter to be set to true"
+                    );
+                    Completion::from_text(request.prompt)
+                })
+                .collect()
+        }
+    }
+
     /// Asserts a specific prompt and model and returns a greeting message
     #[derive(Clone)]
     pub struct CsiGreetingMock;

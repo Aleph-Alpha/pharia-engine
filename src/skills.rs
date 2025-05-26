@@ -528,8 +528,9 @@ pub mod tests {
     use test_skills::{
         given_chat_stream_skill, given_complete_stream_skill, given_invalid_output_skill,
         given_python_skill_greet_v0_2, given_python_skill_greet_v0_3, given_rust_skill_chat,
-        given_rust_skill_explain, given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3,
-        given_rust_skill_search, given_skill_tool_invocation, given_streaming_output_skill,
+        given_rust_skill_complete_with_echo, given_rust_skill_explain, given_rust_skill_greet_v0_2,
+        given_rust_skill_greet_v0_3, given_rust_skill_search, given_skill_tool_invocation,
+        given_streaming_output_skill,
     };
     use tokio::sync::oneshot;
 
@@ -538,8 +539,8 @@ pub mod tests {
         csi::{
             ChatStreamId, CompletionStreamId,
             tests::{
-                CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiForSkillsDouble,
-                CsiGreetingMock, CsiSearchMock, StubCsi,
+                CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiCompleteWithEchoMock,
+                CsiForSkillsDouble, CsiGreetingMock, CsiSearchMock, StubCsi,
             },
         },
         inference::{
@@ -765,6 +766,26 @@ pub mod tests {
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_skill_with_v2_completion() {
+        // Given a skill loaded by our engine
+        let test_skill = given_rust_skill_complete_with_echo();
+        let wasm = test_skill.bytes();
+        let engine = Engine::default();
+        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let ctx = Box::new(CsiCompleteWithEchoMock);
+
+        // When invoked with a json string
+        let input = json!("");
+        let result = skill
+            .run_as_function(&engine, ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
+
+        // Then it returns a json string
+        assert_eq!(result, json!("An apple a day"));
     }
 
     #[tokio::test]
