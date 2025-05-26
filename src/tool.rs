@@ -16,8 +16,6 @@ pub struct InvokeRequest {
     pub arguments: Vec<Argument>,
 }
 
-const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
-
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ToolCallResponseContent {
@@ -48,8 +46,8 @@ pub enum ToolError {
     Other(#[from] anyhow::Error),
 }
 
-pub async fn invoke_tool(request: InvokeRequest) -> Result<Vec<u8>, ToolError> {
-    initialize().await?;
+pub async fn invoke_tool(request: InvokeRequest, mcp_address: &str) -> Result<Vec<u8>, ToolError> {
+    initialize(mcp_address).await?;
 
     let client = Client::new();
     let arguments = request
@@ -71,7 +69,7 @@ pub async fn invoke_tool(request: InvokeRequest) -> Result<Vec<u8>, ToolError> {
       }
     });
     let mut stream = client
-        .post(MCP_SERVER_ADDRESS)
+        .post(mcp_address)
         // MCP server want exactly these two headers, even a wildcard is not accepted
         .header("accept", "application/json,text/event-stream")
         .json(&body)
@@ -130,7 +128,7 @@ pub async fn invoke_tool(request: InvokeRequest) -> Result<Vec<u8>, ToolError> {
 /// - Share implementation details
 ///
 /// See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle#initialization>
-pub async fn initialize() -> Result<(), ToolError> {
+pub async fn initialize(mcp_address: &str) -> Result<(), ToolError> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct InitializeResult {
@@ -162,7 +160,7 @@ pub async fn initialize() -> Result<(), ToolError> {
 
     let client = Client::new();
     let mut stream = client
-        .post(MCP_SERVER_ADDRESS)
+        .post(mcp_address)
         .header("accept", "application/json,text/event-stream")
         .json(&body)
         .send()
@@ -207,7 +205,7 @@ pub async fn initialize() -> Result<(), ToolError> {
     });
 
     let response = client
-        .post(MCP_SERVER_ADDRESS)
+        .post(mcp_address)
         .header("accept", "application/json,text/event-stream")
         .json(&body)
         .send()
@@ -231,7 +229,7 @@ mod test {
 
     #[tokio::test]
     async fn invoke_tool_given_mcp_server() {
-        let _mcp = given_mcp_server().await;
+        let mcp = given_mcp_server().await;
 
         let request = InvokeRequest {
             tool_name: "add".to_owned(),
@@ -246,32 +244,32 @@ mod test {
                 },
             ],
         };
-        let response = invoke_tool(request).await.unwrap();
+        let response = invoke_tool(request, &mcp.address()).await.unwrap();
         let response = String::from_utf8(response).unwrap();
         assert_eq!(response, "3");
     }
 
     #[tokio::test]
     async fn invoke_unknown_tool_gives_error() {
-        let _mcp = given_mcp_server().await;
+        let mcp = given_mcp_server().await;
 
         let request = InvokeRequest {
             tool_name: "unknown".to_owned(),
             arguments: vec![],
         };
-        let response = invoke_tool(request).await.unwrap_err();
+        let response = invoke_tool(request, &mcp.address()).await.unwrap_err();
         assert!(matches!(response, ToolError::ToolCallFailed(_)));
     }
 
     #[tokio::test]
     async fn invoke_saboteur_tool_results_in_error() {
-        let _mcp = given_mcp_server().await;
+        let mcp = given_mcp_server().await;
 
         let request = InvokeRequest {
             tool_name: "saboteur".to_owned(),
             arguments: vec![],
         };
-        let response = invoke_tool(request).await.unwrap_err();
+        let response = invoke_tool(request, &mcp.address()).await.unwrap_err();
         assert_eq!(
             response.to_string(),
             "Error executing tool saboteur: Out of cheese."
@@ -280,8 +278,8 @@ mod test {
 
     #[tokio::test]
     async fn initialize_request() {
-        let _mcp = given_mcp_server().await;
+        let mcp = given_mcp_server().await;
 
-        initialize().await.unwrap();
+        initialize(&mcp.address()).await.unwrap();
     }
 }
