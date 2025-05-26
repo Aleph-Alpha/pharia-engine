@@ -169,6 +169,7 @@ impl InferenceClient for Client {
             },
             special_tokens: *return_special_tokens,
             logprobs: (*logprobs).into(),
+            echo: false,
         };
         let how = how(api_token, tracing_context);
         retry(|| self.completion(&task, model, &how), tracing_context)
@@ -216,6 +217,7 @@ impl InferenceClient for Client {
             },
             special_tokens: *return_special_tokens,
             logprobs: (*logprobs).into(),
+            echo: false,
         };
         let how = how(api_token, tracing_context);
         let mut stream = retry(
