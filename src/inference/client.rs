@@ -894,6 +894,36 @@ Write code to check if number is prime, use that to see if the number 7 is prime
     }
 
     #[tokio::test]
+    async fn echo_parameter_leads_to_echo_in_completion() {
+        // Given
+        let api_token = api_token().to_owned();
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let completion_request = CompletionRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            prompt: "An apple a day, ".to_owned(),
+            params: CompletionParams {
+                max_tokens: Some(1),
+                echo: true,
+                ..Default::default()
+            },
+        };
+        let completion_response = <Client as InferenceClient>::complete(
+            &client,
+            &completion_request,
+            api_token,
+            &TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
+
+        // Then
+        assert_eq!(completion_response.text, " An apple a day, keeps");
+    }
+
+    #[tokio::test]
     async fn usage_for_chat() {
         // Given
         let api_token = api_token().to_owned();

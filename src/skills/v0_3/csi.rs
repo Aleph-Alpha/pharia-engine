@@ -10,9 +10,10 @@ use pharia::skill::{
     },
     inference::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionAppend,
-        CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
-        ExplanationRequest, FinishReason, Granularity, Host as InferenceHost, HostChatStream,
-        HostCompletionStream, Logprob, Logprobs, Message, MessageAppend, TextScore, TokenUsage,
+        CompletionEvent, CompletionParams, CompletionParamsV2, CompletionRequest,
+        CompletionRequestV2, CompletionStream, Distribution, ExplanationRequest, FinishReason,
+        Granularity, Host as InferenceHost, HostChatStream, HostCompletionStream, Logprob,
+        Logprobs, Message, MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest},
@@ -387,6 +388,15 @@ impl InferenceHost for LinkedCtx {
             .map(Into::into)
             .collect()
     }
+
+    async fn complete_v2(&mut self, requests: Vec<CompletionRequestV2>) -> Vec<Completion> {
+        self.ctx
+            .complete(requests.into_iter().map(Into::into).collect())
+            .await
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    }
 }
 
 /// This manages our completion stream within the resource table, allowing us to link to the Resource in the WIT World.
@@ -649,6 +659,36 @@ impl From<CompletionParams> for inference::CompletionParams {
     }
 }
 
+impl From<CompletionParamsV2> for inference::CompletionParams {
+    fn from(params: CompletionParamsV2) -> Self {
+        let CompletionParamsV2 {
+            return_special_tokens,
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+            frequency_penalty,
+            presence_penalty,
+            logprobs,
+            echo,
+        } = params;
+
+        Self {
+            return_special_tokens,
+            max_tokens,
+            temperature,
+            top_k,
+            top_p,
+            stop,
+            frequency_penalty,
+            presence_penalty,
+            logprobs: logprobs.into(),
+            echo,
+        }
+    }
+}
+
 impl From<CompletionRequest> for inference::CompletionRequest {
     fn from(request: CompletionRequest) -> Self {
         let CompletionRequest {
@@ -664,6 +704,21 @@ impl From<CompletionRequest> for inference::CompletionRequest {
     }
 }
 
+impl From<CompletionRequestV2> for inference::CompletionRequest {
+    fn from(request: CompletionRequestV2) -> Self {
+        let CompletionRequestV2 {
+            prompt,
+            model,
+            params,
+        } = request;
+
+        Self {
+            prompt,
+            model,
+            params: params.into(),
+        }
+    }
+}
 impl From<inference::Message> for Message {
     fn from(message: inference::Message) -> Self {
         let inference::Message { role, content } = message;
@@ -732,6 +787,52 @@ impl LanguageHost for LinkedCtx {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn echo_parameter_gets_forwarded() {
+        let source = CompletionRequestV2 {
+            prompt: "Hello, world!".to_string(),
+            model: "model".to_string(),
+            params: CompletionParamsV2 {
+                echo: true,
+                return_special_tokens: true,
+                max_tokens: Some(10),
+                temperature: Some(0.5),
+                top_k: Some(10),
+                top_p: Some(0.9),
+                stop: vec![],
+                frequency_penalty: Some(0.8),
+                presence_penalty: Some(0.7),
+                logprobs: Logprobs::No,
+            },
+        };
+
+        let result: inference::CompletionRequest = source.into();
+        assert!(result.params.echo);
+    }
+
+    #[test]
+    fn echo_parameter_set_to_false_for_old_completion() {
+        let source = CompletionRequest {
+            prompt: "Hello, world!".to_string(),
+            model: "model".to_string(),
+            params: CompletionParams {
+                return_special_tokens: true,
+                max_tokens: Some(10),
+                temperature: Some(0.5),
+                top_k: Some(10),
+                top_p: Some(0.9),
+                stop: vec![],
+                frequency_penalty: Some(0.8),
+                presence_penalty: Some(0.7),
+                logprobs: Logprobs::No,
+            },
+        };
+
+        let result: inference::CompletionRequest = source.into();
+
+        assert!(!result.params.echo);
+    }
 
     #[test]
     fn forward_chunk_params() {
