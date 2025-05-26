@@ -76,6 +76,10 @@ impl Mcp {
         }
     }
 
+    pub fn address(&self) -> String {
+        MCP_SERVER_ADDRESS.to_owned()
+    }
+
     async fn wait_for_ready(&self) {
         for _ in 0..50 {
             if self.ping().await.is_ok() {
