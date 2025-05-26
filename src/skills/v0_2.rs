@@ -121,6 +121,7 @@ impl Host for LinkedCtx {
             frequency_penalty: None,
             presence_penalty: None,
             logprobs: inference::Logprobs::No,
+            echo: false,
         };
         let request = inference::CompletionRequest::new(prompt, model).with_params(params);
         self.ctx.complete(vec![request]).await.remove(0).into()
@@ -355,6 +356,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             frequency_penalty: None,
             presence_penalty: None,
             logprobs: inference::Logprobs::No,
+            echo: false,
         }
     }
 }
@@ -592,6 +594,7 @@ mod tests {
                 frequency_penalty: None,
                 presence_penalty: None,
                 logprobs: inference::Logprobs::No,
+                echo: false,
             }
         );
     }

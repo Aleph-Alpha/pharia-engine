@@ -151,6 +151,7 @@ impl InferenceClient for Client {
                     frequency_penalty,
                     presence_penalty,
                     logprobs,
+                    echo,
                 },
         } = &request;
 
@@ -169,7 +170,7 @@ impl InferenceClient for Client {
             },
             special_tokens: *return_special_tokens,
             logprobs: (*logprobs).into(),
-            echo: false,
+            echo: *echo,
         };
         let how = how(api_token, tracing_context);
         retry(|| self.completion(&task, model, &how), tracing_context)
@@ -199,6 +200,7 @@ impl InferenceClient for Client {
                     frequency_penalty,
                     presence_penalty,
                     logprobs,
+                    echo,
                 },
         } = &request;
 
@@ -217,7 +219,7 @@ impl InferenceClient for Client {
             },
             special_tokens: *return_special_tokens,
             logprobs: (*logprobs).into(),
-            echo: false,
+            echo: *echo,
         };
         let how = how(api_token, tracing_context);
         let mut stream = retry(
@@ -771,6 +773,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
                 presence_penalty: None,
                 stop: Vec::new(),
                 logprobs: Logprobs::No,
+                echo: false,
             },
         };
         let completion_response = <Client as InferenceClient>::complete(
