@@ -31,9 +31,6 @@ pub enum CsiRequest {
     Complete {
         requests: Vec<CompletionRequest>,
     },
-    CompleteV2 {
-        requests: Vec<CompletionRequestV2>,
-    },
     Documents {
         requests: Vec<DocumentPath>,
     },
@@ -116,14 +113,6 @@ impl CsiRequest {
                             .collect(),
                     )
                 })?,
-            CsiRequest::CompleteV2 { requests } => drivers
-                .complete(
-                    auth,
-                    tracing_context,
-                    requests.into_iter().map(Into::into).collect(),
-                )
-                .await
-                .map(|v| CsiResponse::Complete(v.into_iter().map(Into::into).collect()))?,
             CsiRequest::Complete { requests } => drivers
                 .complete(
                     auth,
@@ -882,49 +871,6 @@ impl From<CompletionParams> for inference::CompletionParams {
 }
 
 #[derive(Deserialize)]
-pub struct CompletionParamsV2 {
-    pub echo: bool,
-    pub return_special_tokens: bool,
-    pub max_tokens: Option<u32>,
-    pub temperature: Option<f64>,
-    pub top_k: Option<u32>,
-    pub top_p: Option<f64>,
-    pub stop: Vec<String>,
-    pub frequency_penalty: Option<f64>,
-    pub presence_penalty: Option<f64>,
-    pub logprobs: Logprobs,
-}
-
-impl From<CompletionParamsV2> for inference::CompletionParams {
-    fn from(value: CompletionParamsV2) -> Self {
-        let CompletionParamsV2 {
-            echo,
-            return_special_tokens,
-            max_tokens,
-            temperature,
-            top_k,
-            top_p,
-            frequency_penalty,
-            presence_penalty,
-            logprobs,
-            stop,
-        } = value;
-        inference::CompletionParams {
-            return_special_tokens,
-            max_tokens,
-            temperature,
-            top_k,
-            top_p,
-            stop,
-            frequency_penalty,
-            presence_penalty,
-            logprobs: logprobs.into(),
-            echo,
-        }
-    }
-}
-
-#[derive(Deserialize)]
 pub struct CompletionRequest {
     pub prompt: String,
     pub model: String,
@@ -934,28 +880,6 @@ pub struct CompletionRequest {
 impl From<CompletionRequest> for inference::CompletionRequest {
     fn from(value: CompletionRequest) -> Self {
         let CompletionRequest {
-            prompt,
-            model,
-            params,
-        } = value;
-        inference::CompletionRequest {
-            prompt,
-            model,
-            params: params.into(),
-        }
-    }
-}
-
-#[derive(Deserialize)]
-pub struct CompletionRequestV2 {
-    pub prompt: String,
-    pub model: String,
-    pub params: CompletionParamsV2,
-}
-
-impl From<CompletionRequestV2> for inference::CompletionRequest {
-    fn from(value: CompletionRequestV2) -> Self {
-        let CompletionRequestV2 {
             prompt,
             model,
             params,
@@ -1362,61 +1286,6 @@ mod tests {
             result,
             Ok(VersionedCsiRequest::V0_3(CsiRequest::SelectLanguage { requests })) if requests.len() == 2
         ));
-    }
-
-    #[test]
-    fn complete_v2_request() {
-        let request = json!({
-            "version": "0.3",
-            "function": "complete_v2",
-            "requests": [
-                {
-                    "prompt": "Hello",
-                    "model": "pharia-1-llm-7b-control",
-                    "params": {
-                        "echo": true,
-                        "return_special_tokens": true,
-                        "max_tokens": 128,
-                        "temperature": null,
-                        "top_k": null,
-                        "top_p": null,
-                        "stop": [],
-                        "frequency_penalty": null,
-                        "presence_penalty": null,
-                        "logprobs": "no"
-                    }
-                },
-                {
-                    "prompt": "Hello",
-                    "model": "pharia-1-llm-7b-control",
-                    "params": {
-                        "echo": false,
-                        "return_special_tokens": true,
-                        "max_tokens": 128,
-                        "temperature": null,
-                        "top_k": null,
-                        "top_p": null,
-                        "stop": [],
-                        "frequency_penalty": null,
-                        "presence_penalty": null,
-                        "logprobs": {
-                            "top": 10
-                        }
-                    }
-                }
-            ]
-        });
-
-        let result: Result<VersionedCsiRequest, serde_json::Error> =
-            serde_json::from_value(request);
-
-        if let Ok(VersionedCsiRequest::V0_3(CsiRequest::CompleteV2 { requests })) = result {
-            assert_eq!(requests.len(), 2);
-            assert!(requests[0].params.echo);
-            assert!(!requests[1].params.echo);
-        } else {
-            panic!("Expected CompleteV2 request");
-        }
     }
 
     #[test]

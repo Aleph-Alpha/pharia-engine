@@ -769,7 +769,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn can_load_and_run_skill_with_v2_completion() {
+    async fn skill_requests_completion_with_echo() {
         // Given a skill loaded by our engine
         let test_skill = given_rust_skill_complete_with_echo();
         let wasm = test_skill.bytes();
