@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.11](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.10...pharia-kernel-v0.12.11)
+
+### Features
+
+- Add complete v2 to csi shell - ([81d8816](https://github.com/Aleph-Alpha/pharia-kernel/commit/81d88164c59f8b7f1f7e92928a1b2f97f2e66970))
+- Introduce complete-v2 in wit world with support for echo parameter - ([c1ef979](https://github.com/Aleph-Alpha/pharia-kernel/commit/c1ef9794574cb2f7c460d3448c31c09472915a56))
+
+### Fixes
+
+- Add since gate to tool interface - ([2cd0961](https://github.com/Aleph-Alpha/pharia-kernel/commit/2cd0961e63762a8ddab6f8188cdfdac352145471))
+
+### Builds
+
+- *(deps)* Update to aleph alpha client 0.27 - ([7313db7](https://github.com/Aleph-Alpha/pharia-kernel/commit/7313db728f0accfe2a8360f181a0b7d5bea60172))
+- Remove unused tokio-test - ([cfecbbb](https://github.com/Aleph-Alpha/pharia-kernel/commit/cfecbbb90d3d5c69ce0183cd8a485ef505a066ad))
+
+
 ## [0.12.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.8...pharia-kernel-v0.12.9)
 
 ### Documentation
