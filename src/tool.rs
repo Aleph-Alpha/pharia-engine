@@ -223,13 +223,13 @@ pub async fn initialize(mcp_address: &str) -> Result<(), ToolError> {
 
 #[cfg(test)]
 mod test {
-    use test_skills::given_mcp_server;
+    use test_skills::{given_json_mcp_server, given_sse_mcp_server};
 
     use super::*;
 
     #[tokio::test]
     async fn invoke_tool_given_mcp_server() {
-        let mcp = given_mcp_server().await;
+        let mcp = given_sse_mcp_server().await;
 
         let request = InvokeRequest {
             tool_name: "add".to_owned(),
@@ -244,32 +244,54 @@ mod test {
                 },
             ],
         };
-        let response = invoke_tool(request, &mcp.address()).await.unwrap();
+        let response = invoke_tool(request, mcp.address()).await.unwrap();
+        let response = String::from_utf8(response).unwrap();
+        assert_eq!(response, "3");
+    }
+
+    #[tokio::test]
+    async fn invoke_tool_against_json_mcp_server() {
+        let mcp = given_json_mcp_server().await;
+
+        let request = InvokeRequest {
+            tool_name: "add".to_owned(),
+            arguments: vec![
+                Argument {
+                    name: "a".to_owned(),
+                    value: json!(1).to_string().into_bytes(),
+                },
+                Argument {
+                    name: "b".to_owned(),
+                    value: json!(2).to_string().into_bytes(),
+                },
+            ],
+        };
+        let response = invoke_tool(request, mcp.address()).await.unwrap();
         let response = String::from_utf8(response).unwrap();
         assert_eq!(response, "3");
     }
 
     #[tokio::test]
     async fn invoke_unknown_tool_gives_error() {
-        let mcp = given_mcp_server().await;
+        let mcp = given_sse_mcp_server().await;
 
         let request = InvokeRequest {
             tool_name: "unknown".to_owned(),
             arguments: vec![],
         };
-        let response = invoke_tool(request, &mcp.address()).await.unwrap_err();
+        let response = invoke_tool(request, mcp.address()).await.unwrap_err();
         assert!(matches!(response, ToolError::ToolCallFailed(_)));
     }
 
     #[tokio::test]
     async fn invoke_saboteur_tool_results_in_error() {
-        let mcp = given_mcp_server().await;
+        let mcp = given_sse_mcp_server().await;
 
         let request = InvokeRequest {
             tool_name: "saboteur".to_owned(),
             arguments: vec![],
         };
-        let response = invoke_tool(request, &mcp.address()).await.unwrap_err();
+        let response = invoke_tool(request, mcp.address()).await.unwrap_err();
         assert_eq!(
             response.to_string(),
             "Error executing tool saboteur: Out of cheese."
@@ -278,8 +300,8 @@ mod test {
 
     #[tokio::test]
     async fn initialize_request() {
-        let mcp = given_mcp_server().await;
+        let mcp = given_sse_mcp_server().await;
 
-        initialize(&mcp.address()).await.unwrap();
+        initialize(mcp.address()).await.unwrap();
     }
 }
