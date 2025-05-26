@@ -513,15 +513,12 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use csi_double::csi_double;
-
     use std::{
         collections::HashMap,
         sync::{Arc, Mutex},
     };
 
     use anyhow::{anyhow, bail};
-    use serde_json::json;
 
     use crate::{
         chunking::ChunkParams,
@@ -1210,6 +1207,134 @@ pub mod tests {
         }
     }
 
+    /// This trait provides default unimplemented versions of the CSI methods. It allows to
+    /// construct test doubles for the CSI where only some methods are implemented.
+    #[async_trait]
+    pub trait CsiForSkillsDouble {
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+            unimplemented!()
+        }
+        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            unimplemented!()
+        }
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            unimplemented!()
+        }
+        async fn completion_stream_next(
+            &mut self,
+            _id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            unimplemented!()
+        }
+        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
+            unimplemented!()
+        }
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            unimplemented!()
+        }
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            unimplemented!()
+        }
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            unimplemented!()
+        }
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            unimplemented!()
+        }
+        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+            unimplemented!()
+        }
+        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
+            unimplemented!()
+        }
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            unimplemented!()
+        }
+        async fn document_metadata(
+            &mut self,
+            _document_paths: Vec<DocumentPath>,
+        ) -> Vec<Option<Value>> {
+            unimplemented!()
+        }
+        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
+            unimplemented!()
+        }
+        async fn invoke_tool(&mut self, _requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+            unimplemented!()
+        }
+    }
+
+    /// Forwards the implementation of [`CsiForSkillsDouble`].
+    #[async_trait]
+    impl<C> CsiForSkills for C
+    where
+        C: CsiForSkillsDouble + Send,
+    {
+        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
+            self.explain(_requests).await
+        }
+        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
+            self.complete(_requests).await
+        }
+        async fn completion_stream_new(
+            &mut self,
+            _request: CompletionRequest,
+        ) -> CompletionStreamId {
+            self.completion_stream_new(_request).await
+        }
+        async fn completion_stream_next(
+            &mut self,
+            _id: &CompletionStreamId,
+        ) -> Option<CompletionEvent> {
+            self.completion_stream_next(_id).await
+        }
+        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
+            self.completion_stream_drop(_id).await;
+        }
+        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
+            self.chunk(_requests).await
+        }
+        async fn select_language(
+            &mut self,
+            _requests: Vec<SelectLanguageRequest>,
+        ) -> Vec<Option<Language>> {
+            self.select_language(_requests).await
+        }
+        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            self.chat(_requests).await
+        }
+        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
+            self.chat_stream_new(_request).await
+        }
+        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+            self.chat_stream_next(_id).await
+        }
+        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
+            self.chat_stream_drop(_id).await;
+        }
+        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
+            self.search(_requests).await
+        }
+        async fn document_metadata(
+            &mut self,
+            _document_paths: Vec<DocumentPath>,
+        ) -> Vec<Option<Value>> {
+            self.document_metadata(_document_paths).await
+        }
+        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
+            self.documents(_document_paths).await
+        }
+        async fn invoke_tool(&mut self, _requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+            self.invoke_tool(_requests).await
+        }
+    }
+
     pub struct CsiCompleteStreamStub {
         current_id: usize,
         events: Vec<CompletionEvent>,
@@ -1227,8 +1352,8 @@ pub mod tests {
         }
     }
 
-    #[csi_double]
-    impl CsiForSkills for CsiCompleteStreamStub {
+    #[async_trait]
+    impl CsiForSkillsDouble for CsiCompleteStreamStub {
         async fn completion_stream_new(
             &mut self,
             _request: CompletionRequest,
@@ -1268,8 +1393,8 @@ pub mod tests {
         }
     }
 
-    #[csi_double]
-    impl CsiForSkills for CsiChatStreamStub {
+    #[async_trait]
+    impl CsiForSkillsDouble for CsiChatStreamStub {
         async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
             let id = ChatStreamId::new(self.current_id);
             self.streams.insert(id, self.events.clone());
@@ -1315,8 +1440,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         }
     }
 
-    #[csi_double]
-    impl CsiForSkills for CsiGreetingMock {
+    #[async_trait]
+    impl CsiForSkillsDouble for CsiGreetingMock {
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests.into_iter().map(Self::complete_text).collect()
         }
@@ -1325,8 +1450,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     /// Always return a hardcoded dummy response
     pub struct CsiChatStub;
 
-    #[csi_double]
-    impl CsiForSkills for CsiChatStub {
+    #[async_trait]
+    impl CsiForSkillsDouble for CsiChatStub {
         async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
             requests
                 .iter()
@@ -1346,8 +1471,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     /// Return the content of the query as a search result
     pub struct CsiSearchMock;
 
-    #[csi_double]
-    impl CsiForSkills for CsiSearchMock {
+    #[async_trait]
+    impl CsiForSkillsDouble for CsiSearchMock {
         async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             requests
                 .into_iter()
@@ -1384,8 +1509,8 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         counter: Arc<Mutex<u32>>,
     }
 
-    #[csi_double]
-    impl CsiForSkills for CsiCounter {
+    #[async_trait]
+    impl CsiForSkillsDouble for CsiCounter {
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests
                 .iter()
@@ -1396,50 +1521,5 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
                 })
                 .collect()
         }
-    }
-
-    struct CsiAddToolFake;
-
-    #[csi_double]
-    impl CsiForSkills for CsiAddToolFake {
-        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
-            requests
-                .iter()
-                .map(|request| {
-                    let a = String::from_utf8(request.arguments[0].value.clone())
-                        .unwrap()
-                        .parse::<i32>()
-                        .unwrap();
-                    let b = String::from_utf8(request.arguments[1].value.clone())
-                        .unwrap()
-                        .parse::<i32>()
-                        .unwrap();
-                    let sum = a + b;
-                    json!(sum).to_string().into_bytes()
-                })
-                .collect()
-        }
-    }
-
-    #[tokio::test]
-    async fn csi_double_generates_unimplemented_methods() {
-        let mut mock = CsiAddToolFake;
-
-        // Test that invoke_tool works (implemented)
-        let request = InvokeRequest {
-            tool_name: "add".to_string(),
-            arguments: vec![
-                crate::tool::Argument {
-                    name: "a".to_string(),
-                    value: b"5".to_vec(),
-                },
-                crate::tool::Argument {
-                    name: "b".to_string(),
-                    value: b"3".to_vec(),
-                },
-            ],
-        };
-        let result = mock.invoke_tool(vec![request]).await;
-        assert_eq!(String::from_utf8(result[0].clone()).unwrap(), "8");
     }
 }

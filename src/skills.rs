@@ -523,7 +523,6 @@ pub enum SkillEvent {
 #[cfg(test)]
 pub mod tests {
     use async_trait::async_trait;
-    use csi_double::csi_double;
     use fake::{Fake as _, Faker};
     use serde_json::json;
     use test_skills::{
@@ -539,15 +538,15 @@ pub mod tests {
         csi::{
             ChatStreamId, CompletionStreamId,
             tests::{
-                CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiGreetingMock,
-                CsiSearchMock, StubCsi,
+                CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiForSkillsDouble,
+                CsiGreetingMock, CsiSearchMock, StubCsi,
             },
         },
         inference::{
             ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
             Explanation, ExplanationRequest, FinishReason, TextScore, TokenUsage,
         },
-        language_selection::{self, Language, SelectLanguageRequest},
+        language_selection::{self, SelectLanguageRequest},
         logging::TracingContext,
         search::{Document, DocumentPath, SearchRequest, SearchResult},
         skill_driver::SkillInvocationCtx,
@@ -1088,8 +1087,8 @@ pub mod tests {
 
     struct CsiAddToolFake;
 
-    #[csi_double]
-    impl CsiForSkills for CsiAddToolFake {
+    #[async_trait]
+    impl CsiForSkillsDouble for CsiAddToolFake {
         async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
             requests
                 .iter()
