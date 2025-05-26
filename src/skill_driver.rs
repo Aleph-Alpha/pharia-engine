@@ -1147,6 +1147,7 @@ mod test {
                     return_special_tokens: true,
                     top_k: None,
                     logprobs: Logprobs::No,
+                    echo: false,
                 },
             }])
             .await;
@@ -1358,6 +1359,7 @@ mod test {
                         return_special_tokens: true,
                         top_k: None,
                         logprobs: Logprobs::No,
+                        echo: false,
                     },
                 }])
                 .await;

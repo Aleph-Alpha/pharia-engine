@@ -252,6 +252,7 @@ pub struct CompletionParams {
     pub frequency_penalty: Option<f64>,
     pub presence_penalty: Option<f64>,
     pub logprobs: Logprobs,
+    pub echo: bool,
 }
 
 #[derive(Debug, Clone)]

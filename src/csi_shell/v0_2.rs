@@ -269,6 +269,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             frequency_penalty: None,
             presence_penalty: None,
             logprobs: inference::Logprobs::No,
+            echo: false,
         }
     }
 }

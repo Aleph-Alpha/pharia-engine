@@ -644,6 +644,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             frequency_penalty,
             presence_penalty,
             logprobs: logprobs.into(),
+            echo: false,
         }
     }
 }
