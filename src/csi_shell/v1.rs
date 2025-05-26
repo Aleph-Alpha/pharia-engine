@@ -460,6 +460,8 @@ struct CompletionParams {
     frequency_penalty: Option<f64>,
     presence_penalty: Option<f64>,
     logprobs: Logprobs,
+    #[serde(default)]
+    echo: bool,
 }
 
 impl From<CompletionParams> for inference::CompletionParams {
@@ -474,6 +476,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             presence_penalty,
             logprobs,
             stop,
+            echo,
         } = value;
         inference::CompletionParams {
             return_special_tokens,
@@ -485,7 +488,7 @@ impl From<CompletionParams> for inference::CompletionParams {
             frequency_penalty,
             presence_penalty,
             logprobs: logprobs.into(),
-            echo: false,
+            echo,
         }
     }
 }
