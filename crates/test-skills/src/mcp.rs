@@ -11,23 +11,46 @@ use tempfile::TempDir;
 
 use crate::assert_uv_installed;
 
-const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
-
 /// A mutex to a weak lock allows us to never have more then one instance of the MCP server
 /// running, but don't keep it alive if no one is using it.
-static MCP_SERVER: Mutex<Weak<Mcp>> = Mutex::new(Weak::new());
+static MCP_SSE_SERVER: Mutex<Weak<Mcp>> = Mutex::new(Weak::new());
 
-/// A handle to a running MCP server.
-pub async fn given_mcp_server() -> Arc<Mcp> {
+/// A handle to a running MCP server that responds with `text/event-stream`.
+pub async fn given_sse_mcp_server() -> Arc<Mcp> {
     let mcp = {
-        let mut guard = MCP_SERVER.lock().unwrap();
+        let mut guard = MCP_SSE_SERVER.lock().unwrap();
 
         if let Some(mcp) = guard.upgrade() {
             // The MCP server is already running
             mcp
         } else {
             // Start the MCP server
-            let mcp = Mcp::new();
+            let mcp = Mcp::new(Config::StreamableHttp);
+            let mcp = Arc::new(mcp);
+            *guard = Arc::downgrade(&mcp);
+            mcp
+        }
+    };
+
+    mcp.wait_for_ready().await;
+    mcp
+}
+
+/// A mutex to a weak lock allows us to never have more then one instance of the MCP server
+/// running, but don't keep it alive if no one is using it.
+static MCP_JSON_SERVER: Mutex<Weak<Mcp>> = Mutex::new(Weak::new());
+
+/// A handle to a running MCP server that responds with `application/json`.
+pub async fn given_json_mcp_server() -> Arc<Mcp> {
+    let mcp = {
+        let mut guard = MCP_JSON_SERVER.lock().unwrap();
+
+        if let Some(mcp) = guard.upgrade() {
+            // The MCP server is already running
+            mcp
+        } else {
+            // Start the MCP server
+            let mcp = Mcp::new(Config::JsonResponse);
             let mcp = Arc::new(mcp);
             *guard = Arc::downgrade(&mcp);
             mcp
@@ -44,13 +67,35 @@ pub async fn given_mcp_server() -> Arc<Mcp> {
 pub struct Mcp {
     child: Child,
     _dir: TempDir,
+    address: String,
+}
+
+enum Config {
+    StreamableHttp,
+    JsonResponse,
+}
+
+impl Config {
+    fn args(&self) -> Vec<&str> {
+        match self {
+            Config::StreamableHttp => vec![],
+            Config::JsonResponse => vec!["--json-response"],
+        }
+    }
+
+    fn port(&self) -> u16 {
+        match self {
+            Config::StreamableHttp => 8000,
+            Config::JsonResponse => 8001,
+        }
+    }
 }
 
 const PYTHON_SRC: &str = include_str!("mcp_server.py");
 
 impl Mcp {
     #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    fn new(config: Config) -> Self {
         assert_uv_installed();
 
         // Only a temp file did not make the file executable, so we do a temp directory
@@ -59,7 +104,13 @@ impl Mcp {
         std::fs::write(&temp_file_path, PYTHON_SRC).unwrap();
 
         let mut child = Command::new("uv")
-            .args(["run", temp_file_path.to_str().unwrap()])
+            .args([
+                "run",
+                temp_file_path.to_str().unwrap(),
+                "--port",
+                config.port().to_string().as_str(),
+            ])
+            .args(config.args())
             .spawn()
             .unwrap();
 
@@ -72,12 +123,13 @@ impl Mcp {
             Self {
                 child,
                 _dir: temp_dir,
+                address: format!("http://localhost:{}/mcp", config.port()),
             }
         }
     }
 
-    pub fn address(&self) -> String {
-        MCP_SERVER_ADDRESS.to_owned()
+    pub fn address(&self) -> &str {
+        &self.address
     }
 
     async fn wait_for_ready(&self) {
@@ -98,7 +150,7 @@ impl Mcp {
           "method": "ping"
         });
         let response = client
-            .post(MCP_SERVER_ADDRESS)
+            .post(&self.address)
             // MCP server want exactly these two headers, even a wildcard is not accepted
             .header("accept", "application/json,text/event-stream")
             .json(&body)
@@ -140,6 +192,6 @@ mod tests {
 
     #[tokio::test]
     async fn mcp_server_pingable() {
-        let _mcp = given_mcp_server().await;
+        let _mcp = given_sse_mcp_server().await;
     }
 }

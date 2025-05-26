@@ -3,7 +3,7 @@ mod skill;
 
 use std::process::Command;
 
-pub use mcp::given_mcp_server;
+pub use mcp::{given_json_mcp_server, given_sse_mcp_server};
 pub use skill::{
     given_chat_stream_skill, given_complete_stream_skill, given_invalid_output_skill,
     given_python_skill_greet_v0_2, given_python_skill_greet_v0_3, given_rust_skill_chat,
