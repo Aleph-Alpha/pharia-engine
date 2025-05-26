@@ -41,7 +41,7 @@ exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
 engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.4" }
-aleph-alpha-client = "0.26.0"
+aleph-alpha-client = "0.27.0"
 anyhow = "1.0.98"
 async-trait = "0.1.88"
 axum = { version = "0.8.4", features = ["macros"] }
