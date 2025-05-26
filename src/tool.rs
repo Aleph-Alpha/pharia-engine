@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use futures::StreamExt;
 use reqwest::Client;
+use reqwest::header;
 use serde::Deserialize;
 use serde_json::Value;
 use serde_json::json;
@@ -159,33 +160,52 @@ pub async fn initialize(mcp_address: &str) -> Result<(), ToolError> {
     });
 
     let client = Client::new();
-    let mut stream = client
+    let response = client
         .post(mcp_address)
         .header("accept", "application/json,text/event-stream")
         .json(&body)
         .send()
         .await
-        .unwrap()
-        // We also need to handle application/json responses here:
-        // If the input contains any number of JSON-RPC requests, the server MUST either return
-        // Content-Type: text/event-stream, to initiate an SSE stream, or
-        // Content-Type: application/json, to return one JSON object.
-        // The client MUST support both these cases.
-        // See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#sending-messages-to-the-server>
-        .bytes_stream();
+        .map_err(Into::<anyhow::Error>::into)?;
+    let content_type = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .ok_or_else(|| anyhow!("No content type in response header"))?
+        .to_str()
+        .map_err(Into::<anyhow::Error>::into)?;
+    let response = match content_type {
+        "application/json" => {
+            let data = response.json().await.map_err(Into::<anyhow::Error>::into)?;
+            serde_json::from_value::<InitializeResponse>(data)
+                .map_err(ToolError::DeserializationError)?
+        }
+        "text/event-stream" => {
+            let mut stream = response
+                // We also need to handle application/json responses here:
+                // If the input contains any number of JSON-RPC requests, the server MUST either return
+                // Content-Type: text/event-stream, to initiate an SSE stream, or
+                // Content-Type: application/json, to return one JSON object.
+                // The client MUST support both these cases.
+                // See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#sending-messages-to-the-server>
+                .bytes_stream();
 
-    let item = stream
-        .next()
-        .await
-        .unwrap()
-        .map(|item| String::from_utf8(item.to_vec()))
-        .unwrap()
-        .unwrap();
+            let item = stream
+                .next()
+                .await
+                .ok_or_else(|| anyhow!("No item in stream"))?
+                .map(|item| String::from_utf8(item.to_vec()))
+                .map_err(Into::<anyhow::Error>::into)?
+                .map_err(Into::<anyhow::Error>::into)?;
 
-    let data = item.split("data: ").nth(1).unwrap();
-
-    let response = serde_json::from_str::<InitializeResponse>(data)
-        .map_err(ToolError::DeserializationError)?;
+            let data = item
+                .split("data: ")
+                .nth(1)
+                .ok_or_else(|| anyhow!("No data in stream"))?;
+            serde_json::from_str::<InitializeResponse>(data)
+                .map_err(ToolError::DeserializationError)?
+        }
+        _ => Err(anyhow!("unexpected content type"))?,
+    };
 
     // If the server supports the requested protocol version, it MUST respond with the same version.
     // Otherwise, the server MUST respond with another protocol version it supports.
