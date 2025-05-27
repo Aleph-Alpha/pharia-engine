@@ -77,18 +77,16 @@ impl ToolClient for McpClient {
             .content
             .first()
             .ok_or(anyhow!("No content in tool call response"))?;
-        if !result.is_error {
-            Ok(text.to_owned().into_bytes())
-        } else {
+        if result.is_error {
             // We might want to represent a failed tool call in the wit world and pass it to the model.
             // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
             Err(ToolError::ToolCallFailed(text.to_owned()))
+        } else {
+            Ok(text.to_owned().into_bytes())
         }
     }
-}
 
-impl McpClient {
-    async fn list_tools(&self, mcp_address: &str) -> anyhow::Result<Vec<String>> {
+    async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
         #[derive(Deserialize)]
         struct ToolDescription {
             // there is a lot more fields here, but we need to start somewhere
@@ -119,7 +117,9 @@ impl McpClient {
         let result = Self::json_rpc_result_from_http::<ListToolsResult>(response).await?;
         Ok(result.tools.into_iter().map(|tool| tool.name).collect())
     }
+}
 
+impl McpClient {
     /// The initialization phase MUST be the first interaction between client and server.
     /// During this phase, the client and server:
     /// - Establish protocol version compatibility
