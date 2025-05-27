@@ -6,7 +6,7 @@
 
 import argparse
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 
 
 def main():
@@ -41,8 +41,11 @@ def main():
     )
 
     @mcp.tool()
-    def add(a: int, b: int) -> int:
+    async def add(ctx: Context, a: int, b: int) -> int:
         """Add two numbers"""
+        # This sends a notification/message event to the client.
+        await ctx.info("Getting ready to execute on the addition.")
+
         return a + b
 
     @mcp.tool()
