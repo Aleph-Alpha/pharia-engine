@@ -16,7 +16,7 @@ use crate::{
     logging::TracingContext,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
-    tool::{InvokeRequest, Tool, ToolApi, ToolError},
+    tool::{InvokeRequest, ToolApi, ToolError},
 };
 
 /// `CompletionStreamId` is a unique identifier for a completion stream.
@@ -30,12 +30,12 @@ pub struct ChatStreamId(usize);
 ///
 /// For now this is just a collection of all the APIs without providing logic on its own
 #[derive(Clone)]
-pub struct CsiDrivers<I, S, T> {
+pub struct CsiDrivers<I, S, Tz, Tl> {
     /// We use the inference Api to complete text
     pub inference: I,
     pub search: S,
-    pub tokenizers: T,
-    pub tool: Tool,
+    pub tokenizers: Tz,
+    pub tool: Tl,
 }
 
 /// Cognitive System Interface (CSI) as consumed by Skill developers. In particular some accidental
@@ -169,11 +169,12 @@ impl From<CsiMetrics> for metrics::KeyName {
     }
 }
 
-impl<I, S, T> Csi for CsiDrivers<I, S, T>
+impl<I, S, Tz, Tl> Csi for CsiDrivers<I, S, Tz, Tl>
 where
     I: InferenceApi + Send + Sync,
     S: SearchApi + Send + Sync,
-    T: TokenizerApi + Send + Sync,
+    Tz: TokenizerApi + Send + Sync,
+    Tl: ToolApi + Send + Sync,
 {
     async fn explain(
         &self,
@@ -574,6 +575,7 @@ pub mod tests {
         search::{TextCursor, tests::SearchStub},
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
+        tool::tests::ToolDouble,
     };
 
     use super::*;
@@ -834,12 +836,12 @@ pub mod tests {
         assert!(responses[1].contains("2nd"));
     }
 
-    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, SearchStub, FakeTokenizers> {
+    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, SearchStub, FakeTokenizers, ToolDouble> {
         CsiDrivers {
             inference: InferenceStub::new(),
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
-            tool: Tool,
+            tool: ToolDouble,
         }
     }
 

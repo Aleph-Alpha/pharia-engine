@@ -258,10 +258,22 @@ pub async fn initialize(mcp_address: &str) -> Result<(), ToolError> {
 }
 
 #[cfg(test)]
-mod test {
+pub mod tests {
     use test_skills::{given_json_mcp_server, given_sse_mcp_server};
 
     use super::*;
+
+    pub struct ToolDouble;
+
+    impl ToolApi for ToolDouble {
+        async fn invoke_tool(
+            &self,
+            _request: InvokeRequest,
+            _tracing_context: TracingContext,
+        ) -> Result<Vec<u8>, ToolError> {
+            unimplemented!()
+        }
+    }
 
     #[tokio::test]
     async fn invoke_tool_given_mcp_server() {
