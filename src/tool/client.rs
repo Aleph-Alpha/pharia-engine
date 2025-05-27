@@ -21,21 +21,16 @@ impl McpClient {
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum ToolCallResponseContent {
-    Text { text: String },
-}
-
-#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ToolCallResponseResult {
+struct ToolCallResult {
     content: Vec<ToolCallResponseContent>,
     is_error: bool,
 }
 
 #[derive(Deserialize)]
-struct ToolCallResponse {
-    result: ToolCallResponseResult,
+#[serde(tag = "type", rename_all = "snake_case")]
+enum ToolCallResponseContent {
+    Text { text: String },
 }
 
 impl ToolClient for McpClient {
@@ -75,9 +70,9 @@ impl ToolClient for McpClient {
             .await
             .map_err(anyhow::Error::from)?;
 
-        let tool_response = Self::json_rpc_response_from_http::<ToolCallResponse>(response).await?;
-        match tool_response.result {
-            ToolCallResponseResult {
+        let result = Self::json_rpc_result_from_http::<ToolCallResult>(response).await?;
+        match result {
+            ToolCallResult {
                 content,
                 is_error: false,
             } => {
@@ -88,7 +83,7 @@ impl ToolClient for McpClient {
             }
             // We might want to represent a failed tool call in the wit world and pass it to the model.
             // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
-            ToolCallResponseResult {
+            ToolCallResult {
                 content,
                 is_error: true,
             } => {
@@ -111,10 +106,15 @@ impl McpClient {
     /// Content-Type: application/json, to return one JSON object.
     /// The client MUST support both these cases.
     /// See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#sending-messages-to-the-server>
-    async fn json_rpc_response_from_http<T>(response: Response) -> anyhow::Result<T>
+    async fn json_rpc_result_from_http<T>(response: Response) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
+        #[derive(Deserialize)]
+        struct JsonRpcResponse<T> {
+            result: T,
+        }
+
         let content_type = response
             .headers()
             .get(header::CONTENT_TYPE)
@@ -123,7 +123,7 @@ impl McpClient {
         match content_type {
             "application/json" => {
                 let data = response.json().await?;
-                Ok(serde_json::from_value::<T>(data)?)
+                Ok(serde_json::from_value::<JsonRpcResponse<T>>(data)?.result)
             }
             "text/event-stream" => {
                 // We may get different type of results in the stream.
@@ -137,8 +137,8 @@ impl McpClient {
                         .split("data: ")
                         .nth(1)
                         .ok_or_else(|| anyhow!("No data in stream"))?;
-                    if let Ok(value) = serde_json::from_str::<T>(data) {
-                        return Ok(value);
+                    if let Ok(value) = serde_json::from_str::<JsonRpcResponse<T>>(data) {
+                        return Ok(value.result);
                     }
                 }
                 Err(anyhow!("Expected JSON-RPC response not found in stream"))
@@ -159,11 +159,6 @@ impl McpClient {
         #[serde(rename_all = "camelCase")]
         struct InitializeResult {
             protocol_version: String,
-        }
-
-        #[derive(Deserialize)]
-        struct InitializeResponse {
-            result: InitializeResult,
         }
 
         // In the initialize request, the client MUST send a protocol version it supports.
@@ -193,16 +188,16 @@ impl McpClient {
             .await
             .map_err(Into::<anyhow::Error>::into)?;
 
-        let response = Self::json_rpc_response_from_http::<InitializeResponse>(response).await?;
+        let result = Self::json_rpc_result_from_http::<InitializeResult>(response).await?;
 
         // If the server supports the requested protocol version, it MUST respond with the same version.
         // Otherwise, the server MUST respond with another protocol version it supports.
         // This SHOULD be the latest version supported by the server.
         // If the client does not support the version in the server's response, it SHOULD disconnect.
-        if !SUPPORTED_PROTOCOL_VERSIONS.contains(&response.result.protocol_version.as_str()) {
+        if !SUPPORTED_PROTOCOL_VERSIONS.contains(&result.protocol_version.as_str()) {
             return Err(anyhow!(
                 "The proposed protocol version {} from the MCP server is not supported.",
-                response.result.protocol_version,
+                result.protocol_version,
             ))?;
         }
 
