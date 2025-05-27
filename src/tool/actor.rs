@@ -1,4 +1,5 @@
 use futures::StreamExt;
+use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -162,7 +163,8 @@ impl<T: ToolClient> ToolActor<T> {
                 let client = self.client.clone();
                 let servers = self.mcp_servers.values().cloned().collect();
                 self.running_requests.push(Box::pin(async move {
-                    let result = Self::list_tools(client.as_ref(), servers).await;
+                    let result = Self::tools(client.as_ref(), servers).await;
+                    let result = result.into_values().flatten().collect();
                     drop(send.send(result));
                 }));
             }
@@ -172,6 +174,10 @@ impl<T: ToolClient> ToolActor<T> {
         }
     }
 
+    /// Invoke a tool and return the result.
+    ///
+    /// First, we need to locate the server on which the tool is hosted.
+    /// Then, we invoke the tool on that server.
     async fn invoke_tool(
         client: &impl ToolClient,
         servers: Vec<String>,
@@ -192,31 +198,30 @@ impl<T: ToolClient> ToolActor<T> {
     /// A skill only is interested in a subset of tools. At some layer, we need to trade in
     /// tool names for the json schema. There would be the appropriate place to decide if the
     /// available information is enough.
-    async fn list_tools(client: &impl ToolClient, servers: Vec<String>) -> Vec<String> {
-        let mut all_tools = vec![];
-        for address in servers {
-            if let Ok(tools) = client.list_tools(&address).await {
-                all_tools.extend(tools);
-            }
-        }
-        all_tools
+    async fn tools(client: &impl ToolClient, servers: Vec<String>) -> HashMap<String, Vec<String>> {
+        let results = join_all(servers.into_iter().map(|address| async move {
+            let tools = client.list_tools(&address).await;
+            (address, tools)
+        }))
+        .await;
+        results
+            .into_iter()
+            .filter_map(|(address, result)| result.ok().map(|tools| (address, tools)))
+            .collect()
     }
 
-    /// Which server hosts this tool?
+    /// Return the server that hosts a particular tool, or None if the tool can not be found.
     ///
     /// We do not return a result here, but ignore MCP servers that are giving errors.
-    /// We do not want to allow one bad server to prevent a skill which does not rely on that
-    /// particular server from being invoked successfully.
     async fn server_for_tool(
         client: &impl ToolClient,
         servers: Vec<String>,
         tool: &str,
     ) -> Option<String> {
-        for address in servers {
-            if let Ok(tools) = client.list_tools(&address).await {
-                if tools.contains(&tool.to_owned()) {
-                    return Some(address);
-                }
+        let all_tools = Self::tools(client, servers).await;
+        for (address, tools) in &all_tools {
+            if tools.contains(&tool.to_owned()) {
+                return Some(address.clone());
             }
         }
         None
