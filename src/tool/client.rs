@@ -88,6 +88,38 @@ impl ToolClient for McpClient {
 }
 
 impl McpClient {
+    async fn list_tools(&self, mcp_address: &str) -> anyhow::Result<Vec<String>> {
+        #[derive(Deserialize)]
+        struct ToolDescription {
+            // there is a lot more fields here, but we need to start somewhere
+            name: String,
+        }
+
+        #[derive(Deserialize)]
+        struct ListToolsResult {
+            tools: Vec<ToolDescription>,
+        }
+
+        self.initialize(mcp_address).await?;
+
+        let body = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+        });
+        let response = self
+            .client
+            .post(mcp_address)
+            .header("accept", "application/json,text/event-stream")
+            .json(&body)
+            .send()
+            .await
+            .map_err(anyhow::Error::from)?;
+
+        let result = Self::json_rpc_result_from_http::<ListToolsResult>(response).await?;
+        Ok(result.tools.into_iter().map(|tool| tool.name).collect())
+    }
+
     /// The initialization phase MUST be the first interaction between client and server.
     /// During this phase, the client and server:
     /// - Establish protocol version compatibility
@@ -222,6 +254,21 @@ pub mod tests {
     use crate::tool::actor::Argument;
 
     use super::*;
+
+    #[tokio::test]
+    async fn tools_can_be_listed() {
+        // Given a MCP server
+        let mcp = given_sse_mcp_server().await;
+        let client = McpClient::new();
+
+        // When listing tools
+        let tools = client.list_tools(mcp.address()).await.unwrap();
+
+        // Then the add tool is listed
+        assert_eq!(tools.len(), 2);
+        assert!(tools.contains(&"add".to_owned()));
+        assert!(tools.contains(&"saboteur".to_owned()));
+    }
 
     #[tokio::test]
     async fn invoke_tool_given_mcp_server() {
