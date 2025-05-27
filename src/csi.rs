@@ -606,41 +606,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn chat() {
-        // Given a chat request
-        let chat_request = ChatRequest {
-            model: "dummy_model".to_owned(),
-            messages: vec![Message::new("user", "Hello")],
-            params: ChatParams::default(),
-        };
-
-        // When chatting with the StubCsi
-        let csi = StubCsi::with_chat(|_| ChatResponse {
-            message: Message {
-                role: "assistant".to_owned(),
-                content: "Hello".to_owned(),
-            },
-            finish_reason: FinishReason::Stop,
-            logprobs: vec![],
-            usage: TokenUsage {
-                prompt: 1,
-                completion: 1,
-            },
-        });
-        let result = csi
-            .chat(
-                "dummy-token".to_owned(),
-                TracingContext::dummy(),
-                vec![chat_request],
-            )
-            .await
-            .unwrap();
-
-        // Then the response is the same as the request
-        assert_eq!(result[0].message.content, "Hello");
-    }
-
-    #[tokio::test]
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let tokenizers = FakeTokenizers;
@@ -1155,7 +1120,7 @@ pub mod tests {
         }
     }
 
-    impl Csi for StubCsi {
+    impl CsiDouble for StubCsi {
         async fn explain(
             &self,
             _auth: String,
@@ -1258,15 +1223,6 @@ pub mod tests {
             receiver
         }
 
-        async fn search(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<SearchRequest>,
-        ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
-            unimplemented!()
-        }
-
         async fn select_language(
             &self,
             requests: Vec<SelectLanguageRequest>,
@@ -1280,33 +1236,6 @@ pub mod tests {
             .await?
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?)
-        }
-
-        async fn documents(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<DocumentPath>,
-        ) -> anyhow::Result<Vec<Document>> {
-            unimplemented!()
-        }
-
-        async fn document_metadata(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _document_paths: Vec<DocumentPath>,
-        ) -> anyhow::Result<Vec<Option<Value>>> {
-            unimplemented!()
-        }
-
-        async fn invoke_tool(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<InvokeRequest>,
-        ) -> Result<Vec<Vec<u8>>, ToolError> {
-            unimplemented!()
         }
     }
 
