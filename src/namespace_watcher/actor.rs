@@ -205,6 +205,7 @@ where
 
     async fn run(mut self) {
         let mut started = tokio::time::Instant::now();
+        self.report_hardcoded_tool_server().await;
         self.report_all_changes().await;
         let _ = self.ready.send(true);
         loop {
@@ -215,6 +216,15 @@ where
             started = tokio::time::Instant::now();
             self.report_all_changes().await;
         }
+    }
+
+    async fn report_hardcoded_tool_server(&mut self) {
+        self.tool_api
+            .upsert_tool_server(
+                "calculator".to_owned(),
+                "http://localhost:8000/mcp".to_owned(),
+            )
+            .await;
     }
 
     async fn report_all_changes(&mut self) {
