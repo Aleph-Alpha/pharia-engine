@@ -19,6 +19,8 @@ pub trait ToolApi {
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send;
+
+    fn upsert_tool_server(&self, name: String, address: String) -> impl Future<Output = ()> + Send;
 }
 
 pub struct Tool {
@@ -64,6 +66,11 @@ impl ToolApi for mpsc::Sender<ToolActorMsg> {
         self.send(msg).await.unwrap();
         receive.await.unwrap()
     }
+
+    async fn upsert_tool_server(&self, name: String, address: String) {
+        let msg = ToolActorMsg::UpsertToolServer { name, address };
+        self.send(msg).await.unwrap();
+    }
 }
 
 enum ToolActorMsg {
@@ -71,6 +78,10 @@ enum ToolActorMsg {
         request: InvokeRequest,
         tracing_context: TracingContext,
         send: oneshot::Sender<Result<Vec<u8>, ToolError>>,
+    },
+    UpsertToolServer {
+        name: String,
+        address: String,
     },
 }
 
@@ -97,7 +108,7 @@ impl ToolActor {
         }
     }
 
-    async fn act(&self, msg: ToolActorMsg) {
+    async fn act(&mut self, msg: ToolActorMsg) {
         match msg {
             ToolActorMsg::InvokeTool {
                 request,
@@ -106,6 +117,9 @@ impl ToolActor {
             } => {
                 let result = self.invoke_tool(request, tracing_context).await;
                 drop(response.send(result));
+            }
+            ToolActorMsg::UpsertToolServer { name, address } => {
+                self.mcp_servers.insert(name, address);
             }
         }
     }
@@ -362,6 +376,26 @@ pub mod tests {
         ) -> Result<Vec<u8>, ToolError> {
             unimplemented!()
         }
+
+        async fn upsert_tool_server(&self, _name: String, _address: String) {
+            unimplemented!()
+        }
+    }
+
+    #[tokio::test]
+    async fn tool_server_is_upserted() {
+        // Given a tool
+        let tool = Tool::new().api();
+
+        // When a tool server is upserted
+        tool.upsert_tool_server(
+            "calculator".to_owned(),
+            "http://localhost:8000/mcp".to_owned(),
+        )
+        .await;
+
+        // Then the tool is available
+        panic!("We can not test this nicely yet because the mcp client is not behind a trait.")
     }
 
     #[tokio::test]
