@@ -73,29 +73,16 @@ impl ToolClient for McpClient {
             .map_err(anyhow::Error::from)?;
 
         let result = Self::json_rpc_result_from_http::<ToolCallResult>(response).await?;
-        match result {
-            ToolCallResult {
-                content,
-                is_error: false,
-            } => {
-                let ToolCallResponseContent::Text { text } = content
-                    .first()
-                    .ok_or(anyhow!("No content in tool call response"))?;
-                Ok(text.to_owned().into_bytes())
-            }
+        let ToolCallResponseContent::Text { text } = result
+            .content
+            .first()
+            .ok_or(anyhow!("No content in tool call response"))?;
+        if !result.is_error {
+            Ok(text.to_owned().into_bytes())
+        } else {
             // We might want to represent a failed tool call in the wit world and pass it to the model.
             // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
-            ToolCallResult {
-                content,
-                is_error: true,
-            } => {
-                // Even for errors messages, we expect a text response for each tool call. So if there is no
-                // text, the error is not a tool call failed, but rather a bad response by the MCP server.
-                let ToolCallResponseContent::Text { text } = content
-                    .first()
-                    .ok_or(anyhow!("No content in tool call response"))?;
-                Err(ToolError::ToolCallFailed(text.to_owned()))
-            }
+            Err(ToolError::ToolCallFailed(text.to_owned()))
         }
     }
 }
