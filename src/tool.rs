@@ -21,6 +21,12 @@ pub trait ToolApi {
 #[derive(Clone)]
 pub struct Tool;
 
+impl Tool {
+    pub fn api(&self) -> Tool {
+        self.clone()
+    }
+}
+
 impl ToolApi for Tool {
     async fn invoke_tool(
         &self,
