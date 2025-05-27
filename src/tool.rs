@@ -88,6 +88,7 @@ enum ToolActorMsg {
 struct ToolActor {
     mcp_servers: HashMap<String, String>,
     receiver: mpsc::Receiver<ToolActorMsg>,
+    client: McpClient,
 }
 
 impl ToolActor {
@@ -95,6 +96,7 @@ impl ToolActor {
         Self {
             mcp_servers: HashMap::new(),
             receiver,
+            client: McpClient,
         }
     }
 
@@ -127,7 +129,9 @@ impl ToolActor {
     ) -> Result<Vec<u8>, ToolError> {
         // We always expect to have a calculator MCP server.
         let mcp_address = self.mcp_servers.get("calculator").unwrap();
-        invoke_tool(request, mcp_address, tracing_context).await
+        self.client
+            .invoke_tool(request, mcp_address, tracing_context)
+            .await
     }
 }
 
@@ -211,64 +215,69 @@ where
     }
 }
 
-pub async fn invoke_tool(
-    request: InvokeRequest,
-    mcp_address: &str,
-    _tracing_context: TracingContext,
-) -> Result<Vec<u8>, ToolError> {
-    initialize(mcp_address).await?;
+struct McpClient;
 
-    let client = Client::new();
-    let arguments = request
-        .arguments
-        .into_iter()
-        .map(|argument| {
-            serde_json::from_slice::<Value>(&argument.value).map(|value| (argument.name, value))
-        })
-        .collect::<Result<HashMap<_, _>, serde_json::Error>>()
-        .map_err(anyhow::Error::from)?;
+impl McpClient {
+    pub async fn invoke_tool(
+        &self,
+        request: InvokeRequest,
+        mcp_address: &str,
+        _tracing_context: TracingContext,
+    ) -> Result<Vec<u8>, ToolError> {
+        initialize(mcp_address).await?;
 
-    let body = json!({
-      "jsonrpc": "2.0",
-      "id": 2,
-      "method": "tools/call",
-      "params": {
-        "name": request.tool_name,
-        "arguments": arguments
-      }
-    });
-    let response = client
-        .post(mcp_address)
-        // MCP server want exactly these two headers, even a wildcard is not accepted
-        .header("accept", "application/json,text/event-stream")
-        .json(&body)
-        .send()
-        .await
-        .map_err(anyhow::Error::from)?;
+        let client = Client::new();
+        let arguments = request
+            .arguments
+            .into_iter()
+            .map(|argument| {
+                serde_json::from_slice::<Value>(&argument.value).map(|value| (argument.name, value))
+            })
+            .collect::<Result<HashMap<_, _>, serde_json::Error>>()
+            .map_err(anyhow::Error::from)?;
 
-    let tool_response = json_rpc_response_from_http::<ToolCallResponse>(response).await?;
-    match tool_response.result {
-        ToolCallResponseResult {
-            content,
-            is_error: false,
-        } => {
-            let ToolCallResponseContent::Text { text } = content
-                .first()
-                .ok_or(anyhow!("No content in tool call response"))?;
-            Ok(text.to_owned().into_bytes())
+        let body = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": request.tool_name,
+            "arguments": arguments
         }
-        // We might want to represent a failed tool call in the wit world and pass it to the model.
-        // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
-        ToolCallResponseResult {
-            content,
-            is_error: true,
-        } => {
-            // Even for errors messages, we expect a text response for each tool call. So if there is no
-            // text, the error is not a tool call failed, but rather a bad response by the MCP server.
-            let ToolCallResponseContent::Text { text } = content
-                .first()
-                .ok_or(anyhow!("No content in tool call response"))?;
-            Err(ToolError::ToolCallFailed(text.to_owned()))
+        });
+        let response = client
+            .post(mcp_address)
+            // MCP server want exactly these two headers, even a wildcard is not accepted
+            .header("accept", "application/json,text/event-stream")
+            .json(&body)
+            .send()
+            .await
+            .map_err(anyhow::Error::from)?;
+
+        let tool_response = json_rpc_response_from_http::<ToolCallResponse>(response).await?;
+        match tool_response.result {
+            ToolCallResponseResult {
+                content,
+                is_error: false,
+            } => {
+                let ToolCallResponseContent::Text { text } = content
+                    .first()
+                    .ok_or(anyhow!("No content in tool call response"))?;
+                Ok(text.to_owned().into_bytes())
+            }
+            // We might want to represent a failed tool call in the wit world and pass it to the model.
+            // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
+            ToolCallResponseResult {
+                content,
+                is_error: true,
+            } => {
+                // Even for errors messages, we expect a text response for each tool call. So if there is no
+                // text, the error is not a tool call failed, but rather a bad response by the MCP server.
+                let ToolCallResponseContent::Text { text } = content
+                    .first()
+                    .ok_or(anyhow!("No content in tool call response"))?;
+                Err(ToolError::ToolCallFailed(text.to_owned()))
+            }
         }
     }
 }
@@ -408,7 +417,9 @@ pub mod tests {
                 },
             ],
         };
-        let response = invoke_tool(request, mcp.address(), TracingContext::dummy())
+        let client = McpClient;
+        let response = client
+            .invoke_tool(request, mcp.address(), TracingContext::dummy())
             .await
             .unwrap();
         let response = String::from_utf8(response).unwrap();
@@ -432,7 +443,9 @@ pub mod tests {
                 },
             ],
         };
-        let response = invoke_tool(request, mcp.address(), TracingContext::dummy())
+        let client = McpClient;
+        let response = client
+            .invoke_tool(request, mcp.address(), TracingContext::dummy())
             .await
             .unwrap();
         let response = String::from_utf8(response).unwrap();
@@ -447,7 +460,9 @@ pub mod tests {
             tool_name: "unknown".to_owned(),
             arguments: vec![],
         };
-        let response = invoke_tool(request, mcp.address(), TracingContext::dummy())
+        let client = McpClient;
+        let response = client
+            .invoke_tool(request, mcp.address(), TracingContext::dummy())
             .await
             .unwrap_err();
         assert!(matches!(response, ToolError::ToolCallFailed(_)));
@@ -461,7 +476,9 @@ pub mod tests {
             tool_name: "saboteur".to_owned(),
             arguments: vec![],
         };
-        let response = invoke_tool(request, mcp.address(), TracingContext::dummy())
+        let client = McpClient;
+        let response = client
+            .invoke_tool(request, mcp.address(), TracingContext::dummy())
             .await
             .unwrap_err();
         assert_eq!(
