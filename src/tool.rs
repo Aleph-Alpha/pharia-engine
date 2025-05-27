@@ -10,6 +10,30 @@ use std::collections::HashMap;
 
 use crate::logging::TracingContext;
 
+pub trait ToolApi {
+    fn invoke_tool(
+        &self,
+        request: InvokeRequest,
+        tracing_context: TracingContext,
+    ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send;
+}
+
+#[derive(Clone)]
+pub struct Tool;
+
+impl ToolApi for Tool {
+    fn invoke_tool(
+        &self,
+        _request: InvokeRequest,
+        _tracing_context: TracingContext,
+    ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send {
+        async {
+            const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
+            invoke_tool(_request, MCP_SERVER_ADDRESS, _tracing_context).await
+        }
+    }
+}
+
 pub struct Argument {
     pub name: String,
     pub value: Vec<u8>,
