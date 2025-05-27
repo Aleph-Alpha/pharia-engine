@@ -104,7 +104,7 @@ impl Kernel {
             inference: inference.api(),
             search: search.api(),
             tokenizers: tokenizers.api(),
-            tool,
+            tool: tool.api(),
         };
 
         let registry_config = app_config.namespaces().registry_config();
@@ -120,6 +120,7 @@ impl Kernel {
 
         let mut namespace_watcher = NamespaceWatcher::with_config(
             skill_store.api(),
+            tool.api(),
             loaders,
             app_config.namespace_update_interval(),
         );

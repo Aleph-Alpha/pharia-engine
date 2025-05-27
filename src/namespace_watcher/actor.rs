@@ -5,7 +5,9 @@ use async_trait::async_trait;
 use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
 
-use crate::{skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::SkillPath};
+use crate::{
+    skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::SkillPath, tool::ToolApi,
+};
 
 use super::{
     Namespace, NamespaceConfigs, NamespaceDescriptionLoader,
@@ -83,6 +85,7 @@ impl NamespaceWatcher {
 
     pub fn with_config(
         skill_store_api: impl SkillStoreApi + Send + Sync + 'static,
+        tool_api: impl ToolApi + Send + 'static,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -93,6 +96,7 @@ impl NamespaceWatcher {
                 ready_sender,
                 shutdown_receiver,
                 skill_store_api,
+                tool_api,
                 config,
                 update_interval,
             )
@@ -112,10 +116,11 @@ impl NamespaceWatcher {
     }
 }
 
-struct NamespaceWatcherActor<S> {
+struct NamespaceWatcherActor<S, T> {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_store_api: S,
+    tool_api: T,
     config: Box<dyn ObservableConfig + Send + Sync>,
     update_interval: Duration,
     skills: HashMap<Namespace, Vec<SkillDescription>>,
@@ -157,14 +162,16 @@ impl Diff {
     }
 }
 
-impl<S> NamespaceWatcherActor<S>
+impl<S, T> NamespaceWatcherActor<S, T>
 where
     S: SkillStoreApi,
+    T: ToolApi,
 {
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_store_api: S,
+        tool_api: T,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -172,6 +179,7 @@ where
             ready,
             shutdown,
             skill_store_api,
+            tool_api,
             config,
             update_interval,
             skills: HashMap::new(),
@@ -286,6 +294,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::skill_store::tests::SkillStoreDummy;
+    use crate::tool::tests::ToolDouble;
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill_store::tests::SkillStoreMsg,
@@ -386,7 +395,9 @@ pub mod tests {
             },
         ];
 
-        let diff = NamespaceWatcherActor::<SkillStoreDummy>::compute_diff(&existing, &incoming);
+        let diff = NamespaceWatcherActor::<SkillStoreDummy, ToolDouble>::compute_diff(
+            &existing, &incoming,
+        );
 
         // when the observer checks for new skills
         assert_eq!(
@@ -412,7 +423,7 @@ pub mod tests {
         };
 
         // When the observer checks for new skills
-        let diff = NamespaceWatcherActor::<SkillStoreDummy>::compute_diff(
+        let diff = NamespaceWatcherActor::<SkillStoreDummy, ToolDouble>::compute_diff(
             &[existing.clone()],
             &[incoming.clone()],
         );
@@ -427,7 +438,8 @@ pub mod tests {
         // Given a config that take forever to load
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
-        let mut observer = NamespaceWatcher::with_config(SkillStoreDummy, config, update_interval);
+        let mut observer =
+            NamespaceWatcher::with_config(SkillStoreDummy, ToolDouble, config, update_interval);
 
         // When waiting for the first pass
         let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
@@ -501,7 +513,8 @@ pub mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(1);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let mut observer = NamespaceWatcher::with_config(sender, stub_config, update_interval);
+        let mut observer =
+            NamespaceWatcher::with_config(sender, ToolDouble, stub_config, update_interval);
         observer.wait_for_ready().await;
 
         // Then one new skill message is send for each skill configured
@@ -521,7 +534,7 @@ pub mod tests {
         observer.wait_for_shutdown().await;
     }
 
-    impl<S> NamespaceWatcherActor<S>
+    impl<S> NamespaceWatcherActor<S, ToolDouble>
     where
         S: SkillStoreApi + Send + Sync,
     {
@@ -536,6 +549,7 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api,
+                tool_api: ToolDouble,
                 config,
                 update_interval: Duration::from_millis(1),
                 skills,
@@ -634,7 +648,8 @@ pub mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(1);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let observer = NamespaceWatcher::with_config(sender, stub_config, update_interval);
+        let observer =
+            NamespaceWatcher::with_config(sender, ToolDouble, stub_config, update_interval);
 
         // Then only one new skill message is send for each skill configured
         receiver.recv().await.unwrap();
@@ -663,7 +678,8 @@ pub mod tests {
             ]))));
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
-        let mut observer = NamespaceWatcher::with_config(sender, config, update_interval);
+        let mut observer =
+            NamespaceWatcher::with_config(sender, ToolDouble, config, update_interval);
         observer.wait_for_ready().await;
         receiver.recv().await.unwrap();
 
