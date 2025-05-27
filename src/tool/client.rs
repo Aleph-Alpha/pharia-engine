@@ -20,19 +20,6 @@ impl McpClient {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ToolCallResult {
-    content: Vec<ToolCallResponseContent>,
-    is_error: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum ToolCallResponseContent {
-    Text { text: String },
-}
-
 impl ToolClient for McpClient {
     async fn invoke_tool(
         &self,
@@ -40,6 +27,18 @@ impl ToolClient for McpClient {
         mcp_address: &str,
         _tracing_context: TracingContext,
     ) -> Result<Vec<u8>, ToolError> {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ToolCallResult {
+            content: Vec<ToolCallResponseContent>,
+            is_error: bool,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(tag = "type", rename_all = "snake_case")]
+        enum ToolCallResponseContent {
+            Text { text: String },
+        }
         Self::initialize(mcp_address).await?;
 
         let client = Client::new();
@@ -99,54 +98,6 @@ impl ToolClient for McpClient {
 }
 
 impl McpClient {
-    /// Conditionally parse the response from either an SSE stream or a JSON object.
-    ///
-    /// If the input contains any number of JSON-RPC requests, the server MUST either return
-    /// Content-Type: text/event-stream, to initiate an SSE stream, or
-    /// Content-Type: application/json, to return one JSON object.
-    /// The client MUST support both these cases.
-    /// See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#sending-messages-to-the-server>
-    async fn json_rpc_result_from_http<T>(response: Response) -> anyhow::Result<T>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        #[derive(Deserialize)]
-        struct JsonRpcResponse<T> {
-            result: T,
-        }
-
-        let content_type = response
-            .headers()
-            .get(header::CONTENT_TYPE)
-            .ok_or_else(|| anyhow!("No content type in response header"))?
-            .to_str()?;
-        match content_type {
-            "application/json" => {
-                let data = response.json().await?;
-                Ok(serde_json::from_value::<JsonRpcResponse<T>>(data)?.result)
-            }
-            "text/event-stream" => {
-                // We may get different type of results in the stream.
-                // A client may send different notification types before sending the result we are interested in.
-                // For now, we ignore these notification, which can include progress notifications, but also
-                // log messages. See <https://modelcontextprotocol.io/specification/2025-03-26/basic#notifications>
-                let mut stream = response.bytes_stream();
-                while let Some(Ok(item)) = stream.next().await {
-                    let item = String::from_utf8(item.to_vec())?;
-                    let data = item
-                        .split("data: ")
-                        .nth(1)
-                        .ok_or_else(|| anyhow!("No data in stream"))?;
-                    if let Ok(value) = serde_json::from_str::<JsonRpcResponse<T>>(data) {
-                        return Ok(value.result);
-                    }
-                }
-                Err(anyhow!("Expected JSON-RPC response not found in stream"))
-            }
-            _ => Err(anyhow!("unexpected content type"))?,
-        }
-    }
-
     /// The initialization phase MUST be the first interaction between client and server.
     /// During this phase, the client and server:
     /// - Establish protocol version compatibility
@@ -223,6 +174,54 @@ impl McpClient {
         }
 
         Ok(())
+    }
+
+    /// Conditionally parse the response from either an SSE stream or a JSON object.
+    ///
+    /// If the input contains any number of JSON-RPC requests, the server MUST either return
+    /// Content-Type: text/event-stream, to initiate an SSE stream, or
+    /// Content-Type: application/json, to return one JSON object.
+    /// The client MUST support both these cases.
+    /// See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#sending-messages-to-the-server>
+    async fn json_rpc_result_from_http<T>(response: Response) -> anyhow::Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        #[derive(Deserialize)]
+        struct JsonRpcResponse<T> {
+            result: T,
+        }
+
+        let content_type = response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .ok_or_else(|| anyhow!("No content type in response header"))?
+            .to_str()?;
+        match content_type {
+            "application/json" => {
+                let data = response.json().await?;
+                Ok(serde_json::from_value::<JsonRpcResponse<T>>(data)?.result)
+            }
+            "text/event-stream" => {
+                // We may get different type of results in the stream.
+                // A client may send different notification types before sending the result we are interested in.
+                // For now, we ignore these notification, which can include progress notifications, but also
+                // log messages. See <https://modelcontextprotocol.io/specification/2025-03-26/basic#notifications>
+                let mut stream = response.bytes_stream();
+                while let Some(Ok(item)) = stream.next().await {
+                    let item = String::from_utf8(item.to_vec())?;
+                    let data = item
+                        .split("data: ")
+                        .nth(1)
+                        .ok_or_else(|| anyhow!("No data in stream"))?;
+                    if let Ok(value) = serde_json::from_str::<JsonRpcResponse<T>>(data) {
+                        return Ok(value.result);
+                    }
+                }
+                Err(anyhow!("Expected JSON-RPC response not found in stream"))
+            }
+            _ => Err(anyhow!("unexpected content type"))?,
+        }
     }
 }
 #[cfg(test)]
