@@ -12,11 +12,14 @@ use serde_json::{Value, json};
 
 use super::{InvokeRequest, ToolError, actor::ToolClient};
 
-pub struct McpClient {}
+pub struct McpClient {
+    client: Client,
+}
 
 impl McpClient {
     pub fn new() -> Self {
-        Self {}
+        let client = Client::new();
+        Self { client }
     }
 }
 
@@ -39,9 +42,8 @@ impl ToolClient for McpClient {
         enum ToolCallResponseContent {
             Text { text: String },
         }
-        Self::initialize(mcp_address).await?;
+        self.initialize(mcp_address).await?;
 
-        let client = Client::new();
         let arguments = request
             .arguments
             .into_iter()
@@ -60,7 +62,8 @@ impl ToolClient for McpClient {
             "arguments": arguments
         }
         });
-        let response = client
+        let response = self
+            .client
             .post(mcp_address)
             // MCP server want exactly these two headers, even a wildcard is not accepted
             .header("accept", "application/json,text/event-stream")
@@ -105,7 +108,7 @@ impl McpClient {
     /// - Share implementation details
     ///
     /// See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle#initialization>
-    pub async fn initialize(mcp_address: &str) -> Result<(), ToolError> {
+    pub async fn initialize(&self, mcp_address: &str) -> Result<(), ToolError> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct InitializeResult {
@@ -130,8 +133,8 @@ impl McpClient {
             }
         });
 
-        let client = Client::new();
-        let response = client
+        let response = self
+            .client
             .post(mcp_address)
             .header("accept", "application/json,text/event-stream")
             .json(&body)
@@ -159,7 +162,8 @@ impl McpClient {
             "method": "notifications/initialized",
         });
 
-        let response = client
+        let response = self
+            .client
             .post(mcp_address)
             .header("accept", "application/json,text/event-stream")
             .json(&body)
@@ -323,6 +327,7 @@ pub mod tests {
     async fn initialize_request() {
         let mcp = given_sse_mcp_server().await;
 
-        McpClient::initialize(mcp.address()).await.unwrap();
+        let client = McpClient::new();
+        client.initialize(mcp.address()).await.unwrap();
     }
 }
