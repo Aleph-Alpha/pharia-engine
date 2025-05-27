@@ -22,15 +22,13 @@ pub trait ToolApi {
 pub struct Tool;
 
 impl ToolApi for Tool {
-    fn invoke_tool(
+    async fn invoke_tool(
         &self,
-        _request: InvokeRequest,
-        _tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send {
-        async {
-            const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
-            invoke_tool(_request, MCP_SERVER_ADDRESS, _tracing_context).await
-        }
+        request: InvokeRequest,
+        tracing_context: TracingContext,
+    ) -> Result<Vec<u8>, ToolError> {
+        const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
+        invoke_tool(request, MCP_SERVER_ADDRESS, tracing_context).await
     }
 }
 
