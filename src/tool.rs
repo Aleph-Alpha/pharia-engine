@@ -61,29 +61,29 @@ where
         .headers()
         .get(header::CONTENT_TYPE)
         .ok_or_else(|| anyhow!("No content type in response header"))?
-        .to_str()
-        .map_err(Into::<anyhow::Error>::into)?;
+        .to_str()?;
     match content_type {
         "application/json" => {
-            let data = response.json().await.map_err(Into::<anyhow::Error>::into)?;
+            let data = response.json().await?;
             Ok(serde_json::from_value::<T>(data)?)
         }
         "text/event-stream" => {
+            // We may get different type of results in the stream.
+            // A client may send different notification types before sending the result we are interested in.
+            // For now, we ignore these notification, which can include progress notifications, but also
+            // log messages. See <https://modelcontextprotocol.io/specification/2025-03-26/basic#notifications>
             let mut stream = response.bytes_stream();
-
-            let item = stream
-                .next()
-                .await
-                .ok_or_else(|| anyhow!("No item in stream"))?
-                .map(|item| String::from_utf8(item.to_vec()))
-                .map_err(Into::<anyhow::Error>::into)?
-                .map_err(Into::<anyhow::Error>::into)?;
-
-            let data = item
-                .split("data: ")
-                .nth(1)
-                .ok_or_else(|| anyhow!("No data in stream"))?;
-            Ok(serde_json::from_str::<T>(data)?)
+            while let Some(Ok(item)) = stream.next().await {
+                let item = String::from_utf8(item.to_vec())?;
+                let data = item
+                    .split("data: ")
+                    .nth(1)
+                    .ok_or_else(|| anyhow!("No data in stream"))?;
+                if let Ok(value) = serde_json::from_str::<T>(data) {
+                    return Ok(value);
+                }
+            }
+            Err(anyhow!("Expected JSON-RPC response not found in stream"))
         }
         _ => Err(anyhow!("unexpected content type"))?,
     }
