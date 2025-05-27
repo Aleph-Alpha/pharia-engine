@@ -961,6 +961,216 @@ pub mod tests {
         }
     }
 
+    /// This trait provides default unimplemented versions of the CSI methods. It allows to
+    /// construct test doubles for the CSI where only some methods are implemented.
+    pub trait CsiDouble {
+        fn explain(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<ExplanationRequest>,
+        ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send {
+            async { unimplemented!() }
+        }
+
+        fn complete(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<CompletionRequest>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send {
+            async { unimplemented!() }
+        }
+
+        fn completion_stream(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _request: CompletionRequest,
+        ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send
+        {
+            async { unimplemented!() }
+        }
+
+        fn chunk(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<ChunkRequest>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send {
+            async { unimplemented!() }
+        }
+
+        fn chat(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<ChatRequest>,
+        ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send {
+            async { unimplemented!() }
+        }
+
+        fn chat_stream(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _request: ChatRequest,
+        ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send
+        {
+            async { unimplemented!() }
+        }
+
+        fn select_language(
+            &self,
+            _requests: Vec<SelectLanguageRequest>,
+            _tracing_context: TracingContext,
+        ) -> impl Future<Output = anyhow::Result<Vec<Option<Language>>>> + Send {
+            async { unimplemented!() }
+        }
+
+        fn search(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<SearchRequest>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send {
+            async { unimplemented!() }
+        }
+
+        fn documents(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<DocumentPath>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send {
+            async { unimplemented!() }
+        }
+
+        fn document_metadata(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _document_paths: Vec<DocumentPath>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send {
+            async { unimplemented!() }
+        }
+
+        fn invoke_tool(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<InvokeRequest>,
+        ) -> impl Future<Output = Result<Vec<Vec<u8>>, ToolError>> + Send {
+            async { unimplemented!() }
+        }
+    }
+
+    /// Forwards the implementation of [`CsiForSkillsDouble`].
+    impl<C> Csi for C
+    where
+        C: CsiDouble + Send,
+    {
+        fn explain(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            requests: Vec<ExplanationRequest>,
+        ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send {
+            self.explain(auth, tracing_context, requests)
+        }
+
+        fn complete(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            requests: Vec<CompletionRequest>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send {
+            self.complete(auth, tracing_context, requests)
+        }
+
+        fn completion_stream(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            request: CompletionRequest,
+        ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send
+        {
+            self.completion_stream(auth, tracing_context, request)
+        }
+
+        fn chunk(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            requests: Vec<ChunkRequest>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send {
+            self.chunk(auth, tracing_context, requests)
+        }
+
+        fn chat(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            requests: Vec<ChatRequest>,
+        ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send {
+            self.chat(auth, tracing_context, requests)
+        }
+
+        fn chat_stream(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            request: ChatRequest,
+        ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send
+        {
+            self.chat_stream(auth, tracing_context, request)
+        }
+
+        fn select_language(
+            &self,
+            requests: Vec<SelectLanguageRequest>,
+            tracing_context: TracingContext,
+        ) -> impl Future<Output = anyhow::Result<Vec<Option<Language>>>> + Send {
+            self.select_language(requests, tracing_context)
+        }
+
+        fn search(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            requests: Vec<SearchRequest>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send {
+            self.search(auth, tracing_context, requests)
+        }
+
+        fn documents(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            requests: Vec<DocumentPath>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send {
+            self.documents(auth, tracing_context, requests)
+        }
+
+        fn document_metadata(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            requests: Vec<DocumentPath>,
+        ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send {
+            self.document_metadata(auth, tracing_context, requests)
+        }
+
+        fn invoke_tool(
+            &self,
+            auth: String,
+            tracing_context: TracingContext,
+            requests: Vec<InvokeRequest>,
+        ) -> impl Future<Output = Result<Vec<Vec<u8>>, ToolError>> + Send {
+            self.invoke_tool(auth, tracing_context, requests)
+        }
+    }
+
     #[derive(Clone)]
     pub struct CsiDummy;
 
