@@ -581,52 +581,13 @@ pub mod tests {
     #[derive(Clone)]
     pub struct CsiSaboteur;
 
-    impl Csi for CsiSaboteur {
-        async fn explain(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<ExplanationRequest>,
-        ) -> Result<Vec<Explanation>, CsiError> {
-            Err(CsiError::Any(anyhow!("Test error")))
-        }
+    impl CsiDouble for CsiSaboteur {
         async fn complete(
             &self,
             _auth: String,
             _tracing_context: TracingContext,
             _requests: Vec<CompletionRequest>,
         ) -> anyhow::Result<Vec<Completion>> {
-            bail!("Test error")
-        }
-
-        async fn completion_stream(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _request: CompletionRequest,
-        ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
-            let (send, recv) = mpsc::channel(1);
-            send.send(Err(InferenceError::Other(anyhow!("Test error"))))
-                .await
-                .unwrap();
-            recv
-        }
-
-        async fn chunk(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<ChunkRequest>,
-        ) -> anyhow::Result<Vec<Vec<Chunk>>> {
-            bail!("Test error")
-        }
-
-        async fn chat(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<ChatRequest>,
-        ) -> anyhow::Result<Vec<ChatResponse>> {
             bail!("Test error")
         }
 
@@ -641,50 +602,6 @@ pub mod tests {
                 .await
                 .unwrap();
             recv
-        }
-
-        async fn select_language(
-            &self,
-            _requests: Vec<SelectLanguageRequest>,
-            _tracing_context: TracingContext,
-        ) -> anyhow::Result<Vec<Option<Language>>> {
-            bail!("Test error")
-        }
-
-        async fn search(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<SearchRequest>,
-        ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
-            bail!("Test error")
-        }
-
-        async fn documents(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<DocumentPath>,
-        ) -> anyhow::Result<Vec<Document>> {
-            bail!("Test error")
-        }
-
-        async fn document_metadata(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _document_paths: Vec<DocumentPath>,
-        ) -> anyhow::Result<Vec<Option<Value>>> {
-            bail!("Test error")
-        }
-
-        async fn invoke_tool(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<InvokeRequest>,
-        ) -> Result<Vec<Vec<u8>>, ToolError> {
-            Err(ToolError::Other(anyhow!("Test error")))
         }
     }
 
