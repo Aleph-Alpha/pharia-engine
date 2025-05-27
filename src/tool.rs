@@ -8,6 +8,8 @@ use serde_json::Value;
 use serde_json::json;
 use std::collections::HashMap;
 
+use crate::logging::TracingContext;
+
 pub struct Argument {
     pub name: String,
     pub value: Vec<u8>,
@@ -88,7 +90,11 @@ where
     }
 }
 
-pub async fn invoke_tool(request: InvokeRequest, mcp_address: &str) -> Result<Vec<u8>, ToolError> {
+pub async fn invoke_tool(
+    request: InvokeRequest,
+    mcp_address: &str,
+    _tracing_context: TracingContext,
+) -> Result<Vec<u8>, ToolError> {
     initialize(mcp_address).await?;
 
     let client = Client::new();
@@ -252,7 +258,9 @@ mod test {
                 },
             ],
         };
-        let response = invoke_tool(request, mcp.address()).await.unwrap();
+        let response = invoke_tool(request, mcp.address(), TracingContext::dummy())
+            .await
+            .unwrap();
         let response = String::from_utf8(response).unwrap();
         assert_eq!(response, "3");
     }
@@ -274,7 +282,9 @@ mod test {
                 },
             ],
         };
-        let response = invoke_tool(request, mcp.address()).await.unwrap();
+        let response = invoke_tool(request, mcp.address(), TracingContext::dummy())
+            .await
+            .unwrap();
         let response = String::from_utf8(response).unwrap();
         assert_eq!(response, "3");
     }
@@ -287,7 +297,9 @@ mod test {
             tool_name: "unknown".to_owned(),
             arguments: vec![],
         };
-        let response = invoke_tool(request, mcp.address()).await.unwrap_err();
+        let response = invoke_tool(request, mcp.address(), TracingContext::dummy())
+            .await
+            .unwrap_err();
         assert!(matches!(response, ToolError::ToolCallFailed(_)));
     }
 
@@ -299,7 +311,9 @@ mod test {
             tool_name: "saboteur".to_owned(),
             arguments: vec![],
         };
-        let response = invoke_tool(request, mcp.address()).await.unwrap_err();
+        let response = invoke_tool(request, mcp.address(), TracingContext::dummy())
+            .await
+            .unwrap_err();
         assert_eq!(
             response.to_string(),
             "Error executing tool saboteur: Out of cheese."
