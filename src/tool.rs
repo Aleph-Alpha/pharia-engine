@@ -38,10 +38,9 @@ struct ToolCallResponse {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ToolError {
+    // We plan on passing this error variant to the Skills and model.
     #[error("{0}")]
     ToolCallFailed(String),
-    #[error("The proposed protocol version {0} from the MCP server is not supported.")]
-    InvalidProtocolVersion(String),
     #[error("The tool call could not be executed, original error: {0}")]
     Other(#[from] anyhow::Error),
 }
@@ -131,6 +130,8 @@ pub async fn invoke_tool(request: InvokeRequest, mcp_address: &str) -> Result<Ve
                 .ok_or(anyhow!("No content in tool call response"))?;
             Ok(text.to_owned().into_bytes())
         }
+        // We might want to represent a failed tool call in the wit world and pass it to the model.
+        // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
         ToolCallResponseResult {
             content,
             is_error: true,
@@ -198,9 +199,10 @@ pub async fn initialize(mcp_address: &str) -> Result<(), ToolError> {
     // This SHOULD be the latest version supported by the server.
     // If the client does not support the version in the server's response, it SHOULD disconnect.
     if !SUPPORTED_PROTOCOL_VERSIONS.contains(&response.result.protocol_version.as_str()) {
-        return Err(ToolError::InvalidProtocolVersion(
+        return Err(anyhow!(
+            "The proposed protocol version {} from the MCP server is not supported.",
             response.result.protocol_version,
-        ));
+        ))?;
     }
 
     // After successful initialization, the client MUST send an initialized notification to
