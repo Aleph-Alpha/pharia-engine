@@ -36,6 +36,7 @@ use skill_loader::SkillLoader;
 use skill_store::SkillStore;
 use skills::Engine;
 use tokenizers::Tokenizers;
+use tool::Tool;
 use tracing::error;
 
 use self::{inference::Inference, skill_runtime::SkillRuntime};
@@ -102,6 +103,7 @@ impl Kernel {
             inference: inference.api(),
             search: search.api(),
             tokenizers: tokenizers.api(),
+            tool: Tool,
         };
 
         let registry_config = app_config.namespaces().registry_config();

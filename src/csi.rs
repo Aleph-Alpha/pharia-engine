@@ -16,7 +16,7 @@ use crate::{
     logging::TracingContext,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
-    tool::{InvokeRequest, ToolError, invoke_tool},
+    tool::{InvokeRequest, Tool, ToolApi, ToolError},
 };
 
 /// `CompletionStreamId` is a unique identifier for a completion stream.
@@ -35,6 +35,7 @@ pub struct CsiDrivers<I, S, T> {
     pub inference: I,
     pub search: S,
     pub tokenizers: T,
+    pub tool: Tool,
 }
 
 /// Cognitive System Interface (CSI) as consumed by Skill developers. In particular some accidental
@@ -523,8 +524,6 @@ where
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
     ) -> Result<Vec<Vec<u8>>, ToolError> {
-        const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
-
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "invoke_tool")])
             .increment(requests.len() as u64);
 
@@ -549,7 +548,7 @@ where
                         "invoke_tool",
                         tool_name = request.tool_name
                     );
-                    invoke_tool(request, MCP_SERVER_ADDRESS, context)
+                    self.tool.invoke_tool(request, context)
                 })
                 .collect::<Vec<_>>(),
         )
@@ -958,6 +957,7 @@ pub mod tests {
             inference: InferenceStub::new(),
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
+            tool: Tool,
         }
     }
 
