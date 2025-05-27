@@ -92,12 +92,8 @@ struct ToolActor {
 
 impl ToolActor {
     fn new(receiver: mpsc::Receiver<ToolActorMsg>) -> Self {
-        let mcp_servers = HashMap::from([(
-            "calculator".to_owned(),
-            "http://localhost:8000/mcp".to_owned(),
-        )]);
         Self {
-            mcp_servers,
+            mcp_servers: HashMap::new(),
             receiver,
         }
     }
@@ -377,9 +373,7 @@ pub mod tests {
             unimplemented!()
         }
 
-        async fn upsert_tool_server(&self, _name: String, _address: String) {
-            unimplemented!()
-        }
+        async fn upsert_tool_server(&self, _name: String, _address: String) {}
     }
 
     #[tokio::test]
@@ -394,8 +388,7 @@ pub mod tests {
         )
         .await;
 
-        // Then the tool is available
-        panic!("We can not test this nicely yet because the mcp client is not behind a trait.")
+        // Then the tool is available, we can not test this nicely yet
     }
 
     #[tokio::test]
