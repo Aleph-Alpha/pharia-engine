@@ -16,7 +16,8 @@ pub trait ToolApi {
 
     fn upsert_tool_server(&self, name: String, address: String) -> impl Future<Output = ()> + Send;
 
-    fn list_tools(&self) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send;
+    #[allow(dead_code)]
+    fn list_tools(&self) -> impl Future<Output = Vec<String>> + Send;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -24,6 +25,9 @@ pub enum ToolError {
     // We plan on passing this error variant to the Skills and model.
     #[error("{0}")]
     ToolCallFailed(String),
+    // This variant should also be exposed to the Skill, as the model can recover from this.
+    #[error("Tool {0} not found on any server.")]
+    ToolNotFound(String),
     #[error("The tool call could not be executed, original error: {0}")]
     Other(#[from] anyhow::Error),
 }
@@ -79,7 +83,7 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         self.send(msg).await.unwrap();
     }
 
-    async fn list_tools(&self) -> Result<Vec<String>, anyhow::Error> {
+    async fn list_tools(&self) -> Vec<String> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::ListTools { send };
         self.send(msg).await.unwrap();
@@ -98,7 +102,7 @@ enum ToolMsg {
         address: String,
     },
     ListTools {
-        send: oneshot::Sender<Result<Vec<String>, anyhow::Error>>,
+        send: oneshot::Sender<Vec<String>>,
     },
 }
 
@@ -148,19 +152,45 @@ impl<T: ToolClient> ToolActor<T> {
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> Result<Vec<u8>, ToolError> {
-        // We always expect to have a calculator MCP server.
-        let mcp_address = self.mcp_servers.get("calculator").unwrap();
+        let mcp_address = self
+            .server_for_tool(&request.tool_name)
+            .await
+            .ok_or(ToolError::ToolNotFound(request.tool_name.clone()))?;
         self.client
             .invoke_tool(request, mcp_address, tracing_context)
             .await
     }
 
-    async fn list_tools(&self) -> Result<Vec<String>, anyhow::Error> {
-        let mut tools = vec![];
+    /// Returns all tools found on any of the configured tool servers.
+    ///
+    /// We do not return a result here, but ignore MCP servers that are giving errors.
+    /// A skill only is interested in a subset of tools. At some layer, we need to trade in
+    /// tool names for the json schema. There would be the appropriate place to decide if the
+    /// available information is enough.
+    async fn list_tools(&self) -> Vec<String> {
+        let mut all_tools = vec![];
         for address in self.mcp_servers.values() {
-            tools.extend(self.client.list_tools(address).await?);
+            if let Ok(tools) = self.client.list_tools(address).await {
+                all_tools.extend(tools);
+            }
         }
-        Ok(tools)
+        all_tools
+    }
+
+    /// Which server hosts this tool?
+    ///
+    /// We do not return a result here, but ignore MCP servers that are giving errors.
+    /// We do not want to allow one bad server to prevent a skill which does not rely on that
+    /// particular server from being invoked successfully.
+    async fn server_for_tool(&self, tool: &str) -> Option<&str> {
+        for address in self.mcp_servers.values() {
+            if let Ok(tools) = self.client.list_tools(address).await {
+                if tools.contains(&tool.to_owned()) {
+                    return Some(address);
+                }
+            }
+        }
+        None
     }
 }
 
@@ -192,6 +222,7 @@ pub trait ToolClient: Send + Sync + 'static {
 pub mod tests {
     use std::sync::Arc;
 
+    use serde_json::json;
     use tokio::sync::Mutex;
 
     use crate::{logging::TracingContext, tool::Tool};
@@ -211,7 +242,7 @@ pub mod tests {
 
         async fn upsert_tool_server(&self, _name: String, _address: String) {}
 
-        async fn list_tools(&self) -> Result<Vec<String>, anyhow::Error> {
+        async fn list_tools(&self) -> Vec<String> {
             unimplemented!()
         }
     }
@@ -222,24 +253,44 @@ pub mod tests {
     impl ToolClient for ToolClientMock {
         async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
             if mcp_address == "http://localhost:8000/mcp" {
-                Ok(vec!["stub_tool".to_owned()])
+                Ok(vec!["add".to_owned()])
             } else {
-                Ok(vec![])
+                panic!("This client only knows the localhost:8000 mcp server")
             }
         }
 
         async fn invoke_tool(
             &self,
             _request: InvokeRequest,
-            _mcp_address: &str,
+            mcp_address: &str,
             _tracing_context: TracingContext,
         ) -> Result<Vec<u8>, ToolError> {
-            unimplemented!()
+            if mcp_address == "http://localhost:8000/mcp" {
+                Ok(json!("Success").to_string().into_bytes())
+            } else {
+                panic!("This client only knows the localhost:8000 mcp server")
+            }
         }
     }
 
     #[tokio::test]
-    async fn tool_server_is_upserted() {
+    async fn invoking_unknown_without_servers_gives_tool_not_found() {
+        // Given a tool client
+        let tool = Tool::with_client(ToolClientMock).api();
+
+        // When we invoke an unknown tool
+        let request = InvokeRequest {
+            tool_name: "unknown".to_owned(),
+            arguments: vec![],
+        };
+        let result = tool.invoke_tool(request, TracingContext::dummy()).await;
+
+        // Then we get a tool not found error
+        assert!(matches!(result, Err(ToolError::ToolNotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn tool_server_is_available_after_being_upserted() {
         // Given a tool client that only reports tools for a particular url
         let tool = Tool::with_client(ToolClientMock).api();
 
@@ -250,9 +301,16 @@ pub mod tests {
         )
         .await;
 
-        // Then the tools of that tool server are available
-        let tools = tool.list_tools().await.unwrap();
-        assert_eq!(tools, vec!["stub_tool".to_owned()]);
+        // Then the calculator tool can be invoked
+        let request = InvokeRequest {
+            tool_name: "add".to_owned(),
+            arguments: vec![],
+        };
+        let result = tool
+            .invoke_tool(request, TracingContext::dummy())
+            .await
+            .unwrap();
+        assert_eq!(result, json!("Success").to_string().into_bytes());
     }
 
     struct ToolClientSpy {
@@ -301,12 +359,158 @@ pub mod tests {
         .await;
 
         // When we ask for the list of tools
-        drop(tool.list_tools().await.unwrap());
+        drop(tool.list_tools().await);
 
         // Then both tool servers are queried
         let queried = queried.lock().await.clone();
         assert_eq!(queried.len(), 2);
         assert!(queried.contains(&"http://localhost:8000/mcp".to_owned()));
         assert!(queried.contains(&"http://localhost:8001/mcp".to_owned()));
+    }
+
+    // Given a tool client that knows about two mcp servers
+    struct TwoServerClient;
+
+    impl ToolClient for TwoServerClient {
+        async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+            match mcp_address {
+                "http://localhost:8000/mcp" => Ok(vec!["search".to_owned()]),
+                "http://localhost:8001/mcp" => Ok(vec!["calculator".to_owned()]),
+                _ => {
+                    panic!("Unknown mcp server asked for tools.")
+                }
+            }
+        }
+
+        async fn invoke_tool(
+            &self,
+            request: InvokeRequest,
+            mcp_address: &str,
+            _tracing_context: TracingContext,
+        ) -> Result<Vec<u8>, ToolError> {
+            match mcp_address {
+                "http://localhost:8000/mcp" => {
+                    assert_eq!(request.tool_name, "search");
+                    Ok(json!("search result").to_string().as_bytes().to_vec())
+                }
+                "http://localhost:8001/mcp" => {
+                    assert_eq!(request.tool_name, "calculator");
+                    Ok(json!("calculator result").to_string().as_bytes().to_vec())
+                }
+                _ => Err(ToolError::Other(anyhow::anyhow!(
+                    "Requested rooted to the wrong server."
+                ))),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn correct_mcp_server_is_called_for_tool_invocation() {
+        // Given a tool client that knows about two mcp servers
+        let tool = Tool::with_client(TwoServerClient).api();
+
+        // And given that the server is configured with these two servers
+        tool.upsert_tool_server(
+            "brave_search".to_owned(),
+            "http://localhost:8000/mcp".to_owned(),
+        )
+        .await;
+
+        tool.upsert_tool_server(
+            "calculator".to_owned(),
+            "http://localhost:8001/mcp".to_owned(),
+        )
+        .await;
+
+        // When we invoke the search tool
+        let result = tool
+            .invoke_tool(
+                InvokeRequest {
+                    tool_name: "search".to_owned(),
+                    arguments: vec![],
+                },
+                TracingContext::dummy(),
+            )
+            .await;
+
+        // Then we get the result from the brave_search server
+        assert_eq!(
+            result.unwrap(),
+            json!("search result").to_string().as_bytes().to_vec()
+        );
+    }
+
+    struct ClientOneGoodOtherBad;
+
+    impl ToolClient for ClientOneGoodOtherBad {
+        async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+            if mcp_address == "http://localhost:8000/mcp" {
+                Ok(vec!["search".to_owned()])
+            } else {
+                Err(anyhow::anyhow!("Request to mcp server timed out."))
+            }
+        }
+
+        async fn invoke_tool(
+            &self,
+            _request: InvokeRequest,
+            _mcp_address: &str,
+            _tracing_context: TracingContext,
+        ) -> Result<Vec<u8>, ToolError> {
+            Ok(json!("Success").to_string().into_bytes())
+        }
+    }
+
+    impl Tool {
+        async fn with_servers(self, servers: Vec<(&str, &str)>) -> Self {
+            let api = self.api();
+            for (name, address) in servers {
+                api.upsert_tool_server(name.to_owned(), address.to_owned())
+                    .await;
+            }
+            self
+        }
+    }
+
+    #[tokio::test]
+    async fn one_bad_mcp_server_still_allows_to_list_tools() {
+        // Given an mcp server that returns an error when listing it's tools
+        let tool = Tool::with_client(ClientOneGoodOtherBad)
+            .with_servers(vec![
+                ("search", "http://localhost:8000/mcp"),
+                ("calculator", "http://localhost:8001/mcp"),
+            ])
+            .await;
+
+        // When listing tools
+        let result = tool.api().list_tools().await;
+
+        // Then the search tool is available
+        assert_eq!(result, vec!["search".to_owned()]);
+    }
+
+    #[tokio::test]
+    async fn one_bad_mcp_server_still_allows_to_invoke_tool() {
+        // Given an mcp server that returns an error when listing it's tools
+        let tool = Tool::with_client(ClientOneGoodOtherBad)
+            .with_servers(vec![
+                ("search", "http://localhost:8000/mcp"),
+                ("calculator", "http://localhost:8001/mcp"),
+            ])
+            .await;
+
+        // When invoking a tool
+        let request = InvokeRequest {
+            tool_name: "search".to_owned(),
+            arguments: vec![],
+        };
+        let result = tool
+            .api()
+            .invoke_tool(request, TracingContext::dummy())
+            .await
+            .unwrap();
+
+        // Then the search tool is available
+        assert_eq!(result, json!("Success").to_string().into_bytes());
     }
 }
