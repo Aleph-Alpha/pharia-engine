@@ -15,6 +15,8 @@ pub trait ToolApi {
     ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send;
 
     fn upsert_tool_server(&self, name: String, address: String) -> impl Future<Output = ()> + Send;
+
+    fn list_tools(&self) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -76,6 +78,13 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         let msg = ToolMsg::UpsertToolServer { name, address };
         self.send(msg).await.unwrap();
     }
+
+    async fn list_tools(&self) -> Result<Vec<String>, anyhow::Error> {
+        let (send, receive) = oneshot::channel();
+        let msg = ToolMsg::ListTools { send };
+        self.send(msg).await.unwrap();
+        receive.await.unwrap()
+    }
 }
 
 enum ToolMsg {
@@ -87,6 +96,9 @@ enum ToolMsg {
     UpsertToolServer {
         name: String,
         address: String,
+    },
+    ListTools {
+        send: oneshot::Sender<Result<Vec<String>, anyhow::Error>>,
     },
 }
 
@@ -124,6 +136,10 @@ impl<T: ToolClient> ToolActor<T> {
             ToolMsg::UpsertToolServer { name, address } => {
                 self.mcp_servers.insert(name, address);
             }
+            ToolMsg::ListTools { send } => {
+                let result = self.list_tools().await;
+                drop(send.send(result));
+            }
         }
     }
 
@@ -137,6 +153,14 @@ impl<T: ToolClient> ToolActor<T> {
         self.client
             .invoke_tool(request, mcp_address, tracing_context)
             .await
+    }
+
+    async fn list_tools(&self) -> Result<Vec<String>, anyhow::Error> {
+        let mut tools = vec![];
+        for address in self.mcp_servers.values() {
+            tools.extend(self.client.list_tools(address).await?);
+        }
+        Ok(tools)
     }
 }
 
@@ -157,13 +181,18 @@ pub trait ToolClient: Send + Sync + 'static {
         mcp_address: &str,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send;
+
+    fn list_tools(
+        &self,
+        mcp_address: &str,
+    ) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send;
 }
 
 #[cfg(test)]
 pub mod tests {
     use crate::{logging::TracingContext, tool::Tool};
 
-    use super::{InvokeRequest, ToolApi, ToolError};
+    use super::{InvokeRequest, ToolApi, ToolClient, ToolError};
 
     pub struct ToolDouble;
 
@@ -177,12 +206,33 @@ pub mod tests {
         }
 
         async fn upsert_tool_server(&self, _name: String, _address: String) {}
+
+        async fn list_tools(&self) -> Result<Vec<String>, anyhow::Error> {
+            unimplemented!()
+        }
+    }
+
+    struct ToolClientStub;
+
+    impl ToolClient for ToolClientStub {
+        async fn list_tools(&self, _mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+            Ok(vec!["stub_tool".to_owned()])
+        }
+
+        async fn invoke_tool(
+            &self,
+            _request: InvokeRequest,
+            _mcp_address: &str,
+            _tracing_context: TracingContext,
+        ) -> Result<Vec<u8>, ToolError> {
+            unimplemented!()
+        }
     }
 
     #[tokio::test]
     async fn tool_server_is_upserted() {
         // Given a tool
-        let tool = Tool::new().api();
+        let tool = Tool::with_client(ToolClientStub).api();
 
         // When a tool server is upserted
         tool.upsert_tool_server(
@@ -191,6 +241,8 @@ pub mod tests {
         )
         .await;
 
-        // Then the tool is available, we can not test this nicely yet
+        // Then the tools of that tool server are available
+        let tools = tool.list_tools().await.unwrap();
+        assert_eq!(tools, vec!["stub_tool".to_owned()]);
     }
 }
