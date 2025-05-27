@@ -62,8 +62,7 @@ impl ToolApi for mpsc::Sender<ToolActorMsg> {
 
         // We know that the receiver is still alive as long as Tool is alive.
         self.send(msg).await.unwrap();
-        let result = receive.await.unwrap();
-        result
+        receive.await.unwrap()
     }
 }
 
@@ -76,15 +75,18 @@ enum ToolActorMsg {
 }
 
 struct ToolActor {
-    mcp_address: String,
+    mcp_servers: HashMap<String, String>,
     receiver: mpsc::Receiver<ToolActorMsg>,
 }
 
 impl ToolActor {
     fn new(receiver: mpsc::Receiver<ToolActorMsg>) -> Self {
-        const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
+        let mcp_servers = HashMap::from([(
+            "calculator".to_owned(),
+            "http://localhost:8000/mcp".to_owned(),
+        )]);
         Self {
-            mcp_address: MCP_SERVER_ADDRESS.to_owned(),
+            mcp_servers,
             receiver,
         }
     }
@@ -113,7 +115,9 @@ impl ToolActor {
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> Result<Vec<u8>, ToolError> {
-        invoke_tool(request, &self.mcp_address, tracing_context).await
+        // We always expect to have a calculator MCP server.
+        let mcp_address = self.mcp_servers.get("calculator").unwrap();
+        invoke_tool(request, mcp_address, tracing_context).await
     }
 }
 
