@@ -190,6 +190,10 @@ pub trait ToolClient: Send + Sync + 'static {
 
 #[cfg(test)]
 pub mod tests {
+    use std::sync::Arc;
+
+    use tokio::sync::Mutex;
+
     use crate::{logging::TracingContext, tool::Tool};
 
     use super::{InvokeRequest, ToolApi, ToolClient, ToolError};
@@ -212,11 +216,16 @@ pub mod tests {
         }
     }
 
-    struct ToolClientStub;
+    /// Only report tools for one particular server address
+    struct ToolClientMock;
 
-    impl ToolClient for ToolClientStub {
-        async fn list_tools(&self, _mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
-            Ok(vec!["stub_tool".to_owned()])
+    impl ToolClient for ToolClientMock {
+        async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+            if mcp_address == "http://localhost:8000/mcp" {
+                Ok(vec!["stub_tool".to_owned()])
+            } else {
+                Ok(vec![])
+            }
         }
 
         async fn invoke_tool(
@@ -231,10 +240,10 @@ pub mod tests {
 
     #[tokio::test]
     async fn tool_server_is_upserted() {
-        // Given a tool
-        let tool = Tool::with_client(ToolClientStub).api();
+        // Given a tool client that only reports tools for a particular url
+        let tool = Tool::with_client(ToolClientMock).api();
 
-        // When a tool server is upserted
+        // When a tool server is upserted with that particular url
         tool.upsert_tool_server(
             "calculator".to_owned(),
             "http://localhost:8000/mcp".to_owned(),
@@ -244,5 +253,60 @@ pub mod tests {
         // Then the tools of that tool server are available
         let tools = tool.list_tools().await.unwrap();
         assert_eq!(tools, vec!["stub_tool".to_owned()]);
+    }
+
+    struct ToolClientSpy {
+        queried: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl ToolClientSpy {
+        fn new(queried: Arc<Mutex<Vec<String>>>) -> Self {
+            Self { queried }
+        }
+    }
+
+    impl ToolClient for ToolClientSpy {
+        async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+            let mut queried = self.queried.lock().await;
+            queried.push(mcp_address.to_owned());
+            Ok(vec![])
+        }
+
+        async fn invoke_tool(
+            &self,
+            _request: InvokeRequest,
+            _mcp_address: &str,
+            _tracing_context: TracingContext,
+        ) -> Result<Vec<u8>, ToolError> {
+            unimplemented!()
+        }
+    }
+
+    #[tokio::test]
+    async fn tools_from_multiple_tool_servers_are_available() {
+        // Given a tool with two configured tool servers
+        let queried = Arc::new(Mutex::new(vec![]));
+        let tool = Tool::with_client(ToolClientSpy::new(queried.clone())).api();
+
+        tool.upsert_tool_server(
+            "calculator".to_owned(),
+            "http://localhost:8000/mcp".to_owned(),
+        )
+        .await;
+
+        tool.upsert_tool_server(
+            "brave_search".to_owned(),
+            "http://localhost:8001/mcp".to_owned(),
+        )
+        .await;
+
+        // When we ask for the list of tools
+        drop(tool.list_tools().await.unwrap());
+
+        // Then both tool servers are queried
+        let queried = queried.lock().await.clone();
+        assert_eq!(queried.len(), 2);
+        assert!(queried.contains(&"http://localhost:8000/mcp".to_owned()));
+        assert!(queried.contains(&"http://localhost:8001/mcp".to_owned()));
     }
 }
