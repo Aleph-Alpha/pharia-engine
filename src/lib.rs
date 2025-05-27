@@ -99,7 +99,7 @@ impl Kernel {
         let tokenizers = Tokenizers::new(app_config.inference_url().to_owned()).unwrap();
         let inference = Inference::new(app_config.inference_url().to_owned());
         let search = Search::new(app_config.document_index_url().to_owned());
-        let tool = Tool;
+        let tool = Tool::new();
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
             search: search.api(),
@@ -146,9 +146,14 @@ impl Kernel {
                 // In case construction of shell goes wrong (e.g. we can not bind the port) we
                 // shut down all the other actors we created so far, so they do not live on in
                 // detached threads.
+                //
+                // We shutdown actors that consume other actors first, so they never try to
+                // talk to an actor that is gone. For example: The namespace watcher talks
+                // to the tool and skill store actor, so we first shutdown the namespace watcher.
                 authorization.wait_for_shutdown().await;
                 namespace_watcher.wait_for_shutdown().await;
                 skill_runtime.wait_for_shutdown().await;
+                tool.wait_for_shutdown().await;
                 skill_store.wait_for_shutdown().await;
                 skill_loader.wait_for_shutdown().await;
                 tokenizers.wait_for_shutdown().await;

@@ -7,6 +7,9 @@ use serde::Deserialize;
 use serde_json::Value;
 use serde_json::json;
 use std::collections::HashMap;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 
 use crate::logging::TracingContext;
 
@@ -18,23 +21,99 @@ pub trait ToolApi {
     ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send;
 }
 
-#[derive(Clone)]
-pub struct Tool;
+pub struct Tool {
+    handle: JoinHandle<()>,
+    send: mpsc::Sender<ToolActorMsg>,
+}
 
 impl Tool {
-    pub fn api(&self) -> Tool {
-        self.clone()
+    pub fn new() -> Self {
+        let (send, receiver) = mpsc::channel(1);
+        let actor = ToolActor::new(receiver);
+        let handle = tokio::spawn(async move {
+            let mut actor = actor;
+            actor.run().await;
+        });
+        Self { handle, send }
+    }
+
+    pub fn api(&self) -> impl ToolApi + Send + Sync + Clone + 'static {
+        self.send.clone()
+    }
+
+    pub async fn wait_for_shutdown(self) {
+        drop(self.send);
+        self.handle.await.unwrap();
     }
 }
 
-impl ToolApi for Tool {
+impl ToolApi for mpsc::Sender<ToolActorMsg> {
     async fn invoke_tool(
         &self,
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> Result<Vec<u8>, ToolError> {
+        let (send, receive) = oneshot::channel();
+        let msg = ToolActorMsg::InvokeTool {
+            request,
+            tracing_context,
+            send,
+        };
+
+        // We know that the receiver is still alive as long as Tool is alive.
+        self.send(msg).await.unwrap();
+        let result = receive.await.unwrap();
+        result
+    }
+}
+
+enum ToolActorMsg {
+    InvokeTool {
+        request: InvokeRequest,
+        tracing_context: TracingContext,
+        send: oneshot::Sender<Result<Vec<u8>, ToolError>>,
+    },
+}
+
+struct ToolActor {
+    mcp_address: String,
+    receiver: mpsc::Receiver<ToolActorMsg>,
+}
+
+impl ToolActor {
+    fn new(receiver: mpsc::Receiver<ToolActorMsg>) -> Self {
         const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
-        invoke_tool(request, MCP_SERVER_ADDRESS, tracing_context).await
+        Self {
+            mcp_address: MCP_SERVER_ADDRESS.to_owned(),
+            receiver,
+        }
+    }
+
+    async fn run(&mut self) {
+        while let Some(msg) = self.receiver.recv().await {
+            self.act(msg).await;
+        }
+    }
+
+    async fn act(&self, msg: ToolActorMsg) {
+        match msg {
+            ToolActorMsg::InvokeTool {
+                request,
+                tracing_context,
+                send: response,
+            } => {
+                let result = self.invoke_tool(request, tracing_context).await;
+                drop(response.send(result));
+            }
+        }
+    }
+
+    async fn invoke_tool(
+        &self,
+        request: InvokeRequest,
+        tracing_context: TracingContext,
+    ) -> Result<Vec<u8>, ToolError> {
+        invoke_tool(request, &self.mcp_address, tracing_context).await
     }
 }
 
