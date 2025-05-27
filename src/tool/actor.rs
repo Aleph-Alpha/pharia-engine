@@ -1,4 +1,9 @@
+use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
+use std::pin::Pin;
+use std::sync::Arc;
+use tokio::select;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -109,7 +114,8 @@ enum ToolMsg {
 struct ToolActor<T: ToolClient> {
     mcp_servers: HashMap<String, String>,
     receiver: mpsc::Receiver<ToolMsg>,
-    client: T,
+    running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    client: Arc<T>,
 }
 
 impl<T: ToolClient> ToolActor<T> {
@@ -117,47 +123,66 @@ impl<T: ToolClient> ToolActor<T> {
         Self {
             mcp_servers: HashMap::new(),
             receiver,
-            client,
+            client: Arc::new(client),
+            running_requests: FuturesUnordered::new(),
         }
     }
 
     async fn run(&mut self) {
-        while let Some(msg) = self.receiver.recv().await {
-            self.act(msg).await;
+        // While there are messages and running requests, poll both.
+        // If there is a message, add it to the queue.
+        // If there are running requests, make progress on them.
+        loop {
+            select! {
+                msg = self.receiver.recv() => match msg {
+                    Some(msg) => self.act(msg),
+                    None => break
+                },
+                () = self.running_requests.select_next_some(), if !self.running_requests.is_empty() => {}
+            };
         }
     }
 
-    async fn act(&mut self, msg: ToolMsg) {
+    fn act(&mut self, msg: ToolMsg) {
         match msg {
             ToolMsg::InvokeTool {
                 request,
                 tracing_context,
-                send: response,
+                send,
             } => {
-                let result = self.invoke_tool(request, tracing_context).await;
-                drop(response.send(result));
+                let client = self.client.clone();
+                let servers = self.mcp_servers.values().cloned().collect();
+                self.running_requests.push(Box::pin(async move {
+                    let result =
+                        Self::invoke_tool(client.as_ref(), servers, request, tracing_context).await;
+                    drop(send.send(result));
+                }));
+            }
+            ToolMsg::ListTools { send } => {
+                let client = self.client.clone();
+                let servers = self.mcp_servers.values().cloned().collect();
+                self.running_requests.push(Box::pin(async move {
+                    let result = Self::list_tools(client.as_ref(), servers).await;
+                    drop(send.send(result));
+                }));
             }
             ToolMsg::UpsertToolServer { name, address } => {
                 self.mcp_servers.insert(name, address);
-            }
-            ToolMsg::ListTools { send } => {
-                let result = self.list_tools().await;
-                drop(send.send(result));
             }
         }
     }
 
     async fn invoke_tool(
-        &self,
+        client: &impl ToolClient,
+        servers: Vec<String>,
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> Result<Vec<u8>, ToolError> {
-        let mcp_address = self
-            .server_for_tool(&request.tool_name)
+        let mcp_address = Self::server_for_tool(client, servers, &request.tool_name)
             .await
             .ok_or(ToolError::ToolNotFound(request.tool_name.clone()))?;
-        self.client
-            .invoke_tool(request, mcp_address, tracing_context)
+        client
+            .invoke_tool(request, &mcp_address, tracing_context)
             .await
     }
 
@@ -167,10 +192,10 @@ impl<T: ToolClient> ToolActor<T> {
     /// A skill only is interested in a subset of tools. At some layer, we need to trade in
     /// tool names for the json schema. There would be the appropriate place to decide if the
     /// available information is enough.
-    async fn list_tools(&self) -> Vec<String> {
+    async fn list_tools(client: &impl ToolClient, servers: Vec<String>) -> Vec<String> {
         let mut all_tools = vec![];
-        for address in self.mcp_servers.values() {
-            if let Ok(tools) = self.client.list_tools(address).await {
+        for address in servers {
+            if let Ok(tools) = client.list_tools(&address).await {
                 all_tools.extend(tools);
             }
         }
@@ -182,9 +207,13 @@ impl<T: ToolClient> ToolActor<T> {
     /// We do not return a result here, but ignore MCP servers that are giving errors.
     /// We do not want to allow one bad server to prevent a skill which does not rely on that
     /// particular server from being invoked successfully.
-    async fn server_for_tool(&self, tool: &str) -> Option<&str> {
-        for address in self.mcp_servers.values() {
-            if let Ok(tools) = self.client.list_tools(address).await {
+    async fn server_for_tool(
+        client: &impl ToolClient,
+        servers: Vec<String>,
+        tool: &str,
+    ) -> Option<String> {
+        for address in servers {
+            if let Ok(tools) = client.list_tools(&address).await {
                 if tools.contains(&tool.to_owned()) {
                     return Some(address);
                 }
@@ -220,8 +249,10 @@ pub trait ToolClient: Send + Sync + 'static {
 
 #[cfg(test)]
 pub mod tests {
-    use std::sync::Arc;
+    use core::panic;
+    use std::{sync::Arc, time::Duration};
 
+    use futures::future::pending;
     use serde_json::json;
     use tokio::sync::Mutex;
 
@@ -512,5 +543,62 @@ pub mod tests {
 
         // Then the search tool is available
         assert_eq!(result, json!("Success").to_string().into_bytes());
+    }
+
+    struct SaboteurClient;
+
+    impl ToolClient for SaboteurClient {
+        async fn invoke_tool(
+            &self,
+            request: InvokeRequest,
+            _mcp_address: &str,
+            _tracing_context: TracingContext,
+        ) -> Result<Vec<u8>, ToolError> {
+            match request.tool_name.as_str() {
+                "add" => Ok(json!("Success").to_string().into_bytes()),
+                "divide" => pending().await,
+                _ => panic!("unknown function called"),
+            }
+        }
+
+        async fn list_tools(&self, _mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+            Ok(vec!["add".to_owned(), "divide".to_owned()])
+        }
+    }
+
+    #[tokio::test]
+    async fn tool_calls_are_processed_in_parallel() {
+        // Given a tool that hangs forever for some tool invocation requestsa
+        let tool = Tool::with_client(SaboteurClient)
+            .with_servers(vec![("calculator", "http://localhost:8000/mcp")])
+            .await;
+
+        let api = tool.api();
+
+        // When one hanging request is in progress
+        let request = InvokeRequest {
+            tool_name: "divide".to_owned(),
+            arguments: vec![],
+        };
+        let handle = tokio::spawn(async move {
+            drop(api.invoke_tool(request, TracingContext::dummy()).await);
+        });
+
+        // And waiting shortly for the message to arrive
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Then another request can still be answered
+        let request = InvokeRequest {
+            tool_name: "add".to_owned(),
+            arguments: vec![],
+        };
+        let result = tool
+            .api()
+            .invoke_tool(request, TracingContext::dummy())
+            .await
+            .unwrap();
+        assert_eq!(result, json!("Success").to_string().into_bytes());
+
+        drop(handle);
     }
 }
