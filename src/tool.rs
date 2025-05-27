@@ -25,17 +25,19 @@ pub trait ToolApi {
 
 pub struct Tool {
     handle: JoinHandle<()>,
-    send: mpsc::Sender<ToolActorMsg>,
+    send: mpsc::Sender<ToolMsg>,
 }
 
 impl Tool {
     pub fn new() -> Self {
-        let (send, receiver) = mpsc::channel(1);
-        let actor = ToolActor::new(receiver);
-        let handle = tokio::spawn(async move {
-            let mut actor = actor;
-            actor.run().await;
-        });
+        let client = McpClient;
+        Self::with_client(client)
+    }
+
+    pub fn with_client(client: impl ToolClient) -> Self {
+        let (send, receiver) = tokio::sync::mpsc::channel::<ToolMsg>(1);
+        let mut actor = ToolActor::new(receiver, client);
+        let handle = tokio::spawn(async move { actor.run().await });
         Self { handle, send }
     }
 
@@ -49,14 +51,14 @@ impl Tool {
     }
 }
 
-impl ToolApi for mpsc::Sender<ToolActorMsg> {
+impl ToolApi for mpsc::Sender<ToolMsg> {
     async fn invoke_tool(
         &self,
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> Result<Vec<u8>, ToolError> {
         let (send, receive) = oneshot::channel();
-        let msg = ToolActorMsg::InvokeTool {
+        let msg = ToolMsg::InvokeTool {
             request,
             tracing_context,
             send,
@@ -68,12 +70,12 @@ impl ToolApi for mpsc::Sender<ToolActorMsg> {
     }
 
     async fn upsert_tool_server(&self, name: String, address: String) {
-        let msg = ToolActorMsg::UpsertToolServer { name, address };
+        let msg = ToolMsg::UpsertToolServer { name, address };
         self.send(msg).await.unwrap();
     }
 }
 
-enum ToolActorMsg {
+enum ToolMsg {
     InvokeTool {
         request: InvokeRequest,
         tracing_context: TracingContext,
@@ -85,18 +87,18 @@ enum ToolActorMsg {
     },
 }
 
-struct ToolActor {
+struct ToolActor<T: ToolClient> {
     mcp_servers: HashMap<String, String>,
-    receiver: mpsc::Receiver<ToolActorMsg>,
-    client: McpClient,
+    receiver: mpsc::Receiver<ToolMsg>,
+    client: T,
 }
 
-impl ToolActor {
-    fn new(receiver: mpsc::Receiver<ToolActorMsg>) -> Self {
+impl<T: ToolClient> ToolActor<T> {
+    fn new(receiver: mpsc::Receiver<ToolMsg>, client: T) -> Self {
         Self {
             mcp_servers: HashMap::new(),
             receiver,
-            client: McpClient,
+            client,
         }
     }
 
@@ -106,9 +108,9 @@ impl ToolActor {
         }
     }
 
-    async fn act(&mut self, msg: ToolActorMsg) {
+    async fn act(&mut self, msg: ToolMsg) {
         match msg {
-            ToolActorMsg::InvokeTool {
+            ToolMsg::InvokeTool {
                 request,
                 tracing_context,
                 send: response,
@@ -116,7 +118,7 @@ impl ToolActor {
                 let result = self.invoke_tool(request, tracing_context).await;
                 drop(response.send(result));
             }
-            ToolActorMsg::UpsertToolServer { name, address } => {
+            ToolMsg::UpsertToolServer { name, address } => {
                 self.mcp_servers.insert(name, address);
             }
         }
@@ -215,10 +217,19 @@ where
     }
 }
 
-struct McpClient;
+pub trait ToolClient: Send + Sync + 'static {
+    fn invoke_tool(
+        &self,
+        request: InvokeRequest,
+        mcp_address: &str,
+        tracing_context: TracingContext,
+    ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send;
+}
 
-impl McpClient {
-    pub async fn invoke_tool(
+pub struct McpClient;
+
+impl ToolClient for McpClient {
+    async fn invoke_tool(
         &self,
         request: InvokeRequest,
         mcp_address: &str,
