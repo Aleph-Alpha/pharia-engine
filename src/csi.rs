@@ -520,7 +520,7 @@ where
     async fn invoke_tool(
         &self,
         _auth: String,
-        _tracing_context: TracingContext,
+        tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
     ) -> Result<Vec<Vec<u8>>, ToolError> {
         const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
@@ -528,10 +528,29 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "invoke_tool")])
             .increment(requests.len() as u64);
 
+        let tracing_context = if requests.len() > 1 {
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "invoke_tool_concurrent",
+                requests = requests.len()
+            )
+        } else {
+            tracing_context
+        };
+
         try_join_all(
             requests
                 .into_iter()
-                .map(|request| invoke_tool(request, MCP_SERVER_ADDRESS))
+                .map(|request| {
+                    let context = context!(
+                        tracing_context,
+                        "pharia-kernel::csi",
+                        "invoke_tool",
+                        tool_name = request.tool_name
+                    );
+                    invoke_tool(request, MCP_SERVER_ADDRESS, context)
+                })
                 .collect::<Vec<_>>(),
         )
         .await
