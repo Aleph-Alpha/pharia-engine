@@ -21,7 +21,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
-    tool::{InvokeRequest, invoke_tool},
+    tool::InvokeRequest,
 };
 
 pub struct SkillDriver {
@@ -404,22 +404,18 @@ where
     }
 
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
-        const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
-
-        let mut responses = vec![];
-        for request in requests {
-            match invoke_tool(request, MCP_SERVER_ADDRESS).await {
-                Ok(response) => responses.push(response),
-                Err(error) => {
-                    // Stop Skill execution if a tool call fails, as we do not have the concept of
-                    // tool call errors in the WIT world (yet). However, at a later point we
-                    // might want to expose certain errors to the Skill, as the model may very
-                    // well move on without the tool being available.
-                    self.send_error::<()>(error.into()).await;
-                }
-            }
+        match self
+            .csi_apis
+            .invoke_tool(
+                self.api_token.clone(),
+                self.tracing_context.clone(),
+                requests,
+            )
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => self.send_error(error.into()).await,
         }
-        responses
     }
 }
 

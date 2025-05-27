@@ -16,7 +16,7 @@ use crate::{
     logging::TracingContext,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
-    tool::InvokeRequest,
+    tool::{InvokeRequest, ToolError, invoke_tool},
 };
 
 /// `CompletionStreamId` is a unique identifier for a completion stream.
@@ -138,6 +138,13 @@ pub trait Csi {
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send;
+
+    fn invoke_tool(
+        &self,
+        auth: String,
+        tracing_context: TracingContext,
+        requests: Vec<InvokeRequest>,
+    ) -> impl Future<Output = Result<Vec<Vec<u8>>, ToolError>> + Send;
 }
 
 /// Errors which occurr during interacting with the outside world via CSIs.
@@ -509,6 +516,26 @@ where
         )
         .await
     }
+
+    async fn invoke_tool(
+        &self,
+        _auth: String,
+        _tracing_context: TracingContext,
+        requests: Vec<InvokeRequest>,
+    ) -> Result<Vec<Vec<u8>>, ToolError> {
+        const MCP_SERVER_ADDRESS: &str = "http://localhost:8000/mcp";
+
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "invoke_tool")])
+            .increment(requests.len() as u64);
+
+        try_join_all(
+            requests
+                .into_iter()
+                .map(|request| invoke_tool(request, MCP_SERVER_ADDRESS))
+                .collect::<Vec<_>>(),
+        )
+        .await
+    }
 }
 
 #[cfg(test)]
@@ -631,6 +658,15 @@ pub mod tests {
             _document_paths: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Option<Value>>> {
             bail!("Test error")
+        }
+
+        async fn invoke_tool(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<InvokeRequest>,
+        ) -> Result<Vec<Vec<u8>>, ToolError> {
+            Err(ToolError::Other(anyhow!("Test error")))
         }
     }
 
@@ -997,6 +1033,15 @@ pub mod tests {
         ) -> anyhow::Result<Vec<Option<Value>>> {
             panic!("DummyCsi metadata_document called")
         }
+
+        async fn invoke_tool(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<InvokeRequest>,
+        ) -> Result<Vec<Vec<u8>>, ToolError> {
+            panic!("DummyCsi invoke_tool called")
+        }
     }
 
     type ChatFn = dyn Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync + 'static;
@@ -1203,6 +1248,15 @@ pub mod tests {
             _tracing_context: TracingContext,
             _document_paths: Vec<DocumentPath>,
         ) -> anyhow::Result<Vec<Option<Value>>> {
+            unimplemented!()
+        }
+
+        async fn invoke_tool(
+            &self,
+            _auth: String,
+            _tracing_context: TracingContext,
+            _requests: Vec<InvokeRequest>,
+        ) -> Result<Vec<Vec<u8>>, ToolError> {
             unimplemented!()
         }
     }
