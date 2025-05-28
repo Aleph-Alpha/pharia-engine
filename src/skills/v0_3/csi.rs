@@ -34,10 +34,15 @@ bindgen!({
 });
 
 impl ToolHost for LinkedCtx {
+    // While we represent tool results as JSON values throughout the skill driver, we need to
+    // convert them to bytes here at the WIT boundary.
     async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
         self.ctx
             .invoke_tool(request.into_iter().map(Into::into).collect())
             .await
+            .into_iter()
+            .map(|value| value.to_string().into_bytes())
+            .collect()
     }
 }
 

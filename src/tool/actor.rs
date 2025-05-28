@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ pub trait ToolApi {
         &self,
         request: InvokeRequest,
         tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send;
+    ) -> impl Future<Output = Result<Value, ToolError>> + Send;
 
     fn upsert_tool_server(&self, name: String, address: String) -> impl Future<Output = ()> + Send;
 
@@ -71,7 +72,7 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         &self,
         request: InvokeRequest,
         tracing_context: TracingContext,
-    ) -> Result<Vec<u8>, ToolError> {
+    ) -> Result<Value, ToolError> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::InvokeTool {
             request,
@@ -101,7 +102,7 @@ enum ToolMsg {
     InvokeTool {
         request: InvokeRequest,
         tracing_context: TracingContext,
-        send: oneshot::Sender<Result<Vec<u8>, ToolError>>,
+        send: oneshot::Sender<Result<Value, ToolError>>,
     },
     UpsertToolServer {
         name: String,
@@ -183,7 +184,7 @@ impl<T: ToolClient> ToolActor<T> {
         servers: Vec<String>,
         request: InvokeRequest,
         tracing_context: TracingContext,
-    ) -> Result<Vec<u8>, ToolError> {
+    ) -> Result<Value, ToolError> {
         let mcp_address = Self::server_for_tool(client, servers, &request.tool_name)
             .await
             .ok_or(ToolError::ToolNotFound(request.tool_name.clone()))?;
@@ -244,7 +245,7 @@ pub trait ToolClient: Send + Sync + 'static {
         request: InvokeRequest,
         mcp_address: &str,
         tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<Vec<u8>, ToolError>> + Send;
+    ) -> impl Future<Output = Result<Value, ToolError>> + Send;
 
     fn list_tools(
         &self,
@@ -258,7 +259,7 @@ pub mod tests {
     use std::{sync::Arc, time::Duration};
 
     use futures::future::pending;
-    use serde_json::json;
+    use serde_json::{Value, json};
     use tokio::sync::Mutex;
 
     use crate::{logging::TracingContext, tool::Tool};
@@ -272,7 +273,7 @@ pub mod tests {
             &self,
             _request: InvokeRequest,
             _tracing_context: TracingContext,
-        ) -> Result<Vec<u8>, ToolError> {
+        ) -> Result<Value, ToolError> {
             unimplemented!()
         }
 
@@ -300,9 +301,9 @@ pub mod tests {
             _request: InvokeRequest,
             mcp_address: &str,
             _tracing_context: TracingContext,
-        ) -> Result<Vec<u8>, ToolError> {
+        ) -> Result<Value, ToolError> {
             if mcp_address == "http://localhost:8000/mcp" {
-                Ok(json!("Success").to_string().into_bytes())
+                Ok(json!("Success"))
             } else {
                 panic!("This client only knows the localhost:8000 mcp server")
             }
@@ -346,7 +347,7 @@ pub mod tests {
             .invoke_tool(request, TracingContext::dummy())
             .await
             .unwrap();
-        assert_eq!(result, json!("Success").to_string().into_bytes());
+        assert_eq!(result, json!("Success"));
     }
 
     struct ToolClientSpy {
@@ -371,7 +372,7 @@ pub mod tests {
             _request: InvokeRequest,
             _mcp_address: &str,
             _tracing_context: TracingContext,
-        ) -> Result<Vec<u8>, ToolError> {
+        ) -> Result<Value, ToolError> {
             unimplemented!()
         }
     }
@@ -423,15 +424,15 @@ pub mod tests {
             request: InvokeRequest,
             mcp_address: &str,
             _tracing_context: TracingContext,
-        ) -> Result<Vec<u8>, ToolError> {
+        ) -> Result<Value, ToolError> {
             match mcp_address {
                 "http://localhost:8000/mcp" => {
                     assert_eq!(request.tool_name, "search");
-                    Ok(json!("search result").to_string().as_bytes().to_vec())
+                    Ok(json!("search result"))
                 }
                 "http://localhost:8001/mcp" => {
                     assert_eq!(request.tool_name, "calculator");
-                    Ok(json!("calculator result").to_string().as_bytes().to_vec())
+                    Ok(json!("calculator result"))
                 }
                 _ => Err(ToolError::Other(anyhow::anyhow!(
                     "Requested rooted to the wrong server."
@@ -470,10 +471,7 @@ pub mod tests {
             .await;
 
         // Then we get the result from the brave_search server
-        assert_eq!(
-            result.unwrap(),
-            json!("search result").to_string().as_bytes().to_vec()
-        );
+        assert_eq!(result.unwrap(), json!("search result"));
     }
 
     struct ClientOneGoodOtherBad;
@@ -492,8 +490,8 @@ pub mod tests {
             _request: InvokeRequest,
             _mcp_address: &str,
             _tracing_context: TracingContext,
-        ) -> Result<Vec<u8>, ToolError> {
-            Ok(json!("Success").to_string().into_bytes())
+        ) -> Result<Value, ToolError> {
+            Ok(json!("Success"))
         }
     }
 
@@ -547,7 +545,7 @@ pub mod tests {
             .unwrap();
 
         // Then the search tool is available
-        assert_eq!(result, json!("Success").to_string().into_bytes());
+        assert_eq!(result, json!("Success"));
     }
 
     struct SaboteurClient;
@@ -558,9 +556,9 @@ pub mod tests {
             request: InvokeRequest,
             _mcp_address: &str,
             _tracing_context: TracingContext,
-        ) -> Result<Vec<u8>, ToolError> {
+        ) -> Result<Value, ToolError> {
             match request.tool_name.as_str() {
-                "add" => Ok(json!("Success").to_string().into_bytes()),
+                "add" => Ok(json!("Success")),
                 "divide" => pending().await,
                 _ => panic!("unknown function called"),
             }
@@ -602,7 +600,7 @@ pub mod tests {
             .invoke_tool(request, TracingContext::dummy())
             .await
             .unwrap();
-        assert_eq!(result, json!("Success").to_string().into_bytes());
+        assert_eq!(result, json!("Success"));
 
         drop(handle);
     }
