@@ -35,10 +35,17 @@ pub trait ToolApi {
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Value, ToolError>> + Send;
 
-    fn upsert_tool_server(&self, url: McpServerUrl) -> impl Future<Output = ()> + Send;
-
     #[allow(dead_code)]
     fn list_tools(&self) -> impl Future<Output = Vec<String>> + Send;
+}
+
+/// Interact with tool server storage.
+///
+/// Whereas the [`ToolApi`] allows to interact with tools (and does not care that they are
+/// implemented with different MCP Servers), the [`ToolStoreApi`] allows someone else (e.g.
+/// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
+pub trait ToolStoreApi {
+    fn upsert_tool_server(&self, url: McpServerUrl) -> impl Future<Output = ()> + Send;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -71,7 +78,7 @@ impl Tool {
         Self { handle, send }
     }
 
-    pub fn api(&self) -> impl ToolApi + Send + Sync + Clone + 'static {
+    pub fn api(&self) -> impl ToolApi + ToolStoreApi + Send + Sync + Clone + 'static {
         self.send.clone()
     }
 
@@ -99,16 +106,18 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         receive.await.unwrap()
     }
 
-    async fn upsert_tool_server(&self, url: McpServerUrl) {
-        let msg = ToolMsg::UpsertToolServer { url };
-        self.send(msg).await.unwrap();
-    }
-
     async fn list_tools(&self) -> Vec<String> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::ListTools { send };
         self.send(msg).await.unwrap();
         receive.await.unwrap()
+    }
+}
+
+impl ToolStoreApi for mpsc::Sender<ToolMsg> {
+    async fn upsert_tool_server(&self, url: McpServerUrl) {
+        let msg = ToolMsg::UpsertToolServer { url };
+        self.send(msg).await.unwrap();
     }
 }
 
@@ -279,9 +288,18 @@ pub mod tests {
     use serde_json::{Value, json};
     use tokio::sync::Mutex;
 
-    use crate::{logging::TracingContext, tool::Tool};
+    use crate::{
+        logging::TracingContext,
+        tool::{Tool, actor::ToolStoreApi},
+    };
 
     use super::*;
+
+    pub struct ToolStoreDouble;
+
+    impl ToolStoreApi for ToolStoreDouble {
+        async fn upsert_tool_server(&self, _url: McpServerUrl) {}
+    }
 
     pub struct ToolDouble;
 
@@ -293,8 +311,6 @@ pub mod tests {
         ) -> Result<Value, ToolError> {
             unimplemented!()
         }
-
-        async fn upsert_tool_server(&self, _url: McpServerUrl) {}
 
         async fn list_tools(&self) -> Vec<String> {
             unimplemented!()
