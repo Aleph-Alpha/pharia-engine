@@ -220,7 +220,7 @@ where
 
     async fn report_hardcoded_tool_server(&mut self) {
         self.tool_api
-            .upsert_tool_server("http://localhost:8000/mcp".to_owned())
+            .upsert_tool_server("http://localhost:8000/mcp".into())
             .await;
     }
 
