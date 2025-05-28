@@ -23,7 +23,7 @@ pub trait ToolApi {
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Value, ToolError>> + Send;
 
-    fn upsert_tool_server(&self, name: String, address: String) -> impl Future<Output = ()> + Send;
+    fn upsert_tool_server(&self, address: String) -> impl Future<Output = ()> + Send;
 
     #[allow(dead_code)]
     fn list_tools(&self) -> impl Future<Output = Vec<String>> + Send;
@@ -87,8 +87,8 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         receive.await.unwrap()
     }
 
-    async fn upsert_tool_server(&self, name: String, address: String) {
-        let msg = ToolMsg::UpsertToolServer { name, address };
+    async fn upsert_tool_server(&self, address: String) {
+        let msg = ToolMsg::UpsertToolServer { address };
         self.send(msg).await.unwrap();
     }
 
@@ -107,7 +107,6 @@ enum ToolMsg {
         send: oneshot::Sender<Result<Value, ToolError>>,
     },
     UpsertToolServer {
-        name: String,
         address: String,
     },
     ListTools {
@@ -171,7 +170,7 @@ impl<T: ToolClient> ToolActor<T> {
                     drop(send.send(result));
                 }));
             }
-            ToolMsg::UpsertToolServer { name: _, address } => {
+            ToolMsg::UpsertToolServer { address } => {
                 self.mcp_servers.insert(address);
             }
         }
@@ -280,7 +279,7 @@ pub mod tests {
             unimplemented!()
         }
 
-        async fn upsert_tool_server(&self, _name: String, _address: String) {}
+        async fn upsert_tool_server(&self, _address: String) {}
 
         async fn list_tools(&self) -> Vec<String> {
             unimplemented!()
@@ -335,11 +334,8 @@ pub mod tests {
         let tool = Tool::with_client(ToolClientMock).api();
 
         // When a tool server is upserted with that particular url
-        tool.upsert_tool_server(
-            "calculator".to_owned(),
-            "http://localhost:8000/mcp".to_owned(),
-        )
-        .await;
+        tool.upsert_tool_server("http://localhost:8000/mcp".to_owned())
+            .await;
 
         // Then the calculator tool can be invoked
         let request = InvokeRequest {
@@ -386,17 +382,11 @@ pub mod tests {
         let queried = Arc::new(Mutex::new(vec![]));
         let tool = Tool::with_client(ToolClientSpy::new(queried.clone())).api();
 
-        tool.upsert_tool_server(
-            "calculator".to_owned(),
-            "http://localhost:8000/mcp".to_owned(),
-        )
-        .await;
+        tool.upsert_tool_server("http://localhost:8000/mcp".to_owned())
+            .await;
 
-        tool.upsert_tool_server(
-            "brave_search".to_owned(),
-            "http://localhost:8001/mcp".to_owned(),
-        )
-        .await;
+        tool.upsert_tool_server("http://localhost:8001/mcp".to_owned())
+            .await;
 
         // When we ask for the list of tools
         drop(tool.list_tools().await);
@@ -450,17 +440,11 @@ pub mod tests {
         let tool = Tool::with_client(TwoServerClient).api();
 
         // And given that the server is configured with these two servers
-        tool.upsert_tool_server(
-            "brave_search".to_owned(),
-            "http://localhost:8000/mcp".to_owned(),
-        )
-        .await;
+        tool.upsert_tool_server("http://localhost:8000/mcp".to_owned())
+            .await;
 
-        tool.upsert_tool_server(
-            "calculator".to_owned(),
-            "http://localhost:8001/mcp".to_owned(),
-        )
-        .await;
+        tool.upsert_tool_server("http://localhost:8001/mcp".to_owned())
+            .await;
 
         // When we invoke the search tool
         let result = tool
@@ -499,11 +483,10 @@ pub mod tests {
     }
 
     impl Tool {
-        async fn with_servers(self, servers: Vec<(&str, &str)>) -> Self {
+        async fn with_servers(self, servers: &[&str]) -> Self {
             let api = self.api();
-            for (name, address) in servers {
-                api.upsert_tool_server(name.to_owned(), address.to_owned())
-                    .await;
+            for &address in servers {
+                api.upsert_tool_server(address.to_owned()).await;
             }
             self
         }
@@ -513,10 +496,7 @@ pub mod tests {
     async fn one_bad_mcp_server_still_allows_to_list_tools() {
         // Given an mcp server that returns an error when listing it's tools
         let tool = Tool::with_client(ClientOneGoodOtherBad)
-            .with_servers(vec![
-                ("search", "http://localhost:8000/mcp"),
-                ("calculator", "http://localhost:8001/mcp"),
-            ])
+            .with_servers(&["http://localhost:8000/mcp", "http://localhost:8001/mcp"])
             .await;
 
         // When listing tools
@@ -530,10 +510,7 @@ pub mod tests {
     async fn one_bad_mcp_server_still_allows_to_invoke_tool() {
         // Given an mcp server that returns an error when listing it's tools
         let tool = Tool::with_client(ClientOneGoodOtherBad)
-            .with_servers(vec![
-                ("search", "http://localhost:8000/mcp"),
-                ("calculator", "http://localhost:8001/mcp"),
-            ])
+            .with_servers(&["http://localhost:8000/mcp", "http://localhost:8001/mcp"])
             .await;
 
         // When invoking a tool
@@ -576,7 +553,7 @@ pub mod tests {
     async fn tool_calls_are_processed_in_parallel() {
         // Given a tool that hangs forever for some tool invocation requestsa
         let tool = Tool::with_client(SaboteurClient)
-            .with_servers(vec![("calculator", "http://localhost:8000/mcp")])
+            .with_servers(&["http://localhost:8000/mcp"])
             .await;
 
         let api = tool.api();
