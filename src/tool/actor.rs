@@ -9,6 +9,7 @@ use tokio::select;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
+use tracing::info;
 
 use crate::logging::TracingContext;
 
@@ -187,7 +188,8 @@ impl<T: ToolClient> ToolActor<T> {
     ) -> Result<Value, ToolError> {
         let mcp_address = Self::server_for_tool(client, servers, &request.tool_name)
             .await
-            .ok_or(ToolError::ToolNotFound(request.tool_name.clone()))?;
+            .ok_or(ToolError::ToolNotFound(request.tool_name.clone()))
+            .inspect_err(|e| info!(parent: tracing_context.span(), "{}", e))?;
         client
             .invoke_tool(request, &mcp_address, tracing_context)
             .await
