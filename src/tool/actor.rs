@@ -3,6 +3,7 @@ use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::select;
@@ -116,6 +117,7 @@ enum ToolMsg {
 
 struct ToolActor<T: ToolClient> {
     mcp_servers: HashMap<String, String>,
+    mcp_servers_set: HashSet<String>,
     receiver: mpsc::Receiver<ToolMsg>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
     client: Arc<T>,
@@ -125,6 +127,7 @@ impl<T: ToolClient> ToolActor<T> {
     fn new(receiver: mpsc::Receiver<ToolMsg>, client: T) -> Self {
         Self {
             mcp_servers: HashMap::new(),
+            mcp_servers_set: HashSet::new(),
             receiver,
             client: Arc::new(client),
             running_requests: FuturesUnordered::new(),
@@ -154,7 +157,7 @@ impl<T: ToolClient> ToolActor<T> {
                 send,
             } => {
                 let client = self.client.clone();
-                let servers = self.mcp_servers.values().cloned().collect();
+                let servers = self.mcp_servers_set.clone().into_iter().collect();
                 self.running_requests.push(Box::pin(async move {
                     let result =
                         Self::invoke_tool(client.as_ref(), servers, request, tracing_context).await;
@@ -163,15 +166,15 @@ impl<T: ToolClient> ToolActor<T> {
             }
             ToolMsg::ListTools { send } => {
                 let client = self.client.clone();
-                let servers = self.mcp_servers.values().cloned().collect();
+                let servers = self.mcp_servers_set.clone().into_iter().collect();
                 self.running_requests.push(Box::pin(async move {
                     let result = Self::tools(client.as_ref(), servers).await;
                     let result = result.into_values().flatten().collect();
                     drop(send.send(result));
                 }));
             }
-            ToolMsg::UpsertToolServer { name, address } => {
-                self.mcp_servers.insert(name, address);
+            ToolMsg::UpsertToolServer { name: _, address } => {
+                self.mcp_servers_set.insert(address);
             }
         }
     }
