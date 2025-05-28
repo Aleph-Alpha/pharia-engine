@@ -29,7 +29,7 @@ impl Guest for Skill {
                 },
             ],
         };
-        let result = invoke_tool(&[request]).pop().unwrap();
+        let result = invoke_tool(&[request]).unwrap().pop().unwrap();
         Ok(result)
     }
 

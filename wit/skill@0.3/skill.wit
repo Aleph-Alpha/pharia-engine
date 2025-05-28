@@ -1,4 +1,4 @@
-package pharia:skill@0.3.8;
+package pharia:skill@0.3.9;
 
 @since(version = 0.3.0)
 world skill {
@@ -96,7 +96,6 @@ world csi {
     import document-index;
     import inference;
     import language;
-
     import tool;
 }
 
@@ -117,8 +116,31 @@ interface tool {
         value: list<u8>
     }
 
+    // The set of errors which may be raised during a tool invocation and which we want to
+    // expose to the Skill.
+    // If a model is unavailable, we stop the Skill execution. However, for tool calls, some
+    // errors are recoverable. Imagine the model having called a tool with bad input, or having
+    // output a non-valid tool name. In this case, the information needs to be propagated back to
+    // the model.
+    //
+    // For some reason, we can not use unstable here: For some reason, I can not make the variant itself unstable.
+    // Introducing this with a since gate should still be fine. If we need to do a change, we can introduce a
+    // type and use that one, as `invoke-tool` is still marked as unstable.
+    @since(version = 0.3.9)
+    variant tool-error {
+        // The tool was not found on any of the configured MCP server.
+        tool-not-found(string),
+        // The tool was found, but the execution failed.
+        tool-execution-error(string),
+        // The input to the tool is not valid JSON.
+        invalid-json-input(string),
+        // A generic representation of other errors, adding this now as adding other variants 
+        // would be a breaking change later.
+        other(string)
+    }
+
     @unstable(feature = tool)
-    invoke-tool: func(request: list<invoke-request>) -> list<list<u8>>;
+    invoke-tool: func(request: list<invoke-request>) -> result<list<list<u8>>, tool-error>;
 }
 
 @since(version = 0.3.0)
