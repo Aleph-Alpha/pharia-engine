@@ -403,7 +403,7 @@ where
         }
     }
 
-    async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+    async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Value> {
         match self
             .csi_apis
             .invoke_tool(
@@ -510,7 +510,7 @@ impl CsiForSkills for SkillMetadataCtx {
         self.send_error().await
     }
 
-    async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+    async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Value> {
         self.send_error().await
     }
 }

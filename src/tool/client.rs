@@ -29,7 +29,7 @@ impl ToolClient for McpClient {
         request: InvokeRequest,
         mcp_address: &str,
         _tracing_context: TracingContext,
-    ) -> Result<Vec<u8>, ToolError> {
+    ) -> Result<Value, ToolError> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct ToolCallResult {
@@ -82,7 +82,7 @@ impl ToolClient for McpClient {
             // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
             Err(ToolError::ToolCallFailed(text.to_owned()))
         } else {
-            Ok(text.to_owned().into_bytes())
+            Ok(serde_json::from_str::<Value>(text).map_err(Into::<anyhow::Error>::into)?)
         }
     }
 
@@ -292,8 +292,7 @@ pub mod tests {
             .invoke_tool(request, mcp.address(), TracingContext::dummy())
             .await
             .unwrap();
-        let response = String::from_utf8(response).unwrap();
-        assert_eq!(response, "3");
+        assert_eq!(response, json!(3));
     }
 
     #[tokio::test]
@@ -318,8 +317,7 @@ pub mod tests {
             .invoke_tool(request, mcp.address(), TracingContext::dummy())
             .await
             .unwrap();
-        let response = String::from_utf8(response).unwrap();
-        assert_eq!(response, "3");
+        assert_eq!(response, json!(3));
     }
 
     #[tokio::test]

@@ -1110,7 +1110,7 @@ pub mod tests {
 
     #[async_trait]
     impl CsiForSkillsDouble for CsiAddToolFake {
-        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Value> {
             requests
                 .iter()
                 .map(|request| {
@@ -1123,7 +1123,7 @@ pub mod tests {
                         .parse::<i32>()
                         .unwrap();
                     let sum = a + b;
-                    json!(sum).to_string().into_bytes()
+                    json!(sum)
                 })
                 .collect()
         }
@@ -1284,7 +1284,7 @@ pub mod tests {
             panic!("I am a dummy CsiForSkills")
         }
 
-        async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+        async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Value> {
             panic!("I am a dummy CsiForSkills")
         }
     }

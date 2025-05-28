@@ -61,7 +61,7 @@ pub trait CsiForSkills {
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>>;
     async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;
     async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
-    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Vec<u8>>;
+    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Value>;
 }
 
 /// Cognitive System Interface (CSI) as consumed internally by `PhariaKernel`, before the CSI is
@@ -145,7 +145,7 @@ pub trait Csi {
         auth: String,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
-    ) -> impl Future<Output = Result<Vec<Vec<u8>>, ToolError>> + Send;
+    ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send;
 }
 
 /// Errors which occurr during interacting with the outside world via CSIs.
@@ -524,7 +524,7 @@ where
         _auth: String,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
-    ) -> Result<Vec<Vec<u8>>, ToolError> {
+    ) -> Result<Vec<Value>, ToolError> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "invoke_tool")])
             .increment(requests.len() as u64);
 
@@ -944,7 +944,7 @@ pub mod tests {
             _auth: String,
             _tracing_context: TracingContext,
             _requests: Vec<InvokeRequest>,
-        ) -> impl Future<Output = Result<Vec<Vec<u8>>, ToolError>> + Send {
+        ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send {
             async { unimplemented!() }
         }
     }
@@ -1050,7 +1050,7 @@ pub mod tests {
             auth: String,
             tracing_context: TracingContext,
             requests: Vec<InvokeRequest>,
-        ) -> impl Future<Output = Result<Vec<Vec<u8>>, ToolError>> + Send {
+        ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send {
             self.invoke_tool(auth, tracing_context, requests)
         }
     }
@@ -1299,7 +1299,7 @@ pub mod tests {
         async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
             unimplemented!()
         }
-        async fn invoke_tool(&mut self, _requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+        async fn invoke_tool(&mut self, _requests: Vec<InvokeRequest>) -> Vec<Value> {
             unimplemented!()
         }
     }
@@ -1364,7 +1364,7 @@ pub mod tests {
         async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
             self.documents(_document_paths).await
         }
-        async fn invoke_tool(&mut self, _requests: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+        async fn invoke_tool(&mut self, _requests: Vec<InvokeRequest>) -> Vec<Value> {
             self.invoke_tool(_requests).await
         }
     }
