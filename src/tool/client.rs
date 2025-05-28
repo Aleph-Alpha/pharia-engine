@@ -4,7 +4,10 @@ use reqwest::Response;
 use reqwest::header;
 use serde::Deserialize;
 use std::collections::HashMap;
+use tracing::error;
+use tracing::info;
 
+use crate::context;
 use crate::logging::TracingContext;
 
 use reqwest::Client;
@@ -28,7 +31,7 @@ impl ToolClient for McpClient {
         &self,
         request: InvokeRequest,
         mcp_address: &str,
-        _tracing_context: TracingContext,
+        tracing_context: TracingContext,
     ) -> Result<Value, ToolError> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -42,7 +45,12 @@ impl ToolClient for McpClient {
         enum ToolCallResponseContent {
             Text { text: String },
         }
-        self.initialize(mcp_address).await?;
+
+        let child_context = context!(tracing_context, "pharia-kernel::tool", "initialize");
+        self.initialize(mcp_address)
+            .await
+            .inspect_err(|e| error!(parent: child_context.span(), "{}", e))?;
+        drop(child_context);
 
         let arguments = request
             .arguments
@@ -70,18 +78,22 @@ impl ToolClient for McpClient {
             .json(&body)
             .send()
             .await
-            .map_err(anyhow::Error::from)?;
+            .map_err(anyhow::Error::from)
+            .inspect_err(|e| error!(parent: tracing_context.span(), "{}", e))?;
 
         let result = Self::json_rpc_result_from_http::<ToolCallResult>(response).await?;
         let ToolCallResponseContent::Text { text } = result
             .content
             .first()
-            .ok_or(anyhow!("No content in tool call response"))?;
+            .ok_or(anyhow!("No content in tool call response"))
+            .inspect_err(|e| error!(parent: tracing_context.span(), "{}", e))?;
         if result.is_error {
             // We might want to represent a failed tool call in the wit world and pass it to the model.
             // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
+            info!(parent: tracing_context.span(), "Tool call failed");
             Err(ToolError::ToolCallFailed(text.to_owned()))
         } else {
+            info!(parent: tracing_context.span(), "Tool call succeeded");
             Ok(serde_json::from_str::<Value>(text).map_err(Into::<anyhow::Error>::into)?)
         }
     }
