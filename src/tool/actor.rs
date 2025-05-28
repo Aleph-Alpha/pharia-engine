@@ -16,6 +16,18 @@ use crate::logging::TracingContext;
 
 use super::client::McpClient;
 
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub struct McpServerUrl(pub String);
+
+impl<T> From<T> for McpServerUrl
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
 pub trait ToolApi {
     fn invoke_tool(
         &self,
@@ -23,7 +35,7 @@ pub trait ToolApi {
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Value, ToolError>> + Send;
 
-    fn upsert_tool_server(&self, address: String) -> impl Future<Output = ()> + Send;
+    fn upsert_tool_server(&self, url: McpServerUrl) -> impl Future<Output = ()> + Send;
 
     #[allow(dead_code)]
     fn list_tools(&self) -> impl Future<Output = Vec<String>> + Send;
@@ -87,8 +99,8 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         receive.await.unwrap()
     }
 
-    async fn upsert_tool_server(&self, address: String) {
-        let msg = ToolMsg::UpsertToolServer { address };
+    async fn upsert_tool_server(&self, url: McpServerUrl) {
+        let msg = ToolMsg::UpsertToolServer { url };
         self.send(msg).await.unwrap();
     }
 
@@ -107,7 +119,7 @@ enum ToolMsg {
         send: oneshot::Sender<Result<Value, ToolError>>,
     },
     UpsertToolServer {
-        address: String,
+        url: McpServerUrl,
     },
     ListTools {
         send: oneshot::Sender<Vec<String>>,
@@ -115,7 +127,7 @@ enum ToolMsg {
 }
 
 struct ToolActor<T: ToolClient> {
-    mcp_servers: HashSet<String>,
+    mcp_servers: HashSet<McpServerUrl>,
     receiver: mpsc::Receiver<ToolMsg>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
     client: Arc<T>,
@@ -154,7 +166,7 @@ impl<T: ToolClient> ToolActor<T> {
                 send,
             } => {
                 let client = self.client.clone();
-                let servers = self.mcp_servers.clone().into_iter().collect();
+                let servers = self.mcp_servers.clone();
                 self.running_requests.push(Box::pin(async move {
                     let result =
                         Self::invoke_tool(client.as_ref(), servers, request, tracing_context).await;
@@ -163,15 +175,15 @@ impl<T: ToolClient> ToolActor<T> {
             }
             ToolMsg::ListTools { send } => {
                 let client = self.client.clone();
-                let servers = self.mcp_servers.clone().into_iter().collect();
+                let servers = self.mcp_servers.clone();
                 self.running_requests.push(Box::pin(async move {
                     let result = Self::tools(client.as_ref(), servers).await;
                     let result = result.into_values().flatten().collect();
                     drop(send.send(result));
                 }));
             }
-            ToolMsg::UpsertToolServer { address } => {
-                self.mcp_servers.insert(address);
+            ToolMsg::UpsertToolServer { url } => {
+                self.mcp_servers.insert(url);
             }
         }
     }
@@ -182,7 +194,7 @@ impl<T: ToolClient> ToolActor<T> {
     /// Then, we invoke the tool on that server.
     async fn invoke_tool(
         client: &impl ToolClient,
-        servers: Vec<String>,
+        servers: HashSet<McpServerUrl>,
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> Result<Value, ToolError> {
@@ -201,7 +213,10 @@ impl<T: ToolClient> ToolActor<T> {
     /// A skill only is interested in a subset of tools. At some layer, we need to trade in
     /// tool names for the json schema. There would be the appropriate place to decide if the
     /// available information is enough.
-    async fn tools(client: &impl ToolClient, servers: Vec<String>) -> HashMap<String, Vec<String>> {
+    async fn tools(
+        client: &impl ToolClient,
+        servers: HashSet<McpServerUrl>,
+    ) -> HashMap<McpServerUrl, Vec<String>> {
         let results = join_all(servers.into_iter().map(|address| async move {
             let tools = client.list_tools(&address).await;
             (address, tools)
@@ -218,9 +233,9 @@ impl<T: ToolClient> ToolActor<T> {
     /// We do not return a result here, but ignore MCP servers that are giving errors.
     async fn server_for_tool(
         client: &impl ToolClient,
-        servers: Vec<String>,
+        servers: HashSet<McpServerUrl>,
         tool: &str,
-    ) -> Option<String> {
+    ) -> Option<McpServerUrl> {
         let all_tools = Self::tools(client, servers).await;
         for (address, tools) in &all_tools {
             if tools.contains(&tool.to_owned()) {
@@ -245,13 +260,13 @@ pub trait ToolClient: Send + Sync + 'static {
     fn invoke_tool(
         &self,
         request: InvokeRequest,
-        mcp_address: &str,
+        url: &McpServerUrl,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Value, ToolError>> + Send;
 
     fn list_tools(
         &self,
-        mcp_address: &str,
+        url: &McpServerUrl,
     ) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send;
 }
 
@@ -266,7 +281,7 @@ pub mod tests {
 
     use crate::{logging::TracingContext, tool::Tool};
 
-    use super::{InvokeRequest, ToolApi, ToolClient, ToolError};
+    use super::*;
 
     pub struct ToolDouble;
 
@@ -279,7 +294,7 @@ pub mod tests {
             unimplemented!()
         }
 
-        async fn upsert_tool_server(&self, _address: String) {}
+        async fn upsert_tool_server(&self, _url: McpServerUrl) {}
 
         async fn list_tools(&self) -> Vec<String> {
             unimplemented!()
@@ -290,8 +305,8 @@ pub mod tests {
     struct ToolClientMock;
 
     impl ToolClient for ToolClientMock {
-        async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
-            if mcp_address == "http://localhost:8000/mcp" {
+        async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            if url.0 == "http://localhost:8000/mcp" {
                 Ok(vec!["add".to_owned()])
             } else {
                 panic!("This client only knows the localhost:8000 mcp server")
@@ -301,10 +316,10 @@ pub mod tests {
         async fn invoke_tool(
             &self,
             _request: InvokeRequest,
-            mcp_address: &str,
+            url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Value, ToolError> {
-            if mcp_address == "http://localhost:8000/mcp" {
+            if url.0 == "http://localhost:8000/mcp" {
                 Ok(json!("Success"))
             } else {
                 panic!("This client only knows the localhost:8000 mcp server")
@@ -334,7 +349,7 @@ pub mod tests {
         let tool = Tool::with_client(ToolClientMock).api();
 
         // When a tool server is upserted with that particular url
-        tool.upsert_tool_server("http://localhost:8000/mcp".to_owned())
+        tool.upsert_tool_server("http://localhost:8000/mcp".into())
             .await;
 
         // Then the calculator tool can be invoked
@@ -350,26 +365,26 @@ pub mod tests {
     }
 
     struct ToolClientSpy {
-        queried: Arc<Mutex<Vec<String>>>,
+        queried: Arc<Mutex<HashSet<McpServerUrl>>>,
     }
 
     impl ToolClientSpy {
-        fn new(queried: Arc<Mutex<Vec<String>>>) -> Self {
+        fn new(queried: Arc<Mutex<HashSet<McpServerUrl>>>) -> Self {
             Self { queried }
         }
     }
 
     impl ToolClient for ToolClientSpy {
-        async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+        async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             let mut queried = self.queried.lock().await;
-            queried.push(mcp_address.to_owned());
+            queried.insert(url.to_owned());
             Ok(vec![])
         }
 
         async fn invoke_tool(
             &self,
             _request: InvokeRequest,
-            _mcp_address: &str,
+            _url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Value, ToolError> {
             unimplemented!()
@@ -379,13 +394,13 @@ pub mod tests {
     #[tokio::test]
     async fn tools_from_multiple_tool_servers_are_available() {
         // Given a tool with two configured tool servers
-        let queried = Arc::new(Mutex::new(vec![]));
+        let queried = Arc::new(Mutex::new(HashSet::new()));
         let tool = Tool::with_client(ToolClientSpy::new(queried.clone())).api();
 
-        tool.upsert_tool_server("http://localhost:8000/mcp".to_owned())
+        tool.upsert_tool_server("http://localhost:8000/mcp".into())
             .await;
 
-        tool.upsert_tool_server("http://localhost:8001/mcp".to_owned())
+        tool.upsert_tool_server("http://localhost:8001/mcp".into())
             .await;
 
         // When we ask for the list of tools
@@ -394,16 +409,24 @@ pub mod tests {
         // Then both tool servers are queried
         let queried = queried.lock().await.clone();
         assert_eq!(queried.len(), 2);
-        assert!(queried.contains(&"http://localhost:8000/mcp".to_owned()));
-        assert!(queried.contains(&"http://localhost:8001/mcp".to_owned()));
+        assert!(
+            queried
+                .iter()
+                .any(|url| url.0 == "http://localhost:8000/mcp")
+        );
+        assert!(
+            queried
+                .iter()
+                .any(|url| url.0 == "http://localhost:8001/mcp")
+        );
     }
 
     // Given a tool client that knows about two mcp servers
     struct TwoServerClient;
 
     impl ToolClient for TwoServerClient {
-        async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
-            match mcp_address {
+        async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            match url.0.as_ref() {
                 "http://localhost:8000/mcp" => Ok(vec!["search".to_owned()]),
                 "http://localhost:8001/mcp" => Ok(vec!["calculator".to_owned()]),
                 _ => {
@@ -415,10 +438,10 @@ pub mod tests {
         async fn invoke_tool(
             &self,
             request: InvokeRequest,
-            mcp_address: &str,
+            url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Value, ToolError> {
-            match mcp_address {
+            match url.0.as_ref() {
                 "http://localhost:8000/mcp" => {
                     assert_eq!(request.tool_name, "search");
                     Ok(json!("search result"))
@@ -440,10 +463,10 @@ pub mod tests {
         let tool = Tool::with_client(TwoServerClient).api();
 
         // And given that the server is configured with these two servers
-        tool.upsert_tool_server("http://localhost:8000/mcp".to_owned())
+        tool.upsert_tool_server("http://localhost:8000/mcp".into())
             .await;
 
-        tool.upsert_tool_server("http://localhost:8001/mcp".to_owned())
+        tool.upsert_tool_server("http://localhost:8001/mcp".into())
             .await;
 
         // When we invoke the search tool
@@ -464,8 +487,8 @@ pub mod tests {
     struct ClientOneGoodOtherBad;
 
     impl ToolClient for ClientOneGoodOtherBad {
-        async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
-            if mcp_address == "http://localhost:8000/mcp" {
+        async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            if url.0 == "http://localhost:8000/mcp" {
                 Ok(vec!["search".to_owned()])
             } else {
                 Err(anyhow::anyhow!("Request to mcp server timed out."))
@@ -475,7 +498,7 @@ pub mod tests {
         async fn invoke_tool(
             &self,
             _request: InvokeRequest,
-            _mcp_address: &str,
+            _url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Value, ToolError> {
             Ok(json!("Success"))
@@ -486,7 +509,7 @@ pub mod tests {
         async fn with_servers(self, servers: &[&str]) -> Self {
             let api = self.api();
             for &address in servers {
-                api.upsert_tool_server(address.to_owned()).await;
+                api.upsert_tool_server(address.into()).await;
             }
             self
         }
@@ -534,7 +557,7 @@ pub mod tests {
         async fn invoke_tool(
             &self,
             request: InvokeRequest,
-            _mcp_address: &str,
+            _url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Value, ToolError> {
             match request.tool_name.as_str() {
@@ -544,7 +567,7 @@ pub mod tests {
             }
         }
 
-        async fn list_tools(&self, _mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+        async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             Ok(vec!["add".to_owned(), "divide".to_owned()])
         }
     }

@@ -13,6 +13,7 @@ use crate::logging::TracingContext;
 use reqwest::Client;
 use serde_json::{Value, json};
 
+use super::actor::McpServerUrl;
 use super::{InvokeRequest, ToolError, actor::ToolClient};
 
 pub struct McpClient {
@@ -30,7 +31,7 @@ impl ToolClient for McpClient {
     async fn invoke_tool(
         &self,
         request: InvokeRequest,
-        mcp_address: &str,
+        url: &McpServerUrl,
         tracing_context: TracingContext,
     ) -> Result<Value, ToolError> {
         #[derive(Deserialize)]
@@ -47,7 +48,7 @@ impl ToolClient for McpClient {
         }
 
         let child_context = context!(tracing_context, "pharia-kernel::tool", "initialize");
-        self.initialize(mcp_address)
+        self.initialize(url)
             .await
             .inspect_err(|e| error!(parent: child_context.span(), "{}", e))?;
         drop(child_context);
@@ -72,7 +73,7 @@ impl ToolClient for McpClient {
         });
         let response = self
             .client
-            .post(mcp_address)
+            .post(&url.0)
             // MCP server want exactly these two headers, even a wildcard is not accepted
             .header("accept", "application/json,text/event-stream")
             .json(&body)
@@ -98,7 +99,7 @@ impl ToolClient for McpClient {
         }
     }
 
-    async fn list_tools(&self, mcp_address: &str) -> Result<Vec<String>, anyhow::Error> {
+    async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
         #[derive(Deserialize)]
         struct ToolDescription {
             // there is a lot more fields here, but we need to start somewhere
@@ -110,7 +111,7 @@ impl ToolClient for McpClient {
             tools: Vec<ToolDescription>,
         }
 
-        self.initialize(mcp_address).await?;
+        self.initialize(url).await?;
 
         let body = json!({
             "jsonrpc": "2.0",
@@ -119,7 +120,7 @@ impl ToolClient for McpClient {
         });
         let response = self
             .client
-            .post(mcp_address)
+            .post(&url.0)
             .header("accept", "application/json,text/event-stream")
             .json(&body)
             .send()
@@ -139,7 +140,7 @@ impl McpClient {
     /// - Share implementation details
     ///
     /// See: <https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle#initialization>
-    pub async fn initialize(&self, mcp_address: &str) -> Result<(), ToolError> {
+    pub async fn initialize(&self, url: &McpServerUrl) -> Result<(), ToolError> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct InitializeResult {
@@ -166,7 +167,7 @@ impl McpClient {
 
         let response = self
             .client
-            .post(mcp_address)
+            .post(&url.0)
             .header("accept", "application/json,text/event-stream")
             .json(&body)
             .send()
@@ -195,7 +196,7 @@ impl McpClient {
 
         let response = self
             .client
-            .post(mcp_address)
+            .post(&url.0)
             .header("accept", "application/json,text/event-stream")
             .json(&body)
             .send()
@@ -274,7 +275,7 @@ pub mod tests {
         let client = McpClient::new();
 
         // When listing tools
-        let tools = client.list_tools(mcp.address()).await.unwrap();
+        let tools = client.list_tools(&mcp.address().into()).await.unwrap();
 
         // Then the add tool is listed
         assert_eq!(tools.len(), 2);
@@ -301,7 +302,7 @@ pub mod tests {
         };
         let client = McpClient::new();
         let response = client
-            .invoke_tool(request, mcp.address(), TracingContext::dummy())
+            .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
             .await
             .unwrap();
         assert_eq!(response, json!(3));
@@ -326,7 +327,7 @@ pub mod tests {
         };
         let client = McpClient::new();
         let response = client
-            .invoke_tool(request, mcp.address(), TracingContext::dummy())
+            .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
             .await
             .unwrap();
         assert_eq!(response, json!(3));
@@ -342,7 +343,7 @@ pub mod tests {
         };
         let client = McpClient::new();
         let response = client
-            .invoke_tool(request, mcp.address(), TracingContext::dummy())
+            .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
             .await
             .unwrap_err();
         assert!(matches!(response, ToolError::ToolCallFailed(_)));
@@ -358,7 +359,7 @@ pub mod tests {
         };
         let client = McpClient::new();
         let response = client
-            .invoke_tool(request, mcp.address(), TracingContext::dummy())
+            .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
             .await
             .unwrap_err();
         assert_eq!(
@@ -372,6 +373,6 @@ pub mod tests {
         let mcp = given_sse_mcp_server().await;
 
         let client = McpClient::new();
-        client.initialize(mcp.address()).await.unwrap();
+        client.initialize(&mcp.address().into()).await.unwrap();
     }
 }
