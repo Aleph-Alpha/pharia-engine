@@ -202,6 +202,7 @@ impl NamespaceConfig {
                 registry: _,
             } => Ok(Box::new(NamespaceDescription {
                 skills: skills.clone(),
+                mcp_servers: vec![],
             })),
         }
     }
