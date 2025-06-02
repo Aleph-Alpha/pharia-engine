@@ -690,11 +690,11 @@ mod tests {
         // and a completion request
         let completion_request = CompletionRequest {
             prompt: "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+            
+You are a helpful assistant. You give very short and precise answers to user inquiries.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
-Environment: ipython<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Write code to check if number is prime, use that to see if the number 7 is prime<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
-            model: "llama-3.1-8b-instruct".to_owned(),
+Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
+            model: "pharia-1-llm-7b-control".to_owned(),
             params:CompletionParams {return_special_tokens: true, ..CompletionParams ::default()}
         };
 
@@ -709,7 +709,7 @@ Write code to check if number is prime, use that to see if the number 7 is prime
         .unwrap();
 
         // Then a completion response is returned
-        assert!(completion_response.text.contains("<|python_tag|>"));
+        assert!(completion_response.text.contains("<|endoftext|>"));
     }
 
     #[tokio::test]
