@@ -172,7 +172,7 @@ pub mod tests {
             _tracing_context: TracingContext,
             model_name: String,
         ) -> anyhow::Result<Arc<Tokenizer>> {
-            if model_name == "Pharia-1-LLM-7B-control" {
+            if model_name == "pharia-1-llm-7B-control" {
                 Ok(Arc::new(pharia_1_llm_7b_control_tokenizer()))
             } else {
                 Err(anyhow!(

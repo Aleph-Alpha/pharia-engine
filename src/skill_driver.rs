@@ -788,7 +788,7 @@ mod test {
             SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), TracingContext::dummy());
 
         // When chunking a short text
-        let model = "Pharia-1-LLM-7B-control".to_owned();
+        let model = "pharia-1-llm-7B-control".to_owned();
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),
@@ -822,7 +822,7 @@ mod test {
             SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), TracingContext::dummy());
 
         // When chunking a short text
-        let model = "Pharia-1-LLM-7B-control".to_owned();
+        let model = "pharia-1-llm-7B-control".to_owned();
         let max_tokens = 10;
         let request = ChunkRequest {
             text: "Greet".to_owned(),

@@ -109,7 +109,7 @@ mod tests {
         let request = ChunkRequest {
             text: text.to_owned(),
             params: ChunkParams {
-                model: "Pharia-1-LLM-7B-control".to_owned(),
+                model: "pharia-1-llm-7B-control".to_owned(),
                 max_tokens,
                 overlap: 0,
             },
@@ -142,7 +142,7 @@ mod tests {
         let request = ChunkRequest {
             text: "123456".to_owned(),
             params: ChunkParams {
-                model: "Pharia-1-LLM-7B-control".to_owned(),
+                model: "pharia-1-llm-7B-control".to_owned(),
                 max_tokens: 3,
                 overlap: 2,
             },
@@ -191,7 +191,7 @@ mod tests {
         let request = ChunkRequest {
             text: "Döner macht schöner ☝🏾! Remember that.".to_owned(),
             params: ChunkParams {
-                model: "Pharia-1-LLM-7B-control".to_owned(),
+                model: "pharia-1-llm-7B-control".to_owned(),
                 max_tokens: 7,
                 overlap: 2,
             },
