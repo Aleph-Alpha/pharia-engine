@@ -300,21 +300,26 @@ where
             .insert(namespace.to_owned(), incoming)
             .unwrap_or_default();
         let incoming = self.descriptions.get(namespace).unwrap();
+
+        // propagate skill changes
         let diff = Self::compute_skill_diff(&existing.skills, &incoming.skills);
         for skill in diff.added_or_changed {
             let skill = ConfiguredSkill::new(namespace.clone(), skill);
             self.skill_store_api.upsert(skill).await;
         }
-
         for skill_name in diff.removed {
             self.skill_store_api
                 .remove(SkillPath::new(namespace.clone(), &skill_name))
                 .await;
         }
 
+        // propagate mcp server changes
         let mcp_server_diff = McpServerDiff::compute(&existing.mcp_servers, &incoming.mcp_servers);
         for mcp_server in mcp_server_diff.added {
             self.tool_store_api.upsert_tool_server(mcp_server).await;
+        }
+        for mcp_server in mcp_server_diff.removed {
+            self.tool_store_api.remove_tool_server(mcp_server).await;
         }
     }
 }
@@ -680,6 +685,14 @@ pub mod tests {
         async fn upsert_tool_server(&self, url: McpServerUrl) {
             self.lock().await.push(url);
         }
+
+        async fn remove_tool_server(&self, url: McpServerUrl) {
+            self.lock().await.retain(|u| u != &url);
+        }
+
+        async fn list_tool_servers(&self) -> Vec<McpServerUrl> {
+            self.lock().await.clone()
+        }
     }
 
     #[tokio::test]
@@ -694,7 +707,7 @@ pub mod tests {
             config,
         );
 
-        // When reporting all changes
+        // When observing a namespace with an mcp server
         let namespace = Namespace::new("dummy-namespace").unwrap();
         let descriptions = NamespaceDescription {
             skills: vec![],
@@ -705,8 +718,40 @@ pub mod tests {
             .await;
 
         // Then the new mcp servers is upserted
-        let stored = tool_store_api.lock().await.clone();
+        let stored = tool_store_api.list_tool_servers().await;
         assert_eq!(stored, vec!["http://localhost:8000/mcp".into()]);
+    }
+
+    #[tokio::test]
+    async fn dropped_mcp_server_is_removed() {
+        // Given a namespace description watcher and a tool store that both know about an mcp server
+        let mcp_servers = vec!["http://localhost:8000/mcp".into()];
+        let tool_store = Arc::new(Mutex::new(mcp_servers.clone()));
+        let namespace = Namespace::new("dummy-namespace").unwrap();
+        let descriptions = HashMap::from([(
+            namespace.clone(),
+            NamespaceDescription {
+                skills: vec![],
+                mcp_servers,
+            },
+        )]);
+        let config = Box::new(PendingConfig);
+        let mut watcher =
+            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), config);
+
+        // When the watcher observes a namespace with no mcp servers
+        let namespace = Namespace::new("dummy-namespace").unwrap();
+        let descriptions = NamespaceDescription {
+            skills: vec![],
+            mcp_servers: vec![],
+        };
+        watcher
+            .report_changes_in_namespace(&namespace, Ok(descriptions))
+            .await;
+
+        // Then the tool store is notified that the mcp server is removed
+        let stored = tool_store.list_tool_servers().await;
+        assert_eq!(stored, vec![]);
     }
 
     #[tokio::test]

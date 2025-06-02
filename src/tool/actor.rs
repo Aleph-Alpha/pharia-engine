@@ -48,6 +48,12 @@ pub trait ToolApi {
 /// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
 pub trait ToolStoreApi {
     fn upsert_tool_server(&self, url: McpServerUrl) -> impl Future<Output = ()> + Send;
+    fn remove_tool_server(&self, url: McpServerUrl) -> impl Future<Output = ()> + Send;
+
+    // While this is not used yet (from e.g. the shell), it represents the public surface
+    // to test the tool store.
+    #[allow(dead_code)]
+    fn list_tool_servers(&self) -> impl Future<Output = Vec<McpServerUrl>> + Send;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -121,6 +127,18 @@ impl ToolStoreApi for mpsc::Sender<ToolMsg> {
         let msg = ToolMsg::UpsertToolServer { url };
         self.send(msg).await.unwrap();
     }
+
+    async fn remove_tool_server(&self, url: McpServerUrl) {
+        let msg = ToolMsg::RemoveToolServer { url };
+        self.send(msg).await.unwrap();
+    }
+
+    async fn list_tool_servers(&self) -> Vec<McpServerUrl> {
+        let (send, receive) = oneshot::channel();
+        let msg = ToolMsg::ListToolServers { send };
+        self.send(msg).await.unwrap();
+        receive.await.unwrap()
+    }
 }
 
 enum ToolMsg {
@@ -131,6 +149,12 @@ enum ToolMsg {
     },
     UpsertToolServer {
         url: McpServerUrl,
+    },
+    RemoveToolServer {
+        url: McpServerUrl,
+    },
+    ListToolServers {
+        send: oneshot::Sender<Vec<McpServerUrl>>,
     },
     ListTools {
         send: oneshot::Sender<Vec<String>>,
@@ -195,6 +219,13 @@ impl<T: ToolClient> ToolActor<T> {
             }
             ToolMsg::UpsertToolServer { url } => {
                 self.mcp_servers.insert(url);
+            }
+            ToolMsg::RemoveToolServer { url } => {
+                self.mcp_servers.remove(&url);
+            }
+            ToolMsg::ListToolServers { send } => {
+                let result = self.mcp_servers.iter().cloned().collect();
+                drop(send.send(result));
             }
         }
     }
@@ -301,6 +332,12 @@ pub mod tests {
 
     impl ToolStoreApi for ToolStoreDouble {
         async fn upsert_tool_server(&self, _url: McpServerUrl) {}
+
+        async fn remove_tool_server(&self, _url: McpServerUrl) {}
+
+        async fn list_tool_servers(&self) -> Vec<McpServerUrl> {
+            vec![]
+        }
     }
 
     pub struct ToolDouble;
@@ -380,6 +417,24 @@ pub mod tests {
             .await
             .unwrap();
         assert_eq!(result, json!("Success"));
+    }
+
+    #[tokio::test]
+    async fn tool_server_is_removed() {
+        // Given a tool configured with two mcp servers
+        let tool = Tool::with_client(ToolClientMock).api();
+        tool.upsert_tool_server("http://localhost:8000/mcp".into())
+            .await;
+        tool.upsert_tool_server("http://localhost:8001/mcp".into())
+            .await;
+
+        // When the first mcp server is removed
+        tool.remove_tool_server("http://localhost:8000/mcp".into())
+            .await;
+
+        // Then the list of tools is only the second mcp server
+        let mcp_servers = tool.list_tool_servers().await;
+        assert_eq!(mcp_servers, vec!["http://localhost:8001/mcp".into()]);
     }
 
     struct ToolClientSpy {
