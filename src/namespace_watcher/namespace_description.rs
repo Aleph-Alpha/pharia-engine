@@ -119,11 +119,15 @@ impl NamespaceDescription {
 
 pub struct WatchLoader {
     directory: PathBuf,
+    mcp_servers: Vec<McpServerUrl>,
 }
 
 impl WatchLoader {
-    pub fn new(directory: PathBuf) -> Self {
-        Self { directory }
+    pub fn new(directory: PathBuf, mcp_servers: Vec<McpServerUrl>) -> Self {
+        Self {
+            directory,
+            mcp_servers,
+        }
     }
 }
 
@@ -146,7 +150,7 @@ impl NamespaceDescriptionLoader for WatchLoader {
             .collect();
         Ok(NamespaceDescription {
             skills,
-            mcp_servers: vec![],
+            mcp_servers: self.mcp_servers.clone(),
         })
     }
 }

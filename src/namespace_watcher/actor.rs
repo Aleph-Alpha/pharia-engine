@@ -162,6 +162,7 @@ impl Diff {
     }
 }
 
+#[derive(Debug)]
 struct McpServerDiff {
     added: Vec<McpServerUrl>,
     removed: Vec<McpServerUrl>,
@@ -231,7 +232,6 @@ where
 
     async fn run(mut self) {
         let mut started = tokio::time::Instant::now();
-        self.report_hardcoded_tool_server().await;
         self.report_all_changes().await;
         let _ = self.ready.send(true);
         loop {
@@ -242,12 +242,6 @@ where
             started = tokio::time::Instant::now();
             self.report_all_changes().await;
         }
-    }
-
-    async fn report_hardcoded_tool_server(&mut self) {
-        self.tool_store_api
-            .upsert_tool_server("http://localhost:8000/mcp".into())
-            .await;
     }
 
     async fn report_all_changes(&mut self) {
@@ -521,6 +515,7 @@ pub mod tests {
             Namespace::new("local").unwrap(),
             NamespaceConfig::Watch {
                 directory: temp_dir.path().to_owned(),
+                mcp_servers: vec![],
             },
         )]
         .into_iter()
@@ -551,6 +546,7 @@ pub mod tests {
             Namespace::new("local").unwrap(),
             NamespaceConfig::Watch {
                 directory: directory.to_owned(),
+                mcp_servers: vec![],
             },
         )]
         .into_iter()
