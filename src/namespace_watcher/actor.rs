@@ -121,7 +121,7 @@ struct NamespaceWatcherActor<S, T> {
     tool_api: T,
     config: Box<dyn ObservableConfig + Send + Sync>,
     update_interval: Duration,
-    skills: HashMap<Namespace, Vec<SkillDescription>>,
+    descriptions: HashMap<Namespace, NamespaceDescription>,
     invalid_namespaces: HashSet<Namespace>,
 }
 
@@ -180,7 +180,7 @@ where
             tool_api,
             config,
             update_interval,
-            skills: HashMap::new(),
+            descriptions: HashMap::new(),
             invalid_namespaces: HashSet::new(),
         }
     }
@@ -231,17 +231,16 @@ where
         // this would only work if all the members except config go into a member object.
         // If they are top level, we can not obtain a exclusive reference, as we already have shared references to them in the futures.
         for (namespace, skills) in futures::future::join_all(futures).await {
-            self.report_changes_in_namespace(&namespace, skills.map(|d| d.skills))
-                .await;
+            self.report_changes_in_namespace(&namespace, skills).await;
         }
     }
 
     async fn report_changes_in_namespace(
         &mut self,
         namespace: &Namespace,
-        skills: Result<Vec<SkillDescription>, NamespaceDescriptionError>,
+        description: Result<NamespaceDescription, NamespaceDescriptionError>,
     ) {
-        let incoming = match skills {
+        let incoming = match description {
             Ok(incoming) => {
                 if self.invalid_namespaces.contains(namespace) {
                     self.skill_store_api
@@ -265,15 +264,15 @@ where
                     .set_namespace_error(namespace.clone(), Some(e))
                     .await;
                 self.invalid_namespaces.insert(namespace.to_owned());
-                vec![]
+                NamespaceDescription::empty()
             }
         };
         let existing = self
-            .skills
+            .descriptions
             .insert(namespace.to_owned(), incoming)
             .unwrap_or_default();
-        let incoming = self.skills.get(namespace).unwrap();
-        let diff = Self::compute_diff(&existing, incoming);
+        let incoming = self.descriptions.get(namespace).unwrap();
+        let diff = Self::compute_diff(&existing.skills, &incoming.skills);
         for skill in diff.added_or_changed {
             let skill = ConfiguredSkill::new(namespace.clone(), skill);
             self.skill_store_api.upsert(skill).await;
@@ -558,8 +557,8 @@ pub mod tests {
     where
         S: SkillStoreApi + Send + Sync,
     {
-        fn with_skills(
-            skills: HashMap<Namespace, Vec<SkillDescription>>,
+        fn with_descriptions(
+            descriptions: HashMap<Namespace, NamespaceDescription>,
             skill_store_api: S,
             config: Box<dyn ObservableConfig + Send + Sync>,
         ) -> Self {
@@ -572,7 +571,7 @@ pub mod tests {
                 tool_api: ToolStoreDouble,
                 config,
                 update_interval: Duration::from_millis(1),
-                skills,
+                descriptions,
                 invalid_namespaces: HashSet::new(),
             }
         }
@@ -611,25 +610,24 @@ pub mod tests {
         let dummy_skill = "dummy_skill";
         let namespaces = HashMap::from([(
             dummy_namespace.clone(),
-            vec![SkillDescription::Programmable {
-                name: dummy_skill.to_owned(),
-                tag: "latest".to_owned(),
-            }],
+            NamespaceDescription {
+                skills: vec![SkillDescription::Programmable {
+                    name: dummy_skill.to_owned(),
+                    tag: "latest".to_owned(),
+                }],
+                mcp_servers: vec![],
+            },
         )]);
 
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(2);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.clone()]));
 
-        let mut watcher = NamespaceWatcherActor::with_skills(namespaces, sender, config);
+        let mut watcher = NamespaceWatcherActor::with_descriptions(namespaces, sender, config);
 
         // when we load an invalid namespace
-        let skills = watcher
-            .config
-            .description(&dummy_namespace)
-            .await
-            .map(|d| d.skills);
+        let description = watcher.config.description(&dummy_namespace).await;
         watcher
-            .report_changes_in_namespace(&dummy_namespace, skills)
+            .report_changes_in_namespace(&dummy_namespace, description)
             .await;
 
         // then mark the namespace as invalid and remove all skills of that namespace
