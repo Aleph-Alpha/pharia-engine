@@ -12,16 +12,16 @@ use crate::{
 
 use super::{
     Namespace, NamespaceConfigs, NamespaceDescriptionLoader,
-    namespace_description::{NamespaceDescriptionError, SkillDescription},
+    namespace_description::{NamespaceDescription, NamespaceDescriptionError, SkillDescription},
 };
 
 #[async_trait]
 pub trait ObservableConfig {
     fn namespaces(&self) -> Vec<Namespace>;
-    async fn skills(
+    async fn description(
         &self,
         namespace: &Namespace,
-    ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError>;
+    ) -> Result<NamespaceDescription, NamespaceDescriptionError>;
 }
 
 pub struct NamespaceDescriptionLoaders {
@@ -52,18 +52,15 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
         self.namespaces.keys().cloned().collect()
     }
 
-    async fn skills(
+    async fn description(
         &self,
         namespace: &Namespace,
-    ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
-        let skills = self
-            .namespaces
+    ) -> Result<NamespaceDescription, NamespaceDescriptionError> {
+        self.namespaces
             .get(namespace)
             .expect("namespace must exist.")
             .description(self.beta)
-            .await?
-            .skills;
-        Ok(skills)
+            .await
     }
 }
 
@@ -227,14 +224,15 @@ where
 
     async fn report_all_changes(&mut self) {
         let futures = self.config.namespaces().into_iter().map(async |namespace| {
-            let skills = self.config.skills(&namespace).await;
+            let skills = self.config.description(&namespace).await;
             (namespace, skills)
         });
         // While it would be nice to use a stream and update the state after each future has finished,
         // this would only work if all the members except config go into a member object.
         // If they are top level, we can not obtain a exclusive reference, as we already have shared references to them in the futures.
         for (namespace, skills) in futures::future::join_all(futures).await {
-            self.report_changes_in_namespace(&namespace, skills).await;
+            self.report_changes_in_namespace(&namespace, skills.map(|d| d.skills))
+                .await;
         }
     }
 
@@ -328,11 +326,11 @@ pub mod tests {
             block_on(self.config.lock()).namespaces()
         }
 
-        async fn skills(
+        async fn description(
             &self,
             namespace: &Namespace,
-        ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
-            self.config.lock().await.skills(namespace).await
+        ) -> Result<NamespaceDescription, NamespaceDescriptionError> {
+            self.config.lock().await.description(namespace).await
         }
     }
 
@@ -352,15 +350,18 @@ pub mod tests {
             self.namespaces.keys().cloned().collect()
         }
 
-        async fn skills(
+        async fn description(
             &self,
             namespace: &Namespace,
-        ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
-            Ok(self
-                .namespaces
-                .get(namespace)
-                .expect("namespace must exist.")
-                .clone())
+        ) -> Result<NamespaceDescription, NamespaceDescriptionError> {
+            Ok(NamespaceDescription {
+                skills: self
+                    .namespaces
+                    .get(namespace)
+                    .expect("namespace must exist.")
+                    .clone(),
+                mcp_servers: vec![],
+            })
         }
     }
 
@@ -372,10 +373,10 @@ pub mod tests {
             vec![Namespace::new("dummy-namespace").unwrap()]
         }
 
-        async fn skills(
+        async fn description(
             &self,
             _namespace: &Namespace,
-        ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
+        ) -> Result<NamespaceDescription, NamespaceDescriptionError> {
             pending().await
         }
     }
@@ -477,7 +478,14 @@ pub mod tests {
 
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);
-        assert!(loaders.skills(&namespaces[0]).await.unwrap().is_empty());
+        assert!(
+            loaders
+                .description(&namespaces[0])
+                .await
+                .unwrap()
+                .skills
+                .is_empty()
+        );
     }
 
     #[tokio::test]
@@ -501,7 +509,7 @@ pub mod tests {
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);
 
-        let skills = loaders.skills(&namespaces[0]).await.unwrap();
+        let skills = loaders.description(&namespaces[0]).await.unwrap().skills;
         assert_eq!(skills.len(), 2);
         assert!(matches!(&skills[0], SkillDescription::Programmable { .. }));
         assert!(matches!(&skills[1], SkillDescription::Programmable { .. }));
@@ -586,10 +594,10 @@ pub mod tests {
             self.namespaces.clone()
         }
 
-        async fn skills(
+        async fn description(
             &self,
             _namespace: &Namespace,
-        ) -> Result<Vec<SkillDescription>, NamespaceDescriptionError> {
+        ) -> Result<NamespaceDescription, NamespaceDescriptionError> {
             Err(NamespaceDescriptionError::Unrecoverable(anyhow!(
                 "SaboteurConfig will always fail."
             )))
@@ -615,7 +623,11 @@ pub mod tests {
         let mut watcher = NamespaceWatcherActor::with_skills(namespaces, sender, config);
 
         // when we load an invalid namespace
-        let skills = watcher.config.skills(&dummy_namespace).await;
+        let skills = watcher
+            .config
+            .description(&dummy_namespace)
+            .await
+            .map(|d| d.skills);
         watcher
             .report_changes_in_namespace(&dummy_namespace, skills)
             .await;
