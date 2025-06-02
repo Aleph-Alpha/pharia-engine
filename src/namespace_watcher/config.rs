@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::PathBuf};
 use url::Url;
 use utoipa::ToSchema;
 
-use crate::skill_loader::RegistryConfig;
+use crate::{skill_loader::RegistryConfig, tool::McpServerUrl};
 
 use super::{
     NamespaceDescriptionLoader,
@@ -70,6 +70,7 @@ impl NamespaceConfigs {
             [(
                 Namespace::new("local").unwrap(),
                 NamespaceConfig::InPlace {
+                    mcp_servers: vec![],
                     skills: skills
                         .iter()
                         .map(|&name| SkillDescription::Programmable {
@@ -102,6 +103,7 @@ impl NamespaceConfigs {
             Namespace::new("dev").unwrap(),
             NamespaceConfig::Watch {
                 directory: "skills".into(),
+                mcp_servers: vec![],
             },
         )]
         .into();
@@ -146,7 +148,12 @@ pub enum NamespaceConfig {
     },
     /// For development it is convenient to just watch a local repository for changing skills
     /// without the need for reconfiguration.
-    Watch { directory: PathBuf },
+    Watch {
+        directory: PathBuf,
+        // Setting a default here for backwards compatibility
+        #[serde(default)]
+        mcp_servers: Vec<McpServerUrl>,
+    },
     /// Rather than referencing a configuration where skills are listed, this variant just lists
     /// them in place in the application config. As such these skills are owned by the operators.
     /// This behavior is especially useful to make sure certain skills are found in integration
@@ -155,13 +162,16 @@ pub enum NamespaceConfig {
         skills: Vec<SkillDescription>,
         #[serde(flatten)]
         registry: Registry,
+        // Setting a default here for backwards compatibility
+        #[serde(default)]
+        mcp_servers: Vec<McpServerUrl>,
     },
 }
 
 impl NamespaceConfig {
     pub fn registry(&self) -> Registry {
         match self {
-            NamespaceConfig::Watch { directory } => Registry::File {
+            NamespaceConfig::Watch { directory, .. } => Registry::File {
                 path: directory.to_str().unwrap().to_owned(),
             },
             NamespaceConfig::InPlace { registry, .. }
@@ -194,15 +204,20 @@ impl NamespaceConfig {
                     scheme => Err(anyhow!("Unsupported URL scheme: {scheme}")),
                 }
             }
-            NamespaceConfig::Watch { directory } => {
-                Ok(Box::new(WatchLoader::new(directory.to_owned())))
-            }
+            NamespaceConfig::Watch {
+                directory,
+                mcp_servers,
+            } => Ok(Box::new(WatchLoader::new(
+                directory.to_owned(),
+                mcp_servers.clone(),
+            ))),
             NamespaceConfig::InPlace {
+                mcp_servers,
                 skills,
                 registry: _,
             } => Ok(Box::new(NamespaceDescription {
                 skills: skills.clone(),
-                mcp_servers: vec![],
+                mcp_servers: mcp_servers.clone(),
             })),
         }
     }
@@ -249,8 +264,33 @@ mod tests {
         assert!(config.contains_key(&namespace));
     }
 
+    #[tokio::test]
+    async fn deserialize_watch_config_with_mcp_servers() {
+        // Given a local config with an mcp server
+        let config = NamespaceConfigs::from_toml(
+            r#"
+            [local]
+            directory = "skills"
+            mcp_servers = ["http://localhost:8000/mcp"]
+            "#,
+        )
+        .unwrap();
+        let namespace = Namespace::new("local").unwrap();
+
+        // When converting it to a loader
+        let local_namespace = config.get(&namespace).unwrap().loader().unwrap();
+
+        // Then the loader reports the mcp server
+        let description = local_namespace.description(true).await.unwrap();
+        assert_eq!(
+            description.mcp_servers,
+            vec!["http://localhost:8000/mcp".into()]
+        );
+    }
+
     #[test]
     fn deserialize_watch_config() {
+        // Given a watch config (only a directory is specified)
         let config = NamespaceConfigs::from_toml(
             r#"
             [local]
@@ -264,6 +304,31 @@ mod tests {
         let registry = local_namespace.registry();
 
         assert!(matches!(registry, Registry::File { path } if path == "skills"));
+    }
+
+    #[tokio::test]
+    async fn deserialize_in_place_config_with_mcp_servers() {
+        // Given an in place config (skills and path are specified)
+        let config = NamespaceConfigs::from_toml(
+            r#"
+            [local]
+            mcp_servers = ["http://localhost:8000/mcp"]
+            skills = [{"name"="dummy-skill"}]
+            path = "skills"
+            "#,
+        )
+        .unwrap();
+
+        // When converting it to a loader
+        let namespace = Namespace::new("local").unwrap();
+        let local_namespace = config.get(&namespace).unwrap().loader().unwrap();
+
+        // Then the loader reports the mcp server
+        let description = local_namespace.description(true).await.unwrap();
+        assert_eq!(
+            description.mcp_servers,
+            vec!["http://localhost:8000/mcp".into()]
+        );
     }
 
     #[test]

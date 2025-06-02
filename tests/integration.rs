@@ -30,6 +30,7 @@ use tracing::{given_log_recorder, given_tracing_subscriber};
 struct TestFileRegistry {
     skills: Vec<String>,
     directory: TempDir,
+    mcp_servers: Vec<String>,
 }
 
 impl TestFileRegistry {
@@ -37,6 +38,7 @@ impl TestFileRegistry {
         Self {
             skills: Vec::new(),
             directory: tempdir().unwrap(),
+            mcp_servers: Vec::new(),
         }
     }
 
@@ -47,16 +49,22 @@ impl TestFileRegistry {
         std::fs::write(file_path, wasm_bytes).unwrap();
     }
 
+    fn with_mcp_server(&mut self, url: &str) {
+        self.mcp_servers.push(url.to_owned());
+    }
+
     fn to_namespace_config(&self) -> NamespaceConfigs {
         let skills = self.skills.join("\"},{\"name\"=\"");
         let dir_path = self.directory.path().to_str().unwrap();
         // Mask directory path. It could contain characters which represent escape sequences
         let json_masked_string_with_quotes = serde_json::to_string(dir_path).unwrap();
+        let mcp_servers = self.mcp_servers.join("\",\"");
         toml::from_str(&format!(
             r#"
             [local]
             path = {json_masked_string_with_quotes}
-            skills = [{{"name"="{skills}"}}]"#,
+            skills = [{{"name"="{skills}"}}]
+            mcp_servers = ["{mcp_servers}"]"#,
         ))
         .unwrap()
     }
@@ -195,7 +203,7 @@ async fn run_search_skill() {
 
 #[tokio::test]
 async fn run_skill_with_tool_call() {
-    let _mcp = given_sse_mcp_server().await;
+    let mcp = given_sse_mcp_server().await;
 
     // Simulate the production environment with tracing enabled
     let _guard = given_tracing_subscriber().await;
@@ -203,6 +211,8 @@ async fn run_skill_with_tool_call() {
     let wasm_bytes = given_skill_tool_invocation().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("tool-invocation-rs", wasm_bytes);
+    local_skill_dir.with_mcp_server(mcp.address());
+
     let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
