@@ -1,6 +1,8 @@
 use futures::StreamExt;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
+use serde::Deserialize;
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -16,7 +18,7 @@ use crate::logging::TracingContext;
 
 use super::client::McpClient;
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct McpServerUrl(pub String);
 
 impl<T> From<T> for McpServerUrl

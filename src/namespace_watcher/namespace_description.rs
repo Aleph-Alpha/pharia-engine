@@ -9,7 +9,7 @@ use axum::http::HeaderValue;
 use reqwest::{StatusCode, header::AUTHORIZATION};
 use serde::{Deserialize, Serialize};
 
-use crate::http::HttpClient;
+use crate::{http::HttpClient, tool::McpServerUrl};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NamespaceDescriptionError {
@@ -71,7 +71,7 @@ pub struct NamespaceDescription {
     pub skills: Vec<SkillDescription>,
     // Maintain backwards compatibility with the old config format which did not include mcp servers.
     #[serde(default)]
-    pub mcp_servers: Vec<String>,
+    pub mcp_servers: Vec<McpServerUrl>,
 }
 
 impl NamespaceDescription {
@@ -98,7 +98,7 @@ impl NamespaceDescription {
                 struct NamespaceDescriptionStable {
                     skills: Vec<SkillDescriptionStable>,
                     #[serde(default)]
-                    mcp_servers: Vec<String>,
+                    mcp_servers: Vec<McpServerUrl>,
                 }
 
                 let tc = toml::from_str::<NamespaceDescriptionStable>(config)?;
@@ -256,7 +256,10 @@ pub mod tests {
         mcp_servers = ["localhost:8000", "localhost:8001"]
         "#;
         let tc: NamespaceDescription = NamespaceDescription::from_str(description, true).unwrap();
-        assert_eq!(tc.mcp_servers, vec!["localhost:8000", "localhost:8001"]);
+        assert_eq!(
+            tc.mcp_servers,
+            vec!["localhost:8000".into(), "localhost:8001".into()]
+        );
     }
 
     #[test]
@@ -266,7 +269,10 @@ pub mod tests {
         mcp_servers = ["localhost:8000", "localhost:8001"]
         "#;
         let tc: NamespaceDescription = NamespaceDescription::from_str(description, false).unwrap();
-        assert_eq!(tc.mcp_servers, vec!["localhost:8000", "localhost:8001"]);
+        assert_eq!(
+            tc.mcp_servers,
+            vec!["localhost:8000".into(), "localhost:8001".into()]
+        );
     }
 
     #[test]
