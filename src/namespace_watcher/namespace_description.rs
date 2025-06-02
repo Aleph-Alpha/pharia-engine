@@ -69,6 +69,7 @@ pub trait NamespaceDescriptionLoader {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NamespaceDescription {
     pub skills: Vec<SkillDescription>,
+    pub mcp_servers: Vec<String>,
 }
 
 impl NamespaceDescription {
@@ -87,6 +88,7 @@ impl NamespaceDescription {
                 #[derive(Deserialize)]
                 struct NamespaceDescriptionStable {
                     skills: Vec<SkillDescriptionStable>,
+                    mcp_server: Vec<String>,
                 }
 
                 let tc = toml::from_str::<NamespaceDescriptionStable>(config)?;
@@ -98,6 +100,7 @@ impl NamespaceDescription {
                             SkillDescription::Programmable { name, tag }
                         })
                         .collect(),
+                    mcp_servers: tc.mcp_server,
                 }
             };
         Ok(tc)
@@ -131,7 +134,10 @@ impl NamespaceDescriptionLoader for WatchLoader {
                     .and_then(|entry| SkillDescription::from(entry).ok())
             })
             .collect();
-        Ok(NamespaceDescription { skills })
+        Ok(NamespaceDescription {
+            skills,
+            mcp_servers: vec![],
+        })
     }
 }
 
@@ -232,6 +238,26 @@ impl NamespaceDescriptionLoader for NamespaceDescription {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+    #[test]
+    fn tools_are_loaded_from_config_with_beta_flag() {
+        let description = r#"
+        skills = []
+        mcp_servers = ["localhost:8000", "localhost:8001"]
+        "#;
+        let tc: NamespaceDescription = NamespaceDescription::from_str(description, true).unwrap();
+        assert_eq!(tc.mcp_servers, vec!["localhost:8000", "localhost:8001"]);
+    }
+
+    #[test]
+    fn tools_are_loaded_from_config_without_beta_flag() {
+        let description = r#"
+        skills = []
+        mcp_servers = ["localhost:8000", "localhost:8001"]
+        "#;
+        let tc: NamespaceDescription = NamespaceDescription::from_str(description, false).unwrap();
+        assert_eq!(tc.mcp_servers, vec!["localhost:8000", "localhost:8001"]);
+    }
 
     #[test]
     fn load_skill_list_config_toml() {
