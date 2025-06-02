@@ -1,7 +1,9 @@
 mod actor;
 mod client;
 
-pub use self::actor::{Argument, InvokeRequest, Tool, ToolApi, ToolError, ToolStoreApi};
+pub use self::actor::{
+    Argument, InvokeRequest, McpServerUrl, Tool, ToolApi, ToolError, ToolStoreApi,
+};
 
 #[cfg(test)]
 pub mod tests {

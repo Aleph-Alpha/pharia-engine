@@ -6,8 +6,10 @@ use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
 
 use crate::{
-    skill_loader::ConfiguredSkill, skill_store::SkillStoreApi, skills::SkillPath,
-    tool::ToolStoreApi,
+    skill_loader::ConfiguredSkill,
+    skill_store::SkillStoreApi,
+    skills::SkillPath,
+    tool::{McpServerUrl, ToolStoreApi},
 };
 
 use super::{
@@ -118,7 +120,7 @@ struct NamespaceWatcherActor<S, T> {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_store_api: S,
-    tool_api: T,
+    tool_store_api: T,
     config: Box<dyn ObservableConfig + Send + Sync>,
     update_interval: Duration,
     descriptions: HashMap<Namespace, NamespaceDescription>,
@@ -160,6 +162,32 @@ impl Diff {
     }
 }
 
+struct McpServerDiff {
+    added: Vec<McpServerUrl>,
+    removed: Vec<McpServerUrl>,
+}
+
+impl McpServerDiff {
+    fn new(added: Vec<McpServerUrl>, removed: Vec<McpServerUrl>) -> Self {
+        Self { added, removed }
+    }
+
+    fn compute(existing: &[McpServerUrl], incoming: &[McpServerUrl]) -> Self {
+        let existing = existing.iter().collect::<HashSet<_>>();
+        let incoming = incoming.iter().collect::<HashSet<_>>();
+
+        let added = incoming
+            .difference(&existing)
+            .map(|&url| url.clone())
+            .collect();
+        let removed = existing
+            .difference(&incoming)
+            .map(|&url| url.clone())
+            .collect();
+        Self::new(added, removed)
+    }
+}
+
 impl<S, T> NamespaceWatcherActor<S, T>
 where
     S: SkillStoreApi,
@@ -169,7 +197,7 @@ where
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_store_api: S,
-        tool_api: T,
+        tool_store_api: T,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -177,7 +205,7 @@ where
             ready,
             shutdown,
             skill_store_api,
-            tool_api,
+            tool_store_api,
             config,
             update_interval,
             descriptions: HashMap::new(),
@@ -185,7 +213,7 @@ where
         }
     }
 
-    fn compute_diff(existing: &[SkillDescription], incoming: &[SkillDescription]) -> Diff {
+    fn compute_skill_diff(existing: &[SkillDescription], incoming: &[SkillDescription]) -> Diff {
         let existing = existing.iter().collect::<HashSet<_>>();
         let incoming = incoming.iter().collect::<HashSet<_>>();
 
@@ -217,15 +245,15 @@ where
     }
 
     async fn report_hardcoded_tool_server(&mut self) {
-        self.tool_api
+        self.tool_store_api
             .upsert_tool_server("http://localhost:8000/mcp".into())
             .await;
     }
 
     async fn report_all_changes(&mut self) {
         let futures = self.config.namespaces().into_iter().map(async |namespace| {
-            let skills = self.config.description(&namespace).await;
-            (namespace, skills)
+            let descriptions = self.config.description(&namespace).await;
+            (namespace, descriptions)
         });
         // While it would be nice to use a stream and update the state after each future has finished,
         // this would only work if all the members except config go into a member object.
@@ -272,7 +300,7 @@ where
             .insert(namespace.to_owned(), incoming)
             .unwrap_or_default();
         let incoming = self.descriptions.get(namespace).unwrap();
-        let diff = Self::compute_diff(&existing.skills, &incoming.skills);
+        let diff = Self::compute_skill_diff(&existing.skills, &incoming.skills);
         for skill in diff.added_or_changed {
             let skill = ConfiguredSkill::new(namespace.clone(), skill);
             self.skill_store_api.upsert(skill).await;
@@ -282,6 +310,11 @@ where
             self.skill_store_api
                 .remove(SkillPath::new(namespace.clone(), &skill_name))
                 .await;
+        }
+
+        let mcp_server_diff = McpServerDiff::compute(&existing.mcp_servers, &incoming.mcp_servers);
+        for mcp_server in mcp_server_diff.added {
+            self.tool_store_api.upsert_tool_server(mcp_server).await;
         }
     }
 }
@@ -299,6 +332,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::skill_store::tests::SkillStoreDummy;
+    use crate::tool::McpServerUrl;
     use crate::tool::tests::ToolStoreDouble;
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
@@ -381,6 +415,21 @@ pub mod tests {
     }
 
     #[test]
+    fn mcp_server_diff_is_computed() {
+        let existing = vec![
+            "http://localhost:8000/mcp".into(),
+            "http://localhost:8001/mcp".into(),
+        ];
+        let incoming = vec![
+            "http://localhost:8000/mcp".into(),
+            "http://localhost:8002/mcp".into(),
+        ];
+        let diff = McpServerDiff::compute(&existing, &incoming);
+        assert_eq!(diff.added, vec!["http://localhost:8002/mcp".into()]);
+        assert_eq!(diff.removed, vec!["http://localhost:8001/mcp".into()]);
+    }
+
+    #[test]
     fn diff_is_computed() {
         let incoming = vec![
             SkillDescription::Programmable {
@@ -403,7 +452,7 @@ pub mod tests {
             },
         ];
 
-        let diff = NamespaceWatcherActor::<SkillStoreDummy, ToolStoreDouble>::compute_diff(
+        let diff = NamespaceWatcherActor::<SkillStoreDummy, ToolStoreDouble>::compute_skill_diff(
             &existing, &incoming,
         );
 
@@ -431,7 +480,7 @@ pub mod tests {
         };
 
         // When the observer checks for new skills
-        let diff = NamespaceWatcherActor::<SkillStoreDummy, ToolStoreDouble>::compute_diff(
+        let diff = NamespaceWatcherActor::<SkillStoreDummy, ToolStoreDouble>::compute_skill_diff(
             &[existing.clone()],
             &[incoming.clone()],
         );
@@ -557,7 +606,7 @@ pub mod tests {
     where
         S: SkillStoreApi + Send + Sync,
     {
-        fn with_descriptions(
+        fn with_skill_store_api(
             descriptions: HashMap<Namespace, NamespaceDescription>,
             skill_store_api: S,
             config: Box<dyn ObservableConfig + Send + Sync>,
@@ -568,7 +617,31 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api,
-                tool_api: ToolStoreDouble,
+                tool_store_api: ToolStoreDouble,
+                config,
+                update_interval: Duration::from_millis(1),
+                descriptions,
+                invalid_namespaces: HashSet::new(),
+            }
+        }
+    }
+
+    impl<T> NamespaceWatcherActor<SkillStoreDummy, T>
+    where
+        T: ToolStoreApi + Send + Sync,
+    {
+        fn with_tool_store_api(
+            descriptions: HashMap<Namespace, NamespaceDescription>,
+            tool_store_api: T,
+            config: Box<dyn ObservableConfig + Send + Sync>,
+        ) -> Self {
+            let (ready, _) = tokio::sync::watch::channel(false);
+            let (_, shutdown) = tokio::sync::watch::channel(false);
+            Self {
+                ready,
+                shutdown,
+                skill_store_api: SkillStoreDummy,
+                tool_store_api,
                 config,
                 update_interval: Duration::from_millis(1),
                 descriptions,
@@ -603,6 +676,39 @@ pub mod tests {
         }
     }
 
+    impl ToolStoreApi for Arc<Mutex<Vec<McpServerUrl>>> {
+        async fn upsert_tool_server(&self, url: McpServerUrl) {
+            self.lock().await.push(url);
+        }
+    }
+
+    #[tokio::test]
+    async fn new_mcp_server_is_upserted() {
+        // Given a namespace description watcher with empty descriptions
+        let tool_store_api = Arc::new(Mutex::new(vec![]));
+        let descriptions = HashMap::new();
+        let config = Box::new(PendingConfig);
+        let mut watcher = NamespaceWatcherActor::with_tool_store_api(
+            descriptions,
+            tool_store_api.clone(),
+            config,
+        );
+
+        // When reporting all changes
+        let namespace = Namespace::new("dummy-namespace").unwrap();
+        let descriptions = NamespaceDescription {
+            skills: vec![],
+            mcp_servers: vec!["http://localhost:8000/mcp".into()],
+        };
+        watcher
+            .report_changes_in_namespace(&namespace, Ok(descriptions))
+            .await;
+
+        // Then the new mcp servers is upserted
+        let stored = tool_store_api.lock().await.clone();
+        assert_eq!(stored, vec!["http://localhost:8000/mcp".into()]);
+    }
+
     #[tokio::test]
     async fn add_invalid_namespace_and_unload_skill_for_invalid_namespace_description() {
         // given an configuration observer actor
@@ -622,7 +728,7 @@ pub mod tests {
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(2);
         let config = Box::new(SaboteurConfig::new(vec![dummy_namespace.clone()]));
 
-        let mut watcher = NamespaceWatcherActor::with_descriptions(namespaces, sender, config);
+        let mut watcher = NamespaceWatcherActor::with_skill_store_api(namespaces, sender, config);
 
         // when we load an invalid namespace
         let description = watcher.config.description(&dummy_namespace).await;
