@@ -66,11 +66,9 @@ pub trait NamespaceDescriptionLoader {
     async fn description(&self, beta: bool) -> NamespaceDescriptionResult;
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Clone)]
 pub struct NamespaceDescription {
     pub skills: Vec<SkillDescription>,
-    // Maintain backwards compatibility with the old config format which did not include mcp servers.
-    #[serde(default)]
     pub mcp_servers: Vec<McpServerUrl>,
 }
 
@@ -85,7 +83,18 @@ impl NamespaceDescription {
     pub fn from_str(config: &str, beta: bool) -> anyhow::Result<Self> {
         let tc =
             if beta {
-                toml::from_str(config)?
+                #[derive(Deserialize)]
+                struct NamespaceDescriptionBeta {
+                    skills: Vec<SkillDescription>,
+                    mcp_servers: Option<Vec<McpServerUrl>>,
+                }
+
+                let tc = toml::from_str::<NamespaceDescriptionBeta>(config)?;
+                NamespaceDescription {
+                    skills: tc.skills,
+                    // Specifying mcp servers is optional.
+                    mcp_servers: tc.mcp_servers.unwrap_or_default(),
+                }
             } else {
                 #[derive(Deserialize)]
                 struct SkillDescriptionStable {
