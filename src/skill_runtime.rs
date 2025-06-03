@@ -326,7 +326,15 @@ impl RunMessageStreamMsg {
         let result = {
             let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
             let result = driver
-                .run_message_stream(skill, input, csi_apis, api_token, &context, send)
+                .run_message_stream(
+                    skill,
+                    input,
+                    csi_apis,
+                    api_token,
+                    &context,
+                    skill_path.namespace.clone(),
+                    send.clone(),
+                )
                 .await;
 
             log_skill_result(&context, &skill_path, &result);
@@ -495,7 +503,14 @@ impl RunFunctionMsg {
         let result = {
             let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
             let result = driver
-                .run_function(skill, input, csi_apis, api_token, &context)
+                .run_function(
+                    skill,
+                    input,
+                    csi_apis,
+                    api_token,
+                    &context,
+                    skill_path.namespace.clone(),
+                )
                 .await;
 
             log_skill_result(&context, &skill_path, &result);
