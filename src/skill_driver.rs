@@ -42,6 +42,7 @@ impl SkillDriver {
         csi: impl Csi + Send + Sync + 'static,
         api_token: String,
         tracing_context: &TracingContext,
+        _namespace: Namespace,
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
         let (send_rt_err, mut recv_rt_err) = oneshot::channel();
@@ -123,6 +124,7 @@ impl SkillDriver {
         csi_apis: impl Csi + Send + Sync + 'static,
         api_token: String,
         tracing_context: &TracingContext,
+        _namespace: Namespace,
     ) -> Result<Value, SkillExecutionError> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let csi_for_skills = Box::new(SkillInvocationCtx::new(
@@ -1066,6 +1068,7 @@ mod test {
                 csi,
                 "dummy token".to_owned(),
                 &TracingContext::dummy(),
+                Namespace::dummy(),
             )
             .await;
 
@@ -1090,6 +1093,7 @@ mod test {
                 CsiSaboteur,
                 "TOKEN_NOT_REQUIRED".to_owned(),
                 &TracingContext::dummy(),
+                Namespace::dummy(),
             )
             .await;
 
@@ -1160,6 +1164,7 @@ mod test {
                 CsiSaboteur,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
+                Namespace::dummy(),
                 send,
             )
             .await;
@@ -1184,6 +1189,7 @@ mod test {
                 CsiDummy,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
+                Namespace::dummy(),
                 send,
             )
             .await;
@@ -1208,6 +1214,7 @@ mod test {
                 CsiDummy,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
+                Namespace::dummy(),
                 send,
             )
             .await;
@@ -1232,6 +1239,7 @@ mod test {
                 CsiDummy,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
+                Namespace::dummy(),
                 send,
             )
             .await;
@@ -1288,6 +1296,7 @@ mod test {
                 CsiDummy,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
+                Namespace::dummy(),
                 send,
             )
             .await;
