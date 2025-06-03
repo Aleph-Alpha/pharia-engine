@@ -17,6 +17,9 @@ use tracing::info;
 use crate::logging::TracingContext;
 use crate::namespace_watcher::Namespace;
 
+#[cfg(test)]
+use double_derive::double;
+
 use super::client::McpClient;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -63,6 +66,7 @@ pub trait McpServerStore {
     fn list(&self, namespace: Namespace) -> impl Future<Output = Vec<McpServerUrl>> + Send;
 }
 
+#[cfg_attr(test, double(ToolDouble))]
 pub trait ToolApi {
     fn invoke_tool(
         &self,
@@ -379,21 +383,8 @@ pub mod tests {
         }
     }
 
-    pub struct ToolDouble;
-
-    impl ToolApi for ToolDouble {
-        async fn invoke_tool(
-            &self,
-            _request: InvokeRequest,
-            _tracing_context: TracingContext,
-        ) -> Result<Value, ToolError> {
-            unimplemented!()
-        }
-
-        async fn list_tools(&self) -> Vec<String> {
-            unimplemented!()
-        }
-    }
+    pub struct ToolDummy;
+    impl ToolDouble for ToolDummy {}
 
     /// Only report tools for one particular server address
     struct ToolClientMock;
