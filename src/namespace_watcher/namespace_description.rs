@@ -255,11 +255,11 @@ pub mod tests {
 
     #[test]
     fn tools_are_loaded_from_config_with_beta_flag() {
-        let description = r#"
+        let config = r#"
         skills = []
         mcp_servers = ["localhost:8000", "localhost:8001"]
         "#;
-        let tc: NamespaceDescription = NamespaceDescription::from_str(description, true).unwrap();
+        let tc = NamespaceDescription::from_str(config, true).unwrap();
         assert_eq!(
             tc.mcp_servers,
             vec!["localhost:8000".into(), "localhost:8001".into()]
@@ -268,11 +268,11 @@ pub mod tests {
 
     #[test]
     fn tools_are_loaded_from_config_without_beta_flag() {
-        let description = r#"
+        let config = r#"
         skills = []
         mcp_servers = ["localhost:8000", "localhost:8001"]
         "#;
-        let tc: NamespaceDescription = NamespaceDescription::from_str(description, false).unwrap();
+        let tc = NamespaceDescription::from_str(config, false).unwrap();
         assert_eq!(
             tc.mcp_servers,
             vec!["localhost:8000".into(), "localhost:8001".into()]
@@ -281,16 +281,14 @@ pub mod tests {
 
     #[test]
     fn load_skill_list_config_toml() {
-        let tc: NamespaceDescription = toml::from_str(
-            r#"
-            skills = [
-                {name = "Goofy", tag = "v1.0.0-rc"},
-                {type = "chat",name = "Pluto", version = "1", model = "pharia-1-llm-7b-control", system_prompt = "You are a helpful assistant."},
-                {name = "Gamma"}
-            ]
-            "#,
-        )
-        .unwrap();
+        let config = r#"
+        skills = [
+            {name = "Goofy", tag = "v1.0.0-rc"},
+            {type = "chat",name = "Pluto", version = "1", model = "pharia-1-llm-7b-control", system_prompt = "You are a helpful assistant."},
+            {name = "Gamma"}
+        ]
+        "#;
+        let tc = NamespaceDescription::from_str(config, true).unwrap();
         assert_eq!(tc.skills.len(), 3);
         assert!(
             matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag == "v1.0.0-rc")
@@ -305,8 +303,7 @@ pub mod tests {
 
     #[test]
     fn load_skill_list_config_toml_alternate_syntax() {
-        let tc: NamespaceDescription = toml::from_str(
-            r#"
+        let config = r#"
             [[skills]]
             name = "Goofy"
             tag = "v1.0.0-rc"
@@ -318,9 +315,8 @@ pub mod tests {
             system_prompt = "You are a helpful assistant."
             [[skills]]
             name = "Gamma"
-            "#,
-        )
-        .unwrap();
+            "#;
+        let tc = NamespaceDescription::from_str(config, true).unwrap();
         assert_eq!(tc.skills.len(), 3);
         assert!(
             matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag == "v1.0.0-rc")
