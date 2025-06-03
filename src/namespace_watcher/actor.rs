@@ -337,7 +337,7 @@ pub mod tests {
 
     use crate::skill_store::tests::SkillStoreDummy;
     use crate::tool::McpServerUrl;
-    use crate::tool::tests::ToolStoreDouble;
+    use crate::tool::tests::McpServerStoreDummy;
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill_store::tests::SkillStoreMsg,
@@ -456,9 +456,10 @@ pub mod tests {
             },
         ];
 
-        let diff = NamespaceWatcherActor::<SkillStoreDummy, ToolStoreDouble>::compute_skill_diff(
-            &existing, &incoming,
-        );
+        let diff =
+            NamespaceWatcherActor::<SkillStoreDummy, McpServerStoreDummy>::compute_skill_diff(
+                &existing, &incoming,
+            );
 
         // when the observer checks for new skills
         assert_eq!(
@@ -484,10 +485,11 @@ pub mod tests {
         };
 
         // When the observer checks for new skills
-        let diff = NamespaceWatcherActor::<SkillStoreDummy, ToolStoreDouble>::compute_skill_diff(
-            &[existing.clone()],
-            &[incoming.clone()],
-        );
+        let diff =
+            NamespaceWatcherActor::<SkillStoreDummy, McpServerStoreDummy>::compute_skill_diff(
+                &[existing.clone()],
+                &[incoming.clone()],
+            );
 
         // Then the new version is added and the old version is not removed as only the tag changed
         assert_eq!(diff.added_or_changed, vec![incoming]);
@@ -501,7 +503,7 @@ pub mod tests {
         let update_interval = Duration::from_millis(1);
         let mut observer = NamespaceWatcher::with_config(
             SkillStoreDummy,
-            ToolStoreDouble,
+            McpServerStoreDummy,
             config,
             update_interval,
         );
@@ -587,8 +589,12 @@ pub mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(1);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let mut observer =
-            NamespaceWatcher::with_config(sender, ToolStoreDouble, stub_config, update_interval);
+        let mut observer = NamespaceWatcher::with_config(
+            sender,
+            McpServerStoreDummy,
+            stub_config,
+            update_interval,
+        );
         observer.wait_for_ready().await;
 
         // Then one new skill message is send for each skill configured
@@ -608,7 +614,7 @@ pub mod tests {
         observer.wait_for_shutdown().await;
     }
 
-    impl<S> NamespaceWatcherActor<S, ToolStoreDouble>
+    impl<S> NamespaceWatcherActor<S, McpServerStoreDummy>
     where
         S: SkillStoreApi + Send + Sync,
     {
@@ -623,7 +629,7 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api,
-                tool_store_api: ToolStoreDouble,
+                tool_store_api: McpServerStoreDummy,
                 config,
                 update_interval: Duration::from_millis(1),
                 descriptions,
@@ -846,8 +852,12 @@ pub mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(1);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let observer =
-            NamespaceWatcher::with_config(sender, ToolStoreDouble, stub_config, update_interval);
+        let observer = NamespaceWatcher::with_config(
+            sender,
+            McpServerStoreDummy,
+            stub_config,
+            update_interval,
+        );
 
         // Then only one new skill message is send for each skill configured
         receiver.recv().await.unwrap();
@@ -877,7 +887,7 @@ pub mod tests {
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
         let mut observer =
-            NamespaceWatcher::with_config(sender, ToolStoreDouble, config, update_interval);
+            NamespaceWatcher::with_config(sender, McpServerStoreDummy, config, update_interval);
         observer.wait_for_ready().await;
         receiver.recv().await.unwrap();
 

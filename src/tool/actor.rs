@@ -371,9 +371,9 @@ pub mod tests {
 
     use super::*;
 
-    pub struct ToolStoreDouble;
+    pub struct McpServerStoreDummy;
 
-    impl McpServerStore for ToolStoreDouble {
+    impl McpServerStore for McpServerStoreDummy {
         async fn upsert(&self, _server: ConfiguredMcpServer) {}
 
         async fn remove(&self, _server: ConfiguredMcpServer) {}
