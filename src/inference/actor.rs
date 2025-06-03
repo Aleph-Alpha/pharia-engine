@@ -13,6 +13,9 @@ use crate::logging::TracingContext;
 
 use super::client::{InferenceClient, InferenceError};
 
+#[cfg(test)]
+use double_derive::double;
+
 /// Handle to the inference actor. Spin this up in order to use the inference API.
 pub struct Inference {
     send: mpsc::Sender<InferenceMessage>,
@@ -45,6 +48,7 @@ impl Inference {
     }
 }
 
+#[cfg_attr(test, double(InferenceApiDouble))]
 pub trait InferenceApi {
     fn explain(
         &self,
@@ -655,16 +659,7 @@ pub mod tests {
         }
     }
 
-    impl InferenceApi for InferenceStub {
-        async fn explain(
-            &self,
-            _request: ExplanationRequest,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> Result<Explanation, InferenceError> {
-            unimplemented!()
-        }
-
+    impl InferenceApiDouble for InferenceStub {
         async fn complete(
             &self,
             request: CompletionRequest,
