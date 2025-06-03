@@ -337,7 +337,7 @@ pub mod tests {
 
     use crate::skill_store::tests::SkillStoreDummy;
     use crate::tool::McpServerUrl;
-    use crate::tool::tests::McpServerStoreDummy;
+    use crate::tool::tests::{McpServerStoreDouble, McpServerStoreDummy};
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill_store::tests::SkillStoreMsg,
@@ -689,12 +689,12 @@ pub mod tests {
     }
 
     #[derive(Clone)]
-    struct ToolStoreSpy {
+    struct McpServerStoreSpy {
         upserted: Arc<Mutex<Vec<ConfiguredMcpServer>>>,
         removed: Arc<Mutex<Vec<ConfiguredMcpServer>>>,
     }
 
-    impl ToolStoreSpy {
+    impl McpServerStoreSpy {
         fn new() -> Self {
             Self {
                 upserted: Arc::new(Mutex::new(vec![])),
@@ -703,7 +703,7 @@ pub mod tests {
         }
     }
 
-    impl McpServerStore for ToolStoreSpy {
+    impl McpServerStoreDouble for McpServerStoreSpy {
         async fn upsert(&self, server: ConfiguredMcpServer) {
             self.upserted.lock().await.push(server);
         }
@@ -711,16 +711,12 @@ pub mod tests {
         async fn remove(&self, server: ConfiguredMcpServer) {
             self.removed.lock().await.push(server);
         }
-
-        async fn list(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
-            unimplemented!()
-        }
     }
 
     #[tokio::test]
     async fn new_mcp_server_is_upserted() {
         // Given a namespace description watcher with empty descriptions
-        let tool_store = ToolStoreSpy::new();
+        let tool_store = McpServerStoreSpy::new();
         let descriptions = HashMap::new();
         let config = Box::new(PendingConfig);
         let mut watcher =
@@ -750,7 +746,7 @@ pub mod tests {
     #[tokio::test]
     async fn dropped_mcp_server_is_removed() {
         // Given a namespace description watcher and a tool store that both know about an mcp server
-        let tool_store = ToolStoreSpy::new();
+        let tool_store = McpServerStoreSpy::new();
 
         let namespace = Namespace::new("dummy-namespace").unwrap();
         let descriptions = HashMap::from([(

@@ -607,7 +607,7 @@ pub mod tests {
     use anyhow::anyhow;
     use tokio::{sync::mpsc, time::sleep, try_join};
 
-    use crate::inference::client::{InferenceClient, InferenceClientDouble, InferenceError};
+    use crate::inference::client::{InferenceClientDouble, InferenceError};
 
     use super::*;
 
