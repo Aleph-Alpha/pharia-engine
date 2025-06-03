@@ -537,10 +537,10 @@ pub mod tests {
     use crate::{
         chunking::{Chunk, ChunkRequest},
         csi::{
-            ChatStreamId, CompletionStreamId,
+            ChatStreamId, CompletionStreamId, CsiForSkillsDouble,
             tests::{
                 CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiCompleteWithEchoMock,
-                CsiForSkillsDouble, CsiGreetingMock, CsiSearchMock, StubCsi,
+                CsiGreetingMock, CsiSearchMock, StubCsi,
             },
         },
         inference::{

@@ -46,6 +46,7 @@ pub struct CsiDrivers<I, S, Tz, Tl> {
 /// interface. It also assumes all authentication and authorization is handled behind the scenes.
 /// This is the CSI as passed to user defined code in WASM.
 #[async_trait]
+#[cfg_attr(test, double(CsiForSkillsDouble))]
 pub trait CsiForSkills {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
@@ -1032,134 +1033,6 @@ pub mod tests {
             .await?
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?)
-        }
-    }
-
-    /// This trait provides default unimplemented versions of the CSI methods. It allows to
-    /// construct test doubles for the CSI where only some methods are implemented.
-    #[async_trait]
-    pub trait CsiForSkillsDouble {
-        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-            unimplemented!()
-        }
-        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            unimplemented!()
-        }
-        async fn completion_stream_new(
-            &mut self,
-            _request: CompletionRequest,
-        ) -> CompletionStreamId {
-            unimplemented!()
-        }
-        async fn completion_stream_next(
-            &mut self,
-            _id: &CompletionStreamId,
-        ) -> Option<CompletionEvent> {
-            unimplemented!()
-        }
-        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
-            unimplemented!()
-        }
-        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-            unimplemented!()
-        }
-        async fn select_language(
-            &mut self,
-            _requests: Vec<SelectLanguageRequest>,
-        ) -> Vec<Option<Language>> {
-            unimplemented!()
-        }
-        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-            unimplemented!()
-        }
-        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
-            unimplemented!()
-        }
-        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
-            unimplemented!()
-        }
-        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
-            unimplemented!()
-        }
-        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-            unimplemented!()
-        }
-        async fn document_metadata(
-            &mut self,
-            _document_paths: Vec<DocumentPath>,
-        ) -> Vec<Option<Value>> {
-            unimplemented!()
-        }
-        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
-            unimplemented!()
-        }
-        async fn invoke_tool(&mut self, _requests: Vec<InvokeRequest>) -> Vec<Value> {
-            unimplemented!()
-        }
-    }
-
-    /// Forwards the implementation of [`CsiForSkillsDouble`].
-    #[async_trait]
-    impl<C> CsiForSkills for C
-    where
-        C: CsiForSkillsDouble + Send,
-    {
-        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-            self.explain(_requests).await
-        }
-        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            self.complete(_requests).await
-        }
-        async fn completion_stream_new(
-            &mut self,
-            _request: CompletionRequest,
-        ) -> CompletionStreamId {
-            self.completion_stream_new(_request).await
-        }
-        async fn completion_stream_next(
-            &mut self,
-            _id: &CompletionStreamId,
-        ) -> Option<CompletionEvent> {
-            self.completion_stream_next(_id).await
-        }
-        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
-            self.completion_stream_drop(_id).await;
-        }
-        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-            self.chunk(_requests).await
-        }
-        async fn select_language(
-            &mut self,
-            _requests: Vec<SelectLanguageRequest>,
-        ) -> Vec<Option<Language>> {
-            self.select_language(_requests).await
-        }
-        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-            self.chat(_requests).await
-        }
-        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
-            self.chat_stream_new(_request).await
-        }
-        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
-            self.chat_stream_next(_id).await
-        }
-        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
-            self.chat_stream_drop(_id).await;
-        }
-        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-            self.search(_requests).await
-        }
-        async fn document_metadata(
-            &mut self,
-            _document_paths: Vec<DocumentPath>,
-        ) -> Vec<Option<Value>> {
-            self.document_metadata(_document_paths).await
-        }
-        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
-            self.documents(_document_paths).await
-        }
-        async fn invoke_tool(&mut self, _requests: Vec<InvokeRequest>) -> Vec<Value> {
-            self.invoke_tool(_requests).await
         }
     }
 
