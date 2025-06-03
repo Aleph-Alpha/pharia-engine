@@ -342,6 +342,7 @@ pub struct InvokeRequest {
     pub arguments: Vec<Argument>,
 }
 
+#[cfg_attr(test, double(ToolClientDouble))]
 pub trait ToolClient: Send + Sync + 'static {
     fn invoke_tool(
         &self,
@@ -390,7 +391,7 @@ pub mod tests {
     /// Only report tools for one particular server address
     struct ToolClientMock;
 
-    impl ToolClient for ToolClientMock {
+    impl ToolClientDouble for ToolClientMock {
         async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             if url.0 == "http://localhost:8000/mcp" {
                 Ok(vec!["add".to_owned()])
@@ -521,20 +522,11 @@ pub mod tests {
         }
     }
 
-    impl ToolClient for ToolClientSpy {
+    impl ToolClientDouble for ToolClientSpy {
         async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             let mut queried = self.queried.lock().await;
             queried.insert(url.to_owned());
             Ok(vec![])
-        }
-
-        async fn invoke_tool(
-            &self,
-            _request: InvokeRequest,
-            _url: &McpServerUrl,
-            _tracing_context: TracingContext,
-        ) -> Result<Value, ToolError> {
-            unimplemented!()
         }
     }
 
@@ -572,7 +564,7 @@ pub mod tests {
     // Given a tool client that knows about two mcp servers
     struct TwoServerClient;
 
-    impl ToolClient for TwoServerClient {
+    impl ToolClientDouble for TwoServerClient {
         async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             match url.0.as_ref() {
                 "http://localhost:8000/mcp" => Ok(vec!["search".to_owned()]),
@@ -634,7 +626,7 @@ pub mod tests {
 
     struct ClientOneGoodOtherBad;
 
-    impl ToolClient for ClientOneGoodOtherBad {
+    impl ToolClientDouble for ClientOneGoodOtherBad {
         async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             if url.0 == "http://localhost:8000/mcp" {
                 Ok(vec!["search".to_owned()])
@@ -743,7 +735,7 @@ pub mod tests {
 
     struct SaboteurClient;
 
-    impl ToolClient for SaboteurClient {
+    impl ToolClientDouble for SaboteurClient {
         async fn invoke_tool(
             &self,
             request: InvokeRequest,
