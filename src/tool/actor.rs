@@ -15,11 +15,30 @@ use tokio::task::JoinHandle;
 use tracing::info;
 
 use crate::logging::TracingContext;
+use crate::namespace_watcher::Namespace;
 
 use super::client::McpClient;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct McpServerUrl(pub String);
+
+/// An MCP server that is configured with a namespace.
+///
+/// Per namespace configuration allows different Skills to have access to different tools.
+#[derive(Clone)]
+pub struct ConfiguredMcpServer {
+    pub url: McpServerUrl,
+    pub namespace: Namespace,
+}
+
+impl ConfiguredMcpServer {
+    pub fn new(url: impl Into<McpServerUrl>, namespace: Namespace) -> Self {
+        Self {
+            url: url.into(),
+            namespace,
+        }
+    }
+}
 
 impl<T> From<T> for McpServerUrl
 where
@@ -28,6 +47,20 @@ where
     fn from(value: T) -> Self {
         Self(value.into())
     }
+}
+/// Interact with tool server storage.
+///
+/// Whereas the [`ToolApi`] allows to interact with tools (and does not care that they are
+/// implemented with different MCP Servers), the [`ToolStoreApi`] allows someone else (e.g.
+/// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
+pub trait ToolStoreApi {
+    fn upsert_tool_server(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
+    fn remove_tool_server(&self, url: McpServerUrl) -> impl Future<Output = ()> + Send;
+
+    // While this is not used yet (from e.g. the shell), it represents the public surface
+    // to test the tool store.
+    #[allow(dead_code)]
+    fn list_tool_servers(&self) -> impl Future<Output = Vec<McpServerUrl>> + Send;
 }
 
 pub trait ToolApi {
@@ -39,21 +72,6 @@ pub trait ToolApi {
 
     #[allow(dead_code)]
     fn list_tools(&self) -> impl Future<Output = Vec<String>> + Send;
-}
-
-/// Interact with tool server storage.
-///
-/// Whereas the [`ToolApi`] allows to interact with tools (and does not care that they are
-/// implemented with different MCP Servers), the [`ToolStoreApi`] allows someone else (e.g.
-/// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
-pub trait ToolStoreApi {
-    fn upsert_tool_server(&self, url: McpServerUrl) -> impl Future<Output = ()> + Send;
-    fn remove_tool_server(&self, url: McpServerUrl) -> impl Future<Output = ()> + Send;
-
-    // While this is not used yet (from e.g. the shell), it represents the public surface
-    // to test the tool store.
-    #[allow(dead_code)]
-    fn list_tool_servers(&self) -> impl Future<Output = Vec<McpServerUrl>> + Send;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -123,8 +141,8 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
 }
 
 impl ToolStoreApi for mpsc::Sender<ToolMsg> {
-    async fn upsert_tool_server(&self, url: McpServerUrl) {
-        let msg = ToolMsg::UpsertToolServer { url };
+    async fn upsert_tool_server(&self, server: ConfiguredMcpServer) {
+        let msg = ToolMsg::UpsertToolServer { server };
         self.send(msg).await.unwrap();
     }
 
@@ -148,7 +166,7 @@ enum ToolMsg {
         send: oneshot::Sender<Result<Value, ToolError>>,
     },
     UpsertToolServer {
-        url: McpServerUrl,
+        server: ConfiguredMcpServer,
     },
     RemoveToolServer {
         url: McpServerUrl,
@@ -217,8 +235,8 @@ impl<T: ToolClient> ToolActor<T> {
                     drop(send.send(result));
                 }));
             }
-            ToolMsg::UpsertToolServer { url } => {
-                self.mcp_servers.insert(url);
+            ToolMsg::UpsertToolServer { server } => {
+                self.mcp_servers.insert(server.url);
             }
             ToolMsg::RemoveToolServer { url } => {
                 self.mcp_servers.remove(&url);
@@ -331,7 +349,7 @@ pub mod tests {
     pub struct ToolStoreDouble;
 
     impl ToolStoreApi for ToolStoreDouble {
-        async fn upsert_tool_server(&self, _url: McpServerUrl) {}
+        async fn upsert_tool_server(&self, _server: ConfiguredMcpServer) {}
 
         async fn remove_tool_server(&self, _url: McpServerUrl) {}
 
@@ -404,8 +422,9 @@ pub mod tests {
         let tool = Tool::with_client(ToolClientMock).api();
 
         // When a tool server is upserted with that particular url
-        tool.upsert_tool_server("http://localhost:8000/mcp".into())
-            .await;
+        let namespace = Namespace::new("test").unwrap();
+        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace);
+        tool.upsert_tool_server(server).await;
 
         // Then the calculator tool can be invoked
         let request = InvokeRequest {
@@ -423,10 +442,13 @@ pub mod tests {
     async fn tool_server_is_removed() {
         // Given a tool configured with two mcp servers
         let tool = Tool::with_client(ToolClientMock).api();
-        tool.upsert_tool_server("http://localhost:8000/mcp".into())
-            .await;
-        tool.upsert_tool_server("http://localhost:8001/mcp".into())
-            .await;
+        let namespace = Namespace::new("test").unwrap();
+        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace);
+        tool.upsert_tool_server(server).await;
+
+        let namespace = Namespace::new("test").unwrap();
+        let server = ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace);
+        tool.upsert_tool_server(server).await;
 
         // When the first mcp server is removed
         tool.remove_tool_server("http://localhost:8000/mcp".into())
@@ -468,13 +490,14 @@ pub mod tests {
     async fn tools_from_multiple_tool_servers_are_available() {
         // Given a tool with two configured tool servers
         let queried = Arc::new(Mutex::new(HashSet::new()));
-        let tool = Tool::with_client(ToolClientSpy::new(queried.clone())).api();
-
-        tool.upsert_tool_server("http://localhost:8000/mcp".into())
-            .await;
-
-        tool.upsert_tool_server("http://localhost:8001/mcp".into())
-            .await;
+        let servers = vec![
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", Namespace::new("test").unwrap()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", Namespace::new("test").unwrap()),
+        ];
+        let tool = Tool::with_client(ToolClientSpy::new(queried.clone()))
+            .with_servers(servers.clone())
+            .await
+            .api();
 
         // When we ask for the list of tools
         drop(tool.list_tools().await);
@@ -533,14 +556,14 @@ pub mod tests {
     #[tokio::test]
     async fn correct_mcp_server_is_called_for_tool_invocation() {
         // Given a tool client that knows about two mcp servers
-        let tool = Tool::with_client(TwoServerClient).api();
-
-        // And given that the server is configured with these two servers
-        tool.upsert_tool_server("http://localhost:8000/mcp".into())
-            .await;
-
-        tool.upsert_tool_server("http://localhost:8001/mcp".into())
-            .await;
+        let servers = vec![
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", Namespace::new("test").unwrap()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", Namespace::new("test").unwrap()),
+        ];
+        let tool = Tool::with_client(TwoServerClient)
+            .with_servers(servers)
+            .await
+            .api();
 
         // When we invoke the search tool
         let result = tool
@@ -579,10 +602,10 @@ pub mod tests {
     }
 
     impl Tool {
-        async fn with_servers(self, servers: &[&str]) -> Self {
+        async fn with_servers(self, servers: Vec<ConfiguredMcpServer>) -> Self {
             let api = self.api();
-            for &address in servers {
-                api.upsert_tool_server(address.into()).await;
+            for server in servers {
+                api.upsert_tool_server(server).await;
             }
             self
         }
@@ -591,8 +614,12 @@ pub mod tests {
     #[tokio::test]
     async fn one_bad_mcp_server_still_allows_to_list_tools() {
         // Given an mcp server that returns an error when listing it's tools
+        let servers = vec![
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", Namespace::new("test").unwrap()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", Namespace::new("test").unwrap()),
+        ];
         let tool = Tool::with_client(ClientOneGoodOtherBad)
-            .with_servers(&["http://localhost:8000/mcp", "http://localhost:8001/mcp"])
+            .with_servers(servers)
             .await;
 
         // When listing tools
@@ -605,8 +632,12 @@ pub mod tests {
     #[tokio::test]
     async fn one_bad_mcp_server_still_allows_to_invoke_tool() {
         // Given an mcp server that returns an error when listing it's tools
+        let servers = vec![
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", Namespace::new("test").unwrap()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", Namespace::new("test").unwrap()),
+        ];
         let tool = Tool::with_client(ClientOneGoodOtherBad)
-            .with_servers(&["http://localhost:8000/mcp", "http://localhost:8001/mcp"])
+            .with_servers(servers)
             .await;
 
         // When invoking a tool
@@ -649,7 +680,10 @@ pub mod tests {
     async fn tool_calls_are_processed_in_parallel() {
         // Given a tool that hangs forever for some tool invocation requestsa
         let tool = Tool::with_client(SaboteurClient)
-            .with_servers(&["http://localhost:8000/mcp"])
+            .with_servers(vec![ConfiguredMcpServer::new(
+                "http://localhost:8000/mcp",
+                Namespace::new("test").unwrap(),
+            )])
             .await;
 
         let api = tool.api();
