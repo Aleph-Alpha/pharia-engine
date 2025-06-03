@@ -97,8 +97,6 @@ impl NamespaceDescription {
                 #[derive(Deserialize)]
                 struct NamespaceDescriptionStable {
                     skills: Vec<SkillDescriptionStable>,
-                    #[serde(default)]
-                    mcp_servers: Vec<McpServerUrl>,
                 }
 
                 let tc = toml::from_str::<NamespaceDescriptionStable>(config)?;
@@ -110,7 +108,8 @@ impl NamespaceDescription {
                             SkillDescription::Programmable { name, tag }
                         })
                         .collect(),
-                    mcp_servers: tc.mcp_servers,
+                    // We only support MCP servers with the beta flag active.
+                    mcp_servers: vec![],
                 }
             };
         Ok(tc)
@@ -267,16 +266,13 @@ pub mod tests {
     }
 
     #[test]
-    fn tools_are_loaded_from_config_without_beta_flag() {
+    fn tools_are_not_loaded_from_config_without_beta_flag() {
         let config = r#"
         skills = []
         mcp_servers = ["localhost:8000", "localhost:8001"]
         "#;
         let tc = NamespaceDescription::from_str(config, false).unwrap();
-        assert_eq!(
-            tc.mcp_servers,
-            vec!["localhost:8000".into(), "localhost:8001".into()]
-        );
+        assert_eq!(tc.mcp_servers, vec![]);
     }
 
     #[test]
