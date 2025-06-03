@@ -700,16 +700,18 @@ pub mod tests {
         tool.upsert_tool_server(second).await;
 
         // When listing tool servers for that namespace
-        let result = tool.list_tool_servers(namespace).await;
+        let result: HashSet<McpServerUrl> = tool
+            .list_tool_servers(namespace)
+            .await
+            .into_iter()
+            .collect();
 
         // Then we get the two mcp servers
-        assert_eq!(
-            result,
-            vec![
-                "http://localhost:8000/mcp".into(),
-                "http://localhost:8001/mcp".into()
-            ]
-        );
+        let expected = HashSet::from([
+            "http://localhost:8000/mcp".into(),
+            "http://localhost:8001/mcp".into(),
+        ]);
+        assert_eq!(result, expected);
     }
 
     #[tokio::test]
