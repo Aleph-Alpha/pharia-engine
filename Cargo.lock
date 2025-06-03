@@ -1322,6 +1322,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
+name = "double-derive"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47c4721cf9b326b526ab5f04983bc1273be4fb0ef1c97e64add7646e6dd11a15"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "dummy"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4217,6 +4228,7 @@ dependencies = [
  "config",
  "derive_more",
  "dotenvy",
+ "double-derive",
  "engine-room",
  "fake",
  "futures",
