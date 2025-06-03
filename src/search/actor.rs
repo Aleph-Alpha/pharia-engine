@@ -16,6 +16,9 @@ use super::client::{
     SearchRequest as ClientSearchRequest, SearchResult as ClientSearchResult,
 };
 
+#[cfg(test)]
+use double_derive::double;
+
 /// Handle to the search actor. Spin this up in order to use the Search API
 pub struct Search {
     send: mpsc::Sender<DocumentIndexMessage>,
@@ -51,6 +54,7 @@ impl Search {
 /// Use this to execute tasks with the Search API. The existence of this API handle implies the
 /// actor is alive and running. This means this handle must be disposed of, before the search
 /// actor can shut down.
+#[cfg_attr(test, double(SearchApiDouble))]
 pub trait SearchApi {
     fn search(
         &self,
@@ -430,16 +434,7 @@ pub mod tests {
         }
     }
 
-    impl SearchApi for SearchStub {
-        async fn search(
-            &self,
-            _request: SearchRequest,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> anyhow::Result<Vec<SearchResult>> {
-            unimplemented!()
-        }
-
+    impl SearchApiDouble for SearchStub {
         async fn document_metadata(
             &self,
             document_path: DocumentPath,
