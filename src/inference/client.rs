@@ -22,11 +22,15 @@ use super::{
     Granularity, Logprob, Logprobs, Message, TextScore, TokenUsage,
 };
 
+#[cfg(test)]
+use double_derive::double;
+
 /// The inference client only takes references to the tracing context. Methods like
 /// `stream_chat` return a future that in which the tracing context is dropped after
 /// making the initial request. However, the lifespan of the tracing context matches
 /// the length of the created span, so it may only be dropped after the stream is
 /// finished. By taking only a reference, we manifest this fact in the type system.
+#[cfg_attr(test, double(InferenceClientDouble))]
 pub trait InferenceClient: Send + Sync + 'static {
     fn complete(
         &self,
@@ -690,7 +694,7 @@ mod tests {
         // and a completion request
         let completion_request = CompletionRequest {
             prompt: "<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-            
+
 You are a helpful assistant. You give very short and precise answers to user inquiries.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
