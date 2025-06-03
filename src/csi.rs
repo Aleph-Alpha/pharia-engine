@@ -579,7 +579,7 @@ pub mod tests {
         search::{TextCursor, tests::SearchStub},
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
-        tool::tests::ToolDouble,
+        tool::tests::ToolDummy,
     };
 
     use super::*;
@@ -840,12 +840,12 @@ pub mod tests {
         assert!(responses[1].contains("2nd"));
     }
 
-    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, SearchStub, FakeTokenizers, ToolDouble> {
+    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, SearchStub, FakeTokenizers, ToolDummy> {
         CsiDrivers {
             inference: InferenceStub::new(),
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
-            tool: ToolDouble,
+            tool: ToolDummy,
         }
     }
 
