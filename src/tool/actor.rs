@@ -51,19 +51,16 @@ where
 /// Interact with tool server storage.
 ///
 /// Whereas the [`ToolApi`] allows to interact with tools (and does not care that they are
-/// implemented with different MCP Servers), the [`ToolStoreApi`] allows someone else (e.g.
+/// implemented with different MCP Servers), the [`McpServerStore`] allows someone else (e.g.
 /// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
-pub trait ToolStoreApi {
-    fn upsert_tool_server(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
-    fn remove_tool_server(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
+pub trait McpServerStore {
+    fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
+    fn remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
 
     // While this is not used yet (from e.g. the shell), it represents the public surface
     // to test the tool store.
     #[allow(dead_code)]
-    fn list_tool_servers(
-        &self,
-        namespace: Namespace,
-    ) -> impl Future<Output = Vec<McpServerUrl>> + Send;
+    fn list(&self, namespace: Namespace) -> impl Future<Output = Vec<McpServerUrl>> + Send;
 }
 
 pub trait ToolApi {
@@ -107,7 +104,7 @@ impl Tool {
         Self { handle, send }
     }
 
-    pub fn api(&self) -> impl ToolApi + ToolStoreApi + Send + Sync + Clone + 'static {
+    pub fn api(&self) -> impl ToolApi + McpServerStore + Send + Sync + Clone + 'static {
         self.send.clone()
     }
 
@@ -143,18 +140,18 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
     }
 }
 
-impl ToolStoreApi for mpsc::Sender<ToolMsg> {
-    async fn upsert_tool_server(&self, server: ConfiguredMcpServer) {
+impl McpServerStore for mpsc::Sender<ToolMsg> {
+    async fn upsert(&self, server: ConfiguredMcpServer) {
         let msg = ToolMsg::UpsertToolServer { server };
         self.send(msg).await.unwrap();
     }
 
-    async fn remove_tool_server(&self, server: ConfiguredMcpServer) {
+    async fn remove(&self, server: ConfiguredMcpServer) {
         let msg = ToolMsg::RemoveToolServer { server };
         self.send(msg).await.unwrap();
     }
 
-    async fn list_tool_servers(&self, namespace: Namespace) -> Vec<McpServerUrl> {
+    async fn list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::ListToolServers { namespace, send };
         self.send(msg).await.unwrap();
@@ -365,19 +362,19 @@ pub mod tests {
 
     use crate::{
         logging::TracingContext,
-        tool::{Tool, actor::ToolStoreApi},
+        tool::{Tool, actor::McpServerStore},
     };
 
     use super::*;
 
     pub struct ToolStoreDouble;
 
-    impl ToolStoreApi for ToolStoreDouble {
-        async fn upsert_tool_server(&self, _server: ConfiguredMcpServer) {}
+    impl McpServerStore for ToolStoreDouble {
+        async fn upsert(&self, _server: ConfiguredMcpServer) {}
 
-        async fn remove_tool_server(&self, _server: ConfiguredMcpServer) {}
+        async fn remove(&self, _server: ConfiguredMcpServer) {}
 
-        async fn list_tool_servers(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
+        async fn list(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
             vec![]
         }
     }
@@ -448,7 +445,7 @@ pub mod tests {
         // When a tool server is upserted with that particular url
         let namespace = Namespace::new("test").unwrap();
         let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace);
-        tool.upsert_tool_server(server).await;
+        tool.upsert(server).await;
 
         // Then the calculator tool can be invoked
         let request = InvokeRequest {
@@ -476,10 +473,10 @@ pub mod tests {
             .api();
 
         // When the first mcp server is removed
-        tool.remove_tool_server(servers[0].clone()).await;
+        tool.remove(servers[0].clone()).await;
 
         // Then the list of tools is only the second mcp server
-        let mcp_servers = tool.list_tool_servers(namespace).await;
+        let mcp_servers = tool.list(namespace).await;
         assert_eq!(mcp_servers, vec!["http://localhost:8001/mcp".into()]);
     }
 
@@ -489,13 +486,13 @@ pub mod tests {
         let tool = Tool::with_client(ToolClientMock).api();
         let namespace = Namespace::new("test").unwrap();
         let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
-        tool.upsert_tool_server(server.clone()).await;
+        tool.upsert(server.clone()).await;
 
         // When we add the same tool server again for that namespace
-        tool.upsert_tool_server(server).await;
+        tool.upsert(server).await;
 
         // Then the list of tools is still the same
-        let mcp_servers = tool.list_tool_servers(namespace).await;
+        let mcp_servers = tool.list(namespace).await;
         assert_eq!(mcp_servers, vec!["http://localhost:8000/mcp".into()]);
     }
 
@@ -508,17 +505,17 @@ pub mod tests {
         // When adding the same tool server for two namespaces
         let server_url = "http://localhost:8000/mcp";
         let server = ConfiguredMcpServer::new(server_url, first.clone());
-        tool.upsert_tool_server(server.clone()).await;
+        tool.upsert(server.clone()).await;
 
         let second = Namespace::new("second").unwrap();
         let server = ConfiguredMcpServer::new(server_url, second.clone());
-        tool.upsert_tool_server(server).await;
+        tool.upsert(server).await;
 
         // Then the server is configured for both namespaces
-        let mcp_servers = tool.list_tool_servers(first).await;
+        let mcp_servers = tool.list(first).await;
         assert_eq!(mcp_servers, vec![server_url.into()]);
 
-        let mcp_servers = tool.list_tool_servers(second).await;
+        let mcp_servers = tool.list(second).await;
         assert_eq!(mcp_servers, vec![server_url.into()]);
     }
 
@@ -668,7 +665,7 @@ pub mod tests {
         async fn with_servers(self, servers: Vec<ConfiguredMcpServer>) -> Self {
             let api = self.api();
             for server in servers {
-                api.upsert_tool_server(server).await;
+                api.upsert(server).await;
             }
             self
         }
@@ -680,9 +677,7 @@ pub mod tests {
         let tool = Tool::with_client(ToolClientMock).api();
 
         // When listing tool servers for a namespace
-        let result = tool
-            .list_tool_servers(Namespace::new("test").unwrap())
-            .await;
+        let result = tool.list(Namespace::new("test").unwrap()).await;
 
         // Then we get an empty list
         assert!(result.is_empty());
@@ -694,17 +689,13 @@ pub mod tests {
         let tool = Tool::with_client(ToolClientMock).api();
         let namespace = Namespace::new("test").unwrap();
         let first = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
-        tool.upsert_tool_server(first).await;
+        tool.upsert(first).await;
 
         let second = ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone());
-        tool.upsert_tool_server(second).await;
+        tool.upsert(second).await;
 
         // When listing tool servers for that namespace
-        let result: HashSet<McpServerUrl> = tool
-            .list_tool_servers(namespace)
-            .await
-            .into_iter()
-            .collect();
+        let result: HashSet<McpServerUrl> = tool.list(namespace).await.into_iter().collect();
 
         // Then we get the two mcp servers
         let expected = HashSet::from([

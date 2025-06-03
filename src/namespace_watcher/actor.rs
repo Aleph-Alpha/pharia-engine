@@ -9,7 +9,7 @@ use crate::{
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
-    tool::{ConfiguredMcpServer, McpServerUrl, ToolStoreApi},
+    tool::{ConfiguredMcpServer, McpServerStore, McpServerUrl},
 };
 
 use super::{
@@ -85,7 +85,7 @@ impl NamespaceWatcher {
 
     pub fn with_config(
         skill_store_api: impl SkillStoreApi + Send + Sync + 'static,
-        tool_api: impl ToolStoreApi + Send + 'static,
+        tool_api: impl McpServerStore + Send + 'static,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -189,16 +189,16 @@ impl McpServerDiff {
     }
 }
 
-impl<S, T> NamespaceWatcherActor<S, T>
+impl<S, M> NamespaceWatcherActor<S, M>
 where
     S: SkillStoreApi,
-    T: ToolStoreApi,
+    M: McpServerStore,
 {
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_store_api: S,
-        tool_store_api: T,
+        tool_store_api: M,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -312,12 +312,12 @@ where
         let mcp_server_diff = McpServerDiff::compute(&existing.mcp_servers, &incoming.mcp_servers);
         for mcp_server in mcp_server_diff.added {
             self.tool_store_api
-                .upsert_tool_server(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
+                .upsert(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
                 .await;
         }
         for mcp_server in mcp_server_diff.removed {
             self.tool_store_api
-                .remove_tool_server(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
+                .remove(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
                 .await;
         }
     }
@@ -632,13 +632,13 @@ pub mod tests {
         }
     }
 
-    impl<T> NamespaceWatcherActor<SkillStoreDummy, T>
+    impl<M> NamespaceWatcherActor<SkillStoreDummy, M>
     where
-        T: ToolStoreApi + Send + Sync,
+        M: McpServerStore + Send + Sync,
     {
         fn with_tool_store_api(
             descriptions: HashMap<Namespace, NamespaceDescription>,
-            tool_store_api: T,
+            tool_store_api: M,
             config: Box<dyn ObservableConfig + Send + Sync>,
         ) -> Self {
             let (ready, _) = tokio::sync::watch::channel(false);
@@ -697,16 +697,16 @@ pub mod tests {
         }
     }
 
-    impl ToolStoreApi for ToolStoreSpy {
-        async fn upsert_tool_server(&self, server: ConfiguredMcpServer) {
+    impl McpServerStore for ToolStoreSpy {
+        async fn upsert(&self, server: ConfiguredMcpServer) {
             self.upserted.lock().await.push(server);
         }
 
-        async fn remove_tool_server(&self, server: ConfiguredMcpServer) {
+        async fn remove(&self, server: ConfiguredMcpServer) {
             self.removed.lock().await.push(server);
         }
 
-        async fn list_tool_servers(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
+        async fn list(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
             unimplemented!()
         }
     }
