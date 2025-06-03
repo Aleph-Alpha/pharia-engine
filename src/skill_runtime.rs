@@ -18,6 +18,9 @@ use crate::{
     skills::{AnySkillManifest, Engine, Skill, SkillPath},
 };
 
+#[cfg(test)]
+use double_derive::double;
+
 // It would be nice for users of this module, not to be concerned with the fact that the runtime is
 // using the driver. This may indicate that maybe driver and runtime should be part of the same top
 // level module. For now I decided to leave it like that due to the fact that I am not sure about
@@ -68,6 +71,7 @@ impl SkillRuntime {
 ///
 /// Using a trait rather than an mpsc allows for easier and more ergonomic testing, since the
 /// implementation of the test double is not required to be an actor.
+#[cfg_attr(test, double(SkillRuntimeDouble))]
 pub trait SkillRuntimeApi {
     fn run_function(
         &self,
@@ -322,7 +326,7 @@ impl RunMessageStreamMsg {
         let result = {
             let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
             let result = driver
-                .run_message_stream(skill, input, csi_apis, api_token, &context, send.clone())
+                .run_message_stream(skill, input, csi_apis, api_token, &context, send)
                 .await;
 
             log_skill_result(&context, &skill_path, &result);
