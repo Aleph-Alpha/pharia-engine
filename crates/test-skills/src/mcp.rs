@@ -106,6 +106,9 @@ impl Mcp {
         let temp_file_path = temp_dir.path().join("mcp_server.py");
         std::fs::write(&temp_file_path, PYTHON_SRC).unwrap();
 
+        // Technically, another process could acquire the port before the MCP server starts.
+        // A better solution would be to pass 0 as port number and get the port from the
+        // subprocess.
         let port = free_test_port();
         let mut child = Command::new("uv")
             .args([
