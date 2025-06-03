@@ -56,6 +56,7 @@ where
 /// Whereas the [`ToolApi`] allows to interact with tools (and does not care that they are
 /// implemented with different MCP Servers), the [`McpServerStore`] allows someone else (e.g.
 /// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
+#[cfg_attr(test, double(McpServerStoreDouble))]
 pub trait McpServerStore {
     fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
