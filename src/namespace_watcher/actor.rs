@@ -336,7 +336,6 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::skill_store::tests::SkillStoreDummy;
-    use crate::tool::McpServerUrl;
     use crate::tool::tests::{McpServerStoreDouble, McpServerStoreDummy};
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},

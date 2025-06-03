@@ -394,7 +394,9 @@ pub mod tests {
     use tokio::{time::sleep, try_join};
 
     use crate::{
-        search::client::{Filter, FilterCondition, MetadataFilter, MetadataFilterCondition},
+        search::client::{
+            Filter, FilterCondition, MetadataFilter, MetadataFilterCondition, SearchClientDouble,
+        },
         tests::{api_token, document_index_url},
     };
 
@@ -603,7 +605,7 @@ pub mod tests {
         }
     }
 
-    impl SearchClient for AssertConcurrentClient {
+    impl SearchClientDouble for AssertConcurrentClient {
         async fn search(
             &self,
             _index: IndexPath,
@@ -621,24 +623,6 @@ pub mod tests {
                 sleep(Duration::from_millis(1)).await;
             }
             Ok(vec![])
-        }
-
-        async fn document_metadata(
-            &self,
-            _document_path: DocumentPath,
-            _api_token: &str,
-            _tracing_context: &TracingContext,
-        ) -> anyhow::Result<Option<Value>> {
-            unimplemented!()
-        }
-
-        async fn document(
-            &self,
-            _document_path: DocumentPath,
-            _api_token: &str,
-            _tracing_context: &TracingContext,
-        ) -> anyhow::Result<Document> {
-            unimplemented!()
         }
     }
 
