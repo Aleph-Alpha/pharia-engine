@@ -9,7 +9,7 @@ use crate::{
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
-    tool::{McpServerUrl, ToolStoreApi},
+    tool::{ConfiguredMcpServer, McpServerUrl, ToolStoreApi},
 };
 
 use super::{
@@ -310,7 +310,9 @@ where
         // propagate mcp server changes
         let mcp_server_diff = McpServerDiff::compute(&existing.mcp_servers, &incoming.mcp_servers);
         for mcp_server in mcp_server_diff.added {
-            self.tool_store_api.upsert_tool_server(mcp_server).await;
+            self.tool_store_api
+                .upsert_tool_server(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
+                .await;
         }
         for mcp_server in mcp_server_diff.removed {
             self.tool_store_api.remove_tool_server(mcp_server).await;
@@ -678,8 +680,8 @@ pub mod tests {
     }
 
     impl ToolStoreApi for Arc<Mutex<Vec<McpServerUrl>>> {
-        async fn upsert_tool_server(&self, url: McpServerUrl) {
-            self.lock().await.push(url);
+        async fn upsert_tool_server(&self, server: ConfiguredMcpServer) {
+            self.lock().await.push(server.url);
         }
 
         async fn remove_tool_server(&self, url: McpServerUrl) {
