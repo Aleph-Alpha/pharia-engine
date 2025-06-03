@@ -8,5 +8,5 @@ pub use self::actor::{
 
 #[cfg(test)]
 pub mod tests {
-    pub use super::actor::tests::{ToolDummy, ToolStoreDouble};
+    pub use super::actor::tests::{McpServerStoreDummy, ToolDummy};
 }
