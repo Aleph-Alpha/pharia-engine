@@ -315,7 +315,9 @@ where
                 .await;
         }
         for mcp_server in mcp_server_diff.removed {
-            self.tool_store_api.remove_tool_server(mcp_server).await;
+            self.tool_store_api
+                .remove_tool_server(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
+                .await;
         }
     }
 }
@@ -679,31 +681,43 @@ pub mod tests {
         }
     }
 
-    impl ToolStoreApi for Arc<Mutex<Vec<McpServerUrl>>> {
+    #[derive(Clone)]
+    struct ToolStoreSpy {
+        upserted: Arc<Mutex<Vec<ConfiguredMcpServer>>>,
+        removed: Arc<Mutex<Vec<ConfiguredMcpServer>>>,
+    }
+
+    impl ToolStoreSpy {
+        fn new() -> Self {
+            Self {
+                upserted: Arc::new(Mutex::new(vec![])),
+                removed: Arc::new(Mutex::new(vec![])),
+            }
+        }
+    }
+
+    impl ToolStoreApi for ToolStoreSpy {
         async fn upsert_tool_server(&self, server: ConfiguredMcpServer) {
-            self.lock().await.push(server.url);
+            self.upserted.lock().await.push(server);
         }
 
-        async fn remove_tool_server(&self, url: McpServerUrl) {
-            self.lock().await.retain(|u| u != &url);
+        async fn remove_tool_server(&self, server: ConfiguredMcpServer) {
+            self.removed.lock().await.push(server);
         }
 
-        async fn list_tool_servers(&self) -> Vec<McpServerUrl> {
-            self.lock().await.clone()
+        async fn list_tool_servers(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
+            unimplemented!()
         }
     }
 
     #[tokio::test]
     async fn new_mcp_server_is_upserted() {
         // Given a namespace description watcher with empty descriptions
-        let tool_store_api = Arc::new(Mutex::new(vec![]));
+        let tool_store = ToolStoreSpy::new();
         let descriptions = HashMap::new();
         let config = Box::new(PendingConfig);
-        let mut watcher = NamespaceWatcherActor::with_tool_store_api(
-            descriptions,
-            tool_store_api.clone(),
-            config,
-        );
+        let mut watcher =
+            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), config);
 
         // When observing a namespace with an mcp server
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -716,21 +730,27 @@ pub mod tests {
             .await;
 
         // Then the new mcp servers is upserted
-        let stored = tool_store_api.list_tool_servers().await;
-        assert_eq!(stored, vec!["http://localhost:8000/mcp".into()]);
+        let upserted = tool_store.upserted.lock().await.clone();
+        assert_eq!(
+            upserted,
+            vec![ConfiguredMcpServer::new(
+                "http://localhost:8000/mcp",
+                namespace
+            )]
+        );
     }
 
     #[tokio::test]
     async fn dropped_mcp_server_is_removed() {
         // Given a namespace description watcher and a tool store that both know about an mcp server
-        let mcp_servers = vec!["http://localhost:8000/mcp".into()];
-        let tool_store = Arc::new(Mutex::new(mcp_servers.clone()));
+        let tool_store = ToolStoreSpy::new();
+
         let namespace = Namespace::new("dummy-namespace").unwrap();
         let descriptions = HashMap::from([(
             namespace.clone(),
             NamespaceDescription {
                 skills: vec![],
-                mcp_servers,
+                mcp_servers: vec!["http://localhost:8000/mcp".into()],
             },
         )]);
         let config = Box::new(PendingConfig);
@@ -748,8 +768,14 @@ pub mod tests {
             .await;
 
         // Then the tool store is notified that the mcp server is removed
-        let stored = tool_store.list_tool_servers().await;
-        assert_eq!(stored, vec![]);
+        let removed = tool_store.removed.lock().await.clone();
+        assert_eq!(
+            removed,
+            vec![ConfiguredMcpServer::new(
+                "http://localhost:8000/mcp",
+                namespace
+            )]
+        );
     }
 
     #[tokio::test]
