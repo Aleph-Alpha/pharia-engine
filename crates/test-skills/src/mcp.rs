@@ -3,6 +3,7 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::json;
 use std::{
+    net::TcpListener,
     process::{Child, Command},
     sync::{Arc, Mutex, Weak},
     time::Duration,
@@ -82,13 +83,15 @@ impl Config {
             Config::JsonResponse => vec!["--json-response"],
         }
     }
+}
 
-    fn port(&self) -> u16 {
-        match self {
-            Config::StreamableHttp => 8000,
-            Config::JsonResponse => 8001,
-        }
-    }
+/// Ask the operating system for the next free port
+fn free_test_port() -> u16 {
+    TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port()
 }
 
 const PYTHON_SRC: &str = include_str!("mcp_server.py");
@@ -103,12 +106,13 @@ impl Mcp {
         let temp_file_path = temp_dir.path().join("mcp_server.py");
         std::fs::write(&temp_file_path, PYTHON_SRC).unwrap();
 
+        let port = free_test_port();
         let mut child = Command::new("uv")
             .args([
                 "run",
                 temp_file_path.to_str().unwrap(),
                 "--port",
-                config.port().to_string().as_str(),
+                &port.to_string(),
             ])
             .args(config.args())
             .spawn()
@@ -123,7 +127,7 @@ impl Mcp {
             Self {
                 child,
                 _dir: temp_dir,
-                address: format!("http://localhost:{}/mcp", config.port()),
+                address: format!("http://localhost:{port}/mcp"),
             }
         }
     }
