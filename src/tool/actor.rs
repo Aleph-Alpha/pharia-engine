@@ -378,18 +378,6 @@ pub mod tests {
 
     use super::*;
 
-    pub struct McpServerStoreDummy;
-
-    impl McpServerStore for McpServerStoreDummy {
-        async fn upsert(&self, _server: ConfiguredMcpServer) {}
-
-        async fn remove(&self, _server: ConfiguredMcpServer) {}
-
-        async fn list(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
-            vec![]
-        }
-    }
-
     pub struct ToolDummy;
     impl ToolDouble for ToolDummy {}
 
