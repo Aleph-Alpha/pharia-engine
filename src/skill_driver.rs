@@ -11,7 +11,7 @@ use tokio::{
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
-    csi::{ChatStreamId, CompletionStreamId, RawCsi, CsiForSkills},
+    csi::{ChatStreamId, CompletionStreamId, Csi, RawCsi},
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
         Explanation, ExplanationRequest, InferenceError,
@@ -227,7 +227,7 @@ impl<C> SkillInvocationCtx<C> {
 }
 
 #[async_trait]
-impl<C> CsiForSkills for SkillInvocationCtx<C>
+impl<C> Csi for SkillInvocationCtx<C>
 where
     C: RawCsi + Send + Sync,
 {
@@ -431,10 +431,10 @@ where
     }
 }
 
-/// We know that skill metadata will not invoke any csi functions, but still need to provide an
-/// implementation of `CsiForSkills` We do not want to panic, as someone could build a component
-/// that uses the csi functions inside the metadata function. Therefore, we always send a runtime
-/// error which will lead to skill suspension.
+/// We know that skill metadata will not invoke any CSI functions, but still need to provide an
+/// implementation of `Csi` We do not want to panic, as someone could build a component that uses
+/// the csi functions inside the metadata function. Therefore, we always send a runtime error which
+/// will lead to skill suspension.
 struct SkillMetadataCtx {
     send_rt_err: Option<oneshot::Sender<anyhow::Error>>,
 }
@@ -459,7 +459,7 @@ impl SkillMetadataCtx {
 }
 
 #[async_trait]
-impl CsiForSkills for SkillMetadataCtx {
+impl Csi for SkillMetadataCtx {
     async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
         self.send_error().await
     }
@@ -979,7 +979,7 @@ mod test {
             async fn manifest(
                 &self,
                 _engine: &Engine,
-                mut ctx: Box<dyn CsiForSkills + Send>,
+                mut ctx: Box<dyn Csi + Send>,
                 _tracing_context: &TracingContext,
             ) -> Result<AnySkillManifest, SkillError> {
                 ctx.select_language(vec![SelectLanguageRequest {
@@ -995,7 +995,7 @@ mod test {
             async fn run_as_function(
                 &self,
                 _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
+                _ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {
@@ -1005,7 +1005,7 @@ mod test {
             async fn run_as_message_stream(
                 &self,
                 _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
+                _ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _sender: mpsc::Sender<SkillEvent>,
                 _tracing_context: &TracingContext,
@@ -1039,7 +1039,7 @@ mod test {
             async fn run_as_function(
                 &self,
                 _engine: &Engine,
-                mut ctx: Box<dyn CsiForSkills + Send>,
+                mut ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {
@@ -1063,7 +1063,7 @@ mod test {
             async fn manifest(
                 &self,
                 _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
+                _ctx: Box<dyn Csi + Send>,
                 _tracing_context: &TracingContext,
             ) -> Result<AnySkillManifest, SkillError> {
                 panic!("Dummy metadata implementation of SkillDoubleUsingExplain")
@@ -1072,7 +1072,7 @@ mod test {
             async fn run_as_message_stream(
                 &self,
                 _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
+                _ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _sender: mpsc::Sender<SkillEvent>,
                 _tracing_context: &TracingContext,
@@ -1142,7 +1142,7 @@ mod test {
         async fn run_as_function(
             &self,
             _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
+            _ctx: Box<dyn Csi + Send>,
             _input: Value,
             _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
@@ -1152,7 +1152,7 @@ mod test {
         async fn run_as_message_stream(
             &self,
             _engine: &Engine,
-            mut ctx: Box<dyn CsiForSkills + Send>,
+            mut ctx: Box<dyn Csi + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
             _tracing_context: &TracingContext,
@@ -1298,7 +1298,7 @@ mod test {
             async fn run_as_message_stream(
                 &self,
                 _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
+                _ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 sender: mpsc::Sender<SkillEvent>,
                 _tracing_context: &TracingContext,
@@ -1350,7 +1350,7 @@ mod test {
         async fn run_as_function(
             &self,
             _engine: &Engine,
-            mut ctx: Box<dyn CsiForSkills + Send>,
+            mut ctx: Box<dyn Csi + Send>,
             _input: Value,
             _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
@@ -1379,7 +1379,7 @@ mod test {
         async fn run_as_message_stream(
             &self,
             _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
+            _ctx: Box<dyn Csi + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
             _tracing_context: &TracingContext,
@@ -1396,7 +1396,7 @@ mod test {
         async fn run_as_message_stream(
             &self,
             _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
+            _ctx: Box<dyn Csi + Send>,
             _input: Value,
             sender: mpsc::Sender<SkillEvent>,
             _tracing_context: &TracingContext,

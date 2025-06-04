@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 
 use crate::{
     authorization::AuthorizationApi,
-    csi::{RawCsi, CsiError},
+    csi::{CsiError, RawCsi},
     logging::TracingContext,
     shell::{AppState, CsiState},
     skill_runtime::SkillRuntimeApi,
@@ -69,7 +69,7 @@ where
 
 /// This represents the versioned interactions with the CSI.
 /// The members of this enum provide the glue code to translate between a function
-/// defined in a versioned WIT world and the `CsiForSkills` trait.
+/// defined in a versioned WIT world and the `Csi` trait.
 /// By introducing this abstraction, we can expose a versioned interface of the CSI over http.
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "version")]

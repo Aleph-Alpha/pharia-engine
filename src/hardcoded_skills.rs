@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::{
-    csi::CsiForSkills,
+    csi::Csi,
     inference::{ChatEvent, ChatParams, ChatRequest, Message},
     logging::TracingContext,
     namespace_watcher::Namespace,
@@ -42,7 +42,7 @@ impl Skill for SkillHello {
     async fn manifest(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
@@ -51,7 +51,7 @@ impl Skill for SkillHello {
     async fn run_as_function(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -61,7 +61,7 @@ impl Skill for SkillHello {
     async fn run_as_message_stream(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
@@ -92,7 +92,7 @@ impl Skill for SkillSaboteur {
     async fn manifest(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
@@ -101,7 +101,7 @@ impl Skill for SkillSaboteur {
     async fn run_as_function(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -111,7 +111,7 @@ impl Skill for SkillSaboteur {
     async fn run_as_message_stream(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
@@ -125,7 +125,7 @@ impl Skill for SkillTellMeAJoke {
     async fn manifest(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
@@ -134,7 +134,7 @@ impl Skill for SkillTellMeAJoke {
     async fn run_as_function(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -144,7 +144,7 @@ impl Skill for SkillTellMeAJoke {
     async fn run_as_message_stream(
         &self,
         _engine: &Engine,
-        mut ctx: Box<dyn CsiForSkills + Send>,
+        mut ctx: Box<dyn Csi + Send>,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
@@ -209,7 +209,7 @@ impl Skill for SkillChat {
     async fn manifest(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0_3(SkillMetadataV0_3 {
@@ -236,7 +236,7 @@ impl Skill for SkillChat {
     async fn run_as_function(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -246,7 +246,7 @@ impl Skill for SkillChat {
     async fn run_as_message_stream(
         &self,
         _engine: &Engine,
-        mut ctx: Box<dyn CsiForSkills + Send>,
+        mut ctx: Box<dyn Csi + Send>,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,

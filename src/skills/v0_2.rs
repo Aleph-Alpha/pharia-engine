@@ -11,7 +11,7 @@ use wasmtime::component::bindgen;
 
 use crate::{
     chunking,
-    csi::CsiForSkills,
+    csi::Csi,
     inference,
     language_selection::{self, SelectLanguageRequest},
     logging::TracingContext,
@@ -27,7 +27,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
@@ -36,7 +36,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
     async fn run_as_function(
         &self,
         engine: &Engine,
-        ctx: Box<dyn CsiForSkills + Send>,
+        ctx: Box<dyn Csi + Send>,
         input: Value,
         tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -78,7 +78,7 @@ impl super::Skill for SkillPre<LinkedCtx> {
     async fn run_as_message_stream(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn CsiForSkills + Send>,
+        _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
@@ -497,7 +497,7 @@ mod tests {
     async fn language_selection_from_csi() {
         // Given a linked context
         let (send_rt_err, _) = oneshot::channel();
-        let skill_ctx: Box<dyn CsiForSkills + Send> = Box::new(SkillInvocationCtx::new(
+        let skill_ctx: Box<dyn Csi + Send> = Box::new(SkillInvocationCtx::new(
             send_rt_err,
             StubCsi::empty(),
             api_token().to_owned(),

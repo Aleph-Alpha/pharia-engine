@@ -529,7 +529,7 @@ pub mod tests {
 
     use crate::{
         csi::{
-            CsiForSkills,
+            Csi,
             tests::{CsiDummy, CsiSaboteur},
         },
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke},
@@ -644,7 +644,7 @@ pub mod tests {
             async fn run_as_function(
                 &self,
                 _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
+                _ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {
@@ -662,7 +662,7 @@ pub mod tests {
             async fn manifest(
                 &self,
                 _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
+                _ctx: Box<dyn Csi + Send>,
                 _tracing_context: &TracingContext,
             ) -> Result<AnySkillManifest, SkillError> {
                 panic!("Dummy metadata implementation of Assert concurrency skill")
@@ -671,7 +671,7 @@ pub mod tests {
             async fn run_as_message_stream(
                 &self,
                 _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
+                _ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _mpsc: mpsc::Sender<SkillEvent>,
                 _tracing_context: &TracingContext,
@@ -905,7 +905,7 @@ pub mod tests {
         async fn run_as_function(
             &self,
             _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
+            _ctx: Box<dyn Csi + Send>,
             _input: Value,
             _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
@@ -915,7 +915,7 @@ pub mod tests {
         async fn run_as_message_stream(
             &self,
             _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
+            _ctx: Box<dyn Csi + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
             _tracing_context: &TracingContext,
