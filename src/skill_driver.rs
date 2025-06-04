@@ -169,8 +169,6 @@ pub struct SkillInvocationCtx<C> {
     /// operator.
     send_rt_error: Option<oneshot::Sender<anyhow::Error>>,
     csi_apis: InvocationContext<C>,
-    // How the user authenticates with us
-    api_token: String,
     /// Context that is used to situate certain actions in the overall context.
     tracing_context: TracingContext,
     /// ID counter for stored streams.
@@ -194,8 +192,7 @@ impl<C> SkillInvocationCtx<C> {
     ) -> Self {
         SkillInvocationCtx {
             send_rt_error: Some(send_rt_err),
-            csi_apis: InvocationContext::new(csi_apis, namespace.clone()),
-            api_token,
+            csi_apis: InvocationContext::new(csi_apis, namespace.clone(), api_token.clone()),
             tracing_context,
             current_stream_id: 0,
             chat_streams: HashMap::new(),
@@ -230,11 +227,7 @@ where
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
         match self
             .csi_apis
-            .explain(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                requests,
-            )
+            .explain(self.tracing_context.clone(), requests)
             .await
         {
             Ok(value) => value,
@@ -245,11 +238,7 @@ where
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
         match self
             .csi_apis
-            .complete(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                requests,
-            )
+            .complete(self.tracing_context.clone(), requests)
             .await
         {
             Ok(value) => value,
@@ -261,11 +250,7 @@ where
         let id = self.next_stream_id();
         let recv = self
             .csi_apis
-            .completion_stream(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                request,
-            )
+            .completion_stream(self.tracing_context.clone(), request)
             .await;
         self.completion_streams.insert(id, recv);
         id
@@ -292,11 +277,7 @@ where
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
         match self
             .csi_apis
-            .chat(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                requests,
-            )
+            .chat(self.tracing_context.clone(), requests)
             .await
         {
             Ok(value) => value,
@@ -308,11 +289,7 @@ where
         let id = self.next_stream_id();
         let recv = self
             .csi_apis
-            .chat_stream(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                request,
-            )
+            .chat_stream(self.tracing_context.clone(), request)
             .await;
         self.chat_streams.insert(id, recv);
         id
@@ -339,11 +316,7 @@ where
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
         match self
             .csi_apis
-            .chunk(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                requests,
-            )
+            .chunk(self.tracing_context.clone(), requests)
             .await
         {
             Ok(chunks) => chunks,
@@ -368,11 +341,7 @@ where
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
         match self
             .csi_apis
-            .search(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                requests,
-            )
+            .search(self.tracing_context.clone(), requests)
             .await
         {
             Ok(value) => value,
@@ -383,11 +352,7 @@ where
     async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
         match self
             .csi_apis
-            .documents(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                requests,
-            )
+            .documents(self.tracing_context.clone(), requests)
             .await
         {
             Ok(value) => value,
@@ -398,11 +363,7 @@ where
     async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
         match self
             .csi_apis
-            .document_metadata(
-                self.api_token.clone(),
-                self.tracing_context.clone(),
-                requests,
-            )
+            .document_metadata(self.tracing_context.clone(), requests)
             .await
         {
             // We know there will always be exactly one element in the vector
