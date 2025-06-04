@@ -196,6 +196,14 @@ impl McpServerStore {
     fn new() -> Self {
         Self(HashMap::new())
     }
+
+    fn list_in_namespace(&self, namespace: Namespace) -> impl Iterator<Item = McpServerUrl> + '_ {
+        self.0
+            .get(&namespace)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+    }
 }
 
 struct ToolActor<T: ToolClient> {
@@ -240,12 +248,7 @@ impl<T: ToolClient> ToolActor<T> {
                 send,
             } => {
                 let client = self.client.clone();
-                let servers = self
-                    .mcp_servers
-                    .0
-                    .get(&namespace)
-                    .cloned()
-                    .unwrap_or_default();
+                let servers = self.mcp_servers.list_in_namespace(namespace).collect();
                 self.running_requests.push(Box::pin(async move {
                     let result =
                         Self::invoke_tool(client.as_ref(), servers, request, tracing_context).await;
@@ -254,12 +257,7 @@ impl<T: ToolClient> ToolActor<T> {
             }
             ToolMsg::ListTools { namespace, send } => {
                 let client = self.client.clone();
-                let servers = self
-                    .mcp_servers
-                    .0
-                    .get(&namespace)
-                    .cloned()
-                    .unwrap_or_default();
+                let servers = self.mcp_servers.list_in_namespace(namespace).collect();
                 self.running_requests.push(Box::pin(async move {
                     let result = Self::tools(client.as_ref(), servers).await;
                     let result = result.into_values().flatten().collect();
@@ -299,7 +297,7 @@ impl<T: ToolClient> ToolActor<T> {
     /// Then, we invoke the tool on that server.
     async fn invoke_tool(
         client: &impl ToolClient,
-        servers: HashSet<McpServerUrl>,
+        servers: Vec<McpServerUrl>,
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> Result<Value, ToolError> {
@@ -320,7 +318,7 @@ impl<T: ToolClient> ToolActor<T> {
     /// available information is enough.
     async fn tools(
         client: &impl ToolClient,
-        servers: HashSet<McpServerUrl>,
+        servers: Vec<McpServerUrl>,
     ) -> HashMap<McpServerUrl, Vec<String>> {
         let results = join_all(servers.into_iter().map(|address| async move {
             let tools = client.list_tools(&address).await;
@@ -338,7 +336,7 @@ impl<T: ToolClient> ToolActor<T> {
     /// We do not return a result here, but ignore MCP servers that are giving errors.
     async fn server_for_tool(
         client: &impl ToolClient,
-        servers: HashSet<McpServerUrl>,
+        servers: Vec<McpServerUrl>,
         tool: &str,
     ) -> Option<McpServerUrl> {
         let all_tools = Self::tools(client, servers).await;
