@@ -9,7 +9,7 @@ use crate::{
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
-    tool::{ConfiguredMcpServer, McpServerStore, McpServerUrl},
+    tool::{ConfiguredMcpServer, McpServerStoreApi, McpServerUrl},
 };
 
 use super::{
@@ -85,7 +85,7 @@ impl NamespaceWatcher {
 
     pub fn with_config(
         skill_store_api: impl SkillStoreApi + Send + Sync + 'static,
-        tool_api: impl McpServerStore + Send + 'static,
+        tool_api: impl McpServerStoreApi + Send + 'static,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -192,7 +192,7 @@ impl McpServerDiff {
 impl<S, M> NamespaceWatcherActor<S, M>
 where
     S: SkillStoreApi,
-    M: McpServerStore,
+    M: McpServerStoreApi,
 {
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
@@ -643,7 +643,7 @@ pub mod tests {
 
     impl<M> NamespaceWatcherActor<SkillStoreDummy, M>
     where
-        M: McpServerStore + Send + Sync,
+        M: McpServerStoreApi + Send + Sync,
     {
         fn with_tool_store_api(
             descriptions: HashMap<Namespace, NamespaceDescription>,
