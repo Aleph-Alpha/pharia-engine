@@ -5,6 +5,10 @@ use serde_json::{Value, json};
 
 use crate::{http::HttpClient, logging::TracingContext};
 
+#[cfg(test)]
+use double_derive::double;
+
+#[cfg_attr(test, double(SearchClientDouble))]
 pub trait SearchClient: Send + Sync + 'static {
     fn search(
         &self,
@@ -351,7 +355,7 @@ pub mod tests {
         }
     }
 
-    impl SearchClient for StubClient {
+    impl SearchClientDouble for StubClient {
         async fn search(
             &self,
             _index: IndexPath,

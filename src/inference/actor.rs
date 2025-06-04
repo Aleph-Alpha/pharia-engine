@@ -607,7 +607,7 @@ pub mod tests {
     use anyhow::anyhow;
     use tokio::{sync::mpsc, time::sleep, try_join};
 
-    use crate::inference::client::{InferenceClient, InferenceError};
+    use crate::inference::client::{InferenceClientDouble, InferenceError};
 
     use super::*;
 
@@ -761,15 +761,7 @@ pub mod tests {
         }
     }
 
-    impl InferenceClient for SaboteurClient {
-        async fn explain(
-            &self,
-            _request: &ExplanationRequest,
-            _api_token: String,
-            _tracing_context: &TracingContext,
-        ) -> Result<Explanation, InferenceError> {
-            unimplemented!()
-        }
+    impl InferenceClientDouble for SaboteurClient {
         async fn complete(
             &self,
             _params: &super::CompletionRequest,
@@ -788,32 +780,6 @@ pub mod tests {
             } else {
                 Ok(Completion::from_text("Completion succeeded"))
             }
-        }
-        async fn stream_completion(
-            &self,
-            _request: &CompletionRequest,
-            _api_token: String,
-            _tracing_context: &TracingContext,
-            _send: mpsc::Sender<CompletionEvent>,
-        ) -> Result<(), InferenceError> {
-            unimplemented!()
-        }
-        async fn chat(
-            &self,
-            _request: &ChatRequest,
-            _api_token: String,
-            _tracing_context: &TracingContext,
-        ) -> Result<ChatResponse, InferenceError> {
-            unimplemented!()
-        }
-        async fn stream_chat(
-            &self,
-            _request: &ChatRequest,
-            _api_token: String,
-            _tracing_context: &TracingContext,
-            _send: mpsc::Sender<ChatEvent>,
-        ) -> Result<(), InferenceError> {
-            unimplemented!()
         }
     }
 
@@ -858,15 +824,7 @@ pub mod tests {
         }
     }
 
-    impl InferenceClient for AssertConcurrentClient {
-        async fn explain(
-            &self,
-            _request: &ExplanationRequest,
-            _api_token: String,
-            _tracing_context: &TracingContext,
-        ) -> Result<Explanation, InferenceError> {
-            unimplemented!()
-        }
+    impl InferenceClientDouble for AssertConcurrentClient {
         async fn complete(
             &self,
             request: &CompletionRequest,
@@ -883,35 +841,6 @@ pub mod tests {
                 sleep(Duration::from_millis(1)).await;
             }
             Ok(Completion::from_text(&request.prompt))
-        }
-
-        async fn stream_completion(
-            &self,
-            _request: &CompletionRequest,
-            _api_token: String,
-            _tracing_context: &TracingContext,
-            _send: mpsc::Sender<CompletionEvent>,
-        ) -> Result<(), InferenceError> {
-            unimplemented!()
-        }
-
-        async fn chat(
-            &self,
-            _request: &ChatRequest,
-            _api_token: String,
-            _tracing_context: &TracingContext,
-        ) -> Result<ChatResponse, InferenceError> {
-            unimplemented!()
-        }
-
-        async fn stream_chat(
-            &self,
-            _request: &ChatRequest,
-            _api_token: String,
-            _tracing_context: &TracingContext,
-            _send: mpsc::Sender<ChatEvent>,
-        ) -> Result<(), InferenceError> {
-            unimplemented!()
         }
     }
 

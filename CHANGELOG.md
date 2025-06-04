@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.12](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.11...pharia-kernel-v0.12.12)
+
+### Features
+
+- Only mcp servers configured for the skill namespace are accessed - ([b33c98a](https://github.com/Aleph-Alpha/pharia-kernel/commit/b33c98a7d751a91039b5b59a4190257142fe2f52))
+- Add basic tracing to tool calls - ([51a539f](https://github.com/Aleph-Alpha/pharia-kernel/commit/51a539f201c13349dc330932032e81b715e41054))
+- Mcp client can list tool names - ([ecfcda4](https://github.com/Aleph-Alpha/pharia-kernel/commit/ecfcda4eb812b94368f6d85a31a07f1c04f4cc05))
+
+### Fixes
+
+- Only load mcp servers in config with beta flag - ([c12e902](https://github.com/Aleph-Alpha/pharia-kernel/commit/c12e902964a2aa7ff3afde303c6c98079481c9dc))
+- One bad mcp server allows to invoke tools on others - ([fe17a61](https://github.com/Aleph-Alpha/pharia-kernel/commit/fe17a61ae153ec4038b78740f6926ba40dc44870))
+
+### Documentation
+
+- Specify learnings about WIT - ([15119e4](https://github.com/Aleph-Alpha/pharia-kernel/commit/15119e403e3edd513b4880d79f855ed495711f34))
+
+### Performance
+
+- Do requests for list tool in parallel - ([6e654cf](https://github.com/Aleph-Alpha/pharia-kernel/commit/6e654cf5cb56cbb185761708e5fb68bb4ddeafd9))
+- Tool actor answers request in parallel - ([fbcf053](https://github.com/Aleph-Alpha/pharia-kernel/commit/fbcf053adaec3f08beb83a035f6519f8dacea08d))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 36 updates - ([701e322](https://github.com/Aleph-Alpha/pharia-kernel/commit/701e3221d1223ad26aeb36dfba69ba9a086b9c09))
+
+
 ## [0.12.11](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.10...pharia-kernel-v0.12.11)
 
 ### Features

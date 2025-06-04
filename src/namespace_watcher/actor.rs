@@ -9,7 +9,7 @@ use crate::{
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
-    tool::{ConfiguredMcpServer, McpServerStore, McpServerUrl},
+    tool::{ConfiguredMcpServer, McpServerStoreApi, McpServerUrl},
 };
 
 use super::{
@@ -85,7 +85,7 @@ impl NamespaceWatcher {
 
     pub fn with_config(
         skill_store_api: impl SkillStoreApi + Send + Sync + 'static,
-        tool_api: impl McpServerStore + Send + 'static,
+        tool_api: impl McpServerStoreApi + Send + 'static,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -192,7 +192,7 @@ impl McpServerDiff {
 impl<S, M> NamespaceWatcherActor<S, M>
 where
     S: SkillStoreApi,
-    M: McpServerStore,
+    M: McpServerStoreApi,
 {
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
@@ -336,8 +336,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::skill_store::tests::SkillStoreDummy;
-    use crate::tool::McpServerUrl;
-    use crate::tool::tests::McpServerStoreDummy;
+    use crate::tool::tests::McpServerStoreDouble;
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill_store::tests::SkillStoreMsg,
@@ -432,6 +431,10 @@ pub mod tests {
         assert_eq!(diff.added, vec!["http://localhost:8002/mcp".into()]);
         assert_eq!(diff.removed, vec!["http://localhost:8001/mcp".into()]);
     }
+
+    pub struct McpServerStoreDummy;
+
+    impl McpServerStoreDouble for McpServerStoreDummy {}
 
     #[test]
     fn diff_is_computed() {
@@ -640,7 +643,7 @@ pub mod tests {
 
     impl<M> NamespaceWatcherActor<SkillStoreDummy, M>
     where
-        M: McpServerStore + Send + Sync,
+        M: McpServerStoreApi + Send + Sync,
     {
         fn with_tool_store_api(
             descriptions: HashMap<Namespace, NamespaceDescription>,
@@ -689,12 +692,12 @@ pub mod tests {
     }
 
     #[derive(Clone)]
-    struct ToolStoreSpy {
+    struct McpServerStoreSpy {
         upserted: Arc<Mutex<Vec<ConfiguredMcpServer>>>,
         removed: Arc<Mutex<Vec<ConfiguredMcpServer>>>,
     }
 
-    impl ToolStoreSpy {
+    impl McpServerStoreSpy {
         fn new() -> Self {
             Self {
                 upserted: Arc::new(Mutex::new(vec![])),
@@ -703,7 +706,7 @@ pub mod tests {
         }
     }
 
-    impl McpServerStore for ToolStoreSpy {
+    impl McpServerStoreDouble for McpServerStoreSpy {
         async fn upsert(&self, server: ConfiguredMcpServer) {
             self.upserted.lock().await.push(server);
         }
@@ -711,16 +714,12 @@ pub mod tests {
         async fn remove(&self, server: ConfiguredMcpServer) {
             self.removed.lock().await.push(server);
         }
-
-        async fn list(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
-            unimplemented!()
-        }
     }
 
     #[tokio::test]
     async fn new_mcp_server_is_upserted() {
         // Given a namespace description watcher with empty descriptions
-        let tool_store = ToolStoreSpy::new();
+        let tool_store = McpServerStoreSpy::new();
         let descriptions = HashMap::new();
         let config = Box::new(PendingConfig);
         let mut watcher =
@@ -750,7 +749,7 @@ pub mod tests {
     #[tokio::test]
     async fn dropped_mcp_server_is_removed() {
         // Given a namespace description watcher and a tool store that both know about an mcp server
-        let tool_store = ToolStoreSpy::new();
+        let tool_store = McpServerStoreSpy::new();
 
         let namespace = Namespace::new("dummy-namespace").unwrap();
         let descriptions = HashMap::from([(

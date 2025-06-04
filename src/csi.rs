@@ -14,6 +14,7 @@ use crate::{
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     logging::TracingContext,
+    namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
     tool::{InvokeRequest, ToolApi, ToolError},
@@ -147,7 +148,7 @@ pub trait Csi {
 
     fn invoke_tool(
         &self,
-        auth: String,
+        namespace: Namespace,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
     ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send;
@@ -526,7 +527,7 @@ where
 
     async fn invoke_tool(
         &self,
-        _auth: String,
+        namespace: Namespace,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
     ) -> Result<Vec<Value>, ToolError> {
@@ -554,7 +555,7 @@ where
                         "invoke_tool",
                         tool_name = request.tool_name
                     );
-                    self.tool.invoke_tool(request, context)
+                    self.tool.invoke_tool(request, namespace.clone(), context)
                 })
                 .collect::<Vec<_>>(),
         )

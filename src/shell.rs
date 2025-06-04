@@ -888,10 +888,7 @@ fn skill_wit() -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        panic,
-        sync::{Arc, Mutex},
-    };
+    use std::sync::{Arc, Mutex};
 
     use crate::{
         authorization::tests::StubAuthorization,
@@ -900,6 +897,7 @@ mod tests {
         feature_set::PRODUCTION_FEATURE_SET,
         inference::{self, Explanation, TextScore},
         logging::tests::given_tracing_subscriber,
+        skill_runtime::SkillRuntimeDouble,
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
@@ -2009,35 +2007,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     #[derive(Debug, Clone)]
     struct SkillRuntimeDummy;
 
-    impl SkillRuntimeApi for SkillRuntimeDummy {
-        async fn run_function(
-            &self,
-            _skill_path: SkillPath,
-            _input: Value,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> Result<Value, SkillExecutionError> {
-            panic!("Skill runtime dummy called")
-        }
-
-        async fn run_message_stream(
-            &self,
-            _skill_path: SkillPath,
-            _input: Value,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> mpsc::Receiver<SkillExecutionEvent> {
-            panic!("Skill runtime dummy called")
-        }
-
-        async fn skill_metadata(
-            &self,
-            _skill_path: SkillPath,
-            _tracing_context: TracingContext,
-        ) -> Result<AnySkillManifest, SkillExecutionError> {
-            panic!("Skill runtime dummy called")
-        }
-    }
+    impl SkillRuntimeDouble for SkillRuntimeDummy {}
 
     /// A test helper answering each request with a predefined error
     #[derive(Clone)]
@@ -2053,7 +2023,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    impl SkillRuntimeApi for SkillRuntimeSaboteur {
+    impl SkillRuntimeDouble for SkillRuntimeSaboteur {
         async fn run_function(
             &self,
             _skill_path: SkillPath,
@@ -2062,19 +2032,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             _tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             Err((*self.make_error)())
-        }
-
-        async fn run_message_stream(
-            &self,
-            _skill_path: SkillPath,
-            _input: Value,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> mpsc::Receiver<SkillExecutionEvent> {
-            panic!(
-                "Use the `SkillRuntimeStub`, to simulate errors during streaming instead of the \
-                `SkillRuntimeSaboteur`."
-            )
         }
 
         async fn skill_metadata(
@@ -2120,7 +2077,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    impl SkillRuntimeApi for SkillRuntimeStub {
+    impl SkillRuntimeDouble for SkillRuntimeStub {
         async fn run_function(
             &self,
             _skill_path: SkillPath,
@@ -2164,6 +2121,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         api_token: String,
         input: Value,
         skill_path: SkillPath,
+        tracing_context: Vec<TracingContext>,
     }
 
     impl SkillRuntimeSpy {
@@ -2173,8 +2131,13 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                     api_token: String::new(),
                     input: Value::default(),
                     skill_path: SkillPath::local("SKILL HAS NOT BEEN SEND"),
+                    tracing_context: Vec::new(),
                 })),
             }
+        }
+
+        pub fn tracing_contexts(&self) -> Vec<TracingContext> {
+            self.inner.lock().unwrap().tracing_context.clone()
         }
 
         pub fn api_token(&self) -> String {
@@ -2190,18 +2153,19 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }
     }
 
-    impl SkillRuntimeApi for SkillRuntimeSpy {
+    impl SkillRuntimeDouble for SkillRuntimeSpy {
         async fn run_function(
             &self,
             skill_path: SkillPath,
             input: Value,
             api_token: String,
-            _tracing_context: TracingContext,
+            tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             let mut inner = self.inner.lock().unwrap();
             inner.api_token = api_token;
             inner.input = input;
             inner.skill_path = skill_path;
+            inner.tracing_context.push(tracing_context);
             Ok(Value::default())
         }
 
@@ -2210,22 +2174,15 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             skill_path: SkillPath,
             input: Value,
             api_token: String,
-            _tracing_context: TracingContext,
+            tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             let mut inner = self.inner.lock().unwrap();
             inner.api_token = api_token;
             inner.input = input;
             inner.skill_path = skill_path;
+            inner.tracing_context.push(tracing_context);
             let (_send, recv) = mpsc::channel(1);
             recv
-        }
-
-        async fn skill_metadata(
-            &self,
-            _skill_path: SkillPath,
-            _tracing_context: TracingContext,
-        ) -> Result<AnySkillManifest, SkillExecutionError> {
-            unimplemented!("Not needed in any test for now")
         }
     }
 
@@ -2261,56 +2218,12 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         assert!(traceparent.to_str().unwrap().contains(trace_id));
     }
 
-    #[derive(Clone)]
-    struct SpySkillRuntime(Arc<Mutex<Vec<TracingContext>>>);
-
-    impl SpySkillRuntime {
-        pub fn new() -> Self {
-            Self(Arc::new(Mutex::new(Vec::new())))
-        }
-
-        pub fn tracing_contexts(&self) -> Vec<TracingContext> {
-            self.0.lock().unwrap().clone()
-        }
-    }
-
-    impl SkillRuntimeApi for SpySkillRuntime {
-        async fn run_function(
-            &self,
-            _skill_path: SkillPath,
-            _input: Value,
-            _api_token: String,
-            tracing_context: TracingContext,
-        ) -> Result<Value, SkillExecutionError> {
-            self.0.lock().unwrap().push(tracing_context);
-            Ok(Value::default())
-        }
-
-        async fn run_message_stream(
-            &self,
-            _skill_path: SkillPath,
-            _input: Value,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> mpsc::Receiver<SkillExecutionEvent> {
-            panic!("SpySkillRuntime does not support streaming")
-        }
-
-        async fn skill_metadata(
-            &self,
-            _skill_path: SkillPath,
-            _tracing_context: TracingContext,
-        ) -> Result<AnySkillManifest, SkillExecutionError> {
-            panic!("SpySkillRuntime does not support metadata")
-        }
-    }
-
     #[tokio::test]
     async fn skill_runtime_gets_tracecontext_from_incoming_request() {
         given_tracing_subscriber();
 
         // Given a shell
-        let skill_runtime = SpySkillRuntime::new();
+        let skill_runtime = SkillRuntimeSpy::new();
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
@@ -2345,7 +2258,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         given_tracing_subscriber();
 
         // Given a shell
-        let skill_runtime = SpySkillRuntime::new();
+        let skill_runtime = SkillRuntimeSpy::new();
         let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 

@@ -24,6 +24,9 @@ use wit_parser::{
 use crate::{csi::CsiForSkills, logging::TracingContext, namespace_watcher::Namespace};
 use tracing::error;
 
+#[cfg(test)]
+use double_derive::double;
+
 pub use self::v0_3::SkillMetadataV0_3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -240,6 +243,7 @@ impl Engine {
 pub type LinkedCtx = LinkerImpl<Box<dyn CsiForSkills + Send>>;
 
 #[async_trait]
+#[cfg_attr(test, double(SkillDouble))]
 pub trait Skill: Send + Sync {
     async fn manifest(
         &self,
@@ -535,21 +539,15 @@ pub mod tests {
     use tokio::sync::oneshot;
 
     use crate::{
-        chunking::{Chunk, ChunkRequest},
         csi::{
-            ChatStreamId, CompletionStreamId, CsiForSkillsDouble,
+            CsiForSkillsDouble,
             tests::{
                 CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiCompleteWithEchoMock,
                 CsiGreetingMock, CsiSearchMock, StubCsi,
             },
         },
-        inference::{
-            ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-            Explanation, ExplanationRequest, FinishReason, TextScore, TokenUsage,
-        },
-        language_selection::{self, SelectLanguageRequest},
+        inference::{ChatEvent, CompletionEvent, Explanation, FinishReason, TextScore, TokenUsage},
         logging::TracingContext,
-        search::{Document, DocumentPath, SearchRequest, SearchResult},
         skill_driver::SkillInvocationCtx,
         tool::InvokeRequest,
     };
@@ -641,6 +639,7 @@ pub mod tests {
             send,
             csi,
             "dummy token".to_owned(),
+            Namespace::dummy(),
             TracingContext::dummy(),
         ));
         let skill =
@@ -1193,99 +1192,10 @@ pub mod tests {
     pub struct SkillDummy;
 
     #[async_trait]
-    impl Skill for SkillDummy {
-        async fn manifest(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _tracing_context: &TracingContext,
-        ) -> Result<AnySkillManifest, SkillError> {
-            panic!("I am a dummy Skill")
-        }
-
-        async fn run_as_function(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _input: Value,
-            _tracing_context: &TracingContext,
-        ) -> Result<Value, SkillError> {
-            panic!("I am a dummy Skill")
-        }
-
-        async fn run_as_message_stream(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _input: Value,
-            _sender: mpsc::Sender<SkillEvent>,
-            _tracing_context: &TracingContext,
-        ) -> Result<(), SkillError> {
-            panic!("I am a dummy Skill")
-        }
-    }
+    impl SkillDouble for SkillDummy {}
 
     struct CsiForSkillsDummy;
 
     #[async_trait]
-    impl CsiForSkills for CsiForSkillsDummy {
-        async fn explain(&mut self, _requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn complete(&mut self, _requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn completion_stream_new(
-            &mut self,
-            _request: CompletionRequest,
-        ) -> CompletionStreamId {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn completion_stream_next(
-            &mut self,
-            _id: &CompletionStreamId,
-        ) -> Option<CompletionEvent> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn completion_stream_drop(&mut self, _id: CompletionStreamId) {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn chunk(&mut self, _requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn select_language(
-            &mut self,
-            _requests: Vec<SelectLanguageRequest>,
-        ) -> Vec<Option<language_selection::Language>> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn chat(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn chat_stream_drop(&mut self, _id: ChatStreamId) {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn search(&mut self, _requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn document_metadata(
-            &mut self,
-            _document_paths: Vec<DocumentPath>,
-        ) -> Vec<Option<Value>> {
-            panic!("I am a dummy CsiForSkills")
-        }
-        async fn documents(&mut self, _document_paths: Vec<DocumentPath>) -> Vec<Document> {
-            panic!("I am a dummy CsiForSkills")
-        }
-
-        async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Value> {
-            panic!("I am a dummy CsiForSkills")
-        }
-    }
+    impl CsiForSkillsDouble for CsiForSkillsDummy {}
 }

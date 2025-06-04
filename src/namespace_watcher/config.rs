@@ -43,6 +43,11 @@ impl Namespace {
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
             && input.len() <= Self::MAX_LEN
     }
+
+    #[cfg(test)]
+    pub fn dummy() -> Self {
+        Self::new("dummy").unwrap()
+    }
 }
 
 impl<'de> Deserialize<'de> for Namespace {
