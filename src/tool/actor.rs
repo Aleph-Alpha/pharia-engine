@@ -72,6 +72,7 @@ pub trait ToolApi {
     fn invoke_tool(
         &self,
         request: InvokeRequest,
+        namespace: Namespace,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Value, ToolError>> + Send;
 
@@ -123,6 +124,7 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
     async fn invoke_tool(
         &self,
         request: InvokeRequest,
+        namespace: Namespace,
         tracing_context: TracingContext,
     ) -> Result<Value, ToolError> {
         let (send, receive) = oneshot::channel();
@@ -424,7 +426,9 @@ pub mod tests {
             tool_name: "unknown".to_owned(),
             arguments: vec![],
         };
-        let result = tool.invoke_tool(request, TracingContext::dummy()).await;
+        let result = tool
+            .invoke_tool(request, Namespace::dummy(), TracingContext::dummy())
+            .await;
 
         // Then we get a tool not found error
         assert!(matches!(result, Err(ToolError::ToolNotFound(_))));
@@ -437,7 +441,7 @@ pub mod tests {
 
         // When a tool server is upserted with that particular url
         let namespace = Namespace::new("test").unwrap();
-        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace);
+        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
         tool.upsert(server).await;
 
         // Then the calculator tool can be invoked
@@ -446,7 +450,7 @@ pub mod tests {
             arguments: vec![],
         };
         let result = tool
-            .invoke_tool(request, TracingContext::dummy())
+            .invoke_tool(request, namespace, TracingContext::dummy())
             .await
             .unwrap();
         assert_eq!(result, json!("Success"));
@@ -616,6 +620,7 @@ pub mod tests {
                     tool_name: "search".to_owned(),
                     arguments: vec![],
                 },
+                Namespace::dummy(),
                 TracingContext::dummy(),
             )
             .await;
@@ -725,7 +730,7 @@ pub mod tests {
         };
         let result = tool
             .api()
-            .invoke_tool(request, TracingContext::dummy())
+            .invoke_tool(request, Namespace::dummy(), TracingContext::dummy())
             .await
             .unwrap();
 
@@ -772,7 +777,10 @@ pub mod tests {
             arguments: vec![],
         };
         let handle = tokio::spawn(async move {
-            drop(api.invoke_tool(request, TracingContext::dummy()).await);
+            drop(
+                api.invoke_tool(request, Namespace::dummy(), TracingContext::dummy())
+                    .await,
+            );
         });
 
         // And waiting shortly for the message to arrive
@@ -785,7 +793,7 @@ pub mod tests {
         };
         let result = tool
             .api()
-            .invoke_tool(request, TracingContext::dummy())
+            .invoke_tool(request, Namespace::dummy(), TracingContext::dummy())
             .await
             .unwrap();
         assert_eq!(result, json!("Success"));
