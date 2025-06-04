@@ -487,7 +487,7 @@ mod tests {
     use tokio::sync::oneshot;
 
     use crate::{
-        csi::tests::StubCsi, logging::TracingContext, namespace_watcher::Namespace,
+        csi::tests::RawCsiStub, logging::TracingContext, namespace_watcher::Namespace,
         skill_driver::SkillInvocationCtx, tests::api_token,
     };
 
@@ -499,7 +499,7 @@ mod tests {
         let (send_rt_err, _) = oneshot::channel();
         let skill_ctx: Box<dyn Csi + Send> = Box::new(SkillInvocationCtx::new(
             send_rt_err,
-            StubCsi::empty(),
+            RawCsiStub::empty(),
             api_token().to_owned(),
             Namespace::dummy(),
             TracingContext::dummy(),

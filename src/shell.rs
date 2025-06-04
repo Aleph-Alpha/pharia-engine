@@ -893,7 +893,7 @@ mod tests {
     use crate::{
         authorization::tests::StubAuthorization,
         chunking,
-        csi::tests::{CsiDummy, StubCsi},
+        csi::tests::{RawCsiDummy, RawCsiStub},
         feature_set::PRODUCTION_FEATURE_SET,
         inference::{self, Explanation, TextScore},
         logging::tests::given_tracing_subscriber,
@@ -916,13 +916,13 @@ mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl AppState<StubAuthorization, CsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
+    impl AppState<StubAuthorization, RawCsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
         pub fn dummy() -> Self {
             Self::new(
                 StubAuthorization::new(true),
                 SkillStoreDummy,
                 SkillRuntimeDummy,
-                CsiDummy,
+                RawCsiDummy,
             )
         }
     }
@@ -1050,7 +1050,7 @@ mod tests {
         });
 
         // When
-        let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
+        let csi = RawCsiStub::with_completion(|r| inference::Completion::from_text(r.prompt));
         let app_state = AppState::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
@@ -1088,7 +1088,7 @@ mod tests {
         });
 
         // When
-        let csi = StubCsi::with_completion(|r| inference::Completion::from_text(r.prompt));
+        let csi = RawCsiStub::with_completion(|r| inference::Completion::from_text(r.prompt));
         let app_state = AppState::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
@@ -1141,7 +1141,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let csi = StubCsi::with_completion(|r| {
+        let csi = RawCsiStub::with_completion(|r| {
             // We expect echo to be true
             assert!(r.params.echo);
             inference::Completion::from_text(r.prompt)
@@ -1181,7 +1181,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let csi = StubCsi::with_completion(|r| {
+        let csi = RawCsiStub::with_completion(|r| {
             assert!(!r.params.echo);
             inference::Completion::from_text(r.prompt)
         });
@@ -1224,7 +1224,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         });
 
         // When
-        let csi = StubCsi::with_chat(|_| inference::ChatResponse {
+        let csi = RawCsiStub::with_chat(|_| inference::ChatResponse {
             message: inference::Message {
                 role: "assistant".to_owned(),
                 content: message.to_owned(),
@@ -1283,7 +1283,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             "granularity": "auto"
         }]);
 
-        let csi = StubCsi::with_explain(|_| {
+        let csi = RawCsiStub::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
                 start: 0,
@@ -1328,7 +1328,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let csi = StubCsi::with_chat(|_| inference::ChatResponse {
+        let csi = RawCsiStub::with_chat(|_| inference::ChatResponse {
             message: inference::Message {
                 role: "assistant".to_owned(),
                 content: message.to_owned(),
@@ -1373,7 +1373,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             },
         }]);
 
-        let mut csi = StubCsi::empty();
+        let mut csi = RawCsiStub::empty();
         csi.set_chunking(|r| {
             Ok(r.into_iter()
                 .map(|_| {
@@ -1420,7 +1420,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             "character_offsets": true
         }]);
 
-        let mut csi = StubCsi::empty();
+        let mut csi = RawCsiStub::empty();
         csi.set_chunking(|r| {
             Ok(r.into_iter()
                 .map(|_| {

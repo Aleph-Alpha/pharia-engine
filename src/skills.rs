@@ -543,7 +543,7 @@ pub mod tests {
             CsiDouble,
             tests::{
                 CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiCompleteWithEchoMock,
-                CsiGreetingMock, CsiSearchMock, StubCsi,
+                CsiGreetingMock, CsiSearchMock, RawCsiStub,
             },
         },
         inference::{ChatEvent, CompletionEvent, Explanation, FinishReason, TextScore, TokenUsage},
@@ -628,7 +628,7 @@ pub mod tests {
         let skill_bytes = given_rust_skill_explain().bytes();
         let engine = Engine::default();
         let (send, _) = oneshot::channel();
-        let csi = StubCsi::with_explain(|_| {
+        let csi = RawCsiStub::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
                 start: 0,

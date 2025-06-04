@@ -56,7 +56,7 @@ pub trait Csi {
 
 #[cfg(test)]
 pub mod tests {
-    pub use raw::tests::{CsiDummy, CsiSaboteur, StubCsi};
+    pub use raw::tests::{RawCsiDummy, RawCsiSaboteur, RawCsiStub};
     use std::{
         collections::HashMap,
         sync::{Arc, Mutex},
