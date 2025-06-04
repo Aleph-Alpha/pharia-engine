@@ -107,6 +107,7 @@ impl From<lingua::Language> for Language {
     }
 }
 
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub struct SelectLanguageRequest {
     pub text: String,
     pub languages: Vec<Language>,

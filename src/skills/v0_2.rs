@@ -486,24 +486,37 @@ mod tests {
     use engine_room::LinkerImpl;
     use tokio::sync::oneshot;
 
-    use crate::{
-        csi::tests::RawCsiStub, logging::TracingContext, namespace_watcher::Namespace,
-        skill_driver::SkillInvocationCtx, tests::api_token,
-    };
+    use crate::{csi::tests::ContextualCsiDouble, skill_driver::SkillInvocationCtx};
 
     use super::*;
 
     #[tokio::test]
     async fn language_selection_from_csi() {
-        // Given a linked context
+        // Given a linked context with a mock csi provider
+        struct ContextualCsiMock;
+        impl ContextualCsiDouble for ContextualCsiMock {
+            async fn select_language(
+                &self,
+                requests: Vec<SelectLanguageRequest>,
+            ) -> anyhow::Result<Vec<Option<language_selection::Language>>> {
+                assert_eq!(
+                    requests,
+                    vec![SelectLanguageRequest::new(
+                        "This is a sentence written in German language.".to_owned(),
+                        vec![
+                            language_selection::Language::new("eng".to_owned()),
+                            language_selection::Language::new("deu".to_owned())
+                        ]
+                    )]
+                );
+                Ok(vec![Some(language_selection::Language::new(
+                    "eng".to_owned(),
+                ))])
+            }
+        }
         let (send_rt_err, _) = oneshot::channel();
-        let skill_ctx: Box<dyn Csi + Send> = Box::new(SkillInvocationCtx::new(
-            send_rt_err,
-            RawCsiStub::empty(),
-            api_token().to_owned(),
-            Namespace::dummy(),
-            TracingContext::dummy(),
-        ));
+        let skill_ctx: Box<dyn Csi + Send> =
+            Box::new(SkillInvocationCtx::new(send_rt_err, ContextualCsiMock));
         let mut ctx = LinkerImpl::new(skill_ctx);
 
         // When selecting a language based on the provided text
