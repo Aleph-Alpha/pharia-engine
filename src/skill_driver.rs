@@ -35,6 +35,9 @@ impl SkillDriver {
         Self { engine }
     }
 
+    // While the warning points us to a refactor here, we silence it for now to be able to
+    // integrate continuously.
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_message_stream(
         &self,
         skill: Arc<dyn Skill>,
