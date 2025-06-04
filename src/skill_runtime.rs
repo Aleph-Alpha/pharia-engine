@@ -11,7 +11,7 @@ use tracing::{Level, error, info, warn};
 
 use crate::{
     context,
-    csi::RawCsi,
+    csi::{InvocationContext, RawCsi},
     logging::TracingContext,
     skill_driver::SkillDriver,
     skill_store::{SkillStoreApi, SkillStoreError},
@@ -325,16 +325,14 @@ impl RunMessageStreamMsg {
         let start = Instant::now();
         let result = {
             let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
+            let contextual_csi = InvocationContext::new(
+                csi_apis,
+                skill_path.namespace.clone(),
+                api_token,
+                context.clone(),
+            );
             let result = driver
-                .run_message_stream(
-                    skill,
-                    input,
-                    csi_apis,
-                    api_token,
-                    &context,
-                    skill_path.namespace.clone(),
-                    send.clone(),
-                )
+                .run_message_stream(skill, input, contextual_csi, &context, send.clone())
                 .await;
 
             log_skill_result(&context, &skill_path, &result);
