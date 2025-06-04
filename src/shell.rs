@@ -40,7 +40,7 @@ use utoipa_scalar::Scalar;
 use crate::{
     authorization::AuthorizationApi,
     context,
-    csi::Csi,
+    csi::RawCsi,
     csi_shell,
     feature_set::FeatureSet,
     logging::TracingContext,
@@ -64,7 +64,7 @@ impl Shell {
         authorization_api: impl AuthorizationApi + Clone + Send + Sync + 'static,
         skill_runtime_api: impl SkillRuntimeApi + Clone + Send + Sync + 'static,
         skill_store_api: impl SkillStoreApi + Clone + Send + Sync + 'static,
-        csi_drivers: impl Csi + Clone + Send + Sync + 'static,
+        csi_drivers: impl RawCsi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> anyhow::Result<Self> {
         let addr = addr.into();
@@ -115,7 +115,7 @@ where
 impl<A, C, R, S> AppState<A, C, R, S>
 where
     A: AuthorizationApi + Clone,
-    C: Csi + Clone + Sync + Send + 'static,
+    C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone,
     S: SkillStoreApi + Clone,
 {
@@ -199,7 +199,7 @@ where
 fn v1<A, C, R, S>(feature_set: FeatureSet) -> Router<AppState<A, C, R, S>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
-    C: Csi + Clone + Sync + Send + 'static,
+    C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
@@ -222,7 +222,7 @@ where
 fn http<A, C, R, S>(feature_set: FeatureSet, app_state: AppState<A, C, R, S>) -> Router
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
-    C: Csi + Clone + Sync + Send + 'static,
+    C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
@@ -930,7 +930,7 @@ mod tests {
     impl<A, C, R, S> AppState<A, C, R, S>
     where
         A: AuthorizationApi + Clone + Sync + Send + 'static,
-        C: Csi + Clone + Sync + Send + 'static,
+        C: RawCsi + Clone + Sync + Send + 'static,
         R: SkillRuntimeApi + Clone + Send + Sync + 'static,
         S: SkillStoreApi + Clone + Send + Sync + 'static,
     {
@@ -972,7 +972,7 @@ mod tests {
 
         pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<A, C2, R, S>
         where
-            C2: Csi + Clone + Sync + Send + 'static,
+            C2: RawCsi + Clone + Sync + Send + 'static,
         {
             AppState::new(
                 self.authorization_api,

@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 use crate::csi_shell::CsiShellError;
 use crate::logging::TracingContext;
-use crate::{chunking, csi::Csi, inference, language_selection, search};
+use crate::{chunking, csi::RawCsi, inference, language_selection, search};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]
@@ -58,7 +58,7 @@ impl CsiRequest {
         tracing_context: TracingContext,
     ) -> Result<Value, CsiShellError>
     where
-        C: Csi + Sync,
+        C: RawCsi + Sync,
     {
         let response = match self {
             CsiRequest::Explain { requests } => {

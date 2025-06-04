@@ -1,5 +1,5 @@
 use crate::{
-    chunking, csi::Csi, csi_shell::CsiShellError, inference, language_selection,
+    chunking, csi::RawCsi, csi_shell::CsiShellError, inference, language_selection,
     logging::TracingContext, search,
 };
 /// CSI Shell version 0.2
@@ -41,7 +41,7 @@ impl CsiRequest {
         tracing_context: TracingContext,
     ) -> Result<Value, CsiShellError>
     where
-        C: Csi + Sync,
+        C: RawCsi + Sync,
     {
         let response = match self {
             CsiRequest::Chat(chat_request) => drivers

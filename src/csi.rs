@@ -69,12 +69,11 @@ pub trait CsiForSkills {
     async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Value>;
 }
 
-/// Cognitive System Interface (CSI) as consumed internally by `PhariaKernel`, before the CSI is
-/// passed to the end user in Skill code we further strip away some of the accidental complexity.
-/// See its sibling trait `CsiForSkills`. These methods take `Vec`s rather than individual requests
-/// in order to allow for parallization behind the scenes.
-#[cfg_attr(test, double(CsiDouble))]
-pub trait Csi {
+/// Cognitive System Interface (CSI) - Direct interaction with raw system APIs.
+/// This is the lowest level interface that directly calls the underlying system APIs
+/// without any authentication, namespace resolution, or error handling abstractions.
+#[cfg_attr(test, double(RawCsiDouble))]
+pub trait RawCsi {
     fn explain(
         &self,
         auth: String,
@@ -175,7 +174,7 @@ impl From<CsiMetrics> for metrics::KeyName {
     }
 }
 
-impl<I, S, Tz, Tl> Csi for CsiDrivers<I, S, Tz, Tl>
+impl<I, S, Tz, Tl> RawCsi for CsiDrivers<I, S, Tz, Tl>
 where
     I: InferenceApi + Send + Sync,
     S: SearchApi + Send + Sync,
@@ -589,7 +588,7 @@ pub mod tests {
     #[derive(Clone)]
     pub struct CsiSaboteur;
 
-    impl CsiDouble for CsiSaboteur {
+    impl RawCsiDouble for CsiSaboteur {
         async fn complete(
             &self,
             _auth: String,
@@ -854,7 +853,7 @@ pub mod tests {
     #[derive(Clone)]
     pub struct CsiDummy;
 
-    impl CsiDouble for CsiDummy {}
+    impl RawCsiDouble for CsiDummy {}
 
     type ChatFn = dyn Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync + 'static;
 
@@ -918,7 +917,7 @@ pub mod tests {
         }
     }
 
-    impl CsiDouble for StubCsi {
+    impl RawCsiDouble for StubCsi {
         async fn explain(
             &self,
             _auth: String,

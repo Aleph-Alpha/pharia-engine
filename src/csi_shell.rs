@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 
 use crate::{
     authorization::AuthorizationApi,
-    csi::{Csi, CsiError},
+    csi::{RawCsi, CsiError},
     logging::TracingContext,
     shell::{AppState, CsiState},
     skill_runtime::SkillRuntimeApi,
@@ -28,7 +28,7 @@ use crate::{
 pub fn http<A, C, R, S>() -> Router<AppState<A, C, R, S>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
-    C: Csi + Clone + Sync + Send + 'static,
+    C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
@@ -44,7 +44,7 @@ async fn http_csi_handle<C>(
     Json(args): Json<VersionedCsiRequest>,
 ) -> (StatusCode, Json<Value>)
 where
-    C: Csi + Clone + Sync,
+    C: RawCsi + Clone + Sync,
 {
     let drivers = csi;
     let tracing_context = TracingContext::current();
