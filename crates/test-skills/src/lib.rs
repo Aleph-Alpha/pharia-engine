@@ -1,7 +1,7 @@
 mod mcp;
 mod skill;
 
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 pub use mcp::{given_json_mcp_server, given_sse_mcp_server};
 pub use skill::{
@@ -15,6 +15,7 @@ pub use skill::{
 fn assert_uv_installed() {
     let status = Command::new("uv")
         .args(["--version"])
+        .stdout(Stdio::null())
         .status()
         .expect("UV must be available for testing with Python Skills. Please install it");
 

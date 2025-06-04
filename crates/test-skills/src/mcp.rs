@@ -4,7 +4,7 @@ use reqwest::Client;
 use serde_json::json;
 use std::{
     net::TcpListener,
-    process::{Child, Command},
+    process::{Child, Command, Stdio},
     sync::{Arc, Mutex, Weak},
     time::Duration,
 };
@@ -118,6 +118,8 @@ impl Mcp {
                 &port.to_string(),
             ])
             .args(config.args())
+            .stderr(Stdio::null())
+            .stdout(Stdio::null())
             .spawn()
             .unwrap();
 
