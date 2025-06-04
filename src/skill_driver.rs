@@ -168,6 +168,9 @@ pub struct SkillInvocationCtx<C> {
     csi_apis: C,
     // How the user authenticates with us
     api_token: String,
+    // The namespace of the Skill that is being invoked. Required for tool invocations to check the
+    // list of mcp servers a Skill may access.
+    namespace: Namespace,
     /// Context that is used to situate certain actions in the overall context.
     tracing_context: TracingContext,
     /// ID counter for stored streams.
@@ -193,6 +196,7 @@ impl<C> SkillInvocationCtx<C> {
             send_rt_error: Some(send_rt_err),
             csi_apis,
             api_token,
+            namespace,
             tracing_context,
             current_stream_id: 0,
             chat_streams: HashMap::new(),
@@ -828,8 +832,13 @@ mod test {
         let (send, recv) = oneshot::channel();
         let mut csi = StubCsi::empty();
         csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
-        let mut invocation_ctx =
-            SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), Namespace::dummy(), TracingContext::dummy());
+        let mut invocation_ctx = SkillInvocationCtx::new(
+            send,
+            csi,
+            "dummy token".to_owned(),
+            Namespace::dummy(),
+            TracingContext::dummy(),
+        );
 
         // When chunking a short text
         let model = "pharia-1-llm-7B-control".to_owned();
@@ -866,8 +875,13 @@ mod test {
         };
         let resp = completion.clone();
         let csi = StubCsi::with_completion(move |_| resp.clone());
-        let mut ctx =
-            SkillInvocationCtx::new(send, csi, "dummy".to_owned(), Namespace::dummy(), TracingContext::dummy());
+        let mut ctx = SkillInvocationCtx::new(
+            send,
+            csi,
+            "dummy".to_owned(),
+            Namespace::dummy(),
+            TracingContext::dummy(),
+        );
         let request = CompletionRequest::new("prompt", "model");
 
         let stream_id = ctx.completion_stream_new(request).await;
@@ -912,8 +926,13 @@ mod test {
         };
         let stub_response = response.clone();
         let csi = StubCsi::with_chat(move |_| stub_response.clone());
-        let mut ctx =
-            SkillInvocationCtx::new(send, csi, "dummy".to_owned(), Namespace::dummy(), TracingContext::dummy());
+        let mut ctx = SkillInvocationCtx::new(
+            send,
+            csi,
+            "dummy".to_owned(),
+            Namespace::dummy(),
+            TracingContext::dummy(),
+        );
         let request = ChatRequest {
             model: "model".to_owned(),
             messages: vec![],
