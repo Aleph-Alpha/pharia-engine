@@ -77,7 +77,7 @@ pub trait ToolApi {
     ) -> impl Future<Output = Result<Value, ToolError>> + Send;
 
     #[allow(dead_code)]
-    fn list_tools(&self) -> impl Future<Output = Vec<String>> + Send;
+    fn list_tools(&self, namespace: Namespace) -> impl Future<Output = Vec<String>> + Send;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -140,9 +140,9 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         receive.await.unwrap()
     }
 
-    async fn list_tools(&self) -> Vec<String> {
+    async fn list_tools(&self, namespace: Namespace) -> Vec<String> {
         let (send, receive) = oneshot::channel();
-        let msg = ToolMsg::ListTools { send };
+        let msg = ToolMsg::ListTools { send, namespace };
         self.send(msg).await.unwrap();
         receive.await.unwrap()
     }
@@ -174,6 +174,10 @@ enum ToolMsg {
         tracing_context: TracingContext,
         send: oneshot::Sender<Result<Value, ToolError>>,
     },
+    ListTools {
+        namespace: Namespace,
+        send: oneshot::Sender<Vec<String>>,
+    },
     UpsertToolServer {
         server: ConfiguredMcpServer,
     },
@@ -183,9 +187,6 @@ enum ToolMsg {
     ListToolServers {
         namespace: Namespace,
         send: oneshot::Sender<Vec<McpServerUrl>>,
-    },
-    ListTools {
-        send: oneshot::Sender<Vec<String>>,
     },
 }
 
@@ -222,15 +223,6 @@ impl<T: ToolClient> ToolActor<T> {
         }
     }
 
-    /// All configured servers, independent of the namespace.
-    ///
-    /// While Skills should only have access to the MCP servers for their namespace, we do not
-    /// have the namespace information available at the tool level (yet). This method allows
-    /// us to move incrementally and introduce the namespace concept at the actor level already.
-    fn all_servers(&self) -> HashSet<McpServerUrl> {
-        self.mcp_servers.values().flatten().cloned().collect()
-    }
-
     fn act(&mut self, msg: ToolMsg) {
         match msg {
             ToolMsg::InvokeTool {
@@ -251,9 +243,13 @@ impl<T: ToolClient> ToolActor<T> {
                     drop(send.send(result));
                 }));
             }
-            ToolMsg::ListTools { send } => {
+            ToolMsg::ListTools { namespace, send } => {
                 let client = self.client.clone();
-                let servers = self.all_servers();
+                let servers = self
+                    .mcp_servers
+                    .get(&namespace)
+                    .cloned()
+                    .unwrap_or_default();
                 self.running_requests.push(Box::pin(async move {
                     let result = Self::tools(client.as_ref(), servers).await;
                     let result = result.into_values().flatten().collect();
@@ -576,19 +572,20 @@ pub mod tests {
 
     #[tokio::test]
     async fn tools_from_multiple_tool_servers_are_available() {
-        // Given a tool with two configured tool servers
+        // Given a tool with two configured tool servers for a namespace
         let queried = Arc::new(Mutex::new(HashSet::new()));
+        let namespace = Namespace::new("test").unwrap();
         let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", Namespace::new("test").unwrap()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", Namespace::new("test").unwrap()),
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
         ];
         let tool = Tool::with_client(ToolClientSpy::new(queried.clone()))
             .with_servers(servers.clone())
             .await
             .api();
 
-        // When we ask for the list of tools
-        drop(tool.list_tools().await);
+        // When we ask for the list of tools for that namespace
+        drop(tool.list_tools(namespace).await);
 
         // Then both tool servers are queried
         let queried = queried.lock().await.clone();
@@ -716,13 +713,14 @@ pub mod tests {
     #[tokio::test]
     async fn list_tool_servers() {
         // Given a tool client that knows about two mcp servers for a namespace
-        let tool = Tool::with_client(ToolClientMock).api();
         let namespace = Namespace::new("test").unwrap();
-        let first = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
-        tool.upsert(first).await;
-
-        let second = ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone());
-        tool.upsert(second).await;
+        let tool = Tool::with_client(ToolClientMock)
+            .with_servers(vec![
+                ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
+                ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
+            ])
+            .await
+            .api();
 
         // When listing tool servers for that namespace
         let result: HashSet<McpServerUrl> = tool.list(namespace).await.into_iter().collect();
@@ -735,12 +733,71 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    // Client that, independent of the mcp server, always reports the add tool to be available
+    struct AddTool;
+
+    impl ToolClient for AddTool {
+        async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            Ok(vec!["add".to_owned()])
+        }
+
+        async fn invoke_tool(
+            &self,
+            _request: InvokeRequest,
+            _url: &McpServerUrl,
+            _tracing_context: TracingContext,
+        ) -> Result<Value, ToolError> {
+            unimplemented!()
+        }
+    }
+
+    #[tokio::test]
+    async fn tools_from_server_are_listed() {
+        // Given a tool configured with one namespace and a client that always reports tools for
+        // a particular mcp server
+        let namespace = Namespace::new("test").unwrap();
+        let tool = Tool::with_client(AddTool)
+            .with_servers(vec![ConfiguredMcpServer::new(
+                "http://localhost:8000/mcp",
+                namespace.clone(),
+            )])
+            .await
+            .api();
+
+        // When listing tools for that namespace
+        let result = tool.list_tools(namespace).await;
+
+        // Then we get the tools from the mcp server
+        assert_eq!(result, vec!["add".to_owned()]);
+    }
+
+    #[tokio::test]
+    async fn tools_from_other_namespace_are_not_listed() {
+        // Given a tool configured with one namespace and a client that always reports tools for
+        // a particular mcp server
+        let namespace = Namespace::new("test").unwrap();
+        let tool = Tool::with_client(AddTool)
+            .with_servers(vec![ConfiguredMcpServer::new(
+                "http://localhost:8000/mcp",
+                namespace.clone(),
+            )])
+            .await
+            .api();
+
+        // When listing tools for a different namespace
+        let result = tool.list_tools(Namespace::new("other").unwrap()).await;
+
+        // Then we get an empty list
+        assert!(result.is_empty());
+    }
+
     #[tokio::test]
     async fn one_bad_mcp_server_still_allows_to_list_tools() {
         // Given an mcp server that returns an error when listing it's tools
+        let namespace = Namespace::new("test").unwrap();
         let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", Namespace::new("test").unwrap()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", Namespace::new("test").unwrap()),
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
         ];
         let tool = Tool::with_client(ClientOneGoodOtherBad)
             .with_servers(servers)
@@ -748,7 +805,7 @@ pub mod tests {
             .api();
 
         // When listing tools
-        let result = tool.list_tools().await;
+        let result = tool.list_tools(namespace).await;
 
         // Then the search tool is available
         assert_eq!(result, vec!["search".to_owned()]);
