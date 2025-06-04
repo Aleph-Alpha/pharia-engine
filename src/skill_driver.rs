@@ -35,22 +35,15 @@ impl SkillDriver {
         Self { engine }
     }
 
-    // While the warning points us to a refactor here, we silence it for now to be able to
-    // integrate continuously.
-    #[allow(clippy::too_many_arguments)]
     pub async fn run_message_stream(
         &self,
         skill: Arc<dyn Skill>,
         input: Value,
-        csi: impl RawCsi + Send + Sync + 'static,
-        api_token: String,
+        contextual_csi: impl ContextualCsi + Send + Sync + 'static,
         tracing_context: &TracingContext,
-        namespace: Namespace,
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
         let (send_rt_err, mut recv_rt_err) = oneshot::channel();
-        let contextual_csi =
-            InvocationContext::new(csi, namespace, api_token, tracing_context.clone());
         let csi = Box::new(SkillInvocationCtx::new(send_rt_err, contextual_csi));
 
         let (send_inner, mut recv_inner) = mpsc::channel(1);
@@ -658,7 +651,7 @@ mod test {
     use super::*;
     use crate::{
         chunking::ChunkParams,
-        csi::tests::{ContextualCsiDouble, RawCsiDummy, RawCsiSaboteur, RawCsiStub},
+        csi::tests::{ContextualCsiDouble, RawCsiSaboteur, RawCsiStub},
         hardcoded_skills::SkillHello,
         inference::{
             ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, TextScore,
@@ -666,7 +659,7 @@ mod test {
         },
         skills::{SkillDouble, SkillError},
     };
-    use anyhow::anyhow;
+    use anyhow::{anyhow, bail};
     use serde_json::json;
 
     #[tokio::test]
@@ -1103,8 +1096,19 @@ mod test {
     }
 
     #[tokio::test]
-    async fn should_not_panic_if_receiver_is_dropped() {
-        // Given a skill that emits a JSON error
+    async fn csi_errors_cause_message_stream_to_stop_with_error() {
+        // Given a skill that calls a failing function on the CSI
+        struct CsiSaboteur;
+
+        impl ContextualCsiDouble for CsiSaboteur {
+            async fn complete(
+                &self,
+                _requests: Vec<CompletionRequest>,
+            ) -> anyhow::Result<Vec<Completion>> {
+                bail!("Out of cheese.")
+            }
+        }
+
         let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
@@ -1115,10 +1119,8 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                RawCsiSaboteur,
-                "Dummy Token".to_owned(),
+                CsiSaboteur,
                 &TracingContext::dummy(),
-                Namespace::dummy(),
                 send,
             )
             .await;
@@ -1127,53 +1129,52 @@ mod test {
         assert!(result.is_err());
     }
 
+    struct ContextualCsiDummy;
+    impl ContextualCsiDouble for ContextualCsiDummy {}
+
     #[tokio::test]
-    async fn should_not_panic_on_skill_error_if_receiver_is_dropped() {
-        // Given a skill that emits a JSON error
+    async fn message_stream_skill_error_is_forwarded_as_error() {
+        // Given a skill that returns a user error when run as message stream
         let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
-        // When
+        // When running it as a message stream
         let skill = Arc::new(SkillGreetCompletion);
         let (send, _) = mpsc::channel(1);
         let result = driver
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                RawCsiDummy,
-                "Dummy Token".to_owned(),
+                ContextualCsiDummy,
                 &TracingContext::dummy(),
-                Namespace::dummy(),
                 send,
             )
             .await;
 
-        // The result is an error but it doesn't panic
+        // Then the result is an error
         assert!(result.is_err());
     }
 
     #[tokio::test]
-    async fn should_not_panic_on_skill_completion_if_receiver_is_dropped() {
-        // Given a skill that emits a JSON error
+    async fn message_stream_skill_completes_successfully() {
+        // Given a message stream skill that does not use the CSI
         let engine = Arc::new(Engine::default());
         let driver = SkillDriver::new(engine);
 
-        // When
+        // When running it
         let skill = Arc::new(SkillHello);
         let (send, _) = mpsc::channel(1);
         let result = driver
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                RawCsiDummy,
-                "Dummy Token".to_owned(),
+                ContextualCsiDummy,
                 &TracingContext::dummy(),
-                Namespace::dummy(),
                 send,
             )
             .await;
 
-        // The result is ok
+        // Then the result is ok
         assert!(result.is_ok());
     }
 
@@ -1190,10 +1191,8 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                RawCsiDummy,
-                "Dummy Token".to_owned(),
+                ContextualCsiDummy,
                 &TracingContext::dummy(),
-                Namespace::dummy(),
                 send,
             )
             .await;
@@ -1247,10 +1246,8 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                RawCsiDummy,
-                "Dummy Token".to_owned(),
+                ContextualCsiDummy,
                 &TracingContext::dummy(),
-                Namespace::dummy(),
                 send,
             )
             .await;
@@ -1312,7 +1309,7 @@ mod test {
         }
     }
 
-    /// Test double emmiting a syntax error in the message stream.
+    /// Test double emiting a syntax error in the message stream.
     struct SkillSaboteurInvalidMessageOutput;
 
     #[async_trait]
