@@ -416,7 +416,7 @@ where
         match self
             .csi_apis
             .invoke_tool(
-                self.api_token.clone(),
+                self.namespace.clone(),
                 self.tracing_context.clone(),
                 requests,
             )
