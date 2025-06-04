@@ -762,7 +762,7 @@ mod test {
             ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, Message, TextScore,
             TokenUsage,
         },
-        skills::SkillError,
+        skills::{SkillDouble, SkillError},
     };
     use anyhow::anyhow;
     use serde_json::json;
@@ -1104,7 +1104,7 @@ mod test {
     struct MessageStreamSkillWithCsi;
 
     #[async_trait]
-    impl Skill for MessageStreamSkillWithCsi {
+    impl SkillDouble for MessageStreamSkillWithCsi {
         async fn run_as_function(
             &self,
             _engine: &Engine,
@@ -1113,15 +1113,6 @@ mod test {
             _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
             Err(SkillError::IsMessageStream)
-        }
-
-        async fn manifest(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _tracing_context: &TracingContext,
-        ) -> Result<AnySkillManifest, SkillError> {
-            panic!("Dummy metadata implementation of Skill Greet Completion")
         }
 
         async fn run_as_message_stream(
@@ -1265,26 +1256,7 @@ mod test {
         struct BuggyStreamingSkill;
 
         #[async_trait]
-        impl Skill for BuggyStreamingSkill {
-            async fn run_as_function(
-                &self,
-                _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
-                _input: Value,
-                _tracing_context: &TracingContext,
-            ) -> Result<Value, SkillError> {
-                panic!("This function should not be called");
-            }
-
-            async fn manifest(
-                &self,
-                _engine: &Engine,
-                _ctx: Box<dyn CsiForSkills + Send>,
-                _tracing_context: &TracingContext,
-            ) -> Result<AnySkillManifest, SkillError> {
-                panic!("This function should not be called");
-            }
-
+        impl SkillDouble for BuggyStreamingSkill {
             async fn run_as_message_stream(
                 &self,
                 _engine: &Engine,
@@ -1335,7 +1307,7 @@ mod test {
     struct SkillGreetCompletion;
 
     #[async_trait]
-    impl Skill for SkillGreetCompletion {
+    impl SkillDouble for SkillGreetCompletion {
         async fn run_as_function(
             &self,
             _engine: &Engine,
@@ -1365,15 +1337,6 @@ mod test {
             Ok(json!(completion))
         }
 
-        async fn manifest(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _tracing_context: &TracingContext,
-        ) -> Result<AnySkillManifest, SkillError> {
-            panic!("Dummy metadata implementation of Skill Greet Completion")
-        }
-
         async fn run_as_message_stream(
             &self,
             _engine: &Engine,
@@ -1390,26 +1353,7 @@ mod test {
     struct SkillSaboteurInvalidMessageOutput;
 
     #[async_trait]
-    impl Skill for SkillSaboteurInvalidMessageOutput {
-        async fn run_as_function(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _input: Value,
-            _tracing_context: &TracingContext,
-        ) -> Result<Value, SkillError> {
-            panic!("Dummy, not invoked in test")
-        }
-
-        async fn manifest(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _tracing_context: &TracingContext,
-        ) -> Result<AnySkillManifest, SkillError> {
-            panic!("Dummy, not invoked in test")
-        }
-
+    impl SkillDouble for SkillSaboteurInvalidMessageOutput {
         async fn run_as_message_stream(
             &self,
             _engine: &Engine,
