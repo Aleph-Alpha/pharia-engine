@@ -336,7 +336,7 @@ pub mod tests {
     use tokio::time::timeout;
 
     use crate::skill_store::tests::SkillStoreDummy;
-    use crate::tool::tests::{McpServerStoreDouble, McpServerStoreDummy};
+    use crate::tool::tests::McpServerStoreDouble;
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill_store::tests::SkillStoreMsg,
@@ -431,6 +431,10 @@ pub mod tests {
         assert_eq!(diff.added, vec!["http://localhost:8002/mcp".into()]);
         assert_eq!(diff.removed, vec!["http://localhost:8001/mcp".into()]);
     }
+
+    pub struct McpServerStoreDummy;
+
+    impl McpServerStoreDouble for McpServerStoreDummy {}
 
     #[test]
     fn diff_is_computed() {
