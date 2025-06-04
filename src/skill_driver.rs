@@ -11,7 +11,7 @@ use tokio::{
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
-    csi::{ChatStreamId, CompletionStreamId, Csi, RawCsi},
+    csi::{ChatStreamId, CompletionStreamId, ContextualCsi, Csi, InvocationContext, RawCsi},
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
         Explanation, ExplanationRequest, InferenceError,
@@ -168,7 +168,7 @@ pub struct SkillInvocationCtx<C> {
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
     send_rt_error: Option<oneshot::Sender<anyhow::Error>>,
-    csi_apis: C,
+    csi_apis: InvocationContext<C>,
     // How the user authenticates with us
     api_token: String,
     // The namespace of the Skill that is being invoked. Required for tool invocations to check the
@@ -197,7 +197,7 @@ impl<C> SkillInvocationCtx<C> {
     ) -> Self {
         SkillInvocationCtx {
             send_rt_error: Some(send_rt_err),
-            csi_apis,
+            csi_apis: InvocationContext::new(csi_apis),
             api_token,
             namespace,
             tracing_context,

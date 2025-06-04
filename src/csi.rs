@@ -1,9 +1,11 @@
+mod contextual;
 mod raw;
 
 use async_trait::async_trait;
 use derive_more::{Constructor, From};
 use serde_json::Value;
 
+pub use contextual::{ContextualCsi, InvocationContext};
 pub use raw::{CsiDrivers, CsiError, RawCsi};
 
 use crate::{
