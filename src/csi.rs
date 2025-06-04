@@ -47,8 +47,8 @@ pub struct CsiDrivers<I, S, Tz, Tl> {
 /// interface. It also assumes all authentication and authorization is handled behind the scenes.
 /// This is the CSI as passed to user defined code in WASM.
 #[async_trait]
-#[cfg_attr(test, double(CsiForSkillsDouble))]
-pub trait CsiForSkills {
+#[cfg_attr(test, double(CsiDouble))]
+pub trait Csi {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
     async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId;
@@ -1054,7 +1054,7 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiCompleteStreamStub {
+    impl CsiDouble for CsiCompleteStreamStub {
         async fn completion_stream_new(
             &mut self,
             _request: CompletionRequest,
@@ -1095,7 +1095,7 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiChatStreamStub {
+    impl CsiDouble for CsiChatStreamStub {
         async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
             let id = ChatStreamId::new(self.current_id);
             self.streams.insert(id, self.events.clone());
@@ -1116,7 +1116,7 @@ pub mod tests {
     pub struct CsiCompleteWithEchoMock;
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiCompleteWithEchoMock {
+    impl CsiDouble for CsiCompleteWithEchoMock {
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests
                 .into_iter()
@@ -1161,7 +1161,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     }
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiGreetingMock {
+    impl CsiDouble for CsiGreetingMock {
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests.into_iter().map(Self::complete_text).collect()
         }
@@ -1171,7 +1171,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     pub struct CsiChatStub;
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiChatStub {
+    impl CsiDouble for CsiChatStub {
         async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
             requests
                 .iter()
@@ -1192,7 +1192,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     pub struct CsiSearchMock;
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiSearchMock {
+    impl CsiDouble for CsiSearchMock {
         async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             requests
                 .into_iter()
@@ -1230,7 +1230,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     }
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiCounter {
+    impl CsiDouble for CsiCounter {
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests
                 .iter()

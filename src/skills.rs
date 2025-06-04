@@ -21,7 +21,7 @@ use wit_parser::{
     decoding::{DecodedWasm, decode},
 };
 
-use crate::{csi::CsiForSkills, logging::TracingContext, namespace_watcher::Namespace};
+use crate::{csi::Csi, logging::TracingContext, namespace_watcher::Namespace};
 use tracing::error;
 
 #[cfg(test)]
@@ -235,12 +235,12 @@ impl Engine {
 
     /// Generates a store for a specific invocation.
     /// This will yield after every tick, as well as halt execution after `Self::MAX_EXECUTION_TIME`.
-    fn store(&self, skill_ctx: Box<dyn CsiForSkills + Send>) -> Store<LinkedCtx> {
+    fn store(&self, skill_ctx: Box<dyn Csi + Send>) -> Store<LinkedCtx> {
         self.engine.store(skill_ctx)
     }
 }
 
-pub type LinkedCtx = LinkerImpl<Box<dyn CsiForSkills + Send>>;
+pub type LinkedCtx = LinkerImpl<Box<dyn Csi + Send>>;
 
 #[async_trait]
 #[cfg_attr(test, double(SkillDouble))]
@@ -248,14 +248,14 @@ pub trait Skill: Send + Sync {
     async fn manifest(
         &self,
         engine: &Engine,
-        ctx: Box<dyn CsiForSkills + Send>,
+        ctx: Box<dyn Csi + Send>,
         tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError>;
 
     async fn run_as_function(
         &self,
         engine: &Engine,
-        ctx: Box<dyn CsiForSkills + Send>,
+        ctx: Box<dyn Csi + Send>,
         input: Value,
         tracing_context: &TracingContext,
     ) -> Result<Value, SkillError>;
@@ -263,7 +263,7 @@ pub trait Skill: Send + Sync {
     async fn run_as_message_stream(
         &self,
         engine: &Engine,
-        ctx: Box<dyn CsiForSkills + Send>,
+        ctx: Box<dyn Csi + Send>,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
         tracing_context: &TracingContext,
@@ -540,7 +540,7 @@ pub mod tests {
 
     use crate::{
         csi::{
-            CsiForSkillsDouble,
+            CsiDouble,
             tests::{
                 CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiCompleteWithEchoMock,
                 CsiGreetingMock, CsiSearchMock, StubCsi,
@@ -668,11 +668,7 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata = skill
-            .manifest(
-                &engine,
-                Box::new(CsiForSkillsDummy),
-                &TracingContext::dummy(),
-            )
+            .manifest(&engine, Box::new(CsiDummy), &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -690,11 +686,7 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata_result = skill
-            .manifest(
-                &engine,
-                Box::new(CsiForSkillsDummy),
-                &TracingContext::dummy(),
-            )
+            .manifest(&engine, Box::new(CsiDummy), &TracingContext::dummy())
             .await;
 
         // Then the metadata gives an error
@@ -1108,7 +1100,7 @@ pub mod tests {
     struct CsiAddToolFake;
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiAddToolFake {
+    impl CsiDouble for CsiAddToolFake {
         async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Value> {
             requests
                 .iter()
@@ -1165,11 +1157,7 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata = skill
-            .manifest(
-                &engine,
-                Box::new(CsiForSkillsDummy),
-                &TracingContext::dummy(),
-            )
+            .manifest(&engine, Box::new(CsiDummy), &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -1194,8 +1182,8 @@ pub mod tests {
     #[async_trait]
     impl SkillDouble for SkillDummy {}
 
-    struct CsiForSkillsDummy;
+    struct CsiDummy;
 
     #[async_trait]
-    impl CsiForSkillsDouble for CsiForSkillsDummy {}
+    impl CsiDouble for CsiDummy {}
 }
