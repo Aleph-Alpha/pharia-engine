@@ -204,6 +204,19 @@ impl McpServerStore {
             .unwrap_or_default()
             .into_iter()
     }
+
+    fn upsert(&mut self, namespace: Namespace, url: McpServerUrl) {
+        self.0.entry(namespace).or_default().insert(url);
+    }
+
+    fn remove(&mut self, namespace: Namespace, url: McpServerUrl) {
+        if let Some(servers) = self.0.get_mut(&namespace) {
+            servers.remove(&url);
+            if servers.is_empty() {
+                self.0.remove(&namespace);
+            }
+        }
+    }
 }
 
 struct ToolActor<T: ToolClient> {
@@ -267,25 +280,15 @@ impl<T: ToolClient> ToolActor<T> {
             ToolMsg::UpsertToolServer {
                 server: ConfiguredMcpServer { url, namespace },
             } => {
-                self.mcp_servers.0.entry(namespace).or_default().insert(url);
+                self.mcp_servers.upsert(namespace, url);
             }
             ToolMsg::RemoveToolServer {
                 server: ConfiguredMcpServer { url, namespace },
             } => {
-                if let Some(servers) = self.mcp_servers.0.get_mut(&namespace) {
-                    servers.remove(&url);
-                    if servers.is_empty() {
-                        self.mcp_servers.0.remove(&namespace);
-                    }
-                }
+                self.mcp_servers.remove(namespace, url);
             }
             ToolMsg::ListToolServers { namespace, send } => {
-                let result = self
-                    .mcp_servers
-                    .0
-                    .get(&namespace)
-                    .map(|s| s.iter().cloned().collect())
-                    .unwrap_or_default();
+                let result = self.mcp_servers.list_in_namespace(namespace).collect();
                 drop(send.send(result));
             }
         }
