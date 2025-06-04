@@ -521,7 +521,7 @@ pub mod tests {
         namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
-        skills::{AnySkillManifest, Skill, SkillError, SkillEvent},
+        skills::{AnySkillManifest, Skill, SkillDouble, SkillError, SkillEvent},
     };
     use async_trait::async_trait;
     use bytesize::ByteSize;
@@ -886,7 +886,7 @@ pub mod tests {
     struct GreetSkill;
 
     #[async_trait]
-    impl Skill for GreetSkill {
+    impl SkillDouble for GreetSkill {
         async fn run_as_function(
             &self,
             _engine: &Engine,
@@ -895,15 +895,6 @@ pub mod tests {
             _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
             Ok(json!("Hello"))
-        }
-
-        async fn manifest(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _tracing_context: &TracingContext,
-        ) -> Result<AnySkillManifest, SkillError> {
-            panic!("Dummy metadata implementation of Greet Skill")
         }
 
         async fn run_as_message_stream(

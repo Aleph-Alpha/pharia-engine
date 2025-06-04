@@ -24,6 +24,9 @@ use wit_parser::{
 use crate::{csi::CsiForSkills, logging::TracingContext, namespace_watcher::Namespace};
 use tracing::error;
 
+#[cfg(test)]
+use double_derive::double;
+
 pub use self::v0_3::SkillMetadataV0_3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -240,6 +243,7 @@ impl Engine {
 pub type LinkedCtx = LinkerImpl<Box<dyn CsiForSkills + Send>>;
 
 #[async_trait]
+#[cfg_attr(test, double(SkillDouble))]
 pub trait Skill: Send + Sync {
     async fn manifest(
         &self,
@@ -1193,37 +1197,7 @@ pub mod tests {
     pub struct SkillDummy;
 
     #[async_trait]
-    impl Skill for SkillDummy {
-        async fn manifest(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _tracing_context: &TracingContext,
-        ) -> Result<AnySkillManifest, SkillError> {
-            panic!("I am a dummy Skill")
-        }
-
-        async fn run_as_function(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _input: Value,
-            _tracing_context: &TracingContext,
-        ) -> Result<Value, SkillError> {
-            panic!("I am a dummy Skill")
-        }
-
-        async fn run_as_message_stream(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn CsiForSkills + Send>,
-            _input: Value,
-            _sender: mpsc::Sender<SkillEvent>,
-            _tracing_context: &TracingContext,
-        ) -> Result<(), SkillError> {
-            panic!("I am a dummy Skill")
-        }
-    }
+    impl SkillDouble for SkillDummy {}
 
     struct CsiForSkillsDummy;
 
