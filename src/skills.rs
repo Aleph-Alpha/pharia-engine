@@ -540,13 +540,16 @@ pub mod tests {
 
     use crate::{
         csi::{
-            CsiDouble,
+            CsiDouble, CsiError,
             tests::{
-                CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub, CsiCompleteWithEchoMock,
-                CsiGreetingMock, CsiSearchMock, RawCsiStub,
+                ContextualCsiDouble, CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub,
+                CsiCompleteWithEchoMock, CsiGreetingMock, CsiSearchMock,
             },
         },
-        inference::{ChatEvent, CompletionEvent, Explanation, FinishReason, TextScore, TokenUsage},
+        inference::{
+            ChatEvent, CompletionEvent, Explanation, ExplanationRequest, FinishReason, TextScore,
+            TokenUsage,
+        },
         logging::TracingContext,
         skill_driver::SkillInvocationCtx,
         tool::InvokeRequest,
@@ -625,23 +628,24 @@ pub mod tests {
 
     #[tokio::test]
     async fn explain_skill_component() {
+        struct ContextualCsiStub;
+        impl ContextualCsiDouble for ContextualCsiStub {
+            async fn explain(
+                &self,
+                _requests: Vec<ExplanationRequest>,
+            ) -> Result<Vec<Explanation>, CsiError> {
+                Ok(vec![Explanation::new(vec![TextScore {
+                    score: 0.0,
+                    start: 0,
+                    length: 2,
+                }])])
+            }
+        }
+
         let skill_bytes = given_rust_skill_explain().bytes();
         let engine = Engine::default();
         let (send, _) = oneshot::channel();
-        let csi = RawCsiStub::with_explain(|_| {
-            Explanation::new(vec![TextScore {
-                score: 0.0,
-                start: 0,
-                length: 2,
-            }])
-        });
-        let ctx = Box::new(SkillInvocationCtx::new(
-            send,
-            csi,
-            "dummy token".to_owned(),
-            Namespace::dummy(),
-            TracingContext::dummy(),
-        ));
+        let ctx = Box::new(SkillInvocationCtx::new(send, ContextualCsiStub));
         let skill =
             load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
         let actual = skill

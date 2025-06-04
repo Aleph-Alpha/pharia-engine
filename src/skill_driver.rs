@@ -49,23 +49,14 @@ impl SkillDriver {
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
         let (send_rt_err, mut recv_rt_err) = oneshot::channel();
-        let csi_for_skills = Box::new(SkillInvocationCtx::new(
-            send_rt_err,
-            csi,
-            api_token,
-            namespace,
-            tracing_context.clone(),
-        ));
+        let contextual_csi =
+            InvocationContext::new(csi, namespace, api_token, tracing_context.clone());
+        let csi = Box::new(SkillInvocationCtx::new(send_rt_err, contextual_csi));
 
         let (send_inner, mut recv_inner) = mpsc::channel(1);
 
-        let mut execute_skill = skill.run_as_message_stream(
-            &self.engine,
-            csi_for_skills,
-            input,
-            send_inner,
-            tracing_context,
-        );
+        let mut execute_skill =
+            skill.run_as_message_stream(&self.engine, csi, input, send_inner, tracing_context);
 
         let mut translator = EventTranslator::new();
 
@@ -131,15 +122,11 @@ impl SkillDriver {
         namespace: Namespace,
     ) -> Result<Value, SkillExecutionError> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let csi_for_skills = Box::new(SkillInvocationCtx::new(
-            send_rt_err,
-            csi_apis,
-            api_token,
-            namespace,
-            tracing_context.clone(),
-        ));
+        let contextual_csi =
+            InvocationContext::new(csi_apis, namespace, api_token, tracing_context.clone());
+        let csi = Box::new(SkillInvocationCtx::new(send_rt_err, contextual_csi));
         select! {
-            result = skill.run_as_function(&self.engine, csi_for_skills, input, tracing_context) => result.map_err(Into::into),
+            result = skill.run_as_function(&self.engine, csi, input, tracing_context) => result.map_err(Into::into),
             // An error occurred during skill execution.
             Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error.to_string()))
         }
@@ -168,7 +155,8 @@ pub struct SkillInvocationCtx<C> {
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
     send_rt_error: Option<oneshot::Sender<anyhow::Error>>,
-    csi_apis: InvocationContext<C>,
+    /// Provides the CSI functionality to Skills while encapsulating knowledge about the invocation.
+    contextual_csi: C,
     /// ID counter for stored streams.
     current_stream_id: usize,
     /// Currently running chat streams. We store them here so that we can easier cancel the running
@@ -181,16 +169,10 @@ pub struct SkillInvocationCtx<C> {
 }
 
 impl<C> SkillInvocationCtx<C> {
-    pub fn new(
-        send_rt_err: oneshot::Sender<anyhow::Error>,
-        csi_apis: C,
-        api_token: String,
-        namespace: Namespace,
-        tracing_context: TracingContext,
-    ) -> Self {
+    pub fn new(send_rt_err: oneshot::Sender<anyhow::Error>, contextual_csi: C) -> Self {
         SkillInvocationCtx {
             send_rt_error: Some(send_rt_err),
-            csi_apis: InvocationContext::new(csi_apis, namespace, api_token, tracing_context),
+            contextual_csi,
             current_stream_id: 0,
             chat_streams: HashMap::new(),
             completion_streams: HashMap::new(),
@@ -219,17 +201,17 @@ impl<C> SkillInvocationCtx<C> {
 #[async_trait]
 impl<C> Csi for SkillInvocationCtx<C>
 where
-    C: RawCsi + Send + Sync,
+    C: ContextualCsi + Send + Sync,
 {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-        match self.csi_apis.explain(requests).await {
+        match self.contextual_csi.explain(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error.into()).await,
         }
     }
 
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-        match self.csi_apis.complete(requests).await {
+        match self.contextual_csi.complete(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
@@ -237,7 +219,7 @@ where
 
     async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId {
         let id = self.next_stream_id();
-        let recv = self.csi_apis.completion_stream(request).await;
+        let recv = self.contextual_csi.completion_stream(request).await;
         self.completion_streams.insert(id, recv);
         id
     }
@@ -261,7 +243,7 @@ where
     }
 
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-        match self.csi_apis.chat(requests).await {
+        match self.contextual_csi.chat(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
@@ -269,7 +251,7 @@ where
 
     async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId {
         let id = self.next_stream_id();
-        let recv = self.csi_apis.chat_stream(request).await;
+        let recv = self.contextual_csi.chat_stream(request).await;
         self.chat_streams.insert(id, recv);
         id
     }
@@ -293,7 +275,7 @@ where
     }
 
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-        match self.csi_apis.chunk(requests).await {
+        match self.contextual_csi.chunk(requests).await {
             Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
         }
@@ -303,28 +285,28 @@ where
         &mut self,
         requests: Vec<SelectLanguageRequest>,
     ) -> Vec<Option<Language>> {
-        match self.csi_apis.select_language(requests).await {
+        match self.contextual_csi.select_language(requests).await {
             Ok(language) => language,
             Err(error) => self.send_error(error).await,
         }
     }
 
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-        match self.csi_apis.search(requests).await {
+        match self.contextual_csi.search(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
     }
 
     async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
-        match self.csi_apis.documents(requests).await {
+        match self.contextual_csi.documents(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
     }
 
     async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
-        match self.csi_apis.document_metadata(requests).await {
+        match self.contextual_csi.document_metadata(requests).await {
             // We know there will always be exactly one element in the vector
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
@@ -332,7 +314,7 @@ where
     }
 
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Value> {
-        match self.csi_apis.invoke_tool(requests).await {
+        match self.contextual_csi.invoke_tool(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error.into()).await,
         }
@@ -676,10 +658,10 @@ mod test {
     use super::*;
     use crate::{
         chunking::ChunkParams,
-        csi::tests::{RawCsiDummy, RawCsiSaboteur, RawCsiStub},
+        csi::tests::{ContextualCsiDouble, RawCsiDummy, RawCsiSaboteur, RawCsiStub},
         hardcoded_skills::SkillHello,
         inference::{
-            ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, Message, TextScore,
+            ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, TextScore,
             TokenUsage,
         },
         skills::{SkillDouble, SkillError},
@@ -688,29 +670,21 @@ mod test {
     use serde_json::json;
 
     #[tokio::test]
-    async fn chunk() {
-        // Given a skill invocation context with a stub tokenizer provider
-        let (send, _) = oneshot::channel();
-        let mut csi = RawCsiStub::empty();
-        csi.set_chunking(|r| {
-            Ok(r.into_iter()
-                .map(|_| {
-                    vec![Chunk {
-                        text: "my_chunk".to_owned(),
-                        byte_offset: 0,
-                        character_offset: None,
-                    }]
-                })
-                .collect())
-        });
+    async fn chunk_result_is_forwarded() {
+        // Given a skill invocation context with a stub csi provider
+        struct ContextualCsiStub;
+        impl ContextualCsiDouble for ContextualCsiStub {
+            async fn chunk(&self, _requests: Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> {
+                Ok(vec![vec![Chunk {
+                    text: "my_chunk".to_owned(),
+                    byte_offset: 0,
+                    character_offset: None,
+                }]])
+            }
+        }
 
-        let mut invocation_ctx = SkillInvocationCtx::new(
-            send,
-            csi,
-            "dummy token".to_owned(),
-            Namespace::dummy(),
-            TracingContext::dummy(),
-        );
+        let (send, _) = oneshot::channel();
+        let mut invocation_ctx = SkillInvocationCtx::new(send, ContextualCsiStub);
 
         // When chunking a short text
         let model = "pharia-1-llm-7B-control".to_owned();
@@ -740,16 +714,15 @@ mod test {
     #[tokio::test]
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
+        struct ContextualCsiSaboteur;
+        impl ContextualCsiDouble for ContextualCsiSaboteur {
+            async fn chunk(&self, _requests: Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> {
+                Err(anyhow!("Failed to load tokenizer"))
+            }
+        }
+
         let (send, recv) = oneshot::channel();
-        let mut csi = RawCsiStub::empty();
-        csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
-        let mut invocation_ctx = SkillInvocationCtx::new(
-            send,
-            csi,
-            "dummy token".to_owned(),
-            Namespace::dummy(),
-            TracingContext::dummy(),
-        );
+        let mut invocation_ctx = SkillInvocationCtx::new(send, ContextualCsiSaboteur);
 
         // When chunking a short text
         let model = "pharia-1-llm-7B-control".to_owned();
@@ -774,25 +747,42 @@ mod test {
 
     #[tokio::test]
     async fn skill_invocation_ctx_stream_management() {
+        struct ContextualCsiStub;
+        impl ContextualCsiDouble for ContextualCsiStub {
+            async fn completion_stream(
+                &self,
+                _request: CompletionRequest,
+            ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
+                let (sender, receiver) = mpsc::channel(1);
+                tokio::spawn(async move {
+                    sender
+                        .send(Ok(CompletionEvent::Append {
+                            text: "text".to_owned(),
+                            logprobs: vec![],
+                        }))
+                        .await
+                        .unwrap();
+                    sender
+                        .send(Ok(CompletionEvent::End {
+                            finish_reason: FinishReason::Stop,
+                        }))
+                        .await
+                        .unwrap();
+                    sender
+                        .send(Ok(CompletionEvent::Usage {
+                            usage: TokenUsage {
+                                prompt: 2,
+                                completion: 2,
+                            },
+                        }))
+                        .await
+                        .unwrap();
+                });
+                receiver
+            }
+        }
         let (send, _) = oneshot::channel();
-        let completion = Completion {
-            text: "text".to_owned(),
-            finish_reason: FinishReason::Stop,
-            logprobs: vec![],
-            usage: TokenUsage {
-                prompt: 2,
-                completion: 2,
-            },
-        };
-        let resp = completion.clone();
-        let csi = RawCsiStub::with_completion(move |_| resp.clone());
-        let mut ctx = SkillInvocationCtx::new(
-            send,
-            csi,
-            "dummy".to_owned(),
-            Namespace::dummy(),
-            TracingContext::dummy(),
-        );
+        let mut ctx = SkillInvocationCtx::new(send, ContextualCsiStub);
         let request = CompletionRequest::new("prompt", "model");
 
         let stream_id = ctx.completion_stream_new(request).await;
@@ -806,14 +796,17 @@ mod test {
             events,
             vec![
                 CompletionEvent::Append {
-                    text: completion.text,
-                    logprobs: completion.logprobs
+                    text: "text".to_owned(),
+                    logprobs: vec![]
                 },
                 CompletionEvent::End {
-                    finish_reason: completion.finish_reason
+                    finish_reason: FinishReason::Stop
                 },
                 CompletionEvent::Usage {
-                    usage: completion.usage
+                    usage: TokenUsage {
+                        prompt: 2,
+                        completion: 2
+                    }
                 }
             ]
         );
@@ -822,28 +815,48 @@ mod test {
 
     #[tokio::test]
     async fn skill_invocation_ctx_chat_stream_management() {
+        struct ContextualCsiStub;
+        impl ContextualCsiDouble for ContextualCsiStub {
+            async fn chat_stream(
+                &self,
+                _request: ChatRequest,
+            ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
+                let (sender, receiver) = mpsc::channel(1);
+                tokio::spawn(async move {
+                    sender
+                        .send(Ok(ChatEvent::MessageBegin {
+                            role: "assistant".to_owned(),
+                        }))
+                        .await
+                        .unwrap();
+                    sender
+                        .send(Ok(ChatEvent::MessageAppend {
+                            content: "Hello".to_owned(),
+                            logprobs: vec![],
+                        }))
+                        .await
+                        .unwrap();
+                    sender
+                        .send(Ok(ChatEvent::MessageEnd {
+                            finish_reason: FinishReason::Stop,
+                        }))
+                        .await
+                        .unwrap();
+                    sender
+                        .send(Ok(ChatEvent::Usage {
+                            usage: TokenUsage {
+                                prompt: 1,
+                                completion: 1,
+                            },
+                        }))
+                        .await
+                        .unwrap();
+                });
+                receiver
+            }
+        }
         let (send, _) = oneshot::channel();
-        let response = ChatResponse {
-            message: Message {
-                role: "assistant".to_owned(),
-                content: "Hello".to_owned(),
-            },
-            finish_reason: FinishReason::Stop,
-            logprobs: vec![],
-            usage: TokenUsage {
-                prompt: 1,
-                completion: 1,
-            },
-        };
-        let stub_response = response.clone();
-        let csi = RawCsiStub::with_chat(move |_| stub_response.clone());
-        let mut ctx = SkillInvocationCtx::new(
-            send,
-            csi,
-            "dummy".to_owned(),
-            Namespace::dummy(),
-            TracingContext::dummy(),
-        );
+        let mut ctx = SkillInvocationCtx::new(send, ContextualCsiStub);
         let request = ChatRequest {
             model: "model".to_owned(),
             messages: vec![],
@@ -861,21 +874,24 @@ mod test {
             events,
             vec![
                 ChatEvent::MessageBegin {
-                    role: response.message.role,
+                    role: "assistant".to_owned(),
                 },
                 ChatEvent::MessageAppend {
-                    content: response.message.content,
-                    logprobs: response.logprobs,
+                    content: "Hello".to_owned(),
+                    logprobs: vec![],
                 },
                 ChatEvent::MessageEnd {
-                    finish_reason: response.finish_reason
+                    finish_reason: FinishReason::Stop
                 },
                 ChatEvent::Usage {
-                    usage: response.usage
+                    usage: TokenUsage {
+                        prompt: 1,
+                        completion: 1
+                    }
                 }
             ]
         );
-        assert!(ctx.completion_streams.is_empty());
+        assert!(ctx.chat_streams.is_empty());
     }
 
     #[tokio::test]

@@ -58,6 +58,7 @@ pub trait Csi {
 
 #[cfg(test)]
 pub mod tests {
+    pub use contextual::ContextualCsiDouble;
     pub use raw::tests::{RawCsiDummy, RawCsiSaboteur, RawCsiStub};
     use std::{
         collections::HashMap,
