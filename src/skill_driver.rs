@@ -42,7 +42,7 @@ impl SkillDriver {
         csi: impl Csi + Send + Sync + 'static,
         api_token: String,
         tracing_context: &TracingContext,
-        _namespace: Namespace,
+        namespace: Namespace,
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
         let (send_rt_err, mut recv_rt_err) = oneshot::channel();
@@ -50,6 +50,7 @@ impl SkillDriver {
             send_rt_err,
             csi,
             api_token,
+            namespace,
             tracing_context.clone(),
         ));
 
@@ -124,13 +125,14 @@ impl SkillDriver {
         csi_apis: impl Csi + Send + Sync + 'static,
         api_token: String,
         tracing_context: &TracingContext,
-        _namespace: Namespace,
+        namespace: Namespace,
     ) -> Result<Value, SkillExecutionError> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let csi_for_skills = Box::new(SkillInvocationCtx::new(
             send_rt_err,
             csi_apis,
             api_token,
+            namespace,
             tracing_context.clone(),
         ));
         select! {
@@ -184,6 +186,7 @@ impl<C> SkillInvocationCtx<C> {
         send_rt_err: oneshot::Sender<anyhow::Error>,
         csi_apis: C,
         api_token: String,
+        namespace: Namespace,
         tracing_context: TracingContext,
     ) -> Self {
         SkillInvocationCtx {
@@ -786,8 +789,13 @@ mod test {
                 .collect())
         });
 
-        let mut invocation_ctx =
-            SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), TracingContext::dummy());
+        let mut invocation_ctx = SkillInvocationCtx::new(
+            send,
+            csi,
+            "dummy token".to_owned(),
+            Namespace::dummy(),
+            TracingContext::dummy(),
+        );
 
         // When chunking a short text
         let model = "pharia-1-llm-7B-control".to_owned();
@@ -821,7 +829,7 @@ mod test {
         let mut csi = StubCsi::empty();
         csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
         let mut invocation_ctx =
-            SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), TracingContext::dummy());
+            SkillInvocationCtx::new(send, csi, "dummy token".to_owned(), Namespace::dummy(), TracingContext::dummy());
 
         // When chunking a short text
         let model = "pharia-1-llm-7B-control".to_owned();
@@ -859,7 +867,7 @@ mod test {
         let resp = completion.clone();
         let csi = StubCsi::with_completion(move |_| resp.clone());
         let mut ctx =
-            SkillInvocationCtx::new(send, csi, "dummy".to_owned(), TracingContext::dummy());
+            SkillInvocationCtx::new(send, csi, "dummy".to_owned(), Namespace::dummy(), TracingContext::dummy());
         let request = CompletionRequest::new("prompt", "model");
 
         let stream_id = ctx.completion_stream_new(request).await;
@@ -905,7 +913,7 @@ mod test {
         let stub_response = response.clone();
         let csi = StubCsi::with_chat(move |_| stub_response.clone());
         let mut ctx =
-            SkillInvocationCtx::new(send, csi, "dummy".to_owned(), TracingContext::dummy());
+            SkillInvocationCtx::new(send, csi, "dummy".to_owned(), Namespace::dummy(), TracingContext::dummy());
         let request = ChatRequest {
             model: "model".to_owned(),
             messages: vec![],
