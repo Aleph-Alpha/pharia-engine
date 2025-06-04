@@ -487,8 +487,7 @@ mod tests {
     use tokio::sync::oneshot;
 
     use crate::{
-        csi::tests::StubCsi, logging::TracingContext, skill_driver::SkillInvocationCtx,
-        tests::api_token,
+        csi::tests::StubCsi, logging::TracingContext, namespace_watcher::Namespace, skill_driver::SkillInvocationCtx, tests::api_token
     };
 
     use super::*;
@@ -501,6 +500,7 @@ mod tests {
             send_rt_err,
             StubCsi::empty(),
             api_token().to_owned(),
+            Namespace::dummy(),
             TracingContext::dummy(),
         ));
         let mut ctx = LinkerImpl::new(skill_ctx);

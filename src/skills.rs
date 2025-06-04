@@ -639,6 +639,7 @@ pub mod tests {
             send,
             csi,
             "dummy token".to_owned(),
+            Namespace::dummy(),
             TracingContext::dummy(),
         ));
         let skill =
