@@ -266,6 +266,9 @@ impl<T: ToolClient> ToolActor<T> {
             } => {
                 if let Some(servers) = self.mcp_servers.get_mut(&namespace) {
                     servers.remove(&url);
+                    if servers.is_empty() {
+                        self.mcp_servers.remove(&namespace);
+                    }
                 }
             }
             ToolMsg::ListToolServers { namespace, send } => {
