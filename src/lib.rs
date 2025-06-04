@@ -27,7 +27,6 @@ use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use authorization::Authorization;
-use csi::CsiDrivers;
 use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use search::Search;
@@ -38,6 +37,8 @@ use skills::Engine;
 use tokenizers::Tokenizers;
 use tool::Tool;
 use tracing::error;
+
+use crate::csi::CsiDrivers;
 
 use self::{inference::Inference, skill_runtime::SkillRuntime};
 
