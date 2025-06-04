@@ -768,7 +768,7 @@ mod test {
     use super::*;
     use crate::{
         chunking::ChunkParams,
-        csi::tests::{CsiDummy, CsiSaboteur, StubCsi},
+        csi::tests::{RawCsiDummy, RawCsiSaboteur, RawCsiStub},
         hardcoded_skills::SkillHello,
         inference::{
             ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, Message, TextScore,
@@ -783,7 +783,7 @@ mod test {
     async fn chunk() {
         // Given a skill invocation context with a stub tokenizer provider
         let (send, _) = oneshot::channel();
-        let mut csi = StubCsi::empty();
+        let mut csi = RawCsiStub::empty();
         csi.set_chunking(|r| {
             Ok(r.into_iter()
                 .map(|_| {
@@ -833,7 +833,7 @@ mod test {
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
         let (send, recv) = oneshot::channel();
-        let mut csi = StubCsi::empty();
+        let mut csi = RawCsiStub::empty();
         csi.set_chunking(|_| Err(anyhow!("Failed to load tokenizer")));
         let mut invocation_ctx = SkillInvocationCtx::new(
             send,
@@ -877,7 +877,7 @@ mod test {
             },
         };
         let resp = completion.clone();
-        let csi = StubCsi::with_completion(move |_| resp.clone());
+        let csi = RawCsiStub::with_completion(move |_| resp.clone());
         let mut ctx = SkillInvocationCtx::new(
             send,
             csi,
@@ -928,7 +928,7 @@ mod test {
             },
         };
         let stub_response = response.clone();
-        let csi = StubCsi::with_chat(move |_| stub_response.clone());
+        let csi = RawCsiStub::with_chat(move |_| stub_response.clone());
         let mut ctx = SkillInvocationCtx::new(
             send,
             csi,
@@ -1082,7 +1082,7 @@ mod test {
         }
 
         let engine = Arc::new(Engine::default());
-        let csi = StubCsi::with_explain(|_| {
+        let csi = RawCsiStub::with_explain(|_| {
             Explanation::new(vec![TextScore {
                 score: 0.0,
                 start: 0,
@@ -1120,7 +1120,7 @@ mod test {
             .run_function(
                 skill,
                 json!("Homer"),
-                CsiSaboteur,
+                RawCsiSaboteur,
                 "TOKEN_NOT_REQUIRED".to_owned(),
                 &TracingContext::dummy(),
                 Namespace::dummy(),
@@ -1191,7 +1191,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                CsiSaboteur,
+                RawCsiSaboteur,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
                 Namespace::dummy(),
@@ -1216,7 +1216,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                CsiDummy,
+                RawCsiDummy,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
                 Namespace::dummy(),
@@ -1241,7 +1241,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                CsiDummy,
+                RawCsiDummy,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
                 Namespace::dummy(),
@@ -1266,7 +1266,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                CsiDummy,
+                RawCsiDummy,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
                 Namespace::dummy(),
@@ -1323,7 +1323,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                CsiDummy,
+                RawCsiDummy,
                 "Dummy Token".to_owned(),
                 &TracingContext::dummy(),
                 Namespace::dummy(),

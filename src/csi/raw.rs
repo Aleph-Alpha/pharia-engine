@@ -547,9 +547,9 @@ pub mod tests {
     use super::*;
 
     #[derive(Clone)]
-    pub struct CsiSaboteur;
+    pub struct RawCsiSaboteur;
 
-    impl RawCsiDouble for CsiSaboteur {
+    impl RawCsiDouble for RawCsiSaboteur {
         async fn complete(
             &self,
             _auth: String,
@@ -812,9 +812,9 @@ pub mod tests {
     }
 
     #[derive(Clone)]
-    pub struct CsiDummy;
+    pub struct RawCsiDummy;
 
-    impl RawCsiDouble for CsiDummy {}
+    impl RawCsiDouble for RawCsiDummy {}
 
     type ChatFn = dyn Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync + 'static;
 
@@ -828,16 +828,16 @@ pub mod tests {
         dyn Fn(ExplanationRequest) -> Result<Explanation, CsiError> + Send + Sync + 'static;
 
     #[derive(Clone)]
-    pub struct StubCsi {
+    pub struct RawCsiStub {
         pub chat: Arc<Box<ChatFn>>,
         pub completion: Arc<Box<CompleteFn>>,
         pub chunking: Arc<Box<ChunkFn>>,
         pub explain: Arc<Box<ExplainFn>>,
     }
 
-    impl StubCsi {
+    impl RawCsiStub {
         pub fn empty() -> Self {
-            StubCsi {
+            RawCsiStub {
                 chat: Arc::new(Box::new(|_| bail!("Chat not set in StubCsi"))),
                 completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
                 chunking: Arc::new(Box::new(|_| bail!("Chunking not set in StubCsi"))),
@@ -853,7 +853,7 @@ pub mod tests {
         }
 
         pub fn with_chat(f: impl Fn(ChatRequest) -> ChatResponse + Send + Sync + 'static) -> Self {
-            StubCsi {
+            RawCsiStub {
                 chat: Arc::new(Box::new(move |cr| Ok(f(cr)))),
                 ..Self::empty()
             }
@@ -862,7 +862,7 @@ pub mod tests {
         pub fn with_completion(
             f: impl Fn(CompletionRequest) -> Completion + Send + Sync + 'static,
         ) -> Self {
-            StubCsi {
+            RawCsiStub {
                 completion: Arc::new(Box::new(move |cr| Ok(f(cr)))),
                 ..Self::empty()
             }
@@ -871,14 +871,14 @@ pub mod tests {
         pub fn with_explain(
             f: impl Fn(ExplanationRequest) -> Explanation + Send + Sync + 'static,
         ) -> Self {
-            StubCsi {
+            RawCsiStub {
                 explain: Arc::new(Box::new(move |er| Ok(f(er)))),
                 ..Self::empty()
             }
         }
     }
 
-    impl RawCsiDouble for StubCsi {
+    impl RawCsiDouble for RawCsiStub {
         async fn explain(
             &self,
             _auth: String,
