@@ -130,6 +130,7 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::InvokeTool {
             request,
+            namespace,
             tracing_context,
             send,
         };
@@ -169,6 +170,7 @@ impl McpServerStore for mpsc::Sender<ToolMsg> {
 enum ToolMsg {
     InvokeTool {
         request: InvokeRequest,
+        namespace: Namespace,
         tracing_context: TracingContext,
         send: oneshot::Sender<Result<Value, ToolError>>,
     },
@@ -233,11 +235,16 @@ impl<T: ToolClient> ToolActor<T> {
         match msg {
             ToolMsg::InvokeTool {
                 request,
+                namespace,
                 tracing_context,
                 send,
             } => {
                 let client = self.client.clone();
-                let servers = self.all_servers();
+                let servers = self
+                    .mcp_servers
+                    .get(&namespace)
+                    .cloned()
+                    .unwrap_or_default();
                 self.running_requests.push(Box::pin(async move {
                     let result =
                         Self::invoke_tool(client.as_ref(), servers, request, tracing_context).await;
@@ -435,16 +442,18 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn tool_server_is_available_after_being_upserted() {
+    async fn tool_server_is_available_for_configured_namespace() {
         // Given a tool client that only reports tools for a particular url
-        let tool = Tool::with_client(ToolClientMock).api();
-
-        // When a tool server is upserted with that particular url
         let namespace = Namespace::new("test").unwrap();
-        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
-        tool.upsert(server).await;
+        let tool = Tool::with_client(ToolClientMock)
+            .with_servers(vec![ConfiguredMcpServer::new(
+                "http://localhost:8000/mcp",
+                namespace.clone(),
+            )])
+            .await
+            .api();
 
-        // Then the calculator tool can be invoked
+        // When we invoke a tool that the mock client supports for the configured namespace
         let request = InvokeRequest {
             tool_name: "add".to_owned(),
             arguments: vec![],
@@ -453,7 +462,38 @@ pub mod tests {
             .invoke_tool(request, namespace, TracingContext::dummy())
             .await
             .unwrap();
+
+        //
         assert_eq!(result, json!("Success"));
+    }
+
+    #[tokio::test]
+    async fn tool_server_from_different_namespace_is_not_available() {
+        // Given an mcp server available for the foo namespace
+        let foo = Namespace::new("foo").unwrap();
+        let tool = Tool::with_client(ToolClientMock)
+            .with_servers(vec![ConfiguredMcpServer::new(
+                "http://localhost:800/mcp",
+                foo,
+            )])
+            .await
+            .api();
+
+        // When we invoke a tool from a different namespace
+        let request = InvokeRequest {
+            tool_name: "add".to_owned(),
+            arguments: vec![],
+        };
+        let result = tool
+            .invoke_tool(
+                request,
+                Namespace::new("bar").unwrap(),
+                TracingContext::dummy(),
+            )
+            .await;
+
+        // Then we get a tool not found error
+        assert!(matches!(result, Err(ToolError::ToolNotFound(_))));
     }
 
     #[tokio::test]
@@ -604,9 +644,10 @@ pub mod tests {
     #[tokio::test]
     async fn correct_mcp_server_is_called_for_tool_invocation() {
         // Given a tool client that knows about two mcp servers
+        let namespace = Namespace::new("test").unwrap();
         let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", Namespace::new("test").unwrap()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", Namespace::new("test").unwrap()),
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
         ];
         let tool = Tool::with_client(TwoServerClient)
             .with_servers(servers)
@@ -620,7 +661,7 @@ pub mod tests {
                     tool_name: "search".to_owned(),
                     arguments: vec![],
                 },
-                Namespace::dummy(),
+                namespace,
                 TracingContext::dummy(),
             )
             .await;
@@ -703,10 +744,11 @@ pub mod tests {
         ];
         let tool = Tool::with_client(ClientOneGoodOtherBad)
             .with_servers(servers)
-            .await;
+            .await
+            .api();
 
         // When listing tools
-        let result = tool.api().list_tools().await;
+        let result = tool.list_tools().await;
 
         // Then the search tool is available
         assert_eq!(result, vec!["search".to_owned()]);
@@ -715,13 +757,15 @@ pub mod tests {
     #[tokio::test]
     async fn one_bad_mcp_server_still_allows_to_invoke_tool() {
         // Given an mcp server that returns an error when listing it's tools
+        let namespace = Namespace::new("test").unwrap();
         let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", Namespace::new("test").unwrap()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", Namespace::new("test").unwrap()),
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
         ];
         let tool = Tool::with_client(ClientOneGoodOtherBad)
             .with_servers(servers)
-            .await;
+            .await
+            .api();
 
         // When invoking a tool
         let request = InvokeRequest {
@@ -729,8 +773,7 @@ pub mod tests {
             arguments: vec![],
         };
         let result = tool
-            .api()
-            .invoke_tool(request, Namespace::dummy(), TracingContext::dummy())
+            .invoke_tool(request, namespace, TracingContext::dummy())
             .await
             .unwrap();
 
@@ -762,13 +805,13 @@ pub mod tests {
     #[tokio::test]
     async fn tool_calls_are_processed_in_parallel() {
         // Given a tool that hangs forever for some tool invocation requestsa
+        let namespace = Namespace::new("test").unwrap();
         let tool = Tool::with_client(SaboteurClient)
             .with_servers(vec![ConfiguredMcpServer::new(
                 "http://localhost:8000/mcp",
-                Namespace::new("test").unwrap(),
+                namespace.clone(),
             )])
             .await;
-
         let api = tool.api();
 
         // When one hanging request is in progress
@@ -776,9 +819,10 @@ pub mod tests {
             tool_name: "divide".to_owned(),
             arguments: vec![],
         };
+        let cloned_namespace = namespace.clone();
         let handle = tokio::spawn(async move {
             drop(
-                api.invoke_tool(request, Namespace::dummy(), TracingContext::dummy())
+                api.invoke_tool(request, cloned_namespace, TracingContext::dummy())
                     .await,
             );
         });
@@ -793,7 +837,7 @@ pub mod tests {
         };
         let result = tool
             .api()
-            .invoke_tool(request, Namespace::dummy(), TracingContext::dummy())
+            .invoke_tool(request, namespace, TracingContext::dummy())
             .await
             .unwrap();
         assert_eq!(result, json!("Success"));
