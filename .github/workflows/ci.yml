@@ -19,6 +19,18 @@ env:
   CARGO_PROFILE_TEST_DEBUG: 0
 
 jobs:
+  # We once encountered a a failing build on macOS after merging changes from dependabot:
+  # While we technically did not have a bug, our dev setup is mostly MacOS and we need to ensure
+  # we can always build the project on MacOS.
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - run: cargo build
+
   tests:
     runs-on: ubuntu-latest
     permissions:
