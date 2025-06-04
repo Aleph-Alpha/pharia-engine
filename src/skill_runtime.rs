@@ -11,7 +11,7 @@ use tracing::{Level, error, info, warn};
 
 use crate::{
     context,
-    csi::Csi,
+    csi::RawCsi,
     logging::TracingContext,
     skill_driver::SkillDriver,
     skill_store::{SkillStoreApi, SkillStoreError},
@@ -43,7 +43,7 @@ impl SkillRuntime {
         store: impl SkillStoreApi + Send + Sync + 'static,
     ) -> Self
     where
-        C: Csi + Clone + Send + Sync + 'static,
+        C: RawCsi + Clone + Send + Sync + 'static,
     {
         let driver = SkillDriver::new(engine);
         let (send, recv) = mpsc::channel::<SkillRuntimeMsg>(1);
@@ -170,7 +170,7 @@ struct SkillRuntimeActor<C, S> {
 
 impl<C, S> SkillRuntimeActor<C, S>
 where
-    C: Csi + Clone + Send + Sync + 'static,
+    C: RawCsi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Send + Sync + 'static,
 {
     fn new(
@@ -242,7 +242,7 @@ pub enum SkillRuntimeMsg {
 impl SkillRuntimeMsg {
     async fn act(
         self,
-        csi_apis: impl Csi + Send + Sync + 'static,
+        csi_apis: impl RawCsi + Send + Sync + 'static,
         driver: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {
@@ -294,7 +294,7 @@ pub struct RunMessageStreamMsg {
 impl RunMessageStreamMsg {
     async fn act(
         self,
-        csi_apis: impl Csi + Send + Sync + 'static,
+        csi_apis: impl RawCsi + Send + Sync + 'static,
         driver: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {
@@ -471,7 +471,7 @@ pub struct RunFunctionMsg {
 impl RunFunctionMsg {
     async fn act(
         self,
-        csi_apis: impl Csi + Send + Sync + 'static,
+        csi_apis: impl RawCsi + Send + Sync + 'static,
         driver: &SkillDriver,
         store: &impl SkillStoreApi,
     ) {

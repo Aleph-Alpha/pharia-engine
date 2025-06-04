@@ -20,7 +20,7 @@ use serde_json::Value;
 use crate::{
     authorization::AuthorizationApi,
     chunking,
-    csi::Csi,
+    csi::RawCsi,
     inference, language_selection,
     logging::TracingContext,
     search,
@@ -61,7 +61,7 @@ where
 pub fn http<A, C, R, S>() -> Router<AppState<A, C, R, S>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
-    C: Csi + Clone + Sync + Send + 'static,
+    C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
 {
@@ -85,7 +85,7 @@ async fn select_language<C>(
     Json(requests): Json<Vec<SelectLanguageRequest>>,
 ) -> Result<Json<Vec<Option<Language>>>, CsiShellError>
 where
-    C: Csi + Sync,
+    C: RawCsi + Sync,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -104,7 +104,7 @@ async fn search<C>(
     Json(requests): Json<Vec<SearchRequest>>,
 ) -> Result<Json<Vec<Vec<SearchResult>>>, CsiShellError>
 where
-    C: Csi,
+    C: RawCsi,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -128,7 +128,7 @@ async fn documents<C>(
     Json(requests): Json<Vec<DocumentPath>>,
 ) -> Result<Json<Vec<Document>>, CsiShellError>
 where
-    C: Csi,
+    C: RawCsi,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -148,7 +148,7 @@ async fn document_metadata<C>(
     Json(requests): Json<Vec<DocumentPath>>,
 ) -> Result<Json<Vec<Option<Value>>>, CsiShellError>
 where
-    C: Csi,
+    C: RawCsi,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -167,7 +167,7 @@ async fn chat<C>(
     Json(requests): Json<Vec<ChatRequest>>,
 ) -> Result<Json<Vec<ChatResponse>>, CsiShellError>
 where
-    C: Csi,
+    C: RawCsi,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -187,7 +187,7 @@ async fn chunk<C>(
     Json(requests): Json<Vec<ChunkRequest>>,
 ) -> Result<Json<Vec<Vec<String>>>, CsiShellError>
 where
-    C: Csi,
+    C: RawCsi,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -211,7 +211,7 @@ async fn chunk_with_offsets<C>(
     Json(requests): Json<Vec<ChunkWithOffsetRequest>>,
 ) -> Result<Json<Vec<Vec<ChunkWithOffset>>>, CsiShellError>
 where
-    C: Csi,
+    C: RawCsi,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -235,7 +235,7 @@ async fn explain<C>(
     Json(requests): Json<Vec<ExplainRequest>>,
 ) -> Result<Json<Vec<Vec<TextScore>>>, CsiShellError>
 where
-    C: Csi,
+    C: RawCsi,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -259,7 +259,7 @@ async fn complete<C>(
     Json(requests): Json<Vec<CompletionRequest>>,
 ) -> Result<Json<Vec<Completion>>, CsiShellError>
 where
-    C: Csi,
+    C: RawCsi,
 {
     let tracing_context = TracingContext::current();
     let results = csi
@@ -279,7 +279,7 @@ async fn completion_stream<C>(
     Json(request): Json<CompletionRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
 where
-    C: Csi + Clone + Sync,
+    C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
     let mut recv = csi
@@ -354,7 +354,7 @@ async fn chat_stream<C>(
     Json(request): Json<ChatRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
 where
-    C: Csi + Clone + Sync,
+    C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
     let mut recv = csi

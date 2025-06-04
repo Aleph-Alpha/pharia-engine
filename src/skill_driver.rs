@@ -11,7 +11,7 @@ use tokio::{
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
-    csi::{ChatStreamId, CompletionStreamId, Csi, CsiForSkills},
+    csi::{ChatStreamId, CompletionStreamId, RawCsi, CsiForSkills},
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
         Explanation, ExplanationRequest, InferenceError,
@@ -42,7 +42,7 @@ impl SkillDriver {
         &self,
         skill: Arc<dyn Skill>,
         input: Value,
-        csi: impl Csi + Send + Sync + 'static,
+        csi: impl RawCsi + Send + Sync + 'static,
         api_token: String,
         tracing_context: &TracingContext,
         namespace: Namespace,
@@ -125,7 +125,7 @@ impl SkillDriver {
         &self,
         skill: Arc<dyn Skill>,
         input: Value,
-        csi_apis: impl Csi + Send + Sync + 'static,
+        csi_apis: impl RawCsi + Send + Sync + 'static,
         api_token: String,
         tracing_context: &TracingContext,
         namespace: Namespace,
@@ -229,7 +229,7 @@ impl<C> SkillInvocationCtx<C> {
 #[async_trait]
 impl<C> CsiForSkills for SkillInvocationCtx<C>
 where
-    C: Csi + Send + Sync,
+    C: RawCsi + Send + Sync,
 {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
         match self
