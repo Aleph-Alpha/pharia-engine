@@ -487,7 +487,8 @@ mod tests {
     use tokio::sync::oneshot;
 
     use crate::{
-        csi::tests::StubCsi, logging::TracingContext, namespace_watcher::Namespace, skill_driver::SkillInvocationCtx, tests::api_token
+        csi::tests::StubCsi, logging::TracingContext, namespace_watcher::Namespace,
+        skill_driver::SkillInvocationCtx, tests::api_token,
     };
 
     use super::*;
