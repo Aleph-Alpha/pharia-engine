@@ -57,7 +57,7 @@ where
 /// implemented with different MCP Servers), the [`McpServerStore`] allows someone else (e.g.
 /// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
 #[cfg_attr(test, double(McpServerStoreDouble))]
-pub trait McpServerStore {
+pub trait McpServerStoreApi {
     fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
 
@@ -110,7 +110,7 @@ impl Tool {
         Self { handle, send }
     }
 
-    pub fn api(&self) -> impl ToolApi + McpServerStore + Send + Sync + Clone + 'static {
+    pub fn api(&self) -> impl ToolApi + McpServerStoreApi + Send + Sync + Clone + 'static {
         self.send.clone()
     }
 
@@ -148,7 +148,7 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
     }
 }
 
-impl McpServerStore for mpsc::Sender<ToolMsg> {
+impl McpServerStoreApi for mpsc::Sender<ToolMsg> {
     async fn upsert(&self, server: ConfiguredMcpServer) {
         let msg = ToolMsg::UpsertToolServer { server };
         self.send(msg).await.unwrap();
@@ -190,9 +190,17 @@ enum ToolMsg {
     },
 }
 
+struct McpServerStore(HashMap<Namespace, HashSet<McpServerUrl>>);
+
+impl McpServerStore {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+}
+
 struct ToolActor<T: ToolClient> {
     // Map of which MCP servers are configured for which namespace.
-    mcp_servers: HashMap<Namespace, HashSet<McpServerUrl>>,
+    mcp_servers: McpServerStore,
     receiver: mpsc::Receiver<ToolMsg>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
     client: Arc<T>,
@@ -201,7 +209,7 @@ struct ToolActor<T: ToolClient> {
 impl<T: ToolClient> ToolActor<T> {
     fn new(receiver: mpsc::Receiver<ToolMsg>, client: T) -> Self {
         Self {
-            mcp_servers: HashMap::new(),
+            mcp_servers: McpServerStore::new(),
             receiver,
             client: Arc::new(client),
             running_requests: FuturesUnordered::new(),
@@ -234,6 +242,7 @@ impl<T: ToolClient> ToolActor<T> {
                 let client = self.client.clone();
                 let servers = self
                     .mcp_servers
+                    .0
                     .get(&namespace)
                     .cloned()
                     .unwrap_or_default();
@@ -247,6 +256,7 @@ impl<T: ToolClient> ToolActor<T> {
                 let client = self.client.clone();
                 let servers = self
                     .mcp_servers
+                    .0
                     .get(&namespace)
                     .cloned()
                     .unwrap_or_default();
@@ -259,21 +269,22 @@ impl<T: ToolClient> ToolActor<T> {
             ToolMsg::UpsertToolServer {
                 server: ConfiguredMcpServer { url, namespace },
             } => {
-                self.mcp_servers.entry(namespace).or_default().insert(url);
+                self.mcp_servers.0.entry(namespace).or_default().insert(url);
             }
             ToolMsg::RemoveToolServer {
                 server: ConfiguredMcpServer { url, namespace },
             } => {
-                if let Some(servers) = self.mcp_servers.get_mut(&namespace) {
+                if let Some(servers) = self.mcp_servers.0.get_mut(&namespace) {
                     servers.remove(&url);
                     if servers.is_empty() {
-                        self.mcp_servers.remove(&namespace);
+                        self.mcp_servers.0.remove(&namespace);
                     }
                 }
             }
             ToolMsg::ListToolServers { namespace, send } => {
                 let result = self
                     .mcp_servers
+                    .0
                     .get(&namespace)
                     .map(|s| s.iter().cloned().collect())
                     .unwrap_or_default();
@@ -376,7 +387,7 @@ pub mod tests {
 
     use crate::{
         logging::TracingContext,
-        tool::{Tool, actor::McpServerStore},
+        tool::{Tool, actor::McpServerStoreApi},
     };
 
     use super::*;

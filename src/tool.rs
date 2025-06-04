@@ -2,7 +2,7 @@ mod actor;
 mod client;
 
 pub use self::actor::{
-    Argument, ConfiguredMcpServer, InvokeRequest, McpServerStore, McpServerUrl, Tool, ToolApi,
+    Argument, ConfiguredMcpServer, InvokeRequest, McpServerStoreApi, McpServerUrl, Tool, ToolApi,
     ToolError,
 };
 
