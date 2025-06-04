@@ -736,18 +736,9 @@ pub mod tests {
     // Client that, independent of the mcp server, always reports the add tool to be available
     struct AddTool;
 
-    impl ToolClient for AddTool {
+    impl ToolClientDouble for AddTool {
         async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             Ok(vec!["add".to_owned()])
-        }
-
-        async fn invoke_tool(
-            &self,
-            _request: InvokeRequest,
-            _url: &McpServerUrl,
-            _tracing_context: TracingContext,
-        ) -> Result<Value, ToolError> {
-            unimplemented!()
         }
     }
 
