@@ -169,8 +169,6 @@ pub struct SkillInvocationCtx<C> {
     /// operator.
     send_rt_error: Option<oneshot::Sender<anyhow::Error>>,
     csi_apis: InvocationContext<C>,
-    /// Context that is used to situate certain actions in the overall context.
-    tracing_context: TracingContext,
     /// ID counter for stored streams.
     current_stream_id: usize,
     /// Currently running chat streams. We store them here so that we can easier cancel the running
@@ -192,8 +190,7 @@ impl<C> SkillInvocationCtx<C> {
     ) -> Self {
         SkillInvocationCtx {
             send_rt_error: Some(send_rt_err),
-            csi_apis: InvocationContext::new(csi_apis, namespace.clone(), api_token.clone()),
-            tracing_context,
+            csi_apis: InvocationContext::new(csi_apis, namespace, api_token, tracing_context),
             current_stream_id: 0,
             chat_streams: HashMap::new(),
             completion_streams: HashMap::new(),
@@ -225,22 +222,14 @@ where
     C: RawCsi + Send + Sync,
 {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation> {
-        match self
-            .csi_apis
-            .explain(self.tracing_context.clone(), requests)
-            .await
-        {
+        match self.csi_apis.explain(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error.into()).await,
         }
     }
 
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-        match self
-            .csi_apis
-            .complete(self.tracing_context.clone(), requests)
-            .await
-        {
+        match self.csi_apis.complete(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
@@ -248,10 +237,7 @@ where
 
     async fn completion_stream_new(&mut self, request: CompletionRequest) -> CompletionStreamId {
         let id = self.next_stream_id();
-        let recv = self
-            .csi_apis
-            .completion_stream(self.tracing_context.clone(), request)
-            .await;
+        let recv = self.csi_apis.completion_stream(request).await;
         self.completion_streams.insert(id, recv);
         id
     }
@@ -275,11 +261,7 @@ where
     }
 
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
-        match self
-            .csi_apis
-            .chat(self.tracing_context.clone(), requests)
-            .await
-        {
+        match self.csi_apis.chat(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
@@ -287,10 +269,7 @@ where
 
     async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId {
         let id = self.next_stream_id();
-        let recv = self
-            .csi_apis
-            .chat_stream(self.tracing_context.clone(), request)
-            .await;
+        let recv = self.csi_apis.chat_stream(request).await;
         self.chat_streams.insert(id, recv);
         id
     }
@@ -314,11 +293,7 @@ where
     }
 
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
-        match self
-            .csi_apis
-            .chunk(self.tracing_context.clone(), requests)
-            .await
-        {
+        match self.csi_apis.chunk(requests).await {
             Ok(chunks) => chunks,
             Err(error) => self.send_error(error).await,
         }
@@ -328,44 +303,28 @@ where
         &mut self,
         requests: Vec<SelectLanguageRequest>,
     ) -> Vec<Option<Language>> {
-        match self
-            .csi_apis
-            .select_language(requests, self.tracing_context.clone())
-            .await
-        {
+        match self.csi_apis.select_language(requests).await {
             Ok(language) => language,
             Err(error) => self.send_error(error).await,
         }
     }
 
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
-        match self
-            .csi_apis
-            .search(self.tracing_context.clone(), requests)
-            .await
-        {
+        match self.csi_apis.search(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
     }
 
     async fn documents(&mut self, requests: Vec<DocumentPath>) -> Vec<Document> {
-        match self
-            .csi_apis
-            .documents(self.tracing_context.clone(), requests)
-            .await
-        {
+        match self.csi_apis.documents(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
         }
     }
 
     async fn document_metadata(&mut self, requests: Vec<DocumentPath>) -> Vec<Option<Value>> {
-        match self
-            .csi_apis
-            .document_metadata(self.tracing_context.clone(), requests)
-            .await
-        {
+        match self.csi_apis.document_metadata(requests).await {
             // We know there will always be exactly one element in the vector
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
@@ -373,11 +332,7 @@ where
     }
 
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Value> {
-        match self
-            .csi_apis
-            .invoke_tool(self.tracing_context.clone(), requests)
-            .await
-        {
+        match self.csi_apis.invoke_tool(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error.into()).await,
         }
