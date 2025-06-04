@@ -171,9 +171,6 @@ pub struct SkillInvocationCtx<C> {
     csi_apis: InvocationContext<C>,
     // How the user authenticates with us
     api_token: String,
-    // The namespace of the Skill that is being invoked. Required for tool invocations to check the
-    // list of mcp servers a Skill may access.
-    namespace: Namespace,
     /// Context that is used to situate certain actions in the overall context.
     tracing_context: TracingContext,
     /// ID counter for stored streams.
@@ -197,9 +194,8 @@ impl<C> SkillInvocationCtx<C> {
     ) -> Self {
         SkillInvocationCtx {
             send_rt_error: Some(send_rt_err),
-            csi_apis: InvocationContext::new(csi_apis),
+            csi_apis: InvocationContext::new(csi_apis, namespace.clone()),
             api_token,
-            namespace,
             tracing_context,
             current_stream_id: 0,
             chat_streams: HashMap::new(),
@@ -418,11 +414,7 @@ where
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Value> {
         match self
             .csi_apis
-            .invoke_tool(
-                self.namespace.clone(),
-                self.tracing_context.clone(),
-                requests,
-            )
+            .invoke_tool(self.tracing_context.clone(), requests)
             .await
         {
             Ok(value) => value,

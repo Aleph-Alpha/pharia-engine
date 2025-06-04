@@ -93,19 +93,23 @@ pub trait ContextualCsi {
 
     fn invoke_tool(
         &self,
-        namespace: Namespace,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
     ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send;
 }
 
+/// Takes a [`RawCsi`] and converts it into a [`ContextualCsi`] by binding the namespace and api
+/// token associated with the invocation.
 pub struct InvocationContext<R> {
     raw_csi: R,
+    // The namespace of the Skill that is being invoked. Required for tool invocations to check the
+    // list of mcp servers a Skill may access.
+    namespace: Namespace,
 }
 
 impl<R> InvocationContext<R> {
-    pub fn new(raw_csi: R) -> Self {
-        Self { raw_csi }
+    pub fn new(raw_csi: R, namespace: Namespace) -> Self {
+        Self { raw_csi, namespace }
     }
 }
 
@@ -206,11 +210,10 @@ where
 
     fn invoke_tool(
         &self,
-        namespace: Namespace,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
     ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send {
         self.raw_csi
-            .invoke_tool(namespace, tracing_context, requests)
+            .invoke_tool(self.namespace.clone(), tracing_context, requests)
     }
 }
