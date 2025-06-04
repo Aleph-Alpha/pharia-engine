@@ -22,42 +22,36 @@ use crate::{
 pub trait ContextualCsi {
     fn explain(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<ExplanationRequest>,
     ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send;
 
     fn complete(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<CompletionRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send;
 
     fn completion_stream(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         request: CompletionRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send;
 
     fn chat(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<ChatRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
 
     fn chat_stream(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         request: ChatRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
 
     fn chunk(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<ChunkRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send;
@@ -72,21 +66,18 @@ pub trait ContextualCsi {
 
     fn search(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<SearchRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send;
 
     fn documents(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send;
 
     fn document_metadata(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send;
@@ -105,11 +96,17 @@ pub struct InvocationContext<R> {
     // The namespace of the Skill that is being invoked. Required for tool invocations to check the
     // list of mcp servers a Skill may access.
     namespace: Namespace,
+    // The authentication provided as part of the Skill invocation.
+    api_token: String,
 }
 
 impl<R> InvocationContext<R> {
-    pub fn new(raw_csi: R, namespace: Namespace) -> Self {
-        Self { raw_csi, namespace }
+    pub fn new(raw_csi: R, namespace: Namespace, api_token: String) -> Self {
+        Self {
+            raw_csi,
+            namespace,
+            api_token,
+        }
     }
 }
 
@@ -119,57 +116,56 @@ where
 {
     fn explain(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<ExplanationRequest>,
     ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send {
-        self.raw_csi.explain(auth, tracing_context, requests)
+        self.raw_csi
+            .explain(self.api_token.clone(), tracing_context, requests)
     }
 
     fn complete(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<CompletionRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send {
-        self.raw_csi.complete(auth, tracing_context, requests)
+        self.raw_csi
+            .complete(self.api_token.clone(), tracing_context, requests)
     }
 
     fn completion_stream(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         request: CompletionRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send {
         self.raw_csi
-            .completion_stream(auth, tracing_context, request)
+            .completion_stream(self.api_token.clone(), tracing_context, request)
     }
 
     fn chat(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<ChatRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send {
-        self.raw_csi.chat(auth, tracing_context, requests)
+        self.raw_csi
+            .chat(self.api_token.clone(), tracing_context, requests)
     }
 
     fn chat_stream(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         request: ChatRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send {
-        self.raw_csi.chat_stream(auth, tracing_context, request)
+        self.raw_csi
+            .chat_stream(self.api_token.clone(), tracing_context, request)
     }
 
     fn chunk(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<ChunkRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send {
-        self.raw_csi.chunk(auth, tracing_context, requests)
+        self.raw_csi
+            .chunk(self.api_token.clone(), tracing_context, requests)
     }
 
     fn select_language(
@@ -182,30 +178,29 @@ where
 
     fn search(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<SearchRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send {
-        self.raw_csi.search(auth, tracing_context, requests)
+        self.raw_csi
+            .search(self.api_token.clone(), tracing_context, requests)
     }
 
     fn documents(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send {
-        self.raw_csi.documents(auth, tracing_context, requests)
+        self.raw_csi
+            .documents(self.api_token.clone(), tracing_context, requests)
     }
 
     fn document_metadata(
         &self,
-        auth: String,
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send {
         self.raw_csi
-            .document_metadata(auth, tracing_context, requests)
+            .document_metadata(self.api_token.clone(), tracing_context, requests)
     }
 
     fn invoke_tool(
