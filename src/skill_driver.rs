@@ -11,7 +11,7 @@ use tokio::{
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
-    csi::{ChatStreamId, CompletionStreamId, ContextualCsi, Csi, InvocationContext, RawCsi},
+    csi::{ChatStreamId, CompletionStreamId, ContextualCsi, Csi},
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
         Explanation, ExplanationRequest, InferenceError,
@@ -109,14 +109,10 @@ impl SkillDriver {
         &self,
         skill: Arc<dyn Skill>,
         input: Value,
-        csi_apis: impl RawCsi + Send + Sync + 'static,
-        api_token: String,
+        contextual_csi: impl ContextualCsi + Send + Sync + 'static,
         tracing_context: &TracingContext,
-        namespace: Namespace,
     ) -> Result<Value, SkillExecutionError> {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
-        let contextual_csi =
-            InvocationContext::new(csi_apis, namespace, api_token, tracing_context.clone());
         let csi = Box::new(SkillInvocationCtx::new(send_rt_err, contextual_csi));
         select! {
             result = skill.run_as_function(&self.engine, csi, input, tracing_context) => result.map_err(Into::into),
@@ -651,7 +647,7 @@ mod test {
     use super::*;
     use crate::{
         chunking::ChunkParams,
-        csi::tests::{ContextualCsiDouble, RawCsiSaboteur, RawCsiStub},
+        csi::{CsiError, tests::ContextualCsiDouble},
         hardcoded_skills::SkillHello,
         inference::{
             ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, TextScore,
@@ -950,9 +946,8 @@ mod test {
     #[tokio::test]
     async fn forward_explain_response_from_csi() {
         struct SkillDoubleUsingExplain;
-
         #[async_trait]
-        impl Skill for SkillDoubleUsingExplain {
+        impl SkillDouble for SkillDoubleUsingExplain {
             async fn run_as_function(
                 &self,
                 _engine: &Engine,
@@ -976,46 +971,30 @@ mod test {
                     .collect::<Vec<_>>();
                 Ok(json!(output))
             }
+        }
 
-            async fn manifest(
+        struct ContextualCsiStub;
+        impl ContextualCsiDouble for ContextualCsiStub {
+            async fn explain(
                 &self,
-                _engine: &Engine,
-                _ctx: Box<dyn Csi + Send>,
-                _tracing_context: &TracingContext,
-            ) -> Result<AnySkillManifest, SkillError> {
-                panic!("Dummy metadata implementation of SkillDoubleUsingExplain")
-            }
-
-            async fn run_as_message_stream(
-                &self,
-                _engine: &Engine,
-                _ctx: Box<dyn Csi + Send>,
-                _input: Value,
-                _sender: mpsc::Sender<SkillEvent>,
-                _tracing_context: &TracingContext,
-            ) -> Result<(), SkillError> {
-                panic!("Dummy message stream implementation of SkillDoubleUsingExplain")
+                _requests: Vec<ExplanationRequest>,
+            ) -> Result<Vec<Explanation>, CsiError> {
+                Ok(vec![Explanation::new(vec![TextScore {
+                    score: 0.0,
+                    start: 0,
+                    length: 2,
+                }])])
             }
         }
 
         let engine = Arc::new(Engine::default());
-        let csi = RawCsiStub::with_explain(|_| {
-            Explanation::new(vec![TextScore {
-                score: 0.0,
-                start: 0,
-                length: 2,
-            }])
-        });
-
         let runtime = SkillDriver::new(engine);
         let resp = runtime
             .run_function(
                 Arc::new(SkillDoubleUsingExplain),
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
-                csi,
-                "dummy token".to_owned(),
+                ContextualCsiStub,
                 &TracingContext::dummy(),
-                Namespace::dummy(),
             )
             .await;
 
@@ -1026,6 +1005,16 @@ mod test {
 
     #[tokio::test]
     async fn should_forward_csi_errors() {
+        struct ContextualCsiSaboteur;
+        impl ContextualCsiDouble for ContextualCsiSaboteur {
+            async fn complete(
+                &self,
+                _requests: Vec<CompletionRequest>,
+            ) -> anyhow::Result<Vec<Completion>> {
+                bail!("Test error")
+            }
+        }
+
         // Given a skill using csi and a csi that fails
         // Note we are using a skill which actually invokes the csi
         let skill = Arc::new(SkillGreetCompletion);
@@ -1037,19 +1026,17 @@ mod test {
             .run_function(
                 skill,
                 json!("Homer"),
-                RawCsiSaboteur,
-                "TOKEN_NOT_REQUIRED".to_owned(),
+                ContextualCsiSaboteur,
                 &TracingContext::dummy(),
-                Namespace::dummy(),
             )
             .await;
 
         // Then
-        let expectet_error_msg = "The skill could not be executed to completion, something in our \
+        let expected_error_msg = "The skill could not be executed to completion, something in our \
             runtime is currently unavailable or misconfigured. You should try again later, if \
             the situation persists you may want to contact the operators. Original error:\n\n\
             Test error";
-        assert_eq!(result.unwrap_err().to_string(), expectet_error_msg);
+        assert_eq!(result.unwrap_err().to_string(), expected_error_msg);
     }
 
     struct MessageStreamSkillWithCsi;
