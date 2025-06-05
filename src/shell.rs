@@ -17,7 +17,10 @@ use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer}
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time::Instant};
+use std::{
+    convert::Infallible, future::Future, iter::once, net::SocketAddr, sync::mpsc::RecvTimeoutError,
+    time::Instant,
+};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -209,14 +212,21 @@ where
         get(skills)
     };
 
-    Router::new()
+    let mut router = Router::new()
         .route("/skills", skills_route)
         .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
         .route("/skills/{namespace}/{name}/run", post(run_skill))
         .route(
             "/skills/{namespace}/{name}/message-stream",
             post(message_stream_skill),
-        )
+        );
+
+    // Additional routes for beta features, please keep them in sync with the API documentation.
+    if feature_set == FeatureSet::Beta {
+        router = router.route("/mcp_servers/{namespace}", get(list_mcp_servers));
+    }
+
+    router
 }
 
 fn http<A, C, R, S>(feature_set: FeatureSet, app_state: AppState<A, C, R, S>) -> Router
@@ -423,7 +433,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, skills_beta, run_skill, message_stream_skill, skill_wit, skill_metadata),
+    paths(serve_docs, skills_beta, run_skill, message_stream_skill, skill_wit, skill_metadata, list_mcp_servers),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -886,6 +896,21 @@ fn skill_wit() -> &'static str {
     include_str!("../wit/skill@0.3/skill.wit")
 }
 
+/// List of all mcp servers configured for this namespace
+#[utoipa::path(
+    get,
+    operation_id = "list_mcp_servers",
+    path = "v1/mcp_servers/{namespace}",
+    tag = "namespace",
+    security(("api_token" = [])),
+    responses(
+        (status = 200, body=Vec<String>, example = json!([])),
+    ),
+)]
+async fn list_mcp_servers(Path(namespace): Path<Namespace>) -> Json<Vec<String>> {
+    Json(Vec::new())
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
@@ -994,6 +1019,35 @@ mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
         auth_value
+    }
+
+    #[tokio::test]
+    async fn list_mcp_servers_by_namespace() {
+        let app_state = AppState::dummy();
+        let http = http(FeatureSet::Beta, app_state);
+
+        // When
+        let api_token = api_token();
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/v1/mcp_servers/my-test-namespace")
+                    .header(AUTHORIZATION, auth_value)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        // assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = String::from_utf8(body.to_vec()).unwrap();
+        assert_eq!(answer, "[]");
     }
 
     #[tokio::test]
