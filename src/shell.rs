@@ -1077,11 +1077,44 @@ mod tests {
 
     #[tokio::test]
     async fn http_csi_handle_returns_completion_stream() {
-        // Given a versioned csi request
-        let prompt = "Say hello to Homer";
+        // Given a versioned csi request and a stub csi that returns three events for completions
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn completion_stream(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _request: inference::CompletionRequest,
+            ) -> mpsc::Receiver<Result<inference::CompletionEvent, inference::InferenceError>>
+            {
+                let (sender, receiver) = mpsc::channel(1);
+                tokio::spawn(async move {
+                    let append = inference::CompletionEvent::Append {
+                        text: "Say hello to Homer".to_owned(),
+                        logprobs: vec![],
+                    };
+                    let end = inference::CompletionEvent::End {
+                        finish_reason: inference::FinishReason::Stop,
+                    };
+                    let usage = inference::CompletionEvent::Usage {
+                        usage: inference::TokenUsage {
+                            prompt: 0,
+                            completion: 0,
+                        },
+                    };
+                    sender.send(Ok(append)).await.unwrap();
+                    sender.send(Ok(end)).await.unwrap();
+                    sender.send(Ok(usage)).await.unwrap();
+                });
+                receiver
+            }
+        }
+
         let body = json!({
             "model": "pharia-1-llm-7b-control",
-            "prompt": prompt,
+            "prompt": "Hi",
             "params": {
                 "max_tokens": 1,
                 "stop": [],
@@ -1091,8 +1124,7 @@ mod tests {
         });
 
         // When
-        let csi = RawCsiStub::with_completion(|r| inference::Completion::from_text(r.prompt));
-        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1108,7 +1140,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Then we get separate events for each letter in "Hello"
+        // Then we get the expected events
         assert_eq!(resp.status(), StatusCode::OK);
         let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
         assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
