@@ -903,7 +903,7 @@ mod tests {
         skill_runtime::SkillRuntimeDouble,
         skill_store::{
             SkillStoreApiDouble,
-            tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
+            tests::{SkillStoreDummy, SkillStoreMsg},
         },
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
@@ -1789,13 +1789,19 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn list_cached_skills_for_user() {
-        // Given
-        let mut skill_store = SkillStoreStub::new();
-        skill_store.with_list_cached_response(vec![
-            SkillPath::new(Namespace::new("ns").unwrap(), "first"),
-            SkillPath::new(Namespace::new("ns").unwrap(), "second"),
-        ]);
-        let app_state = AppState::dummy().with_skill_store_api(skill_store);
+        // Given a skill store with two cached skills
+        #[derive(Clone)]
+        struct SkillStoreStub;
+
+        impl SkillStoreApiDouble for SkillStoreStub {
+            async fn list_cached(&self) -> Vec<SkillPath> {
+                vec![
+                    SkillPath::new(Namespace::new("ns").unwrap(), "first"),
+                    SkillPath::new(Namespace::new("ns").unwrap(), "second"),
+                ]
+            }
+        }
+        let app_state = AppState::dummy().with_skill_store_api(SkillStoreStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When

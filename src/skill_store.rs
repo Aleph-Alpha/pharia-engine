@@ -597,25 +597,16 @@ pub mod tests {
 
     #[derive(Clone)]
     pub struct SkillStoreStub {
-        list_cached: Vec<SkillPath>,
         fetch: Option<Arc<dyn Skill>>,
     }
 
     impl SkillStoreStub {
         pub fn new() -> Self {
-            SkillStoreStub {
-                list_cached: vec![],
-                fetch: None,
-            }
+            SkillStoreStub { fetch: None }
         }
 
         pub fn with_fetch_response(&mut self, fetch_response: Option<Arc<dyn Skill>>) -> &mut Self {
             self.fetch = fetch_response;
-            self
-        }
-
-        pub fn with_list_cached_response(&mut self, list_response: Vec<SkillPath>) -> &mut Self {
-            self.list_cached = list_response;
             self
         }
     }
@@ -627,10 +618,6 @@ pub mod tests {
             _tracing_context: &TracingContext,
         ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
             Ok(self.fetch.clone())
-        }
-
-        async fn list_cached(&self) -> Vec<SkillPath> {
-            self.list_cached.clone()
         }
     }
 
