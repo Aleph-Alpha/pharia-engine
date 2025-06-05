@@ -495,20 +495,17 @@ pub mod tests {
 
         // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel/docs");
-        let maybe_metadata = client
+        let metadata = client
             .document_metadata(document_path, api_token, &TracingContext::dummy())
             .await
+            .unwrap()
             .unwrap();
 
         // Then we get the expected metadata
-        if let Some(metadata) = maybe_metadata {
-            assert_eq!(
-                metadata["url"].as_str().unwrap(),
-                "https://pharia-kernel.product.pharia.com/"
-            );
-        } else {
-            panic!("metadata not found");
-        }
+        assert_eq!(
+            metadata["url"].as_str().unwrap(),
+            "https://pharia-kernel.product.pharia.com/"
+        );
     }
 
     #[tokio::test]
