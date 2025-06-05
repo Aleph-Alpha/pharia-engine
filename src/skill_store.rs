@@ -595,19 +595,15 @@ pub mod tests {
 
     impl SkillStoreApiDouble for SkillStoreDummy {}
 
+    /// A testing double that can be loaded up with a particular skill that will always be loaded.
     #[derive(Clone)]
     pub struct SkillStoreStub {
-        fetch: Option<Arc<dyn Skill>>,
+        fetch_response: Option<Arc<dyn Skill>>,
     }
 
     impl SkillStoreStub {
-        pub fn new() -> Self {
-            SkillStoreStub { fetch: None }
-        }
-
-        pub fn with_fetch_response(&mut self, fetch_response: Option<Arc<dyn Skill>>) -> &mut Self {
-            self.fetch = fetch_response;
-            self
+        pub fn with_fetch_response(fetch_response: Option<Arc<dyn Skill>>) -> Self {
+            SkillStoreStub { fetch_response }
         }
     }
 
@@ -617,7 +613,7 @@ pub mod tests {
             _skill_path: SkillPath,
             _tracing_context: &TracingContext,
         ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
-            Ok(self.fetch.clone())
+            Ok(self.fetch_response.clone())
         }
     }
 
