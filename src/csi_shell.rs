@@ -16,28 +16,21 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
-    authorization::AuthorizationApi,
     csi::{CsiError, RawCsi},
     logging::TracingContext,
-    shell::{AppStateImpl, CsiState},
-    skill_runtime::SkillRuntimeApi,
-    skill_store::SkillStoreApi,
+    shell::{AppState, CsiState},
     skills::SupportedVersion,
-    tool::McpServerStoreApi,
 };
 
-pub fn http<A, C, R, S, M>() -> Router<AppStateImpl<A, C, R, S, M>>
+pub fn http<T>() -> Router<T>
 where
-    A: AuthorizationApi + Clone + Send + Sync + 'static,
-    C: RawCsi + Clone + Sync + Send + 'static,
-    R: SkillRuntimeApi + Clone + Send + Sync + 'static,
-    S: SkillStoreApi + Clone + Send + Sync + 'static,
-    M: McpServerStoreApi + Clone + Send + Sync + 'static,
+    T: AppState + Clone + Send + Sync + 'static,
+    T::Csi: RawCsi + Clone + Sync + Send + 'static,
 {
     Router::new()
         .nest("/csi/v1", v1::http())
         // Legacy CSI route
-        .route("/csi", post(http_csi_handle::<C>))
+        .route("/csi", post(http_csi_handle::<T::Csi>))
 }
 
 async fn http_csi_handle<C>(

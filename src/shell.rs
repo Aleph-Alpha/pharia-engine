@@ -240,13 +240,12 @@ impl<T: AppState> FromRef<T> for McpServerStoreState<T::McpServerStore> {
     }
 }
 
-fn v1<A, C, R, S, M>(feature_set: FeatureSet) -> Router<AppStateImpl<A, C, R, S, M>>
+fn v1<T>(feature_set: FeatureSet) -> Router<T>
 where
-    A: AuthorizationApi + Clone + Send + Sync + 'static,
-    C: RawCsi + Clone + Sync + Send + 'static,
-    R: SkillRuntimeApi + Clone + Send + Sync + 'static,
-    S: SkillStoreApi + Clone + Send + Sync + 'static,
-    M: McpServerStoreApi + Clone + Send + Sync + 'static,
+    T: AppState + Clone + Send + Sync + 'static,
+    T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
+    T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
+    T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
 {
     let skills_route = if feature_set == FeatureSet::Beta {
         get(skills_beta)
@@ -271,13 +270,14 @@ where
     router
 }
 
-fn http<A, C, R, S, M>(feature_set: FeatureSet, app_state: AppStateImpl<A, C, R, S, M>) -> Router
+fn http<T>(feature_set: FeatureSet, app_state: T) -> Router
 where
-    A: AuthorizationApi + Clone + Send + Sync + 'static,
-    C: RawCsi + Clone + Sync + Send + 'static,
-    R: SkillRuntimeApi + Clone + Send + Sync + 'static,
-    S: SkillStoreApi + Clone + Send + Sync + 'static,
-    M: McpServerStoreApi + Clone + Send + Sync + 'static,
+    T: AppState + Clone + Send + Sync + 'static,
+    T::Authorization: AuthorizationApi + Clone + Send + Sync + 'static,
+    T::Csi: RawCsi + Clone + Sync + Send + 'static,
+    T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
+    T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
+    T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
 {
     // Show documentation for unstable features only in beta systems.
     let api_doc = if feature_set == FeatureSet::Beta {
