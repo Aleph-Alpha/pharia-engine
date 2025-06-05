@@ -527,14 +527,16 @@ pub mod tests {
     use crate::{
         csi::{
             Csi,
-            tests::{RawCsiDummy, RawCsiSaboteur},
+            tests::{RawCsiDouble, RawCsiDummy},
         },
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke},
+        inference::{ChatEvent, ChatRequest, Completion, CompletionRequest, InferenceError},
         namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         skills::{AnySkillManifest, Skill, SkillDouble, SkillError, SkillEvent},
     };
+    use anyhow::{anyhow, bail};
     use async_trait::async_trait;
     use bytesize::ByteSize;
     use metrics::Label;
@@ -860,6 +862,33 @@ pub mod tests {
 
     #[tokio::test]
     async fn stream_skill_should_emit_error_in_case_of_runtime_error_in_csi() {
+        #[derive(Clone)]
+        pub struct RawCsiSaboteur;
+
+        impl RawCsiDouble for RawCsiSaboteur {
+            async fn complete(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _requests: Vec<CompletionRequest>,
+            ) -> anyhow::Result<Vec<Completion>> {
+                bail!("Test error")
+            }
+
+            async fn chat_stream(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _request: ChatRequest,
+            ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
+                let (send, recv) = mpsc::channel(1);
+                send.send(Err(InferenceError::Other(anyhow!("Test error"))))
+                    .await
+                    .unwrap();
+                recv
+            }
+        }
+
         // Given
         let engine = Arc::new(Engine::default());
         let mut store = SkillStoreStub::new();
