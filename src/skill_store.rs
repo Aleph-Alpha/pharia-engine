@@ -24,6 +24,9 @@ use tokio::{
 };
 use tracing::{error, info};
 
+#[cfg(test)]
+use double_derive::double;
+
 struct SkillStoreState<L> {
     known_skills: HashMap<SkillPath, ConfiguredSkill>,
     cached_skills: SkillCache,
@@ -221,6 +224,7 @@ impl SkillStore {
     }
 }
 
+#[cfg_attr(test, double(SkillStoreApiDouble))]
 pub trait SkillStoreApi {
     fn remove(&self, skill_path: SkillPath) -> impl Future<Output = ()> + Send;
 
@@ -589,39 +593,7 @@ pub mod tests {
     #[derive(Debug, Clone)]
     pub struct SkillStoreDummy;
 
-    impl SkillStoreApi for SkillStoreDummy {
-        async fn remove(&self, _skill_path: SkillPath) {
-            panic!("Skill store dummy called.");
-        }
-
-        async fn upsert(&self, _skill: ConfiguredSkill) {
-            panic!("Skill store dummy called.");
-        }
-
-        async fn set_namespace_error(&self, _namespace: Namespace, _error: Option<anyhow::Error>) {
-            panic!("Skill store dummy called.");
-        }
-
-        async fn fetch(
-            &self,
-            _skill_path: SkillPath,
-            _tracing_context: &TracingContext,
-        ) -> Result<Option<Arc<dyn Skill>>, SkillStoreError> {
-            panic!("Skill store dummy called.");
-        }
-
-        async fn list_cached(&self) -> Vec<SkillPath> {
-            panic!("Skill store dummy called.")
-        }
-
-        async fn list(&self, _skill_type: Option<SkillDescriptionFilterType>) -> Vec<SkillPath> {
-            panic!("Skill store dummy called.")
-        }
-
-        async fn invalidate_cache(&self, _skill_path: SkillPath) -> bool {
-            panic!("Skill store dummy called.")
-        }
-    }
+    impl SkillStoreApiDouble for SkillStoreDummy {}
 
     #[derive(Clone)]
     pub struct SkillStoreStub {
