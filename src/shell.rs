@@ -1088,13 +1088,14 @@ mod tests {
     #[tokio::test]
     async fn list_mcp_servers_by_namespace() {
         #[derive(Clone)]
-        struct McpServerStub;
-        impl McpServerStoreDouble for McpServerStub{
-            async fn list(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
+        struct McpServerMock;
+        impl McpServerStoreDouble for McpServerMock {
+            async fn list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
+                assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
                 vec![McpServerUrl("localhost:8080/my_tool".to_owned())]
             }
         }
-        let app_state = AppState::dummy().with_mcp_server_store(McpServerStub);
+        let app_state = AppState::dummy().with_mcp_server_store(McpServerMock);
         let http = http(FeatureSet::Beta, app_state);
 
         // When
