@@ -103,8 +103,10 @@ impl Shell {
 
 pub trait AppState {
     type SkillRuntime: Clone;
+    type SkillStore: Clone;
 
     fn skill_runtime(&self) -> &Self::SkillRuntime;
+    fn skill_store(&self) -> &Self::SkillStore;
 }
 
 impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
@@ -116,9 +118,14 @@ where
     M: Clone,
 {
     type SkillRuntime = R;
+    type SkillStore = S;
 
     fn skill_runtime(&self) -> &Self::SkillRuntime {
         &self.skill_runtime_api
+    }
+
+    fn skill_store(&self) -> &Self::SkillStore {
+        &self.skill_store_api
     }
 }
 
@@ -210,16 +217,9 @@ impl<T: AppState> FromRef<T> for SkillRuntimeState<T::SkillRuntime> {
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct SkillStoreState<S>(pub S);
 
-impl<A, C, R, S, M> FromRef<AppStateImpl<A, C, R, S, M>> for SkillStoreState<S>
-where
-    A: Clone,
-    C: Clone,
-    R: Clone,
-    S: Clone,
-    M: Clone,
-{
-    fn from_ref(app_state: &AppStateImpl<A, C, R, S, M>) -> SkillStoreState<S> {
-        SkillStoreState(app_state.skill_store_api.clone())
+impl<T: AppState> FromRef<T> for SkillStoreState<T::SkillStore> {
+    fn from_ref(app_state: &T) -> SkillStoreState<T::SkillStore> {
+        SkillStoreState(app_state.skill_store().clone())
     }
 }
 
