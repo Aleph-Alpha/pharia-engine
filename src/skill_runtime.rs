@@ -549,8 +549,7 @@ pub mod tests {
     #[tokio::test]
     async fn errors_for_non_existing_skill() {
         // Given a skill actor connected to an empty skill store
-        let mut store = SkillStoreStub::new();
-        store.with_fetch_response(None);
+        let store = SkillStoreStub::with_fetch_response(None);
         let skill_actor = SkillRuntime::new(Arc::new(Engine::default()), RawCsiDummy, store);
 
         // When asking the skill actor to run the skill
@@ -611,8 +610,7 @@ pub mod tests {
         let skill = GreetSkill;
         let csi = RawCsiDummy;
         let engine = Arc::new(Engine::default());
-        let mut store = SkillStoreStub::new();
-        store.with_fetch_response(Some(Arc::new(skill)));
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(skill)));
 
         // When
         let runtime = SkillRuntime::new(engine, csi, store);
@@ -662,8 +660,7 @@ pub mod tests {
         let (send, _recv) = broadcast::channel(2);
         let skill = SkillAssertConcurrent { send: send.clone() };
         let engine = Arc::new(Engine::default());
-        let mut store = SkillStoreStub::new();
-        store.with_fetch_response(Some(Arc::new(skill)));
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(skill)));
         let runtime = SkillRuntime::new(engine, RawCsiDummy, store);
 
         // When invoking two skills in parallel
@@ -704,8 +701,7 @@ pub mod tests {
     async fn stream_hello_test() {
         // Given
         let engine = Arc::new(Engine::default());
-        let mut store = SkillStoreStub::new();
-        store.with_fetch_response(Some(Arc::new(SkillHello)));
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillHello)));
         let runtime = SkillRuntime::new(engine, RawCsiDummy, store);
 
         // When
@@ -770,8 +766,7 @@ pub mod tests {
     async fn stream_saboteur_test() {
         // Given
         let engine = Arc::new(Engine::default());
-        let mut store = SkillStoreStub::new();
-        store.with_fetch_response(Some(Arc::new(SkillSaboteur)));
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillSaboteur)));
         let runtime = SkillRuntime::new(engine, RawCsiDummy, store);
 
         // When
@@ -801,8 +796,7 @@ pub mod tests {
     #[test]
     fn skill_runtime_metrics_emitted() {
         let skill_path = SkillPath::local("greet");
-        let mut store = SkillStoreStub::new();
-        store.with_fetch_response(Some(Arc::new(GreetSkill)));
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(GreetSkill)));
         let engine = Arc::new(Engine::default());
         let (send, _) = oneshot::channel();
         let msg = RunFunctionMsg {
@@ -862,8 +856,7 @@ pub mod tests {
 
         // Given
         let engine = Arc::new(Engine::default());
-        let mut store = SkillStoreStub::new();
-        store.with_fetch_response(Some(Arc::new(SkillTellMeAJoke)));
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillTellMeAJoke)));
         let runtime = SkillRuntime::new(engine, RawCsiSaboteur, store);
         let skill_path = SkillPath::new(Namespace::new("test-beta").unwrap(), "tell_me_a_joke");
 
