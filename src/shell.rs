@@ -59,17 +59,20 @@ pub struct Shell {
 impl Shell {
     /// Start a shell listening to incoming requests at the given address. Successful construction
     /// implies that the listener is bound to the endpoint.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    pub async fn new<T>(
         feature_set: FeatureSet,
         addr: impl Into<SocketAddr>,
-        authorization_api: impl AuthorizationApi + Clone + Send + Sync + 'static,
-        skill_runtime_api: impl SkillRuntimeApi + Clone + Send + Sync + 'static,
-        skill_store_api: impl SkillStoreApi + Clone + Send + Sync + 'static,
-        mcp_servers: impl McpServerStoreApi + Clone + Send + Sync + 'static,
-        csi_drivers: impl RawCsi + Clone + Send + Sync + 'static,
+        app_state: T,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
-    ) -> anyhow::Result<Self> {
+    ) -> anyhow::Result<Self>
+    where
+        T: AppState + Clone + Send + Sync + 'static,
+        T::Csi: RawCsi + Clone + Send + Sync + 'static,
+        T::Authorization: AuthorizationApi + Clone + Send + Sync + 'static,
+        T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
+        T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
+        T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
+    {
         let addr = addr.into();
         // It is important to construct the listener outside of the `spawn` invocation. We need to
         // guarantee the listener is already bound to the port, once `Self` is constructed.
@@ -78,13 +81,6 @@ impl Shell {
             .context(format!("Could not bind a tcp listener to '{addr}'"))?;
         info!("Listening on: {addr}");
 
-        let app_state = AppStateImpl::new(
-            authorization_api,
-            skill_store_api,
-            skill_runtime_api,
-            mcp_servers,
-            csi_drivers,
-        );
         let handle = tokio::spawn(async move {
             let res = axum::serve(listener, http(feature_set, app_state))
                 .with_graceful_shutdown(shutdown_signal)

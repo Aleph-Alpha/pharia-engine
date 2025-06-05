@@ -38,7 +38,7 @@ use tokenizers::Tokenizers;
 use tool::Tool;
 use tracing::error;
 
-use crate::csi::CsiDrivers;
+use crate::{csi::CsiDrivers, shell::AppStateImpl};
 
 use self::{inference::Inference, skill_runtime::SkillRuntime};
 
@@ -131,14 +131,18 @@ impl Kernel {
 
         let authorization = Authorization::new(app_config.authorization_url().to_owned());
 
+        let app_state = AppStateImpl::new(
+            authorization.api(),
+            skill_store.api(),
+            skill_runtime.api(),
+            tool.api(),
+            csi_drivers.clone(),
+        );
+
         let shell = match Shell::new(
             app_config.pharia_ai_feature_set(),
             app_config.kernel_address(),
-            authorization.api(),
-            skill_runtime.api(),
-            skill_store.api(),
-            tool.api(),
-            csi_drivers.clone(),
+            app_state,
             shutdown_signal,
         )
         .await
