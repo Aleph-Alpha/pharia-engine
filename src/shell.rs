@@ -955,7 +955,7 @@ mod tests {
         chunking::{Chunk, ChunkRequest},
         csi::{
             CsiError,
-            tests::{CompletionStub, RawCsiDouble, RawCsiDummy},
+            tests::{CompletionStub, RawCsiDouble},
         },
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
@@ -977,6 +977,7 @@ mod tests {
         http::{Method, Request, header},
     };
 
+    use double_trait::Dummy;
     use http_body_util::BodyExt;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
     use reqwest::header::CONTENT_TYPE;
@@ -984,22 +985,14 @@ mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl
-        AppState<
-            StubAuthorization,
-            RawCsiDummy,
-            SkillRuntimeDummy,
-            SkillStoreDummy,
-            McpServerStoreDummy,
-        >
-    {
+    impl AppState<StubAuthorization, Dummy, SkillRuntimeDummy, SkillStoreDummy, McpServerStoreDummy> {
         pub fn dummy() -> Self {
             Self::new(
                 StubAuthorization::new(true),
                 SkillStoreDummy,
                 SkillRuntimeDummy,
                 McpServerStoreDummy,
-                RawCsiDummy,
+                Dummy,
             )
         }
     }

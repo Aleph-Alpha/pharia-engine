@@ -525,10 +525,7 @@ pub mod tests {
     use std::time::Duration;
 
     use crate::{
-        csi::{
-            Csi,
-            tests::{RawCsiDouble, RawCsiDummy},
-        },
+        csi::{Csi, tests::RawCsiDouble},
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke},
         inference::{ChatEvent, ChatRequest, InferenceError},
         namespace_watcher::Namespace,
@@ -539,6 +536,7 @@ pub mod tests {
     use anyhow::anyhow;
     use async_trait::async_trait;
     use bytesize::ByteSize;
+    use double_trait::Dummy;
     use metrics::Label;
     use metrics_util::debugging::{DebugValue, DebuggingRecorder, Snapshot};
     use serde_json::json;
@@ -550,7 +548,7 @@ pub mod tests {
     async fn errors_for_non_existing_skill() {
         // Given a skill actor connected to an empty skill store
         let store = SkillStoreStub::with_fetch_response(None);
-        let skill_actor = SkillRuntime::new(Arc::new(Engine::default()), RawCsiDummy, store);
+        let skill_actor = SkillRuntime::new(Arc::new(Engine::default()), Dummy, store);
 
         // When asking the skill actor to run the skill
         let result = skill_actor
@@ -579,7 +577,7 @@ pub mod tests {
 
         let skill_store =
             SkillStore::new(skill_loader, Duration::from_secs(10), ByteSize(u64::MAX));
-        let csi_apis = RawCsiDummy;
+        let csi_apis = Dummy;
         let executer = SkillRuntime::new(engine, csi_apis, skill_store.api());
         let api = executer.api();
 
@@ -608,7 +606,7 @@ pub mod tests {
     async fn greeting_skill_should_output_hello() {
         // Given
         let skill = GreetSkill;
-        let csi = RawCsiDummy;
+        let csi = Dummy;
         let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(skill)));
 
@@ -661,7 +659,7 @@ pub mod tests {
         let skill = SkillAssertConcurrent { send: send.clone() };
         let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(skill)));
-        let runtime = SkillRuntime::new(engine, RawCsiDummy, store);
+        let runtime = SkillRuntime::new(engine, Dummy, store);
 
         // When invoking two skills in parallel
         let token = "TOKEN_NOT_REQUIRED";
@@ -702,7 +700,7 @@ pub mod tests {
         // Given
         let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillHello)));
-        let runtime = SkillRuntime::new(engine, RawCsiDummy, store);
+        let runtime = SkillRuntime::new(engine, Dummy, store);
 
         // When
         let mut recv = runtime
@@ -767,7 +765,7 @@ pub mod tests {
         // Given
         let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillSaboteur)));
-        let runtime = SkillRuntime::new(engine, RawCsiDummy, store);
+        let runtime = SkillRuntime::new(engine, Dummy, store);
 
         // When
         let mut recv = runtime
@@ -810,7 +808,7 @@ pub mod tests {
         // Metrics requires sync, so all of the async parts are moved into this closure.
         let snapshot = metrics_snapshot(async || {
             let runtime = SkillDriver::new(engine);
-            msg.act(RawCsiDummy, &runtime, &store).await;
+            msg.act(Dummy, &runtime, &store).await;
             drop(runtime);
         });
 

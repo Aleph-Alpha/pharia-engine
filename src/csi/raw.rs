@@ -836,11 +836,6 @@ pub mod tests {
         }
     }
 
-    #[derive(Clone)]
-    pub struct RawCsiDummy;
-
-    impl RawCsiDouble for RawCsiDummy {}
-
     type CompleteFn =
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
