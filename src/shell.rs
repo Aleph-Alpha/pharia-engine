@@ -961,10 +961,7 @@ mod tests {
         inference,
         logging::tests::given_tracing_subscriber,
         skill_runtime::SkillRuntimeDouble,
-        skill_store::{
-            SkillStoreApiDouble,
-            tests::{SkillStoreDummy, SkillStoreMsg},
-        },
+        skill_store::{SkillStoreApiDouble, tests::SkillStoreMsg},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
         tool::tests::McpServerStoreDouble,
@@ -985,11 +982,11 @@ mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl AppState<StubAuthorization, Dummy, SkillRuntimeDummy, SkillStoreDummy, McpServerStoreDummy> {
+    impl AppState<StubAuthorization, Dummy, SkillRuntimeDummy, Dummy, McpServerStoreDummy> {
         pub fn dummy() -> Self {
             Self::new(
                 StubAuthorization::new(true),
-                SkillStoreDummy,
+                Dummy,
                 SkillRuntimeDummy,
                 McpServerStoreDummy,
                 Dummy,

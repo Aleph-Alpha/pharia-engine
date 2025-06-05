@@ -330,12 +330,12 @@ pub mod tests {
     use std::future::pending;
     use std::sync::Arc;
 
+    use double_trait::Dummy;
     use futures::executor::block_on;
     use tempfile::tempdir;
     use tokio::sync::{Mutex, mpsc};
     use tokio::time::timeout;
 
-    use crate::skill_store::tests::SkillStoreDummy;
     use crate::tool::tests::McpServerStoreDouble;
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
@@ -459,10 +459,9 @@ pub mod tests {
             },
         ];
 
-        let diff =
-            NamespaceWatcherActor::<SkillStoreDummy, McpServerStoreDummy>::compute_skill_diff(
-                &existing, &incoming,
-            );
+        let diff = NamespaceWatcherActor::<Dummy, McpServerStoreDummy>::compute_skill_diff(
+            &existing, &incoming,
+        );
 
         // when the observer checks for new skills
         assert_eq!(
@@ -488,11 +487,10 @@ pub mod tests {
         };
 
         // When the observer checks for new skills
-        let diff =
-            NamespaceWatcherActor::<SkillStoreDummy, McpServerStoreDummy>::compute_skill_diff(
-                &[existing.clone()],
-                &[incoming.clone()],
-            );
+        let diff = NamespaceWatcherActor::<Dummy, McpServerStoreDummy>::compute_skill_diff(
+            &[existing.clone()],
+            &[incoming.clone()],
+        );
 
         // Then the new version is added and the old version is not removed as only the tag changed
         assert_eq!(diff.added_or_changed, vec![incoming]);
@@ -504,12 +502,8 @@ pub mod tests {
         // Given a config that take forever to load
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
-        let mut observer = NamespaceWatcher::with_config(
-            SkillStoreDummy,
-            McpServerStoreDummy,
-            config,
-            update_interval,
-        );
+        let mut observer =
+            NamespaceWatcher::with_config(Dummy, McpServerStoreDummy, config, update_interval);
 
         // When waiting for the first pass
         let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
@@ -641,7 +635,7 @@ pub mod tests {
         }
     }
 
-    impl<M> NamespaceWatcherActor<SkillStoreDummy, M>
+    impl<M> NamespaceWatcherActor<Dummy, M>
     where
         M: McpServerStoreApi + Send + Sync,
     {
@@ -655,7 +649,7 @@ pub mod tests {
             Self {
                 ready,
                 shutdown,
-                skill_store_api: SkillStoreDummy,
+                skill_store_api: Dummy,
                 tool_store_api,
                 config,
                 update_interval: Duration::from_millis(1),
