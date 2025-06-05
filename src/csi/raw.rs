@@ -530,8 +530,6 @@ where
 pub mod tests {
     use std::sync::Arc;
 
-    use anyhow::bail;
-
     use crate::{
         chunking::ChunkParams,
         inference::{
@@ -789,38 +787,20 @@ pub mod tests {
 
     impl RawCsiDouble for RawCsiDummy {}
 
-    type ChatFn = dyn Fn(ChatRequest) -> anyhow::Result<ChatResponse> + Send + Sync + 'static;
-
     type CompleteFn =
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
     #[derive(Clone)]
     pub struct RawCsiStub {
-        pub chat: Arc<Box<ChatFn>>,
         pub completion: Arc<Box<CompleteFn>>,
     }
 
     impl RawCsiStub {
-        pub fn empty() -> Self {
-            RawCsiStub {
-                chat: Arc::new(Box::new(|_| bail!("Chat not set in StubCsi"))),
-                completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
-            }
-        }
-
-        pub fn with_chat(f: impl Fn(ChatRequest) -> ChatResponse + Send + Sync + 'static) -> Self {
-            RawCsiStub {
-                chat: Arc::new(Box::new(move |cr| Ok(f(cr)))),
-                ..Self::empty()
-            }
-        }
-
         pub fn with_completion(
             f: impl Fn(CompletionRequest) -> Completion + Send + Sync + 'static,
         ) -> Self {
             RawCsiStub {
                 completion: Arc::new(Box::new(move |cr| Ok(f(cr)))),
-                ..Self::empty()
             }
         }
     }
@@ -864,40 +844,6 @@ pub mod tests {
                     .send(Ok(CompletionEvent::Usage { usage }))
                     .await
                     .unwrap();
-            });
-            receiver
-        }
-
-        async fn chat_stream(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            request: ChatRequest,
-        ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
-            let (sender, receiver) = mpsc::channel(1);
-            let ChatResponse {
-                message,
-                finish_reason,
-                logprobs,
-                usage,
-            } = (*self.chat)(request).unwrap();
-            tokio::spawn(async move {
-                sender
-                    .send(Ok(ChatEvent::MessageBegin { role: message.role }))
-                    .await
-                    .unwrap();
-                sender
-                    .send(Ok(ChatEvent::MessageAppend {
-                        content: message.content,
-                        logprobs,
-                    }))
-                    .await
-                    .unwrap();
-                sender
-                    .send(Ok(ChatEvent::MessageEnd { finish_reason }))
-                    .await
-                    .unwrap();
-                sender.send(Ok(ChatEvent::Usage { usage })).await.unwrap();
             });
             receiver
         }
