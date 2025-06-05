@@ -24,7 +24,7 @@ use crate::{
     inference, language_selection,
     logging::TracingContext,
     search,
-    shell::{AppState, CsiState},
+    shell::{AppStateImpl, CsiState},
     skill_runtime::SkillRuntimeApi,
     skill_store::SkillStoreApi,
     tool::McpServerStoreApi,
@@ -59,7 +59,7 @@ where
     }
 }
 
-pub fn http<A, C, R, S, M>() -> Router<AppState<A, C, R, S, M>>
+pub fn http<A, C, R, S, M>() -> Router<AppStateImpl<A, C, R, S, M>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: RawCsi + Clone + Sync + Send + 'static,

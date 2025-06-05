@@ -19,14 +19,14 @@ use crate::{
     authorization::AuthorizationApi,
     csi::{CsiError, RawCsi},
     logging::TracingContext,
-    shell::{AppState, CsiState},
+    shell::{AppStateImpl, CsiState},
     skill_runtime::SkillRuntimeApi,
     skill_store::SkillStoreApi,
     skills::SupportedVersion,
     tool::McpServerStoreApi,
 };
 
-pub fn http<A, C, R, S, M>() -> Router<AppState<A, C, R, S, M>>
+pub fn http<A, C, R, S, M>() -> Router<AppStateImpl<A, C, R, S, M>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: RawCsi + Clone + Sync + Send + 'static,
