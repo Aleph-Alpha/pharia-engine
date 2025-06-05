@@ -628,14 +628,12 @@ pub mod tests {
     pub struct InferenceStub {
         complete:
             Box<dyn Fn(CompletionRequest) -> Result<Completion, InferenceError> + Send + Sync>,
-        chat: Box<dyn Fn(ChatRequest) -> Result<ChatResponse, InferenceError> + Send + Sync>,
     }
 
     impl InferenceStub {
         pub fn new() -> Self {
             Self {
                 complete: Box::new(|_| Err(InferenceError::Other(anyhow!("Not implemented")))),
-                chat: Box::new(|_| Err(InferenceError::Other(anyhow!("Not implemented")))),
             }
         }
 
@@ -647,14 +645,6 @@ pub mod tests {
             + 'static,
         ) -> Self {
             self.complete = Box::new(complete);
-            self
-        }
-
-        pub fn with_chat(
-            mut self,
-            chat: impl Fn(ChatRequest) -> Result<ChatResponse, InferenceError> + Send + Sync + 'static,
-        ) -> Self {
-            self.chat = Box::new(chat);
             self
         }
     }
@@ -694,52 +684,6 @@ pub mod tests {
                     send.send(Ok(CompletionEvent::Usage { usage }))
                         .await
                         .unwrap();
-                }
-                Err(e) => {
-                    send.send(Err(e)).await.unwrap();
-                }
-            }
-            recv
-        }
-
-        async fn chat(
-            &self,
-            request: ChatRequest,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> Result<ChatResponse, InferenceError> {
-            let chat_response = (self.chat)(request)?;
-            Ok(chat_response)
-        }
-
-        async fn chat_stream(
-            &self,
-            request: ChatRequest,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
-            let (send, recv) = mpsc::channel(4);
-            // Load up the receiver with events before returning it
-            match (self.chat)(request) {
-                Ok(ChatResponse {
-                    message,
-                    finish_reason,
-                    logprobs,
-                    usage,
-                }) => {
-                    send.send(Ok(ChatEvent::MessageBegin { role: message.role }))
-                        .await
-                        .unwrap();
-                    send.send(Ok(ChatEvent::MessageAppend {
-                        content: message.content,
-                        logprobs,
-                    }))
-                    .await
-                    .unwrap();
-                    send.send(Ok(ChatEvent::MessageEnd { finish_reason }))
-                        .await
-                        .unwrap();
-                    send.send(Ok(ChatEvent::Usage { usage })).await.unwrap();
                 }
                 Err(e) => {
                     send.send(Err(e)).await.unwrap();
