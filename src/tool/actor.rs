@@ -18,7 +18,7 @@ use crate::logging::TracingContext;
 use crate::namespace_watcher::Namespace;
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 use super::client::McpClient;
 

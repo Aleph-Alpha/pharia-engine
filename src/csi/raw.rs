@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 /// Cognitive System Interface (CSI) - Direct interaction with raw system APIs.
 /// This is the lowest level interface that directly calls the underlying system APIs

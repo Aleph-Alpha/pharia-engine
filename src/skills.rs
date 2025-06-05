@@ -25,7 +25,7 @@ use crate::{csi::Csi, logging::TracingContext, namespace_watcher::Namespace};
 use tracing::error;
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 pub use self::v0_3::SkillMetadataV0_3;
 

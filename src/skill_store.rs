@@ -25,7 +25,7 @@ use tokio::{
 use tracing::{error, info};
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 struct SkillStoreState<L> {
     known_skills: HashMap<SkillPath, ConfiguredSkill>,

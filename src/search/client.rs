@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use crate::{http::HttpClient, logging::TracingContext};
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 #[cfg_attr(test, double(SearchClientDouble))]
 pub trait SearchClient: Send + Sync + 'static {

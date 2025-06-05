@@ -17,7 +17,7 @@ use super::client::{
 };
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 /// Handle to the search actor. Spin this up in order to use the Search API
 pub struct Search {

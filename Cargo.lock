@@ -1302,13 +1302,22 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "double-derive"
-version = "0.1.4"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c151174e6b889598a19796b6133aa3beef88427e84a7669fb2116a71ec6cb5"
+checksum = "0166b940b110e671a045815bc1a2d0ae1b8aa3b2a7d175523b9737b9f85602f1"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "double-trait"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3cb9794bdb1e41c97b1c9bcc5f5ae857ba1b101d130ebaa96739277ab5d42d7"
+dependencies = [
+ "double-derive",
 ]
 
 [[package]]
@@ -4222,7 +4231,7 @@ dependencies = [
  "config",
  "derive_more",
  "dotenvy",
- "double-derive",
+ "double-trait",
  "engine-room",
  "fake",
  "futures",
