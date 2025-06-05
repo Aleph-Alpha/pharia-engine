@@ -794,14 +794,10 @@ pub mod tests {
     type CompleteFn =
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
-    type ExplainFn =
-        dyn Fn(ExplanationRequest) -> Result<Explanation, CsiError> + Send + Sync + 'static;
-
     #[derive(Clone)]
     pub struct RawCsiStub {
         pub chat: Arc<Box<ChatFn>>,
         pub completion: Arc<Box<CompleteFn>>,
-        pub explain: Arc<Box<ExplainFn>>,
     }
 
     impl RawCsiStub {
@@ -809,7 +805,6 @@ pub mod tests {
             RawCsiStub {
                 chat: Arc::new(Box::new(|_| bail!("Chat not set in StubCsi"))),
                 completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
-                explain: Arc::new(Box::new(|_| unimplemented!("Explain not set in StubCsi"))),
             }
         }
 
@@ -828,26 +823,9 @@ pub mod tests {
                 ..Self::empty()
             }
         }
-
-        pub fn with_explain(
-            f: impl Fn(ExplanationRequest) -> Explanation + Send + Sync + 'static,
-        ) -> Self {
-            RawCsiStub {
-                explain: Arc::new(Box::new(move |er| Ok(f(er)))),
-                ..Self::empty()
-            }
-        }
     }
 
     impl RawCsiDouble for RawCsiStub {
-        async fn explain(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            requests: Vec<ExplanationRequest>,
-        ) -> Result<Vec<Explanation>, CsiError> {
-            requests.into_iter().map(|r| (*self.explain)(r)).collect()
-        }
         async fn complete(
             &self,
             _auth: String,
