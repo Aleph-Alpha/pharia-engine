@@ -530,7 +530,7 @@ where
 pub mod tests {
     use std::sync::Arc;
 
-    use anyhow::{anyhow, bail};
+    use anyhow::bail;
 
     use crate::{
         chunking::ChunkParams,
@@ -545,33 +545,6 @@ pub mod tests {
     };
 
     use super::*;
-
-    #[derive(Clone)]
-    pub struct RawCsiSaboteur;
-
-    impl RawCsiDouble for RawCsiSaboteur {
-        async fn complete(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _requests: Vec<CompletionRequest>,
-        ) -> anyhow::Result<Vec<Completion>> {
-            bail!("Test error")
-        }
-
-        async fn chat_stream(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            _request: ChatRequest,
-        ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
-            let (send, recv) = mpsc::channel(1);
-            send.send(Err(InferenceError::Other(anyhow!("Test error"))))
-                .await
-                .unwrap();
-            recv
-        }
-    }
 
     #[tokio::test]
     async fn chunk() {
