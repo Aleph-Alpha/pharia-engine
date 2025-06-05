@@ -534,7 +534,8 @@ pub mod tests {
         chunking::ChunkParams,
         inference::{
             ChatEvent, ChatParams, CompletionEvent, CompletionParams, FinishReason, Message,
-            TokenUsage, tests::InferenceStub,
+            TokenUsage,
+            tests::{InferenceApiDouble, InferenceStub},
         },
         search::tests::SearchStub,
         tests::api_token,
@@ -642,24 +643,46 @@ pub mod tests {
 
     #[tokio::test]
     async fn chat_stream_events() {
-        // Given a CSI drivers with stub completion
-        let inference = InferenceStub::new().with_chat(|_| {
-            Ok(ChatResponse {
-                message: Message {
+        struct ChatStreamStub;
+
+        impl InferenceApiDouble for ChatStreamStub {
+            async fn chat_stream(
+                &self,
+                _request: ChatRequest,
+                _api_token: String,
+                _tracing_context: TracingContext,
+            ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
+                let (send, recv) = mpsc::channel(4);
+                let begin = ChatEvent::MessageBegin {
                     role: "assistant".to_owned(),
+                };
+                let append = ChatEvent::MessageAppend {
                     content: "Hello".to_owned(),
-                },
-                finish_reason: FinishReason::Stop,
-                logprobs: vec![],
-                usage: TokenUsage {
-                    prompt: 1,
-                    completion: 1,
-                },
-            })
-        });
+                    logprobs: vec![],
+                };
+                let end = ChatEvent::MessageEnd {
+                    finish_reason: FinishReason::Stop,
+                };
+                let usage = ChatEvent::Usage {
+                    usage: TokenUsage {
+                        prompt: 1,
+                        completion: 1,
+                    },
+                };
+                send.send(Ok(begin)).await.unwrap();
+                send.send(Ok(append)).await.unwrap();
+                send.send(Ok(end)).await.unwrap();
+                send.send(Ok(usage)).await.unwrap();
+                recv
+            }
+        }
+
+        // Given a CSI drivers with stub completion
         let csi_apis = CsiDrivers {
-            inference,
-            ..dummy_csi_drivers()
+            inference: ChatStreamStub,
+            search: SearchStub::new(),
+            tokenizers: FakeTokenizers,
+            tool: ToolDummy,
         };
 
         // When requesting a streamed completion
@@ -790,7 +813,7 @@ pub mod tests {
     type CompleteFn =
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
-    /// A test double for the RawCsi trait that can be loaded up with a completion function
+    /// A test double for the `RawCsi` trait that can be loaded up with a completion function
     #[derive(Clone)]
     pub struct CompletionStub {
         pub completion: Arc<Box<CompleteFn>>,

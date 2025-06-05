@@ -13,5 +13,6 @@ pub use self::{
 
 #[cfg(test)]
 pub mod tests {
+    pub use super::actor::InferenceApiDouble;
     pub use super::actor::tests::InferenceStub;
 }
