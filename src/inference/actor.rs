@@ -605,7 +605,7 @@ pub mod tests {
     };
 
     use anyhow::anyhow;
-    use tokio::{sync::mpsc, time::sleep, try_join};
+    use tokio::{time::sleep, try_join};
 
     use crate::inference::client::{InferenceClientDouble, InferenceError};
 
@@ -658,38 +658,6 @@ pub mod tests {
         ) -> Result<Completion, InferenceError> {
             let completion = (self.complete)(request)?;
             Ok(completion)
-        }
-
-        async fn completion_stream(
-            &self,
-            request: CompletionRequest,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
-            let (send, recv) = mpsc::channel(3);
-            // Load up the receiver with events before returning it
-            match (self.complete)(request) {
-                Ok(Completion {
-                    text,
-                    finish_reason,
-                    logprobs,
-                    usage,
-                }) => {
-                    send.send(Ok(CompletionEvent::Append { text, logprobs }))
-                        .await
-                        .unwrap();
-                    send.send(Ok(CompletionEvent::End { finish_reason }))
-                        .await
-                        .unwrap();
-                    send.send(Ok(CompletionEvent::Usage { usage }))
-                        .await
-                        .unwrap();
-                }
-                Err(e) => {
-                    send.send(Err(e)).await.unwrap();
-                }
-            }
-            recv
         }
     }
 
