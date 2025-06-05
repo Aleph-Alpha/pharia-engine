@@ -605,11 +605,41 @@ pub mod tests {
 
     #[tokio::test]
     async fn completion_stream_events() {
-        // Given a CSI drivers with stub completion
-        let inference = InferenceStub::new().with_complete(|r| Ok(Completion::from_text(r.prompt)));
+        // Given a CSI drivers with stub completion stream
+        struct CompletionStreamStub;
+
+        impl InferenceApiDouble for CompletionStreamStub {
+            async fn completion_stream(
+                &self,
+                _request: CompletionRequest,
+                _api_token: String,
+                _tracing_context: TracingContext,
+            ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
+                let (send, recv) = mpsc::channel(3);
+                let append = CompletionEvent::Append {
+                    text: "Hello".to_owned(),
+                    logprobs: vec![],
+                };
+                let end = CompletionEvent::End {
+                    finish_reason: FinishReason::Stop,
+                };
+                let usage = CompletionEvent::Usage {
+                    usage: TokenUsage {
+                        prompt: 1,
+                        completion: 1,
+                    },
+                };
+                send.send(Ok(append)).await.unwrap();
+                send.send(Ok(end)).await.unwrap();
+                send.send(Ok(usage)).await.unwrap();
+                recv
+            }
+        }
         let csi_apis = CsiDrivers {
-            inference,
-            ..dummy_csi_drivers()
+            inference: CompletionStreamStub,
+            search: SearchStub::new(),
+            tokenizers: FakeTokenizers,
+            tool: ToolDummy,
         };
 
         // When requesting a streamed completion
