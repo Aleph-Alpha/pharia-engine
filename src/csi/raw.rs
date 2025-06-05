@@ -817,35 +817,5 @@ pub mod tests {
                 .map(|r| (*self.completion)(r))
                 .collect()
         }
-
-        async fn completion_stream(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            request: CompletionRequest,
-        ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
-            let (sender, receiver) = mpsc::channel(1);
-            let Completion {
-                text,
-                finish_reason,
-                logprobs,
-                usage,
-            } = (*self.completion)(request).unwrap();
-            tokio::spawn(async move {
-                sender
-                    .send(Ok(CompletionEvent::Append { text, logprobs }))
-                    .await
-                    .unwrap();
-                sender
-                    .send(Ok(CompletionEvent::End { finish_reason }))
-                    .await
-                    .unwrap();
-                sender
-                    .send(Ok(CompletionEvent::Usage { usage }))
-                    .await
-                    .unwrap();
-            });
-            receiver
-        }
     }
 }
