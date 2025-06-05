@@ -534,7 +534,7 @@ pub mod tests {
         namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
-        skills::{AnySkillManifest, Skill, SkillDouble, SkillError, SkillEvent},
+        skills::{SkillDouble, SkillError, SkillEvent},
     };
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -639,7 +639,7 @@ pub mod tests {
         }
 
         #[async_trait]
-        impl Skill for SkillAssertConcurrent {
+        impl SkillDouble for SkillAssertConcurrent {
             async fn run_as_function(
                 &self,
                 _engine: &Engine,
@@ -656,26 +656,6 @@ pub mod tests {
                 // We finished, lets unblock our counterpart, in case it missed a broadcast
                 self.send.send(()).unwrap();
                 Ok(json!("Hello"))
-            }
-
-            async fn manifest(
-                &self,
-                _engine: &Engine,
-                _ctx: Box<dyn Csi + Send>,
-                _tracing_context: &TracingContext,
-            ) -> Result<AnySkillManifest, SkillError> {
-                panic!("Dummy metadata implementation of Assert concurrency skill")
-            }
-
-            async fn run_as_message_stream(
-                &self,
-                _engine: &Engine,
-                _ctx: Box<dyn Csi + Send>,
-                _input: Value,
-                _mpsc: mpsc::Sender<SkillEvent>,
-                _tracing_context: &TracingContext,
-            ) -> Result<(), SkillError> {
-                panic!("Dummy message stream implementation of Assert concurrency skill")
             }
         }
 

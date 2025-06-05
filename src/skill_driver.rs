@@ -1023,16 +1023,6 @@ mod test {
 
     #[async_trait]
     impl SkillDouble for MessageStreamSkillWithCsi {
-        async fn run_as_function(
-            &self,
-            _engine: &Engine,
-            _ctx: Box<dyn Csi + Send>,
-            _input: Value,
-            _tracing_context: &TracingContext,
-        ) -> Result<Value, SkillError> {
-            Err(SkillError::IsMessageStream)
-        }
-
         async fn run_as_message_stream(
             &self,
             _engine: &Engine,
