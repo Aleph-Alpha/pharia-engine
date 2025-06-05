@@ -895,7 +895,7 @@ mod tests {
         chunking::{Chunk, ChunkRequest},
         csi::{
             CsiError,
-            tests::{RawCsiDouble, RawCsiDummy, RawCsiStub},
+            tests::{CompletionStub, RawCsiDouble, RawCsiDummy},
         },
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
@@ -1053,7 +1053,7 @@ mod tests {
         });
 
         // When
-        let csi = RawCsiStub::with_completion(|r| inference::Completion::from_text(r.prompt));
+        let csi = CompletionStub::new(|r| inference::Completion::from_text(r.prompt));
         let app_state = AppState::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
@@ -1176,7 +1176,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let csi = RawCsiStub::with_completion(|r| {
+        let csi = CompletionStub::new(|r| {
             // We expect echo to be true
             assert!(r.params.echo);
             inference::Completion::from_text(r.prompt)
@@ -1216,7 +1216,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let csi = RawCsiStub::with_completion(|r| {
+        let csi = CompletionStub::new(|r| {
             assert!(!r.params.echo);
             inference::Completion::from_text(r.prompt)
         });

@@ -790,22 +790,21 @@ pub mod tests {
     type CompleteFn =
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
+    /// A test double for the RawCsi trait that can be loaded up with a completion function
     #[derive(Clone)]
-    pub struct RawCsiStub {
+    pub struct CompletionStub {
         pub completion: Arc<Box<CompleteFn>>,
     }
 
-    impl RawCsiStub {
-        pub fn with_completion(
-            f: impl Fn(CompletionRequest) -> Completion + Send + Sync + 'static,
-        ) -> Self {
-            RawCsiStub {
+    impl CompletionStub {
+        pub fn new(f: impl Fn(CompletionRequest) -> Completion + Send + Sync + 'static) -> Self {
+            CompletionStub {
                 completion: Arc::new(Box::new(move |cr| Ok(f(cr)))),
             }
         }
     }
 
-    impl RawCsiDouble for RawCsiStub {
+    impl RawCsiDouble for CompletionStub {
         async fn complete(
             &self,
             _auth: String,

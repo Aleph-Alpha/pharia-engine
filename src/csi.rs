@@ -60,7 +60,7 @@ pub trait Csi {
 pub mod tests {
     pub use contextual::ContextualCsiDouble;
     pub use raw::RawCsiDouble;
-    pub use raw::tests::{RawCsiDummy, RawCsiStub};
+    pub use raw::tests::{CompletionStub, RawCsiDummy};
     use std::{
         collections::HashMap,
         sync::{Arc, Mutex},
