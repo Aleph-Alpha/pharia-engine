@@ -910,20 +910,5 @@ pub mod tests {
             });
             receiver
         }
-
-        async fn select_language(
-            &self,
-            requests: Vec<SelectLanguageRequest>,
-            _tracing_context: TracingContext,
-        ) -> anyhow::Result<Vec<Option<Language>>> {
-            Ok(try_join_all(requests.into_iter().map(|request| {
-                tokio::task::spawn_blocking(move || {
-                    select_language(request, TracingContext::dummy())
-                })
-            }))
-            .await?
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?)
-        }
     }
 }
