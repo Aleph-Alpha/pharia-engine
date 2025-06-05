@@ -590,11 +590,6 @@ pub mod tests {
         }
     }
 
-    #[derive(Debug, Clone)]
-    pub struct SkillStoreDummy;
-
-    impl SkillStoreApiDouble for SkillStoreDummy {}
-
     /// A testing double that can be loaded up with a particular skill that will always be loaded.
     #[derive(Clone)]
     pub struct SkillStoreStub {
