@@ -597,7 +597,6 @@ pub mod tests {
 
     #[derive(Clone)]
     pub struct SkillStoreStub {
-        list: Vec<SkillPath>,
         list_cached: Vec<SkillPath>,
         fetch: Option<Arc<dyn Skill>>,
     }
@@ -605,7 +604,6 @@ pub mod tests {
     impl SkillStoreStub {
         pub fn new() -> Self {
             SkillStoreStub {
-                list: vec![],
                 list_cached: vec![],
                 fetch: None,
             }
@@ -613,11 +611,6 @@ pub mod tests {
 
         pub fn with_fetch_response(&mut self, fetch_response: Option<Arc<dyn Skill>>) -> &mut Self {
             self.fetch = fetch_response;
-            self
-        }
-
-        pub fn with_list_response(&mut self, list_response: Vec<SkillPath>) -> &mut Self {
-            self.list = list_response;
             self
         }
 
@@ -638,14 +631,6 @@ pub mod tests {
 
         async fn list_cached(&self) -> Vec<SkillPath> {
             self.list_cached.clone()
-        }
-
-        async fn list(&self, skill_type: Option<SkillDescriptionFilterType>) -> Vec<SkillPath> {
-            if let Some(skill_type) = skill_type {
-                panic!("Skill store stub called with skill type: {skill_type:?}");
-            } else {
-                self.list.clone()
-            }
         }
     }
 

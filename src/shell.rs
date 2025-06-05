@@ -901,7 +901,10 @@ mod tests {
         inference,
         logging::tests::given_tracing_subscriber,
         skill_runtime::SkillRuntimeDouble,
-        skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
+        skill_store::{
+            SkillStoreApiDouble,
+            tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
+        },
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
     };
@@ -1958,13 +1961,22 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn list_skills() {
-        // Given we can provide two skills "ns-one/one" and "ns-two/two"
-        let mut skill_store = SkillStoreStub::new();
-        skill_store.with_list_response(vec![
-            SkillPath::new(Namespace::new("ns-one").unwrap(), "one"),
-            SkillPath::new(Namespace::new("ns-two").unwrap(), "two"),
-        ]);
-        let app_state = AppState::dummy().with_skill_store_api(skill_store);
+        // Given a skill store which can provide two skills "ns-one/one" and "ns-two/two"
+        #[derive(Clone)]
+        struct SkillStoreStub;
+
+        impl SkillStoreApiDouble for SkillStoreStub {
+            async fn list(
+                &self,
+                _skill_type: Option<SkillDescriptionFilterType>,
+            ) -> Vec<SkillPath> {
+                vec![
+                    SkillPath::new(Namespace::new("ns-one").unwrap(), "one"),
+                    SkillPath::new(Namespace::new("ns-two").unwrap(), "two"),
+                ]
+            }
+        }
+        let app_state = AppState::dummy().with_skill_store_api(SkillStoreStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
