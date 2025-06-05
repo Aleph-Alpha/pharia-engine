@@ -59,6 +59,7 @@ pub struct Shell {
 impl Shell {
     /// Start a shell listening to incoming requests at the given address. Successful construction
     /// implies that the listener is bound to the endpoint.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         feature_set: FeatureSet,
         addr: impl Into<SocketAddr>,
