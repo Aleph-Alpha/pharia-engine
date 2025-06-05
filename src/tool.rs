@@ -8,5 +8,5 @@ pub use self::actor::{
 
 #[cfg(test)]
 pub mod tests {
-    pub use super::actor::{McpServerStoreDouble, tests::ToolDummy};
+    pub use super::actor::McpServerStoreDouble;
 }

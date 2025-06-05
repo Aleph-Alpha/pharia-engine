@@ -530,6 +530,8 @@ where
 pub mod tests {
     use std::sync::Arc;
 
+    use double_trait::Dummy;
+
     use crate::{
         chunking::ChunkParams,
         inference::{
@@ -540,7 +542,6 @@ pub mod tests {
         search::tests::SearchStub,
         tests::api_token,
         tokenizers::tests::FakeTokenizers,
-        tool::tests::ToolDummy,
     };
 
     use super::*;
@@ -639,7 +640,7 @@ pub mod tests {
             inference: CompletionStreamStub,
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
-            tool: ToolDummy,
+            tool: Dummy,
         };
 
         // When requesting a streamed completion
@@ -712,7 +713,7 @@ pub mod tests {
             inference: ChatStreamStub,
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
-            tool: ToolDummy,
+            tool: Dummy,
         };
 
         // When requesting a streamed completion
@@ -826,12 +827,12 @@ pub mod tests {
         assert!(responses[1].contains("2nd"));
     }
 
-    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, SearchStub, FakeTokenizers, ToolDummy> {
+    fn dummy_csi_drivers() -> CsiDrivers<InferenceStub, SearchStub, FakeTokenizers, Dummy> {
         CsiDrivers {
             inference: InferenceStub::new(),
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
-            tool: ToolDummy,
+            tool: Dummy,
         }
     }
 
