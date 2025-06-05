@@ -18,16 +18,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    authorization::AuthorizationApi,
     chunking,
     csi::RawCsi,
     inference, language_selection,
     logging::TracingContext,
     search,
-    shell::{AppStateImpl, CsiState},
-    skill_runtime::SkillRuntimeApi,
-    skill_store::SkillStoreApi,
-    tool::McpServerStoreApi,
+    shell::{AppState, CsiState},
 };
 
 // Make our own error that wraps `anyhow::Error`.
@@ -59,13 +55,10 @@ where
     }
 }
 
-pub fn http<A, C, R, S, M>() -> Router<AppStateImpl<A, C, R, S, M>>
+pub fn http<T>() -> Router<T>
 where
-    A: AuthorizationApi + Clone + Send + Sync + 'static,
-    C: RawCsi + Clone + Sync + Send + 'static,
-    R: SkillRuntimeApi + Clone + Send + Sync + 'static,
-    S: SkillStoreApi + Clone + Send + Sync + 'static,
-    M: McpServerStoreApi + Clone + Send + Sync + 'static,
+    T: AppState + Clone + Send + Sync + 'static,
+    T::Csi: RawCsi + Clone + Sync + Send + 'static,
 {
     Router::new()
         .route("/chat", post(chat))
