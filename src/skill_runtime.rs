@@ -530,13 +530,13 @@ pub mod tests {
             tests::{RawCsiDouble, RawCsiDummy},
         },
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke},
-        inference::{ChatEvent, ChatRequest, Completion, CompletionRequest, InferenceError},
+        inference::{ChatEvent, ChatRequest, InferenceError},
         namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         skills::{AnySkillManifest, Skill, SkillDouble, SkillError, SkillEvent},
     };
-    use anyhow::{anyhow, bail};
+    use anyhow::anyhow;
     use async_trait::async_trait;
     use bytesize::ByteSize;
     use metrics::Label;
@@ -866,15 +866,6 @@ pub mod tests {
         pub struct RawCsiSaboteur;
 
         impl RawCsiDouble for RawCsiSaboteur {
-            async fn complete(
-                &self,
-                _auth: String,
-                _tracing_context: TracingContext,
-                _requests: Vec<CompletionRequest>,
-            ) -> anyhow::Result<Vec<Completion>> {
-                bail!("Test error")
-            }
-
             async fn chat_stream(
                 &self,
                 _auth: String,
