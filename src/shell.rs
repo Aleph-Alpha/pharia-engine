@@ -1212,6 +1212,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn http_csi_handle_returns_stream() {
+        // Given a versioned csi request and a stub csi that returns four events for completions
         #[derive(Clone)]
         struct RawCsiStub;
 
@@ -1225,39 +1226,30 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             {
                 let (sender, receiver) = mpsc::channel(1);
                 tokio::spawn(async move {
-                    sender
-                        .send(Ok(inference::ChatEvent::MessageBegin {
-                            role: "assistant".to_owned(),
-                        }))
-                        .await
-                        .unwrap();
-                    sender
-                        .send(Ok(inference::ChatEvent::MessageAppend {
-                            content: "Say hello to Homer".to_owned(),
-                            logprobs: vec![],
-                        }))
-                        .await
-                        .unwrap();
-                    sender
-                        .send(Ok(inference::ChatEvent::MessageEnd {
-                            finish_reason: inference::FinishReason::Stop,
-                        }))
-                        .await
-                        .unwrap();
-                    sender
-                        .send(Ok(inference::ChatEvent::Usage {
-                            usage: inference::TokenUsage {
-                                prompt: 0,
-                                completion: 0,
-                            },
-                        }))
-                        .await
-                        .unwrap();
+                    let message_begin = inference::ChatEvent::MessageBegin {
+                        role: "assistant".to_owned(),
+                    };
+                    let message_append = inference::ChatEvent::MessageAppend {
+                        content: "Say hello to Homer".to_owned(),
+                        logprobs: vec![],
+                    };
+                    let message_end = inference::ChatEvent::MessageEnd {
+                        finish_reason: inference::FinishReason::Stop,
+                    };
+                    let usage = inference::ChatEvent::Usage {
+                        usage: inference::TokenUsage {
+                            prompt: 0,
+                            completion: 0,
+                        },
+                    };
+                    sender.send(Ok(message_begin)).await.unwrap();
+                    sender.send(Ok(message_append)).await.unwrap();
+                    sender.send(Ok(message_end)).await.unwrap();
+                    sender.send(Ok(usage)).await.unwrap();
                 });
                 receiver
             }
         }
-        // Given a versioned csi request
         let body = json!({
             "model": "pharia-1-llm-7b-control",
             "messages": [
@@ -1287,7 +1279,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             .await
             .unwrap();
 
-        // Then we get separate events for each letter in "Hello"
+        // Then we get the expected events
         assert_eq!(resp.status(), StatusCode::OK);
         let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
         assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
