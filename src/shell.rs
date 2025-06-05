@@ -1212,12 +1212,56 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn http_csi_handle_returns_stream() {
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn chat_stream(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _request: inference::ChatRequest,
+            ) -> mpsc::Receiver<Result<inference::ChatEvent, inference::InferenceError>>
+            {
+                let (sender, receiver) = mpsc::channel(1);
+                tokio::spawn(async move {
+                    sender
+                        .send(Ok(inference::ChatEvent::MessageBegin {
+                            role: "assistant".to_owned(),
+                        }))
+                        .await
+                        .unwrap();
+                    sender
+                        .send(Ok(inference::ChatEvent::MessageAppend {
+                            content: "Say hello to Homer".to_owned(),
+                            logprobs: vec![],
+                        }))
+                        .await
+                        .unwrap();
+                    sender
+                        .send(Ok(inference::ChatEvent::MessageEnd {
+                            finish_reason: inference::FinishReason::Stop,
+                        }))
+                        .await
+                        .unwrap();
+                    sender
+                        .send(Ok(inference::ChatEvent::Usage {
+                            usage: inference::TokenUsage {
+                                prompt: 0,
+                                completion: 0,
+                            },
+                        }))
+                        .await
+                        .unwrap();
+                });
+                receiver
+            }
+        }
         // Given a versioned csi request
-        let message = "Say hello to Homer";
         let body = json!({
             "model": "pharia-1-llm-7b-control",
             "messages": [
-                {"role": "user", "content": message}
+                {"role": "user", "content": "Hi"}
             ],
             "params": {
                 "max_tokens": 1,
@@ -1227,19 +1271,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         });
 
         // When
-        let csi = RawCsiStub::with_chat(|_| inference::ChatResponse {
-            message: inference::Message {
-                role: "assistant".to_owned(),
-                content: message.to_owned(),
-            },
-            finish_reason: inference::FinishReason::Stop,
-            logprobs: vec![],
-            usage: inference::TokenUsage {
-                prompt: 0,
-                completion: 0,
-            },
-        });
-        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
