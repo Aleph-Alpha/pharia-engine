@@ -60,10 +60,6 @@ where
 pub trait McpServerStoreApi {
     fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
-
-    // While this is not used yet (from e.g. the shell), it represents the public surface
-    // to test the tool store.
-    #[allow(dead_code)]
     fn list(&self, namespace: Namespace) -> impl Future<Output = Vec<McpServerUrl>> + Send;
 }
 
