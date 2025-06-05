@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.13](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.12...pharia-kernel-v0.12.13)
+
+### Features
+
+- Use actual app state to list MCP servers, test outstanding. - ([653a154](https://github.com/Aleph-Alpha/pharia-kernel/commit/653a15498db640a018a45b3ff221313f3b3739dd))
+- Register route for listing mcp servers as beta - ([8c0bb32](https://github.com/Aleph-Alpha/pharia-kernel/commit/8c0bb32f54261eb895d81938bff0ad1ec9dc217e))
+
+### Builds
+
+- *(deps)* Replace double_derive with double_trait - ([57cf4be](https://github.com/Aleph-Alpha/pharia-kernel/commit/57cf4bef02a7656176d0d64c19d83c4bb30825b7))
+- *(deps)* Bump aquasecurity/trivy-action from 0.30.0 to 0.31.0 - ([810d45e](https://github.com/Aleph-Alpha/pharia-kernel/commit/810d45e68e093e98e01fea470223f06fbde4449b))
+
+
 ## [0.12.12](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.11...pharia-kernel-v0.12.12)
 
 ### Features
