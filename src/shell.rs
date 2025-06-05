@@ -898,7 +898,7 @@ mod tests {
             tests::{RawCsiDouble, RawCsiDummy, RawCsiStub},
         },
         feature_set::PRODUCTION_FEATURE_SET,
-        inference::{self, Explanation, ExplanationRequest, TextScore},
+        inference,
         logging::tests::given_tracing_subscriber,
         skill_runtime::SkillRuntimeDouble,
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
@@ -1287,13 +1287,15 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 &self,
                 _auth: String,
                 _tracing_context: TracingContext,
-                _requests: Vec<ExplanationRequest>,
-            ) -> Result<Vec<Explanation>, CsiError> {
-                Ok(vec![Explanation::new(vec![TextScore {
-                    score: 0.0,
-                    start: 0,
-                    length: 2,
-                }])])
+                _requests: Vec<inference::ExplanationRequest>,
+            ) -> Result<Vec<inference::Explanation>, CsiError> {
+                Ok(vec![inference::Explanation::new(vec![
+                    inference::TextScore {
+                        score: 0.0,
+                        start: 0,
+                        length: 2,
+                    },
+                ])])
             }
         }
 
@@ -1327,6 +1329,30 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn http_csi_handle_chat() {
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn chat(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _requests: Vec<inference::ChatRequest>,
+            ) -> anyhow::Result<Vec<inference::ChatResponse>> {
+                Ok(vec![inference::ChatResponse {
+                    message: inference::Message {
+                        role: "assistant".to_owned(),
+                        content: "dummy-content".to_owned(),
+                    },
+                    finish_reason: inference::FinishReason::Stop,
+                    logprobs: vec![],
+                    usage: inference::TokenUsage {
+                        prompt: 0,
+                        completion: 0,
+                    },
+                }])
+            }
+        }
         // Given a versioned csi request
         let message = "Say hello to Homer";
         let body = json!([{
@@ -1342,19 +1368,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let csi = RawCsiStub::with_chat(|_| inference::ChatResponse {
-            message: inference::Message {
-                role: "assistant".to_owned(),
-                content: message.to_owned(),
-            },
-            finish_reason: inference::FinishReason::Stop,
-            logprobs: vec![],
-            usage: inference::TokenUsage {
-                prompt: 0,
-                completion: 0,
-            },
-        });
-        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1370,7 +1384,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             .await
             .unwrap();
 
-        // Then we get separate events for each letter in "Hello"
+        // Then
         assert_eq!(resp.status(), StatusCode::OK);
         let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
         assert_eq!(content_type, APPLICATION_JSON.as_ref());
