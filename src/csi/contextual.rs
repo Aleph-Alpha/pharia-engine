@@ -15,7 +15,7 @@ use crate::{
     tool::{InvokeRequest, ToolError},
 };
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 /// An abstraction level on top of [`crate::csi::RawCsi`] that encapsulates context about user
 /// invocation and Skill. This includes Skill namespace and authentication.

@@ -20,7 +20,7 @@ use crate::{
 };
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 /// `CompletionStreamId` is a unique identifier for a completion stream.
 #[derive(Debug, Clone, Constructor, Copy, From, PartialEq, Eq, Hash)]

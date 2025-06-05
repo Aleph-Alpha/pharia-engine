@@ -14,7 +14,7 @@ use crate::logging::TracingContext;
 use super::client::{InferenceClient, InferenceError};
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 /// Handle to the inference actor. Spin this up in order to use the inference API.
 pub struct Inference {

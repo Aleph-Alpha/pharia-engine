@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 // It would be nice for users of this module, not to be concerned with the fact that the runtime is
 // using the driver. This may indicate that maybe driver and runtime should be part of the same top

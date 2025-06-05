@@ -23,7 +23,7 @@ use super::{
 };
 
 #[cfg(test)]
-use double_derive::double;
+use double_trait::double;
 
 /// The inference client only takes references to the tracing context. Methods like
 /// `stream_chat` return a future that in which the tracing context is dropped after
