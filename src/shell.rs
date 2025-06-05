@@ -17,10 +17,7 @@ use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer}
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{
-    convert::Infallible, future::Future, iter::once, net::SocketAddr, sync::mpsc::RecvTimeoutError,
-    time::Instant,
-};
+use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time::Instant};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -52,6 +49,7 @@ use crate::{
     skill_runtime::{SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi},
     skill_store::SkillStoreApi,
     skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
+    tool::{McpServerStoreApi, McpServerUrl},
 };
 
 pub struct Shell {
@@ -67,6 +65,7 @@ impl Shell {
         authorization_api: impl AuthorizationApi + Clone + Send + Sync + 'static,
         skill_runtime_api: impl SkillRuntimeApi + Clone + Send + Sync + 'static,
         skill_store_api: impl SkillStoreApi + Clone + Send + Sync + 'static,
+        mcp_servers: impl McpServerStoreApi + Clone + Send + Sync + 'static,
         csi_drivers: impl RawCsi + Clone + Send + Sync + 'static,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> anyhow::Result<Self> {
@@ -82,6 +81,7 @@ impl Shell {
             authorization_api,
             skill_store_api,
             skill_runtime_api,
+            mcp_servers,
             csi_drivers,
         );
         let handle = tokio::spawn(async move {
@@ -102,30 +102,34 @@ impl Shell {
 
 /// State shared between routes
 #[derive(Clone)]
-pub struct AppState<A, C, R, S>
+pub struct AppState<A, C, R, S, M>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
+    M: Clone,
 {
     authorization_api: A,
     skill_store_api: S,
     skill_runtime_api: R,
     csi_drivers: C,
+    mcp_servers: M,
 }
 
-impl<A, C, R, S> AppState<A, C, R, S>
+impl<A, C, R, S, M> AppState<A, C, R, S, M>
 where
     A: AuthorizationApi + Clone,
     C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone,
     S: SkillStoreApi + Clone,
+    M: McpServerStoreApi + Clone,
 {
     pub fn new(
         authorization_api: A,
         skill_store_api: S,
         skill_runtime_api: R,
+        mcp_servers: M,
         csi_drivers: C,
     ) -> Self {
         Self {
@@ -133,6 +137,7 @@ where
             skill_store_api,
             skill_runtime_api,
             csi_drivers,
+            mcp_servers,
         }
     }
 }
@@ -140,14 +145,15 @@ where
 /// Wrapper used to extract [`AuthorizationApi`] api from the [`AppState`] using a [`FromRef`] implementation.
 struct AuthorizationState<A>(pub A);
 
-impl<A, C, R, S> FromRef<AppState<A, C, R, S>> for AuthorizationState<A>
+impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for AuthorizationState<A>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
+    M: Clone,
 {
-    fn from_ref(app_state: &AppState<A, C, R, S>) -> AuthorizationState<A> {
+    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> AuthorizationState<A> {
         AuthorizationState(app_state.authorization_api.clone())
     }
 }
@@ -155,14 +161,15 @@ where
 /// Wrapper used to extract [`Csi`] api from the [`AppState`] using a [`FromRef`] implementation.
 pub struct CsiState<C>(pub C);
 
-impl<A, C, R, S> FromRef<AppState<A, C, R, S>> for CsiState<C>
+impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for CsiState<C>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
+    M: Clone,
 {
-    fn from_ref(app_state: &AppState<A, C, R, S>) -> CsiState<C> {
+    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> CsiState<C> {
         CsiState(app_state.csi_drivers.clone())
     }
 }
@@ -171,14 +178,15 @@ where
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct SkillRuntimeState<R>(pub R);
 
-impl<A, C, R, S> FromRef<AppState<A, C, R, S>> for SkillRuntimeState<R>
+impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for SkillRuntimeState<R>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
+    M: Clone,
 {
-    fn from_ref(app_state: &AppState<A, C, R, S>) -> SkillRuntimeState<R> {
+    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> SkillRuntimeState<R> {
         SkillRuntimeState(app_state.skill_runtime_api.clone())
     }
 }
@@ -187,24 +195,43 @@ where
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct SkillStoreState<S>(pub S);
 
-impl<A, C, R, S> FromRef<AppState<A, C, R, S>> for SkillStoreState<S>
+impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for SkillStoreState<S>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
+    M: Clone,
 {
-    fn from_ref(app_state: &AppState<A, C, R, S>) -> SkillStoreState<S> {
+    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> SkillStoreState<S> {
         SkillStoreState(app_state.skill_store_api.clone())
     }
 }
 
-fn v1<A, C, R, S>(feature_set: FeatureSet) -> Router<AppState<A, C, R, S>>
+/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
+/// reference from the [`AppState`] using a [`FromRef`] implementation.
+struct McpServerStoreState<M>(pub M);
+
+impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for McpServerStoreState<M>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+{
+    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> McpServerStoreState<M> {
+        McpServerStoreState(app_state.mcp_servers.clone())
+    }
+}
+
+fn v1<A, C, R, S, M>(feature_set: FeatureSet) -> Router<AppState<A, C, R, S, M>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
+    M: McpServerStoreApi + Clone + Send + Sync + 'static,
 {
     let skills_route = if feature_set == FeatureSet::Beta {
         get(skills_beta)
@@ -229,12 +256,13 @@ where
     router
 }
 
-fn http<A, C, R, S>(feature_set: FeatureSet, app_state: AppState<A, C, R, S>) -> Router
+fn http<A, C, R, S, M>(feature_set: FeatureSet, app_state: AppState<A, C, R, S, M>) -> Router
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
+    M: McpServerStoreApi + Clone + Send + Sync + 'static,
 {
     // Show documentation for unstable features only in beta systems.
     let api_doc = if feature_set == FeatureSet::Beta {
@@ -904,11 +932,18 @@ fn skill_wit() -> &'static str {
     tag = "namespace",
     security(("api_token" = [])),
     responses(
-        (status = 200, body=Vec<String>, example = json!([])),
+        (status = 200, body=Vec<String>, example = json!(["localhost:8080/my_tool"])),
     ),
 )]
-async fn list_mcp_servers(Path(namespace): Path<Namespace>) -> Json<Vec<String>> {
-    Json(Vec::new())
+async fn list_mcp_servers<M>(
+    Path(namespace): Path<Namespace>,
+    State(McpServerStoreState(mcp_servers)): State<McpServerStoreState<M>>,
+) -> Json<Vec<McpServerUrl>>
+where
+    M: McpServerStoreApi,
+{
+    let servers = mcp_servers.list(namespace).await;
+    Json(servers)
 }
 
 #[cfg(test)]
@@ -932,6 +967,7 @@ mod tests {
         },
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
+        tool::tests::McpServerStoreDouble,
     };
 
     use super::*;
@@ -940,6 +976,7 @@ mod tests {
         body::Body,
         http::{Method, Request, header},
     };
+
     use http_body_util::BodyExt;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
     use reqwest::header::CONTENT_TYPE;
@@ -947,25 +984,35 @@ mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl AppState<StubAuthorization, RawCsiDummy, SkillRuntimeDummy, SkillStoreDummy> {
+    impl
+        AppState<
+            StubAuthorization,
+            RawCsiDummy,
+            SkillRuntimeDummy,
+            SkillStoreDummy,
+            McpServerStoreDummy,
+        >
+    {
         pub fn dummy() -> Self {
             Self::new(
                 StubAuthorization::new(true),
                 SkillStoreDummy,
                 SkillRuntimeDummy,
+                McpServerStoreDummy,
                 RawCsiDummy,
             )
         }
     }
 
-    impl<A, C, R, S> AppState<A, C, R, S>
+    impl<A, C, R, S, M> AppState<A, C, R, S, M>
     where
         A: AuthorizationApi + Clone + Sync + Send + 'static,
         C: RawCsi + Clone + Sync + Send + 'static,
         R: SkillRuntimeApi + Clone + Send + Sync + 'static,
         S: SkillStoreApi + Clone + Send + Sync + 'static,
+        M: McpServerStoreApi + Clone + Send + Sync + 'static,
     {
-        pub fn with_authorization_api<A2>(self, authorization_api: A2) -> AppState<A2, C, R, S>
+        pub fn with_authorization_api<A2>(self, authorization_api: A2) -> AppState<A2, C, R, S, M>
         where
             A2: AuthorizationApi + Clone + Sync + Send + 'static,
         {
@@ -973,11 +1020,12 @@ mod tests {
                 authorization_api,
                 self.skill_store_api,
                 self.skill_runtime_api,
+                self.mcp_servers,
                 self.csi_drivers,
             )
         }
 
-        pub fn with_skill_store_api<S2>(self, skill_store_api: S2) -> AppState<A, C, R, S2>
+        pub fn with_skill_store_api<S2>(self, skill_store_api: S2) -> AppState<A, C, R, S2, M>
         where
             S2: SkillStoreApi + Clone + Send + Sync + 'static,
         {
@@ -985,11 +1033,12 @@ mod tests {
                 self.authorization_api,
                 skill_store_api,
                 self.skill_runtime_api,
+                self.mcp_servers,
                 self.csi_drivers,
             )
         }
 
-        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppState<A, C, R2, S>
+        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppState<A, C, R2, S, M>
         where
             R2: SkillRuntimeApi + Clone + Send + Sync + 'static,
         {
@@ -997,11 +1046,12 @@ mod tests {
                 self.authorization_api,
                 self.skill_store_api,
                 skill_runtime_api,
+                self.mcp_servers,
                 self.csi_drivers,
             )
         }
 
-        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<A, C2, R, S>
+        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<A, C2, R, S, M>
         where
             C2: RawCsi + Clone + Sync + Send + 'static,
         {
@@ -1009,6 +1059,7 @@ mod tests {
                 self.authorization_api,
                 self.skill_store_api,
                 self.skill_runtime_api,
+                self.mcp_servers,
                 csi_drivers,
             )
         }
@@ -1022,6 +1073,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[should_panic]
     async fn list_mcp_servers_by_namespace() {
         let app_state = AppState::dummy();
         let http = http(FeatureSet::Beta, app_state);
@@ -1047,7 +1099,7 @@ mod tests {
         // assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(answer, "[]");
+        assert_eq!(answer, "[\"localhost:8080/my_tool\"]");
     }
 
     #[tokio::test]
@@ -2173,6 +2225,10 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     struct SkillRuntimeDummy;
 
     impl SkillRuntimeDouble for SkillRuntimeDummy {}
+
+    #[derive(Debug, Clone)]
+    struct McpServerStoreDummy;
+    impl McpServerStoreDouble for McpServerStoreDummy {}
 
     /// A test helper answering each request with a predefined error
     #[derive(Clone)]

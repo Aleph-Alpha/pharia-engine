@@ -23,14 +23,16 @@ use crate::{
     skill_runtime::SkillRuntimeApi,
     skill_store::SkillStoreApi,
     skills::SupportedVersion,
+    tool::McpServerStoreApi,
 };
 
-pub fn http<A, C, R, S>() -> Router<AppState<A, C, R, S>>
+pub fn http<A, C, R, S, M>() -> Router<AppState<A, C, R, S, M>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone + Send + Sync + 'static,
     S: SkillStoreApi + Clone + Send + Sync + 'static,
+    M: McpServerStoreApi + Clone + Send + Sync + 'static,
 {
     Router::new()
         .nest("/csi/v1", v1::http())

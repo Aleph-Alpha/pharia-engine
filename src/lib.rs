@@ -137,7 +137,8 @@ impl Kernel {
             authorization.api(),
             skill_runtime.api(),
             skill_store.api(),
-            csi_drivers,
+            tool.api(),
+            csi_drivers.clone(),
             shutdown_signal,
         )
         .await
