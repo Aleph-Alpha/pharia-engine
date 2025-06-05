@@ -794,9 +794,6 @@ pub mod tests {
     type CompleteFn =
         dyn Fn(CompletionRequest) -> anyhow::Result<Completion> + Send + Sync + 'static;
 
-    type ChunkFn =
-        dyn Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> + Send + Sync + 'static;
-
     type ExplainFn =
         dyn Fn(ExplanationRequest) -> Result<Explanation, CsiError> + Send + Sync + 'static;
 
@@ -804,7 +801,6 @@ pub mod tests {
     pub struct RawCsiStub {
         pub chat: Arc<Box<ChatFn>>,
         pub completion: Arc<Box<CompleteFn>>,
-        pub chunking: Arc<Box<ChunkFn>>,
         pub explain: Arc<Box<ExplainFn>>,
     }
 
@@ -813,16 +809,8 @@ pub mod tests {
             RawCsiStub {
                 chat: Arc::new(Box::new(|_| bail!("Chat not set in StubCsi"))),
                 completion: Arc::new(Box::new(|_| bail!("Completion not set in StubCsi"))),
-                chunking: Arc::new(Box::new(|_| bail!("Chunking not set in StubCsi"))),
                 explain: Arc::new(Box::new(|_| unimplemented!("Explain not set in StubCsi"))),
             }
-        }
-
-        pub fn set_chunking(
-            &mut self,
-            f: impl Fn(Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> + Send + Sync + 'static,
-        ) {
-            self.chunking = Arc::new(Box::new(f));
         }
 
         pub fn with_chat(f: impl Fn(ChatRequest) -> ChatResponse + Send + Sync + 'static) -> Self {
@@ -900,15 +888,6 @@ pub mod tests {
                     .unwrap();
             });
             receiver
-        }
-
-        async fn chunk(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            requests: Vec<ChunkRequest>,
-        ) -> anyhow::Result<Vec<Vec<Chunk>>> {
-            (*self.chunking)(requests)
         }
 
         async fn chat(
