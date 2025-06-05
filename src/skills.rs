@@ -527,6 +527,7 @@ pub enum SkillEvent {
 #[cfg(test)]
 pub mod tests {
     use async_trait::async_trait;
+    use double_trait::Dummy;
     use fake::{Fake as _, Faker};
     use serde_json::json;
     use test_skills::{
@@ -672,7 +673,7 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata = skill
-            .manifest(&engine, Box::new(CsiDummy), &TracingContext::dummy())
+            .manifest(&engine, Box::new(Dummy), &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -690,7 +691,7 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata_result = skill
-            .manifest(&engine, Box::new(CsiDummy), &TracingContext::dummy())
+            .manifest(&engine, Box::new(Dummy), &TracingContext::dummy())
             .await;
 
         // Then the metadata gives an error
@@ -1161,7 +1162,7 @@ pub mod tests {
 
         // When metadata for a skill is requested
         let metadata = skill
-            .manifest(&engine, Box::new(CsiDummy), &TracingContext::dummy())
+            .manifest(&engine, Box::new(Dummy), &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -1185,9 +1186,4 @@ pub mod tests {
 
     #[async_trait]
     impl SkillDouble for SkillDummy {}
-
-    struct CsiDummy;
-
-    #[async_trait]
-    impl CsiDouble for CsiDummy {}
 }

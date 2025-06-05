@@ -393,9 +393,6 @@ pub mod tests {
 
     use super::*;
 
-    pub struct ToolDummy;
-    impl ToolDouble for ToolDummy {}
-
     /// Only report tools for one particular server address
     struct ToolClientMock;
 
