@@ -627,19 +627,7 @@ pub mod tests {
         }
     }
 
-    impl SkillStoreApi for SkillStoreStub {
-        async fn remove(&self, _skill_path: SkillPath) {
-            panic!("Skill store stub called.")
-        }
-
-        async fn upsert(&self, _skill: ConfiguredSkill) {
-            panic!("Skill store stub called.")
-        }
-
-        async fn set_namespace_error(&self, _namespace: Namespace, _error: Option<anyhow::Error>) {
-            panic!("Skill store stub called.")
-        }
-
+    impl SkillStoreApiDouble for SkillStoreStub {
         async fn fetch(
             &self,
             _skill_path: SkillPath,
@@ -658,10 +646,6 @@ pub mod tests {
             } else {
                 self.list.clone()
             }
-        }
-
-        async fn invalidate_cache(&self, _skill_path: SkillPath) -> bool {
-            panic!("Skill store stub called.")
         }
     }
 
