@@ -102,11 +102,15 @@ impl Shell {
 }
 
 pub trait AppState {
+    type Csi: Clone;
     type SkillRuntime: Clone;
     type SkillStore: Clone;
+    type McpServerStore: Clone;
 
+    fn csi(&self) -> &Self::Csi;
     fn skill_runtime(&self) -> &Self::SkillRuntime;
     fn skill_store(&self) -> &Self::SkillStore;
+    fn mcp_server_store(&self) -> &Self::McpServerStore;
 }
 
 impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
@@ -117,8 +121,14 @@ where
     S: Clone,
     M: Clone,
 {
+    type Csi = C;
     type SkillRuntime = R;
     type SkillStore = S;
+    type McpServerStore = M;
+
+    fn csi(&self) -> &Self::Csi {
+        &self.csi_drivers
+    }
 
     fn skill_runtime(&self) -> &Self::SkillRuntime {
         &self.skill_runtime_api
@@ -126,6 +136,10 @@ where
 
     fn skill_store(&self) -> &Self::SkillStore {
         &self.skill_store_api
+    }
+
+    fn mcp_server_store(&self) -> &Self::McpServerStore {
+        &self.mcp_servers
     }
 }
 
@@ -190,16 +204,9 @@ where
 /// Wrapper used to extract [`Csi`] api from the [`AppState`] using a [`FromRef`] implementation.
 pub struct CsiState<C>(pub C);
 
-impl<A, C, R, S, M> FromRef<AppStateImpl<A, C, R, S, M>> for CsiState<C>
-where
-    A: Clone,
-    C: Clone,
-    R: Clone,
-    S: Clone,
-    M: Clone,
-{
-    fn from_ref(app_state: &AppStateImpl<A, C, R, S, M>) -> CsiState<C> {
-        CsiState(app_state.csi_drivers.clone())
+impl<T: AppState> FromRef<T> for CsiState<T::Csi> {
+    fn from_ref(app_state: &T) -> CsiState<T::Csi> {
+        CsiState(app_state.csi().clone())
     }
 }
 
@@ -227,16 +234,9 @@ impl<T: AppState> FromRef<T> for SkillStoreState<T::SkillStore> {
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct McpServerStoreState<M>(pub M);
 
-impl<A, C, R, S, M> FromRef<AppStateImpl<A, C, R, S, M>> for McpServerStoreState<M>
-where
-    A: Clone,
-    C: Clone,
-    R: Clone,
-    S: Clone,
-    M: Clone,
-{
-    fn from_ref(app_state: &AppStateImpl<A, C, R, S, M>) -> McpServerStoreState<M> {
-        McpServerStoreState(app_state.mcp_servers.clone())
+impl<T: AppState> FromRef<T> for McpServerStoreState<T::McpServerStore> {
+    fn from_ref(app_state: &T) -> McpServerStoreState<T::McpServerStore> {
+        McpServerStoreState(app_state.mcp_server_store().clone())
     }
 }
 
