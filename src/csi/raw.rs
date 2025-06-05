@@ -868,15 +868,6 @@ pub mod tests {
             receiver
         }
 
-        async fn chat(
-            &self,
-            _auth: String,
-            _tracing_context: TracingContext,
-            requests: Vec<ChatRequest>,
-        ) -> anyhow::Result<Vec<ChatResponse>> {
-            requests.into_iter().map(|r| (*self.chat)(r)).collect()
-        }
-
         async fn chat_stream(
             &self,
             _auth: String,
