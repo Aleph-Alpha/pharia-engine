@@ -1083,7 +1083,7 @@ mod tests {
         impl McpServerStoreDouble for McpServerMock {
             async fn list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
-                vec![McpServerUrl("localhost:8080/my_tool".to_owned())]
+                vec![McpServerUrl("http://localhost:8083/mcp".to_owned())]
             }
         }
         let app_state = AppState::dummy().with_mcp_server_store(McpServerMock);
@@ -1107,10 +1107,10 @@ mod tests {
             .unwrap();
 
         // Then
-        // assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(answer, "[\"localhost:8080/my_tool\"]");
+        assert_eq!(answer, "[\"http://localhost:8083/mcp\"]");
     }
 
     #[tokio::test]
