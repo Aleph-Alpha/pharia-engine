@@ -1051,6 +1051,19 @@ mod tests {
             )
         }
 
+        pub fn with_mcp_server_store<M2>(self, mcp_servers: M2) -> AppState<A, C, R, S, M2>
+        where
+            M2: McpServerStoreApi + Clone + Send + Sync + 'static,
+        {
+            AppState::new(
+                self.authorization_api,
+                self.skill_store_api,
+                self.skill_runtime_api,
+                mcp_servers,
+                self.csi_drivers,
+            )
+        }
+
         pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<A, C2, R, S, M>
         where
             C2: RawCsi + Clone + Sync + Send + 'static,
@@ -1073,9 +1086,15 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic]
     async fn list_mcp_servers_by_namespace() {
-        let app_state = AppState::dummy();
+        #[derive(Clone)]
+        struct McpServerStub;
+        impl McpServerStoreDouble for McpServerStub{
+            async fn list(&self, _namespace: Namespace) -> Vec<McpServerUrl> {
+                vec![McpServerUrl("localhost:8080/my_tool".to_owned())]
+            }
+        }
+        let app_state = AppState::dummy().with_mcp_server_store(McpServerStub);
         let http = http(FeatureSet::Beta, app_state);
 
         // When
