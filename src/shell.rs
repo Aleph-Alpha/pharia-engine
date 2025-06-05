@@ -102,11 +102,13 @@ impl Shell {
 }
 
 pub trait AppState {
+    type Authorization: Clone;
     type Csi: Clone;
     type SkillRuntime: Clone;
     type SkillStore: Clone;
     type McpServerStore: Clone;
 
+    fn authorization(&self) -> &Self::Authorization;
     fn csi(&self) -> &Self::Csi;
     fn skill_runtime(&self) -> &Self::SkillRuntime;
     fn skill_store(&self) -> &Self::SkillStore;
@@ -121,10 +123,15 @@ where
     S: Clone,
     M: Clone,
 {
+    type Authorization = A;
     type Csi = C;
     type SkillRuntime = R;
     type SkillStore = S;
     type McpServerStore = M;
+
+    fn authorization(&self) -> &Self::Authorization {
+        &self.authorization_api
+    }
 
     fn csi(&self) -> &Self::Csi {
         &self.csi_drivers
@@ -188,16 +195,9 @@ where
 /// Wrapper used to extract [`AuthorizationApi`] api from the [`AppState`] using a [`FromRef`] implementation.
 struct AuthorizationState<A>(pub A);
 
-impl<A, C, R, S, M> FromRef<AppStateImpl<A, C, R, S, M>> for AuthorizationState<A>
-where
-    A: Clone,
-    C: Clone,
-    R: Clone,
-    S: Clone,
-    M: Clone,
-{
-    fn from_ref(app_state: &AppStateImpl<A, C, R, S, M>) -> AuthorizationState<A> {
-        AuthorizationState(app_state.authorization_api.clone())
+impl<T: AppState> FromRef<T> for AuthorizationState<T::Authorization> {
+    fn from_ref(app_state: &T) -> AuthorizationState<T::Authorization> {
+        AuthorizationState(app_state.authorization().clone())
     }
 }
 
