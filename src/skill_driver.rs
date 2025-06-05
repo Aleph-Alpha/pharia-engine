@@ -887,8 +887,9 @@ mod test {
     async fn csi_usage_from_metadata_leads_to_suspension() {
         // Given a skill runtime that always returns a skill that uses the csi from the metadata function
         struct CsiFromMetadataSkill;
+
         #[async_trait]
-        impl Skill for CsiFromMetadataSkill {
+        impl SkillDouble for CsiFromMetadataSkill {
             async fn manifest(
                 &self,
                 _engine: &Engine,
@@ -903,27 +904,6 @@ mod test {
                 unreachable!(
                     "The test should never reach this point, as its execution shoud be suspendend"
                 )
-            }
-
-            async fn run_as_function(
-                &self,
-                _engine: &Engine,
-                _ctx: Box<dyn Csi + Send>,
-                _input: Value,
-                _tracing_context: &TracingContext,
-            ) -> Result<Value, SkillError> {
-                unreachable!("This won't be invoked during the test")
-            }
-
-            async fn run_as_message_stream(
-                &self,
-                _engine: &Engine,
-                _ctx: Box<dyn Csi + Send>,
-                _input: Value,
-                _sender: mpsc::Sender<SkillEvent>,
-                _tracing_context: &TracingContext,
-            ) -> Result<(), SkillError> {
-                unreachable!("This won't be invoked during the test")
             }
         }
 
