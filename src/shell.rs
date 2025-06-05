@@ -893,9 +893,12 @@ mod tests {
     use crate::{
         authorization::tests::StubAuthorization,
         chunking::{Chunk, ChunkRequest},
-        csi::tests::{RawCsiDouble, RawCsiDummy, RawCsiStub},
+        csi::{
+            CsiError,
+            tests::{RawCsiDouble, RawCsiDummy, RawCsiStub},
+        },
         feature_set::PRODUCTION_FEATURE_SET,
-        inference::{self, Explanation, TextScore},
+        inference::{self, Explanation, ExplanationRequest, TextScore},
         logging::tests::given_tracing_subscriber,
         skill_runtime::SkillRuntimeDouble,
         skill_store::tests::{SkillStoreDummy, SkillStoreMsg, SkillStoreStub},
@@ -1276,6 +1279,24 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn http_csi_handle_returns_explain() {
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn explain(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _requests: Vec<ExplanationRequest>,
+            ) -> Result<Vec<Explanation>, CsiError> {
+                Ok(vec![Explanation::new(vec![TextScore {
+                    score: 0.0,
+                    start: 0,
+                    length: 2,
+                }])])
+            }
+        }
+
         let body = json!([{
             "prompt": "prompt",
             "target": "target",
@@ -1283,14 +1304,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             "granularity": "auto"
         }]);
 
-        let csi = RawCsiStub::with_explain(|_| {
-            Explanation::new(vec![TextScore {
-                score: 0.0,
-                start: 0,
-                length: 2,
-            }])
-        });
-        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
