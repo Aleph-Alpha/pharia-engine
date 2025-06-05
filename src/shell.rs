@@ -78,7 +78,7 @@ impl Shell {
             .context(format!("Could not bind a tcp listener to '{addr}'"))?;
         info!("Listening on: {addr}");
 
-        let app_state = AppState::new(
+        let app_state = AppStateImpl::new(
             authorization_api,
             skill_store_api,
             skill_runtime_api,
@@ -101,9 +101,30 @@ impl Shell {
     }
 }
 
+pub trait AppState {
+    type SkillRuntime: Clone;
+
+    fn skill_runtime(&self) -> &Self::SkillRuntime;
+}
+
+impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+{
+    type SkillRuntime = R;
+
+    fn skill_runtime(&self) -> &Self::SkillRuntime {
+        &self.skill_runtime_api
+    }
+}
+
 /// State shared between routes
 #[derive(Clone)]
-pub struct AppState<A, C, R, S, M>
+pub struct AppStateImpl<A, C, R, S, M>
 where
     A: Clone,
     C: Clone,
@@ -118,7 +139,7 @@ where
     mcp_servers: M,
 }
 
-impl<A, C, R, S, M> AppState<A, C, R, S, M>
+impl<A, C, R, S, M> AppStateImpl<A, C, R, S, M>
 where
     A: AuthorizationApi + Clone,
     C: RawCsi + Clone + Sync + Send + 'static,
@@ -146,7 +167,7 @@ where
 /// Wrapper used to extract [`AuthorizationApi`] api from the [`AppState`] using a [`FromRef`] implementation.
 struct AuthorizationState<A>(pub A);
 
-impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for AuthorizationState<A>
+impl<A, C, R, S, M> FromRef<AppStateImpl<A, C, R, S, M>> for AuthorizationState<A>
 where
     A: Clone,
     C: Clone,
@@ -154,7 +175,7 @@ where
     S: Clone,
     M: Clone,
 {
-    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> AuthorizationState<A> {
+    fn from_ref(app_state: &AppStateImpl<A, C, R, S, M>) -> AuthorizationState<A> {
         AuthorizationState(app_state.authorization_api.clone())
     }
 }
@@ -162,7 +183,7 @@ where
 /// Wrapper used to extract [`Csi`] api from the [`AppState`] using a [`FromRef`] implementation.
 pub struct CsiState<C>(pub C);
 
-impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for CsiState<C>
+impl<A, C, R, S, M> FromRef<AppStateImpl<A, C, R, S, M>> for CsiState<C>
 where
     A: Clone,
     C: Clone,
@@ -170,7 +191,7 @@ where
     S: Clone,
     M: Clone,
 {
-    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> CsiState<C> {
+    fn from_ref(app_state: &AppStateImpl<A, C, R, S, M>) -> CsiState<C> {
         CsiState(app_state.csi_drivers.clone())
     }
 }
@@ -179,16 +200,9 @@ where
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct SkillRuntimeState<R>(pub R);
 
-impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for SkillRuntimeState<R>
-where
-    A: Clone,
-    C: Clone,
-    R: Clone,
-    S: Clone,
-    M: Clone,
-{
-    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> SkillRuntimeState<R> {
-        SkillRuntimeState(app_state.skill_runtime_api.clone())
+impl<T: AppState> FromRef<T> for SkillRuntimeState<T::SkillRuntime> {
+    fn from_ref(app_state: &T) -> SkillRuntimeState<T::SkillRuntime> {
+        SkillRuntimeState(app_state.skill_runtime().clone())
     }
 }
 
@@ -196,7 +210,7 @@ where
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct SkillStoreState<S>(pub S);
 
-impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for SkillStoreState<S>
+impl<A, C, R, S, M> FromRef<AppStateImpl<A, C, R, S, M>> for SkillStoreState<S>
 where
     A: Clone,
     C: Clone,
@@ -204,7 +218,7 @@ where
     S: Clone,
     M: Clone,
 {
-    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> SkillStoreState<S> {
+    fn from_ref(app_state: &AppStateImpl<A, C, R, S, M>) -> SkillStoreState<S> {
         SkillStoreState(app_state.skill_store_api.clone())
     }
 }
@@ -213,7 +227,7 @@ where
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct McpServerStoreState<M>(pub M);
 
-impl<A, C, R, S, M> FromRef<AppState<A, C, R, S, M>> for McpServerStoreState<M>
+impl<A, C, R, S, M> FromRef<AppStateImpl<A, C, R, S, M>> for McpServerStoreState<M>
 where
     A: Clone,
     C: Clone,
@@ -221,12 +235,12 @@ where
     S: Clone,
     M: Clone,
 {
-    fn from_ref(app_state: &AppState<A, C, R, S, M>) -> McpServerStoreState<M> {
+    fn from_ref(app_state: &AppStateImpl<A, C, R, S, M>) -> McpServerStoreState<M> {
         McpServerStoreState(app_state.mcp_servers.clone())
     }
 }
 
-fn v1<A, C, R, S, M>(feature_set: FeatureSet) -> Router<AppState<A, C, R, S, M>>
+fn v1<A, C, R, S, M>(feature_set: FeatureSet) -> Router<AppStateImpl<A, C, R, S, M>>
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: RawCsi + Clone + Sync + Send + 'static,
@@ -257,7 +271,7 @@ where
     router
 }
 
-fn http<A, C, R, S, M>(feature_set: FeatureSet, app_state: AppState<A, C, R, S, M>) -> Router
+fn http<A, C, R, S, M>(feature_set: FeatureSet, app_state: AppStateImpl<A, C, R, S, M>) -> Router
 where
     A: AuthorizationApi + Clone + Send + Sync + 'static,
     C: RawCsi + Clone + Sync + Send + 'static,
@@ -983,7 +997,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl AppState<StubAuthorization, Dummy, SkillRuntimeDummy, Dummy, McpServerStoreDummy> {
+    impl AppStateImpl<StubAuthorization, Dummy, SkillRuntimeDummy, Dummy, McpServerStoreDummy> {
         pub fn dummy() -> Self {
             Self::new(
                 StubAuthorization::new(true),
@@ -995,7 +1009,7 @@ mod tests {
         }
     }
 
-    impl<A, C, R, S, M> AppState<A, C, R, S, M>
+    impl<A, C, R, S, M> AppStateImpl<A, C, R, S, M>
     where
         A: AuthorizationApi + Clone + Sync + Send + 'static,
         C: RawCsi + Clone + Sync + Send + 'static,
@@ -1003,11 +1017,14 @@ mod tests {
         S: SkillStoreApi + Clone + Send + Sync + 'static,
         M: McpServerStoreApi + Clone + Send + Sync + 'static,
     {
-        pub fn with_authorization_api<A2>(self, authorization_api: A2) -> AppState<A2, C, R, S, M>
+        pub fn with_authorization_api<A2>(
+            self,
+            authorization_api: A2,
+        ) -> AppStateImpl<A2, C, R, S, M>
         where
             A2: AuthorizationApi + Clone + Sync + Send + 'static,
         {
-            AppState::new(
+            AppStateImpl::new(
                 authorization_api,
                 self.skill_store_api,
                 self.skill_runtime_api,
@@ -1016,11 +1033,11 @@ mod tests {
             )
         }
 
-        pub fn with_skill_store_api<S2>(self, skill_store_api: S2) -> AppState<A, C, R, S2, M>
+        pub fn with_skill_store_api<S2>(self, skill_store_api: S2) -> AppStateImpl<A, C, R, S2, M>
         where
             S2: SkillStoreApi + Clone + Send + Sync + 'static,
         {
-            AppState::new(
+            AppStateImpl::new(
                 self.authorization_api,
                 skill_store_api,
                 self.skill_runtime_api,
@@ -1029,11 +1046,14 @@ mod tests {
             )
         }
 
-        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppState<A, C, R2, S, M>
+        pub fn with_skill_runtime_api<R2>(
+            self,
+            skill_runtime_api: R2,
+        ) -> AppStateImpl<A, C, R2, S, M>
         where
             R2: SkillRuntimeApi + Clone + Send + Sync + 'static,
         {
-            AppState::new(
+            AppStateImpl::new(
                 self.authorization_api,
                 self.skill_store_api,
                 skill_runtime_api,
@@ -1042,11 +1062,11 @@ mod tests {
             )
         }
 
-        pub fn with_mcp_server_store<M2>(self, mcp_servers: M2) -> AppState<A, C, R, S, M2>
+        pub fn with_mcp_server_store<M2>(self, mcp_servers: M2) -> AppStateImpl<A, C, R, S, M2>
         where
             M2: McpServerStoreApi + Clone + Send + Sync + 'static,
         {
-            AppState::new(
+            AppStateImpl::new(
                 self.authorization_api,
                 self.skill_store_api,
                 self.skill_runtime_api,
@@ -1055,11 +1075,11 @@ mod tests {
             )
         }
 
-        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppState<A, C2, R, S, M>
+        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppStateImpl<A, C2, R, S, M>
         where
             C2: RawCsi + Clone + Sync + Send + 'static,
         {
-            AppState::new(
+            AppStateImpl::new(
                 self.authorization_api,
                 self.skill_store_api,
                 self.skill_runtime_api,
@@ -1086,7 +1106,7 @@ mod tests {
                 vec![McpServerUrl("http://localhost:8083/mcp".to_owned())]
             }
         }
-        let app_state = AppState::dummy().with_mcp_server_store(McpServerMock);
+        let app_state = AppStateImpl::dummy().with_mcp_server_store(McpServerMock);
         let http = http(FeatureSet::Beta, app_state);
 
         // When
@@ -1124,7 +1144,7 @@ mod tests {
             },
         });
         let runtime = SkillRuntimeStub::with_metadata(metadata);
-        let app_state = AppState::dummy().with_skill_runtime_api(runtime);
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(runtime);
 
         // When
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -1174,7 +1194,7 @@ mod tests {
 
         // When
         let csi = CompletionStub::new(|r| inference::Completion::from_text(r.prompt));
-        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1244,7 +1264,7 @@ mod tests {
         });
 
         // When
-        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1301,7 +1321,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             assert!(r.params.echo);
             inference::Completion::from_text(r.prompt)
         });
-        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1340,7 +1360,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             assert!(!r.params.echo);
             inference::Completion::from_text(r.prompt)
         });
-        let app_state = AppState::dummy().with_csi_drivers(csi);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(csi);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1415,7 +1435,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         });
 
         // When
-        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1482,7 +1502,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             "granularity": "auto"
         }]);
 
-        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1544,7 +1564,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         }]);
 
         // When
-        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1594,7 +1614,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             },
         }]);
 
-        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1646,7 +1666,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             "character_offsets": true
         }]);
 
-        let app_state = AppState::dummy().with_csi_drivers(RawCsiStub);
+        let app_state = AppStateImpl::dummy().with_csi_drivers(RawCsiStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         let resp = http
@@ -1672,7 +1692,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     async fn run_skill_with_bad_namespace() {
         // Given an invalid namespace
         let bad_namespace = "bad_namespace";
-        let app_state = AppState::dummy();
+        let app_state = AppStateImpl::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -1699,7 +1719,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     async fn answer_of_succesfull_run_skill_function() {
         // Given
         let runtime = SkillRuntimeStub::with_function_ok(json!("Result from Skill"));
-        let app_state = AppState::dummy().with_skill_runtime_api(runtime);
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(runtime);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -1727,7 +1747,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     async fn should_forward_function_input_to_skill_runtime() {
         // Given
         let runtime_spy = SkillRuntimeSpy::new();
-        let app_state = AppState::dummy().with_skill_runtime_api(runtime_spy.clone());
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(runtime_spy.clone());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -1762,7 +1782,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             payload: json!(null),
         });
         let skill_executer_mock = SkillRuntimeStub::with_stream_events(stream_events);
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_executer_mock);
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_executer_mock);
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a message stream
@@ -1810,7 +1830,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             SkillExecutionError::RuntimeError("Skill is a saboteur".to_string()),
         )];
         let skill_runtime = SkillRuntimeStub::with_stream_events(stream_events);
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a message stream from a skill that does not exist
@@ -1846,7 +1866,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     async fn api_token_missing_permission() {
         // Given
         let stub_authorization = StubAuthorization::new(false);
-        let app_state = AppState::dummy().with_authorization_api(stub_authorization);
+        let app_state = AppStateImpl::dummy().with_authorization_api(stub_authorization);
 
         // When we want to access an endpoint that requires authentication
         let api_token = api_token();
@@ -1879,7 +1899,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     #[tokio::test]
     async fn api_token_missing_in_run_skill() {
         // Given
-        let app_state = AppState::dummy();
+        let app_state = AppStateImpl::dummy();
 
         // When
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -1918,7 +1938,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 ]
             }
         }
-        let app_state = AppState::dummy().with_skill_store_api(SkillStoreStub);
+        let app_state = AppStateImpl::dummy().with_skill_store_api(SkillStoreStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -1963,7 +1983,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 send.send(true).unwrap();
             }
         });
-        let app_state = AppState::dummy().with_skill_store_api(send);
+        let app_state = AppStateImpl::dummy().with_skill_store_api(send);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When the skill is deleted
@@ -2015,7 +2035,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 send.send(false).unwrap();
             }
         });
-        let app_state = AppState::dummy().with_skill_store_api(send);
+        let app_state = AppStateImpl::dummy().with_skill_store_api(send);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When the skill is deleted
@@ -2048,7 +2068,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn health() {
-        let app_state = AppState::dummy();
+        let app_state = AppStateImpl::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
@@ -2065,7 +2085,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
     #[tokio::test]
     async fn skill_wit_route_should_return_current_wit_world() {
-        let app_state = AppState::dummy();
+        let app_state = AppStateImpl::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
@@ -2099,7 +2119,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 ]
             }
         }
-        let app_state = AppState::dummy().with_skill_store_api(SkillStoreStub);
+        let app_state = AppStateImpl::dummy().with_skill_store_api(SkillStoreStub);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -2129,7 +2149,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     async fn cannot_list_skills_without_permissions() {
         // Given we have a saboteur authorization
         let saboteur_authorization = StubAuthorization::new(false);
-        let app_state = AppState::dummy().with_authorization_api(saboteur_authorization);
+        let app_state = AppStateImpl::dummy().with_authorization_api(saboteur_authorization);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -2165,7 +2185,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
                 namespace: Namespace::new("playground").unwrap(),
                 original_syntax_error: "error msg".to_owned(),
             });
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When executing a skill in the namespace
@@ -2202,7 +2222,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         // Given a skill executer which always replies Skill does not exist
         let skill_runtime = SkillRuntimeSaboteur::new(|| SkillExecutionError::SkillNotConfigured);
         let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime);
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime);
 
         // When executing a skill
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -2424,7 +2444,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         // spans will not be created as no one is interested in them.
         given_tracing_subscriber();
 
-        let app_state = AppState::dummy();
+        let app_state = AppStateImpl::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When doing a request with a traceparent header
@@ -2456,7 +2476,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
         // Given a shell
         let skill_runtime = SkillRuntimeSpy::new();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime.clone());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When a request with a trace id comes in
@@ -2491,7 +2511,7 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
         // Given a shell
         let skill_runtime = SkillRuntimeSpy::new();
-        let app_state = AppState::dummy().with_skill_runtime_api(skill_runtime.clone());
+        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime.clone());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When a request with a tracestate header comes in
