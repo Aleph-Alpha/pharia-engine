@@ -12,13 +12,19 @@ use axum_extra::{
     headers::{Authorization, authorization::Bearer},
 };
 use futures::Stream;
+use reqwest::StatusCode;
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::OpenApi;
 
 use crate::{
-    FeatureSet, logging::TracingContext, namespace_watcher::Namespace, shell::HttpError,
-    skill_driver::SkillExecutionEvent, skill_runtime::SkillRuntimeApi, skills::SkillPath,
+    FeatureSet,
+    logging::TracingContext,
+    namespace_watcher::Namespace,
+    shell::HttpError,
+    skill_driver::{SkillExecutionError, SkillExecutionEvent},
+    skill_runtime::SkillRuntimeApi,
+    skills::SkillPath,
 };
 
 pub fn http_skill_runtime_v1<T>(_feature_set: FeatureSet) -> Router<T>
@@ -249,6 +255,32 @@ enum MessageEvent {
 #[derive(Serialize)]
 struct SseErrorEvent {
     message: String,
+}
+
+impl From<SkillExecutionError> for HttpError {
+    fn from(value: SkillExecutionError) -> Self {
+        let status_code = match &value {
+            // We return 5xx not only for runtime errors, but also for errors we consider Bugs in
+            // the deployed skills.
+            SkillExecutionError::MisconfiguredNamespace { .. }
+            | SkillExecutionError::CsiUseFromMetadata
+            | SkillExecutionError::InvalidOutput(_)
+            | SkillExecutionError::MessageAppendWithoutMessageBegin
+            | SkillExecutionError::MessageBeginWhileMessageActive
+            | SkillExecutionError::MessageEndWithoutMessageBegin
+            | SkillExecutionError::SkillLoadError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            // Service unavailable indicates better that the situation is temporary and retrying it
+            // might be worth it.
+            SkillExecutionError::RuntimeError(_) => StatusCode::SERVICE_UNAVAILABLE,
+            // 400 for every error we see an error on the client side of HTTP
+            SkillExecutionError::UserCode(_)
+            | SkillExecutionError::SkillNotConfigured
+            | SkillExecutionError::IsFunction
+            | SkillExecutionError::IsMessageStream
+            | SkillExecutionError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+        };
+        HttpError::new(value.to_string(), status_code)
+    }
 }
 
 #[cfg(test)]
