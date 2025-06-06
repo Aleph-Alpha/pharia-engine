@@ -46,8 +46,8 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     skill_runtime::{
-        SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi, SkillRuntimeProvider,
-        SkillRuntimeState, http_skill_runtime_v1, openapi_skill_runtime_v1,
+        SkillExecutionEvent, SkillRuntimeApi, SkillRuntimeProvider, SkillRuntimeState,
+        http_skill_runtime_v1, openapi_skill_runtime_v1,
     },
     skill_store::{
         SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
@@ -247,7 +247,6 @@ where
         .merge(http_skill_store_v1(feature_set))
         .merge(http_skill_runtime_v1(feature_set))
         .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
-        .route("/skills/{namespace}/{name}/run", post(run_skill))
         .route(
             "/skills/{namespace}/{name}/message-stream",
             post(message_stream_skill),
@@ -362,13 +361,13 @@ where
     Ok(response)
 }
 
-struct HttpError {
+pub struct HttpError {
     message: String,
     status_code: StatusCode,
 }
 
 impl HttpError {
-    fn new(message: String, status_code: StatusCode) -> Self {
+    pub fn new(message: String, status_code: StatusCode) -> Self {
         Self {
             message,
             status_code,
@@ -379,32 +378,6 @@ impl HttpError {
 impl IntoResponse for HttpError {
     fn into_response(self) -> axum::response::Response {
         (self.status_code, self.message).into_response()
-    }
-}
-
-impl From<SkillExecutionError> for HttpError {
-    fn from(value: SkillExecutionError) -> Self {
-        let status_code = match &value {
-            // We return 5xx not only for runtime errors, but also for errors we consider Bugs in
-            // the deployed skills.
-            SkillExecutionError::MisconfiguredNamespace { .. }
-            | SkillExecutionError::CsiUseFromMetadata
-            | SkillExecutionError::InvalidOutput(_)
-            | SkillExecutionError::MessageAppendWithoutMessageBegin
-            | SkillExecutionError::MessageBeginWhileMessageActive
-            | SkillExecutionError::MessageEndWithoutMessageBegin
-            | SkillExecutionError::SkillLoadError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            // Service unavailable indicates better that the situation is temporary and retrying it
-            // might be worth it.
-            SkillExecutionError::RuntimeError(_) => StatusCode::SERVICE_UNAVAILABLE,
-            // 400 for every error we see an error on the client side of HTTP
-            SkillExecutionError::UserCode(_)
-            | SkillExecutionError::SkillNotConfigured
-            | SkillExecutionError::IsFunction
-            | SkillExecutionError::IsMessageStream
-            | SkillExecutionError::InvalidInput(_) => StatusCode::BAD_REQUEST,
-        };
-        HttpError::new(value.to_string(), status_code)
     }
 }
 
@@ -448,7 +421,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, run_skill, message_stream_skill),
+    paths(serve_docs, message_stream_skill),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -461,7 +434,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, run_skill, message_stream_skill, skill_wit, skill_metadata),
+    paths(serve_docs, message_stream_skill, skill_wit, skill_metadata),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -592,43 +565,6 @@ impl From<AnySkillManifest> for SkillMetadataV1Representation {
             output_schema: signature.and_then(Signature::output_schema).cloned(),
         }
     }
-}
-
-/// Run
-///
-/// Run a Skill in the Kernel from one of the available repositories.
-#[utoipa::path(
-    post,
-    operation_id = "run_skill",
-    path = "/v1/skills/{namespace}/{name}/run",
-    request_body(content_type = "application/json", description = "The expected input for the skill in JSON format.", example = json!({"text": "some text to be summarized", "length": "short"})),
-    security(("api_token" = [])),
-    tag = "skills",
-    responses(
-        (status = 200, description = "The Skill was executed.", body=Value, example = json!({"summary": "The summary of the text."})),
-        (status = 400, description = "The Skill invocation failed.", body=String, example = "Skill not found.")
-    ),
-)]
-async fn run_skill<R>(
-    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
-    Path((namespace, name)): Path<(Namespace, String)>,
-    Json(input): Json<Value>,
-) -> Result<Json<Value>, HttpError>
-where
-    R: SkillRuntimeApi,
-{
-    let tracing_context = TracingContext::current();
-    let skill_path = SkillPath::new(namespace, name);
-    let response = skill_runtime_api
-        .run_function(
-            skill_path,
-            input,
-            bearer.token().to_owned(),
-            tracing_context,
-        )
-        .await?;
-    Ok(Json(response))
 }
 
 /// Stream
@@ -793,7 +729,7 @@ fn skill_wit() -> &'static str {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
@@ -806,6 +742,7 @@ mod tests {
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
         logging::tests::given_tracing_subscriber,
+        skill_driver::SkillExecutionError,
         skill_runtime::SkillRuntimeDouble,
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
@@ -886,7 +823,7 @@ mod tests {
         }
     }
 
-    fn dummy_auth_value() -> header::HeaderValue {
+    pub fn dummy_auth_value() -> header::HeaderValue {
         let api_token = "dummy auth token";
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
@@ -1446,33 +1383,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         assert_eq!(resp.status(), StatusCode::OK);
         let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
         assert_eq!(content_type, APPLICATION_JSON.as_ref());
-    }
-
-    #[tokio::test]
-    async fn run_skill_with_bad_namespace() {
-        // Given an invalid namespace
-        let bad_namespace = "bad_namespace";
-        let app_state = AppStateImpl::dummy();
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        // When
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri(format!("/v1/skills/{bad_namespace}/greet_skill/run"))
-                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let error = String::from_utf8(body.to_vec()).unwrap();
-        assert!(error.to_lowercase().contains("invalid namespace"));
     }
 
     #[tokio::test]
