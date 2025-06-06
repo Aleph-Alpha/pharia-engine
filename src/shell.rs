@@ -45,7 +45,10 @@ use crate::{
     feature_set::FeatureSet,
     logging::TracingContext,
     namespace_watcher::Namespace,
-    skill_runtime::{SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi},
+    skill_runtime::{
+        SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi, SkillRuntimeProvider,
+        SkillRuntimeState, http_skill_runtime_v1, openapi_skill_runtime_v1,
+    },
     skill_store::{
         SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
         openapi_skill_store_v1,
@@ -129,14 +132,27 @@ where
     }
 }
 
-pub trait AppState: McpServerStoreProvider + SkillStoreProvider {
+impl<A, C, R, S, M> SkillRuntimeProvider for AppStateImpl<A, C, R, S, M>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+{
+    type SkillRuntime = R;
+
+    fn skill_runtime(&self) -> &R {
+        &self.skill_runtime_api
+    }
+}
+
+pub trait AppState: McpServerStoreProvider + SkillStoreProvider + SkillRuntimeProvider {
     type Authorization: Clone;
     type Csi: Clone;
-    type SkillRuntime: Clone;
 
     fn authorization(&self) -> &Self::Authorization;
     fn csi(&self) -> &Self::Csi;
-    fn skill_runtime(&self) -> &Self::SkillRuntime;
 }
 
 impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
@@ -149,7 +165,6 @@ where
 {
     type Authorization = A;
     type Csi = C;
-    type SkillRuntime = R;
 
     fn authorization(&self) -> &Self::Authorization {
         &self.authorization_api
@@ -157,10 +172,6 @@ where
 
     fn csi(&self) -> &Self::Csi {
         &self.csi_drivers
-    }
-
-    fn skill_runtime(&self) -> &Self::SkillRuntime {
-        &self.skill_runtime_api
     }
 }
 
@@ -224,16 +235,6 @@ impl<T: AppState> FromRef<T> for CsiState<T::Csi> {
     }
 }
 
-/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
-/// reference from the [`AppState`] using a [`FromRef`] implementation.
-struct SkillRuntimeState<R>(pub R);
-
-impl<T: AppState> FromRef<T> for SkillRuntimeState<T::SkillRuntime> {
-    fn from_ref(app_state: &T) -> SkillRuntimeState<T::SkillRuntime> {
-        SkillRuntimeState(app_state.skill_runtime().clone())
-    }
-}
-
 fn v1<T>(feature_set: FeatureSet) -> Router<T>
 where
     T: AppState + Clone + Send + Sync + 'static,
@@ -244,6 +245,7 @@ where
     Router::new()
         .merge(http_tools_v1(feature_set))
         .merge(http_skill_store_v1(feature_set))
+        .merge(http_skill_runtime_v1(feature_set))
         .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
         .route("/skills/{namespace}/{name}/run", post(run_skill))
         .route(
@@ -269,7 +271,9 @@ where
     };
     let api_doc = api_doc.nest(
         "v1",
-        openapi_tools_v1(feature_set).merge_from(openapi_skill_store_v1(feature_set)),
+        openapi_tools_v1(feature_set)
+            .merge_from(openapi_skill_store_v1(feature_set))
+            .merge_from(openapi_skill_runtime_v1(feature_set)),
     );
 
     Router::new()
