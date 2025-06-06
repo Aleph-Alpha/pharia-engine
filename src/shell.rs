@@ -3,11 +3,11 @@ use async_stream::try_stream;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{FromRef, MatchedPath, Path, Query, Request, State},
+    extract::{FromRef, MatchedPath, Path, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
     response::{ErrorResponse, Html, IntoResponse, Response, Sse, sse::Event},
-    routing::{delete, get, post},
+    routing::{get, post},
 };
 use axum_extra::{
     TypedHeader,
@@ -45,9 +45,11 @@ use crate::{
     feature_set::FeatureSet,
     logging::TracingContext,
     namespace_watcher::Namespace,
-    skill_loader::SkillDescriptionFilterType,
     skill_runtime::{SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi},
-    skill_store::SkillStoreApi,
+    skill_store::{
+        SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
+        openapi_skill_store_v1,
+    },
     skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
     tool::{McpServerStoreApi, McpServerStoreProvider, http_tools_v1, openapi_tools_v1},
 };
@@ -112,16 +114,29 @@ where
     }
 }
 
-pub trait AppState: McpServerStoreProvider {
+impl<A, C, R, S, M> SkillStoreProvider for AppStateImpl<A, C, R, S, M>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+{
+    type SkillStore = S;
+
+    fn skill_store(&self) -> &Self::SkillStore {
+        &self.skill_store_api
+    }
+}
+
+pub trait AppState: McpServerStoreProvider + SkillStoreProvider {
     type Authorization: Clone;
     type Csi: Clone;
     type SkillRuntime: Clone;
-    type SkillStore: Clone;
 
     fn authorization(&self) -> &Self::Authorization;
     fn csi(&self) -> &Self::Csi;
     fn skill_runtime(&self) -> &Self::SkillRuntime;
-    fn skill_store(&self) -> &Self::SkillStore;
 }
 
 impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
@@ -135,7 +150,6 @@ where
     type Authorization = A;
     type Csi = C;
     type SkillRuntime = R;
-    type SkillStore = S;
 
     fn authorization(&self) -> &Self::Authorization {
         &self.authorization_api
@@ -147,10 +161,6 @@ where
 
     fn skill_runtime(&self) -> &Self::SkillRuntime {
         &self.skill_runtime_api
-    }
-
-    fn skill_store(&self) -> &Self::SkillStore {
-        &self.skill_store_api
     }
 }
 
@@ -224,16 +234,6 @@ impl<T: AppState> FromRef<T> for SkillRuntimeState<T::SkillRuntime> {
     }
 }
 
-/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
-/// reference from the [`AppState`] using a [`FromRef`] implementation.
-struct SkillStoreState<S>(pub S);
-
-impl<T: AppState> FromRef<T> for SkillStoreState<T::SkillStore> {
-    fn from_ref(app_state: &T) -> SkillStoreState<T::SkillStore> {
-        SkillStoreState(app_state.skill_store().clone())
-    }
-}
-
 fn v1<T>(feature_set: FeatureSet) -> Router<T>
 where
     T: AppState + Clone + Send + Sync + 'static,
@@ -241,15 +241,9 @@ where
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
     T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
 {
-    let skills_route = if feature_set == FeatureSet::Beta {
-        get(skills_beta)
-    } else {
-        get(skills)
-    };
-
     Router::new()
         .merge(http_tools_v1(feature_set))
-        .route("/skills", skills_route)
+        .merge(http_skill_store_v1(feature_set))
         .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
         .route("/skills/{namespace}/{name}/run", post(run_skill))
         .route(
@@ -273,18 +267,16 @@ where
     } else {
         ApiDoc::openapi()
     };
-    let api_doc = api_doc.nest("v1/", openapi_tools_v1(feature_set));
+    let api_doc = api_doc.nest(
+        "v1",
+        openapi_tools_v1(feature_set).merge_from(openapi_skill_store_v1(feature_set)),
+    );
 
     Router::new()
         // Authenticated routes
         .nest("/v1", v1(feature_set))
         .merge(csi_shell::http())
-        // Hidden routes for cache for internal use
-        .route("/cached_skills", get(cached_skills))
-        .route(
-            "/cached_skills/{namespace}/{name}",
-            delete(drop_cached_skill),
-        )
+        .merge(http_skill_store_v0(feature_set))
         .route_layer(middleware::from_fn_with_state(
             app_state.clone(),
             authorization_middleware,
@@ -452,7 +444,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, skills, run_skill, message_stream_skill),
+    paths(serve_docs, run_skill, message_stream_skill),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -465,7 +457,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, skills_beta, run_skill, message_stream_skill, skill_wit, skill_metadata),
+    paths(serve_docs, run_skill, message_stream_skill, skill_wit, skill_metadata),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -780,138 +772,6 @@ struct SseErrorEvent {
     message: String,
 }
 
-#[derive(Deserialize, ToSchema)]
-struct SkillListParams {
-    #[serde(rename = "type")]
-    skill_type: Option<SkillDescriptionSchemaType>,
-}
-
-#[derive(Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum SkillDescriptionSchemaType {
-    Chat,
-    Programmable,
-}
-
-impl From<SkillDescriptionSchemaType> for SkillDescriptionFilterType {
-    fn from(value: SkillDescriptionSchemaType) -> Self {
-        match value {
-            SkillDescriptionSchemaType::Chat => SkillDescriptionFilterType::Chat,
-            SkillDescriptionSchemaType::Programmable => SkillDescriptionFilterType::Programmable,
-        }
-    }
-}
-
-/// List
-///
-/// List of configured Skills (Beta).
-#[utoipa::path(
-    get,
-    operation_id = "skills",
-    path = "/v1/skills",
-    tag = "skills",
-    security(("api_token" = [])),
-    params(("type" = Option<SkillDescriptionSchemaType>, Query, nullable, description = "The type of skills to list. Can be `chat` or `null`.")),
-    responses(
-        (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
-    ),
-)]
-async fn skills_beta<S>(
-    State(SkillStoreState(skill_store_api)): State<SkillStoreState<S>>,
-    Query(SkillListParams { skill_type }): Query<SkillListParams>,
-) -> Json<Vec<String>>
-where
-    S: SkillStoreApi,
-{
-    let response = skill_store_api.list(skill_type.map(Into::into)).await;
-    let response = response.iter().map(ToString::to_string).collect();
-    Json(response)
-}
-
-/// List
-///
-/// List of configured Skills.
-#[utoipa::path(
-    get,
-    operation_id = "skills",
-    path = "/v1/skills",
-    tag = "skills",
-    security(("api_token" = [])),
-    responses(
-        (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
-    ),
-)]
-async fn skills<S>(
-    State(SkillStoreState(skill_store_api)): State<SkillStoreState<S>>,
-) -> Json<Vec<String>>
-where
-    S: SkillStoreApi,
-{
-    let response = skill_store_api.list(None).await;
-    let response = response.iter().map(ToString::to_string).collect();
-    Json(response)
-}
-
-/// cached_skills
-///
-/// List of all cached Skills. These are Skills that are already compiled
-/// and are faster because they do not have to be transpiled to machine code.
-/// When executing a Skill which is not loaded yet, it will be cached.
-#[utoipa::path(
-    get,
-    operation_id = "cached_skills",
-    path = "/cached_skills",
-    tag = "skills",
-    security(("api_token" = [])),
-    responses(
-        (status = 200, body=Vec<String>, example = json!(["acme/first_skill", "acme/second_skill"])),
-    ),
-)]
-async fn cached_skills<S>(
-    State(SkillStoreState(skill_store_api)): State<SkillStoreState<S>>,
-) -> Json<Vec<String>>
-where
-    S: SkillStoreApi,
-{
-    let response = skill_store_api.list_cached().await;
-    let response = response.iter().map(ToString::to_string).collect();
-    Json(response)
-}
-
-/// drop_cached_skill
-///
-/// Remove a loaded Skill from the runtime. With a first invocation, Skills are loaded to
-/// the runtime. This leads to faster execution on the second invocation. If a Skill is
-/// updated in the repository, it needs to be removed from the cache so that the new version
-/// becomes available in the Kernel.
-#[utoipa::path(
-    delete,
-    operation_id = "drop_cached_skill",
-    path = "/cached_skills/{namespace}/{name}",
-    tag = "skills",
-    security(("api_token" = [])),
-    responses(
-        (status = 200, body=String, example = json!("Skill removed from cache.")),
-        (status = 200, body=String, example = json!("Skill was not present in cache.")),
-    ),
-)]
-async fn drop_cached_skill<S>(
-    State(SkillStoreState(skill_store_api)): State<SkillStoreState<S>>,
-    Path((namespace, name)): Path<(Namespace, String)>,
-) -> Json<String>
-where
-    S: SkillStoreApi,
-{
-    let skill_path = SkillPath::new(namespace, name);
-    let skill_was_cached = skill_store_api.invalidate_cache(skill_path).await;
-    let msg = if skill_was_cached {
-        "Skill removed from cache".to_string()
-    } else {
-        "Skill was not present in cache".to_string()
-    };
-    Json(msg)
-}
-
 /// WIT (WebAssembly Interface Types) of Skills
 ///
 /// Skills are WebAssembly components built against a WIT world. This route returns this WIT world.
@@ -943,7 +803,6 @@ mod tests {
         inference,
         logging::tests::given_tracing_subscriber,
         skill_runtime::SkillRuntimeDouble,
-        skill_store::{SkillStoreApiDouble, tests::SkillStoreMsg},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
     };
@@ -987,19 +846,6 @@ mod tests {
             AppStateImpl::new(
                 authorization_api,
                 self.skill_store_api,
-                self.skill_runtime_api,
-                self.mcp_servers,
-                self.csi_drivers,
-            )
-        }
-
-        pub fn with_skill_store_api<S2>(self, skill_store_api: S2) -> AppStateImpl<A, C, R, S2, M>
-        where
-            S2: SkillStoreApi + Clone + Send + Sync + 'static,
-        {
-            AppStateImpl::new(
-                self.authorization_api,
-                skill_store_api,
                 self.skill_runtime_api,
                 self.mcp_servers,
                 self.csi_drivers,
@@ -1835,148 +1681,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
-    async fn list_cached_skills_for_user() {
-        // Given a skill store with two cached skills
-        #[derive(Clone)]
-        struct SkillStoreStub;
-
-        impl SkillStoreApiDouble for SkillStoreStub {
-            async fn list_cached(&self) -> Vec<SkillPath> {
-                vec![
-                    SkillPath::new(Namespace::new("ns").unwrap(), "first"),
-                    SkillPath::new(Namespace::new("ns").unwrap(), "second"),
-                ]
-            }
-        }
-        let app_state = AppStateImpl::dummy().with_skill_store_api(SkillStoreStub);
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        // When
-        let api_token = api_token();
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .uri("/cached_skills")
-                    .header(AUTHORIZATION, auth_value)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(answer, "[\"ns/first\",\"ns/second\"]");
-    }
-
-    #[tokio::test]
-    async fn drop_cached_skill() {
-        // Given a provider which answers invalidate cache with `true`
-
-        // We use this to spy on the path send to the skill executer. Better to use a channel,
-        // rather than a mutex, but we do not have async closures yet.
-        let skill_path = Arc::new(Mutex::new(None));
-        let skill_path_clone = skill_path.clone();
-        let (send, mut recv) = mpsc::channel(1);
-        let namespace = Namespace::new("pharia-kernel-team").unwrap();
-        tokio::spawn(async move {
-            if let SkillStoreMsg::InvalidateCache { skill_path, send } = recv.recv().await.unwrap()
-            {
-                skill_path_clone.lock().unwrap().replace(skill_path);
-                // `true` means it we actually deleted a skill
-                send.send(true).unwrap();
-            }
-        });
-        let app_state = AppStateImpl::dummy().with_skill_store_api(send);
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        // When the skill is deleted
-        let api_token = api_token();
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::DELETE)
-                    .uri(format!("/cached_skills/{namespace}/haiku_skill"))
-                    .header(AUTHORIZATION, auth_value)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
-        assert_eq!(
-            skill_path.lock().unwrap().take().unwrap(),
-            SkillPath::new(namespace, "haiku_skill")
-        );
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert!(answer.contains("removed from cache"));
-    }
-
-    #[tokio::test]
-    async fn drop_non_cached_skill() {
-        // Given a runtime without cached skill
-
-        // We use this to spy on the path send to the skill executer. Better to use a channel,
-        // rather than a mutex, but we do not have async closures yet.
-        let skill_path = Arc::new(Mutex::new(None));
-        let skill_path_clone = skill_path.clone();
-        let (send, mut recv) = mpsc::channel(1);
-        let namespace = Namespace::new("pharia-kernel-team").unwrap();
-        // We use this to spy on the path send to the skill executer. Better to use a channel,
-        // rather than a mutex, but we do not have async closures yet.
-        // Given a runtime with one installed skill
-        tokio::spawn(async move {
-            if let SkillStoreMsg::InvalidateCache { skill_path, send } = recv.recv().await.unwrap()
-            {
-                skill_path_clone.lock().unwrap().replace(skill_path);
-                // `false` means the skill has not been there before
-                send.send(false).unwrap();
-            }
-        });
-        let app_state = AppStateImpl::dummy().with_skill_store_api(send);
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        // When the skill is deleted
-        let api_token = api_token();
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::DELETE)
-                    .uri(format!("/cached_skills/{namespace}/haiku_skill"))
-                    .header(AUTHORIZATION, auth_value)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
-        assert_eq!(
-            skill_path.lock().unwrap().take().unwrap(),
-            SkillPath::new(namespace, "haiku_skill")
-        );
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(answer, "\"Skill was not present in cache\"");
-    }
-
-    #[tokio::test]
     async fn health() {
         let app_state = AppStateImpl::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -2010,49 +1714,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         let actual = String::from_utf8(body.to_vec()).unwrap();
 
         assert_eq!(actual, include_str!("../wit/skill@0.3/skill.wit"));
-    }
-
-    #[tokio::test]
-    async fn list_skills() {
-        // Given a skill store which can provide two skills "ns-one/one" and "ns-two/two"
-        #[derive(Clone)]
-        struct SkillStoreStub;
-
-        impl SkillStoreApiDouble for SkillStoreStub {
-            async fn list(
-                &self,
-                _skill_type: Option<SkillDescriptionFilterType>,
-            ) -> Vec<SkillPath> {
-                vec![
-                    SkillPath::new(Namespace::new("ns-one").unwrap(), "one"),
-                    SkillPath::new(Namespace::new("ns-two").unwrap(), "two"),
-                ]
-            }
-        }
-        let app_state = AppStateImpl::dummy().with_skill_store_api(SkillStoreStub);
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        // When
-        let api_token = api_token();
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .uri("/v1/skills")
-                    .header(AUTHORIZATION, auth_value)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let actual = String::from_utf8(body.to_vec()).unwrap();
-        let expected = "[\"ns-one/one\",\"ns-two/two\"]";
-        assert_eq!(actual, expected);
     }
 
     #[tokio::test]

@@ -1,3 +1,9 @@
+mod routes;
+
+pub use routes::{
+    SkillStoreProvider, http_skill_store_v0, http_skill_store_v1, openapi_skill_store_v1,
+};
+
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::{
