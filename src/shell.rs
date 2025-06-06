@@ -97,18 +97,37 @@ impl Shell {
     }
 }
 
-pub trait AppState {
+pub trait McpServerStoreProvider {
+    type McpServerStore;
+
+    fn mcp_server_store(&self) -> &Self::McpServerStore;
+}
+
+impl<A, C, R, S, M> McpServerStoreProvider for AppStateImpl<A, C, R, S, M>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+{
+    type McpServerStore = M;
+
+    fn mcp_server_store(&self) -> &M {
+        &self.mcp_servers
+    }
+}
+
+pub trait AppState: McpServerStoreProvider {
     type Authorization: Clone;
     type Csi: Clone;
     type SkillRuntime: Clone;
     type SkillStore: Clone;
-    type McpServerStore: Clone;
 
     fn authorization(&self) -> &Self::Authorization;
     fn csi(&self) -> &Self::Csi;
     fn skill_runtime(&self) -> &Self::SkillRuntime;
     fn skill_store(&self) -> &Self::SkillStore;
-    fn mcp_server_store(&self) -> &Self::McpServerStore;
 }
 
 impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
@@ -123,7 +142,6 @@ where
     type Csi = C;
     type SkillRuntime = R;
     type SkillStore = S;
-    type McpServerStore = M;
 
     fn authorization(&self) -> &Self::Authorization {
         &self.authorization_api
@@ -139,10 +157,6 @@ where
 
     fn skill_store(&self) -> &Self::SkillStore {
         &self.skill_store_api
-    }
-
-    fn mcp_server_store(&self) -> &Self::McpServerStore {
-        &self.mcp_servers
     }
 }
 
@@ -230,7 +244,11 @@ impl<T: AppState> FromRef<T> for SkillStoreState<T::SkillStore> {
 /// reference from the [`AppState`] using a [`FromRef`] implementation.
 struct McpServerStoreState<M>(pub M);
 
-impl<T: AppState> FromRef<T> for McpServerStoreState<T::McpServerStore> {
+impl<T> FromRef<T> for McpServerStoreState<T::McpServerStore>
+where
+    T: AppState,
+    T::McpServerStore: Clone,
+{
     fn from_ref(app_state: &T) -> McpServerStoreState<T::McpServerStore> {
         McpServerStoreState(app_state.mcp_server_store().clone())
     }
