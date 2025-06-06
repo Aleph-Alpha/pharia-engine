@@ -1,23 +1,21 @@
 use anyhow::Context;
-use async_stream::try_stream;
 use axum::{
     Json, Router,
     body::Body,
     extract::{FromRef, MatchedPath, Path, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
-    response::{ErrorResponse, Html, IntoResponse, Response, Sse, sse::Event},
-    routing::{get, post},
+    response::{ErrorResponse, Html, IntoResponse, Response},
+    routing::get,
 };
 use axum_extra::{
     TypedHeader,
     headers::{self, Authorization, authorization::Bearer},
 };
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{convert::Infallible, future::Future, iter::once, net::SocketAddr, time::Instant};
+use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -46,8 +44,8 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     skill_runtime::{
-        SkillExecutionEvent, SkillRuntimeApi, SkillRuntimeProvider, SkillRuntimeState,
-        http_skill_runtime_v1, openapi_skill_runtime_v1,
+        SkillRuntimeApi, SkillRuntimeProvider, SkillRuntimeState, http_skill_runtime_v1,
+        openapi_skill_runtime_v1,
     },
     skill_store::{
         SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
@@ -247,10 +245,6 @@ where
         .merge(http_skill_store_v1(feature_set))
         .merge(http_skill_runtime_v1(feature_set))
         .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
-        .route(
-            "/skills/{namespace}/{name}/message-stream",
-            post(message_stream_skill),
-        )
 }
 
 fn http<T>(feature_set: FeatureSet, app_state: T) -> Router
@@ -421,7 +415,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
 #[derive(OpenApi)]
 #[openapi(
     info(description = "The best place to run serverless AI applications."),
-    paths(serve_docs, message_stream_skill),
+    paths(serve_docs),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -434,7 +428,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, message_stream_skill, skill_wit, skill_metadata),
+    paths(serve_docs, skill_wit, skill_metadata),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -567,151 +561,6 @@ impl From<AnySkillManifest> for SkillMetadataV1Representation {
     }
 }
 
-/// Stream
-///
-/// Stream from a Skill in the Kernel from one of the available repositories.
-#[utoipa::path(
-    post,
-    operation_id = "message_stream_skill",
-    path = "/v1/skills/{namespace}/{name}/message-stream",
-    request_body(
-        content_type = "application/json",
-        description = "The expected input for the skill in JSON format.",
-        example = json!({})
-    ),
-    security(("api_token" = [])),
-    tag = "skills",
-    responses(
-        (status = 200,
-            description = "A stream of substrings composing a message",
-            body=Value,
-            content(("text/event-stream", examples(
-                ("Tell me a joke" = (
-                    summary = "Namespace: `example`, Skill: `tell_me_a_joke`",
-                    description = "The `tell_me_a_joke` Skill in the `example` namespace streams a joke.",
-                    value = json!("\
-                        event: message\n\
-                        data: {\"type\":\"begin\"}\n\
-                        \n\
-                        event: message\n\
-                        data: {\"type\":\"append\",\"text\":\"Here's one:\\n\\nWhat do you call a fake noodle?\\n\\nAn impasta!\\n\\nHope that made you laugh! Do you want to hear another one?\"}\n\
-                        \n\
-                        event: message\n\
-                        data: {\"type\":\"end\",\"payload\":\"Stop\"}\n\
-                    ")
-                )),
-                ("Hello" = (
-                    summary = "Namespace: `example`, Skill: `hello`",
-                    description = "The `hello` Skill in the `example` namespace streams each character of the text \"Hello\".",
-                    value = json!("\
-                        event: message\n\
-                        data: {\"type\":\"begin\"}\n\
-                        \n\
-                        event: message\n\
-                        data: {\"type\":\"append\",\"text\":\"H\"}\n\
-                        \n\
-                        event: message\n\
-                        data: {\"type\":\"append\",\"text\":\"e\"}\n\
-                        \n\
-                        event: message\n\
-                        data: {\"type\":\"append\",\"text\":\"l\"}\n\
-                        \n\
-                        event: message\n\
-                        data: {\"type\":\"append\",\"text\":\"l\"}\n\
-                        \n\
-                        event: message\n\
-                        data: {\"type\":\"append\",\"text\":\"o\"}\n\
-                        \n\
-                        event: message\n\
-                        data: {\"type\":\"end\",\"payload\":null}\n\
-                    ")
-                )),
-                ("Saboteur" = (
-                    summary = "Namespace: `example`, Skill: `saboteur`",
-                    description = "The `saboteur` Skill in the `example` namespace responds with an error.",
-                    value = json!("\
-                        event: error\n\
-                        data: {\"message\":\"The skill you called responded with an error. Maybe you should check your input, if it seems to be correct you may want to contact the skill developer. Error reported by Skill:\\n\\nSkill is a saboteur\"}\n\
-                    ")
-                )),
-                ("Non-existing Skill" = (
-                    summary = "Namespace: `example`, Skill: `non-existing-skill`",
-                    description = "The `non-existing-skill` Skill does not exist in the `example` namespace.",
-                    value = json!("\
-                        event: error\n\
-                        data: {\"message\":\"Sorry, we could not find the skill you requested in its namespace. This can have three causes:\\n\n1. You sent the wrong skill name.\\n2. You sent the wrong namespace.\\n3. The skill is not configured in the namespace you requested. You may want to check the namespace configuration.\"}\n\
-                    ")
-                ))
-            )))),
-        ),
-)]
-async fn message_stream_skill<R>(
-    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
-    Path((namespace, name)): Path<(Namespace, String)>,
-    Json(input): Json<Value>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
-where
-    R: SkillRuntimeApi,
-{
-    let path = SkillPath::new(namespace, name);
-    let tracing_context = TracingContext::current();
-    let mut stream_events = skill_runtime_api
-        .run_message_stream(path, input, bearer.token().to_owned(), tracing_context)
-        .await;
-
-    // We need to use `try_stream!` instead of `stream!`, because `stream!` does not implement the
-    // traits required to be converted into an http body for the response. Since we do wanna rely on
-    // the implementation provided by axum for this, we use `try_stream!` with an infallible error
-    // type. Please note, that we report the actual errors as "normal" events in the stream.
-    let stream = try_stream! {
-        while let Some(event) = stream_events.recv().await {
-            // Convert stream events to Server Side Events
-            yield event.into();
-        }
-    };
-
-    Sse::new(stream)
-}
-
-impl From<SkillExecutionEvent> for Event {
-    fn from(value: SkillExecutionEvent) -> Self {
-        match value {
-            SkillExecutionEvent::MessageBegin => Self::default()
-                .event("message")
-                .json_data(MessageEvent::Begin)
-                .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::MessageEnd { payload } => Self::default()
-                .event("message")
-                .json_data(MessageEvent::End { payload })
-                .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::MessageAppend { text } => Self::default()
-                .event("message")
-                .json_data(MessageEvent::Append { text })
-                .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::Error(error) => Self::default()
-                .event("error")
-                .json_data(SseErrorEvent {
-                    message: error.to_string(),
-                })
-                .expect("`json_data` must only be called once."),
-        }
-    }
-}
-
-#[derive(Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum MessageEvent {
-    Begin,
-    Append { text: String },
-    End { payload: Value },
-}
-
-#[derive(Serialize)]
-struct SseErrorEvent {
-    message: String,
-}
-
 /// WIT (WebAssembly Interface Types) of Skills
 ///
 /// Skills are WebAssembly components built against a WIT world. This route returns this WIT world.
@@ -742,7 +591,7 @@ pub mod tests {
         feature_set::PRODUCTION_FEATURE_SET,
         inference,
         logging::tests::given_tracing_subscriber,
-        skill_driver::SkillExecutionError,
+        skill_driver::{SkillExecutionError, SkillExecutionEvent},
         skill_runtime::SkillRuntimeDouble,
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
@@ -1438,59 +1287,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         assert_eq!(runtime_spy.api_token(), "dummy auth token");
         assert_eq!(runtime_spy.skill_path(), SkillPath::local("greet_skill"));
         assert_eq!(runtime_spy.input(), json!("Homer"));
-    }
-
-    #[tokio::test]
-    async fn stream_endpoint_should_send_individual_message_deltas() {
-        // Given
-        let mut stream_events = Vec::new();
-        stream_events.push(SkillExecutionEvent::MessageBegin);
-        stream_events.extend("Hello".chars().map(|c| SkillExecutionEvent::MessageAppend {
-            text: c.to_string(),
-        }));
-        stream_events.push(SkillExecutionEvent::MessageEnd {
-            payload: json!(null),
-        });
-        let skill_executer_mock = SkillRuntimeStub::with_stream_events(stream_events);
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_executer_mock);
-        let http = http(FeatureSet::Beta, app_state);
-
-        // When asking for a message stream
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri("/v1/skills/local/hello/message-stream")
-                    .body(Body::from("\"\""))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then we get separate events for each letter in "Hello"
-        assert_eq!(resp.status(), StatusCode::OK);
-        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
-        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
-
-        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
-        let expected_body = "\
-            event: message\n\
-            data: {\"type\":\"begin\"}\n\n\
-            event: message\n\
-            data: {\"type\":\"append\",\"text\":\"H\"}\n\n\
-            event: message\n\
-            data: {\"type\":\"append\",\"text\":\"e\"}\n\n\
-            event: message\n\
-            data: {\"type\":\"append\",\"text\":\"l\"}\n\n\
-            event: message\n\
-            data: {\"type\":\"append\",\"text\":\"l\"}\n\n\
-            event: message\n\
-            data: {\"type\":\"append\",\"text\":\"o\"}\n\n\
-            event: message\n\
-            data: {\"type\":\"end\",\"payload\":null}\n\n";
-        assert_eq!(body_text, expected_body);
     }
 
     #[tokio::test]
