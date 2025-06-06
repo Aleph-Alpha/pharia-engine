@@ -993,12 +993,12 @@ mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl AppStateImpl<StubAuthorization, Dummy, SkillRuntimeDummy, Dummy, McpServerStoreDummy> {
+    impl AppStateImpl<StubAuthorization, Dummy, Dummy, Dummy, McpServerStoreDummy> {
         pub fn dummy() -> Self {
             Self::new(
                 StubAuthorization::new(true),
                 Dummy,
-                SkillRuntimeDummy,
+                Dummy,
                 McpServerStoreDummy,
                 Dummy,
             )
@@ -2247,11 +2247,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             body_str
         );
     }
-
-    #[derive(Debug, Clone)]
-    struct SkillRuntimeDummy;
-
-    impl SkillRuntimeDouble for SkillRuntimeDummy {}
 
     #[derive(Debug, Clone)]
     struct McpServerStoreDummy;
