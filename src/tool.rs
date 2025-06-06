@@ -7,7 +7,7 @@ pub use self::{
         Argument, ConfiguredMcpServer, InvokeRequest, McpServerStoreApi, McpServerUrl, Tool,
         ToolApi, ToolError,
     },
-    routes::{McpServerStoreProvider, ToolOpenApiDoc, ToolOpenApiDocBeta, http_tools_v1},
+    routes::{McpServerStoreProvider, http_tools_v1, openapi_tools_v1},
 };
 
 #[cfg(test)]
