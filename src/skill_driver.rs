@@ -656,6 +656,7 @@ mod test {
         skills::{SkillDouble, SkillError},
     };
     use anyhow::{anyhow, bail};
+    use double_trait::Dummy;
     use serde_json::json;
 
     #[tokio::test]
@@ -1086,9 +1087,6 @@ mod test {
         assert!(result.is_err());
     }
 
-    struct ContextualCsiDummy;
-    impl ContextualCsiDouble for ContextualCsiDummy {}
-
     #[tokio::test]
     async fn message_stream_skill_error_is_forwarded_as_error() {
         // Given a skill that returns a user error when run as message stream
@@ -1102,7 +1100,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                ContextualCsiDummy,
+                Dummy,
                 &TracingContext::dummy(),
                 send,
             )
@@ -1125,7 +1123,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                ContextualCsiDummy,
+                Dummy,
                 &TracingContext::dummy(),
                 send,
             )
@@ -1148,7 +1146,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                ContextualCsiDummy,
+                Dummy,
                 &TracingContext::dummy(),
                 send,
             )
@@ -1203,7 +1201,7 @@ mod test {
             .run_message_stream(
                 skill.clone(),
                 json!({}),
-                ContextualCsiDummy,
+                Dummy,
                 &TracingContext::dummy(),
                 send,
             )
