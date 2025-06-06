@@ -206,7 +206,8 @@ impl SkillCache {
 
 #[cfg(test)]
 mod tests {
-    use crate::skills::tests::SkillDummy;
+
+    use double_trait::Dummy;
 
     use super::*;
 
@@ -214,11 +215,8 @@ mod tests {
     fn cache_invalidation() {
         let desired_memory_usage = ByteSize::mib(240);
         let mut cache = SkillCache::new(desired_memory_usage);
-        let loaded_skill = LoadedSkill::new(
-            Arc::new(SkillDummy),
-            Digest::new("digest"),
-            ByteSize::mib(60),
-        );
+        let loaded_skill =
+            LoadedSkill::new(Arc::new(Dummy), Digest::new("digest"), ByteSize::mib(60));
 
         let skill_paths = [SkillPath::dummy(), SkillPath::dummy(), SkillPath::dummy()];
 
@@ -238,7 +236,7 @@ mod tests {
         let desired_memory_usage = ByteSize::mib(1200);
         let rust_size = ByteSize::kib(500);
         let mut cache = SkillCache::new(desired_memory_usage);
-        let loaded_skill = LoadedSkill::new(Arc::new(SkillDummy), Digest::new("digest"), rust_size);
+        let loaded_skill = LoadedSkill::new(Arc::new(Dummy), Digest::new("digest"), rust_size);
 
         let skill_paths = (0..100).map(|_| SkillPath::dummy()).collect::<Vec<_>>();
 

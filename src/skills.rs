@@ -1181,9 +1181,4 @@ pub mod tests {
                 .unwrap()
         );
     }
-
-    pub struct SkillDummy;
-
-    #[async_trait]
-    impl SkillDouble for SkillDummy {}
 }
