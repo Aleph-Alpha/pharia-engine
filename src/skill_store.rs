@@ -569,6 +569,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
+    use double_trait::Dummy;
     use std::sync::Mutex;
     use tokio::time::{sleep, timeout};
 
@@ -576,7 +577,7 @@ pub mod tests {
         namespace_watcher::Namespace,
         registries::{Digest, RegistryError},
         skill_loader::{LoadedSkill, SkillLoader, SkillLoaderMsg},
-        skills::{Engine, SkillPath, tests::SkillDummy},
+        skills::{Engine, SkillPath},
     };
 
     use super::*;
@@ -916,7 +917,7 @@ pub mod tests {
         let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
         provider.insert(
             skill_path.clone(),
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("dummy"), ByteSize(1)),
+            LoadedSkill::new(Arc::new(Dummy), Digest::new("dummy"), ByteSize(1)),
         );
 
         // When we remove the skill
@@ -949,10 +950,10 @@ pub mod tests {
         let second_skill_path = SkillPath::local("second_skill");
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&first_skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("first"), ByteSize(1))
+            LoadedSkill::new(Arc::new(Dummy), Digest::new("first"), ByteSize(1))
         });
         skill_loader.add(&second_skill_path, || {
-            LoadedSkill::new(Arc::new(SkillDummy), Digest::new("second"), ByteSize(1))
+            LoadedSkill::new(Arc::new(Dummy), Digest::new("second"), ByteSize(1))
         });
 
         // When
@@ -1013,11 +1014,7 @@ pub mod tests {
         let skill = ConfiguredSkill::from_path(&skill_path);
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&skill_path, || {
-            LoadedSkill::new(
-                Arc::new(SkillDummy),
-                Digest::new("original-digest"),
-                ByteSize(1),
-            )
+            LoadedSkill::new(Arc::new(Dummy), Digest::new("original-digest"), ByteSize(1))
         });
         let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
@@ -1042,11 +1039,7 @@ pub mod tests {
         let greet_skill = SkillPath::local("greet_skill");
         let skill_loader = SkillLoaderStub::new();
         skill_loader.add(&greet_skill, || {
-            LoadedSkill::new(
-                Arc::new(SkillDummy),
-                Digest::new("dummy digest"),
-                ByteSize(1),
-            )
+            LoadedSkill::new(Arc::new(Dummy), Digest::new("dummy digest"), ByteSize(1))
         });
         let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
@@ -1102,26 +1095,18 @@ pub mod tests {
         let skill_path = SkillPath::local("greet");
         let mut skill_store_state = SkillStoreState::new(skill_loader.clone(), ByteSize(u64::MAX));
         skill_loader.add(&skill_path, || {
-            LoadedSkill::new(
-                Arc::new(SkillDummy),
-                Digest::new("original-digest"),
-                ByteSize(1),
-            )
+            LoadedSkill::new(Arc::new(Dummy), Digest::new("original-digest"), ByteSize(1))
         });
         skill_store_state.upsert_skill(ConfiguredSkill::from_path(&skill_path));
         skill_store_state.insert(
             skill_path.clone(),
-            LoadedSkill::new(
-                Arc::new(SkillDummy),
-                Digest::new("original-digest"),
-                ByteSize(1),
-            ),
+            LoadedSkill::new(Arc::new(Dummy), Digest::new("original-digest"), ByteSize(1)),
         );
 
         // When we update the digest of the "greet" skill and we clear out expired skills
         skill_loader.add(&skill_path, || {
             LoadedSkill::new(
-                Arc::new(SkillDummy),
+                Arc::new(Dummy),
                 Digest::new("different-digest"),
                 ByteSize(1),
             )
@@ -1149,7 +1134,7 @@ pub mod tests {
         skill_loader.add(&skill_path, || {
             // Skill store always returns the same digest
             LoadedSkill::new(
-                Arc::new(SkillDummy),
+                Arc::new(Dummy),
                 Digest::new("originals-digest"),
                 ByteSize(1),
             )
