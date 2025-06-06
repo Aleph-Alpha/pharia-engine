@@ -49,7 +49,10 @@ use crate::{
     skill_runtime::{SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi},
     skill_store::SkillStoreApi,
     skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
-    tool::{McpServerStoreApi, McpServerUrl},
+    tool::{
+        McpServerStoreApi, McpServerStoreProvider, ToolOpenApiDoc, ToolOpenApiDocBeta,
+        http_tools_v1,
+    },
 };
 
 pub struct Shell {
@@ -95,12 +98,6 @@ impl Shell {
     pub async fn wait_for_shutdown(self) {
         self.handle.await.unwrap();
     }
-}
-
-pub trait McpServerStoreProvider {
-    type McpServerStore;
-
-    fn mcp_server_store(&self) -> &Self::McpServerStore;
 }
 
 impl<A, C, R, S, M> McpServerStoreProvider for AppStateImpl<A, C, R, S, M>
@@ -240,20 +237,6 @@ impl<T: AppState> FromRef<T> for SkillStoreState<T::SkillStore> {
     }
 }
 
-/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
-/// reference from the [`AppState`] using a [`FromRef`] implementation.
-struct McpServerStoreState<M>(pub M);
-
-impl<T> FromRef<T> for McpServerStoreState<T::McpServerStore>
-where
-    T: AppState,
-    T::McpServerStore: Clone,
-{
-    fn from_ref(app_state: &T) -> McpServerStoreState<T::McpServerStore> {
-        McpServerStoreState(app_state.mcp_server_store().clone())
-    }
-}
-
 fn v1<T>(feature_set: FeatureSet) -> Router<T>
 where
     T: AppState + Clone + Send + Sync + 'static,
@@ -267,21 +250,15 @@ where
         get(skills)
     };
 
-    let mut router = Router::new()
+    Router::new()
+        .merge(http_tools_v1(feature_set))
         .route("/skills", skills_route)
         .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
         .route("/skills/{namespace}/{name}/run", post(run_skill))
         .route(
             "/skills/{namespace}/{name}/message-stream",
             post(message_stream_skill),
-        );
-
-    // Additional routes for beta features, please keep them in sync with the API documentation.
-    if feature_set == FeatureSet::Beta {
-        router = router.route("/mcp_servers/{namespace}", get(list_mcp_servers));
-    }
-
-    router
+        )
 }
 
 fn http<T>(feature_set: FeatureSet, app_state: T) -> Router
@@ -295,9 +272,9 @@ where
 {
     // Show documentation for unstable features only in beta systems.
     let api_doc = if feature_set == FeatureSet::Beta {
-        ApiDocBeta::openapi()
+        ApiDocBeta::openapi().merge_from(ToolOpenApiDocBeta::openapi())
     } else {
-        ApiDoc::openapi()
+        ApiDoc::openapi().merge_from(ToolOpenApiDoc::openapi())
     };
 
     Router::new()
@@ -490,7 +467,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, skills_beta, run_skill, message_stream_skill, skill_wit, skill_metadata, list_mcp_servers),
+    paths(serve_docs, skills_beta, run_skill, message_stream_skill, skill_wit, skill_metadata),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -953,28 +930,6 @@ fn skill_wit() -> &'static str {
     include_str!("../wit/skill@0.3/skill.wit")
 }
 
-/// List of all mcp servers configured for this namespace
-#[utoipa::path(
-    get,
-    operation_id = "list_mcp_servers",
-    path = "v1/mcp_servers/{namespace}",
-    tag = "namespace",
-    security(("api_token" = [])),
-    responses(
-        (status = 200, body=Vec<String>, example = json!(["localhost:8080/my_tool"])),
-    ),
-)]
-async fn list_mcp_servers<M>(
-    Path(namespace): Path<Namespace>,
-    State(McpServerStoreState(mcp_servers)): State<McpServerStoreState<M>>,
-) -> Json<Vec<McpServerUrl>>
-where
-    M: McpServerStoreApi,
-{
-    let servers = mcp_servers.list(namespace).await;
-    Json(servers)
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
@@ -993,7 +948,6 @@ mod tests {
         skill_store::{SkillStoreApiDouble, tests::SkillStoreMsg},
         skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
         tests::api_token,
-        tool::tests::McpServerStoreDouble,
     };
 
     use super::*;
@@ -1070,19 +1024,6 @@ mod tests {
             )
         }
 
-        pub fn with_mcp_server_store<M2>(self, mcp_servers: M2) -> AppStateImpl<A, C, R, S, M2>
-        where
-            M2: McpServerStoreApi + Clone + Send + Sync + 'static,
-        {
-            AppStateImpl::new(
-                self.authorization_api,
-                self.skill_store_api,
-                self.skill_runtime_api,
-                mcp_servers,
-                self.csi_drivers,
-            )
-        }
-
         pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppStateImpl<A, C2, R, S, M>
         where
             C2: RawCsi + Clone + Sync + Send + 'static,
@@ -1102,43 +1043,6 @@ mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
         auth_value
-    }
-
-    #[tokio::test]
-    async fn list_mcp_servers_by_namespace() {
-        #[derive(Clone)]
-        struct McpServerMock;
-        impl McpServerStoreDouble for McpServerMock {
-            async fn list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
-                assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
-                vec![McpServerUrl("http://localhost:8083/mcp".to_owned())]
-            }
-        }
-        let app_state = AppStateImpl::dummy().with_mcp_server_store(McpServerMock);
-        let http = http(FeatureSet::Beta, app_state);
-
-        // When
-        let api_token = api_token();
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .uri("/v1/mcp_servers/my-test-namespace")
-                    .header(AUTHORIZATION, auth_value)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(answer, "[\"http://localhost:8083/mcp\"]");
     }
 
     #[tokio::test]
