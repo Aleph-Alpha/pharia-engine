@@ -993,15 +993,9 @@ mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl AppStateImpl<StubAuthorization, Dummy, Dummy, Dummy, McpServerStoreDummy> {
+    impl AppStateImpl<StubAuthorization, Dummy, Dummy, Dummy, Dummy> {
         pub fn dummy() -> Self {
-            Self::new(
-                StubAuthorization::new(true),
-                Dummy,
-                Dummy,
-                McpServerStoreDummy,
-                Dummy,
-            )
+            Self::new(StubAuthorization::new(true), Dummy, Dummy, Dummy, Dummy)
         }
     }
 
@@ -2247,10 +2241,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
             body_str
         );
     }
-
-    #[derive(Debug, Clone)]
-    struct McpServerStoreDummy;
-    impl McpServerStoreDouble for McpServerStoreDummy {}
 
     /// A test helper answering each request with a predefined error
     #[derive(Clone)]
