@@ -7,7 +7,6 @@ pub use self::routes::{
 use std::{borrow::Cow, future::Future, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{StreamExt, stream::FuturesUnordered};
-use reqwest::StatusCode;
 use serde_json::Value;
 use tokio::{
     select,
@@ -20,7 +19,6 @@ use crate::{
     context,
     csi::{InvocationContext, RawCsi},
     logging::TracingContext,
-    shell::HttpError,
     skill_driver::SkillDriver,
     skill_store::{SkillStoreApi, SkillStoreError},
     skills::{AnySkillManifest, Engine, Skill, SkillPath},
@@ -525,32 +523,6 @@ impl RunFunctionMsg {
 
         // Error is expected to happen during shutdown. Ignore result.
         drop(send.send(result));
-    }
-}
-
-impl From<SkillExecutionError> for HttpError {
-    fn from(value: SkillExecutionError) -> Self {
-        let status_code = match &value {
-            // We return 5xx not only for runtime errors, but also for errors we consider Bugs in
-            // the deployed skills.
-            SkillExecutionError::MisconfiguredNamespace { .. }
-            | SkillExecutionError::CsiUseFromMetadata
-            | SkillExecutionError::InvalidOutput(_)
-            | SkillExecutionError::MessageAppendWithoutMessageBegin
-            | SkillExecutionError::MessageBeginWhileMessageActive
-            | SkillExecutionError::MessageEndWithoutMessageBegin
-            | SkillExecutionError::SkillLoadError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            // Service unavailable indicates better that the situation is temporary and retrying it
-            // might be worth it.
-            SkillExecutionError::RuntimeError(_) => StatusCode::SERVICE_UNAVAILABLE,
-            // 400 for every error we see an error on the client side of HTTP
-            SkillExecutionError::UserCode(_)
-            | SkillExecutionError::SkillNotConfigured
-            | SkillExecutionError::IsFunction
-            | SkillExecutionError::IsMessageStream
-            | SkillExecutionError::InvalidInput(_) => StatusCode::BAD_REQUEST,
-        };
-        HttpError::new(value.to_string(), status_code)
     }
 }
 

@@ -127,7 +127,7 @@ struct SkillListParams {
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum SkillDescriptionSchemaType {
+enum SkillDescriptionSchemaType {
     Chat,
     Programmable,
 }
