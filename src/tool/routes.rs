@@ -45,8 +45,8 @@ pub trait McpServerStoreProvider {
     fn mcp_server_store(&self) -> &Self::McpServerStore;
 }
 
-/// Wrapper around Skill runtime Api for the shell. We use this strict alias to enable extracting a
-/// reference from the [`AppState`] using a [`FromRef`] implementation.
+/// Wrapper around Tool Api for the shell. We use this strict alias to enable extracting a reference
+/// from the [`AppState`] using a [`FromRef`] implementation.
 pub struct McpServerStoreState<M>(pub M);
 
 impl<T> FromRef<T> for McpServerStoreState<T::McpServerStore>
@@ -63,8 +63,8 @@ where
 #[utoipa::path(
     get,
     operation_id = "list_mcp_servers",
-    path = "mcp_servers/{namespace}",
-    tag = "namespace",
+    path = "/mcp_servers/{namespace}",
+    tag = "tools",
     security(("api_token" = [])),
     responses(
         (status = 200, body=Vec<String>, example = json!(["localhost:8080/my_tool"])),
