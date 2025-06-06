@@ -49,10 +49,7 @@ use crate::{
     skill_runtime::{SkillExecutionError, SkillExecutionEvent, SkillRuntimeApi},
     skill_store::SkillStoreApi,
     skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
-    tool::{
-        McpServerStoreApi, McpServerStoreProvider, ToolOpenApiDoc, ToolOpenApiDocBeta,
-        http_tools_v1,
-    },
+    tool::{McpServerStoreApi, McpServerStoreProvider, http_tools_v1, openapi_tools_v1},
 };
 
 pub struct Shell {
@@ -272,10 +269,11 @@ where
 {
     // Show documentation for unstable features only in beta systems.
     let api_doc = if feature_set == FeatureSet::Beta {
-        ApiDocBeta::openapi().merge_from(ToolOpenApiDocBeta::openapi())
+        ApiDocBeta::openapi()
     } else {
-        ApiDoc::openapi().merge_from(ToolOpenApiDoc::openapi())
+        ApiDoc::openapi()
     };
+    let api_doc = api_doc.nest("v1/", openapi_tools_v1(feature_set));
 
     Router::new()
         // Authenticated routes
