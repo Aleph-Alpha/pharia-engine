@@ -125,7 +125,6 @@ jobs:
           path: /tmp/pharia-kernel.tar
           retention-days: 1
     outputs:
-      image: ${{ steps.build-image.outputs.image }}
       image_id: ${{ env.IMAGE_ID }}
 
   test-and-deploy-if-main-or-tag:
@@ -199,7 +198,7 @@ jobs:
         id: push-local
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: ${{ needs.build-image.outputs.image }}
+          image: pharia-kernel
           tags: ${{ env.IMAGE_ID }}
           registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
           tls-verify: false
@@ -305,7 +304,7 @@ jobs:
         name: Push to GitHub
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: ${{ needs.build-image.outputs.image }}
+          image: pharia-kernel
           tags: latest
           registry: ghcr.io/aleph-alpha/pharia-kernel
 
