@@ -78,19 +78,14 @@ jobs:
           cargo install cargo-shear
           cargo shear
 
-  test-and-deploy-if-main-or-tag:
+  build-image:
+    # We were seeing image build times of 14:46 minutes on ubuntu-latest.
+    # 8c-32gb brought this down to 7:20 minutes while being billed at $0.032/minute (~$0.23/build)
+    # 16c-64gb comes in at 6:18 minutes while being billed at $0.064/minute (~$0.40/build)
     runs-on: cpu-runner-16c-64gb-01
-    needs: [tests, lints]
-    concurrency: test-and-deploy-if-main-or-tag-${{ github.ref }}
     permissions:
       contents: read
-      id-token: write
-      packages: write
-    env:
-      ARTIFACTORY_URL: https://alephalpha.jfrog.io
-      ARTIFACTORY_HOST: alephalpha.jfrog.io
-      ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
-      ARTIFACTORY_HELM_REPOSITORY: pharia-kernel-helm
+      packages: read
     steps:
       - uses: actions/checkout@v4
       - name: Generate image ID
@@ -120,6 +115,48 @@ jobs:
           containerfiles: |
             ./Containerfile
 
+      - name: Export image to tarball
+        run: podman save localhost/pharia-kernel:${{ env.IMAGE_ID }} -o /tmp/pharia-kernel.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pharia-kernel-image
+          path: /tmp/pharia-kernel.tar
+          retention-days: 1
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+      image_id: ${{ env.IMAGE_ID }}
+
+  test-and-deploy-if-main-or-tag:
+    runs-on: cpu-runner-8c-32gb-01
+    needs: [build-image, tests, lints]
+    concurrency: test-and-deploy-if-main-or-tag-${{ github.ref }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    env:
+      ARTIFACTORY_URL: https://alephalpha.jfrog.io
+      ARTIFACTORY_HOST: alephalpha.jfrog.io
+      ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
+      ARTIFACTORY_HELM_REPOSITORY: pharia-kernel-helm
+      IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pharia-kernel-image
+          path: /tmp
+
+      - name: Load image from tarball
+        run: podman load -i /tmp/pharia-kernel.tar
+
+      - name: Tag image as latest
+        run: podman tag pharia-kernel:${{ env.IMAGE_ID }} pharia-kernel:latest
+
       - name: Container test
         run: bash -x ./tests/test-container.sh pharia-kernel:$IMAGE_ID
 
@@ -132,9 +169,6 @@ jobs:
             -e PHARIA_AI_TOKEN=dummy \
             pharia-kernel:$IMAGE_ID | cat) &
           bash -x ./tests/test-image.sh 8081 127.0.0.1
-
-      - name: Export image to tarball
-        run: podman save localhost/pharia-kernel:latest -o /tmp/pharia-kernel.tar
 
       - name: Extract SBOM from tarball
         uses: aquasecurity/trivy-action@0.31.0
@@ -165,7 +199,7 @@ jobs:
         id: push-local
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: ${{ steps.build-image.outputs.image }}
+          image: ${{ needs.build-image.outputs.image }}
           tags: ${{ env.IMAGE_ID }}
           registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
           tls-verify: false
@@ -240,8 +274,8 @@ jobs:
         id: push
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: ${{ steps.build-image.outputs.image }}
-          tags: ${{ steps.build-image.outputs.tags }}
+          image: pharia-kernel
+          tags: latest ${{ env.IMAGE_ID }}
           registry: ${{ env.ARTIFACTORY_REPOSITORY }}
 
       - if: github.event_name != 'pull_request'
@@ -271,7 +305,7 @@ jobs:
         name: Push to GitHub
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: ${{ steps.build-image.outputs.image }}
+          image: ${{ needs.build-image.outputs.image }}
           tags: latest
           registry: ghcr.io/aleph-alpha/pharia-kernel
 
