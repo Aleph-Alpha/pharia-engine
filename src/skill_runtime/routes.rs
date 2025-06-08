@@ -535,6 +535,89 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn should_forward_function_input_to_skill_runtime() {
+        // Given
+        #[derive(Clone)]
+        struct SkillRuntimeMock;
+        impl SkillRuntimeDouble for SkillRuntimeMock {
+            fn run_function(
+                &self,
+                path: SkillPath,
+                input: Value,
+                auth: String,
+                _: TracingContext,
+            ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send {
+                assert_eq!(path, SkillPath::local("greet_skill"));
+                assert_eq!(input, json!("Homer"));
+                assert_eq!(auth, "dummy auth token".to_owned());
+                async move { Ok(json!({})) }
+            }
+        }
+        let app_state = ProviderStub::new(SkillRuntimeMock);
+        let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+
+        // When
+        let _resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn not_existing_skill_is_400_error() {
+        // Given a skill executer which always replies Skill does not exist
+        #[derive(Clone)]
+        struct SkillRuntimeStub;
+        impl SkillRuntimeDouble for SkillRuntimeStub {
+            fn run_function(
+                &self,
+                _: SkillPath,
+                _: Value,
+                _: String,
+                _: TracingContext,
+            ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send {
+                async { Err(SkillExecutionError::SkillNotConfigured) }
+            }
+        }
+        let app_state = ProviderStub::new(SkillRuntimeStub);
+
+        // When executing a skill
+        let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/skills/any-namespace/any_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then answer is 400 skill does not exist
+        assert_eq!(StatusCode::BAD_REQUEST, resp.status());
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let body_str = String::from_utf8(body.to_vec()).unwrap();
+        assert_eq!(
+            "Sorry, we could not find the skill you requested in its namespace. This can have \
+            three causes:\n\n1. You sent the wrong skill name.\n2. You sent the wrong namespace.\
+            \n3. The skill is not configured in the namespace you requested. You may want to \
+            check the namespace configuration.",
+            body_str
+        );
+    }
+
+    #[tokio::test]
     async fn skill_metadata() {
         // Given
         #[derive(Clone)]
