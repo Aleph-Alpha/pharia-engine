@@ -13,8 +13,6 @@ use axum_extra::{
     headers::{self, authorization::Bearer},
 };
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
@@ -27,7 +25,7 @@ use tower_http::{
 };
 use tracing::{Level, error, info};
 use utoipa::{
-    Modify, OpenApi, ToSchema,
+    Modify, OpenApi,
     openapi::{
         self,
         security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -414,7 +412,7 @@ async fn track_route_metrics(req: Request, next: Next) -> impl IntoResponse {
     info(description = "The best place to run serverless AI applications."),
     paths(serve_docs),
     modifiers(&SecurityAddon),
-    components(schemas(ExecuteSkillArgs, Namespace)),
+    components(schemas(Namespace)),
     tags(
         (name = "skills"),
         (name = "docs"),
@@ -427,7 +425,7 @@ struct ApiDoc;
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
     paths(serve_docs, skill_wit),
     modifiers(&SecurityAddon),
-    components(schemas(ExecuteSkillArgs, Namespace)),
+    components(schemas(Namespace)),
     tags(
         (name = "skills"),
         (name = "docs"),
@@ -470,18 +468,6 @@ async fn index() -> Html<&'static str> {
 )]
 async fn serve_docs() -> Json<openapi::OpenApi> {
     Json(ApiDoc::openapi())
-}
-
-#[derive(Deserialize, Serialize, ToSchema)]
-struct ExecuteSkillArgs {
-    /// The qualified name of the Skill to invoke. The qualified name consists of a namespace and
-    /// a Skill name (e.g. "acme/summarize").
-    ///
-    skill: String,
-    /// The expected input for the Skill in JSON format. Examples:
-    /// * "input": "Hello"
-    /// * "input": {"text": "some text to be summarized", "length": "short"}
-    input: Value,
 }
 
 /// WIT (WebAssembly Interface Types) of Skills
@@ -531,7 +517,7 @@ pub mod tests {
     use http_body_util::BodyExt;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
     use reqwest::header::CONTENT_TYPE;
-    use serde_json::json;
+    use serde_json::{Value, json};
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
