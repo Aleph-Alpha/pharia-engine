@@ -301,8 +301,8 @@ mod tests {
         feature_set::PRODUCTION_FEATURE_SET,
         logging::TracingContext,
         shell::tests::dummy_auth_value,
-        skill_driver::SkillExecutionEvent,
-        skill_runtime::{SkillRuntimeDouble, http_skill_runtime_v1, routes::SkillRuntimeProvider},
+        skill_driver::{SkillExecutionError, SkillExecutionEvent},
+        skill_runtime::{http_skill_runtime_v1, routes::SkillRuntimeProvider, SkillRuntimeDouble},
         skills::SkillPath,
     };
 
@@ -418,5 +418,45 @@ mod tests {
             event: message\n\
             data: {\"type\":\"end\",\"payload\":null}\n\n";
         assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
+    async fn answer_of_succesfull_run_skill_function() {
+        // Given
+        #[derive(Clone)]
+        struct SkillRuntimeStub;
+        impl SkillRuntimeDouble for SkillRuntimeStub {
+            async fn run_function(
+                &self,
+                _skill_path: SkillPath,
+                _input: Value,
+                _api_token: String,
+                _tracing_context: TracingContext,
+            ) -> Result<Value, SkillExecutionError> {
+                Ok(json!("Result from Skill"))
+            }
+        }
+        let app_state = ProviderStub::new(SkillRuntimeStub);
+        let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+
+        // When
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = serde_json::from_slice::<String>(&body).unwrap();
+        assert_eq!(answer, "Result from Skill");
     }
 }
