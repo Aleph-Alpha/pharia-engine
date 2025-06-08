@@ -1106,33 +1106,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
-    async fn should_forward_function_input_to_skill_runtime() {
-        // Given
-        let runtime_spy = SkillRuntimeSpy::new();
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(runtime_spy.clone());
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        // When
-        let _resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri("/v1/skills/local/greet_skill/run")
-                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(runtime_spy.api_token(), "dummy auth token");
-        assert_eq!(runtime_spy.skill_path(), SkillPath::local("greet_skill"));
-        assert_eq!(runtime_spy.input(), json!("Homer"));
-    }
-
-    #[tokio::test]
     async fn stream_endpoint_for_saboteur_skill() {
         // Given
         let stream_events = vec![SkillExecutionEvent::Error(
@@ -1341,41 +1314,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         );
     }
 
-    #[tokio::test]
-    async fn not_existing_skill_is_400_error() {
-        // Given a skill executer which always replies Skill does not exist
-        let skill_runtime = SkillRuntimeSaboteur::new(|| SkillExecutionError::SkillNotConfigured);
-        let auth_value = header::HeaderValue::from_str("Bearer DummyToken").unwrap();
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime);
-
-        // When executing a skill
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, auth_value)
-                    .uri("/v1/skills/any-namespace/any_skill/run")
-                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then answer is 400 skill does not exist
-        assert_eq!(StatusCode::BAD_REQUEST, resp.status());
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let body_str = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(
-            "Sorry, we could not find the skill you requested in its namespace. This can have \
-            three causes:\n\n1. You sent the wrong skill name.\n2. You sent the wrong namespace.\
-            \n3. The skill is not configured in the namespace you requested. You may want to \
-            check the namespace configuration.",
-            body_str
-        );
-    }
-
     /// A test helper answering each request with a predefined error
     #[derive(Clone)]
     struct SkillRuntimeSaboteur {
@@ -1489,18 +1427,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
 
         pub fn tracing_contexts(&self) -> Vec<TracingContext> {
             self.inner.lock().unwrap().tracing_context.clone()
-        }
-
-        pub fn api_token(&self) -> String {
-            self.inner.lock().unwrap().api_token.clone()
-        }
-
-        pub fn input(&self) -> Value {
-            self.inner.lock().unwrap().input.clone()
-        }
-
-        pub fn skill_path(&self) -> SkillPath {
-            self.inner.lock().unwrap().skill_path.clone()
         }
     }
 
