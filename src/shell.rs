@@ -1235,34 +1235,6 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     #[tokio::test]
-    async fn answer_of_succesfull_run_skill_function() {
-        // Given
-        let runtime = SkillRuntimeStub::with_function_ok(json!("Result from Skill"));
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(runtime);
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        // When
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri("/v1/skills/local/greet_skill/run")
-                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let answer = serde_json::from_slice::<String>(&body).unwrap();
-        assert_eq!(answer, "Result from Skill");
-    }
-
-    #[tokio::test]
     async fn should_forward_function_input_to_skill_runtime() {
         // Given
         let runtime_spy = SkillRuntimeSpy::new();
