@@ -242,6 +242,21 @@ where
         .merge(http_skill_runtime_v1(feature_set))
 }
 
+fn open_api_docs(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
+    // Show documentation for unstable features only in beta systems.
+    let api_doc = if feature_set == FeatureSet::Beta {
+        ApiDocBeta::openapi()
+    } else {
+        ApiDoc::openapi()
+    };
+    api_doc.nest(
+        "v1",
+        openapi_tools_v1(feature_set)
+            .merge_from(openapi_skill_store_v1(feature_set))
+            .merge_from(openapi_skill_runtime_v1(feature_set)),
+    )
+}
+
 fn http<T>(feature_set: FeatureSet, app_state: T) -> Router
 where
     T: AppState + Clone + Send + Sync + 'static,
@@ -251,19 +266,7 @@ where
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
     T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
 {
-    // Show documentation for unstable features only in beta systems.
-    let api_doc = if feature_set == FeatureSet::Beta {
-        ApiDocBeta::openapi()
-    } else {
-        ApiDoc::openapi()
-    };
-    let api_doc = api_doc.nest(
-        "v1",
-        openapi_tools_v1(feature_set)
-            .merge_from(openapi_skill_store_v1(feature_set))
-            .merge_from(openapi_skill_runtime_v1(feature_set)),
-    );
-
+    let api_docs = open_api_docs(feature_set);
     Router::new()
         // Authenticated routes
         .nest("/v1", v1(feature_set))
@@ -279,9 +282,9 @@ where
         .route("/skill.wit", get(skill_wit()))
         .route(
             "/api-docs",
-            get(async || Html(Scalar::new(api_doc).to_html())),
+            get(async || Html(Scalar::new(api_docs).to_html())),
         )
-        .route("/openapi.json", get(serve_docs))
+        .route("/openapi.json", get(move || serve_docs(feature_set)))
         .route("/health", get(async || "ok"))
         .route_layer(middleware::from_fn(track_route_metrics))
         .layer(
@@ -466,8 +469,8 @@ async fn index() -> Html<&'static str> {
         (status = 200, description = "JSON file", body = ())
     ),
 )]
-async fn serve_docs() -> Json<openapi::OpenApi> {
-    Json(ApiDoc::openapi())
+async fn serve_docs(feature_set: FeatureSet) -> Json<openapi::OpenApi> {
+    Json(open_api_docs(feature_set))
 }
 
 /// WIT (WebAssembly Interface Types) of Skills
