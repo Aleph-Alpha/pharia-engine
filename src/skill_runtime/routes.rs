@@ -5,7 +5,7 @@ use axum::{
     Json, Router,
     extract::{FromRef, Path, State},
     response::{Sse, sse::Event},
-    routing::post,
+    routing::{get, post},
 };
 use axum_extra::{
     TypedHeader,
@@ -15,7 +15,7 @@ use futures::Stream;
 use reqwest::StatusCode;
 use serde::Serialize;
 use serde_json::Value;
-use utoipa::OpenApi;
+use utoipa::{OpenApi, ToSchema};
 
 use crate::{
     FeatureSet,
@@ -24,7 +24,7 @@ use crate::{
     shell::HttpError,
     skill_driver::{SkillExecutionError, SkillExecutionEvent},
     skill_runtime::SkillRuntimeApi,
-    skills::SkillPath,
+    skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
 };
 
 pub fn http_skill_runtime_v1<T>(_feature_set: FeatureSet) -> Router<T>
@@ -38,6 +38,7 @@ where
             "/skills/{namespace}/{name}/message-stream",
             post(message_stream_skill),
         )
+        .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
 }
 
 pub fn openapi_skill_runtime_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
@@ -53,7 +54,7 @@ pub fn openapi_skill_runtime_v1(feature_set: FeatureSet) -> utoipa::openapi::Ope
 struct SkillRuntimeOpenApiDoc;
 
 #[derive(OpenApi)]
-#[openapi(paths(run_skill, message_stream_skill))]
+#[openapi(paths(run_skill, message_stream_skill, skill_metadata))]
 struct SkillRuntimeOpenApiDocBeta;
 
 pub trait SkillRuntimeProvider {
@@ -283,6 +284,79 @@ impl From<SkillExecutionError> for HttpError {
     }
 }
 
+/// Metadata
+///
+/// Get the metadata (input schema, output schema, description) for a Skill.
+#[utoipa::path(
+    get,
+    operation_id = "skill_metadata",
+    path = "/skills/{namespace}/{name}/metadata",
+    security(("api_token" = [])),
+    tag = "skills",
+    responses(
+        (status = 200, description = "Description, input schema, and output schema of the skill if specified",
+            body=SkillMetadataV1Representation, example = json!({
+                "description": "The summary of the text.",
+                "input_schema": {
+                    "properties": {
+                        "topic": {
+                            "description": "The topic of the haiku",
+                            "examples": ["Banana", "Oat milk"],
+                            "title": "Topic",
+                            "type": "string",
+                        }
+                    },
+                    "required": ["topic"],
+                    "title": "Input",
+                    "type": "object",
+                },
+                "output_schema": {
+                    "properties": {"message": {"title": "Message", "type": "string"}},
+                    "required": ["message"],
+                    "title": "Output",
+                    "type": "object",
+                }
+            })),
+        (status = 400, description = "Failed to get skill metadata.", body=String, example = "Invalid skill input schema.")
+    ),
+)]
+async fn skill_metadata<R>(
+    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
+    Path((namespace, name)): Path<(Namespace, String)>,
+) -> Result<Json<SkillMetadataV1Representation>, HttpError>
+where
+    R: SkillRuntimeApi,
+{
+    let tracing_context = TracingContext::current();
+    let skill_path = SkillPath::new(namespace, name);
+    let response = skill_runtime_api
+        .skill_metadata(skill_path, tracing_context)
+        .await?;
+    Ok(Json(response.into()))
+}
+
+#[derive(ToSchema, Serialize, Debug, Clone)]
+struct SkillMetadataV1Representation {
+    description: Option<String>,
+    version: Option<&'static str>,
+    skill_type: &'static str,
+    input_schema: Option<JsonSchema>,
+    output_schema: Option<JsonSchema>,
+}
+
+impl From<AnySkillManifest> for SkillMetadataV1Representation {
+    fn from(metadata: AnySkillManifest) -> Self {
+        let signature = metadata.signature();
+        SkillMetadataV1Representation {
+            description: metadata.description().map(ToOwned::to_owned),
+            version: metadata.version(),
+            skill_type: metadata.skill_type_name(),
+            input_schema: signature.map(Signature::input_schema).cloned(),
+            output_schema: signature.and_then(Signature::output_schema).cloned(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, http::Request};
@@ -302,8 +376,8 @@ mod tests {
         logging::TracingContext,
         shell::tests::dummy_auth_value,
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
-        skill_runtime::{http_skill_runtime_v1, routes::SkillRuntimeProvider, SkillRuntimeDouble},
-        skills::SkillPath,
+        skill_runtime::{SkillRuntimeDouble, http_skill_runtime_v1, routes::SkillRuntimeProvider},
+        skills::{AnySkillManifest, JsonSchema, Signature, SkillMetadataV0_3, SkillPath},
     };
 
     #[derive(Clone)]
@@ -458,5 +532,56 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = serde_json::from_slice::<String>(&body).unwrap();
         assert_eq!(answer, "Result from Skill");
+    }
+
+    #[tokio::test]
+    async fn skill_metadata() {
+        // Given
+        #[derive(Clone)]
+        struct SkillRuntimeStub;
+        impl SkillRuntimeDouble for SkillRuntimeStub {
+            async fn skill_metadata(
+                &self,
+                _: SkillPath,
+                _: TracingContext,
+            ) -> Result<AnySkillManifest, SkillExecutionError> {
+                let metadata = AnySkillManifest::V0_3(SkillMetadataV0_3 {
+                    description: Some("dummy description".to_owned()),
+                    signature: Signature::Function {
+                        input_schema: JsonSchema::dummy(),
+                        output_schema: JsonSchema::dummy(),
+                    },
+                });
+                Ok(metadata)
+            }
+        }
+        let app_state = ProviderStub::new(SkillRuntimeStub);
+
+        // When
+        let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/skills/local/greet_skill/metadata")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let metadata = serde_json::from_slice::<Value>(&body).unwrap();
+        let expected = json!({
+            "description": "dummy description",
+            "skill_type": "function",
+            "input_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
+            "output_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
+            "version": "0.3",
+        });
+        assert_eq!(metadata, expected);
     }
 }
