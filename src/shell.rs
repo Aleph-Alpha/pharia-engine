@@ -2,7 +2,7 @@ use anyhow::Context;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{FromRef, MatchedPath, Path, Request, State},
+    extract::{FromRef, MatchedPath, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
     response::{ErrorResponse, Html, IntoResponse, Response},
@@ -10,7 +10,7 @@ use axum::{
 };
 use axum_extra::{
     TypedHeader,
-    headers::{self, Authorization, authorization::Bearer},
+    headers::{self, authorization::Bearer},
 };
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use serde::{Deserialize, Serialize};
@@ -44,14 +44,12 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     skill_runtime::{
-        SkillRuntimeApi, SkillRuntimeProvider, SkillRuntimeState, http_skill_runtime_v1,
-        openapi_skill_runtime_v1,
+        SkillRuntimeApi, SkillRuntimeProvider, http_skill_runtime_v1, openapi_skill_runtime_v1,
     },
     skill_store::{
         SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
         openapi_skill_store_v1,
     },
-    skills::{AnySkillManifest, JsonSchema, Signature, SkillPath},
     tool::{McpServerStoreApi, McpServerStoreProvider, http_tools_v1, openapi_tools_v1},
 };
 
@@ -244,7 +242,6 @@ where
         .merge(http_tools_v1(feature_set))
         .merge(http_skill_store_v1(feature_set))
         .merge(http_skill_runtime_v1(feature_set))
-        .route("/skills/{namespace}/{name}/metadata", get(skill_metadata))
 }
 
 fn http<T>(feature_set: FeatureSet, app_state: T) -> Router
@@ -428,7 +425,7 @@ struct ApiDoc;
 #[derive(OpenApi)]
 #[openapi(
     info(description = "Pharia Kernel (Beta): The best place to run serverless AI applications."),
-    paths(serve_docs, skill_wit, skill_metadata),
+    paths(serve_docs, skill_wit),
     modifiers(&SecurityAddon),
     components(schemas(ExecuteSkillArgs, Namespace)),
     tags(
@@ -487,80 +484,6 @@ struct ExecuteSkillArgs {
     input: Value,
 }
 
-/// Metadata
-///
-/// Get the metadata (input schema, output schema, description) for a Skill.
-#[utoipa::path(
-    get,
-    operation_id = "skill_metadata",
-    path = "/v1/skills/{namespace}/{name}/metadata",
-    security(("api_token" = [])),
-    tag = "skills",
-    responses(
-        (status = 200, description = "Description, input schema, and output schema of the skill if specified",
-            body=SkillMetadataV1Representation, example = json!({
-                "description": "The summary of the text.",
-                "input_schema": {
-                    "properties": {
-                        "topic": {
-                            "description": "The topic of the haiku",
-                            "examples": ["Banana", "Oat milk"],
-                            "title": "Topic",
-                            "type": "string",
-                        }
-                    },
-                    "required": ["topic"],
-                    "title": "Input",
-                    "type": "object",
-                },
-                "output_schema": {
-                    "properties": {"message": {"title": "Message", "type": "string"}},
-                    "required": ["message"],
-                    "title": "Output",
-                    "type": "object",
-                }
-            })),
-        (status = 400, description = "Failed to get skill metadata.", body=String, example = "Invalid skill input schema.")
-    ),
-)]
-async fn skill_metadata<R>(
-    State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
-    _bearer: TypedHeader<Authorization<Bearer>>,
-    Path((namespace, name)): Path<(Namespace, String)>,
-) -> Result<Json<SkillMetadataV1Representation>, HttpError>
-where
-    R: SkillRuntimeApi,
-{
-    let tracing_context = TracingContext::current();
-    let skill_path = SkillPath::new(namespace, name);
-    let response = skill_runtime_api
-        .skill_metadata(skill_path, tracing_context)
-        .await?;
-    Ok(Json(response.into()))
-}
-
-#[derive(ToSchema, Serialize, Debug, Clone)]
-struct SkillMetadataV1Representation {
-    description: Option<String>,
-    version: Option<&'static str>,
-    skill_type: &'static str,
-    input_schema: Option<JsonSchema>,
-    output_schema: Option<JsonSchema>,
-}
-
-impl From<AnySkillManifest> for SkillMetadataV1Representation {
-    fn from(metadata: AnySkillManifest) -> Self {
-        let signature = metadata.signature();
-        SkillMetadataV1Representation {
-            description: metadata.description().map(ToOwned::to_owned),
-            version: metadata.version(),
-            skill_type: metadata.skill_type_name(),
-            input_schema: signature.map(Signature::input_schema).cloned(),
-            output_schema: signature.and_then(Signature::output_schema).cloned(),
-        }
-    }
-}
-
 /// WIT (WebAssembly Interface Types) of Skills
 ///
 /// Skills are WebAssembly components built against a WIT world. This route returns this WIT world.
@@ -593,7 +516,7 @@ pub mod tests {
         logging::tests::given_tracing_subscriber,
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
         skill_runtime::SkillRuntimeDouble,
-        skills::{AnySkillManifest, JsonSchema, SkillMetadataV0_3, SkillPath},
+        skills::{AnySkillManifest, SkillPath},
         tests::api_token,
     };
 
@@ -677,47 +600,6 @@ pub mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
         auth_value
-    }
-
-    #[tokio::test]
-    async fn skill_metadata() {
-        // Given
-        let metadata = AnySkillManifest::V0_3(SkillMetadataV0_3 {
-            description: Some("dummy description".to_owned()),
-            signature: Signature::Function {
-                input_schema: JsonSchema::dummy(),
-                output_schema: JsonSchema::dummy(),
-            },
-        });
-        let runtime = SkillRuntimeStub::with_metadata(metadata);
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(runtime);
-
-        // When
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri("/v1/skills/local/greet_skill/metadata")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let metadata = serde_json::from_slice::<Value>(&body).unwrap();
-        let expected = json!({
-            "description": "dummy description",
-            "skill_type": "function",
-            "input_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
-            "output_schema": {"properties": {"topic": {"title": "Topic", "type": "string"}}, "required": ["topic"], "title": "Input", "type": "object"},
-            "version": "0.3",
-        });
-        assert_eq!(metadata, expected);
     }
 
     #[tokio::test]
@@ -1003,19 +885,19 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
         assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
 
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
-        let expected_body = "event: message_begin
-data: {\"role\":\"assistant\"}
-
-event: message_append
-data: {\"content\":\"Say hello to Homer\",\"logprobs\":[]}
-
-event: message_end
-data: {\"finish_reason\":\"stop\"}
-
-event: usage
-data: {\"usage\":{\"prompt\":0,\"completion\":0}}
-
-";
+        let expected_body = "event: message_begin\n\
+            data: {\"role\":\"assistant\"}\n\
+            \n\
+            event: message_append\n\
+            data: {\"content\":\"Say hello to Homer\",\"logprobs\":[]}\n\
+            \n\
+            event: message_end\n\
+            data: {\"finish_reason\":\"stop\"}\n\
+            \n\
+            event: usage\n\
+            data: {\"usage\":{\"prompt\":0,\"completion\":0}}\n\
+            \n\
+            ";
         assert_eq!(body_text, expected_body);
     }
 
@@ -1548,27 +1430,11 @@ data: {\"usage\":{\"prompt\":0,\"completion\":0}}
     }
 
     impl SkillRuntimeStub {
-        pub fn with_function_ok(value: Value) -> Self {
-            Self {
-                function_result: value,
-                stream_events: Vec::new(),
-                metadata: AnySkillManifest::V0,
-            }
-        }
-
         pub fn with_stream_events(stream_events: Vec<SkillExecutionEvent>) -> Self {
             Self {
                 function_result: Value::default(),
                 stream_events,
                 metadata: AnySkillManifest::V0,
-            }
-        }
-
-        pub fn with_metadata(metadata: AnySkillManifest) -> Self {
-            Self {
-                function_result: Value::default(),
-                stream_events: Vec::new(),
-                metadata,
             }
         }
     }
