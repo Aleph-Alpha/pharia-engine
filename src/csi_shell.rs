@@ -6,7 +6,12 @@ mod v0_2;
 mod v0_3;
 mod v1;
 
-use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
+use axum::{
+    Json, Router,
+    extract::{FromRef, State},
+    http::StatusCode,
+    routing::post,
+};
 use axum_extra::{
     TypedHeader,
     headers::{Authorization, authorization::Bearer},
@@ -18,19 +23,37 @@ use serde_json::{Value, json};
 use crate::{
     csi::{CsiError, RawCsi},
     logging::TracingContext,
-    shell::{AppState, CsiState},
     skills::SupportedVersion,
 };
 
 pub fn http<T>() -> Router<T>
 where
-    T: AppState + Clone + Send + Sync + 'static,
+    T: CsiProvider + Clone + Send + Sync + 'static,
     T::Csi: RawCsi + Clone + Sync + Send + 'static,
 {
     Router::new()
         .nest("/csi/v1", v1::http())
         // Legacy CSI route
         .route("/csi", post(http_csi_handle::<T::Csi>))
+}
+
+pub trait CsiProvider {
+    type Csi;
+    fn csi(&self) -> &Self::Csi;
+}
+
+/// Wrapper around Raw Csi API for the csi shell. We use this strict alias to enable extracting a
+/// reference from the [`AppState`] using a [`FromRef`] implementation.
+pub struct CsiState<M>(pub M);
+
+impl<T> FromRef<T> for CsiState<T::Csi>
+where
+    T: CsiProvider,
+    T::Csi: Clone,
+{
+    fn from_ref(app_state: &T) -> CsiState<T::Csi> {
+        CsiState(app_state.csi().clone())
+    }
 }
 
 async fn http_csi_handle<C>(
@@ -150,6 +173,16 @@ impl From<UnknownCsiRequest> for CsiShellError {
 
 #[cfg(test)]
 mod tests {
+    use axum::{body::Body, http::Request};
+    use http_body_util::BodyExt as _;
+    use reqwest::{Method, header::CONTENT_TYPE};
+    use tower::ServiceExt as _;
+
+    use crate::{
+        csi::tests::RawCsiDouble,
+        inference::{Completion, CompletionRequest},
+    };
+
     use super::*;
 
     #[test]
@@ -413,5 +446,75 @@ mod tests {
             result,
             Ok(VersionedCsiRequest::V0_2(v0_2::CsiRequest::Unknown { function: Some(function) })) if function == "not-implemented"
         ));
+    }
+
+    #[tokio::test]
+    async fn http_csi_handle_returns_completion() {
+        // Given a versioned csi request
+        let prompt = "Say hello to Homer";
+        let body = json!({
+            "version": "0.2",
+            "function": "complete",
+            "model": "pharia-1-llm-7b-control",
+            "prompt": prompt,
+            "params": {
+                "max_tokens": 1,
+                "temperature": null,
+                "top_k": null,
+                "top_p": null,
+                "stop": [],
+            },
+        });
+
+        // When
+        #[derive(Clone)]
+        struct CsiStub;
+        impl RawCsiDouble for CsiStub {
+            async fn complete(
+                &self,
+                _: String,
+                _: TracingContext,
+                request: Vec<CompletionRequest>,
+            ) -> anyhow::Result<Vec<Completion>> {
+                Ok(vec![Completion::from_text(request[0].prompt.clone())])
+            }
+        }
+        let app_state = ProviderStub::new(CsiStub);
+        let http = http().with_state(app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .uri("/csi")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json_value: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json_value["text"].as_str().unwrap(), prompt);
+    }
+
+    #[derive(Clone)]
+    struct ProviderStub<T> {
+        csi: T,
+    }
+
+    impl<T> ProviderStub<T> {
+        fn new(csi: T) -> Self {
+            Self { csi }
+        }
+    }
+
+    impl<T> CsiProvider for ProviderStub<T> {
+        type Csi = T;
+
+        fn csi(&self) -> &T {
+            &self.csi
+        }
     }
 }

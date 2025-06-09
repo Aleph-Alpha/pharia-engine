@@ -37,7 +37,7 @@ use crate::{
     authorization::AuthorizationApi,
     context,
     csi::RawCsi,
-    csi_shell,
+    csi_shell::{self, CsiProvider},
     feature_set::FeatureSet,
     logging::TracingContext,
     namespace_watcher::Namespace,
@@ -111,6 +111,21 @@ where
     }
 }
 
+impl<A, C, R, S, M> CsiProvider for AppStateImpl<A, C, R, S, M>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+{
+    type Csi = C;
+
+    fn csi(&self) -> &C {
+        &self.csi_drivers
+    }
+}
+
 impl<A, C, R, S, M> SkillStoreProvider for AppStateImpl<A, C, R, S, M>
 where
     A: Clone,
@@ -141,12 +156,12 @@ where
     }
 }
 
-pub trait AppState: McpServerStoreProvider + SkillStoreProvider + SkillRuntimeProvider {
+pub trait AppState:
+    McpServerStoreProvider + SkillStoreProvider + SkillRuntimeProvider + CsiProvider
+{
     type Authorization: Clone;
-    type Csi: Clone;
 
     fn authorization(&self) -> &Self::Authorization;
-    fn csi(&self) -> &Self::Csi;
 }
 
 impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
@@ -158,14 +173,9 @@ where
     M: Clone,
 {
     type Authorization = A;
-    type Csi = C;
 
     fn authorization(&self) -> &Self::Authorization {
         &self.authorization_api
-    }
-
-    fn csi(&self) -> &Self::Csi {
-        &self.csi_drivers
     }
 }
 
@@ -217,15 +227,6 @@ struct AuthorizationState<A>(pub A);
 impl<T: AppState> FromRef<T> for AuthorizationState<T::Authorization> {
     fn from_ref(app_state: &T) -> AuthorizationState<T::Authorization> {
         AuthorizationState(app_state.authorization().clone())
-    }
-}
-
-/// Wrapper used to extract [`Csi`] api from the [`AppState`] using a [`FromRef`] implementation.
-pub struct CsiState<C>(pub C);
-
-impl<T: AppState> FromRef<T> for CsiState<T::Csi> {
-    fn from_ref(app_state: &T) -> CsiState<T::Csi> {
-        CsiState(app_state.csi().clone())
     }
 }
 
@@ -589,47 +590,6 @@ pub mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
         auth_value
-    }
-
-    #[tokio::test]
-    async fn http_csi_handle_returns_completion() {
-        // Given a versioned csi request
-        let prompt = "Say hello to Homer";
-        let body = json!({
-            "version": "0.2",
-            "function": "complete",
-            "model": "pharia-1-llm-7b-control",
-            "prompt": prompt,
-            "params": {
-                "max_tokens": 1,
-                "temperature": null,
-                "top_k": null,
-                "top_p": null,
-                "stop": [],
-            },
-        });
-
-        // When
-        let csi = CompletionStub::new(|r| inference::Completion::from_text(r.prompt));
-        let app_state = AppStateImpl::dummy().with_csi_drivers(csi);
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri("/csi")
-                    .body(Body::from(serde_json::to_string(&body).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
-        let body = resp.into_body().collect().await.unwrap().to_bytes();
-        let json_value: Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json_value["text"].as_str().unwrap(), prompt);
     }
 
     #[tokio::test]
