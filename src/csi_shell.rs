@@ -175,12 +175,21 @@ impl From<UnknownCsiRequest> for CsiShellError {
 mod tests {
     use axum::{body::Body, http::Request};
     use http_body_util::BodyExt as _;
-    use reqwest::{Method, header::CONTENT_TYPE};
+    use mime::TEXT_EVENT_STREAM;
+    use reqwest::{
+        Method,
+        header::{AUTHORIZATION, CONTENT_TYPE},
+    };
+    use tokio::sync::mpsc;
     use tower::ServiceExt as _;
 
     use crate::{
         csi::tests::RawCsiDouble,
-        inference::{Completion, CompletionRequest},
+        inference::{
+            Completion, CompletionEvent, CompletionRequest, FinishReason, InferenceError,
+            TokenUsage,
+        },
+        shell::tests::dummy_auth_value,
     };
 
     use super::*;
@@ -487,6 +496,7 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -497,6 +507,89 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let json_value: Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json_value["text"].as_str().unwrap(), prompt);
+    }
+
+    #[tokio::test]
+    async fn http_csi_handle_returns_completion_stream() {
+        // Given a versioned csi request and a stub csi that returns three events for completions
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn completion_stream(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _request: CompletionRequest,
+            ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
+                let (sender, receiver) = mpsc::channel(1);
+                tokio::spawn(async move {
+                    let append = CompletionEvent::Append {
+                        text: "Say hello to Homer".to_owned(),
+                        logprobs: vec![],
+                    };
+                    let end = CompletionEvent::End {
+                        finish_reason: FinishReason::Stop,
+                    };
+                    let usage = CompletionEvent::Usage {
+                        usage: TokenUsage {
+                            prompt: 0,
+                            completion: 0,
+                        },
+                    };
+                    sender.send(Ok(append)).await.unwrap();
+                    sender.send(Ok(end)).await.unwrap();
+                    sender.send(Ok(usage)).await.unwrap();
+                });
+                receiver
+            }
+        }
+
+        let body = json!({
+            "model": "pharia-1-llm-7b-control",
+            "prompt": "Hi",
+            "params": {
+                "max_tokens": 1,
+                "stop": [],
+                "return_special_tokens": true,
+                "logprobs": "no",
+            },
+        });
+
+        // When
+        let app_state = ProviderStub::new(RawCsiStub);
+        let http = http().with_state(app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/csi/v1/completion_stream")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get the expected events
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = "event: append\n\
+            data: {\"text\":\"Say hello to Homer\",\"logprobs\":[]}\n\
+            \n\
+            event: end\n\
+            data: {\"finish_reason\":\"stop\"}\n\
+            \n\
+            event: usage\n\
+            data: {\"usage\":{\"prompt\":0,\"completion\":0}}\n\
+            \n\
+            ";
+        assert_eq!(body_text, expected_body);
     }
 
     #[derive(Clone)]
