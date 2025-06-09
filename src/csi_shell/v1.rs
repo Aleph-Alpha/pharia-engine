@@ -20,10 +20,10 @@ use serde_json::Value;
 use crate::{
     chunking,
     csi::RawCsi,
+    csi_shell::{CsiProvider, CsiState},
     inference, language_selection,
     logging::TracingContext,
     search,
-    shell::{AppState, CsiState},
 };
 
 // Make our own error that wraps `anyhow::Error`.
@@ -57,7 +57,7 @@ where
 
 pub fn http<T>() -> Router<T>
 where
-    T: AppState + Clone + Send + Sync + 'static,
+    T: CsiProvider + Clone + Send + Sync + 'static,
     T::Csi: RawCsi + Clone + Sync + Send + 'static,
 {
     Router::new()
