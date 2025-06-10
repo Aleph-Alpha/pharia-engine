@@ -185,19 +185,12 @@ jobs:
             pharia-kernel:$IMAGE_ID | cat) &
           bash -x ./tests/test-image.sh 8081 127.0.0.1
 
-  test-and-deploy-if-main-or-tag:
+  test-helm-chart:
     runs-on: cpu-runner-8c-32gb-01
-    needs: [build-image, test-image, tests, lints]
-    concurrency: test-and-deploy-if-main-or-tag-${{ github.ref }}
+    needs: [build-image]
     permissions:
       contents: read
-      id-token: write
-      packages: write
     env:
-      ARTIFACTORY_URL: https://alephalpha.jfrog.io
-      ARTIFACTORY_HOST: alephalpha.jfrog.io
-      ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
-      ARTIFACTORY_HELM_REPOSITORY: pharia-kernel-helm
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v4
@@ -207,12 +200,6 @@ jobs:
         with:
           name: pharia-kernel-image
           path: /tmp
-
-      - name: Download scanning artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: security-scanning-results
-          path: ./
 
       - name: Load image from tarball
         run: podman load -i /tmp/pharia-kernel.tar
@@ -263,6 +250,45 @@ jobs:
 
           helm uninstall pharia-kernel
 
+  test-helm-chart-beta:
+    runs-on: cpu-runner-8c-32gb-01
+    needs: [build-image]
+    permissions:
+      contents: read
+    env:
+      IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pharia-kernel-image
+          path: /tmp
+
+      - name: Load image from tarball
+        run: podman load -i /tmp/pharia-kernel.tar
+
+      - name: Tag image as latest
+        run: podman tag pharia-kernel:${{ env.IMAGE_ID }} pharia-kernel:latest
+
+      - name: Create kind cluster with registry
+        id: kind
+        uses: helm/kind-action@v1
+        with:
+          registry: true
+          registry_name: local-registry
+          registry_port: 5002
+
+      - name: Push to local registry
+        id: push-local
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: pharia-kernel
+          tags: ${{ env.IMAGE_ID }}
+          registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
+          tls-verify: false
+
       - name: Test Helm chart Beta
         env:
           LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
@@ -289,6 +315,41 @@ jobs:
           ./tests/test-run-skill.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8083
 
           helm uninstall pharia-kernel
+
+  test-and-deploy-if-main-or-tag:
+    runs-on: cpu-runner-8c-32gb-01
+    needs: [build-image, test-image, test-helm-chart, test-helm-chart-beta, tests, lints]
+    concurrency: test-and-deploy-if-main-or-tag-${{ github.ref }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    env:
+      ARTIFACTORY_URL: https://alephalpha.jfrog.io
+      ARTIFACTORY_HOST: alephalpha.jfrog.io
+      ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
+      ARTIFACTORY_HELM_REPOSITORY: pharia-kernel-helm
+      IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pharia-kernel-image
+          path: /tmp
+
+      - name: Download scanning artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: security-scanning-results
+          path: ./
+
+      - name: Load image from tarball
+        run: podman load -i /tmp/pharia-kernel.tar
+
+      - name: Tag image as latest
+        run: podman tag pharia-kernel:${{ env.IMAGE_ID }} pharia-kernel:latest
 
       - if: github.event_name != 'pull_request'
         name: Get JFrog Artifactory login credentials
