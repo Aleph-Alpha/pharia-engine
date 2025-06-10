@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.14](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.13...pharia-kernel-v0.12.14)
+
+### Fixes
+
+- Bump aa client to fix echo param with logprobs - ([ac12c40](https://github.com/Aleph-Alpha/pharia-kernel/commit/ac12c40c5e1b23b2d52ab66c074798fd752e9bac))
+- Openapi.json now returns specification according to feature set - ([a795dd6](https://github.com/Aleph-Alpha/pharia-kernel/commit/a795dd6c5f5c9821d550752642488df01c37793e))
+
+### Builds
+
+- *(deps)* Bump remaining otel crates - ([3acd832](https://github.com/Aleph-Alpha/pharia-kernel/commit/3acd8329e4e5ce8661bca97339cf728405f9932b))
+- *(deps)* Bump the minor group across 1 directory with 46 updates - ([39dc579](https://github.com/Aleph-Alpha/pharia-kernel/commit/39dc57963516e8f831026464e2e847091ec07216))
+
+
 ## [0.12.13](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.12...pharia-kernel-v0.12.13)
 
 ### Features
