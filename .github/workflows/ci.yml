@@ -125,6 +125,7 @@ jobs:
           name: pharia-kernel-image
           path: /tmp/pharia-kernel.tar
           retention-days: 1
+          compression-level: 1
     outputs:
       image_id: ${{ env.IMAGE_ID }}
 
