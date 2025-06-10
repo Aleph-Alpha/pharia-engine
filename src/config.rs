@@ -85,6 +85,9 @@ pub struct AppConfig {
     /// stack, as well as used to fetch Tokenizers for said models.
     #[serde(default = "defaults::inference_url")]
     inference_url: String,
+    /// An optional API key that will be used to authenticate against the inference API.
+    /// This takes precedence over the token provided by incomgin requests
+    inference_api_key: Option<String>,
     /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
     #[serde(default = "defaults::document_index_url")]
     document_index_url: String,
@@ -239,6 +242,11 @@ impl AppConfig {
     #[must_use]
     pub fn inference_url(&self) -> &str {
         &self.inference_url
+    }
+
+    #[must_use]
+    pub fn inference_api_key(&self) -> Option<&str> {
+        self.inference_api_key.as_deref()
     }
 
     #[must_use]
@@ -468,6 +476,7 @@ impl Default for AppConfig {
             kernel_address: defaults::kernel_address(),
             metrics_address: defaults::metrics_address(),
             inference_url: defaults::inference_url(),
+            inference_api_key: None,
             document_index_url: defaults::document_index_url(),
             authorization_url: defaults::authorization_url(),
             namespaces: NamespaceConfigs::default(),
@@ -529,6 +538,10 @@ mod tests {
                 "https://inference-api.product.pharia.com".to_owned(),
             ),
             (
+                "INFERENCE_API_KEY".to_owned(),
+                "very-secret-api-key".to_owned(),
+            ),
+            (
                 "DOCUMENT_INDEX_URL".to_owned(),
                 "https://document-index.product.pharia.com".to_owned(),
             ),
@@ -556,6 +569,8 @@ mod tests {
         assert_eq!(config.log_level(), "dummy");
         assert_eq!(config.namespaces().len(), 1);
         assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
+        assert_eq!(config.inference_url(), "https://inference-api.product.pharia.com");
+        assert_eq!(config.inference_api_key(), Some("very-secret-api-key"));
         Ok(())
     }
 
