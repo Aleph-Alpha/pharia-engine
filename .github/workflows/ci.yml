@@ -153,9 +153,41 @@ jobs:
     outputs:
       image_id: ${{ env.IMAGE_ID }}
 
+  test-image:
+    runs-on: cpu-runner-8c-32gb-01
+    needs: [build-image]
+    permissions:
+      contents: read
+    env:
+      IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pharia-kernel-image
+          path: /tmp
+
+      - name: Load image from tarball
+        run: podman load -i /tmp/pharia-kernel.tar
+
+      - name: Container test
+        run: bash -x ./tests/test-container.sh pharia-kernel:$IMAGE_ID
+
+      - name: Integration test
+        run: |
+          (podman run -p 8081:8081 -v ./config.toml:/app/config.toml \
+            -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER=dummy \
+            -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD=dummy \
+            -e NAMESPACES__PHARIA_KERNEL_TEAM__CONFIG_ACCESS_TOKEN=dummy \
+            -e PHARIA_AI_TOKEN=dummy \
+            pharia-kernel:$IMAGE_ID | cat) &
+          bash -x ./tests/test-image.sh 8081 127.0.0.1
+
   test-and-deploy-if-main-or-tag:
     runs-on: cpu-runner-8c-32gb-01
-    needs: [build-image, tests, lints]
+    needs: [build-image, test-image, tests, lints]
     concurrency: test-and-deploy-if-main-or-tag-${{ github.ref }}
     permissions:
       contents: read
@@ -187,19 +219,6 @@ jobs:
 
       - name: Tag image as latest
         run: podman tag pharia-kernel:${{ env.IMAGE_ID }} pharia-kernel:latest
-
-      - name: Container test
-        run: bash -x ./tests/test-container.sh pharia-kernel:$IMAGE_ID
-
-      - name: Integration test
-        run: |
-          (podman run -p 8081:8081 -v ./config.toml:/app/config.toml \
-            -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER=dummy \
-            -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD=dummy \
-            -e NAMESPACES__PHARIA_KERNEL_TEAM__CONFIG_ACCESS_TOKEN=dummy \
-            -e PHARIA_AI_TOKEN=dummy \
-            pharia-kernel:$IMAGE_ID | cat) &
-          bash -x ./tests/test-image.sh 8081 127.0.0.1
 
       - name: Create kind cluster with registry
         id: kind
