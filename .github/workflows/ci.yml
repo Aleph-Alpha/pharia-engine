@@ -118,11 +118,37 @@ jobs:
       - name: Export image to tarball
         run: podman save localhost/pharia-kernel:${{ env.IMAGE_ID }} -o /tmp/pharia-kernel.tar
 
+      - name: Extract SBOM from tarball
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          format: "cyclonedx"
+          input: "/tmp/pharia-kernel.tar"
+          output: "sbom.json"
+          scan-type: "fs"
+
+      - name: Vulnerability scanning with Trivy
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          input: /tmp/pharia-kernel.tar
+          trivyignores: ".trivyignore"
+          severity: "MEDIUM,HIGH,CRITICAL"
+          exit-code: "1"
+          output: "report.json"
+
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
           name: pharia-kernel-image
           path: /tmp/pharia-kernel.tar
+          retention-days: 1
+
+      - name: Upload scanning artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scanning-results
+          path: |
+            sbom.json
+            report.json
           retention-days: 1
     outputs:
       image_id: ${{ env.IMAGE_ID }}
@@ -150,6 +176,12 @@ jobs:
           name: pharia-kernel-image
           path: /tmp
 
+      - name: Download scanning artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: security-scanning-results
+          path: ./
+
       - name: Load image from tarball
         run: podman load -i /tmp/pharia-kernel.tar
 
@@ -168,23 +200,6 @@ jobs:
             -e PHARIA_AI_TOKEN=dummy \
             pharia-kernel:$IMAGE_ID | cat) &
           bash -x ./tests/test-image.sh 8081 127.0.0.1
-
-      - name: Extract SBOM from tarball
-        uses: aquasecurity/trivy-action@0.31.0
-        with:
-          format: "cyclonedx"
-          input: "/tmp/pharia-kernel.tar"
-          output: "sbom.json"
-          scan-type: "fs"
-
-      - name: Vulnerability scanning with Trivy
-        uses: aquasecurity/trivy-action@0.31.0
-        with:
-          input: /tmp/pharia-kernel.tar
-          trivyignores: ".trivyignore"
-          severity: "MEDIUM,HIGH,CRITICAL"
-          exit-code: "1"
-          output: "report.json"
 
       - name: Create kind cluster with registry
         id: kind
