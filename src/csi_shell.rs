@@ -186,8 +186,9 @@ mod tests {
     use crate::{
         csi::tests::RawCsiDouble,
         inference::{
-            ChatEvent, ChatRequest, Completion, CompletionEvent, CompletionRequest, Explanation,
-            ExplanationRequest, FinishReason, InferenceError, TextScore, TokenUsage,
+            ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
+            Explanation, ExplanationRequest, FinishReason, InferenceError, Message, TextScore,
+            TokenUsage,
         },
         shell::tests::dummy_auth_value,
     };
@@ -820,6 +821,69 @@ mod tests {
             .await
             .unwrap();
 
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, APPLICATION_JSON.as_ref());
+    }
+
+    #[tokio::test]
+    async fn http_csi_handle_chat() {
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn chat(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _requests: Vec<ChatRequest>,
+            ) -> anyhow::Result<Vec<ChatResponse>> {
+                Ok(vec![ChatResponse {
+                    message: Message {
+                        role: "assistant".to_owned(),
+                        content: "dummy-content".to_owned(),
+                    },
+                    finish_reason: FinishReason::Stop,
+                    logprobs: vec![],
+                    usage: TokenUsage {
+                        prompt: 0,
+                        completion: 0,
+                    },
+                }])
+            }
+        }
+        // Given a versioned csi request
+        let message = "Say hello to Homer";
+        let body = json!([{
+            "model": "pharia-1-llm-7b-control",
+            "messages": [
+                {"role": "user", "content": message}
+            ],
+            "params": {
+                "max_tokens": 1,
+                "stop": [],
+                "logprobs": "no",
+            },
+        }]);
+
+        // When
+        let app_state = ProviderStub::new(RawCsiStub);
+        let http = http().with_state(app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/csi/v1/chat")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
         assert_eq!(resp.status(), StatusCode::OK);
         let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
         assert_eq!(content_type, APPLICATION_JSON.as_ref());

@@ -500,7 +500,6 @@ pub mod tests {
         chunking::{Chunk, ChunkRequest},
         csi::tests::RawCsiDouble,
         feature_set::PRODUCTION_FEATURE_SET,
-        inference,
         logging::tests::given_tracing_subscriber,
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
         skill_runtime::SkillRuntimeDouble,
@@ -588,69 +587,6 @@ pub mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
         auth_value
-    }
-
-    #[tokio::test]
-    async fn http_csi_handle_chat() {
-        #[derive(Clone)]
-        struct RawCsiStub;
-
-        impl RawCsiDouble for RawCsiStub {
-            async fn chat(
-                &self,
-                _auth: String,
-                _tracing_context: TracingContext,
-                _requests: Vec<inference::ChatRequest>,
-            ) -> anyhow::Result<Vec<inference::ChatResponse>> {
-                Ok(vec![inference::ChatResponse {
-                    message: inference::Message {
-                        role: "assistant".to_owned(),
-                        content: "dummy-content".to_owned(),
-                    },
-                    finish_reason: inference::FinishReason::Stop,
-                    logprobs: vec![],
-                    usage: inference::TokenUsage {
-                        prompt: 0,
-                        completion: 0,
-                    },
-                }])
-            }
-        }
-        // Given a versioned csi request
-        let message = "Say hello to Homer";
-        let body = json!([{
-            "model": "pharia-1-llm-7b-control",
-            "messages": [
-                {"role": "user", "content": message}
-            ],
-            "params": {
-                "max_tokens": 1,
-                "stop": [],
-                "logprobs": "no",
-            },
-        }]);
-
-        // When
-        let app_state = AppStateImpl::dummy().with_csi_drivers(RawCsiStub);
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri("/csi/v1/chat")
-                    .body(Body::from(serde_json::to_string(&body).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then
-        assert_eq!(resp.status(), StatusCode::OK);
-        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
-        assert_eq!(content_type, APPLICATION_JSON.as_ref());
     }
 
     #[tokio::test]
