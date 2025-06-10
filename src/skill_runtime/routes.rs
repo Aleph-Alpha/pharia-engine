@@ -577,14 +577,14 @@ mod tests {
         #[derive(Clone)]
         struct SkillRuntimeStub;
         impl SkillRuntimeDouble for SkillRuntimeStub {
-            fn run_function(
+            async fn run_function(
                 &self,
                 _: SkillPath,
                 _: Value,
                 _: String,
                 _: TracingContext,
-            ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send {
-                async { Err(SkillExecutionError::SkillNotConfigured) }
+            ) -> Result<Value, SkillExecutionError> {
+                Err(SkillExecutionError::SkillNotConfigured)
             }
         }
         let app_state = ProviderStub::new(SkillRuntimeStub);

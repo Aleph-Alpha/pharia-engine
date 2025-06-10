@@ -470,6 +470,7 @@ async fn index() -> Html<&'static str> {
         (status = 200, description = "JSON file", body = ())
     ),
 )]
+#[allow(clippy::unused_async)]
 async fn serve_docs(feature_set: FeatureSet) -> Json<openapi::OpenApi> {
     Json(open_api_docs(feature_set))
 }
