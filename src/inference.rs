@@ -5,8 +5,8 @@ pub use self::{
     actor::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
         CompletionParams, CompletionRequest, Distribution, Explanation, ExplanationRequest,
-        FinishReason, Granularity, Inference, InferenceApi, Logprob, Logprobs, Message, TextScore,
-        TokenUsage,
+        FinishReason, Granularity, Inference, InferenceApi, InferenceConfig, Logprob, Logprobs,
+        Message, TextScore, TokenUsage,
     },
     client::InferenceError,
 };

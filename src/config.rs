@@ -11,7 +11,9 @@ use std::{
     time::Duration,
 };
 
-use crate::{feature_set::FeatureSet, namespace_watcher::NamespaceConfigs};
+use crate::{
+    feature_set::FeatureSet, inference::InferenceConfig, namespace_watcher::NamespaceConfigs,
+};
 
 mod defaults {
     use std::{net::SocketAddr, time::Duration};
@@ -247,6 +249,11 @@ impl AppConfig {
     #[must_use]
     pub fn inference_api_key(&self) -> Option<&str> {
         self.inference_api_key.as_deref()
+    }
+
+    #[must_use]
+    pub fn as_inference_config(&self) -> InferenceConfig {
+        InferenceConfig::new(self.inference_url.clone(), self.inference_api_key.clone())
     }
 
     #[must_use]
@@ -569,7 +576,10 @@ mod tests {
         assert_eq!(config.log_level(), "dummy");
         assert_eq!(config.namespaces().len(), 1);
         assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
-        assert_eq!(config.inference_url(), "https://inference-api.product.pharia.com");
+        assert_eq!(
+            config.inference_url(),
+            "https://inference-api.product.pharia.com"
+        );
         assert_eq!(config.inference_api_key(), Some("very-secret-api-key"));
         Ok(())
     }

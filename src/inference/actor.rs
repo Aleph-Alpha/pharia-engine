@@ -22,11 +22,26 @@ pub struct Inference {
     handle: JoinHandle<()>,
 }
 
+/// Configuration for the inference actor.
+pub struct InferenceConfig {
+    // Base URL of the inference API
+    address: String,
+    // Optional API key to authenticate against the inference API
+    // If provided, this will take precedence over the token provided by incoming requests
+    api_key: Option<String>,
+}
+
+impl InferenceConfig {
+    pub fn new(address: String, api_key: Option<String>) -> Self {
+        Self { address, api_key }
+    }
+}
+
 impl Inference {
     /// Starts a new inference Actor. Calls to this method be balanced by calls to
     /// [`Self::shutdown`].
-    pub fn new(inference_addr: String) -> Self {
-        let client = Client::new(inference_addr, None).unwrap();
+    pub fn new(config: InferenceConfig) -> Self {
+        let client = Client::new(config.address, config.api_key).unwrap();
         Self::with_client(client)
     }
 
