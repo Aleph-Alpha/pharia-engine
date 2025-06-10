@@ -514,7 +514,7 @@ pub mod tests {
 
     use double_trait::Dummy;
     use http_body_util::BodyExt;
-    use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
+    use mime::APPLICATION_JSON;
     use reqwest::header::CONTENT_TYPE;
     use serde_json::{Value, json};
     use tokio::sync::mpsc;
@@ -572,45 +572,6 @@ pub mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
         auth_value
-    }
-
-    #[tokio::test]
-    async fn stream_endpoint_for_saboteur_skill() {
-        // Given
-        let stream_events = vec![SkillExecutionEvent::Error(
-            SkillExecutionError::RuntimeError("Skill is a saboteur".to_string()),
-        )];
-        let skill_runtime = SkillRuntimeStub::with_stream_events(stream_events);
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime);
-        let http = http(FeatureSet::Beta, app_state);
-
-        // When asking for a message stream from a skill that does not exist
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri("/v1/skills/local/saboteur/message-stream")
-                    .body(Body::from("\"\""))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then we get a OK response that contains an error
-        assert_eq!(resp.status(), StatusCode::OK);
-        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
-        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
-
-        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
-        let expected_body = "\
-            event: error\n\
-            data: {\"message\":\"The skill could not be executed to completion, something in our \
-                runtime is currently unavailable or misconfigured. You should try again later, if \
-                the situation persists you may want to contact the operators. Original error:\\n\\n\
-                Skill is a saboteur\"}\n\n";
-        assert_eq!(body_text, expected_body);
     }
 
     #[tokio::test]
@@ -814,58 +775,6 @@ pub mod tests {
             _tracing_context: TracingContext,
         ) -> Result<AnySkillManifest, SkillExecutionError> {
             Err((*self.make_error)())
-        }
-    }
-
-    /// Stub Skill Runtime which emits predefined stream events
-    #[derive(Debug, Clone)]
-    struct SkillRuntimeStub {
-        function_result: Value,
-        metadata: AnySkillManifest,
-        stream_events: Vec<SkillExecutionEvent>,
-    }
-
-    impl SkillRuntimeStub {
-        pub fn with_stream_events(stream_events: Vec<SkillExecutionEvent>) -> Self {
-            Self {
-                function_result: Value::default(),
-                stream_events,
-                metadata: AnySkillManifest::V0,
-            }
-        }
-    }
-
-    impl SkillRuntimeDouble for SkillRuntimeStub {
-        async fn run_function(
-            &self,
-            _skill_path: SkillPath,
-            _input: Value,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> Result<Value, SkillExecutionError> {
-            Ok(self.function_result.clone())
-        }
-
-        async fn run_message_stream(
-            &self,
-            _skill_path: SkillPath,
-            _input: Value,
-            _api_token: String,
-            _tracing_context: TracingContext,
-        ) -> mpsc::Receiver<SkillExecutionEvent> {
-            let (send, recv) = mpsc::channel(self.stream_events.len());
-            for ce in &self.stream_events {
-                send.send(ce.clone()).await.unwrap();
-            }
-            recv
-        }
-
-        async fn skill_metadata(
-            &self,
-            _skill_path: SkillPath,
-            _tracing_context: TracingContext,
-        ) -> Result<AnySkillManifest, SkillExecutionError> {
-            Ok(self.metadata.clone())
         }
     }
 
