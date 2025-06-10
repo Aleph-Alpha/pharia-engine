@@ -186,8 +186,8 @@ mod tests {
     use crate::{
         csi::tests::RawCsiDouble,
         inference::{
-            Completion, CompletionEvent, CompletionRequest, FinishReason, InferenceError,
-            TokenUsage,
+            ChatEvent, ChatRequest, Completion, CompletionEvent, CompletionRequest, FinishReason,
+            InferenceError, TokenUsage,
         },
         shell::tests::dummy_auth_value,
     };
@@ -685,6 +685,96 @@ mod tests {
             )
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn http_csi_handle_returns_stream() {
+        // Given a versioned csi request and a stub csi that returns four events for completions
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn chat_stream(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _request: ChatRequest,
+            ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
+                let (sender, receiver) = mpsc::channel(1);
+                tokio::spawn(async move {
+                    let message_begin = ChatEvent::MessageBegin {
+                        role: "assistant".to_owned(),
+                    };
+                    let message_append = ChatEvent::MessageAppend {
+                        content: "Say hello to Homer".to_owned(),
+                        logprobs: vec![],
+                    };
+                    let message_end = ChatEvent::MessageEnd {
+                        finish_reason: FinishReason::Stop,
+                    };
+                    let usage = ChatEvent::Usage {
+                        usage: TokenUsage {
+                            prompt: 0,
+                            completion: 0,
+                        },
+                    };
+                    sender.send(Ok(message_begin)).await.unwrap();
+                    sender.send(Ok(message_append)).await.unwrap();
+                    sender.send(Ok(message_end)).await.unwrap();
+                    sender.send(Ok(usage)).await.unwrap();
+                });
+                receiver
+            }
+        }
+        let body = json!({
+            "model": "pharia-1-llm-7b-control",
+            "messages": [
+                {"role": "user", "content": "Hi"}
+            ],
+            "params": {
+                "max_tokens": 1,
+                "stop": [],
+                "logprobs": "no",
+            },
+        });
+
+        // When
+        let app_state = ProviderStub::new(RawCsiStub);
+        let http = http().with_state(app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/csi/v1/chat_stream")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get the expected events
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = "event: message_begin\n\
+            data: {\"role\":\"assistant\"}\n\
+            \n\
+            event: message_append\n\
+            data: {\"content\":\"Say hello to Homer\",\"logprobs\":[]}\n\
+            \n\
+            event: message_end\n\
+            data: {\"finish_reason\":\"stop\"}\n\
+            \n\
+            event: usage\n\
+            data: {\"usage\":{\"prompt\":0,\"completion\":0}}\n\
+            \n\
+            ";
+        assert_eq!(body_text, expected_body);
     }
 
     #[derive(Clone)]
