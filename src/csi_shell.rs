@@ -175,7 +175,7 @@ impl From<UnknownCsiRequest> for CsiShellError {
 mod tests {
     use axum::{body::Body, http::Request};
     use http_body_util::BodyExt as _;
-    use mime::TEXT_EVENT_STREAM;
+    use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
     use reqwest::{
         Method,
         header::{AUTHORIZATION, CONTENT_TYPE},
@@ -186,8 +186,8 @@ mod tests {
     use crate::{
         csi::tests::RawCsiDouble,
         inference::{
-            ChatEvent, ChatRequest, Completion, CompletionEvent, CompletionRequest, FinishReason,
-            InferenceError, TokenUsage,
+            ChatEvent, ChatRequest, Completion, CompletionEvent, CompletionRequest, Explanation,
+            ExplanationRequest, FinishReason, InferenceError, TextScore, TokenUsage,
         },
         shell::tests::dummy_auth_value,
     };
@@ -775,6 +775,54 @@ mod tests {
             \n\
             ";
         assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
+    async fn http_csi_handle_returns_explain() {
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn explain(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _requests: Vec<ExplanationRequest>,
+            ) -> Result<Vec<Explanation>, CsiError> {
+                Ok(vec![Explanation::new(vec![TextScore {
+                    score: 0.0,
+                    start: 0,
+                    length: 2,
+                }])])
+            }
+        }
+
+        let body = json!([{
+            "prompt": "prompt",
+            "target": "target",
+            "model": "model",
+            "granularity": "auto"
+        }]);
+
+        let app_state = ProviderStub::new(RawCsiStub);
+        let http = http().with_state(app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/csi/v1/explain")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, APPLICATION_JSON.as_ref());
     }
 
     #[derive(Clone)]
