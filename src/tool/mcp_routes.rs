@@ -11,7 +11,7 @@ use crate::{
     tool::{McpServerStoreApi, McpServerUrl},
 };
 
-pub fn http_tools_v1<T>(feature_set: FeatureSet) -> Router<T>
+pub fn http_mcp_servers_v1<T>(feature_set: FeatureSet) -> Router<T>
 where
     T: Send + Sync + Clone + McpServerStoreProvider + 'static,
     T::McpServerStore: McpServerStoreApi + Send + Clone,
@@ -24,7 +24,7 @@ where
     }
 }
 
-pub fn openapi_tools_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
+pub fn openapi_mcp_servers_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
     if feature_set == FeatureSet::Beta {
         ToolOpenApiDocBeta::openapi()
     } else {
@@ -88,7 +88,7 @@ mod tests {
     use reqwest::Method;
     use tower::ServiceExt as _;
 
-    use super::{McpServerStoreProvider, McpServerUrl, http_tools_v1};
+    use super::{McpServerStoreProvider, McpServerUrl, http_mcp_servers_v1};
     use crate::{FeatureSet, namespace_watcher::Namespace, tool::actor::McpServerStoreDouble};
 
     #[derive(Clone)]
@@ -121,7 +121,7 @@ mod tests {
             }
         }
         let app_state = ProviderStub::new(McpServerMock);
-        let http = http_tools_v1(FeatureSet::Beta).with_state(app_state);
+        let http = http_mcp_servers_v1(FeatureSet::Beta).with_state(app_state);
 
         // When
         let resp = http

@@ -202,6 +202,26 @@ async fn run_search_skill() {
 }
 
 #[tokio::test]
+async fn tools_can_be_listed() {
+    let mcp = given_sse_mcp_server().await;
+    let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
+    local_skill_dir.with_mcp_server(mcp.address());
+    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .get(format!("http://127.0.0.1:{}/v1/tools/local", kernel.port()))
+        .header(header::AUTHORIZATION, auth_value())
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let tools: Vec<String> = resp.json().await.unwrap();
+    assert_eq!(tools, vec!["add", "saboteur"]);
+}
+
+#[tokio::test]
 async fn run_skill_with_tool_call() {
     let mcp = given_sse_mcp_server().await;
 
