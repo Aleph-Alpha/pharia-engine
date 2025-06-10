@@ -460,6 +460,19 @@ mod tests {
     #[tokio::test]
     async fn http_csi_handle_returns_completion() {
         // Given a versioned csi request
+        #[derive(Clone)]
+        struct CsiStub;
+        impl RawCsiDouble for CsiStub {
+            async fn complete(
+                &self,
+                _: String,
+                _: TracingContext,
+                request: Vec<CompletionRequest>,
+            ) -> anyhow::Result<Vec<Completion>> {
+                Ok(vec![Completion::from_text(request[0].prompt.clone())])
+            }
+        }
+
         let prompt = "Say hello to Homer";
         let body = json!({
             "version": "0.2",
@@ -476,18 +489,6 @@ mod tests {
         });
 
         // When
-        #[derive(Clone)]
-        struct CsiStub;
-        impl RawCsiDouble for CsiStub {
-            async fn complete(
-                &self,
-                _: String,
-                _: TracingContext,
-                request: Vec<CompletionRequest>,
-            ) -> anyhow::Result<Vec<Completion>> {
-                Ok(vec![Completion::from_text(request[0].prompt.clone())])
-            }
-        }
         let app_state = ProviderStub::new(CsiStub);
         let http = http().with_state(app_state);
 
