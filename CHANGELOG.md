@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.15](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.14...pharia-kernel-v0.12.15)
+
+### Features
+
+- Add route to list available tools - ([01896b7](https://github.com/Aleph-Alpha/pharia-kernel/commit/01896b77e9da42d59f03dd70b4527e5e6a075226))
+
+
 ## [0.12.14](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.13...pharia-kernel-v0.12.14)
 
 ### Fixes
