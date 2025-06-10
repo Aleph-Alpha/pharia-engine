@@ -137,6 +137,7 @@ impl Kernel {
             skill_runtime.api(),
             tool.api(),
             csi_drivers.clone(),
+            tool.api(),
         );
 
         let shell = match Shell::new(

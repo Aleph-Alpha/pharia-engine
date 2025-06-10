@@ -48,7 +48,10 @@ use crate::{
         SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
         openapi_skill_store_v1,
     },
-    tool::{McpServerStoreApi, McpServerStoreProvider, http_tools_v1, openapi_tools_v1},
+    tool::{
+        McpServerStoreApi, McpServerStoreProvider, ToolApi, ToolProvider, http_mcp_servers_v1,
+        http_tools_v1, openapi_mcp_servers_v1, openapi_tools_v1,
+    },
 };
 
 pub struct Shell {
@@ -71,6 +74,7 @@ impl Shell {
         T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
         T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
         T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
+        T::Tool: ToolApi + Clone + Send + Sync + 'static,
     {
         let addr = addr.into();
         // It is important to construct the listener outside of the `spawn` invocation. We need to
@@ -96,13 +100,14 @@ impl Shell {
     }
 }
 
-impl<A, C, R, S, M> McpServerStoreProvider for AppStateImpl<A, C, R, S, M>
+impl<A, C, R, S, M, T> McpServerStoreProvider for AppStateImpl<A, C, R, S, M, T>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
     M: Clone,
+    T: Clone,
 {
     type McpServerStore = M;
 
@@ -111,13 +116,14 @@ where
     }
 }
 
-impl<A, C, R, S, M> CsiProvider for AppStateImpl<A, C, R, S, M>
+impl<A, C, R, S, M, T> CsiProvider for AppStateImpl<A, C, R, S, M, T>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
     M: Clone,
+    T: Clone,
 {
     type Csi = C;
 
@@ -126,13 +132,14 @@ where
     }
 }
 
-impl<A, C, R, S, M> SkillStoreProvider for AppStateImpl<A, C, R, S, M>
+impl<A, C, R, S, M, T> SkillStoreProvider for AppStateImpl<A, C, R, S, M, T>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
     M: Clone,
+    T: Clone,
 {
     type SkillStore = S;
 
@@ -141,13 +148,14 @@ where
     }
 }
 
-impl<A, C, R, S, M> SkillRuntimeProvider for AppStateImpl<A, C, R, S, M>
+impl<A, C, R, S, M, T> SkillRuntimeProvider for AppStateImpl<A, C, R, S, M, T>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
     M: Clone,
+    T: Clone,
 {
     type SkillRuntime = R;
 
@@ -156,21 +164,38 @@ where
     }
 }
 
-pub trait AppState:
-    McpServerStoreProvider + SkillStoreProvider + SkillRuntimeProvider + CsiProvider
-{
-    type Authorization: Clone;
-
-    fn authorization(&self) -> &Self::Authorization;
-}
-
-impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
+impl<A, C, R, S, M, T> ToolProvider for AppStateImpl<A, C, R, S, M, T>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
     M: Clone,
+    T: Clone,
+{
+    type Tool = T;
+
+    fn tool(&self) -> &T {
+        &self.tool
+    }
+}
+
+pub trait AppState:
+    McpServerStoreProvider + SkillStoreProvider + SkillRuntimeProvider + CsiProvider + ToolProvider
+{
+    type Authorization: Clone;
+
+    fn authorization(&self) -> &Self::Authorization;
+}
+
+impl<A, C, R, S, M, T> AppState for AppStateImpl<A, C, R, S, M, T>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+    T: Clone,
 {
     type Authorization = A;
 
@@ -181,28 +206,31 @@ where
 
 /// State shared between routes
 #[derive(Clone)]
-pub struct AppStateImpl<A, C, R, S, M>
+pub struct AppStateImpl<A, C, R, S, M, T>
 where
     A: Clone,
     C: Clone,
     R: Clone,
     S: Clone,
     M: Clone,
+    T: Clone,
 {
     authorization_api: A,
     skill_store_api: S,
     skill_runtime_api: R,
     csi_drivers: C,
     mcp_servers: M,
+    tool: T,
 }
 
-impl<A, C, R, S, M> AppStateImpl<A, C, R, S, M>
+impl<A, C, R, S, M, T> AppStateImpl<A, C, R, S, M, T>
 where
     A: AuthorizationApi + Clone,
     C: RawCsi + Clone + Sync + Send + 'static,
     R: SkillRuntimeApi + Clone,
     S: SkillStoreApi + Clone,
     M: McpServerStoreApi + Clone,
+    T: ToolApi + Clone,
 {
     pub fn new(
         authorization_api: A,
@@ -210,6 +238,7 @@ where
         skill_runtime_api: R,
         mcp_servers: M,
         csi_drivers: C,
+        tool: T,
     ) -> Self {
         Self {
             authorization_api,
@@ -217,6 +246,7 @@ where
             skill_runtime_api,
             csi_drivers,
             mcp_servers,
+            tool,
         }
     }
 }
@@ -236,9 +266,11 @@ where
     T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
     T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
+    T::Tool: ToolApi + Clone + Send + Sync + 'static,
 {
     Router::new()
         .merge(http_tools_v1(feature_set))
+        .merge(http_mcp_servers_v1(feature_set))
         .merge(http_skill_store_v1(feature_set))
         .merge(http_skill_runtime_v1(feature_set))
 }
@@ -253,6 +285,7 @@ fn open_api_docs(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
     api_doc.nest(
         "v1",
         openapi_tools_v1(feature_set)
+            .merge_from(openapi_mcp_servers_v1(feature_set))
             .merge_from(openapi_skill_store_v1(feature_set))
             .merge_from(openapi_skill_runtime_v1(feature_set)),
     )
@@ -266,6 +299,7 @@ where
     T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
     T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
+    T::Tool: ToolApi + Clone + Send + Sync + 'static,
 {
     let api_docs = open_api_docs(feature_set);
     Router::new()
@@ -520,24 +554,32 @@ pub mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl AppStateImpl<StubAuthorization, Dummy, Dummy, Dummy, Dummy> {
+    impl AppStateImpl<StubAuthorization, Dummy, Dummy, Dummy, Dummy, Dummy> {
         pub fn dummy() -> Self {
-            Self::new(StubAuthorization::new(true), Dummy, Dummy, Dummy, Dummy)
+            Self::new(
+                StubAuthorization::new(true),
+                Dummy,
+                Dummy,
+                Dummy,
+                Dummy,
+                Dummy,
+            )
         }
     }
 
-    impl<A, C, R, S, M> AppStateImpl<A, C, R, S, M>
+    impl<A, C, R, S, M, T> AppStateImpl<A, C, R, S, M, T>
     where
         A: AuthorizationApi + Clone + Sync + Send + 'static,
         C: RawCsi + Clone + Sync + Send + 'static,
         R: SkillRuntimeApi + Clone + Send + Sync + 'static,
         S: SkillStoreApi + Clone + Send + Sync + 'static,
         M: McpServerStoreApi + Clone + Send + Sync + 'static,
+        T: ToolApi + Clone + Send + Sync + 'static,
     {
         pub fn with_authorization_api<A2>(
             self,
             authorization_api: A2,
-        ) -> AppStateImpl<A2, C, R, S, M>
+        ) -> AppStateImpl<A2, C, R, S, M, T>
         where
             A2: AuthorizationApi + Clone + Sync + Send + 'static,
         {
@@ -547,13 +589,14 @@ pub mod tests {
                 self.skill_runtime_api,
                 self.mcp_servers,
                 self.csi_drivers,
+                self.tool,
             )
         }
 
         pub fn with_skill_runtime_api<R2>(
             self,
             skill_runtime_api: R2,
-        ) -> AppStateImpl<A, C, R2, S, M>
+        ) -> AppStateImpl<A, C, R2, S, M, T>
         where
             R2: SkillRuntimeApi + Clone + Send + Sync + 'static,
         {
@@ -563,6 +606,7 @@ pub mod tests {
                 skill_runtime_api,
                 self.mcp_servers,
                 self.csi_drivers,
+                self.tool,
             )
         }
     }
