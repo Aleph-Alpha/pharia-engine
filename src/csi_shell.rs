@@ -556,11 +556,10 @@ mod tests {
                 "logprobs": "no",
             },
         });
-
-        // When
         let app_state = ProviderStub::new(RawCsiStub);
         let http = http().with_state(app_state);
 
+        // When
         let resp = http
             .oneshot(
                 Request::builder()
@@ -591,6 +590,54 @@ mod tests {
             \n\
             ";
         assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
+    async fn http_csi_v1_forward_echo_parameter() {
+        // Given a request with echo == true
+        #[derive(Clone)]
+        struct CsiMock;
+        impl RawCsiDouble for CsiMock {
+            async fn complete(
+                &self,
+                _: String,
+                _: TracingContext,
+                mut request: Vec<CompletionRequest>,
+            ) -> anyhow::Result<Vec<Completion>> {
+                // Then we expect the echo parameter to be true if forwarded to the CSI
+                let r = request.pop().unwrap();
+                assert!(r.params.echo);
+                Ok(vec![Completion::from_text(r.prompt)])
+            }
+        }
+        let prompt = "Say hello to Homer";
+        let body = json!([{
+            "model": "pharia-1-llm-7b-control",
+            "prompt": prompt,
+            "params": {
+                "echo": true,
+                "max_tokens": 1,
+                "stop": [],
+                "return_special_tokens": true,
+                "logprobs": "no",
+            },
+        }]);
+        let app_state = ProviderStub::new(CsiMock);
+        let http = http().with_state(app_state);
+
+        // When
+        let _resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/csi/v1/complete")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
     }
 
     #[derive(Clone)]
