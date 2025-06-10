@@ -118,6 +118,31 @@ jobs:
       - name: Export image to tarball
         run: podman save localhost/pharia-kernel:${{ env.IMAGE_ID }} -o /tmp/pharia-kernel.tar
 
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pharia-kernel-image
+          path: /tmp/pharia-kernel.tar
+          retention-days: 1
+    outputs:
+      image_id: ${{ env.IMAGE_ID }}
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [build-image]
+    permissions:
+      contents: read
+    env:
+      IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pharia-kernel-image
+          path: /tmp
+
       - name: Extract SBOM from tarball
         uses: aquasecurity/trivy-action@0.31.0
         with:
@@ -135,13 +160,6 @@ jobs:
           exit-code: "1"
           output: "report.json"
 
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pharia-kernel-image
-          path: /tmp/pharia-kernel.tar
-          retention-days: 1
-
       - name: Upload scanning artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -150,8 +168,6 @@ jobs:
             sbom.json
             report.json
           retention-days: 1
-    outputs:
-      image_id: ${{ env.IMAGE_ID }}
 
   test-image:
     runs-on: cpu-runner-8c-32gb-01
@@ -319,7 +335,7 @@ jobs:
   deploy:
     if: github.event_name != 'pull_request'
     runs-on: cpu-runner-8c-32gb-01
-    needs: [build-image, test-image, test-helm-chart, test-helm-chart-beta, tests, lints]
+    needs: [build-image, security-scan, test-image, test-helm-chart, test-helm-chart-beta, tests, lints]
     concurrency: deploy-${{ github.ref }}
     permissions:
       contents: read
