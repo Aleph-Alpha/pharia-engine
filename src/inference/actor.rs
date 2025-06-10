@@ -509,9 +509,7 @@ impl InferenceMessage {
                 api_token,
                 tracing_context,
             } => {
-                let result = client
-                    .complete(&request, api_token.clone(), &tracing_context)
-                    .await;
+                let result = client.complete(&request, api_token, &tracing_context).await;
                 drop(send.send(result));
             }
             Self::CompletionStream {
@@ -603,9 +601,7 @@ impl InferenceMessage {
                 api_token,
                 tracing_context,
             } => {
-                let result = client
-                    .explain(&request, api_token.clone(), &tracing_context)
-                    .await;
+                let result = client.explain(&request, api_token, &tracing_context).await;
                 drop(send.send(result));
             }
         }
