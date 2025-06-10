@@ -37,8 +37,8 @@ impl Inference {
         Inference { send, handle }
     }
 
-    pub fn api(&self) -> mpsc::Sender<InferenceMessage> {
-        self.send.clone()
+    pub fn api(&self) -> InferenceSender {
+        InferenceSender(self.send.clone())
     }
 
     /// Inference is going to shutdown, as soon as the last instance of [`InferenceApi`] is dropped.
@@ -47,6 +47,13 @@ impl Inference {
         self.handle.await.unwrap();
     }
 }
+
+/// Implements [`InferenceApi`] by sending messages to the actor and waiting for the response.
+///
+/// Having a dedicated type for the sender, rather than using `mpsc::Sender` directly allows us to
+/// keep the message type private to the actor module.
+#[derive(Clone)]
+pub struct InferenceSender(mpsc::Sender<InferenceMessage>);
 
 #[cfg_attr(test, double(InferenceApiDouble))]
 pub trait InferenceApi {
@@ -86,7 +93,7 @@ pub trait InferenceApi {
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
 }
 
-impl InferenceApi for mpsc::Sender<InferenceMessage> {
+impl InferenceApi for InferenceSender {
     async fn explain(
         &self,
         request: ExplanationRequest,
@@ -100,7 +107,8 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         let explanation = recv
@@ -122,7 +130,8 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         let completion = recv
@@ -144,7 +153,8 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
@@ -163,7 +173,8 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         let chat_response = recv
@@ -185,7 +196,8 @@ impl InferenceApi for mpsc::Sender<InferenceMessage> {
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
@@ -451,7 +463,7 @@ impl<C: InferenceClient> InferenceActor<C> {
     }
 }
 
-pub enum InferenceMessage {
+enum InferenceMessage {
     Complete {
         request: CompletionRequest,
         send: oneshot::Sender<Result<Completion, InferenceError>>,
