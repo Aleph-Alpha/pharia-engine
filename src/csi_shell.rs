@@ -511,6 +511,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_csi_v1_echo_defaults_to_false() {
+        #[derive(Clone)]
+        struct CsiMock;
+        impl RawCsiDouble for CsiMock {
+            async fn complete(
+                &self,
+                _: String,
+                _: TracingContext,
+                request: Vec<CompletionRequest>,
+            ) -> anyhow::Result<Vec<Completion>> {
+                // Then
+                assert!(!request[0].params.echo);
+                Ok(vec![Completion::from_text("")])
+            }
+        }
+        // Given a versioned csi request
+        let prompt = "Say hello to Homer";
+        let body = json!([{
+            "model": "pharia-1-llm-7b-control",
+            "prompt": prompt,
+            "params": {
+                "max_tokens": 1,
+                "stop": [],
+                "return_special_tokens": true,
+                "logprobs": "no",
+            },
+        }]);
+
+        let app_state = ProviderStub::new(CsiMock);
+        let http = http().with_state(app_state);
+
+        // When
+        let _resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/csi/v1/complete")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn http_csi_handle_returns_completion_stream() {
         // Given a versioned csi request and a stub csi that returns three events for completions
         #[derive(Clone)]
