@@ -497,8 +497,6 @@ pub mod tests {
 
     use crate::{
         authorization::tests::StubAuthorization,
-        chunking::{Chunk, ChunkRequest},
-        csi::tests::RawCsiDouble,
         feature_set::PRODUCTION_FEATURE_SET,
         logging::tests::given_tracing_subscriber,
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
@@ -567,19 +565,6 @@ pub mod tests {
                 self.csi_drivers,
             )
         }
-
-        pub fn with_csi_drivers<C2>(self, csi_drivers: C2) -> AppStateImpl<A, C2, R, S, M>
-        where
-            C2: RawCsi + Clone + Sync + Send + 'static,
-        {
-            AppStateImpl::new(
-                self.authorization_api,
-                self.skill_store_api,
-                self.skill_runtime_api,
-                self.mcp_servers,
-                csi_drivers,
-            )
-        }
     }
 
     pub fn dummy_auth_value() -> header::HeaderValue {
@@ -587,58 +572,6 @@ pub mod tests {
         let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
         auth_value.set_sensitive(true);
         auth_value
-    }
-
-    #[tokio::test]
-    async fn http_csi_handle_chunk_with_offsets() {
-        #[derive(Clone)]
-        struct RawCsiStub;
-
-        impl RawCsiDouble for RawCsiStub {
-            async fn chunk(
-                &self,
-                _auth: String,
-                _tracing_context: TracingContext,
-                _requests: Vec<ChunkRequest>,
-            ) -> anyhow::Result<Vec<Vec<Chunk>>> {
-                Ok(vec![vec![Chunk {
-                    text: "my_chunk".to_owned(),
-                    byte_offset: 0,
-                    character_offset: Some(0),
-                }]])
-            }
-        }
-
-        let body = json!([{
-            "text": "text",
-            "params": {
-                "model": "model",
-                "max_tokens": 3,
-                "overlap": 0,
-            },
-            "character_offsets": true
-        }]);
-
-        let app_state = AppStateImpl::dummy().with_csi_drivers(RawCsiStub);
-        let http = http(PRODUCTION_FEATURE_SET, app_state);
-
-        let resp = http
-            .oneshot(
-                Request::builder()
-                    .method(Method::POST)
-                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
-                    .uri("/csi/v1/chunk_with_offsets")
-                    .body(Body::from(serde_json::to_string(&body).unwrap()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Then we get separate events for each letter in "Hello"
-        assert_eq!(resp.status(), StatusCode::OK);
-        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
-        assert_eq!(content_type, APPLICATION_JSON.as_ref());
     }
 
     #[tokio::test]

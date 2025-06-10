@@ -940,6 +940,58 @@ mod tests {
         assert_eq!(content_type, APPLICATION_JSON.as_ref());
     }
 
+    #[tokio::test]
+    async fn http_csi_handle_chunk_with_offsets() {
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn chunk(
+                &self,
+                _auth: String,
+                _tracing_context: TracingContext,
+                _requests: Vec<ChunkRequest>,
+            ) -> anyhow::Result<Vec<Vec<Chunk>>> {
+                Ok(vec![vec![Chunk {
+                    text: "my_chunk".to_owned(),
+                    byte_offset: 0,
+                    character_offset: Some(0),
+                }]])
+            }
+        }
+
+        let body = json!([{
+            "text": "text",
+            "params": {
+                "model": "model",
+                "max_tokens": 3,
+                "overlap": 0,
+            },
+            "character_offsets": true
+        }]);
+
+        let app_state = ProviderStub::new(RawCsiStub);
+        let http = http().with_state(app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/csi/v1/chunk_with_offsets")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get separate events for each letter in "Hello"
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, APPLICATION_JSON.as_ref());
+    }
+
     #[derive(Clone)]
     struct ProviderStub<T> {
         csi: T,
