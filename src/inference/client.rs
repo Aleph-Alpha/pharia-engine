@@ -25,6 +25,48 @@ use super::{
 #[cfg(test)]
 use double_trait::double;
 
+/// Configuration for the inference actor.
+pub struct ClientConfig {
+    // Base URL of the inference API
+    address: String,
+    // Optional API key to authenticate against the inference API
+    // If provided, this will take precedence over the token provided by incoming requests
+    api_key: Option<String>,
+}
+
+impl ClientConfig {
+    pub fn new(address: String, api_key: Option<String>) -> Self {
+        Self { address, api_key }
+    }
+}
+
+/// A wrapper around the aa inference client that stores the optional api token.
+/// We want to control storage ourselves to choose priority of tokens.
+pub struct ClientWithAuth {
+    client: Client,
+    api_token: Option<String>,
+}
+
+impl ClientWithAuth {
+    pub fn new(config: ClientConfig) -> Self {
+        Self {
+            // Do not forward the api token to the client on setup, as we handle it ourselves
+            client: Client::new(config.address, None).unwrap(),
+            api_token: config.api_key,
+        }
+    }
+
+    /// Create a new [`aleph_alpha_client::How`] based on the given api token and tracing context.
+    fn how(&self, api_token: String, tracing_context: &TracingContext) -> How {
+        How {
+            // The token provided to the client on setup takes precedence over the token provided to the method
+            api_token: self.api_token.clone().or(Some(api_token)),
+            trace_context: tracing_context.as_inference_client_context(),
+            ..Default::default()
+        }
+    }
+}
+
 /// The inference client only takes references to the tracing context. Methods like
 /// `stream_chat` return a future that in which the tracing context is dropped after
 /// making the initial request. However, the lifespan of the tracing context matches
@@ -66,16 +108,7 @@ pub trait InferenceClient: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 }
 
-/// Create a new [`aleph_alpha_client::How`] based on the given api token and tracing context.
-fn how(api_token: String, tracing_context: &TracingContext) -> How {
-    How {
-        api_token: Some(api_token),
-        trace_context: tracing_context.as_inference_client_context(),
-        ..Default::default()
-    }
-}
-
-impl InferenceClient for Client {
+impl InferenceClient for ClientWithAuth {
     async fn explain(
         &self,
         request: &ExplanationRequest,
@@ -93,11 +126,14 @@ impl InferenceClient for Client {
             target,
             granularity: granularity.into(),
         };
-        let how = how(api_token, tracing_context);
-        retry(|| self.explanation(&task, model, &how), tracing_context)
-            .await?
-            .try_into()
-            .map_err(InferenceError::Other)
+        let how = self.how(api_token, tracing_context);
+        retry(
+            || self.client.explanation(&task, model, &how),
+            tracing_context,
+        )
+        .await?
+        .try_into()
+        .map_err(InferenceError::Other)
     }
     async fn chat(
         &self,
@@ -107,11 +143,14 @@ impl InferenceClient for Client {
     ) -> Result<ChatResponse, InferenceError> {
         let task = request.to_task_chat();
 
-        let how = how(api_token, tracing_context);
-        retry(|| self.chat(&task, &request.model, &how), tracing_context)
-            .await?
-            .try_into()
-            .map_err(InferenceError::Other)
+        let how = self.how(api_token, tracing_context);
+        retry(
+            || self.client.chat(&task, &request.model, &how),
+            tracing_context,
+        )
+        .await?
+        .try_into()
+        .map_err(InferenceError::Other)
     }
 
     async fn stream_chat(
@@ -122,9 +161,9 @@ impl InferenceClient for Client {
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let task = request.to_task_chat();
-        let how = how(api_token, tracing_context);
+        let how = self.how(api_token, tracing_context);
         let mut stream = retry(
-            || self.stream_chat(&task, &request.model, &how),
+            || self.client.stream_chat(&task, &request.model, &how),
             tracing_context,
         )
         .await?;
@@ -176,11 +215,14 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
             echo: *echo,
         };
-        let how = how(api_token, tracing_context);
-        retry(|| self.completion(&task, model, &how), tracing_context)
-            .await?
-            .try_into()
-            .map_err(InferenceError::Other)
+        let how = self.how(api_token, tracing_context);
+        retry(
+            || self.client.completion(&task, model, &how),
+            tracing_context,
+        )
+        .await?
+        .try_into()
+        .map_err(InferenceError::Other)
     }
 
     async fn stream_completion(
@@ -225,9 +267,9 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
             echo: *echo,
         };
-        let how = how(api_token, tracing_context);
+        let how = self.how(api_token, tracing_context);
         let mut stream = retry(
-            || self.stream_completion(&task, model, &how),
+            || self.client.stream_completion(&task, model, &how),
             tracing_context,
         )
         .await?;
@@ -527,14 +569,39 @@ mod tests {
         tests::{api_token, inference_url},
     };
 
+    impl ClientConfig {
+        pub fn without_api_key(inference_url: impl Into<String>) -> Self {
+            Self {
+                address: inference_url.into(),
+                api_key: None,
+            }
+        }
+    }
+
     use super::*;
+
+    #[test]
+    fn api_key_takes_precedence_over_request_token() {
+        // Given a client config with an api key
+        let config = ClientConfig::new(
+            "https://api.example.com".to_owned(),
+            Some("api-key".to_owned()),
+        );
+        let client = ClientWithAuth::new(config);
+
+        // When setting up the how
+        let result = client.how("another_token".to_owned(), &TracingContext::dummy());
+
+        // Then the api key is used
+        assert_eq!(result.api_token, Some("api-key".to_owned()));
+    }
 
     #[tokio::test]
     async fn explain() {
         // Given an inference client
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When explaining complete
         let request = ExplanationRequest {
@@ -543,14 +610,10 @@ mod tests {
             model: "pharia-1-llm-7b-control".to_string(),
             granularity: Granularity::Auto,
         };
-        let explanation = <Client as InferenceClient>::explain(
-            &client,
-            &request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let explanation = client
+            .explain(&request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then we explanation of five items
         assert_eq!(explanation.len(), 5);
@@ -629,8 +692,8 @@ mod tests {
     async fn test_chat_message_conversion() {
         // Given an inference client
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // and a chat request
         let chat_request = ChatRequest {
@@ -640,14 +703,10 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_response = <Client as InferenceClient>::chat(
-            &client,
-            &chat_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let chat_response = client
+            .chat(&chat_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then a chat response is returned
         assert!(!chat_response.message.content.is_empty());
@@ -657,8 +716,8 @@ mod tests {
     async fn test_bad_token_gives_inference_client_error() {
         // Given an inference client and a bad token
         let bad_api_token = "bad_api_token".to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // and a chat request return an error
         let chat_request = ChatRequest {
@@ -668,13 +727,9 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_result = <Client as InferenceClient>::chat(
-            &client,
-            &chat_request,
-            bad_api_token,
-            &TracingContext::dummy(),
-        )
-        .await;
+        let chat_result = client
+            .chat(&chat_request, bad_api_token, &TracingContext::dummy())
+            .await;
 
         // Then an InferenceClientError Unauthorized is returned
         assert!(chat_result.is_err());
@@ -688,8 +743,8 @@ mod tests {
     async fn complete_response_with_special_tokens() {
         // Given an inference client
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // and a completion request
         let completion_request = CompletionRequest {
@@ -703,14 +758,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         };
 
         // When completing text with inference client
-        let completion_response = <Client as InferenceClient>::complete(
-            &client,
-            &completion_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let completion_response = client
+            .complete(&completion_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then a completion response is returned
         assert!(completion_response.text.contains("<|endoftext|>"));
@@ -720,8 +771,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn frequency_penalty_for_chat() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let chat_request = ChatRequest {
@@ -736,14 +787,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };
-        let chat_response = <Client as InferenceClient>::chat(
-            &client,
-            &chat_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let chat_response = client
+            .chat(&chat_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then we expect the word oat, to appear at least five times
         let number_oat_mentioned = chat_response
@@ -760,8 +807,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn sampling_parameters_for_completion() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let completion_request = CompletionRequest {
@@ -780,14 +827,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 echo: false,
             },
         };
-        let completion_response = <Client as InferenceClient>::complete(
-            &client,
-            &completion_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let completion_response = client
+            .complete(&completion_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then we expect the word oat, to appear at least five times
         let completion = completion_response.text;
@@ -804,8 +847,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn top_logprobs_for_chat() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let chat_request = ChatRequest {
@@ -817,14 +860,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <Client as InferenceClient>::chat(
-            &client,
-            &chat_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let chat_response = client
+            .chat(&chat_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then
         assert_eq!(chat_response.logprobs.len(), 1);
@@ -838,8 +877,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn top_logprobs_for_completion() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let completion_request = CompletionRequest {
@@ -851,14 +890,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let completion_response = <Client as InferenceClient>::complete(
-            &client,
-            &completion_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let completion_response = client
+            .complete(&completion_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then
         assert_eq!(completion_response.logprobs.len(), 1);
@@ -871,8 +906,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn usage_for_completion() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let completion_request = CompletionRequest {
@@ -883,14 +918,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let completion_response = <Client as InferenceClient>::complete(
-            &client,
-            &completion_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let completion_response = client
+            .complete(&completion_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then
         assert_eq!(completion_response.usage.prompt, 6);
@@ -901,8 +932,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn echo_parameter_leads_to_echo_in_completion() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let completion_request = CompletionRequest {
@@ -914,14 +945,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let completion_response = <Client as InferenceClient>::complete(
-            &client,
-            &completion_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let completion_response = client
+            .complete(&completion_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then
         assert_eq!(completion_response.text, " An apple a day, keeps");
@@ -931,8 +958,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn usage_for_chat() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let chat_request = ChatRequest {
@@ -943,14 +970,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <Client as InferenceClient>::chat(
-            &client,
-            &chat_request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let chat_response = client
+            .chat(&chat_request, api_token, &TracingContext::dummy())
+            .await
+            .unwrap();
 
         // Then
         assert_eq!(chat_response.usage.prompt, 20);
@@ -961,8 +984,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn completion_stream() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let completion_request = CompletionRequest {
@@ -976,15 +999,15 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <Client as InferenceClient>::stream_completion(
-                &client,
-                &completion_request,
-                api_token,
-                &TracingContext::dummy(),
-                send,
-            )
-            .await
-            .unwrap();
+            client
+                .stream_completion(
+                    &completion_request,
+                    api_token,
+                    &TracingContext::dummy(),
+                    send,
+                )
+                .await
+                .unwrap();
         });
 
         let mut events = vec![];
@@ -1008,8 +1031,8 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     async fn chat_stream() {
         // Given
         let api_token = api_token().to_owned();
-        let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let config = ClientConfig::without_api_key(inference_url());
+        let client = ClientWithAuth::new(config);
 
         // When
         let chat_request = ChatRequest {
@@ -1026,15 +1049,10 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <Client as InferenceClient>::stream_chat(
-                &client,
-                &chat_request,
-                api_token,
-                &TracingContext::dummy(),
-                send,
-            )
-            .await
-            .unwrap();
+            client
+                .stream_chat(&chat_request, api_token, &TracingContext::dummy(), send)
+                .await
+                .unwrap();
         });
 
         let mut events = vec![];

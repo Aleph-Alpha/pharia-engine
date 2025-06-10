@@ -11,9 +11,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    feature_set::FeatureSet, inference::InferenceConfig, namespace_watcher::NamespaceConfigs,
-};
+use crate::{feature_set::FeatureSet, inference, namespace_watcher::NamespaceConfigs};
 
 mod defaults {
     use std::{net::SocketAddr, time::Duration};
@@ -252,8 +250,8 @@ impl AppConfig {
     }
 
     #[must_use]
-    pub fn as_inference_config(&self) -> InferenceConfig {
-        InferenceConfig::new(self.inference_url.clone(), self.inference_api_key.clone())
+    pub fn as_inference_config(&self) -> inference::ClientConfig {
+        inference::ClientConfig::new(self.inference_url.clone(), self.inference_api_key.clone())
     }
 
     #[must_use]
