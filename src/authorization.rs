@@ -1,6 +1,6 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use axum::http::StatusCode;
+use axum::{extract::FromRef, http::StatusCode};
 use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -205,6 +205,24 @@ impl AuthorizationClient for HttpAuthorizationClient {
 
         // Check that we got the same list back
         Ok(allowed_permissions == required_permissions)
+    }
+}
+
+pub trait AuthorizationProvider {
+    type Authorization;
+    fn authorization(&self) -> &Self::Authorization;
+}
+
+/// Wrapper used to extract [`AuthorizationApi`] api from the [`AppState`] using a [`FromRef`] implementation.
+pub struct AuthorizationState<T>(pub T);
+
+impl<T> FromRef<T> for AuthorizationState<T::Authorization>
+where
+    T: AuthorizationProvider,
+    T::Authorization: Clone,
+{
+    fn from_ref(app_state: &T) -> AuthorizationState<T::Authorization> {
+        AuthorizationState(app_state.authorization().clone())
     }
 }
 

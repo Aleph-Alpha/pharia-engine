@@ -2,7 +2,7 @@ use anyhow::Context;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{FromRef, MatchedPath, Request, State},
+    extract::{MatchedPath, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
     response::{ErrorResponse, Html, IntoResponse, Response},
@@ -34,7 +34,7 @@ use utoipa::{
 use utoipa_scalar::Scalar;
 
 use crate::{
-    authorization::AuthorizationApi,
+    authorization::{AuthorizationApi, AuthorizationProvider, AuthorizationState},
     context,
     csi::RawCsi,
     csi_shell::{self, CsiProvider},
@@ -156,15 +156,7 @@ where
     }
 }
 
-pub trait AppState:
-    McpServerStoreProvider + SkillStoreProvider + SkillRuntimeProvider + CsiProvider
-{
-    type Authorization: Clone;
-
-    fn authorization(&self) -> &Self::Authorization;
-}
-
-impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
+impl<A, C, R, S, M> AuthorizationProvider for AppStateImpl<A, C, R, S, M>
 where
     A: Clone,
     C: Clone,
@@ -177,6 +169,25 @@ where
     fn authorization(&self) -> &Self::Authorization {
         &self.authorization_api
     }
+}
+
+pub trait AppState:
+    McpServerStoreProvider
+    + SkillStoreProvider
+    + SkillRuntimeProvider
+    + CsiProvider
+    + AuthorizationProvider
+{
+}
+
+impl<A, C, R, S, M> AppState for AppStateImpl<A, C, R, S, M>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+{
 }
 
 /// State shared between routes
@@ -218,15 +229,6 @@ where
             csi_drivers,
             mcp_servers,
         }
-    }
-}
-
-/// Wrapper used to extract [`AuthorizationApi`] api from the [`AppState`] using a [`FromRef`] implementation.
-struct AuthorizationState<A>(pub A);
-
-impl<T: AppState> FromRef<T> for AuthorizationState<T::Authorization> {
-    fn from_ref(app_state: &T) -> AuthorizationState<T::Authorization> {
-        AuthorizationState(app_state.authorization().clone())
     }
 }
 
