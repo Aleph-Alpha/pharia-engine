@@ -6,7 +6,7 @@ mod tool_routes;
 pub use self::{
     actor::{
         Argument, ConfiguredMcpServer, InvokeRequest, McpServerStoreApi, McpServerUrl, Tool,
-        ToolApi, ToolError,
+        ToolApi, ToolError, ToolSender,
     },
     client::{Modality, ToolOutput},
     mcp_routes::{McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
