@@ -21,7 +21,7 @@ use double_trait::double;
 
 /// Handle to the search actor. Spin this up in order to use the Search API
 pub struct Search {
-    send: mpsc::Sender<DocumentIndexMessage>,
+    send: mpsc::Sender<SearchMsg>,
     handle: JoinHandle<()>,
 }
 
@@ -34,14 +34,14 @@ impl Search {
     }
 
     pub fn with_client(client: impl SearchClient) -> Self {
-        let (send, recv) = mpsc::channel::<DocumentIndexMessage>(1);
+        let (send, recv) = mpsc::channel::<SearchMsg>(1);
         let mut actor = SearchActor::new(client, recv);
         let handle = tokio::spawn(async move { actor.run().await });
         Self { send, handle }
     }
 
-    pub fn api(&self) -> mpsc::Sender<DocumentIndexMessage> {
-        self.send.clone()
+    pub fn api(&self) -> SearchSender {
+        SearchSender(self.send.clone())
     }
 
     /// Inference is going to shutdown, as soon as the last instance of [`InferenceApi`] is dropped.
@@ -76,7 +76,12 @@ pub trait SearchApi {
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
 
-impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
+/// Opaque wrapper around a sender to the search actor, so we do not need to expose our message
+/// type.
+#[derive(Clone)]
+pub struct SearchSender(mpsc::Sender<SearchMsg>);
+
+impl SearchApi for SearchSender {
     async fn search(
         &self,
         request: SearchRequest,
@@ -84,13 +89,13 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let (send, recv) = oneshot::channel();
-        let msg = DocumentIndexMessage::Search {
+        let msg = SearchMsg::Search {
             request,
             send,
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
@@ -104,13 +109,13 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         tracing_context: TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         let (send, recv) = oneshot::channel();
-        let msg = DocumentIndexMessage::Metadata {
+        let msg = SearchMsg::Metadata {
             document_path,
             send,
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
@@ -124,13 +129,13 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
         tracing_context: TracingContext,
     ) -> anyhow::Result<Document> {
         let (send, recv) = oneshot::channel();
-        let msg = DocumentIndexMessage::Document {
+        let msg = SearchMsg::Document {
             document_path,
             send,
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0.send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
@@ -183,12 +188,12 @@ pub struct TextCursor {
 struct SearchActor<C: SearchClient> {
     /// Internal client to interact with the Document Index API
     client: Arc<C>,
-    recv: mpsc::Receiver<DocumentIndexMessage>,
+    recv: mpsc::Receiver<SearchMsg>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
 impl<C: SearchClient> SearchActor<C> {
-    fn new(client: C, recv: mpsc::Receiver<DocumentIndexMessage>) -> Self {
+    fn new(client: C, recv: mpsc::Receiver<SearchMsg>) -> Self {
         Self {
             client: Arc::new(client),
             recv,
@@ -214,7 +219,7 @@ impl<C: SearchClient> SearchActor<C> {
         }
     }
 
-    fn act(&mut self, msg: DocumentIndexMessage) {
+    fn act(&mut self, msg: SearchMsg) {
         let client = self.client.clone();
         self.running_requests.push(Box::pin(async move {
             msg.act(client.as_ref()).await;
@@ -223,7 +228,7 @@ impl<C: SearchClient> SearchActor<C> {
 }
 
 #[derive(Debug)]
-pub enum DocumentIndexMessage {
+enum SearchMsg {
     Search {
         request: SearchRequest,
         send: oneshot::Sender<anyhow::Result<Vec<SearchResult>>>,
@@ -244,7 +249,7 @@ pub enum DocumentIndexMessage {
     },
 }
 
-impl DocumentIndexMessage {
+impl SearchMsg {
     async fn act(self, client: &impl SearchClient) {
         match self {
             Self::Search {
