@@ -37,6 +37,27 @@ pub enum Modality {
     Text { text: String },
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ToolCallResult {
+    content: ToolOutput,
+    is_error: bool,
+}
+
+impl McpClient {
+    fn parse_tool_call_result(result: ToolCallResult) -> Result<ToolOutput, ToolError> {
+        if result.is_error {
+            let Modality::Text { text } = result
+                .content
+                .first()
+                .ok_or(anyhow!("No content in tool call response"))?;
+            Err(ToolError::ToolCallFailed(text.to_owned()))
+        } else {
+            Ok(result.content)
+        }
+    }
+}
+
 impl ToolClient for McpClient {
     async fn invoke_tool(
         &self,
@@ -44,13 +65,6 @@ impl ToolClient for McpClient {
         url: &McpServerUrl,
         tracing_context: TracingContext,
     ) -> Result<ToolOutput, ToolError> {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct ToolCallResult {
-            content: ToolOutput,
-            is_error: bool,
-        }
-
         let child_context = context!(tracing_context, "pharia-kernel::tool", "initialize");
         self.initialize(url)
             .await
@@ -87,20 +101,13 @@ impl ToolClient for McpClient {
             .inspect_err(|e| error!(parent: tracing_context.span(), "{}", e))?;
 
         let result = Self::json_rpc_result_from_http::<ToolCallResult>(response).await?;
-        let Modality::Text { text } = result
-            .content
-            .first()
-            .ok_or(anyhow!("No content in tool call response"))
-            .inspect_err(|e| error!(parent: tracing_context.span(), "{}", e))?;
-        if result.is_error {
-            // We might want to represent a failed tool call in the wit world and pass it to the model.
-            // this would mean not returning an `Err` case for this, but rather a variant of `Ok`.
-            info!(parent: tracing_context.span(), "Tool call failed");
-            Err(ToolError::ToolCallFailed(text.to_owned()))
-        } else {
+        let result = Self::parse_tool_call_result(result);
+        if result.is_ok() {
             info!(parent: tracing_context.span(), "Tool call succeeded");
-            Ok(result.content)
+        } else {
+            info!(parent: tracing_context.span(), "Tool call failed");
         }
+        result
     }
 
     async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
@@ -382,5 +389,17 @@ pub mod tests {
 
         let client = McpClient::new();
         client.initialize(&mcp.address().into()).await.unwrap();
+    }
+
+    #[test]
+    fn parse_tool_call_result_with_empty_list() {
+        let result = ToolCallResult {
+            content: vec![],
+            is_error: false,
+        };
+
+        let result = McpClient::parse_tool_call_result(result);
+
+        assert!(result.is_ok());
     }
 }
