@@ -19,7 +19,12 @@ pub trait TokenizerApi {
     ) -> impl Future<Output = anyhow::Result<Arc<Tokenizer>>> + Send;
 }
 
-impl TokenizerApi for mpsc::Sender<TokenizersMsg> {
+/// Opaque wrapper around a sender to the tokenizer actor, so we do not need to expose our message
+/// type.
+#[derive(Clone)]
+pub struct TokenizerSender(mpsc::Sender<TokenizersMsg>);
+
+impl TokenizerApi for TokenizerSender {
     async fn tokenizer_by_model(
         &self,
         api_token: String,
@@ -33,7 +38,7 @@ impl TokenizerApi for mpsc::Sender<TokenizersMsg> {
             model_name,
             send,
         };
-        self.send(msg).await.unwrap();
+        self.0.send(msg).await.unwrap();
         recv.await.unwrap()
     }
 }
@@ -55,8 +60,8 @@ impl Tokenizers {
         Ok(Tokenizers { sender, handle })
     }
 
-    pub fn api(&self) -> mpsc::Sender<TokenizersMsg> {
-        self.sender.clone()
+    pub fn api(&self) -> TokenizerSender {
+        TokenizerSender(self.sender.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -65,7 +70,7 @@ impl Tokenizers {
     }
 }
 
-pub enum TokenizersMsg {
+enum TokenizersMsg {
     TokenizerByModel {
         api_token: String,
         tracing_context: TracingContext,
