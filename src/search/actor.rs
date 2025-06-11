@@ -40,8 +40,8 @@ impl Search {
         Self { send, handle }
     }
 
-    pub fn api(&self) -> mpsc::Sender<DocumentIndexMessage> {
-        self.send.clone()
+    pub fn api(&self) -> SearchSender {
+        SearchSender(self.send.clone())
     }
 
     /// Inference is going to shutdown, as soon as the last instance of [`InferenceApi`] is dropped.
@@ -76,7 +76,7 @@ pub trait SearchApi {
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
 
-impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
+impl SearchApi for SearchSender {
     async fn search(
         &self,
         request: SearchRequest,
@@ -90,7 +90,8 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
@@ -110,7 +111,8 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
@@ -130,13 +132,21 @@ impl SearchApi for mpsc::Sender<DocumentIndexMessage> {
             api_token,
             tracing_context,
         };
-        self.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
             .expect("sender must be alive when awaiting for answers")
     }
 }
+
+/// Implements [`SearchApi`] by sending messages to the actor and waiting for the response.
+///
+/// Having a dedicated type for the sender, rather than using `mpsc::Sender` directly allows us to
+/// keep the message type private to the actor module.
+#[derive(Clone)]
+pub struct SearchSender(mpsc::Sender<DocumentIndexMessage>);
 
 /// Search a Document Index collection
 #[derive(Debug)]
@@ -223,7 +233,7 @@ impl<C: SearchClient> SearchActor<C> {
 }
 
 #[derive(Debug)]
-pub enum DocumentIndexMessage {
+enum DocumentIndexMessage {
     Search {
         request: SearchRequest,
         send: oneshot::Sender<anyhow::Result<Vec<SearchResult>>>,
