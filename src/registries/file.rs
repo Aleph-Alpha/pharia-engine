@@ -92,7 +92,7 @@ mod test {
         let different_skill_bytes = b"DIFFERENT DUMMY SKILL BYTES";
         let skill_dir = tempdir().unwrap();
         let file_path = skill_dir.path().join("my_skill.wasm");
-        fs::write(&file_path, &any_skill_bytes).unwrap();
+        fs::write(&file_path, any_skill_bytes).unwrap();
         eprintln!(
             "{:?}",
             File::open(&file_path)
@@ -110,7 +110,7 @@ mod test {
         // get the digest and change the file in under one millisecond, and with some bad timing not
         // see the change, because the digest is rounded to milliseconds.
         sleep(Duration::from_millis(1)).await;
-        fs::write(&file_path, &different_skill_bytes).unwrap();
+        fs::write(&file_path, different_skill_bytes).unwrap();
         eprintln!(
             "{:?}",
             File::open(file_path)
