@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.16](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.15...pharia-kernel-v0.12.16)
+
+### Features
+
+- Allow empty list as tool call result - ([c3ee9ae](https://github.com/Aleph-Alpha/pharia-kernel/commit/c3ee9aebb3bb26cdd72f9af48b06e1fa09327be1))
+
+### Fixes
+
+- Represent tool result as vec of modalities - ([5671d9c](https://github.com/Aleph-Alpha/pharia-kernel/commit/5671d9cc7fb826038506c26b5f985d749bf492c2))
+
+
 ## [0.12.15](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.14...pharia-kernel-v0.12.15)
 
 ### Features
