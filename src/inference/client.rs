@@ -566,7 +566,7 @@ mod tests {
 
     use crate::{
         inference::{ChatParams, ExplanationRequest, FinishReason, Granularity},
-        tests::{api_token, inference_url},
+        tests::{api_token, inference_url, openai_api_key, openai_url},
     };
 
     impl ClientConfig {
@@ -1076,5 +1076,174 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             }
         );
         assert!(matches!(events[3], ChatEvent::Usage { .. }));
+    }
+
+    #[tokio::test]
+    async fn chat_request_against_openai() {
+        // Given a client against an OpenAI compatible inference API
+        let api_key = openai_api_key().to_owned();
+        let config = ClientConfig::new(openai_url().to_owned(), Some(api_key));
+        let client = ClientWithAuth::new(config);
+
+        // When doing a chat request
+        let chat_request = ChatRequest {
+            model: "gpt-4o-mini".to_owned(),
+            messages: vec![Message::new("user", "An apple a day")],
+            params: ChatParams {
+                max_tokens: Some(10),
+                ..Default::default()
+            },
+        };
+        let response = client
+            .chat(
+                &chat_request,
+                "dummy-token".to_owned(),
+                &TracingContext::dummy(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get a response
+        assert!(!response.message.content.is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_stream_against_openai() {
+        // Given a client against an OpenAI compatible inference API
+        let api_key = openai_api_key().to_owned();
+        let config = ClientConfig::new(openai_url().to_owned(), Some(api_key));
+        let client = ClientWithAuth::new(config);
+
+        // When doing a chat stream request
+        let chat_request = ChatRequest {
+            model: "gpt-4o-mini".to_owned(),
+            messages: vec![Message::new("user", "An apple a day")],
+            params: ChatParams {
+                max_tokens: Some(10),
+                ..Default::default()
+            },
+        };
+        let (send, mut recv) = mpsc::channel(1);
+
+        tokio::spawn(async move {
+            client
+                .stream_chat(
+                    &chat_request,
+                    "dummy-token".to_owned(),
+                    &TracingContext::dummy(),
+                    send,
+                )
+                .await
+                .unwrap();
+        });
+
+        let mut events = vec![];
+        while let Some(event) = recv.recv().await {
+            events.push(event);
+        }
+
+        // Then we get events
+        assert_eq!(
+            events[0],
+            ChatEvent::MessageBegin {
+                role: "assistant".to_owned()
+            }
+        );
+        assert!(matches!(events[1], ChatEvent::MessageAppend { .. }));
+        assert_eq!(
+            events[events.len() - 2],
+            ChatEvent::MessageEnd {
+                finish_reason: FinishReason::Length
+            }
+        );
+        assert!(matches!(events[events.len() - 1], ChatEvent::Usage { .. }));
+    }
+
+    #[tokio::test]
+    async fn completion_request_against_openai_gives_error() {
+        // Given a client against an OpenAI compatible inference API
+        let api_key = openai_api_key().to_owned();
+        let config = ClientConfig::new(openai_url().to_owned(), Some(api_key));
+        let client = ClientWithAuth::new(config);
+
+        // When doing a completion request
+        let completion_request = CompletionRequest {
+            model: "gpt-4o-mini".to_owned(),
+            prompt: "An apple a day".to_owned(),
+            params: CompletionParams {
+                max_tokens: Some(10),
+                ..Default::default()
+            },
+        };
+        let response = client
+            .complete(
+                &completion_request,
+                "dummy-token".to_owned(),
+                &TracingContext::dummy(),
+            )
+            .await
+            .unwrap_err();
+
+        // Then we get an error
+        assert!(matches!(response, InferenceError::Other(_)));
+    }
+
+    #[tokio::test]
+    async fn completion_stream_against_openai_gives_error() {
+        // Given a client against an OpenAI compatible inference API
+        let api_key = openai_api_key().to_owned();
+        let config = ClientConfig::new(openai_url().to_owned(), Some(api_key));
+        let client = ClientWithAuth::new(config);
+
+        // When doing a completion stream request
+        let completion_request = CompletionRequest {
+            model: "gpt-4o-mini".to_owned(),
+            prompt: "An apple a day".to_owned(),
+            params: CompletionParams {
+                max_tokens: Some(10),
+                ..Default::default()
+            },
+        };
+        let (send, _recv) = mpsc::channel(1);
+
+        let response = client
+            .stream_completion(
+                &completion_request,
+                "dummy-token".to_owned(),
+                &TracingContext::dummy(),
+                send,
+            )
+            .await
+            .unwrap_err();
+
+        // Then we get an error
+        assert!(matches!(response, InferenceError::Other(_)));
+    }
+
+    #[tokio::test]
+    async fn explain_request_against_openai_gives_error() {
+        // Given a client against an OpenAI compatible inference API
+        let api_key = openai_api_key().to_owned();
+        let config = ClientConfig::new(openai_url().to_owned(), Some(api_key));
+        let client = ClientWithAuth::new(config);
+
+        // When doing an explain request
+        let explain_request = ExplanationRequest {
+            model: "gpt-4o-mini".to_owned(),
+            prompt: "An apple a day".to_owned(),
+            target: "An apple a day".to_owned(),
+            granularity: Granularity::Sentence,
+        };
+        let response = client
+            .explain(
+                &explain_request,
+                "dummy-token".to_owned(),
+                &TracingContext::dummy(),
+            )
+            .await
+            .unwrap_err();
+
+        // Then we get an error
+        assert!(matches!(response, InferenceError::Other(_)));
     }
 }

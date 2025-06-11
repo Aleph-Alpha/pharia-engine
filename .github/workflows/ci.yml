@@ -62,6 +62,8 @@ jobs:
       NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER: ${{ github.actor }}
       NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       PHARIA_AI_TOKEN: ${{ secrets.PHARIA_AI_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_URL: https://api.openai.com/v1
       INFERENCE_URL: https://inference-api.product.pharia.com
       AUTHORIZATION_URL: https://pharia-iam.product.pharia.com
 
