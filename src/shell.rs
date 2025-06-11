@@ -2,7 +2,7 @@ use anyhow::Context;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{FromRef, MatchedPath, Request, State},
+    extract::{MatchedPath, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
     response::{ErrorResponse, Html, IntoResponse, Response},
@@ -34,7 +34,7 @@ use utoipa::{
 use utoipa_scalar::Scalar;
 
 use crate::{
-    authorization::AuthorizationApi,
+    authorization::{AuthorizationApi, AuthorizationProvider, AuthorizationState},
     context,
     csi::RawCsi,
     csi_shell::{self, CsiProvider},
@@ -97,6 +97,22 @@ impl Shell {
 
     pub async fn wait_for_shutdown(self) {
         self.handle.await.unwrap();
+    }
+}
+
+impl<A, C, R, S, M, T> AuthorizationProvider for AppStateImpl<A, C, R, S, M, T>
+where
+    A: Clone,
+    C: Clone,
+    R: Clone,
+    S: Clone,
+    M: Clone,
+    T: Clone,
+{
+    type Authorization = A;
+
+    fn authorization(&self) -> &A {
+        &self.authorization_api
     }
 }
 
@@ -181,11 +197,13 @@ where
 }
 
 pub trait AppState:
-    McpServerStoreProvider + SkillStoreProvider + SkillRuntimeProvider + CsiProvider + ToolProvider
+    McpServerStoreProvider
+    + SkillStoreProvider
+    + SkillRuntimeProvider
+    + CsiProvider
+    + ToolProvider
+    + AuthorizationProvider
 {
-    type Authorization: Clone;
-
-    fn authorization(&self) -> &Self::Authorization;
 }
 
 impl<A, C, R, S, M, T> AppState for AppStateImpl<A, C, R, S, M, T>
@@ -197,11 +215,6 @@ where
     M: Clone,
     T: Clone,
 {
-    type Authorization = A;
-
-    fn authorization(&self) -> &Self::Authorization {
-        &self.authorization_api
-    }
 }
 
 /// State shared between routes
@@ -248,15 +261,6 @@ where
             mcp_servers,
             tool,
         }
-    }
-}
-
-/// Wrapper used to extract [`AuthorizationApi`] api from the [`AppState`] using a [`FromRef`] implementation.
-struct AuthorizationState<A>(pub A);
-
-impl<T: AppState> FromRef<T> for AuthorizationState<T::Authorization> {
-    fn from_ref(app_state: &T) -> AuthorizationState<T::Authorization> {
-        AuthorizationState(app_state.authorization().clone())
     }
 }
 
