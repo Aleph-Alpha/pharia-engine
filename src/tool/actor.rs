@@ -107,8 +107,8 @@ impl Tool {
         Self { handle, send }
     }
 
-    pub fn api(&self) -> impl ToolApi + McpServerStoreApi + Send + Sync + Clone + 'static {
-        self.send.clone()
+    pub fn api(&self) -> ToolSender {
+        ToolSender(self.send.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -117,7 +117,7 @@ impl Tool {
     }
 }
 
-impl ToolApi for mpsc::Sender<ToolMsg> {
+impl ToolApi for ToolSender {
     async fn invoke_tool(
         &self,
         request: InvokeRequest,
@@ -133,33 +133,38 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         };
 
         // We know that the receiver is still alive as long as Tool is alive.
-        self.send(msg).await.unwrap();
+        self.0.send(msg).await.unwrap();
         receive.await.unwrap()
     }
 
     async fn list_tools(&self, namespace: Namespace) -> Vec<String> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::ListTools { send, namespace };
-        self.send(msg).await.unwrap();
+        self.0.send(msg).await.unwrap();
         receive.await.unwrap()
     }
 }
 
-impl McpServerStoreApi for mpsc::Sender<ToolMsg> {
+/// Opaque wrapper around a sender to the tool actor, so we do not need to expose our message
+/// type.
+#[derive(Clone)]
+pub struct ToolSender(mpsc::Sender<ToolMsg>);
+
+impl McpServerStoreApi for ToolSender {
     async fn upsert(&self, server: ConfiguredMcpServer) {
         let msg = ToolMsg::UpsertToolServer { server };
-        self.send(msg).await.unwrap();
+        self.0.send(msg).await.unwrap();
     }
 
     async fn remove(&self, server: ConfiguredMcpServer) {
         let msg = ToolMsg::RemoveToolServer { server };
-        self.send(msg).await.unwrap();
+        self.0.send(msg).await.unwrap();
     }
 
     async fn list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::ListToolServers { namespace, send };
-        self.send(msg).await.unwrap();
+        self.0.send(msg).await.unwrap();
         receive.await.unwrap()
     }
 }

@@ -95,7 +95,8 @@ impl SearchApi for SearchSender {
             api_token,
             tracing_context,
         };
-        self.0.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
@@ -115,7 +116,8 @@ impl SearchApi for SearchSender {
             api_token,
             tracing_context,
         };
-        self.0.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
@@ -135,7 +137,8 @@ impl SearchApi for SearchSender {
             api_token,
             tracing_context,
         };
-        self.0.send(msg)
+        self.0
+            .send(msg)
             .await
             .expect("all api handlers must be shutdown before actors");
         recv.await
