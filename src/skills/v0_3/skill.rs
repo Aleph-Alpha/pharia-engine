@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use exports::pharia::skill::skill_handler::SkillMetadata;
 use serde_json::Value;
 use tokio::sync::mpsc;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 use wasmtime::component::bindgen;
 
 use crate::{
@@ -103,6 +103,7 @@ impl crate::skills::Skill for SkillPre<LinkedCtx> {
                     return Err(SkillError::UserCode(e));
                 }
                 exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
+                    info!(parent: tracing_context.span(), "Skill received invalid input: {}", e);
                     return Err(SkillError::InvalidInput(e.to_string()));
                 }
             },
