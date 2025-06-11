@@ -208,7 +208,8 @@ impl AuthorizationClient for HttpAuthorizationClient {
     }
 }
 
-/// Authorization Provider allows to
+/// Authorization Provider allows to fetch the authorization API from an aggregated application
+/// state.
 pub trait AuthorizationProvider {
     type Authorization;
     fn authorization(&self) -> &Self::Authorization;
