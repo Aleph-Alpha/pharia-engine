@@ -15,7 +15,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
-    tool::{InvokeRequest, ToolApi, ToolError},
+    tool::{InvokeRequest, ToolApi, ToolError, ToolOutput},
 };
 
 #[cfg(test)]
@@ -102,7 +102,7 @@ pub trait RawCsi {
         namespace: Namespace,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
-    ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send;
+    ) -> impl Future<Output = Result<Vec<ToolOutput>, ToolError>> + Send;
 }
 
 /// Errors which occurr during interacting with the outside world via CSIs.
@@ -493,7 +493,7 @@ where
         namespace: Namespace,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
-    ) -> Result<Vec<Value>, ToolError> {
+    ) -> Result<Vec<ToolOutput>, ToolError> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "invoke_tool")])
             .increment(requests.len() as u64);
 

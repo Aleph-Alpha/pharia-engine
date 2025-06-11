@@ -27,24 +27,28 @@ impl McpClient {
     }
 }
 
+pub type ToolOutput = Vec<Modality>;
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Modality {
+    // There are more types of content, but we do not support these at the moment.
+    // See: <https://modelcontextprotocol.io/specification/2025-03-26/server/tools#tool-result>
+    Text { text: String },
+}
+
 impl ToolClient for McpClient {
     async fn invoke_tool(
         &self,
         request: InvokeRequest,
         url: &McpServerUrl,
         tracing_context: TracingContext,
-    ) -> Result<Value, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct ToolCallResult {
-            content: Vec<ToolCallResponseContent>,
+            content: ToolOutput,
             is_error: bool,
-        }
-
-        #[derive(Deserialize)]
-        #[serde(tag = "type", rename_all = "snake_case")]
-        enum ToolCallResponseContent {
-            Text { text: String },
         }
 
         let child_context = context!(tracing_context, "pharia-kernel::tool", "initialize");
@@ -83,7 +87,7 @@ impl ToolClient for McpClient {
             .inspect_err(|e| error!(parent: tracing_context.span(), "{}", e))?;
 
         let result = Self::json_rpc_result_from_http::<ToolCallResult>(response).await?;
-        let ToolCallResponseContent::Text { text } = result
+        let Modality::Text { text } = result
             .content
             .first()
             .ok_or(anyhow!("No content in tool call response"))
@@ -95,7 +99,7 @@ impl ToolClient for McpClient {
             Err(ToolError::ToolCallFailed(text.to_owned()))
         } else {
             info!(parent: tracing_context.span(), "Tool call succeeded");
-            Ok(serde_json::from_str::<Value>(text).map_err(Into::<anyhow::Error>::into)?)
+            Ok(result.content)
         }
     }
 
@@ -305,7 +309,9 @@ pub mod tests {
             .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
             .await
             .unwrap();
-        assert_eq!(response, json!(3));
+
+        assert_eq!(response.len(), 1);
+        assert!(matches!(&response[0], Modality::Text { text } if text == "3"));
     }
 
     #[tokio::test]
@@ -330,7 +336,9 @@ pub mod tests {
             .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
             .await
             .unwrap();
-        assert_eq!(response, json!(3));
+
+        assert_eq!(response.len(), 1);
+        assert!(matches!(&response[0], Modality::Text { text } if text == "3"));
     }
 
     #[tokio::test]

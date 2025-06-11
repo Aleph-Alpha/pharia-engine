@@ -3,7 +3,6 @@ use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::pin::Pin;
@@ -16,6 +15,8 @@ use tracing::info;
 
 use crate::logging::TracingContext;
 use crate::namespace_watcher::Namespace;
+use crate::tool::client::Modality;
+use crate::tool::client::ToolOutput;
 
 #[cfg(test)]
 use double_trait::double;
@@ -70,7 +71,7 @@ pub trait ToolApi {
         request: InvokeRequest,
         namespace: Namespace,
         tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<Value, ToolError>> + Send;
+    ) -> impl Future<Output = Result<ToolOutput, ToolError>> + Send;
 
     #[allow(dead_code)]
     fn list_tools(&self, namespace: Namespace) -> impl Future<Output = Vec<String>> + Send;
@@ -122,7 +123,7 @@ impl ToolApi for mpsc::Sender<ToolMsg> {
         request: InvokeRequest,
         namespace: Namespace,
         tracing_context: TracingContext,
-    ) -> Result<Value, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::InvokeTool {
             request,
@@ -168,7 +169,7 @@ enum ToolMsg {
         request: InvokeRequest,
         namespace: Namespace,
         tracing_context: TracingContext,
-        send: oneshot::Sender<Result<Value, ToolError>>,
+        send: oneshot::Sender<Result<Vec<Modality>, ToolError>>,
     },
     ListTools {
         namespace: Namespace,
@@ -299,7 +300,7 @@ impl<T: ToolClient> ToolActor<T> {
         servers: Vec<McpServerUrl>,
         request: InvokeRequest,
         tracing_context: TracingContext,
-    ) -> Result<Value, ToolError> {
+    ) -> Result<Vec<Modality>, ToolError> {
         let mcp_address = Self::server_for_tool(client, servers, &request.tool_name)
             .await
             .ok_or(ToolError::ToolNotFound(request.tool_name.clone()))
@@ -365,7 +366,7 @@ pub trait ToolClient: Send + Sync + 'static {
         request: InvokeRequest,
         url: &McpServerUrl,
         tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<Value, ToolError>> + Send;
+    ) -> impl Future<Output = Result<Vec<Modality>, ToolError>> + Send;
 
     fn list_tools(
         &self,
@@ -379,7 +380,6 @@ pub mod tests {
     use std::{sync::Arc, time::Duration};
 
     use futures::future::pending;
-    use serde_json::{Value, json};
     use tokio::sync::Mutex;
 
     use crate::{
@@ -406,9 +406,11 @@ pub mod tests {
             _request: InvokeRequest,
             url: &McpServerUrl,
             _tracing_context: TracingContext,
-        ) -> Result<Value, ToolError> {
+        ) -> Result<Vec<Modality>, ToolError> {
             if url.0 == "http://localhost:8000/mcp" {
-                Ok(json!("Success"))
+                Ok(vec![Modality::Text {
+                    text: "Success".to_owned(),
+                }])
             } else {
                 panic!("This client only knows the localhost:8000 mcp server")
             }
@@ -455,8 +457,8 @@ pub mod tests {
             .await
             .unwrap();
 
-        //
-        assert_eq!(result, json!("Success"));
+        assert_eq!(result.len(), 1);
+        assert!(matches!(&result[0], Modality::Text { text } if text == "Success"));
     }
 
     #[tokio::test]
@@ -617,15 +619,19 @@ pub mod tests {
             request: InvokeRequest,
             url: &McpServerUrl,
             _tracing_context: TracingContext,
-        ) -> Result<Value, ToolError> {
+        ) -> Result<Vec<Modality>, ToolError> {
             match url.0.as_ref() {
                 "http://localhost:8000/mcp" => {
                     assert_eq!(request.tool_name, "search");
-                    Ok(json!("search result"))
+                    Ok(vec![Modality::Text {
+                        text: "search result".to_owned(),
+                    }])
                 }
                 "http://localhost:8001/mcp" => {
                     assert_eq!(request.tool_name, "calculator");
-                    Ok(json!("calculator result"))
+                    Ok(vec![Modality::Text {
+                        text: "calculator result".to_owned(),
+                    }])
                 }
                 _ => Err(ToolError::Other(anyhow::anyhow!(
                     "Requested rooted to the wrong server."
@@ -657,10 +663,12 @@ pub mod tests {
                 namespace,
                 TracingContext::dummy(),
             )
-            .await;
+            .await
+            .unwrap();
 
         // Then we get the result from the brave_search server
-        assert_eq!(result.unwrap(), json!("search result"));
+        assert_eq!(result.len(), 1);
+        assert!(matches!(&result[0], Modality::Text { text } if text == "search result"));
     }
 
     struct ClientOneGoodOtherBad;
@@ -679,8 +687,10 @@ pub mod tests {
             _request: InvokeRequest,
             _url: &McpServerUrl,
             _tracing_context: TracingContext,
-        ) -> Result<Value, ToolError> {
-            Ok(json!("Success"))
+        ) -> Result<Vec<Modality>, ToolError> {
+            Ok(vec![Modality::Text {
+                text: "Success".to_owned(),
+            }])
         }
     }
 
@@ -822,7 +832,8 @@ pub mod tests {
             .unwrap();
 
         // Then the search tool is available
-        assert_eq!(result, json!("Success"));
+        assert_eq!(result.len(), 1);
+        assert!(matches!(&result[0], Modality::Text { text } if text == "Success"));
     }
 
     struct SaboteurClient;
@@ -833,9 +844,11 @@ pub mod tests {
             request: InvokeRequest,
             _url: &McpServerUrl,
             _tracing_context: TracingContext,
-        ) -> Result<Value, ToolError> {
+        ) -> Result<Vec<Modality>, ToolError> {
             match request.tool_name.as_str() {
-                "add" => Ok(json!("Success")),
+                "add" => Ok(vec![Modality::Text {
+                    text: "Success".to_owned(),
+                }]),
                 "divide" => pending().await,
                 _ => panic!("unknown function called"),
             }
@@ -884,7 +897,9 @@ pub mod tests {
             .invoke_tool(request, namespace, TracingContext::dummy())
             .await
             .unwrap();
-        assert_eq!(result, json!("Success"));
+
+        assert_eq!(result.len(), 1);
+        assert!(matches!(&result[0], Modality::Text { text } if text == "Success"));
 
         drop(handle);
     }

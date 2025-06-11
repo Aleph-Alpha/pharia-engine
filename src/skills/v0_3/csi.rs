@@ -16,7 +16,7 @@ use pharia::skill::{
         Logprobs, Message, MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
-    tool::{Argument, Host as ToolHost, InvokeRequest},
+    tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, ToolOutput},
 };
 use tracing::error;
 use wasmtime::component::{Resource, bindgen};
@@ -36,12 +36,12 @@ bindgen!({
 impl ToolHost for LinkedCtx {
     // While we represent tool results as JSON values throughout the skill driver, we need to
     // convert them to bytes here at the WIT boundary.
-    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<Vec<u8>> {
+    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<ToolOutput> {
         self.ctx
             .invoke_tool(request.into_iter().map(Into::into).collect())
             .await
             .into_iter()
-            .map(|value| value.to_string().into_bytes())
+            .map(|value| value.into_iter().map(Into::into).collect())
             .collect()
     }
 }
@@ -63,6 +63,14 @@ impl From<InvokeRequest> for tool::InvokeRequest {
 impl From<Argument> for tool::Argument {
     fn from(Argument { name, value }: Argument) -> Self {
         Self { name, value }
+    }
+}
+
+impl From<tool::Modality> for ToolModality {
+    fn from(modality: tool::Modality) -> Self {
+        match modality {
+            tool::Modality::Text { text } => ToolModality::Text(text),
+        }
     }
 }
 

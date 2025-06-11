@@ -21,7 +21,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
-    tool::InvokeRequest,
+    tool::{InvokeRequest, ToolOutput},
 };
 
 pub struct SkillDriver {
@@ -302,7 +302,7 @@ where
         }
     }
 
-    async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Value> {
+    async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolOutput> {
         match self.contextual_csi.invoke_tool(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error.into()).await,
@@ -401,7 +401,7 @@ impl Csi for SkillMetadataCtx {
         self.send_error().await
     }
 
-    async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<Value> {
+    async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<ToolOutput> {
         self.send_error().await
     }
 }
