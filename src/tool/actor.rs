@@ -306,9 +306,9 @@ impl<T: ToolClient> ToolActor<T> {
         request: InvokeRequest,
         tracing_context: TracingContext,
     ) -> Result<Vec<Modality>, ToolError> {
-        let mcp_address = Self::server_for_tool(client, servers, &request.tool_name)
+        let mcp_address = Self::server_for_tool(client, servers, &request.name)
             .await
-            .ok_or(ToolError::ToolNotFound(request.tool_name.clone()))
+            .ok_or(ToolError::ToolNotFound(request.name.clone()))
             .inspect_err(|e| info!(parent: tracing_context.span(), "{}", e))?;
         client
             .invoke_tool(request, &mcp_address, tracing_context)
@@ -354,13 +354,14 @@ impl<T: ToolClient> ToolActor<T> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Argument {
     pub name: String,
     pub value: Vec<u8>,
 }
 
 pub struct InvokeRequest {
-    pub tool_name: String,
+    pub name: String,
     pub arguments: Vec<Argument>,
 }
 
@@ -429,7 +430,7 @@ pub mod tests {
 
         // When we invoke an unknown tool
         let request = InvokeRequest {
-            tool_name: "unknown".to_owned(),
+            name: "unknown".to_owned(),
             arguments: vec![],
         };
         let result = tool
@@ -454,7 +455,7 @@ pub mod tests {
 
         // When we invoke a tool that the mock client supports for the configured namespace
         let request = InvokeRequest {
-            tool_name: "add".to_owned(),
+            name: "add".to_owned(),
             arguments: vec![],
         };
         let result = tool
@@ -480,7 +481,7 @@ pub mod tests {
 
         // When we invoke a tool from a different namespace
         let request = InvokeRequest {
-            tool_name: "add".to_owned(),
+            name: "add".to_owned(),
             arguments: vec![],
         };
         let result = tool
@@ -627,13 +628,13 @@ pub mod tests {
         ) -> Result<Vec<Modality>, ToolError> {
             match url.0.as_ref() {
                 "http://localhost:8000/mcp" => {
-                    assert_eq!(request.tool_name, "search");
+                    assert_eq!(request.name, "search");
                     Ok(vec![Modality::Text {
                         text: "search result".to_owned(),
                     }])
                 }
                 "http://localhost:8001/mcp" => {
-                    assert_eq!(request.tool_name, "calculator");
+                    assert_eq!(request.name, "calculator");
                     Ok(vec![Modality::Text {
                         text: "calculator result".to_owned(),
                     }])
@@ -662,7 +663,7 @@ pub mod tests {
         let result = tool
             .invoke_tool(
                 InvokeRequest {
-                    tool_name: "search".to_owned(),
+                    name: "search".to_owned(),
                     arguments: vec![],
                 },
                 namespace,
@@ -828,7 +829,7 @@ pub mod tests {
 
         // When invoking a tool
         let request = InvokeRequest {
-            tool_name: "search".to_owned(),
+            name: "search".to_owned(),
             arguments: vec![],
         };
         let result = tool
@@ -850,7 +851,7 @@ pub mod tests {
             _url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Vec<Modality>, ToolError> {
-            match request.tool_name.as_str() {
+            match request.name.as_str() {
                 "add" => Ok(vec![Modality::Text {
                     text: "Success".to_owned(),
                 }]),
@@ -878,7 +879,7 @@ pub mod tests {
 
         // When one hanging request is in progress
         let request = InvokeRequest {
-            tool_name: "divide".to_owned(),
+            name: "divide".to_owned(),
             arguments: vec![],
         };
         let cloned_namespace = namespace.clone();
@@ -894,7 +895,7 @@ pub mod tests {
 
         // Then another request can still be answered
         let request = InvokeRequest {
-            tool_name: "add".to_owned(),
+            name: "add".to_owned(),
             arguments: vec![],
         };
         let result = tool

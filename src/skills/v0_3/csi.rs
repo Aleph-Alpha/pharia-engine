@@ -54,7 +54,7 @@ impl From<InvokeRequest> for tool::InvokeRequest {
         }: InvokeRequest,
     ) -> Self {
         Self {
-            tool_name,
+            name: tool_name,
             arguments: arguments.into_iter().map(Into::into).collect(),
         }
     }

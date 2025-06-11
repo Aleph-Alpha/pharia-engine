@@ -23,7 +23,8 @@ use crate::{
     csi_shell::{CsiProvider, CsiState},
     inference, language_selection,
     logging::TracingContext,
-    search,
+    namespace_watcher::Namespace,
+    search, tool,
 };
 
 // Make our own error that wraps `anyhow::Error`.
@@ -70,8 +71,82 @@ where
         .route("/documents", post(documents))
         .route("/document_metadata", post(document_metadata))
         .route("/explain", post(explain))
+        .route("/invoke_tool", post(invoke_tool))
         .route("/search", post(search))
         .route("/select_language", post(select_language))
+}
+
+#[derive(Deserialize)]
+struct Argument {
+    name: String,
+    value: Value,
+}
+
+impl From<Argument> for tool::Argument {
+    fn from(value: Argument) -> Self {
+        Self {
+            name: value.name,
+            value: value.value.to_string().into_bytes(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct InvokeRequest {
+    name: String,
+    arguments: Vec<Argument>,
+}
+
+impl From<InvokeRequest> for tool::InvokeRequest {
+    fn from(value: InvokeRequest) -> Self {
+        Self {
+            name: value.name,
+            arguments: value.arguments.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct InvokeRequests {
+    namespace: Namespace,
+    requests: Vec<InvokeRequest>,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum ToolOutput {
+    Text { text: String },
+}
+
+impl From<tool::Modality> for ToolOutput {
+    fn from(value: tool::Modality) -> Self {
+        match value {
+            tool::Modality::Text { text } => ToolOutput::Text { text },
+        }
+    }
+}
+
+async fn invoke_tool<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    _bearer: TypedHeader<Authorization<Bearer>>,
+    Json(requests): Json<InvokeRequests>,
+) -> Result<Json<Vec<Vec<ToolOutput>>>, CsiShellError>
+where
+    C: RawCsi,
+{
+    let tracing_context = TracingContext::current();
+    let results = csi
+        .invoke_tool(
+            requests.namespace,
+            tracing_context,
+            requests.requests.into_iter().map(Into::into).collect(),
+        )
+        .await?;
+    let results = results
+        .into_iter()
+        .map(|r| r.into_iter().map(Into::into).collect())
+        .collect();
+    Ok(Json(results))
 }
 
 async fn select_language<C>(
@@ -1169,10 +1244,92 @@ mod tests {
     };
     use serde_json::json;
 
-    use crate::csi::tests::RawCsiDouble;
+    use crate::{
+        csi::tests::RawCsiDouble,
+        namespace_watcher::Namespace,
+        tool::{Argument, InvokeRequest, Modality, ToolError, ToolOutput},
+    };
 
     use super::*;
     use tower::util::ServiceExt;
+
+    impl Argument {
+        pub fn new(name: impl Into<String>, value: impl Into<Vec<u8>>) -> Self {
+            Self {
+                name: name.into(),
+                value: value.into(),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn tool_invokation_via_csi_shell() {
+        // Given a csi mock that asserts on the input and returns a fixed output
+        #[derive(Clone)]
+        struct RawCsiMock;
+        impl RawCsiDouble for RawCsiMock {
+            async fn invoke_tool(
+                &self,
+                _namespace: Namespace,
+                _tracing_context: TracingContext,
+                mut requests: Vec<InvokeRequest>,
+            ) -> Result<Vec<ToolOutput>, ToolError> {
+                let InvokeRequest { name, arguments } = requests.remove(0);
+                let expected_args = vec![Argument::new("a", "1"), Argument::new("b", "2")];
+                assert_eq!(arguments, expected_args);
+                assert_eq!(name, "add");
+                Ok(vec![vec![Modality::Text {
+                    text: "3".to_string(),
+                }]])
+            }
+        }
+
+        #[derive(Clone)]
+        struct CsiProviderStub;
+        impl CsiProvider for CsiProviderStub {
+            type Csi = RawCsiMock;
+            fn csi(&self) -> &Self::Csi {
+                &RawCsiMock
+            }
+        }
+
+        // When we send a request to the invoke_tool endpoint
+        let body = json!({
+            "namespace": "test",
+            "requests": [{
+                "name": "add",
+                "arguments": [
+                    {
+                        "name": "a",
+                        "value": 1
+                    },
+                    {
+                        "name": "b",
+                        "value": 2
+                    }
+                ]
+            }]
+        });
+        let response = http()
+            .with_state(CsiProviderStub)
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, "Bearer test")
+                    .uri("/invoke_tool")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the response is successful and contains the expected tool output
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert_eq!(body, "[[{\"type\":\"text\",\"text\":\"3\"}]]");
+    }
 
     #[tokio::test]
     async fn select_language_endpoint_works() {

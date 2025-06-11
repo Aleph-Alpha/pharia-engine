@@ -516,7 +516,7 @@ where
                         tracing_context,
                         "pharia-kernel::csi",
                         "invoke_tool",
-                        tool_name = request.tool_name
+                        tool_name = request.name
                     );
                     self.tool.invoke_tool(request, namespace.clone(), context)
                 })
