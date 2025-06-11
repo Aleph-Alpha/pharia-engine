@@ -553,7 +553,7 @@ pub mod tests {
         },
         logging::TracingContext,
         skill_driver::SkillInvocationCtx,
-        tool::InvokeRequest,
+        tool::{InvokeRequest, Modality, ToolOutput},
     };
 
     use super::*;
@@ -1106,7 +1106,7 @@ pub mod tests {
 
     #[async_trait]
     impl CsiDouble for CsiAddToolFake {
-        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<Value> {
+        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolOutput> {
             requests
                 .iter()
                 .map(|request| {
@@ -1119,7 +1119,9 @@ pub mod tests {
                         .parse::<i32>()
                         .unwrap();
                     let sum = a + b;
-                    json!(sum)
+                    vec![Modality::Text {
+                        text: sum.to_string(),
+                    }]
                 })
                 .collect()
         }
@@ -1146,9 +1148,9 @@ pub mod tests {
             )
             .await
             .unwrap();
-        let sum = response.as_number().unwrap().as_i64().unwrap();
 
         // then the response is equal to expected text
+        let sum = response.as_number().unwrap().as_i64().unwrap();
         assert_eq!(sum, 3);
     }
 

@@ -8,6 +8,7 @@ pub use self::{
         Argument, ConfiguredMcpServer, InvokeRequest, McpServerStoreApi, McpServerUrl, Tool,
         ToolApi, ToolError,
     },
+    client::{Modality, ToolOutput},
     mcp_routes::{McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
     tool_routes::{ToolProvider, http_tools_v1, openapi_tools_v1},
 };

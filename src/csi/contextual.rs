@@ -12,7 +12,7 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    tool::{InvokeRequest, ToolError},
+    tool::{InvokeRequest, ToolError, ToolOutput},
 };
 #[cfg(test)]
 use double_trait::double;
@@ -78,7 +78,7 @@ pub trait ContextualCsi {
     fn invoke_tool(
         &self,
         requests: Vec<InvokeRequest>,
-    ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send;
+    ) -> impl Future<Output = Result<Vec<ToolOutput>, ToolError>> + Send;
 }
 
 /// Takes a [`RawCsi`] and converts it into a [`ContextualCsi`] by binding the namespace and api
@@ -224,7 +224,7 @@ where
     fn invoke_tool(
         &self,
         requests: Vec<InvokeRequest>,
-    ) -> impl Future<Output = Result<Vec<Value>, ToolError>> + Send {
+    ) -> impl Future<Output = Result<Vec<ToolOutput>, ToolError>> + Send {
         self.raw_csi.invoke_tool(
             self.namespace.clone(),
             self.tracing_context.clone(),

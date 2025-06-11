@@ -3,6 +3,8 @@ use pharia::skill::tool::{Argument, InvokeRequest, invoke_tool};
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::pharia::skill::tool::Modality;
+
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill", features: ["tool"] });
 
 #[derive(Deserialize)]
@@ -29,8 +31,10 @@ impl Guest for Skill {
                 },
             ],
         };
-        let result = invoke_tool(&[request]).pop().unwrap();
-        Ok(result)
+        let mut result = invoke_tool(&[request]).pop().unwrap();
+        let Modality::Text(text) = result.remove(0);
+        let number = serde_json::from_str::<i32>(&text).unwrap();
+        Ok(json!(number).to_string().into_bytes())
     }
 
     fn metadata() -> SkillMetadata {
