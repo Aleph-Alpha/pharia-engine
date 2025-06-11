@@ -85,7 +85,7 @@ impl ToolClient for McpClient {
         "id": 2,
         "method": "tools/call",
         "params": {
-            "name": request.tool_name,
+            "name": request.name,
             "arguments": arguments
         }
         });
@@ -299,7 +299,7 @@ pub mod tests {
         let mcp = given_sse_mcp_server().await;
 
         let request = InvokeRequest {
-            tool_name: "add".to_owned(),
+            name: "add".to_owned(),
             arguments: vec![
                 Argument {
                     name: "a".to_owned(),
@@ -326,7 +326,7 @@ pub mod tests {
         let mcp = given_json_mcp_server().await;
 
         let request = InvokeRequest {
-            tool_name: "add".to_owned(),
+            name: "add".to_owned(),
             arguments: vec![
                 Argument {
                     name: "a".to_owned(),
@@ -353,7 +353,7 @@ pub mod tests {
         let mcp = given_sse_mcp_server().await;
 
         let request = InvokeRequest {
-            tool_name: "unknown".to_owned(),
+            name: "unknown".to_owned(),
             arguments: vec![],
         };
         let client = McpClient::new();
@@ -369,7 +369,7 @@ pub mod tests {
         let mcp = given_sse_mcp_server().await;
 
         let request = InvokeRequest {
-            tool_name: "saboteur".to_owned(),
+            name: "saboteur".to_owned(),
             arguments: vec![],
         };
         let client = McpClient::new();
