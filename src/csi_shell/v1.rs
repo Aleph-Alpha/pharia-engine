@@ -1157,3 +1157,71 @@ impl From<inference::Completion> for Completion {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{body::Body, http::Request};
+    use http_body_util::BodyExt;
+    use mime::APPLICATION_JSON;
+    use reqwest::{
+        Method,
+        header::{AUTHORIZATION, CONTENT_TYPE},
+    };
+    use serde_json::json;
+
+    use crate::csi::tests::RawCsiDouble;
+
+    use super::*;
+    use tower::util::ServiceExt;
+
+    #[tokio::test]
+    async fn select_language_endpoint_works() {
+        // Given a csi that always returns en
+        #[derive(Clone)]
+        struct RawCsiStub;
+        impl RawCsiDouble for RawCsiStub {
+            async fn select_language(
+                &self,
+                _requests: Vec<language_selection::SelectLanguageRequest>,
+                _tracing_context: TracingContext,
+            ) -> anyhow::Result<Vec<Option<language_selection::Language>>> {
+                Ok(vec![Some(language_selection::Language::new(
+                    "en".to_string(),
+                ))])
+            }
+        }
+
+        #[derive(Clone)]
+        struct CsiProviderStub;
+        impl CsiProvider for CsiProviderStub {
+            type Csi = RawCsiStub;
+            fn csi(&self) -> &Self::Csi {
+                &RawCsiStub
+            }
+        }
+
+        // When we send a request to the select_language endpoint
+        let body = json!([{
+            "text": "Hello world",
+            "languages": ["en", "es"]
+        }]);
+        let response = http()
+            .with_state(CsiProviderStub)
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, "Bearer test")
+                    .uri("/select_language")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the response is successful and contains the expected language
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"[\"en\"]");
+    }
+}
