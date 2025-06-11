@@ -38,7 +38,7 @@ use tokenizers::Tokenizers;
 use tool::Tool;
 use tracing::error;
 
-use crate::{csi::CsiDrivers, shell::AppStateImpl};
+use crate::{csi::CsiDrivers, shell::ShellState};
 
 use self::{inference::Inference, skill_runtime::SkillRuntime};
 
@@ -131,13 +131,11 @@ impl Kernel {
 
         let authorization = Authorization::new(app_config.authorization_url().to_owned());
 
-        let app_state = AppStateImpl::new(
-            authorization.api(),
-            skill_store.api(),
+        let app_state = ShellState::new(
             skill_runtime.api(),
-            tool.api(),
+            skill_store.api(),
+            authorization.api(),
             csi_drivers.clone(),
-            tool.api(),
         );
 
         let shell = match Shell::new(
