@@ -77,18 +77,19 @@ impl SkillRegistry for FileRegistry {
 
 #[cfg(test)]
 mod test {
-    use std::fs::File;
+    use std::{fs::File, time::Duration};
 
     use super::*;
     use tempfile::tempdir;
-    use test_skills::{given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3};
+    use test_skills::given_rust_skill_greet_v0_3;
+    use tokio::time::sleep;
 
     #[tokio::test]
     async fn change_digest_if_file_is_modified() {
         // Given a file `my_skill.wasm` containing a skill in a directory
-        let any_skill_bytes = given_rust_skill_greet_v0_2().bytes();
+        let any_skill_bytes = b"DUMMY SKILL BYTES";
         // Any skill bytes do, as long as they are different
-        let different_skill_bytes = given_rust_skill_greet_v0_3().bytes();
+        let different_skill_bytes = b"DIFFERENT DUMMY SKILL BYTES";
         let skill_dir = tempdir().unwrap();
         let file_path = skill_dir.path().join("my_skill.wasm");
         fs::write(&file_path, &any_skill_bytes).unwrap();
@@ -108,7 +109,7 @@ mod test {
         // Wait for at least one millisecond before changing the file. Otherwise we might actually
         // get the digest and change the file in under one millisecond, and with some bad timing not
         // see the change, because the digest is rounded to milliseconds.
-        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        sleep(Duration::from_millis(1)).await;
         fs::write(&file_path, &different_skill_bytes).unwrap();
         eprintln!(
             "{:?}",
