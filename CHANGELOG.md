@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.17](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.16...pharia-kernel-v0.12.17)
+
+### Features
+
+- Expose invoke tool via csi shell - ([13a7baf](https://github.com/Aleph-Alpha/pharia-kernel/commit/13a7bafdbb3f62e5bbe8c08e420274f84978d3e1))
+
+
 ## [0.12.16](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.15...pharia-kernel-v0.12.16)
 
 ### Features
