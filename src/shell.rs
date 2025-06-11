@@ -408,44 +408,28 @@ pub mod tests {
     use tokio::sync::mpsc;
     use tower::util::ServiceExt;
 
-    impl<A, C, R, S, M, T> AppState for AppStateImpl<A, C, R, S, M, T>
+    impl<A, R> AppState for AppStateDouble<A, R>
     where
         A: Clone,
-        C: Clone,
         R: Clone,
-        S: Clone,
-        M: Clone,
-        T: Clone,
     {
     }
 
     /// State shared between routes
     #[derive(Clone)]
-    struct AppStateImpl<A, C, R, S, M, T>
+    struct AppStateDouble<A, R>
     where
         A: Clone,
-        C: Clone,
         R: Clone,
-        S: Clone,
-        M: Clone,
-        T: Clone,
     {
         authorization_api: A,
-        skill_store_api: S,
         skill_runtime_api: R,
-        csi_drivers: C,
-        mcp_servers: M,
-        tool: T,
     }
 
-    impl<A, C, R, S, M, T> AuthorizationProvider for AppStateImpl<A, C, R, S, M, T>
+    impl<A, R> AuthorizationProvider for AppStateDouble<A, R>
     where
         A: Clone,
-        C: Clone,
         R: Clone,
-        S: Clone,
-        M: Clone,
-        T: Clone,
     {
         type Authorization = A;
 
@@ -454,62 +438,46 @@ pub mod tests {
         }
     }
 
-    impl<A, C, R, S, M, T> McpServerStoreProvider for AppStateImpl<A, C, R, S, M, T>
+    impl<A, R> McpServerStoreProvider for AppStateDouble<A, R>
     where
         A: Clone,
-        C: Clone,
         R: Clone,
-        S: Clone,
-        M: Clone,
-        T: Clone,
     {
-        type McpServerStore = M;
+        type McpServerStore = Dummy;
 
-        fn mcp_server_store(&self) -> &M {
-            &self.mcp_servers
+        fn mcp_server_store(&self) -> &Dummy {
+            &Dummy
         }
     }
 
-    impl<A, C, R, S, M, T> CsiProvider for AppStateImpl<A, C, R, S, M, T>
+    impl<A, R> CsiProvider for AppStateDouble<A, R>
     where
         A: Clone,
-        C: Clone,
         R: Clone,
-        S: Clone,
-        M: Clone,
-        T: Clone,
     {
-        type Csi = C;
+        type Csi = Dummy;
 
-        fn csi(&self) -> &C {
-            &self.csi_drivers
+        fn csi(&self) -> &Dummy {
+            &Dummy
         }
     }
 
-    impl<A, C, R, S, M, T> SkillStoreProvider for AppStateImpl<A, C, R, S, M, T>
+    impl<A, R> SkillStoreProvider for AppStateDouble<A, R>
     where
         A: Clone,
-        C: Clone,
         R: Clone,
-        S: Clone,
-        M: Clone,
-        T: Clone,
     {
-        type SkillStore = S;
+        type SkillStore = Dummy;
 
-        fn skill_store(&self) -> &Self::SkillStore {
-            &self.skill_store_api
+        fn skill_store(&self) -> &Dummy {
+            &Dummy
         }
     }
 
-    impl<A, C, R, S, M, T> SkillRuntimeProvider for AppStateImpl<A, C, R, S, M, T>
+    impl<A, R> SkillRuntimeProvider for AppStateDouble<A, R>
     where
         A: Clone,
-        C: Clone,
         R: Clone,
-        S: Clone,
-        M: Clone,
-        T: Clone,
     {
         type SkillRuntime = R;
 
@@ -518,94 +486,51 @@ pub mod tests {
         }
     }
 
-    impl<A, C, R, S, M, T> ToolProvider for AppStateImpl<A, C, R, S, M, T>
+    impl<A, R> ToolProvider for AppStateDouble<A, R>
     where
         A: Clone,
-        C: Clone,
         R: Clone,
-        S: Clone,
-        M: Clone,
-        T: Clone,
     {
-        type Tool = T;
+        type Tool = Dummy;
 
-        fn tool(&self) -> &T {
-            &self.tool
+        fn tool(&self) -> &Dummy {
+            &Dummy
         }
     }
 
-    impl AppStateImpl<StubAuthorization, Dummy, Dummy, Dummy, Dummy, Dummy> {
+    impl AppStateDouble<StubAuthorization, Dummy> {
         pub fn dummy() -> Self {
             Self {
                 authorization_api: StubAuthorization::new(true),
-                skill_store_api: Dummy,
                 skill_runtime_api: Dummy,
-                csi_drivers: Dummy,
-                mcp_servers: Dummy,
-                tool: Dummy,
             }
         }
     }
 
-    impl<A, C, R, S, M, T> AppStateImpl<A, C, R, S, M, T>
+    impl<A, R> AppStateDouble<A, R>
     where
         A: AuthorizationApi + Clone + Sync + Send + 'static,
-        C: RawCsi + Clone + Sync + Send + 'static,
         R: SkillRuntimeApi + Clone + Send + Sync + 'static,
-        S: SkillStoreApi + Clone + Send + Sync + 'static,
-        M: McpServerStoreApi + Clone + Send + Sync + 'static,
-        T: ToolApi + Clone + Send + Sync + 'static,
     {
-        pub fn new(
-            authorization_api: A,
-            skill_store_api: S,
-            skill_runtime_api: R,
-            mcp_servers: M,
-            csi_drivers: C,
-            tool: T,
-        ) -> Self {
+        pub fn new(authorization_api: A, skill_runtime_api: R) -> Self {
             Self {
                 authorization_api,
-                skill_store_api,
                 skill_runtime_api,
-                csi_drivers,
-                mcp_servers,
-                tool,
             }
         }
 
-        pub fn with_authorization_api<A2>(
-            self,
-            authorization_api: A2,
-        ) -> AppStateImpl<A2, C, R, S, M, T>
+        pub fn with_authorization_api<A2>(self, authorization_api: A2) -> AppStateDouble<A2, R>
         where
             A2: AuthorizationApi + Clone + Sync + Send + 'static,
         {
-            AppStateImpl::new(
-                authorization_api,
-                self.skill_store_api,
-                self.skill_runtime_api,
-                self.mcp_servers,
-                self.csi_drivers,
-                self.tool,
-            )
+            AppStateDouble::new(authorization_api, self.skill_runtime_api)
         }
 
-        pub fn with_skill_runtime_api<R2>(
-            self,
-            skill_runtime_api: R2,
-        ) -> AppStateImpl<A, C, R2, S, M, T>
+        pub fn with_skill_runtime_api<R2>(self, skill_runtime_api: R2) -> AppStateDouble<A, R2>
         where
             R2: SkillRuntimeApi + Clone + Send + Sync + 'static,
         {
-            AppStateImpl::new(
-                self.authorization_api,
-                self.skill_store_api,
-                skill_runtime_api,
-                self.mcp_servers,
-                self.csi_drivers,
-                self.tool,
-            )
+            AppStateDouble::new(self.authorization_api, skill_runtime_api)
         }
     }
 
@@ -623,7 +548,7 @@ pub mod tests {
             SkillExecutionError::RuntimeError("Skill is a saboteur".to_string()),
         )];
         let skill_runtime = SkillRuntimeStub::with_stream_events(stream_events);
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime);
+        let app_state = AppStateDouble::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(FeatureSet::Beta, app_state);
 
         // When asking for a message stream from a skill that does not exist
@@ -659,7 +584,7 @@ pub mod tests {
     async fn api_token_missing_permission() {
         // Given
         let stub_authorization = StubAuthorization::new(false);
-        let app_state = AppStateImpl::dummy().with_authorization_api(stub_authorization);
+        let app_state = AppStateDouble::dummy().with_authorization_api(stub_authorization);
 
         // When we want to access an endpoint that requires authentication
         let api_token = api_token();
@@ -692,7 +617,7 @@ pub mod tests {
     #[tokio::test]
     async fn api_token_missing_in_run_skill() {
         // Given
-        let app_state = AppStateImpl::dummy();
+        let app_state = AppStateDouble::dummy();
 
         // When
         let http = http(PRODUCTION_FEATURE_SET, app_state);
@@ -719,7 +644,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn health() {
-        let app_state = AppStateImpl::dummy();
+        let app_state = AppStateDouble::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
@@ -736,7 +661,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn skill_wit_route_should_return_current_wit_world() {
-        let app_state = AppStateImpl::dummy();
+        let app_state = AppStateDouble::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
         let resp = http
             .oneshot(
@@ -757,7 +682,7 @@ pub mod tests {
     async fn cannot_list_skills_without_permissions() {
         // Given we have a saboteur authorization
         let saboteur_authorization = StubAuthorization::new(false);
-        let app_state = AppStateImpl::dummy().with_authorization_api(saboteur_authorization);
+        let app_state = AppStateDouble::dummy().with_authorization_api(saboteur_authorization);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When
@@ -793,7 +718,7 @@ pub mod tests {
                 namespace: Namespace::new("playground").unwrap(),
                 original_syntax_error: "error msg".to_owned(),
             });
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime);
+        let app_state = AppStateDouble::dummy().with_skill_runtime_api(skill_runtime);
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When executing a skill in the namespace
@@ -980,7 +905,7 @@ pub mod tests {
         // spans will not be created as no one is interested in them.
         given_tracing_subscriber();
 
-        let app_state = AppStateImpl::dummy();
+        let app_state = AppStateDouble::dummy();
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When doing a request with a traceparent header
@@ -1012,7 +937,7 @@ pub mod tests {
 
         // Given a shell
         let skill_runtime = SkillRuntimeSpy::new();
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime.clone());
+        let app_state = AppStateDouble::dummy().with_skill_runtime_api(skill_runtime.clone());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When a request with a trace id comes in
@@ -1047,7 +972,7 @@ pub mod tests {
 
         // Given a shell
         let skill_runtime = SkillRuntimeSpy::new();
-        let app_state = AppStateImpl::dummy().with_skill_runtime_api(skill_runtime.clone());
+        let app_state = AppStateDouble::dummy().with_skill_runtime_api(skill_runtime.clone());
         let http = http(PRODUCTION_FEATURE_SET, app_state);
 
         // When a request with a tracestate header comes in
