@@ -8,13 +8,13 @@ use utoipa::OpenApi;
 use crate::{
     FeatureSet,
     namespace_watcher::Namespace,
-    tool::{McpServerStoreApi, McpServerUrl},
+    tool::{McpServerUrl, ToolStoreApi},
 };
 
 pub fn http_mcp_servers_v1<T>(feature_set: FeatureSet) -> Router<T>
 where
     T: Send + Sync + Clone + McpServerStoreProvider + 'static,
-    T::McpServerStore: McpServerStoreApi + Send + Clone,
+    T::McpServerStore: ToolStoreApi + Send + Clone,
 {
     // Additional routes for beta features, please keep them in sync with the API documentation.
     if feature_set == FeatureSet::Beta {
@@ -75,9 +75,9 @@ async fn list_mcp_servers<M>(
     State(McpServerStoreState(mcp_servers)): State<McpServerStoreState<M>>,
 ) -> Json<Vec<McpServerUrl>>
 where
-    M: McpServerStoreApi,
+    M: ToolStoreApi,
 {
-    let servers = mcp_servers.list(namespace).await;
+    let servers = mcp_servers.mcp_list(namespace).await;
     Json(servers)
 }
 
@@ -89,7 +89,7 @@ mod tests {
     use tower::ServiceExt as _;
 
     use super::{McpServerStoreProvider, McpServerUrl, http_mcp_servers_v1};
-    use crate::{FeatureSet, namespace_watcher::Namespace, tool::actor::McpServerStoreDouble};
+    use crate::{FeatureSet, namespace_watcher::Namespace, tool::actor::ToolStoreDouble};
 
     #[derive(Clone)]
     struct ProviderStub<T> {
@@ -114,8 +114,8 @@ mod tests {
     async fn list_mcp_servers_by_namespace() {
         #[derive(Clone)]
         struct McpServerMock;
-        impl McpServerStoreDouble for McpServerMock {
-            async fn list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
+        impl ToolStoreDouble for McpServerMock {
+            async fn mcp_list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
                 vec![McpServerUrl("http://localhost:8083/mcp".to_owned())]
             }

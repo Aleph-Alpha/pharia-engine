@@ -9,7 +9,7 @@ use crate::{
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
-    tool::{ConfiguredMcpServer, McpServerStoreApi, McpServerUrl},
+    tool::{ConfiguredMcpServer, ConfiguredNativeTool, McpServerUrl, ToolStoreApi},
 };
 
 use super::{
@@ -84,7 +84,7 @@ impl NamespaceWatcher {
 
     pub fn with_config(
         skill_store_api: impl SkillStoreApi + Send + Sync + 'static,
-        tool_api: impl McpServerStoreApi + Send + 'static,
+        tool_api: impl ToolStoreApi + Send + 'static,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -119,7 +119,7 @@ struct NamespaceWatcherActor<S, T> {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_store_api: S,
-    tool_store_api: T,
+    mcp_store_api: T,
     config: Box<dyn ObservableConfig + Send + Sync>,
     update_interval: Duration,
     descriptions: HashMap<Namespace, NamespaceDescription>,
@@ -162,6 +162,33 @@ impl Diff {
 }
 
 #[derive(Debug)]
+struct NativeToolDiff {
+    added: Vec<String>,
+    removed: Vec<String>,
+}
+
+impl NativeToolDiff {
+    fn new(added: Vec<String>, removed: Vec<String>) -> Self {
+        Self { added, removed }
+    }
+
+    fn compute(existing: &[String], incoming: &[String]) -> Self {
+        let existing = existing.iter().collect::<HashSet<_>>();
+        let incoming = incoming.iter().collect::<HashSet<_>>();
+
+        let added = incoming
+            .difference(&existing)
+            .map(|&tool| tool.clone())
+            .collect();
+        let removed = existing
+            .difference(&incoming)
+            .map(|&tool| tool.clone())
+            .collect();
+        Self::new(added, removed)
+    }
+}
+
+#[derive(Debug)]
 struct McpServerDiff {
     added: Vec<McpServerUrl>,
     removed: Vec<McpServerUrl>,
@@ -191,13 +218,13 @@ impl McpServerDiff {
 impl<S, M> NamespaceWatcherActor<S, M>
 where
     S: SkillStoreApi,
-    M: McpServerStoreApi,
+    M: ToolStoreApi,
 {
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_store_api: S,
-        tool_store_api: M,
+        mcp_store_api: M,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -205,7 +232,7 @@ where
             ready,
             shutdown,
             skill_store_api,
-            tool_store_api,
+            mcp_store_api,
             config,
             update_interval,
             descriptions: HashMap::new(),
@@ -310,13 +337,33 @@ where
         // propagate mcp server changes
         let mcp_server_diff = McpServerDiff::compute(&existing.mcp_servers, &incoming.mcp_servers);
         for mcp_server in mcp_server_diff.added {
-            self.tool_store_api
-                .upsert(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
+            self.mcp_store_api
+                .mcp_upsert(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
                 .await;
         }
         for mcp_server in mcp_server_diff.removed {
-            self.tool_store_api
-                .remove(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
+            self.mcp_store_api
+                .mcp_remove(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
+                .await;
+        }
+
+        // propagate native tool changes
+        let native_tool_diff =
+            NativeToolDiff::compute(&existing.native_tools, &incoming.native_tools);
+        for name in native_tool_diff.added {
+            self.mcp_store_api
+                .native_tool_upsert(ConfiguredNativeTool {
+                    name,
+                    namespace: namespace.clone(),
+                })
+                .await;
+        }
+        for name in native_tool_diff.removed {
+            self.mcp_store_api
+                .native_tool_remove(ConfiguredNativeTool {
+                    name,
+                    namespace: namespace.clone(),
+                })
                 .await;
         }
     }
@@ -335,7 +382,7 @@ pub mod tests {
     use tokio::sync::{Mutex, mpsc};
     use tokio::time::timeout;
 
-    use crate::tool::tests::McpServerStoreDouble;
+    use crate::tool::tests::ToolStoreDouble;
     use crate::{
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill_store::tests::SkillStoreMsg,
@@ -432,9 +479,18 @@ pub mod tests {
         assert_eq!(diff.removed, vec!["http://localhost:8001/mcp".into()]);
     }
 
+    #[test]
+    fn native_tool_diff_is_computed() {
+        let existing = vec!["keep_tool_name".into(), "remove_tool_name".into()];
+        let incoming = vec!["keep_tool_name".into(), "add_tool_name".into()];
+        let diff = NativeToolDiff::compute(&existing, &incoming);
+        assert_eq!(diff.added, vec!["add_tool_name".to_owned()]);
+        assert_eq!(diff.removed, vec!["remove_tool_name".to_owned()]);
+    }
+
     pub struct McpServerStoreDummy;
 
-    impl McpServerStoreDouble for McpServerStoreDummy {}
+    impl ToolStoreDouble for McpServerStoreDummy {}
 
     #[test]
     fn diff_is_computed() {
@@ -628,7 +684,7 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api,
-                tool_store_api: McpServerStoreDummy,
+                mcp_store_api: McpServerStoreDummy,
                 config,
                 update_interval: Duration::from_millis(1),
                 descriptions,
@@ -639,7 +695,7 @@ pub mod tests {
 
     impl<M> NamespaceWatcherActor<Dummy, M>
     where
-        M: McpServerStoreApi + Send + Sync,
+        M: ToolStoreApi + Send + Sync,
     {
         fn with_tool_store_api(
             descriptions: HashMap<Namespace, NamespaceDescription>,
@@ -652,7 +708,7 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api: Dummy,
-                tool_store_api,
+                mcp_store_api: tool_store_api,
                 config,
                 update_interval: Duration::from_millis(1),
                 descriptions,
@@ -702,12 +758,12 @@ pub mod tests {
         }
     }
 
-    impl McpServerStoreDouble for McpServerStoreSpy {
-        async fn upsert(&self, server: ConfiguredMcpServer) {
+    impl ToolStoreDouble for McpServerStoreSpy {
+        async fn mcp_upsert(&self, server: ConfiguredMcpServer) {
             self.upserted.lock().await.push(server);
         }
 
-        async fn remove(&self, server: ConfiguredMcpServer) {
+        async fn mcp_remove(&self, server: ConfiguredMcpServer) {
             self.removed.lock().await.push(server);
         }
     }
@@ -780,6 +836,103 @@ pub mod tests {
                 "http://localhost:8000/mcp",
                 namespace
             )]
+        );
+    }
+
+    #[derive(Clone)]
+    struct NativeToolStoreSpy {
+        upserted: Arc<Mutex<Vec<ConfiguredNativeTool>>>,
+        removed: Arc<Mutex<Vec<ConfiguredNativeTool>>>,
+    }
+
+    impl NativeToolStoreSpy {
+        fn new() -> Self {
+            Self {
+                upserted: Arc::new(Mutex::new(Vec::new())),
+                removed: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+    }
+
+    impl ToolStoreDouble for NativeToolStoreSpy {
+        async fn native_tool_upsert(&self, tool: ConfiguredNativeTool) {
+            self.upserted.lock().await.push(tool);
+        }
+
+        async fn native_tool_remove(&self, tool: ConfiguredNativeTool) {
+            self.removed.lock().await.push(tool);
+        }
+    }
+
+    #[tokio::test]
+    async fn new_native_tool_is_upserted() {
+        // Given a namespace description watcher with empty descriptions
+        let tool_store = NativeToolStoreSpy::new();
+        let descriptions = HashMap::new();
+        let config = Box::new(PendingConfig);
+        let mut watcher =
+            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), config);
+
+        // When observing a namespace with a new native_tool
+        let namespace = Namespace::new("dummy-namespace").unwrap();
+        let descriptions = NamespaceDescription {
+            skills: Vec::new(),
+            mcp_servers: Vec::new(),
+            native_tools: vec!["newly_added_tool".to_owned()],
+        };
+        watcher
+            .report_changes_in_namespace(&namespace, Ok(descriptions))
+            .await;
+
+        // Then the new native tool is upserted
+        let upserted = &*tool_store.upserted.lock().await;
+        assert_eq!(
+            upserted,
+            &[ConfiguredNativeTool {
+                name: "newly_added_tool".to_owned(),
+                namespace: namespace.clone(),
+            }]
+        );
+    }
+
+    #[tokio::test]
+    async fn dropped_native_tool_is_removed() {
+        // Given a namespace description watcher and a tool store that both know about a configured
+        // native tool
+        let tool_store = NativeToolStoreSpy::new();
+
+        let namespace = Namespace::new("dummy-namespace").unwrap();
+        let descriptions = HashMap::from([(
+            namespace.clone(),
+            NamespaceDescription {
+                skills: Vec::new(),
+                native_tools: vec!["remove_me".to_owned()],
+                mcp_servers: Vec::new(),
+            },
+        )]);
+        let config = Box::new(PendingConfig);
+        let mut watcher =
+            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), config);
+
+        // When the watcher observes a namespace with no native_tools
+        let namespace = Namespace::new("dummy-namespace").unwrap();
+        let descriptions = NamespaceDescription {
+            skills: vec![],
+            mcp_servers: vec![],
+            native_tools: vec![],
+        };
+        watcher
+            .report_changes_in_namespace(&namespace, Ok(descriptions))
+            .await;
+
+        // Then the tool store is notified that the native tool is removed
+        let removed = &*tool_store.removed.lock().await;
+        assert_eq!(
+            removed,
+            &[ConfiguredNativeTool {
+                name: "remove_me".to_owned(),
+                namespace
+            }]
         );
     }
 
