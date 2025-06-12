@@ -395,7 +395,8 @@ pub mod tests {
                     .get(namespace)
                     .expect("namespace must exist.")
                     .clone(),
-                mcp_servers: vec![],
+                mcp_servers: Vec::new(),
+                native_tools: Vec::new(),
             })
         }
     }
@@ -519,6 +520,7 @@ pub mod tests {
             NamespaceConfig::Watch {
                 directory: temp_dir.path().to_owned(),
                 mcp_servers: vec![],
+                native_tools: vec![],
             },
         )]
         .into_iter()
@@ -550,6 +552,7 @@ pub mod tests {
             NamespaceConfig::Watch {
                 directory: directory.to_owned(),
                 mcp_servers: vec![],
+                native_tools: vec![],
             },
         )]
         .into_iter()
@@ -721,8 +724,9 @@ pub mod tests {
         // When observing a namespace with an mcp server
         let namespace = Namespace::new("dummy-namespace").unwrap();
         let descriptions = NamespaceDescription {
-            skills: vec![],
+            skills: Vec::new(),
             mcp_servers: vec!["http://localhost:8000/mcp".into()],
+            native_tools: Vec::new(),
         };
         watcher
             .report_changes_in_namespace(&namespace, Ok(descriptions))
@@ -748,7 +752,8 @@ pub mod tests {
         let descriptions = HashMap::from([(
             namespace.clone(),
             NamespaceDescription {
-                skills: vec![],
+                skills: Vec::new(),
+                native_tools: Vec::new(),
                 mcp_servers: vec!["http://localhost:8000/mcp".into()],
             },
         )]);
@@ -761,6 +766,7 @@ pub mod tests {
         let descriptions = NamespaceDescription {
             skills: vec![],
             mcp_servers: vec![],
+            native_tools: vec![],
         };
         watcher
             .report_changes_in_namespace(&namespace, Ok(descriptions))
@@ -790,6 +796,7 @@ pub mod tests {
                     tag: "latest".to_owned(),
                 }],
                 mcp_servers: vec![],
+                native_tools: vec![],
             },
         )]);
 
