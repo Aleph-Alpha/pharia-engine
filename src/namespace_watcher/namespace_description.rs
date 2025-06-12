@@ -24,12 +24,14 @@ type NamespaceDescriptionResult = Result<NamespaceDescription, NamespaceDescript
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SkillDescription {
+    // Experimental configuration for highly specialized Chat Skills. Not stable yet.
     Chat {
         name: String,
         version: String,
         model: String,
         system_prompt: String,
     },
+    // This is currently the only type of skill that is communicated to people outside of the team
     #[serde(untagged)]
     Programmable {
         name: String,
@@ -66,35 +68,26 @@ pub trait NamespaceDescriptionLoader {
     async fn description(&self) -> NamespaceDescriptionResult;
 }
 
-#[derive(Default, Debug, Serialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct NamespaceDescription {
     pub skills: Vec<SkillDescription>,
+    #[serde(default)]
     pub mcp_servers: Vec<McpServerUrl>,
+    #[serde(default)]
+    pub native_tools: Vec<String>,
 }
 
 impl NamespaceDescription {
     pub fn empty() -> Self {
         Self {
-            skills: vec![],
-            mcp_servers: vec![],
+            skills: Vec::new(),
+            mcp_servers: Vec::new(),
+            native_tools: Vec::new(),
         }
     }
 
     pub fn from_str(config: &str) -> anyhow::Result<Self> {
-        let tc = {
-            #[derive(Deserialize)]
-            struct NamespaceDescriptionBeta {
-                skills: Vec<SkillDescription>,
-                mcp_servers: Option<Vec<McpServerUrl>>,
-            }
-
-            let tc = toml::from_str::<NamespaceDescriptionBeta>(config)?;
-            NamespaceDescription {
-                skills: tc.skills,
-                // Specifying mcp servers is optional.
-                mcp_servers: tc.mcp_servers.unwrap_or_default(),
-            }
-        };
+        let tc = toml::from_str::<NamespaceDescription>(config)?;
         Ok(tc)
     }
 }
@@ -102,13 +95,19 @@ impl NamespaceDescription {
 pub struct WatchLoader {
     directory: PathBuf,
     mcp_servers: Vec<McpServerUrl>,
+    native_tools: Vec<String>,
 }
 
 impl WatchLoader {
-    pub fn new(directory: PathBuf, mcp_servers: Vec<McpServerUrl>) -> Self {
+    pub fn new(
+        directory: PathBuf,
+        mcp_servers: Vec<McpServerUrl>,
+        native_tools: Vec<String>,
+    ) -> Self {
         Self {
             directory,
             mcp_servers,
+            native_tools,
         }
     }
 }
@@ -133,6 +132,7 @@ impl NamespaceDescriptionLoader for WatchLoader {
         Ok(NamespaceDescription {
             skills,
             mcp_servers: self.mcp_servers.clone(),
+            native_tools: self.native_tools.clone(),
         })
     }
 }
@@ -236,7 +236,7 @@ pub mod tests {
     use super::*;
 
     #[test]
-    fn tools_are_loaded_from_config_flag() {
+    fn mcp_servers_are_loaded_from_config() {
         let config = r#"
         skills = []
         mcp_servers = ["localhost:8000", "localhost:8001"]
@@ -245,6 +245,19 @@ pub mod tests {
         assert_eq!(
             tc.mcp_servers,
             vec!["localhost:8000".into(), "localhost:8001".into()]
+        );
+    }
+
+    #[test]
+    fn native_tools_are_loaded_from_config() {
+        let config = r#"
+        skills = []
+        native_tools = ["test_add"]
+        "#;
+        let tc = NamespaceDescription::from_str(config).unwrap();
+        assert_eq!(
+            tc.native_tools,
+            vec!["test_add".to_owned()]
         );
     }
 

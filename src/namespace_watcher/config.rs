@@ -76,6 +76,7 @@ impl NamespaceConfigs {
                 Namespace::new("local").unwrap(),
                 NamespaceConfig::InPlace {
                     mcp_servers: vec![],
+                    native_tools: vec![],
                     skills: skills
                         .iter()
                         .map(|&name| SkillDescription::Programmable {
@@ -109,6 +110,7 @@ impl NamespaceConfigs {
             NamespaceConfig::Watch {
                 directory: "skills".into(),
                 mcp_servers: vec![],
+                native_tools: vec![],
             },
         )]
         .into();
@@ -155,9 +157,11 @@ pub enum NamespaceConfig {
     /// without the need for reconfiguration.
     Watch {
         directory: PathBuf,
-        // Setting a default here for backwards compatibility
+        // Setting a default here for backwards compatibility and convience
         #[serde(default)]
         mcp_servers: Vec<McpServerUrl>,
+        #[serde(default)]
+        native_tools: Vec<String>,
     },
     /// Rather than referencing a configuration where skills are listed, this variant just lists
     /// them in place in the application config. As such these skills are owned by the operators.
@@ -170,6 +174,8 @@ pub enum NamespaceConfig {
         // Setting a default here for backwards compatibility
         #[serde(default)]
         mcp_servers: Vec<McpServerUrl>,
+        #[serde(default)]
+        native_tools: Vec<String>,
     },
 }
 
@@ -212,17 +218,21 @@ impl NamespaceConfig {
             NamespaceConfig::Watch {
                 directory,
                 mcp_servers,
+                native_tools,
             } => Ok(Box::new(WatchLoader::new(
                 directory.to_owned(),
                 mcp_servers.clone(),
+                native_tools.clone(),
             ))),
             NamespaceConfig::InPlace {
                 mcp_servers,
+                native_tools,
                 skills,
                 registry: _,
             } => Ok(Box::new(NamespaceDescription {
                 skills: skills.clone(),
                 mcp_servers: mcp_servers.clone(),
+                native_tools: native_tools.clone(),
             })),
         }
     }
