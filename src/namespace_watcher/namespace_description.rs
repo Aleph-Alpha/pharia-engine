@@ -255,10 +255,7 @@ pub mod tests {
         native_tools = ["test_add"]
         "#;
         let tc = NamespaceDescription::from_str(config).unwrap();
-        assert_eq!(
-            tc.native_tools,
-            vec!["test_add".to_owned()]
-        );
+        assert_eq!(tc.native_tools, vec!["test_add".to_owned()]);
     }
 
     #[test]
