@@ -5,8 +5,8 @@ mod tool_routes;
 
 pub use self::{
     actor::{
-        Argument, ConfiguredMcpServer, InvokeRequest, McpServerStoreApi, McpServerUrl, Tool,
-        ToolApi, ToolError, ToolSender,
+        Argument, ConfiguredMcpServer, ConfiguredNativeTool, InvokeRequest, McpServerUrl, Tool,
+        ToolApi, ToolError, ToolSender, ToolStoreApi,
     },
     client::{Modality, ToolOutput},
     mcp_routes::{McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
@@ -15,5 +15,5 @@ pub use self::{
 
 #[cfg(test)]
 pub mod tests {
-    pub use super::actor::McpServerStoreDouble;
+    pub use super::actor::ToolStoreDouble;
 }

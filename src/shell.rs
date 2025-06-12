@@ -51,7 +51,7 @@ use crate::{
         openapi_skill_store_v1,
     },
     tool::{
-        McpServerStoreApi, McpServerStoreProvider, ToolApi, ToolProvider, http_mcp_servers_v1,
+        McpServerStoreProvider, ToolApi, ToolProvider, ToolStoreApi, http_mcp_servers_v1,
         http_tools_v1, openapi_mcp_servers_v1, openapi_tools_v1,
     },
 };
@@ -77,7 +77,7 @@ impl Shell {
         T::Authorization: AuthorizationApi + Clone + Send + Sync + 'static,
         T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
         T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
-        T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
+        T::McpServerStore: ToolStoreApi + Clone + Send + Sync + 'static,
         T::Tool: ToolApi + Clone + Send + Sync + 'static,
     {
         let addr = addr.into();
@@ -119,7 +119,7 @@ where
     T: AppState + Clone + Send + Sync + 'static,
     T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
-    T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
+    T::McpServerStore: ToolStoreApi + Clone + Send + Sync + 'static,
     T::Tool: ToolApi + Clone + Send + Sync + 'static,
 {
     Router::new()
@@ -152,7 +152,7 @@ where
     T::Csi: RawCsi + Clone + Sync + Send + 'static,
     T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
-    T::McpServerStore: McpServerStoreApi + Clone + Send + Sync + 'static,
+    T::McpServerStore: ToolStoreApi + Clone + Send + Sync + 'static,
     T::Tool: ToolApi + Clone + Send + Sync + 'static,
 {
     let api_docs = open_api_docs(feature_set);
