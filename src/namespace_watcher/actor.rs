@@ -28,11 +28,10 @@ pub trait ObservableConfig {
 
 pub struct NamespaceDescriptionLoaders {
     namespaces: HashMap<Namespace, Box<dyn NamespaceDescriptionLoader + Send + Sync>>,
-    beta: bool,
 }
 
 impl NamespaceDescriptionLoaders {
-    pub fn new(deserialized: NamespaceConfigs, beta: bool) -> anyhow::Result<Self> {
+    pub fn new(deserialized: NamespaceConfigs) -> anyhow::Result<Self> {
         let namespaces = deserialized
             .into_iter()
             .map(|(namespace, config)| {
@@ -44,7 +43,7 @@ impl NamespaceDescriptionLoaders {
                     .map(|loader| (namespace, loader))
             })
             .collect::<anyhow::Result<HashMap<_, _>>>()?;
-        Ok(Self { namespaces, beta })
+        Ok(Self { namespaces })
     }
 }
 
@@ -61,7 +60,7 @@ impl ObservableConfig for NamespaceDescriptionLoaders {
         self.namespaces
             .get(namespace)
             .expect("namespace must exist.")
-            .description(self.beta)
+            .description()
             .await
     }
 }
@@ -526,7 +525,7 @@ pub mod tests {
         .collect();
         let config = NamespaceConfigs::new(namespaces);
 
-        let loaders = NamespaceDescriptionLoaders::new(config, false).unwrap();
+        let loaders = NamespaceDescriptionLoaders::new(config).unwrap();
 
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);
@@ -557,7 +556,7 @@ pub mod tests {
         .collect();
         let config = NamespaceConfigs::new(namespaces);
 
-        let loaders = NamespaceDescriptionLoaders::new(config, false).unwrap();
+        let loaders = NamespaceDescriptionLoaders::new(config).unwrap();
 
         let namespaces = loaders.namespaces();
         assert_eq!(namespaces.len(), 1);

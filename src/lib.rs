@@ -83,12 +83,9 @@ impl Kernel {
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self, Error> {
         let loaders = Box::new(
-            NamespaceDescriptionLoaders::new(
-                app_config.namespaces().clone(),
-                app_config.pharia_ai_feature_set() == FeatureSet::Beta,
-            )
-            .context("Unable to read the configuration for namespaces")
-            .inspect_err(|e| error!("{e}"))?,
+            NamespaceDescriptionLoaders::new(app_config.namespaces().clone())
+                .context("Unable to read the configuration for namespaces")
+                .inspect_err(|e| error!("{e}"))?,
         );
         let engine = Arc::new(
             Engine::new(app_config.engine_config())

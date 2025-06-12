@@ -63,7 +63,7 @@ impl SkillDescription {
 // but could also load skills
 #[async_trait]
 pub trait NamespaceDescriptionLoader {
-    async fn description(&self, beta: bool) -> NamespaceDescriptionResult;
+    async fn description(&self) -> NamespaceDescriptionResult;
 }
 
 #[derive(Default, Debug, Serialize, Clone)]
@@ -80,47 +80,21 @@ impl NamespaceDescription {
         }
     }
 
-    pub fn from_str(config: &str, beta: bool) -> anyhow::Result<Self> {
-        let tc =
-            if beta {
-                #[derive(Deserialize)]
-                struct NamespaceDescriptionBeta {
-                    skills: Vec<SkillDescription>,
-                    mcp_servers: Option<Vec<McpServerUrl>>,
-                }
+    pub fn from_str(config: &str) -> anyhow::Result<Self> {
+        let tc = {
+            #[derive(Deserialize)]
+            struct NamespaceDescriptionBeta {
+                skills: Vec<SkillDescription>,
+                mcp_servers: Option<Vec<McpServerUrl>>,
+            }
 
-                let tc = toml::from_str::<NamespaceDescriptionBeta>(config)?;
-                NamespaceDescription {
-                    skills: tc.skills,
-                    // Specifying mcp servers is optional.
-                    mcp_servers: tc.mcp_servers.unwrap_or_default(),
-                }
-            } else {
-                #[derive(Deserialize)]
-                struct SkillDescriptionStable {
-                    name: String,
-                    #[serde(default = "default_tag")]
-                    tag: String,
-                }
-
-                #[derive(Deserialize)]
-                struct NamespaceDescriptionStable {
-                    skills: Vec<SkillDescriptionStable>,
-                }
-
-                let tc = toml::from_str::<NamespaceDescriptionStable>(config)?;
-                NamespaceDescription {
-                    skills: tc
-                        .skills
-                        .into_iter()
-                        .map(|SkillDescriptionStable { name, tag }| {
-                            SkillDescription::Programmable { name, tag }
-                        })
-                        .collect(),
-                    // We only support MCP servers with the beta flag active.
-                    mcp_servers: vec![],
-                }
-            };
+            let tc = toml::from_str::<NamespaceDescriptionBeta>(config)?;
+            NamespaceDescription {
+                skills: tc.skills,
+                // Specifying mcp servers is optional.
+                mcp_servers: tc.mcp_servers.unwrap_or_default(),
+            }
+        };
         Ok(tc)
     }
 }
@@ -141,7 +115,7 @@ impl WatchLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for WatchLoader {
-    async fn description(&self, _beta: bool) -> NamespaceDescriptionResult {
+    async fn description(&self) -> NamespaceDescriptionResult {
         if !self.directory.is_dir() {
             return Err(NamespaceDescriptionError::Unrecoverable(anyhow!(
                 "The directory to watch '{:?}' is not a directory.",
@@ -175,11 +149,11 @@ impl FileLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for FileLoader {
-    async fn description(&self, beta: bool) -> NamespaceDescriptionResult {
+    async fn description(&self) -> NamespaceDescriptionResult {
         let config = std::fs::read_to_string(&self.path)
             .with_context(|| format!("Unable to read file {}", self.path.to_string_lossy()))
             .map_err(NamespaceDescriptionError::Unrecoverable)?;
-        let desc = NamespaceDescription::from_str(&config, beta)
+        let desc = NamespaceDescription::from_str(&config)
             .with_context(|| {
                 format!(
                 "Unable to parse file {} into a valid configuration for a team owned namespace.",
@@ -207,7 +181,7 @@ impl HttpLoader {
 }
 #[async_trait]
 impl NamespaceDescriptionLoader for HttpLoader {
-    async fn description(&self, beta: bool) -> NamespaceDescriptionResult {
+    async fn description(&self) -> NamespaceDescriptionResult {
         let mut req_builder = self.client.get(&self.url);
         if let Some(token) = &self.token {
             let mut auth_value = HeaderValue::from_str(&format!("Bearer {token}"))
@@ -240,7 +214,7 @@ impl NamespaceDescriptionLoader for HttpLoader {
             .text()
             .await
             .map_err(|e| NamespaceDescriptionError::Recoverable(e.into()))?;
-        let desc = NamespaceDescription::from_str(&content, beta).with_context(|| {
+        let desc = NamespaceDescription::from_str(&content).with_context(|| {
             format!(
                 "Unable to parse file at '{}' into a valid configuration for a team owned namespace.",
                 self.url
@@ -252,7 +226,7 @@ impl NamespaceDescriptionLoader for HttpLoader {
 
 #[async_trait]
 impl NamespaceDescriptionLoader for NamespaceDescription {
-    async fn description(&self, _beta: bool) -> NamespaceDescriptionResult {
+    async fn description(&self) -> NamespaceDescriptionResult {
         Ok(self.clone())
     }
 }
@@ -262,26 +236,16 @@ pub mod tests {
     use super::*;
 
     #[test]
-    fn tools_are_loaded_from_config_with_beta_flag() {
+    fn tools_are_loaded_from_config_flag() {
         let config = r#"
         skills = []
         mcp_servers = ["localhost:8000", "localhost:8001"]
         "#;
-        let tc = NamespaceDescription::from_str(config, true).unwrap();
+        let tc = NamespaceDescription::from_str(config).unwrap();
         assert_eq!(
             tc.mcp_servers,
             vec!["localhost:8000".into(), "localhost:8001".into()]
         );
-    }
-
-    #[test]
-    fn tools_are_not_loaded_from_config_without_beta_flag() {
-        let config = r#"
-        skills = []
-        mcp_servers = ["localhost:8000", "localhost:8001"]
-        "#;
-        let tc = NamespaceDescription::from_str(config, false).unwrap();
-        assert_eq!(tc.mcp_servers, vec![]);
     }
 
     #[test]
@@ -293,7 +257,7 @@ pub mod tests {
             {name = "Gamma"}
         ]
         "#;
-        let tc = NamespaceDescription::from_str(config, true).unwrap();
+        let tc = NamespaceDescription::from_str(config).unwrap();
         assert_eq!(tc.skills.len(), 3);
         assert!(
             matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag == "v1.0.0-rc")
@@ -321,7 +285,7 @@ pub mod tests {
             [[skills]]
             name = "Gamma"
             "#;
-        let tc = NamespaceDescription::from_str(config, true).unwrap();
+        let tc = NamespaceDescription::from_str(config).unwrap();
         assert_eq!(tc.skills.len(), 3);
         assert!(
             matches!(&tc.skills[0], SkillDescription::Programmable { name, tag } if name == "Goofy" && tag == "v1.0.0-rc")

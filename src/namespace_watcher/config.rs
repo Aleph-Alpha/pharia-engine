@@ -25,7 +25,7 @@ impl Namespace {
     const MAX_LEN: usize = 64;
 
     pub fn new(input: impl Into<String>) -> anyhow::Result<Self> {
-        let input = input.into();
+        let input: String = input.into();
         if Self::is_valid(&input) {
             Ok(Self(input))
         } else {
@@ -286,7 +286,7 @@ mod tests {
         let local_namespace = config.get(&namespace).unwrap().loader().unwrap();
 
         // Then the loader reports the mcp server
-        let description = local_namespace.description(true).await.unwrap();
+        let description = local_namespace.description().await.unwrap();
         assert_eq!(
             description.mcp_servers,
             vec!["http://localhost:8000/mcp".into()]
@@ -329,7 +329,7 @@ mod tests {
         let local_namespace = config.get(&namespace).unwrap().loader().unwrap();
 
         // Then the loader reports the mcp server
-        let description = local_namespace.description(true).await.unwrap();
+        let description = local_namespace.description().await.unwrap();
         assert_eq!(
             description.mcp_servers,
             vec!["http://localhost:8000/mcp".into()]
