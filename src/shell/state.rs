@@ -75,6 +75,8 @@ impl ToolProvider for ShellState {
     type Tool = ToolSender;
 
     fn tool(&self) -> &Self::Tool {
+        // The tool actor is used to  list tools for the shell as well as implementing tool calling
+        // for the CSI.
         &self.csi_drivers.tool
     }
 }
@@ -83,6 +85,8 @@ impl McpServerStoreProvider for ShellState {
     type McpServerStore = ToolSender;
 
     fn mcp_server_store(&self) -> &Self::McpServerStore {
+        // The tool actor is used to  list mcp servers for the shell as well as implementing tool
+        // calling for the CSI.
         &self.csi_drivers.tool
     }
 }

@@ -372,6 +372,7 @@ mod tests {
     use tower::ServiceExt as _;
 
     use crate::{
+        FeatureSet,
         feature_set::PRODUCTION_FEATURE_SET,
         logging::TracingContext,
         shell::tests::dummy_auth_value,
@@ -429,31 +430,14 @@ mod tests {
     #[tokio::test]
     async fn stream_endpoint_should_send_individual_message_deltas() {
         // Given
-        #[derive(Clone)]
-        struct SkillRuntimeStub;
-        impl SkillRuntimeDouble for SkillRuntimeStub {
-            async fn run_message_stream(
-                &self,
-                _skill_path: SkillPath,
-                _input: Value,
-                _api_token: String,
-                _tracing_context: TracingContext,
-            ) -> mpsc::Receiver<SkillExecutionEvent> {
-                let mut stream_events = vec![SkillExecutionEvent::MessageBegin];
-                stream_events.extend("Hello".chars().map(|c| SkillExecutionEvent::MessageAppend {
-                    text: c.to_string(),
-                }));
-                stream_events.push(SkillExecutionEvent::MessageEnd {
-                    payload: json!(null),
-                });
-                let (send, recv) = mpsc::channel(stream_events.len());
-                for ce in &stream_events {
-                    send.send(ce.clone()).await.unwrap();
-                }
-                recv
-            }
-        }
-        let app_state = ProviderStub::new(SkillRuntimeStub);
+        let mut events = vec![SkillExecutionEvent::MessageBegin];
+        events.extend("Hello".chars().map(|c| SkillExecutionEvent::MessageAppend {
+            text: c.to_string(),
+        }));
+        events.push(SkillExecutionEvent::MessageEnd {
+            payload: json!(null),
+        });
+        let app_state = ProviderStub::new(EventStreamStub::new(events));
         let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
 
         // When asking for a message stream
@@ -666,5 +650,71 @@ mod tests {
             "version": "0.3",
         });
         assert_eq!(metadata, expected);
+    }
+
+    #[tokio::test]
+    async fn stream_endpoint_for_saboteur_skill() {
+        // Given
+        let stream_events = vec![SkillExecutionEvent::Error(
+            SkillExecutionError::RuntimeError("Skill is a saboteur".to_string()),
+        )];
+        let skill_runtime = EventStreamStub::new(stream_events);
+        let app_state = ProviderStub::new(skill_runtime);
+        let http = http_skill_runtime_v1(FeatureSet::Beta).with_state(app_state);
+
+        // When asking for a message stream from a skill that does not exist
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/skills/local/saboteur/message-stream")
+                    .body(Body::from("\"\""))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get a OK response that contains an error
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = "\
+            event: error\n\
+            data: {\"message\":\"The skill could not be executed to completion, something in our \
+                runtime is currently unavailable or misconfigured. You should try again later, if \
+                the situation persists you may want to contact the operators. Original error:\\n\\n\
+                Skill is a saboteur\"}\n\n";
+        assert_eq!(body_text, expected_body);
+    }
+
+    #[derive(Clone)]
+    struct EventStreamStub {
+        events: Vec<SkillExecutionEvent>,
+    }
+
+    impl EventStreamStub {
+        fn new(events: Vec<SkillExecutionEvent>) -> Self {
+            Self { events }
+        }
+    }
+
+    impl SkillRuntimeDouble for EventStreamStub {
+        async fn run_message_stream(
+            &self,
+            _skill_path: SkillPath,
+            _input: Value,
+            _api_token: String,
+            _tracing_context: TracingContext,
+        ) -> mpsc::Receiver<SkillExecutionEvent> {
+            let (send, recv) = mpsc::channel(self.events.len());
+            for ce in &self.events {
+                send.send(ce.clone()).await.unwrap();
+            }
+            recv
+        }
     }
 }
