@@ -128,15 +128,19 @@ pub struct ConfiguredNativeTool {
     pub namespace: Namespace,
 }
 
-struct McpServerStore(HashMap<Namespace, HashSet<McpServerUrl>>);
+struct McpServerStore {
+    urls: HashMap<Namespace, HashSet<McpServerUrl>>,
+}
 
 impl McpServerStore {
     fn new() -> Self {
-        Self(HashMap::new())
+        Self {
+            urls: HashMap::new(),
+        }
     }
 
     fn list_in_namespace(&self, namespace: &Namespace) -> impl Iterator<Item = McpServerUrl> + '_ {
-        self.0
+        self.urls
             .get(namespace)
             .cloned()
             .unwrap_or_default()
@@ -144,14 +148,14 @@ impl McpServerStore {
     }
 
     fn upsert(&mut self, namespace: Namespace, url: McpServerUrl) {
-        self.0.entry(namespace).or_default().insert(url);
+        self.urls.entry(namespace).or_default().insert(url);
     }
 
     fn remove(&mut self, namespace: Namespace, url: McpServerUrl) {
-        if let Some(servers) = self.0.get_mut(&namespace) {
+        if let Some(servers) = self.urls.get_mut(&namespace) {
             servers.remove(&url);
             if servers.is_empty() {
-                self.0.remove(&namespace);
+                self.urls.remove(&namespace);
             }
         }
     }
