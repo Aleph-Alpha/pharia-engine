@@ -123,6 +123,8 @@ impl McpActor {
 #[cfg(test)]
 pub mod tests {
 
+    use std::collections::HashSet;
+
     use super::*;
 
     #[tokio::test]
@@ -178,5 +180,71 @@ pub mod tests {
         // Then we get an empty list
         let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
         assert_eq!(result, vec![]);
+    }
+
+    #[tokio::test]
+    async fn adding_existing_tool_server_does_not_add_it_again() {
+        // Given a tool client that knows about two mcp servers for a namespace
+        let mcp = Mcp::new().api();
+        let namespace = Namespace::new("test").unwrap();
+        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
+        mcp.upsert(server.clone()).await;
+
+        // When we add the same tool server again for that namespace
+        mcp.upsert(server).await;
+
+        // Then the list of tools is still the same
+        let mcp_servers = mcp.mcp_list(namespace).await;
+        assert_eq!(mcp_servers, vec!["http://localhost:8000/mcp".into()]);
+    }
+
+    #[tokio::test]
+    async fn same_tool_server_can_be_configured_for_different_namespaces() {
+        // Given a tool client
+        let mcp = Mcp::new().api();
+        let first = Namespace::new("first").unwrap();
+
+        // When adding the same tool server for two namespaces
+        let server_url = "http://localhost:8000/mcp";
+        let server = ConfiguredMcpServer::new(server_url, first.clone());
+        mcp.upsert(server.clone()).await;
+
+        let second = Namespace::new("second").unwrap();
+        let server = ConfiguredMcpServer::new(server_url, second.clone());
+        mcp.upsert(server).await;
+
+        // Then the server is configured for both namespaces
+        let mcp_servers = mcp.mcp_list(first).await;
+        assert_eq!(mcp_servers, vec![server_url.into()]);
+
+        let mcp_servers = mcp.mcp_list(second).await;
+        assert_eq!(mcp_servers, vec![server_url.into()]);
+    }
+
+    #[tokio::test]
+    async fn list_tool_servers() {
+        // Given a store with two mcp servers inserted for the namespace "test"
+        let mcp = Mcp::new().api();
+        let namespace = Namespace::new("test").unwrap();
+        mcp.upsert(ConfiguredMcpServer::new(
+            "http://localhost:8000/mcp",
+            namespace.clone(),
+        ))
+        .await;
+        mcp.upsert(ConfiguredMcpServer::new(
+            "http://localhost:8001/mcp",
+            namespace.clone(),
+        ))
+        .await;
+
+        // When listing tool servers for that namespace
+        let result: HashSet<McpServerUrl> = mcp.mcp_list(namespace).await.into_iter().collect();
+
+        // Then we get the two mcp servers
+        let expected = HashSet::from([
+            "http://localhost:8000/mcp".into(),
+            "http://localhost:8001/mcp".into(),
+        ]);
+        assert_eq!(result, expected);
     }
 }

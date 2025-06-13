@@ -32,7 +32,6 @@ use super::client::McpClient;
 pub trait ToolStoreApi {
     fn mcp_upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn mcp_remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
-    fn mcp_list(&self, namespace: Namespace) -> impl Future<Output = Vec<McpServerUrl>> + Send;
 
     // These could become a separate interface, if we decide to have a separate actor for managing
     // MCP servers.
@@ -126,13 +125,6 @@ impl ToolStoreApi for ToolSender {
         self.0.send(msg).await.unwrap();
     }
 
-    async fn mcp_list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
-        let (send, receive) = oneshot::channel();
-        let msg = ToolMsg::ListToolServers { namespace, send };
-        self.0.send(msg).await.unwrap();
-        receive.await.unwrap()
-    }
-
     async fn native_tool_upsert(&self, tool: ConfiguredNativeTool) {
         let msg = ToolMsg::UpsertNativeTool { tool };
         self.0.send(msg).await.unwrap();
@@ -160,10 +152,6 @@ enum ToolMsg {
     },
     RemoveToolServer {
         server: ConfiguredMcpServer,
-    },
-    ListToolServers {
-        namespace: Namespace,
-        send: oneshot::Sender<Vec<McpServerUrl>>,
     },
     UpsertNativeTool {
         tool: ConfiguredNativeTool,
@@ -241,13 +229,6 @@ impl<T: ToolClient> ToolActor<T> {
                 server: ConfiguredMcpServer { url, namespace },
             } => {
                 self.toolbox.remove_mcp_server(namespace, url);
-            }
-            ToolMsg::ListToolServers { namespace, send } => {
-                let result = self
-                    .toolbox
-                    .list_mcp_servers_in_namespace(&namespace)
-                    .collect();
-                drop(send.send(result));
             }
             ToolMsg::UpsertNativeTool { tool } => self.toolbox.upsert_native_tool(tool),
             ToolMsg::RemoveNativeTool { tool } => self.toolbox.remove_native_tool(tool),
@@ -414,66 +395,6 @@ pub mod tests {
         assert!(matches!(result, Err(ToolError::ToolNotFound(_))));
     }
 
-    #[tokio::test]
-    async fn tool_server_is_removed() {
-        // Given a tool configured with two mcp servers for a namespace
-        let namespace = Namespace::new("test").unwrap();
-        let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
-        ];
-        let tool = ToolRuntime::with_client(ToolClientMock)
-            .with_servers(servers.clone())
-            .await
-            .api();
-
-        // When the first mcp server is removed
-        tool.mcp_remove(servers[0].clone()).await;
-
-        // Then the list of tools is only the second mcp server
-        let mcp_servers = tool.mcp_list(namespace).await;
-        assert_eq!(mcp_servers, vec!["http://localhost:8001/mcp".into()]);
-    }
-
-    #[tokio::test]
-    async fn adding_existing_tool_server_does_not_add_it_again() {
-        // Given a tool client that knows about two mcp servers for a namespace
-        let tool = ToolRuntime::with_client(ToolClientMock).api();
-        let namespace = Namespace::new("test").unwrap();
-        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
-        tool.mcp_upsert(server.clone()).await;
-
-        // When we add the same tool server again for that namespace
-        tool.mcp_upsert(server).await;
-
-        // Then the list of tools is still the same
-        let mcp_servers = tool.mcp_list(namespace).await;
-        assert_eq!(mcp_servers, vec!["http://localhost:8000/mcp".into()]);
-    }
-
-    #[tokio::test]
-    async fn same_tool_server_can_be_configured_for_different_namespaces() {
-        // Given a tool client
-        let tool = ToolRuntime::with_client(ToolClientMock).api();
-        let first = Namespace::new("first").unwrap();
-
-        // When adding the same tool server for two namespaces
-        let server_url = "http://localhost:8000/mcp";
-        let server = ConfiguredMcpServer::new(server_url, first.clone());
-        tool.mcp_upsert(server.clone()).await;
-
-        let second = Namespace::new("second").unwrap();
-        let server = ConfiguredMcpServer::new(server_url, second.clone());
-        tool.mcp_upsert(server).await;
-
-        // Then the server is configured for both namespaces
-        let mcp_servers = tool.mcp_list(first).await;
-        assert_eq!(mcp_servers, vec![server_url.into()]);
-
-        let mcp_servers = tool.mcp_list(second).await;
-        assert_eq!(mcp_servers, vec![server_url.into()]);
-    }
-
     struct ToolClientSpy {
         queried: Arc<Mutex<HashSet<McpServerUrl>>>,
     }
@@ -628,41 +549,6 @@ pub mod tests {
             }
             self
         }
-    }
-
-    #[tokio::test]
-    async fn list_tool_servers_none_configured() {
-        // Given a tool client that knows about no mcp servers
-        let tool = ToolRuntime::with_client(ToolClientMock).api();
-
-        // When listing tool servers for a namespace
-        let result = tool.mcp_list(Namespace::new("test").unwrap()).await;
-
-        // Then we get an empty list
-        assert!(result.is_empty());
-    }
-
-    #[tokio::test]
-    async fn list_tool_servers() {
-        // Given a tool client that knows about two mcp servers for a namespace
-        let namespace = Namespace::new("test").unwrap();
-        let tool = ToolRuntime::with_client(ToolClientMock)
-            .with_servers(vec![
-                ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
-                ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
-            ])
-            .await
-            .api();
-
-        // When listing tool servers for that namespace
-        let result: HashSet<McpServerUrl> = tool.mcp_list(namespace).await.into_iter().collect();
-
-        // Then we get the two mcp servers
-        let expected = HashSet::from([
-            "http://localhost:8000/mcp".into(),
-            "http://localhost:8001/mcp".into(),
-        ]);
-        assert_eq!(result, expected);
     }
 
     // Client that, independent of the mcp server, always reports the add tool to be available
