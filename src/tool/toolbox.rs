@@ -28,34 +28,42 @@ impl<T> Toolbox<T> {
         }
     }
 
-    async fn mcp_server_for_tool(&self, namespace: &Namespace, name: &str) -> Option<McpServerUrl>
+    fn mcp_server_for_tool(
+        urls: Vec<McpServerUrl>,
+        client: Arc<T>,
+        name: String,
+    ) -> impl Future<Output = Option<McpServerUrl>> + Send + Sync
     where
         T: ToolClient + 'static,
     {
-        for url in self.mcp_servers.list_in_namespace(&namespace) {
-            if let Ok(tools) = self.client.list_tools(&url).await {
-                if tools.contains(&name.to_string()) {
-                    return Some(url);
+        async move {
+            for url in urls {
+                if let Ok(tools) = client.list_tools(&url).await {
+                    if tools.contains(&name) {
+                        return Some(url);
+                    }
                 }
             }
-        }
 
-        None
+            None
+        }
     }
 
-    pub async fn fetch_tool(&self, namespace: Namespace, name: &str) -> Option<Arc<dyn Tool>>
+    pub fn fetch_tool(
+        &self,
+        namespace: Namespace,
+        name: &str,
+    ) -> Option<Box<dyn Tool + Send + Sync>>
     where
         T: ToolClient + 'static,
     {
-        if let Some(url) = self.mcp_server_for_tool(&namespace, name).await {
-            Some(Arc::new(McpTool::new(
-                name.to_owned(),
-                url,
-                self.client.clone(),
-            )))
-        } else {
-            None
-        }
+        let urls = self.mcp_servers.list_in_namespace(&namespace).collect();
+        let server = Toolbox::mcp_server_for_tool(urls, self.client.clone(), name.to_owned());
+        Some(Box::new(McpTool::new(
+            name.to_owned(),
+            server,
+            self.client.clone(),
+        )))
     }
 
     pub fn list_mcp_servers_in_namespace(
@@ -94,30 +102,39 @@ where
     }
 }
 
-struct McpTool<C> {
+struct McpTool<C, U> {
     name: String,
-    url: McpServerUrl,
+    url: U,
     client: Arc<C>,
 }
 
-impl<C> McpTool<C> {
-    pub fn new(name: String, url: McpServerUrl, client: Arc<C>) -> Self {
+impl<C, U> McpTool<C, U> {
+    pub fn new(name: String, url: U, client: Arc<C>) -> Self {
         Self { name, url, client }
     }
 }
 
 #[async_trait]
-impl<C> Tool for McpTool<C>
+impl<C, U> Tool for McpTool<C, U>
 where
     C: ToolClient,
+    U: Future<Output = Option<McpServerUrl>> + Send + Sync,
 {
     async fn invoke(
-        &self,
+        self: Box<Self>,
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
     ) -> Result<Vec<Modality>, ToolError> {
         self.client
-            .invoke_tool(&self.name, arguments, &self.url, tracing_context)
+            .invoke_tool(
+                &self.name,
+                arguments,
+                &self
+                    .url
+                    .await
+                    .ok_or_else(|| ToolError::ToolNotFound(self.name.clone()))?,
+                tracing_context,
+            )
             .await
     }
 }
@@ -207,10 +224,7 @@ pub mod tests {
             Namespace::dummy(),
             McpServerUrl::from("http://localhost:8080"),
         );
-        let tool = toolbox
-            .fetch_tool(Namespace::dummy(), "test")
-            .await
-            .unwrap();
+        let tool = toolbox.fetch_tool(Namespace::dummy(), "test").unwrap();
 
         let arguments = vec![];
         let modalities = tool
@@ -250,8 +264,13 @@ pub mod tests {
             Namespace::dummy(),
             McpServerUrl::from("http://localhost:8080"),
         );
-        let tool = toolbox.fetch_tool(Namespace::dummy(), "test").await;
+        let tool = toolbox.fetch_tool(Namespace::dummy(), "test").unwrap();
+        let result = tool.invoke(vec![], TracingContext::dummy()).await;
 
-        assert!(tool.is_none());
+        assert!(matches!(
+            result,
+            Err(ToolError::ToolNotFound(tool_name))
+            if tool_name == "test"
+        ));
     }
 }

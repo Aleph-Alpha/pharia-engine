@@ -47,7 +47,7 @@ pub enum ToolError {
 #[async_trait]
 pub trait Tool {
     async fn invoke(
-        &self,
+        self: Box<Self>,
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
     ) -> Result<Vec<Modality>, ToolError>;
