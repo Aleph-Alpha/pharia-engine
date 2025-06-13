@@ -32,7 +32,11 @@ impl<T> Toolbox<T> {
     where
         T: ToolClient + 'static,
     {
-        Arc::new(McpTool::new(name.to_owned(), self.client.clone()))
+        Arc::new(McpTool::new(
+            name.to_owned(),
+            McpServerUrl::from("http://localhost:8080"),
+            self.client.clone(),
+        ))
     }
 
     pub fn list_mcp_servers_in_namespace(
@@ -73,12 +77,13 @@ where
 
 struct McpTool<C> {
     name: String,
+    url: McpServerUrl,
     client: Arc<C>,
 }
 
 impl<C> McpTool<C> {
-    pub fn new(name: String, client: Arc<C>) -> Self {
-        Self { name, client }
+    pub fn new(name: String, url: McpServerUrl, client: Arc<C>) -> Self {
+        Self { name, url, client }
     }
 }
 
@@ -92,9 +97,8 @@ where
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
     ) -> Result<Vec<Modality>, ToolError> {
-        let url = McpServerUrl::from("http://localhost:8080");
         self.client
-            .invoke_tool(&self.name, arguments, &url, tracing_context)
+            .invoke_tool(&self.name, arguments, &self.url, tracing_context)
             .await
     }
 }
