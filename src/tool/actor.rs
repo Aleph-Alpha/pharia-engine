@@ -232,7 +232,7 @@ impl<T: ToolClient> ToolActor<T> {
                 let client = self.toolbox.client.clone();
                 let servers = self
                     .toolbox
-                    .list_mcp_servers_in_namespace(namespace)
+                    .list_mcp_servers_in_namespace(&namespace)
                     .collect();
                 self.running_requests.push(Box::pin(async move {
                     let result =
@@ -244,7 +244,7 @@ impl<T: ToolClient> ToolActor<T> {
                 let client = self.toolbox.client.clone();
                 let servers = self
                     .toolbox
-                    .list_mcp_servers_in_namespace(namespace)
+                    .list_mcp_servers_in_namespace(&namespace)
                     .collect();
                 self.running_requests.push(Box::pin(async move {
                     let result = Self::tools(client.as_ref(), servers).await;
@@ -265,7 +265,7 @@ impl<T: ToolClient> ToolActor<T> {
             ToolMsg::ListToolServers { namespace, send } => {
                 let result = self
                     .toolbox
-                    .list_mcp_servers_in_namespace(namespace)
+                    .list_mcp_servers_in_namespace(&namespace)
                     .collect();
                 drop(send.send(result));
             }

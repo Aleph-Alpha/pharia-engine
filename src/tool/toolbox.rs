@@ -28,20 +28,39 @@ impl<T> Toolbox<T> {
         }
     }
 
-    pub async fn fetch_tool(&self, namespace: Namespace, name: &str) -> Arc<dyn Tool>
+    async fn mcp_server_for_tool(&self, namespace: &Namespace, name: &str) -> Option<McpServerUrl>
     where
         T: ToolClient + 'static,
     {
-        Arc::new(McpTool::new(
-            name.to_owned(),
-            McpServerUrl::from("http://localhost:8080"),
-            self.client.clone(),
-        ))
+        for url in self.mcp_servers.list_in_namespace(&namespace) {
+            if let Ok(tools) = self.client.list_tools(&url).await {
+                if tools.contains(&name.to_string()) {
+                    return Some(url);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub async fn fetch_tool(&self, namespace: Namespace, name: &str) -> Option<Arc<dyn Tool>>
+    where
+        T: ToolClient + 'static,
+    {
+        if let Some(url) = self.mcp_server_for_tool(&namespace, name).await {
+            Some(Arc::new(McpTool::new(
+                name.to_owned(),
+                url,
+                self.client.clone(),
+            )))
+        } else {
+            None
+        }
     }
 
     pub fn list_mcp_servers_in_namespace(
         &self,
-        namespace: Namespace,
+        namespace: &Namespace,
     ) -> impl Iterator<Item = McpServerUrl> + '_ {
         self.mcp_servers.list_in_namespace(namespace)
     }
@@ -116,9 +135,9 @@ impl McpServerStore {
         Self(HashMap::new())
     }
 
-    fn list_in_namespace(&self, namespace: Namespace) -> impl Iterator<Item = McpServerUrl> + '_ {
+    fn list_in_namespace(&self, namespace: &Namespace) -> impl Iterator<Item = McpServerUrl> + '_ {
         self.0
-            .get(&namespace)
+            .get(namespace)
             .cloned()
             .unwrap_or_default()
             .into_iter()
@@ -173,10 +192,21 @@ pub mod tests {
                     text: "success".to_string(),
                 }])
             }
+
+            async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+                Ok(vec!["test".to_string()])
+            }
         }
 
-        let toolbox = Toolbox::new(ToolClientStub);
-        let tool = toolbox.fetch_tool(Namespace::dummy(), "test").await;
+        let mut toolbox = Toolbox::new(ToolClientStub);
+        toolbox.upsert_mcp_server(
+            Namespace::dummy(),
+            McpServerUrl::from("http://localhost:8080"),
+        );
+        let tool = toolbox
+            .fetch_tool(Namespace::dummy(), "test")
+            .await
+            .unwrap();
 
         let arguments = vec![];
         let modalities = tool
@@ -190,5 +220,34 @@ pub mod tests {
                 text: "success".to_string()
             }]
         );
+    }
+
+    #[tokio::test]
+    async fn fetch_missing_tool() {
+        struct ToolClientStub;
+        impl ToolClientDouble for ToolClientStub {
+            async fn invoke_tool(
+                &self,
+                _name: &str,
+                _args: Vec<Argument>,
+                _url: &McpServerUrl,
+                _tracing_context: TracingContext,
+            ) -> Result<Vec<Modality>, ToolError> {
+                Ok(vec![])
+            }
+
+            async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+                Ok(vec![])
+            }
+        }
+
+        let mut toolbox = Toolbox::new(ToolClientStub);
+        toolbox.upsert_mcp_server(
+            Namespace::dummy(),
+            McpServerUrl::from("http://localhost:8080"),
+        );
+        let tool = toolbox.fetch_tool(Namespace::dummy(), "test").await;
+
+        assert!(tool.is_none());
     }
 }
