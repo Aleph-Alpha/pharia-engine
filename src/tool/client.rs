@@ -9,11 +9,13 @@ use tracing::info;
 
 use crate::context;
 use crate::logging::TracingContext;
+use crate::tool::Modality;
+use crate::tool::ToolOutput;
 
 use reqwest::Client;
 use serde_json::{Value, json};
 
-use super::actor::McpServerUrl;
+use super::toolbox::McpServerUrl;
 use super::{InvokeRequest, ToolError, actor::ToolClient};
 
 pub struct McpClient {
@@ -25,16 +27,6 @@ impl McpClient {
         let client = Client::new();
         Self { client }
     }
-}
-
-pub type ToolOutput = Vec<Modality>;
-
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Modality {
-    // There are more types of content, but we do not support these at the moment.
-    // See: <https://modelcontextprotocol.io/specification/2025-03-26/server/tools#tool-result>
-    Text { text: String },
 }
 
 #[derive(Deserialize)]
@@ -275,7 +267,7 @@ impl McpClient {
 pub mod tests {
     use test_skills::{given_json_mcp_server, given_sse_mcp_server};
 
-    use crate::tool::actor::Argument;
+    use crate::tool::Argument;
 
     use super::*;
 

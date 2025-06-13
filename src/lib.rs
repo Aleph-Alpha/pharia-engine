@@ -35,7 +35,7 @@ use skill_loader::SkillLoader;
 use skill_store::SkillStore;
 use skills::Engine;
 use tokenizers::Tokenizers;
-use tool::Tool;
+use tool::ToolRuntime;
 use tracing::error;
 
 use crate::{csi::CsiDrivers, shell::ShellState};
@@ -97,7 +97,7 @@ impl Kernel {
         let tokenizers = Tokenizers::new(app_config.inference_url().to_owned()).unwrap();
         let inference = Inference::new(app_config.inference_url().to_owned());
         let search = Search::new(app_config.document_index_url().to_owned());
-        let tool = Tool::new();
+        let tool = ToolRuntime::new();
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
             search: search.api(),
