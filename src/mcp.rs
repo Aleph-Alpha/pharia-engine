@@ -10,6 +10,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct McpServerUrl(pub String);
 
+impl McpServerUrl {
+    pub fn new(url: impl Into<String>) -> Self {
+        Self(url.into())
+    }
+}
+
 impl<T> From<T> for McpServerUrl
 where
     T: Into<String>,
