@@ -301,13 +301,13 @@ where
             }
             Err(NamespaceDescriptionError::Recoverable(e)) => {
                 error!(
-                    "Failed to get the skills in namespace {namespace}, fallback to existing state, caused by: {e}"
+                    "Failed to get the skills in namespace {namespace}, fallback to existing state, caused by: {e:#}"
                 );
                 return;
             }
             Err(NamespaceDescriptionError::Unrecoverable(e)) => {
                 error!(
-                    "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e}"
+                    "Failed to get the skills in namespace {namespace}, mark it as invalid and unload all skills, caused by: {e:#}"
                 );
                 self.skill_store_api
                     .set_namespace_error(namespace.clone(), Some(e))
