@@ -257,8 +257,10 @@ impl NativeToolStore {
         Self
     }
 
+    #[allow(clippy::unused_self)]
     fn upsert(&self, _tool: ConfiguredNativeTool) {}
 
+    #[allow(clippy::unused_self)]
     fn remove(&self, _tool: ConfiguredNativeTool) {}
 }
 
