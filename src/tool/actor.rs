@@ -355,7 +355,7 @@ pub trait ToolClient: Send + Sync + 'static {
     fn list_tools(
         &self,
         url: &McpServerUrl,
-    ) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send + Sync;
 }
 
 #[cfg(test)]
