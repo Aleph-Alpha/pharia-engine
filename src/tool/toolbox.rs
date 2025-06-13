@@ -1,14 +1,10 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     logging::TracingContext,
-    mcp::McpServerUrl,
+    mcp::{McpServerStore, McpServerUrl},
     namespace_watcher::Namespace,
     tool::{Argument, Modality, Tool, ToolError, actor::ToolClient},
 };
@@ -132,39 +128,6 @@ where
 pub struct ConfiguredNativeTool {
     pub name: String,
     pub namespace: Namespace,
-}
-
-struct McpServerStore {
-    urls: HashMap<Namespace, HashSet<McpServerUrl>>,
-}
-
-impl McpServerStore {
-    fn new() -> Self {
-        Self {
-            urls: HashMap::new(),
-        }
-    }
-
-    fn list_in_namespace(&self, namespace: &Namespace) -> impl Iterator<Item = McpServerUrl> + '_ {
-        self.urls
-            .get(namespace)
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-    }
-
-    fn upsert(&mut self, namespace: Namespace, url: McpServerUrl) {
-        self.urls.entry(namespace).or_default().insert(url);
-    }
-
-    fn remove(&mut self, namespace: Namespace, url: McpServerUrl) {
-        if let Some(servers) = self.urls.get_mut(&namespace) {
-            servers.remove(&url);
-            if servers.is_empty() {
-                self.urls.remove(&namespace);
-            }
-        }
-    }
 }
 
 struct NativeToolStore;
