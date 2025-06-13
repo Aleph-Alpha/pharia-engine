@@ -9,6 +9,7 @@ mod http;
 mod inference;
 mod language_selection;
 mod logging;
+mod mcp;
 mod metrics;
 mod namespace_watcher;
 mod registries;
@@ -38,7 +39,7 @@ use tokenizers::Tokenizers;
 use tool::ToolRuntime;
 use tracing::error;
 
-use crate::{csi::CsiDrivers, shell::ShellState};
+use crate::{csi::CsiDrivers, mcp::Mcp, shell::ShellState};
 
 use self::{inference::Inference, skill_runtime::SkillRuntime};
 
@@ -64,6 +65,8 @@ pub struct Kernel {
     search: Search,
     skill_loader: SkillLoader,
     skill_store: SkillStore,
+    tool: ToolRuntime,
+    mcp: Mcp,
     skill_runtime: SkillRuntime,
     namespace_watcher: NamespaceWatcher,
     authorization: Authorization,
@@ -98,6 +101,7 @@ impl Kernel {
         let inference = Inference::new(app_config.inference_url().to_owned());
         let search = Search::new(app_config.document_index_url().to_owned());
         let tool = ToolRuntime::new();
+        let mcp = Mcp::new();
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
             search: search.api(),
@@ -155,6 +159,7 @@ impl Kernel {
                 authorization.wait_for_shutdown().await;
                 namespace_watcher.wait_for_shutdown().await;
                 skill_runtime.wait_for_shutdown().await;
+                mcp.wait_for_shutdown().await;
                 tool.wait_for_shutdown().await;
                 skill_store.wait_for_shutdown().await;
                 skill_loader.wait_for_shutdown().await;
@@ -172,6 +177,8 @@ impl Kernel {
             search,
             skill_loader,
             skill_store,
+            tool,
+            mcp,
             skill_runtime,
             namespace_watcher,
             authorization,
@@ -188,6 +195,8 @@ impl Kernel {
         self.authorization.wait_for_shutdown().await;
         self.namespace_watcher.wait_for_shutdown().await;
         self.skill_runtime.wait_for_shutdown().await;
+        self.mcp.wait_for_shutdown().await;
+        self.tool.wait_for_shutdown().await;
         self.skill_store.wait_for_shutdown().await;
         self.skill_loader.wait_for_shutdown().await;
         self.tokenizers.wait_for_shutdown().await;
