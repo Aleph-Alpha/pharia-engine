@@ -28,7 +28,7 @@ impl<T> Toolbox<T> {
         }
     }
 
-    pub fn fetch_tool(&self, namespace: Namespace, name: &str) -> Arc<dyn Tool>
+    pub async fn fetch_tool(&self, namespace: Namespace, name: &str) -> Arc<dyn Tool>
     where
         T: ToolClient + 'static,
     {
@@ -176,7 +176,7 @@ pub mod tests {
         }
 
         let toolbox = Toolbox::new(ToolClientStub);
-        let tool = toolbox.fetch_tool(Namespace::dummy(), "test");
+        let tool = toolbox.fetch_tool(Namespace::dummy(), "test").await;
 
         let arguments = vec![];
         let modalities = tool
