@@ -1,9 +1,11 @@
 mod actor;
+mod store;
 
 pub use actor::Mcp;
-use serde::{Deserialize, Serialize};
+pub use store::McpServerStore;
 
 use crate::namespace_watcher::Namespace;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct McpServerUrl(pub String);
