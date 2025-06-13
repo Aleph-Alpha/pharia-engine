@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::PathBuf};
 use url::Url;
 use utoipa::ToSchema;
 
-use crate::{skill_loader::RegistryConfig, tool::McpServerUrl};
+use crate::{mcp::McpServerUrl, skill_loader::RegistryConfig};
 
 use super::{
     NamespaceDescriptionLoader,

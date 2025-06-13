@@ -5,11 +5,7 @@ use axum::{
 };
 use utoipa::OpenApi;
 
-use crate::{
-    FeatureSet,
-    namespace_watcher::Namespace,
-    tool::{McpServerUrl, ToolStoreApi},
-};
+use crate::{FeatureSet, mcp::McpServerUrl, namespace_watcher::Namespace, tool::ToolStoreApi};
 
 pub fn http_mcp_servers_v1<T>(feature_set: FeatureSet) -> Router<T>
 where

@@ -9,7 +9,7 @@ use axum::http::HeaderValue;
 use reqwest::{StatusCode, header::AUTHORIZATION};
 use serde::{Deserialize, Serialize};
 
-use crate::{http::HttpClient, tool::McpServerUrl};
+use crate::{http::HttpClient, mcp::McpServerUrl};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NamespaceDescriptionError {

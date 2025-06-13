@@ -6,10 +6,11 @@ use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
 
 use crate::{
+    mcp::{ConfiguredMcpServer, McpServerUrl},
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
-    tool::{ConfiguredMcpServer, ConfiguredNativeTool, McpServerUrl, ToolStoreApi},
+    tool::{ConfiguredNativeTool, ToolStoreApi},
 };
 
 use super::{

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     logging::TracingContext,
+    mcp::McpServerUrl,
     namespace_watcher::Namespace,
     tool::{Argument, Modality, Tool, ToolError, actor::ToolClient},
 };
@@ -87,18 +88,6 @@ impl<T> Toolbox<T> {
 
     pub fn remove_native_tool(&self, tool: ConfiguredNativeTool) {
         self.native_tools.remove(tool);
-    }
-}
-
-#[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct McpServerUrl(pub String);
-
-impl<T> From<T> for McpServerUrl
-where
-    T: Into<String>,
-{
-    fn from(value: T) -> Self {
-        Self(value.into())
     }
 }
 

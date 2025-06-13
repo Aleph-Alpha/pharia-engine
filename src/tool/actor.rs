@@ -9,36 +9,19 @@ use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 use crate::logging::TracingContext;
+use crate::mcp::ConfiguredMcpServer;
+use crate::mcp::McpServerUrl;
 use crate::namespace_watcher::Namespace;
 use crate::tool::Argument;
 use crate::tool::Modality;
 use crate::tool::ToolError;
 use crate::tool::ToolOutput;
-use crate::tool::toolbox::McpServerUrl;
 use crate::tool::toolbox::{ConfiguredNativeTool, Toolbox};
 
 #[cfg(test)]
 use double_trait::double;
 
 use super::client::McpClient;
-
-/// An MCP server that is configured with a namespace.
-///
-/// Per namespace configuration allows different Skills to have access to different tools.
-#[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub struct ConfiguredMcpServer {
-    pub url: McpServerUrl,
-    pub namespace: Namespace,
-}
-
-impl ConfiguredMcpServer {
-    pub fn new(url: impl Into<McpServerUrl>, namespace: Namespace) -> Self {
-        Self {
-            url: url.into(),
-            namespace,
-        }
-    }
-}
 
 /// Interact with tool server storage.
 ///
