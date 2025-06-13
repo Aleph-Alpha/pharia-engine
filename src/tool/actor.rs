@@ -72,9 +72,9 @@ pub trait ToolStoreApi {
 
     // These could become a separate interface, if we decide to have a separate actor for managing
     // MCP servers.
-    fn native_tool_upsert(&self, _tool: ConfiguredNativeTool) -> impl Future<Output = ()> + Send;
+    fn native_tool_upsert(&self, tool: ConfiguredNativeTool) -> impl Future<Output = ()> + Send;
 
-    fn native_tool_remove(&self, _tool: ConfiguredNativeTool) -> impl Future<Output = ()> + Send;
+    fn native_tool_remove(&self, tool: ConfiguredNativeTool) -> impl Future<Output = ()> + Send;
 }
 
 /// CSI facing interface, allows to invoke and list tools
