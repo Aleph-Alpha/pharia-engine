@@ -3,11 +3,13 @@ use std::{
     sync::Arc,
 };
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    logging::TracingContext,
     namespace_watcher::Namespace,
-    tool::{Modality, Tool, ToolError},
+    tool::{Argument, Modality, Tool, ToolError, actor::ToolClient},
 };
 
 pub struct Toolbox<T> {
@@ -28,7 +30,7 @@ impl<T> Toolbox<T> {
 
     pub fn fetch_tool(&self, namespace: Namespace, name: &str) -> Arc<dyn Tool>
     where
-        T: 'static,
+        T: ToolClient + 'static,
     {
         Arc::new(McpTool::new(name.to_owned(), self.client.clone()))
     }
@@ -80,11 +82,20 @@ impl<C> McpTool<C> {
     }
 }
 
-impl<C> Tool for McpTool<C> {
-    fn invoke(&self) -> Result<Vec<Modality>, ToolError> {
-        Ok(vec![Modality::Text {
-            text: "success".to_string(),
-        }])
+#[async_trait]
+impl<C> Tool for McpTool<C>
+where
+    C: ToolClient,
+{
+    async fn invoke(
+        &self,
+        arguments: Vec<Argument>,
+        tracing_context: TracingContext,
+    ) -> Result<Vec<Modality>, ToolError> {
+        let url = McpServerUrl::from("http://localhost:8080");
+        self.client
+            .invoke_tool(&self.name, arguments, &url, tracing_context)
+            .await
     }
 }
 
@@ -143,15 +154,31 @@ pub mod tests {
 
     use super::*;
 
-    #[test]
-    fn invoke_tool_success() {
+    #[tokio::test]
+    async fn invoke_tool_success() {
         struct ToolClientStub;
-        impl ToolClientDouble for ToolClientStub {}
+        impl ToolClientDouble for ToolClientStub {
+            async fn invoke_tool(
+                &self,
+                _name: &str,
+                _args: Vec<Argument>,
+                _url: &McpServerUrl,
+                _tracing_context: TracingContext,
+            ) -> Result<Vec<Modality>, ToolError> {
+                Ok(vec![Modality::Text {
+                    text: "success".to_string(),
+                }])
+            }
+        }
 
         let toolbox = Toolbox::new(ToolClientStub);
         let tool = toolbox.fetch_tool(Namespace::dummy(), "test");
 
-        let modalities = tool.invoke().unwrap();
+        let arguments = vec![];
+        let modalities = tool
+            .invoke(arguments, TracingContext::dummy())
+            .await
+            .unwrap();
 
         assert_eq!(
             &modalities,

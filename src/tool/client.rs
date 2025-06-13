@@ -9,14 +9,13 @@ use tracing::info;
 
 use crate::context;
 use crate::logging::TracingContext;
-use crate::tool::Modality;
-use crate::tool::ToolOutput;
+use crate::tool::{Argument, Modality, ToolOutput};
 
 use reqwest::Client;
 use serde_json::{Value, json};
 
 use super::toolbox::McpServerUrl;
-use super::{InvokeRequest, ToolError, actor::ToolClient};
+use super::{ToolError, actor::ToolClient};
 
 pub struct McpClient {
     client: Client,
@@ -53,7 +52,8 @@ impl McpClient {
 impl ToolClient for McpClient {
     async fn invoke_tool(
         &self,
-        request: InvokeRequest,
+        name: &str,
+        arguments: Vec<Argument>,
         url: &McpServerUrl,
         tracing_context: TracingContext,
     ) -> Result<ToolOutput, ToolError> {
@@ -63,8 +63,7 @@ impl ToolClient for McpClient {
             .inspect_err(|e| error!(parent: child_context.span(), "{}", e))?;
         drop(child_context);
 
-        let arguments = request
-            .arguments
+        let arguments = arguments
             .into_iter()
             .map(|argument| {
                 serde_json::from_slice::<Value>(&argument.value).map(|value| (argument.name, value))
@@ -77,7 +76,7 @@ impl ToolClient for McpClient {
         "id": 2,
         "method": "tools/call",
         "params": {
-            "name": request.name,
+            "name": name,
             "arguments": arguments
         }
         });
@@ -290,22 +289,24 @@ pub mod tests {
     async fn invoke_tool_given_mcp_server() {
         let mcp = given_sse_mcp_server().await;
 
-        let request = InvokeRequest {
-            name: "add".to_owned(),
-            arguments: vec![
-                Argument {
-                    name: "a".to_owned(),
-                    value: json!(1).to_string().into_bytes(),
-                },
-                Argument {
-                    name: "b".to_owned(),
-                    value: json!(2).to_string().into_bytes(),
-                },
-            ],
-        };
+        let arguments = vec![
+            Argument {
+                name: "a".to_owned(),
+                value: json!(1).to_string().into_bytes(),
+            },
+            Argument {
+                name: "b".to_owned(),
+                value: json!(2).to_string().into_bytes(),
+            },
+        ];
         let client = McpClient::new();
         let response = client
-            .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
+            .invoke_tool(
+                "add",
+                arguments,
+                &mcp.address().into(),
+                TracingContext::dummy(),
+            )
             .await
             .unwrap();
 
@@ -317,22 +318,24 @@ pub mod tests {
     async fn invoke_tool_against_json_mcp_server() {
         let mcp = given_json_mcp_server().await;
 
-        let request = InvokeRequest {
-            name: "add".to_owned(),
-            arguments: vec![
-                Argument {
-                    name: "a".to_owned(),
-                    value: json!(1).to_string().into_bytes(),
-                },
-                Argument {
-                    name: "b".to_owned(),
-                    value: json!(2).to_string().into_bytes(),
-                },
-            ],
-        };
+        let arguments = vec![
+            Argument {
+                name: "a".to_owned(),
+                value: json!(1).to_string().into_bytes(),
+            },
+            Argument {
+                name: "b".to_owned(),
+                value: json!(2).to_string().into_bytes(),
+            },
+        ];
         let client = McpClient::new();
         let response = client
-            .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
+            .invoke_tool(
+                "add",
+                arguments,
+                &mcp.address().into(),
+                TracingContext::dummy(),
+            )
             .await
             .unwrap();
 
@@ -344,13 +347,14 @@ pub mod tests {
     async fn invoke_unknown_tool_gives_error() {
         let mcp = given_sse_mcp_server().await;
 
-        let request = InvokeRequest {
-            name: "unknown".to_owned(),
-            arguments: vec![],
-        };
         let client = McpClient::new();
         let response = client
-            .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
+            .invoke_tool(
+                "unknown",
+                vec![],
+                &mcp.address().into(),
+                TracingContext::dummy(),
+            )
             .await
             .unwrap_err();
         assert!(matches!(response, ToolError::ToolCallFailed(_)));
@@ -360,13 +364,14 @@ pub mod tests {
     async fn invoke_saboteur_tool_results_in_error() {
         let mcp = given_sse_mcp_server().await;
 
-        let request = InvokeRequest {
-            name: "saboteur".to_owned(),
-            arguments: vec![],
-        };
         let client = McpClient::new();
         let response = client
-            .invoke_tool(request, &mcp.address().into(), TracingContext::dummy())
+            .invoke_tool(
+                "saboteur",
+                vec![],
+                &mcp.address().into(),
+                TracingContext::dummy(),
+            )
             .await
             .unwrap_err();
         assert_eq!(
