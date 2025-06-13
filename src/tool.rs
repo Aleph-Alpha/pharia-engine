@@ -4,7 +4,10 @@ mod mcp_routes;
 mod tool_routes;
 mod toolbox;
 
+use async_trait::async_trait;
 use serde::Deserialize;
+
+use crate::logging::TracingContext;
 
 pub use self::{
     actor::{ConfiguredMcpServer, InvokeRequest, ToolApi, ToolRuntime, ToolSender, ToolStoreApi},
@@ -41,8 +44,13 @@ pub enum ToolError {
     Other(#[from] anyhow::Error),
 }
 
+#[async_trait]
 pub trait Tool {
-    fn invoke(&self) -> Result<Vec<Modality>, ToolError>;
+    async fn invoke(
+        &self,
+        arguments: Vec<Argument>,
+        tracing_context: TracingContext,
+    ) -> Result<Vec<Modality>, ToolError>;
 }
 
 #[cfg(test)]

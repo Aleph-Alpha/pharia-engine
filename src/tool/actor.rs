@@ -289,7 +289,12 @@ impl<T: ToolClient> ToolActor<T> {
             .ok_or(ToolError::ToolNotFound(request.name.clone()))
             .inspect_err(|e| info!(parent: tracing_context.span(), "{}", e))?;
         client
-            .invoke_tool(request, &mcp_address, tracing_context)
+            .invoke_tool(
+                &request.name,
+                request.arguments,
+                &mcp_address,
+                tracing_context,
+            )
             .await
     }
 
@@ -341,7 +346,8 @@ pub struct InvokeRequest {
 pub trait ToolClient: Send + Sync + 'static {
     fn invoke_tool(
         &self,
-        request: InvokeRequest,
+        name: &str,
+        arguments: Vec<Argument>,
         url: &McpServerUrl,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Vec<Modality>, ToolError>> + Send;
@@ -381,7 +387,8 @@ pub mod tests {
 
         async fn invoke_tool(
             &self,
-            _request: InvokeRequest,
+            _name: &str,
+            _args: Vec<Argument>,
             url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Vec<Modality>, ToolError> {
@@ -594,19 +601,20 @@ pub mod tests {
 
         async fn invoke_tool(
             &self,
-            request: InvokeRequest,
+            name: &str,
+            _args: Vec<Argument>,
             url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Vec<Modality>, ToolError> {
             match url.0.as_ref() {
                 "http://localhost:8000/mcp" => {
-                    assert_eq!(request.name, "search");
+                    assert_eq!(name, "search");
                     Ok(vec![Modality::Text {
                         text: "search result".to_owned(),
                     }])
                 }
                 "http://localhost:8001/mcp" => {
-                    assert_eq!(request.name, "calculator");
+                    assert_eq!(name, "calculator");
                     Ok(vec![Modality::Text {
                         text: "calculator result".to_owned(),
                     }])
@@ -662,7 +670,8 @@ pub mod tests {
 
         async fn invoke_tool(
             &self,
-            _request: InvokeRequest,
+            _name: &str,
+            _args: Vec<Argument>,
             _url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Vec<Modality>, ToolError> {
@@ -819,11 +828,12 @@ pub mod tests {
     impl ToolClientDouble for SaboteurClient {
         async fn invoke_tool(
             &self,
-            request: InvokeRequest,
+            name: &str,
+            _args: Vec<Argument>,
             _url: &McpServerUrl,
             _tracing_context: TracingContext,
         ) -> Result<Vec<Modality>, ToolError> {
-            match request.name.as_str() {
+            match name {
                 "add" => Ok(vec![Modality::Text {
                     text: "Success".to_owned(),
                 }]),
