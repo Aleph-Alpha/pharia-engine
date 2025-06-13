@@ -1,22 +1,24 @@
-use futures::StreamExt;
-use futures::future::join_all;
-use futures::stream::FuturesUnordered;
-use std::collections::HashMap;
-use std::pin::Pin;
-use tokio::select;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-use tokio::task::JoinHandle;
+use futures::{
+    future::join_all,
+    stream::FuturesUnordered,
+    StreamExt,
+};
+use std::{collections::HashMap, pin::Pin};
+use tokio::{
+    select,
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 
-use crate::logging::TracingContext;
-use crate::mcp::ConfiguredMcpServer;
-use crate::mcp::McpServerUrl;
-use crate::namespace_watcher::Namespace;
-use crate::tool::Argument;
-use crate::tool::Modality;
-use crate::tool::ToolError;
-use crate::tool::ToolOutput;
-use crate::tool::toolbox::{ConfiguredNativeTool, Toolbox};
+use crate::{
+    logging::TracingContext,
+    mcp::{ConfiguredMcpServer, McpServerUrl},
+    namespace_watcher::Namespace,
+    tool::{
+        toolbox::{ConfiguredNativeTool, Toolbox},
+        Argument, Modality, ToolError, ToolOutput,
+    },
+};
 
 #[cfg(test)]
 use double_trait::double;
