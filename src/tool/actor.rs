@@ -181,9 +181,15 @@ impl ToolStoreApi for ToolSender {
         receive.await.unwrap()
     }
 
-    async fn native_tool_upsert(&self, _tool: ConfiguredNativeTool) {}
+    async fn native_tool_upsert(&self, tool: ConfiguredNativeTool) {
+        let msg = ToolMsg::UpsertNativeTool { tool };
+        self.0.send(msg).await.unwrap();
+    }
 
-    async fn native_tool_remove(&self, _tool: ConfiguredNativeTool) {}
+    async fn native_tool_remove(&self, tool: ConfiguredNativeTool) {
+        let msg = ToolMsg::RemoveNativeTool { tool };
+        self.0.send(msg).await.unwrap();
+    }
 }
 
 enum ToolMsg {
@@ -206,6 +212,12 @@ enum ToolMsg {
     ListToolServers {
         namespace: Namespace,
         send: oneshot::Sender<Vec<McpServerUrl>>,
+    },
+    UpsertNativeTool {
+        tool: ConfiguredNativeTool,
+    },
+    RemoveNativeTool {
+        tool: ConfiguredNativeTool,
     },
 }
 
@@ -238,9 +250,22 @@ impl McpServerStore {
     }
 }
 
+struct NativeToolStore;
+
+impl NativeToolStore {
+    fn new() -> Self {
+        Self
+    }
+
+    fn upsert(&self, _tool: ConfiguredNativeTool) {}
+
+    fn remove(&self, _tool: ConfiguredNativeTool) {}
+}
+
 struct ToolActor<T: ToolClient> {
     // Map of which MCP servers are configured for which namespace.
     mcp_servers: McpServerStore,
+    native_tools: NativeToolStore,
     receiver: mpsc::Receiver<ToolMsg>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
     client: Arc<T>,
@@ -250,6 +275,7 @@ impl<T: ToolClient> ToolActor<T> {
     fn new(receiver: mpsc::Receiver<ToolMsg>, client: T) -> Self {
         Self {
             mcp_servers: McpServerStore::new(),
+            native_tools: NativeToolStore::new(),
             receiver,
             client: Arc::new(client),
             running_requests: FuturesUnordered::new(),
@@ -310,6 +336,8 @@ impl<T: ToolClient> ToolActor<T> {
                 let result = self.mcp_servers.list_in_namespace(namespace).collect();
                 drop(send.send(result));
             }
+            ToolMsg::UpsertNativeTool { tool } => self.native_tools.upsert(tool),
+            ToolMsg::RemoveNativeTool { tool } => self.native_tools.remove(tool),
         }
     }
 
