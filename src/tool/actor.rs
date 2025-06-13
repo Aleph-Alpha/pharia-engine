@@ -1,8 +1,4 @@
-use futures::{
-    future::join_all,
-    stream::FuturesUnordered,
-    StreamExt,
-};
+use futures::{StreamExt, future::join_all, stream::FuturesUnordered};
 use std::{collections::HashMap, pin::Pin};
 use tokio::{
     select,
@@ -15,8 +11,8 @@ use crate::{
     mcp::{ConfiguredMcpServer, McpServerUrl},
     namespace_watcher::Namespace,
     tool::{
-        toolbox::{ConfiguredNativeTool, Toolbox},
         Argument, Modality, ToolError, ToolOutput,
+        toolbox::{ConfiguredNativeTool, Toolbox},
     },
 };
 
