@@ -1,8 +1,9 @@
 mod actor;
 mod store;
 
-pub use actor::Mcp;
-pub use store::McpServerStore;
+pub use self::{actor::{Mcp, McpApi}, store::McpServerStore};
+#[cfg(test)]
+pub use self::actor::McpDouble;
 
 use crate::namespace_watcher::Namespace;
 use serde::{Deserialize, Serialize};

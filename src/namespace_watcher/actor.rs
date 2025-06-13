@@ -6,7 +6,7 @@ use tokio::{select, task::JoinHandle, time::Duration};
 use tracing::error;
 
 use crate::{
-    mcp::{ConfiguredMcpServer, McpServerUrl},
+    mcp::{ConfiguredMcpServer, McpApi, McpServerUrl},
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
@@ -84,8 +84,9 @@ impl NamespaceWatcher {
     }
 
     pub fn with_config(
-        skill_store_api: impl SkillStoreApi + Send + Sync + 'static,
+        skill_store_api: impl SkillStoreApi + Send + 'static,
         tool_api: impl ToolStoreApi + Send + 'static,
+        mcp_api: impl McpApi + Send + 'static,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
     ) -> Self {
@@ -97,6 +98,7 @@ impl NamespaceWatcher {
                 shutdown_receiver,
                 skill_store_api,
                 tool_api,
+                mcp_api,
                 config,
                 update_interval,
             )
@@ -116,11 +118,12 @@ impl NamespaceWatcher {
     }
 }
 
-struct NamespaceWatcherActor<S, T> {
+struct NamespaceWatcherActor<S, T, M> {
     ready: tokio::sync::watch::Sender<bool>,
     shutdown: tokio::sync::watch::Receiver<bool>,
     skill_store_api: S,
-    mcp_store_api: T,
+    tool_store_api: T,
+    mcp_store_api: M,
     config: Box<dyn ObservableConfig + Send + Sync>,
     update_interval: Duration,
     descriptions: HashMap<Namespace, NamespaceDescription>,
@@ -216,15 +219,17 @@ impl McpServerDiff {
     }
 }
 
-impl<S, M> NamespaceWatcherActor<S, M>
+impl<S, T, M> NamespaceWatcherActor<S, T, M>
 where
     S: SkillStoreApi,
-    M: ToolStoreApi,
+    T: ToolStoreApi,
+    M: McpApi
 {
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
         shutdown: tokio::sync::watch::Receiver<bool>,
         skill_store_api: S,
+        tool_store_api: T,
         mcp_store_api: M,
         config: Box<dyn ObservableConfig + Send + Sync>,
         update_interval: Duration,
@@ -233,6 +238,7 @@ where
             ready,
             shutdown,
             skill_store_api,
+            tool_store_api,
             mcp_store_api,
             config,
             update_interval,
@@ -338,12 +344,20 @@ where
         // propagate mcp server changes
         let mcp_server_diff = McpServerDiff::compute(&existing.mcp_servers, &incoming.mcp_servers);
         for mcp_server in mcp_server_diff.added {
-            self.mcp_store_api
+            self.mcp_store_api.upsert(ConfiguredMcpServer::new(
+                mcp_server.clone(),
+                namespace.clone(),
+            )).await;
+            self.tool_store_api
                 .mcp_upsert(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
                 .await;
         }
         for mcp_server in mcp_server_diff.removed {
-            self.mcp_store_api
+            self.mcp_store_api.remove(ConfiguredMcpServer::new(
+                mcp_server.clone(),
+                namespace.clone(),
+            )).await;
+            self.tool_store_api
                 .mcp_remove(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
                 .await;
         }
@@ -352,7 +366,7 @@ where
         let native_tool_diff =
             NativeToolDiff::compute(&existing.native_tools, &incoming.native_tools);
         for name in native_tool_diff.added {
-            self.mcp_store_api
+            self.tool_store_api
                 .native_tool_upsert(ConfiguredNativeTool {
                     name,
                     namespace: namespace.clone(),
@@ -360,7 +374,7 @@ where
                 .await;
         }
         for name in native_tool_diff.removed {
-            self.mcp_store_api
+            self.tool_store_api
                 .native_tool_remove(ConfiguredNativeTool {
                     name,
                     namespace: namespace.clone(),
@@ -372,22 +386,27 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::collections::HashMap;
-    use std::fs;
-    use std::future::pending;
-    use std::sync::Arc;
+    use std::{
+        collections::HashMap,
+        fs,
+        future::pending,
+        sync::Arc,
+    };
 
     use double_trait::Dummy;
     use futures::executor::block_on;
     use tempfile::tempdir;
-    use tokio::sync::{Mutex, mpsc};
-    use tokio::time::timeout;
+    use tokio::{
+        sync::{mpsc, Mutex},
+        time::timeout,
+    };
 
-    use crate::tool::tests::ToolStoreDouble;
     use crate::{
+        mcp::McpDouble,
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill_store::tests::SkillStoreMsg,
         skills::SkillPath,
+        tool::tests::ToolStoreDouble,
     };
 
     use super::*;
@@ -489,9 +508,9 @@ pub mod tests {
         assert_eq!(diff.removed, vec!["remove_tool_name".to_owned()]);
     }
 
-    pub struct McpServerStoreDummy;
+    pub struct ToolStoreDummy;
 
-    impl ToolStoreDouble for McpServerStoreDummy {}
+    impl ToolStoreDouble for ToolStoreDummy {}
 
     #[test]
     fn diff_is_computed() {
@@ -516,7 +535,7 @@ pub mod tests {
             },
         ];
 
-        let diff = NamespaceWatcherActor::<Dummy, McpServerStoreDummy>::compute_skill_diff(
+        let diff = NamespaceWatcherActor::<Dummy, ToolStoreDummy, Dummy>::compute_skill_diff(
             &existing, &incoming,
         );
 
@@ -544,7 +563,7 @@ pub mod tests {
         };
 
         // When the observer checks for new skills
-        let diff = NamespaceWatcherActor::<Dummy, McpServerStoreDummy>::compute_skill_diff(
+        let diff = NamespaceWatcherActor::<Dummy, ToolStoreDummy, Dummy>::compute_skill_diff(
             &[existing.clone()],
             &[incoming.clone()],
         );
@@ -560,7 +579,7 @@ pub mod tests {
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
         let mut observer =
-            NamespaceWatcher::with_config(Dummy, McpServerStoreDummy, config, update_interval);
+            NamespaceWatcher::with_config(Dummy, ToolStoreDummy, Dummy, config, update_interval);
 
         // When waiting for the first pass
         let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
@@ -647,7 +666,8 @@ pub mod tests {
         let update_interval = Duration::from_millis(update_interval_ms);
         let mut observer = NamespaceWatcher::with_config(
             sender,
-            McpServerStoreDummy,
+            ToolStoreDummy,
+            Dummy,
             stub_config,
             update_interval,
         );
@@ -670,7 +690,7 @@ pub mod tests {
         observer.wait_for_shutdown().await;
     }
 
-    impl<S> NamespaceWatcherActor<S, McpServerStoreDummy>
+    impl<S> NamespaceWatcherActor<S, ToolStoreDummy, Dummy>
     where
         S: SkillStoreApi + Send + Sync,
     {
@@ -685,7 +705,8 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api,
-                mcp_store_api: McpServerStoreDummy,
+                tool_store_api: ToolStoreDummy,
+                mcp_store_api: Dummy,
                 config,
                 update_interval: Duration::from_millis(1),
                 descriptions,
@@ -694,13 +715,15 @@ pub mod tests {
         }
     }
 
-    impl<M> NamespaceWatcherActor<Dummy, M>
+    impl<T, M> NamespaceWatcherActor<Dummy, T, M>
     where
-        M: ToolStoreApi + Send + Sync,
+        T: ToolStoreApi + Send,
+        M: McpApi + Send,
     {
         fn with_tool_store_api(
             descriptions: HashMap<Namespace, NamespaceDescription>,
-            tool_store_api: M,
+            tool_store_api: T,
+            mcp_store_api: M,
             config: Box<dyn ObservableConfig + Send + Sync>,
         ) -> Self {
             let (ready, _) = tokio::sync::watch::channel(false);
@@ -709,7 +732,8 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api: Dummy,
-                mcp_store_api: tool_store_api,
+                tool_store_api,
+                mcp_store_api,
                 config,
                 update_interval: Duration::from_millis(1),
                 descriptions,
@@ -769,14 +793,25 @@ pub mod tests {
         }
     }
 
+    impl McpDouble for McpServerStoreSpy {
+        async fn upsert(&self, server: ConfiguredMcpServer) {
+            self.upserted.lock().await.push(server);
+        }
+
+        async fn remove(&self, server: ConfiguredMcpServer) {
+            self.removed.lock().await.push(server);
+        }
+    }
+
     #[tokio::test]
     async fn new_mcp_server_is_upserted() {
         // Given a namespace description watcher with empty descriptions
         let tool_store = McpServerStoreSpy::new();
+        let mcp_store = McpServerStoreSpy::new();
         let descriptions = HashMap::new();
         let config = Box::new(PendingConfig);
         let mut watcher =
-            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), config);
+            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), mcp_store.clone(), config);
 
         // When observing a namespace with an mcp server
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -795,6 +830,14 @@ pub mod tests {
             upserted,
             vec![ConfiguredMcpServer::new(
                 "http://localhost:8000/mcp",
+                namespace.clone()
+            )]
+        );
+        let upserted = mcp_store.upserted.lock().await.clone();
+        assert_eq!(
+            upserted,
+            vec![ConfiguredMcpServer::new(
+                "http://localhost:8000/mcp",
                 namespace
             )]
         );
@@ -804,6 +847,7 @@ pub mod tests {
     async fn dropped_mcp_server_is_removed() {
         // Given a namespace description watcher and a tool store that both know about an mcp server
         let tool_store = McpServerStoreSpy::new();
+        let mcp_store = McpServerStoreSpy::new();
 
         let namespace = Namespace::new("dummy-namespace").unwrap();
         let descriptions = HashMap::from([(
@@ -816,7 +860,7 @@ pub mod tests {
         )]);
         let config = Box::new(PendingConfig);
         let mut watcher =
-            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), config);
+            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), mcp_store.clone(), config);
 
         // When the watcher observes a namespace with no mcp servers
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -831,6 +875,14 @@ pub mod tests {
 
         // Then the tool store is notified that the mcp server is removed
         let removed = tool_store.removed.lock().await.clone();
+        assert_eq!(
+            removed,
+            vec![ConfiguredMcpServer::new(
+                "http://localhost:8000/mcp",
+                namespace.clone()
+            )]
+        );
+        let removed = mcp_store.removed.lock().await.clone();
         assert_eq!(
             removed,
             vec![ConfiguredMcpServer::new(
@@ -872,7 +924,7 @@ pub mod tests {
         let descriptions = HashMap::new();
         let config = Box::new(PendingConfig);
         let mut watcher =
-            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), config);
+            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), Dummy, config);
 
         // When observing a namespace with a new native_tool
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -913,7 +965,7 @@ pub mod tests {
         )]);
         let config = Box::new(PendingConfig);
         let mut watcher =
-            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), config);
+            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), Dummy, config);
 
         // When the watcher observes a namespace with no native_tools
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -1007,7 +1059,8 @@ pub mod tests {
         let update_interval = Duration::from_millis(update_interval_ms);
         let observer = NamespaceWatcher::with_config(
             sender,
-            McpServerStoreDummy,
+            ToolStoreDummy,
+            Dummy,
             stub_config,
             update_interval,
         );
@@ -1040,7 +1093,7 @@ pub mod tests {
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
         let mut observer =
-            NamespaceWatcher::with_config(sender, McpServerStoreDummy, config, update_interval);
+            NamespaceWatcher::with_config(sender, ToolStoreDummy, Dummy, config, update_interval);
         observer.wait_for_ready().await;
         receiver.recv().await.unwrap();
 

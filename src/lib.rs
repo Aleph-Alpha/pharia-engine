@@ -123,6 +123,7 @@ impl Kernel {
         let mut namespace_watcher = NamespaceWatcher::with_config(
             skill_store.api(),
             tool.api(),
+            mcp.api(),
             loaders,
             app_config.namespace_update_interval(),
         );
