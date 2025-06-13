@@ -7,7 +7,6 @@ use tokio::select;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use tracing::info;
 
 use crate::logging::TracingContext;
 use crate::namespace_watcher::Namespace;
@@ -229,14 +228,12 @@ impl<T: ToolClient> ToolActor<T> {
                 tracing_context,
                 send,
             } => {
-                let client = self.toolbox.client.clone();
-                let servers = self
-                    .toolbox
-                    .list_mcp_servers_in_namespace(&namespace)
-                    .collect();
+                let tool = self.toolbox.fetch_tool(namespace, &request.name);
                 self.running_requests.push(Box::pin(async move {
-                    let result =
-                        Self::invoke_tool(client.as_ref(), servers, request, tracing_context).await;
+                    let result = tool
+                        .expect("Can never returned None until the Toolbox is caching the tool")
+                        .invoke(request.arguments, tracing_context)
+                        .await;
                     drop(send.send(result));
                 }));
             }
@@ -274,30 +271,6 @@ impl<T: ToolClient> ToolActor<T> {
         }
     }
 
-    /// Invoke a tool and return the result.
-    ///
-    /// First, we need to locate the server on which the tool is hosted.
-    /// Then, we invoke the tool on that server.
-    async fn invoke_tool(
-        client: &impl ToolClient,
-        servers: Vec<McpServerUrl>,
-        request: InvokeRequest,
-        tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError> {
-        let mcp_address = Self::server_for_tool(client, servers, &request.name)
-            .await
-            .ok_or(ToolError::ToolNotFound(request.name.clone()))
-            .inspect_err(|e| info!(parent: tracing_context.span(), "{}", e))?;
-        client
-            .invoke_tool(
-                &request.name,
-                request.arguments,
-                &mcp_address,
-                tracing_context,
-            )
-            .await
-    }
-
     /// Returns all tools found on any of the configured tool servers.
     ///
     /// We do not return a result here, but ignore MCP servers that are giving errors.
@@ -317,23 +290,6 @@ impl<T: ToolClient> ToolActor<T> {
             .into_iter()
             .filter_map(|(address, result)| result.ok().map(|tools| (address, tools)))
             .collect()
-    }
-
-    /// Return the server that hosts a particular tool, or None if the tool can not be found.
-    ///
-    /// We do not return a result here, but ignore MCP servers that are giving errors.
-    async fn server_for_tool(
-        client: &impl ToolClient,
-        servers: Vec<McpServerUrl>,
-        tool: &str,
-    ) -> Option<McpServerUrl> {
-        let all_tools = Self::tools(client, servers).await;
-        for (address, tools) in &all_tools {
-            if tools.contains(&tool.to_owned()) {
-                return Some(address.clone());
-            }
-        }
-        None
     }
 }
 
