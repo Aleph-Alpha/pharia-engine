@@ -26,8 +26,11 @@ impl<T> Toolbox<T> {
         }
     }
 
-    pub fn fetch_tool(&self, namespace: Namespace, name: &str) -> Arc<dyn Tool> {
-        Arc::new(McpTool)
+    pub fn fetch_tool(&self, namespace: Namespace, name: &str) -> Arc<dyn Tool>
+    where
+        T: 'static,
+    {
+        Arc::new(McpTool::new(name.to_owned(), self.client.clone()))
     }
 
     pub fn list_mcp_servers_in_namespace(
@@ -66,9 +69,18 @@ where
     }
 }
 
-struct McpTool;
+struct McpTool<C> {
+    name: String,
+    client: Arc<C>,
+}
 
-impl Tool for McpTool {
+impl<C> McpTool<C> {
+    pub fn new(name: String, client: Arc<C>) -> Self {
+        Self { name, client }
+    }
+}
+
+impl<C> Tool for McpTool<C> {
     fn invoke(&self) -> Result<Vec<Modality>, ToolError> {
         Ok(vec![Modality::Text {
             text: "success".to_string(),
