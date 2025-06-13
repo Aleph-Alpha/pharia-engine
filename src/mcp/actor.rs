@@ -1,4 +1,7 @@
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 
 #[cfg(test)]
 use double_trait::double;
@@ -46,19 +49,35 @@ pub struct McpSender(mpsc::Sender<McpMsg>);
 
 impl McpApi for McpSender {
     async fn mcp_upsert(&self, server: ConfiguredMcpServer) {
-        todo!()
+        let msg = McpMsg::Upsert { server };
+        self.0.send(msg).await.unwrap();
     }
 
     async fn mcp_remove(&self, server: ConfiguredMcpServer) {
-        todo!()
+        let msg = McpMsg::Remove { server };
+        self.0.send(msg).await.unwrap();
     }
 
     async fn mcp_list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
-        todo!()
+        let (send, receive) = oneshot::channel();
+        let msg = McpMsg::List { namespace, send };
+        self.0.send(msg).await.unwrap();
+        receive.await.unwrap()
     }
 }
 
-enum McpMsg {}
+enum McpMsg {
+    Upsert {
+        server: ConfiguredMcpServer,
+    },
+    Remove {
+        server: ConfiguredMcpServer,
+    },
+    List {
+        namespace: Namespace,
+        send: oneshot::Sender<Vec<McpServerUrl>>,
+    },
+}
 
 struct McpActor {
     receiver: mpsc::Receiver<McpMsg>,
@@ -80,7 +99,13 @@ impl McpActor {
     }
 
     fn act(&mut self, msg: McpMsg) {
-        match msg {}
+        match msg {
+            McpMsg::Upsert { server } => todo!(),
+            McpMsg::Remove { server } => todo!(),
+            McpMsg::List { namespace, send } => {
+                send.send(vec![]).unwrap();
+            }
+        }
     }
 }
 
@@ -88,4 +113,16 @@ impl McpActor {
 pub mod tests {
 
     use super::*;
+
+    #[tokio::test]
+    async fn list_mcp_servers_none_configured() {
+        // Given a MCP API that knows about no mcp servers
+        let mcp = Mcp::new().api();
+
+        // When listing mcp servers for a namespace
+        let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
+
+        // Then we get an empty list
+        assert!(result.is_empty());
+    }
 }
