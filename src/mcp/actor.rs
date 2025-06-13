@@ -15,8 +15,8 @@ use crate::{
 #[cfg_attr(test, double(McpDouble))]
 #[allow(dead_code)]
 pub trait McpApi {
-    fn mcp_upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
-    fn mcp_remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
+    fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
+    fn remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn mcp_list(&self, namespace: Namespace) -> impl Future<Output = Vec<McpServerUrl>> + Send;
 }
 
@@ -50,12 +50,12 @@ impl Mcp {
 pub struct McpSender(mpsc::Sender<McpMsg>);
 
 impl McpApi for McpSender {
-    async fn mcp_upsert(&self, server: ConfiguredMcpServer) {
+    async fn upsert(&self, server: ConfiguredMcpServer) {
         let msg = McpMsg::Upsert { server };
         self.0.send(msg).await.unwrap();
     }
 
-    async fn mcp_remove(&self, server: ConfiguredMcpServer) {
+    async fn remove(&self, server: ConfiguredMcpServer) {
         let msg = McpMsg::Remove { server };
         self.0.send(msg).await.unwrap();
     }
@@ -143,7 +143,7 @@ pub mod tests {
         let mcp = Mcp::new().api();
 
         // When upserting mcp server for the namespace
-        mcp.mcp_upsert(ConfiguredMcpServer::new(
+        mcp.upsert(ConfiguredMcpServer::new(
             "http://localhost:8000/mcp",
             Namespace::new("test").unwrap(),
         ))
@@ -162,14 +162,14 @@ pub mod tests {
     async fn removed_server_is_not_listed() {
         // Given a MCP API that knows about one mcp server
         let mcp = Mcp::new().api();
-        mcp.mcp_upsert(ConfiguredMcpServer::new(
+        mcp.upsert(ConfiguredMcpServer::new(
             "http://localhost:8000/mcp",
             Namespace::new("test").unwrap(),
         ))
         .await;
 
         // When removing the mcp server
-        mcp.mcp_remove(ConfiguredMcpServer::new(
+        mcp.remove(ConfiguredMcpServer::new(
             "http://localhost:8000/mcp",
             Namespace::new("test").unwrap(),
         ))
