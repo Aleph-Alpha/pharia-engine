@@ -5,12 +5,13 @@ use crate::{
     csi::CsiDrivers,
     csi_shell::CsiProvider,
     inference::InferenceSender,
+    mcp::{McpSender, McpServerStoreProvider},
     search::SearchSender,
     shell::AppState,
     skill_runtime::{SkillRuntimeMsg, SkillRuntimeProvider},
     skill_store::{SkillStoreMsg, SkillStoreProvider},
     tokenizers::TokenizerSender,
-    tool::{McpServerStoreProvider, ToolProvider, ToolSender},
+    tool::{ToolProvider, ToolSender},
 };
 
 type CsiDriversImpl = CsiDrivers<InferenceSender, SearchSender, TokenizerSender, ToolSender>;
@@ -20,6 +21,7 @@ pub struct ShellState {
     skill_runtime: mpsc::Sender<SkillRuntimeMsg>,
     skill_store: mpsc::Sender<SkillStoreMsg>,
     authorization: mpsc::Sender<AuthorizationMsg>,
+    mcp_server_store: McpSender,
     csi_drivers: CsiDriversImpl,
 }
 
@@ -28,12 +30,14 @@ impl ShellState {
         skill_runtime: mpsc::Sender<SkillRuntimeMsg>,
         skill_store: mpsc::Sender<SkillStoreMsg>,
         authorization: mpsc::Sender<AuthorizationMsg>,
+        mcp_server_store: McpSender,
         csi_drivers: CsiDriversImpl,
     ) -> Self {
         Self {
             skill_runtime,
             skill_store,
             authorization,
+            mcp_server_store,
             csi_drivers,
         }
     }
@@ -82,12 +86,10 @@ impl ToolProvider for ShellState {
 }
 
 impl McpServerStoreProvider for ShellState {
-    type McpServerStore = ToolSender;
+    type McpServerStore = McpSender;
 
     fn mcp_server_store(&self) -> &Self::McpServerStore {
-        // The tool actor is used to  list mcp servers for the shell as well as implementing tool
-        // calling for the CSI.
-        &self.csi_drivers.tool
+        &self.mcp_server_store
     }
 }
 
