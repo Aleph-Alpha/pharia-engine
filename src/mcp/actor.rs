@@ -13,6 +13,7 @@ use crate::{
 
 /// CSI facing interface, allows to invoke and list tools
 #[cfg_attr(test, double(McpDouble))]
+#[allow(dead_code)]
 pub trait McpApi {
     fn mcp_upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn mcp_remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
@@ -32,6 +33,7 @@ impl Mcp {
         Self { handle, send }
     }
 
+    #[allow(dead_code)]
     pub fn api(&self) -> McpSender {
         McpSender(self.send.clone())
     }

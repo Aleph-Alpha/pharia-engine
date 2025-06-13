@@ -25,27 +25,26 @@ impl<T> Toolbox<T> {
         }
     }
 
-    fn mcp_server_for_tool(
+    async fn mcp_server_for_tool(
         urls: Vec<McpServerUrl>,
         client: Arc<T>,
         name: String,
-    ) -> impl Future<Output = Option<McpServerUrl>> + Send + Sync
+    ) -> Option<McpServerUrl>
     where
         T: ToolClient + 'static,
     {
-        async move {
-            for url in urls {
-                if let Ok(tools) = client.list_tools(&url).await {
-                    if tools.contains(&name) {
-                        return Some(url);
-                    }
+        for url in urls {
+            if let Ok(tools) = client.list_tools(&url).await {
+                if tools.contains(&name) {
+                    return Some(url);
                 }
             }
-
-            None
         }
+
+        None
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     pub fn fetch_tool(
         &self,
         namespace: Namespace,
