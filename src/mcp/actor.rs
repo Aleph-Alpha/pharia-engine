@@ -7,7 +7,7 @@ use tokio::{
 use double_trait::double;
 
 use crate::{
-    mcp::{ConfiguredMcpServer, McpServerUrl},
+    mcp::{ConfiguredMcpServer, McpServerStore, McpServerUrl},
     namespace_watcher::Namespace,
 };
 
@@ -80,12 +80,16 @@ enum McpMsg {
 }
 
 struct McpActor {
+    store: McpServerStore,
     receiver: mpsc::Receiver<McpMsg>,
 }
 
 impl McpActor {
     fn new(receiver: mpsc::Receiver<McpMsg>) -> Self {
-        Self { receiver }
+        Self {
+            store: McpServerStore::new(),
+            receiver,
+        }
     }
 
     async fn run(&mut self) {
@@ -100,10 +104,15 @@ impl McpActor {
 
     fn act(&mut self, msg: McpMsg) {
         match msg {
-            McpMsg::Upsert { server } => todo!(),
-            McpMsg::Remove { server } => todo!(),
+            McpMsg::Upsert { server } => {
+                self.store.upsert(server.namespace, server.url);
+            }
+            McpMsg::Remove { server } => {
+                self.store.remove(server.namespace, server.url);
+            }
             McpMsg::List { namespace, send } => {
-                send.send(vec![]).unwrap();
+                let result = self.store.list_in_namespace(&namespace).collect();
+                drop(send.send(result));
             }
         }
     }
@@ -124,5 +133,48 @@ pub mod tests {
 
         // Then we get an empty list
         assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn upserted_server_is_listed() {
+        // Given a MCP API that knows about no mcp servers
+        let mcp = Mcp::new().api();
+
+        // When upserting mcp server for the namespace
+        mcp.mcp_upsert(ConfiguredMcpServer::new(
+            "http://localhost:8000/mcp",
+            Namespace::new("test").unwrap(),
+        ))
+        .await;
+
+        // Then we get an empty list for a namespace that does not have a mcp server
+        let result = mcp.mcp_list(Namespace::new("not-existing").unwrap()).await;
+        assert_eq!(result, vec![]);
+
+        // Then we get the mcp server
+        let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
+        assert_eq!(result, vec![McpServerUrl::new("http://localhost:8000/mcp")]);
+    }
+
+    #[tokio::test]
+    async fn removed_server_is_not_listed() {
+        // Given a MCP API that knows about one mcp server
+        let mcp = Mcp::new().api();
+        mcp.mcp_upsert(ConfiguredMcpServer::new(
+            "http://localhost:8000/mcp",
+            Namespace::new("test").unwrap(),
+        ))
+        .await;
+
+        // When removing the mcp server
+        mcp.mcp_remove(ConfiguredMcpServer::new(
+            "http://localhost:8000/mcp",
+            Namespace::new("test").unwrap(),
+        ))
+        .await;
+
+        // Then we get an empty list
+        let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
+        assert_eq!(result, vec![]);
     }
 }
