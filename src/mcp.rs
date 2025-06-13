@@ -1,9 +1,14 @@
 mod actor;
+mod routes;
 mod store;
 
-pub use self::{actor::{Mcp, McpApi}, store::McpServerStore};
 #[cfg(test)]
 pub use self::actor::McpDouble;
+pub use self::{
+    actor::{Mcp, McpApi, McpSender},
+    routes::{McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
+    store::McpServerStore,
+};
 
 use crate::namespace_watcher::Namespace;
 use serde::{Deserialize, Serialize};

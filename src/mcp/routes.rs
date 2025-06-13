@@ -5,12 +5,16 @@ use axum::{
 };
 use utoipa::OpenApi;
 
-use crate::{FeatureSet, mcp::McpServerUrl, namespace_watcher::Namespace, tool::ToolStoreApi};
+use crate::{
+    FeatureSet,
+    mcp::{McpApi, McpServerUrl},
+    namespace_watcher::Namespace,
+};
 
 pub fn http_mcp_servers_v1<T>(feature_set: FeatureSet) -> Router<T>
 where
     T: Send + Sync + Clone + McpServerStoreProvider + 'static,
-    T::McpServerStore: ToolStoreApi + Send + Clone,
+    T::McpServerStore: McpApi + Send + Clone,
 {
     // Additional routes for beta features, please keep them in sync with the API documentation.
     if feature_set == FeatureSet::Beta {
@@ -22,19 +26,19 @@ where
 
 pub fn openapi_mcp_servers_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
     if feature_set == FeatureSet::Beta {
-        ToolOpenApiDocBeta::openapi()
+        McpOpenApiDocBeta::openapi()
     } else {
-        ToolOpenApiDoc::openapi()
+        McpOpenApiDoc::openapi()
     }
 }
 
 #[derive(OpenApi)]
 #[openapi(paths())]
-struct ToolOpenApiDoc;
+struct McpOpenApiDoc;
 
 #[derive(OpenApi)]
 #[openapi(paths(list_mcp_servers))]
-struct ToolOpenApiDocBeta;
+struct McpOpenApiDocBeta;
 
 pub trait McpServerStoreProvider {
     type McpServerStore;
@@ -71,7 +75,7 @@ async fn list_mcp_servers<M>(
     State(McpServerStoreState(mcp_servers)): State<McpServerStoreState<M>>,
 ) -> Json<Vec<McpServerUrl>>
 where
-    M: ToolStoreApi,
+    M: McpApi,
 {
     let servers = mcp_servers.mcp_list(namespace).await;
     Json(servers)
@@ -85,7 +89,7 @@ mod tests {
     use tower::ServiceExt as _;
 
     use super::{McpServerStoreProvider, McpServerUrl, http_mcp_servers_v1};
-    use crate::{FeatureSet, namespace_watcher::Namespace, tool::actor::ToolStoreDouble};
+    use crate::{FeatureSet, mcp::McpDouble, namespace_watcher::Namespace};
 
     #[derive(Clone)]
     struct ProviderStub<T> {
@@ -110,7 +114,7 @@ mod tests {
     async fn list_mcp_servers_by_namespace() {
         #[derive(Clone)]
         struct McpServerMock;
-        impl ToolStoreDouble for McpServerMock {
+        impl McpDouble for McpServerMock {
             async fn mcp_list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
                 vec![McpServerUrl("http://localhost:8083/mcp".to_owned())]

@@ -42,6 +42,7 @@ use crate::{
     csi_shell::{self, CsiProvider},
     feature_set::FeatureSet,
     logging::TracingContext,
+    mcp::{McpApi, McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
     namespace_watcher::Namespace,
     skill_runtime::{
         SkillRuntimeApi, SkillRuntimeProvider, http_skill_runtime_v1, openapi_skill_runtime_v1,
@@ -50,10 +51,7 @@ use crate::{
         SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
         openapi_skill_store_v1,
     },
-    tool::{
-        McpServerStoreProvider, ToolApi, ToolProvider, ToolStoreApi, http_mcp_servers_v1,
-        http_tools_v1, openapi_mcp_servers_v1, openapi_tools_v1,
-    },
+    tool::{ToolApi, ToolProvider, http_tools_v1, openapi_tools_v1},
 };
 
 pub use self::state::ShellState;
@@ -77,7 +75,7 @@ impl Shell {
         T::Authorization: AuthorizationApi + Clone + Send + Sync + 'static,
         T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
         T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
-        T::McpServerStore: ToolStoreApi + Clone + Send + Sync + 'static,
+        T::McpServerStore: McpApi + Clone + Send + Sync + 'static,
         T::Tool: ToolApi + Clone + Send + Sync + 'static,
     {
         let addr = addr.into();
@@ -119,7 +117,7 @@ where
     T: AppState + Clone + Send + Sync + 'static,
     T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
-    T::McpServerStore: ToolStoreApi + Clone + Send + Sync + 'static,
+    T::McpServerStore: McpApi + Clone + Send + Sync + 'static,
     T::Tool: ToolApi + Clone + Send + Sync + 'static,
 {
     Router::new()
@@ -152,7 +150,7 @@ where
     T::Csi: RawCsi + Clone + Sync + Send + 'static,
     T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
-    T::McpServerStore: ToolStoreApi + Clone + Send + Sync + 'static,
+    T::McpServerStore: McpApi + Clone + Send + Sync + 'static,
     T::Tool: ToolApi + Clone + Send + Sync + 'static,
 {
     let api_docs = open_api_docs(feature_set);

@@ -223,7 +223,7 @@ impl<S, T, M> NamespaceWatcherActor<S, T, M>
 where
     S: SkillStoreApi,
     T: ToolStoreApi,
-    M: McpApi
+    M: McpApi,
 {
     fn new(
         ready: tokio::sync::watch::Sender<bool>,
@@ -344,19 +344,23 @@ where
         // propagate mcp server changes
         let mcp_server_diff = McpServerDiff::compute(&existing.mcp_servers, &incoming.mcp_servers);
         for mcp_server in mcp_server_diff.added {
-            self.mcp_store_api.upsert(ConfiguredMcpServer::new(
-                mcp_server.clone(),
-                namespace.clone(),
-            )).await;
+            self.mcp_store_api
+                .upsert(ConfiguredMcpServer::new(
+                    mcp_server.clone(),
+                    namespace.clone(),
+                ))
+                .await;
             self.tool_store_api
                 .mcp_upsert(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
                 .await;
         }
         for mcp_server in mcp_server_diff.removed {
-            self.mcp_store_api.remove(ConfiguredMcpServer::new(
-                mcp_server.clone(),
-                namespace.clone(),
-            )).await;
+            self.mcp_store_api
+                .remove(ConfiguredMcpServer::new(
+                    mcp_server.clone(),
+                    namespace.clone(),
+                ))
+                .await;
             self.tool_store_api
                 .mcp_remove(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
                 .await;
@@ -386,18 +390,13 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::{
-        collections::HashMap,
-        fs,
-        future::pending,
-        sync::Arc,
-    };
+    use std::{collections::HashMap, fs, future::pending, sync::Arc};
 
     use double_trait::Dummy;
     use futures::executor::block_on;
     use tempfile::tempdir;
     use tokio::{
-        sync::{mpsc, Mutex},
+        sync::{Mutex, mpsc},
         time::timeout,
     };
 
@@ -810,8 +809,12 @@ pub mod tests {
         let mcp_store = McpServerStoreSpy::new();
         let descriptions = HashMap::new();
         let config = Box::new(PendingConfig);
-        let mut watcher =
-            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), mcp_store.clone(), config);
+        let mut watcher = NamespaceWatcherActor::with_tool_store_api(
+            descriptions,
+            tool_store.clone(),
+            mcp_store.clone(),
+            config,
+        );
 
         // When observing a namespace with an mcp server
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -859,8 +862,12 @@ pub mod tests {
             },
         )]);
         let config = Box::new(PendingConfig);
-        let mut watcher =
-            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), mcp_store.clone(), config);
+        let mut watcher = NamespaceWatcherActor::with_tool_store_api(
+            descriptions,
+            tool_store.clone(),
+            mcp_store.clone(),
+            config,
+        );
 
         // When the watcher observes a namespace with no mcp servers
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -923,8 +930,12 @@ pub mod tests {
         let tool_store = NativeToolStoreSpy::new();
         let descriptions = HashMap::new();
         let config = Box::new(PendingConfig);
-        let mut watcher =
-            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), Dummy, config);
+        let mut watcher = NamespaceWatcherActor::with_tool_store_api(
+            descriptions,
+            tool_store.clone(),
+            Dummy,
+            config,
+        );
 
         // When observing a namespace with a new native_tool
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -964,8 +975,12 @@ pub mod tests {
             },
         )]);
         let config = Box::new(PendingConfig);
-        let mut watcher =
-            NamespaceWatcherActor::with_tool_store_api(descriptions, tool_store.clone(), Dummy, config);
+        let mut watcher = NamespaceWatcherActor::with_tool_store_api(
+            descriptions,
+            tool_store.clone(),
+            Dummy,
+            config,
+        );
 
         // When the watcher observes a namespace with no native_tools
         let namespace = Namespace::new("dummy-namespace").unwrap();

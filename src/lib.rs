@@ -137,6 +137,7 @@ impl Kernel {
             skill_runtime.api(),
             skill_store.api(),
             authorization.api(),
+            mcp.api(),
             csi_drivers.clone(),
         );
 
