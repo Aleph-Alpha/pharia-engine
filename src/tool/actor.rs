@@ -8,7 +8,7 @@ use tokio::{
 
 use crate::{
     logging::TracingContext,
-    mcp::{ConfiguredMcpServer, McpServerUrl},
+    mcp::{ConfiguredMcpServer, McpClient, McpServerUrl, ToolClient},
     namespace_watcher::Namespace,
     tool::{
         Argument, Modality, ToolError, ToolOutput,
@@ -18,8 +18,6 @@ use crate::{
 
 #[cfg(test)]
 use double_trait::double;
-
-use super::client::McpClient;
 
 /// Interact with tool server storage.
 ///
@@ -260,22 +258,6 @@ pub struct InvokeRequest {
     pub arguments: Vec<Argument>,
 }
 
-#[cfg_attr(test, double(ToolClientDouble))]
-pub trait ToolClient: Send + Sync + 'static {
-    fn invoke_tool(
-        &self,
-        name: &str,
-        arguments: Vec<Argument>,
-        url: &McpServerUrl,
-        tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<Vec<Modality>, ToolError>> + Send;
-
-    fn list_tools(
-        &self,
-        url: &McpServerUrl,
-    ) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send + Sync;
-}
-
 #[cfg(test)]
 pub mod tests {
     use core::panic;
@@ -286,6 +268,7 @@ pub mod tests {
 
     use crate::{
         logging::TracingContext,
+        mcp::ToolClientDouble,
         tool::{ToolRuntime, actor::ToolStoreApi},
     };
 
