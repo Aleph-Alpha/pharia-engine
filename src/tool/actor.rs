@@ -8,7 +8,7 @@ use tokio::{
 
 use crate::{
     logging::TracingContext,
-    mcp::{ConfiguredMcpServer, McpServerUrl},
+    mcp::{ConfiguredMcpServer, McpClient, McpServerUrl},
     namespace_watcher::Namespace,
     tool::{
         Argument, Modality, ToolError, ToolOutput,
@@ -18,8 +18,6 @@ use crate::{
 
 #[cfg(test)]
 use double_trait::double;
-
-use super::client::McpClient;
 
 /// Interact with tool server storage.
 ///

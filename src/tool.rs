@@ -1,5 +1,4 @@
 mod actor;
-mod client;
 mod tool_routes;
 mod toolbox;
 
@@ -9,7 +8,7 @@ use serde::Deserialize;
 use crate::logging::TracingContext;
 
 pub use self::{
-    actor::{InvokeRequest, ToolApi, ToolRuntime, ToolSender, ToolStoreApi},
+    actor::{InvokeRequest, ToolApi, ToolClient, ToolRuntime, ToolSender, ToolStoreApi},
     tool_routes::{ToolProvider, http_tools_v1, openapi_tools_v1},
     toolbox::ConfiguredNativeTool,
 };

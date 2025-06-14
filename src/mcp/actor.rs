@@ -1,3 +1,6 @@
+use std::collections::{HashMap, HashSet};
+
+use itertools::Itertools;
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
@@ -7,8 +10,9 @@ use tokio::{
 use double_trait::double;
 
 use crate::{
-    mcp::{ConfiguredMcpServer, McpServerStore, McpServerUrl},
+    mcp::{ConfiguredMcpServer, McpClient, McpServerStore, McpServerUrl},
     namespace_watcher::Namespace,
+    tool::ToolClient,
 };
 
 /// CSI facing interface, allows to invoke and list tools
@@ -18,6 +22,7 @@ pub trait McpApi {
     fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn mcp_list(&self, namespace: Namespace) -> impl Future<Output = Vec<McpServerUrl>> + Send;
+    fn list_tools(&self, namespace: Namespace) -> impl Future<Output = Vec<String>> + Send;
 }
 
 pub struct Mcp {
@@ -66,6 +71,13 @@ impl McpApi for McpSender {
         self.0.send(msg).await.unwrap();
         receive.await.unwrap()
     }
+
+    async fn list_tools(&self, namespace: Namespace) -> Vec<String> {
+        let (send, receive) = oneshot::channel();
+        let msg = McpMsg::ListTools { namespace, send };
+        self.0.send(msg).await.unwrap();
+        receive.await.unwrap()
+    }
 }
 
 enum McpMsg {
@@ -79,10 +91,16 @@ enum McpMsg {
         namespace: Namespace,
         send: oneshot::Sender<Vec<McpServerUrl>>,
     },
+    ListTools {
+        namespace: Namespace,
+        send: oneshot::Sender<Vec<String>>,
+    },
 }
 
 struct McpActor {
     store: McpServerStore,
+    tools: HashMap<McpServerUrl, HashSet<String>>,
+    client: McpClient,
     receiver: mpsc::Receiver<McpMsg>,
 }
 
@@ -90,6 +108,8 @@ impl McpActor {
     fn new(receiver: mpsc::Receiver<McpMsg>) -> Self {
         Self {
             store: McpServerStore::new(),
+            tools: HashMap::new(),
+            client: McpClient::new(),
             receiver,
         }
     }
@@ -98,16 +118,21 @@ impl McpActor {
         loop {
             let msg = self.receiver.recv().await;
             match msg {
-                Some(msg) => self.act(msg),
+                Some(msg) => self.act(msg).await,
                 None => break,
             }
         }
     }
 
-    fn act(&mut self, msg: McpMsg) {
+    async fn act(&mut self, msg: McpMsg) {
         match msg {
             McpMsg::Upsert { server } => {
-                self.store.upsert(server.namespace, server.url);
+                self.store.upsert(server.namespace, server.url.clone());
+                if let Ok(tools) = self.client.list_tools(&server.url).await {
+                    self.tools.insert(server.url, tools.into_iter().collect());
+                } else {
+                    self.tools.remove(&server.url);
+                }
             }
             McpMsg::Remove { server } => {
                 self.store.remove(server.namespace, server.url);
@@ -115,6 +140,15 @@ impl McpActor {
             McpMsg::List { namespace, send } => {
                 let result = self.store.list_in_namespace(&namespace).collect();
                 drop(send.send(result));
+            }
+            McpMsg::ListTools { namespace, send } => {
+                let urls = self.store.list_in_namespace(&namespace).collect::<Vec<_>>();
+                let tools = urls
+                    .iter()
+                    .flat_map(|url| self.tools.get(url).cloned().unwrap_or_default())
+                    .sorted()
+                    .collect();
+                drop(send.send(tools));
             }
         }
     }
@@ -124,6 +158,8 @@ impl McpActor {
 pub mod tests {
 
     use std::collections::HashSet;
+
+    use test_skills::given_sse_mcp_server;
 
     use super::*;
 
@@ -246,5 +282,23 @@ pub mod tests {
             "http://localhost:8001/mcp".into(),
         ]);
         assert_eq!(result, expected);
+    }
+
+    #[tokio::test]
+    async fn cache_tools_on_upsert() {
+        // Given a MCP Server
+        let mcp_server = given_sse_mcp_server().await;
+
+        // Given a MCP actor
+        let mcp = Mcp::new().api();
+
+        // When adding the MCP server for a namespace
+        let namespace = Namespace::new("test").unwrap();
+        let server = ConfiguredMcpServer::new(mcp_server.address(), namespace.clone());
+        mcp.upsert(server).await;
+
+        // Then the tools from the MCP server are listed
+        let tools = mcp.list_tools(namespace).await;
+        assert_eq!(tools, vec!["add", "saboteur"]);
     }
 }

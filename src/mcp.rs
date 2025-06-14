@@ -1,4 +1,5 @@
 mod actor;
+mod client;
 mod routes;
 mod store;
 
@@ -6,6 +7,7 @@ mod store;
 pub use self::actor::McpDouble;
 pub use self::{
     actor::{Mcp, McpApi, McpSender},
+    client::McpClient,
     routes::{McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
     store::McpServerStore,
 };

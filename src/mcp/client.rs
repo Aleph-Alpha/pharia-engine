@@ -10,12 +10,10 @@ use tracing::info;
 use crate::context;
 use crate::logging::TracingContext;
 use crate::mcp::McpServerUrl;
-use crate::tool::{Argument, Modality, ToolOutput};
+use crate::tool::{Argument, Modality, ToolClient, ToolError, ToolOutput};
 
 use reqwest::Client;
 use serde_json::{Value, json};
-
-use super::{ToolError, actor::ToolClient};
 
 pub struct McpClient {
     client: Client,
