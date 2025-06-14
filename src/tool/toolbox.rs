@@ -4,9 +4,9 @@ use async_trait::async_trait;
 
 use crate::{
     logging::TracingContext,
-    mcp::{McpServerStore, McpServerUrl},
+    mcp::{McpServerStore, McpServerUrl, ToolClient},
     namespace_watcher::Namespace,
-    tool::{Argument, Modality, Tool, ToolError, actor::ToolClient},
+    tool::{Argument, Modality, Tool, ToolError},
 };
 
 pub struct Toolbox<T> {
@@ -145,7 +145,7 @@ impl NativeToolStore {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::tool::actor::ToolClientDouble;
+    use crate::mcp::ToolClientDouble;
 
     use super::*;
 

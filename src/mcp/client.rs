@@ -1,21 +1,20 @@
 use anyhow::anyhow;
 use futures::StreamExt;
-use reqwest::Response;
-use reqwest::header;
+use reqwest::{Client, Response, header};
 use serde::Deserialize;
-use std::collections::HashMap;
-use tracing::error;
-use tracing::info;
-
-use crate::context;
-use crate::logging::TracingContext;
-use crate::mcp::McpServerUrl;
-use crate::tool::{Argument, Modality, ToolOutput};
-
-use reqwest::Client;
 use serde_json::{Value, json};
+use std::collections::HashMap;
+use tracing::{error, info};
 
-use super::{ToolError, actor::ToolClient};
+use crate::{
+    context,
+    logging::TracingContext,
+    mcp::McpServerUrl,
+    tool::{Argument, Modality, ToolError, ToolOutput},
+};
+
+#[cfg(test)]
+use double_trait::double;
 
 pub struct McpClient {
     client: Client,
@@ -47,6 +46,22 @@ impl McpClient {
             Ok(result.content)
         }
     }
+}
+
+#[cfg_attr(test, double(ToolClientDouble))]
+pub trait ToolClient: Send + Sync + 'static {
+    fn invoke_tool(
+        &self,
+        name: &str,
+        arguments: Vec<Argument>,
+        url: &McpServerUrl,
+        tracing_context: TracingContext,
+    ) -> impl Future<Output = Result<Vec<Modality>, ToolError>> + Send;
+
+    fn list_tools(
+        &self,
+        url: &McpServerUrl,
+    ) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send + Sync;
 }
 
 impl ToolClient for McpClient {

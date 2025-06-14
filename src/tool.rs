@@ -1,5 +1,4 @@
 mod actor;
-mod client;
 mod tool_routes;
 mod toolbox;
 
