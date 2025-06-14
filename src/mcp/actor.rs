@@ -301,4 +301,23 @@ pub mod tests {
         let tools = mcp.list_tools(namespace).await;
         assert_eq!(tools, vec!["add", "saboteur"]);
     }
+
+    #[tokio::test]
+    async fn remove_server_unlist_tools() {
+        // Given a MCP Server
+        let mcp_server = given_sse_mcp_server().await;
+
+        // Given a MCP actor with the MCP server for a namespace
+        let mcp = Mcp::new().api();
+        let namespace = Namespace::new("test").unwrap();
+        let server = ConfiguredMcpServer::new(mcp_server.address(), namespace.clone());
+        mcp.upsert(server.clone()).await;
+
+        // When removing the MCP server for a namespace
+        mcp.remove(server).await;
+
+        // Then the tools from the MCP server are removed
+        let tools = mcp.list_tools(namespace).await;
+        assert!(tools.is_empty());
+    }
 }
