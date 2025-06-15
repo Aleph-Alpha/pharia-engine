@@ -85,7 +85,7 @@ where
     C: McpClient,
 {
     async fn invoke(
-        self: Box<Self>,
+        &self,
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
     ) -> Result<Vec<Modality>, ToolError> {
