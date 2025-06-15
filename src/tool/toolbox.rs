@@ -122,12 +122,9 @@ where
     ) -> Result<Vec<Modality>, ToolError> {
         self.client
             .invoke_tool(
-                &self.name,
+                &self.desc.name,
                 arguments,
-                &self
-                    .url
-                    .await
-                    .ok_or_else(|| ToolError::ToolNotFound(self.name.clone()))?,
+                &self.desc.server,
                 tracing_context,
             )
             .await
@@ -233,16 +230,10 @@ pub mod tests {
                 McpServerUrl::from("http://localhost:8080"),
             )
             .await;
-        let tool = toolbox
+        let maybe_tool = toolbox
             .fetch_tool(Namespace::dummy(), "test")
-            .await
-            .unwrap();
-        let result = tool.invoke(vec![], TracingContext::dummy()).await;
+            .await;
 
-        assert!(matches!(
-            result,
-            Err(ToolError::ToolNotFound(tool_name))
-            if tool_name == "test"
-        ));
+        assert!(maybe_tool.is_none());
     }
 }
