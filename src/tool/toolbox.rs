@@ -20,10 +20,7 @@ impl Toolbox {
         }
     }
 
-    pub async fn fetch_tool(
-        &mut self,
-        qtn: &QualifiedToolName,
-    ) -> Option<Arc<dyn Tool + Send + Sync>> {
+    pub fn fetch_tool(&mut self, qtn: &QualifiedToolName) -> Option<Arc<dyn Tool + Send + Sync>> {
         let tool = self.mcp_tools.get(qtn)?.clone();
         Some(tool)
     }
@@ -117,7 +114,6 @@ pub mod tests {
                 namespace: Namespace::dummy(),
                 name: "test".to_owned(),
             })
-            .await
             .unwrap();
 
         let arguments = vec![];
@@ -140,12 +136,10 @@ pub mod tests {
         let mut toolbox = Toolbox::new();
 
         // When we try to fetch a tool that does not exist
-        let maybe_tool = toolbox
-            .fetch_tool(&QualifiedToolName {
-                namespace: Namespace::dummy(),
-                name: "test".to_owned(),
-            })
-            .await;
+        let maybe_tool = toolbox.fetch_tool(&QualifiedToolName {
+            namespace: Namespace::dummy(),
+            name: "test".to_owned(),
+        });
 
         // Then we expect it to return None
         assert!(maybe_tool.is_none());

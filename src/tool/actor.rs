@@ -173,7 +173,7 @@ impl ToolActor {
         loop {
             select! {
                 msg = self.receiver.recv() => match msg {
-                    Some(msg) => self.act(msg).await,
+                    Some(msg) => self.act(msg),
                     None => break
                 },
                 () = self.running_requests.select_next_some(), if !self.running_requests.is_empty() => {}
@@ -181,7 +181,7 @@ impl ToolActor {
         }
     }
 
-    async fn act(&mut self, msg: ToolMsg) {
+    fn act(&mut self, msg: ToolMsg) {
         match msg {
             ToolMsg::InvokeTool {
                 name: qualified_name,
@@ -189,7 +189,7 @@ impl ToolActor {
                 tracing_context,
                 send,
             } => {
-                let maybe_tool = self.toolbox.fetch_tool(&qualified_name).await;
+                let maybe_tool = self.toolbox.fetch_tool(&qualified_name);
                 if let Some(tool) = maybe_tool {
                     self.running_requests.push(Box::pin(async move {
                         let result = tool.invoke(arguments, tracing_context).await;
