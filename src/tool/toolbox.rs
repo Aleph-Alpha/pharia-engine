@@ -7,6 +7,8 @@ use crate::{
 };
 
 pub struct Toolbox<T> {
+    /// Tools reported by the MCP servers
+    mcp_tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
     // Map of which MCP servers are configured for which namespace.
     mcp_servers: McpServerStore,
     native_tools: NativeToolStore,
@@ -19,6 +21,7 @@ where
 {
     pub fn new(client: T) -> Self {
         Self {
+            mcp_tools: HashMap::new(),
             mcp_servers: McpServerStore::new(),
             native_tools: NativeToolStore::new(),
             client: Arc::new(client),
