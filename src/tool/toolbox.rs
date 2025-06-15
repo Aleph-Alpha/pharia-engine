@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     mcp::{McpClient, McpServerStore, McpServerUrl, McpTool},
     namespace_watcher::Namespace,
-    tool::Tool,
+    tool::{QualifiedToolName, Tool},
 };
 
 pub struct Toolbox<T> {
@@ -27,8 +27,7 @@ where
 
     pub async fn fetch_tool(
         &mut self,
-        namespace: Namespace,
-        name: &str,
+        qtn: &QualifiedToolName,
     ) -> Option<Box<dyn Tool + Send + Sync>>
     where
         T: McpClient + 'static,
@@ -36,8 +35,8 @@ where
         self.mcp_servers
             .update_tool_list(self.client.as_ref())
             .await;
-        let tools = self.mcp_servers.list_tools_for_namespace(&namespace);
-        let tool_desc = tools.into_iter().find(|tool| tool.name == name)?;
+        let tools = self.mcp_servers.list_tools_for_namespace(&qtn.namespace);
+        let tool_desc = tools.into_iter().find(|tool| tool.name == qtn.name)?;
         Some(Box::new(McpTool::new(tool_desc, self.client.clone())))
     }
 
@@ -124,7 +123,10 @@ pub mod tests {
             )
             .await;
         let tool = toolbox
-            .fetch_tool(Namespace::dummy(), "test")
+            .fetch_tool(&QualifiedToolName {
+                namespace: Namespace::dummy(),
+                name: "test".to_owned(),
+            })
             .await
             .unwrap();
 
@@ -168,7 +170,12 @@ pub mod tests {
                 McpServerUrl::from("http://localhost:8080"),
             )
             .await;
-        let maybe_tool = toolbox.fetch_tool(Namespace::dummy(), "test").await;
+        let maybe_tool = toolbox
+            .fetch_tool(&QualifiedToolName {
+                namespace: Namespace::dummy(),
+                name: "test".to_owned(),
+            })
+            .await;
 
         assert!(maybe_tool.is_none());
     }
