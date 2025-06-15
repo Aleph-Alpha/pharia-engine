@@ -282,7 +282,7 @@ pub mod tests {
             if url.0 == "http://localhost:8000/mcp" {
                 Ok(vec!["add".to_owned()])
             } else {
-                panic!("This client only knows the localhost:8000 mcp server")
+                panic!("This client only knows the localhost:8000/mcp server")
             }
         }
 
@@ -353,7 +353,7 @@ pub mod tests {
         let foo = Namespace::new("foo").unwrap();
         let tool = ToolRuntime::with_client(ToolClientMock)
             .with_servers(vec![ConfiguredMcpServer::new(
-                "http://localhost:800/mcp",
+                "http://localhost:8000/mcp",
                 foo,
             )])
             .await

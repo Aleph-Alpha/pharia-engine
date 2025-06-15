@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use tracing::error;
+
 use crate::{
     mcp::{McpClient, McpServerUrl},
     namespace_watcher::Namespace,
@@ -42,6 +44,23 @@ impl McpServerStore {
     ) {
         if self.tools.get(&server_to_upsert).is_none() {
             // If the server is new, initialize its tool list.
+            match client.list_tools(&server_to_upsert).await {
+                Ok(tools) => {
+                    self.tools.insert(server_to_upsert.clone(), tools);
+                }
+                Err(e) => {
+                    // If we cannot fetch the tools, we still need to keep track of the server. We
+                    // will provide only an empty tool list. If the error is temporary we will
+                    // eventually be able to fetch the tools, using our regular update.
+                    error!(
+                        target: "pharia_kernel::mcp",
+                        "Failed to fetch tools for server: {}\n caused by: {e:#}",
+                        server_to_upsert.0
+                    );
+                    self.tools.insert(server_to_upsert.clone(), Vec::new());
+                }
+            }
+
             self.tools.insert(server_to_upsert.clone(), Vec::new());
         }
         self.servers
