@@ -36,6 +36,25 @@ impl McpServerStore {
             .into_iter()
     }
 
+    /// Updates the tool list for all configured MCP servers. `true` if the list of tools has
+    /// changed.
+    pub async fn update_tool_list(&mut self, client: &impl McpClient) -> bool {
+        let mut any_changes_so_far = false;
+        for (server, tools_known) in self.tools.iter_mut() {
+            let Ok(up_to_date_tools) = Self::fetch_tools_for(server, client).await else {
+                // If we cannot fetch the tools, we will not update the list. We will try again
+                // later.
+                continue;
+            };
+            if up_to_date_tools != *tools_known {
+                // If the tool list has changed, we update it.
+                *tools_known = up_to_date_tools;
+                any_changes_so_far = true;
+            }
+        }
+        any_changes_so_far
+    }
+
     pub async fn upsert(
         &mut self,
         namespace: Namespace,
@@ -44,24 +63,15 @@ impl McpServerStore {
     ) {
         if self.tools.get(&server_to_upsert).is_none() {
             // If the server is new, initialize its tool list.
-            match client.list_tools(&server_to_upsert).await {
-                Ok(tools) => {
-                    self.tools.insert(server_to_upsert.clone(), tools);
-                }
-                Err(e) => {
-                    // If we cannot fetch the tools, we still need to keep track of the server. We
-                    // will provide only an empty tool list. If the error is temporary we will
-                    // eventually be able to fetch the tools, using our regular update.
-                    error!(
-                        target: "pharia_kernel::mcp",
-                        "Failed to fetch tools for server: {}\n caused by: {e:#}",
-                        server_to_upsert.0
-                    );
-                    self.tools.insert(server_to_upsert.clone(), Vec::new());
-                }
-            }
-
-            self.tools.insert(server_to_upsert.clone(), Vec::new());
+            let tools = if let Ok(tools) = Self::fetch_tools_for(&server_to_upsert, client).await {
+                tools
+            } else {
+                // If we cannot fetch the tools, we still need to keep track of the server. We will
+                // provide only an empty tool list. If the error is temporary we will eventually be
+                // able to fetch the tools, using our regular update.
+                Vec::new()
+            };
+            self.tools.insert(server_to_upsert.clone(), tools);
         }
         self.servers
             .entry(namespace)
@@ -85,5 +95,23 @@ impl McpServerStore {
             // tools it provides.
             self.tools.remove(&server_to_remove);
         }
+    }
+
+    /// Fetches the list of tools for the given MCP server. The returned list is sorted, so that the
+    /// list can be compared trivially later.
+    async fn fetch_tools_for(
+        server: &McpServerUrl,
+        client: &impl McpClient,
+    ) -> Result<Vec<String>, anyhow::Error> {
+        client.list_tools(&server).await.inspect_err(|e| {
+            error!(
+                target: "pharia_kernel::mcp",
+                "Failed to fetch tools for server: {}\n caused by: {e:#}",
+                server.0
+            );
+        }).map(|mut list| {
+            list.sort();
+            list
+        })
     }
 }
