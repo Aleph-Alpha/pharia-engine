@@ -8,7 +8,10 @@ use tokio::{
 
 use crate::{
     mcp::{
-        client::{McpClient, McpClientImpl}, mcp_tool::McpTool, store::McpServerStore, ConfiguredMcpServer, McpServerUrl, McpSubscriber
+        ConfiguredMcpServer, McpServerUrl, McpSubscriber,
+        client::{McpClient, McpClientImpl},
+        mcp_tool::McpTool,
+        store::McpServerStore,
     },
     namespace_watcher::Namespace,
     tool::Tool,
