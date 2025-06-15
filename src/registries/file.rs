@@ -109,7 +109,10 @@ mod test {
         // Wait for at least one millisecond before changing the file. Otherwise we might actually
         // get the digest and change the file in under one millisecond, and with some bad timing not
         // see the change, because the digest is rounded to milliseconds.
-        sleep(Duration::from_millis(1)).await;
+        //
+        // One millisecond should be enough, but seems not te be on my desktop if testing on a
+        // Ubuntu in WSL. 2 milliseconds seem to be doing the trick reliably, though.
+        sleep(Duration::from_millis(2)).await;
         fs::write(&file_path, different_skill_bytes).unwrap();
         eprintln!(
             "{:?}",
