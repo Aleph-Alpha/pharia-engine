@@ -101,7 +101,7 @@ impl Kernel {
         let inference = Inference::new(app_config.inference_url().to_owned());
         let search = Search::new(app_config.document_index_url().to_owned());
         let tool = ToolRuntime::new();
-        let mcp = Mcp::new(tool.api());
+        let mcp = Mcp::from_subscriber(tool.api());
         let csi_drivers = CsiDrivers {
             inference: inference.api(),
             search: search.api(),
