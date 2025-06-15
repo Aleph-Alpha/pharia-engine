@@ -96,16 +96,16 @@ impl McpActor {
         loop {
             let msg = self.receiver.recv().await;
             match msg {
-                Some(msg) => self.act(msg),
+                Some(msg) => self.act(msg).await,
                 None => break,
             }
         }
     }
 
-    fn act(&mut self, msg: McpMsg) {
+    async fn act(&mut self, msg: McpMsg) {
         match msg {
             McpMsg::Upsert { server } => {
-                self.store.upsert(server.namespace, server.url);
+                self.store.upsert(server.namespace, server.url).await;
             }
             McpMsg::Remove { server } => {
                 self.store.remove(server.namespace, server.url);
