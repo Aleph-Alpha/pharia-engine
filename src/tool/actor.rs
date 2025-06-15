@@ -195,14 +195,15 @@ impl<T: McpClient> ToolActor<T> {
                 tracing_context,
                 send,
             } => {
-                let tool = self.toolbox.fetch_tool(namespace, &request.name).await;
-                self.running_requests.push(Box::pin(async move {
-                    let result = tool
-                        .expect("Can never returned None until the Toolbox is caching the tool")
-                        .invoke(request.arguments, tracing_context)
-                        .await;
-                    drop(send.send(result));
-                }));
+                let maybe_tool = self.toolbox.fetch_tool(namespace, &request.name).await;
+                if let Some(tool) = maybe_tool {
+                    self.running_requests.push(Box::pin(async move {
+                        let result = tool.invoke(request.arguments, tracing_context).await;
+                        drop(send.send(result));
+                    }));
+                } else {
+                    drop(send.send(Err(ToolError::ToolNotFound(request.name))));
+                }
             }
             ToolMsg::ListTools { namespace, send } => {
                 let client = self.toolbox.client.clone();
