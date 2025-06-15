@@ -51,7 +51,7 @@ use crate::{
         SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
         openapi_skill_store_v1,
     },
-    tool::{ToolRuntimeApi, ToolProvider, http_tools_v1, openapi_tools_v1},
+    tool::{ToolProvider, ToolRuntimeApi, http_tools_v1, openapi_tools_v1},
 };
 
 pub use self::state::ShellState;

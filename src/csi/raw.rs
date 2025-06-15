@@ -15,7 +15,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
-    tool::{InvokeRequest, ToolRuntimeApi, ToolError, ToolOutput},
+    tool::{InvokeRequest, ToolError, ToolOutput, ToolRuntimeApi},
 };
 
 #[cfg(test)]

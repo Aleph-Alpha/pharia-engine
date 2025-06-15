@@ -8,7 +8,7 @@ use serde::Deserialize;
 use crate::logging::TracingContext;
 
 pub use self::{
-    actor::{InvokeRequest, ToolRuntimeApi, ToolRuntime, ToolRuntimeSender, ToolStoreApi},
+    actor::{InvokeRequest, ToolRuntime, ToolRuntimeApi, ToolRuntimeSender, ToolStoreApi},
     tool_routes::{ToolProvider, http_tools_v1, openapi_tools_v1},
     toolbox::ConfiguredNativeTool,
 };

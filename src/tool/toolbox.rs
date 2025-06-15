@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
 use crate::{
-    logging::TracingContext,
-    mcp::{McpClient, McpServerStore, McpServerUrl, McpToolDesc},
+    mcp::{McpClient, McpServerStore, McpServerUrl, McpTool},
     namespace_watcher::Namespace,
-    tool::{Argument, Modality, Tool, ToolError},
+    tool::Tool,
 };
 
 pub struct Toolbox<T> {
@@ -68,38 +65,6 @@ where
     }
 }
 
-struct McpTool<C> {
-    desc: McpToolDesc,
-    client: Arc<C>,
-}
-
-impl<C> McpTool<C> {
-    pub fn new(desc: McpToolDesc, client: Arc<C>) -> Self {
-        Self { desc, client }
-    }
-}
-
-#[async_trait]
-impl<C> Tool for McpTool<C>
-where
-    C: McpClient,
-{
-    async fn invoke(
-        &self,
-        arguments: Vec<Argument>,
-        tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError> {
-        self.client
-            .invoke_tool(
-                &self.desc.name,
-                arguments,
-                &self.desc.server,
-                tracing_context,
-            )
-            .await
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConfiguredNativeTool {
     pub name: String,
@@ -122,7 +87,11 @@ impl NativeToolStore {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::mcp::ToolClientDouble;
+    use crate::{
+        logging::TracingContext,
+        mcp::ToolClientDouble,
+        tool::{Argument, Modality, ToolError},
+    };
 
     use super::*;
 
