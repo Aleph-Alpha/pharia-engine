@@ -25,7 +25,7 @@ use double_trait::double;
 /// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
 #[cfg_attr(test, double(ToolStoreDouble))]
 pub trait ToolStoreApi {
-    /// Update the list of tools known to the ToolRuntime.
+    /// Update the list of tools known to the `ToolRuntime``.
     ///
     /// With the current execption of the native tools.
     fn report_updated_tools(

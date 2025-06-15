@@ -41,7 +41,7 @@ impl McpServerStore {
     /// changed.
     pub async fn update_tool_list(&mut self, client: &impl McpClient) -> bool {
         let mut any_changes_so_far = false;
-        for (server, tools_known) in self.tools.iter_mut() {
+        for (server, tools_known) in &mut self.tools {
             let Ok(up_to_date_tools) = Self::fetch_tools_for(server, client).await else {
                 // If we cannot fetch the tools, we will not update the list. We will try again
                 // later.
@@ -62,16 +62,14 @@ impl McpServerStore {
         server_to_upsert: McpServerUrl,
         client: &impl McpClient,
     ) {
-        if self.tools.get(&server_to_upsert).is_none() {
+        if !self.tools.contains_key(&server_to_upsert) {
             // If the server is new, initialize its tool list.
-            let tools = if let Ok(tools) = Self::fetch_tools_for(&server_to_upsert, client).await {
-                tools
-            } else {
+            let tools = Self::fetch_tools_for(&server_to_upsert, client)
+                .await
                 // If we cannot fetch the tools, we still need to keep track of the server. We will
                 // provide only an empty tool list. If the error is temporary we will eventually be
                 // able to fetch the tools, using our regular update.
-                Vec::new()
-            };
+                .unwrap_or_default();
             self.tools.insert(server_to_upsert.clone(), tools);
         }
         self.servers
@@ -137,7 +135,7 @@ impl McpServerStore {
         client: &impl McpClient,
     ) -> Result<Vec<String>, anyhow::Error> {
         client
-            .list_tools(&server)
+            .list_tools(server)
             .await
             .inspect_err(|e| {
                 error!(
