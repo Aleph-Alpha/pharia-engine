@@ -195,7 +195,7 @@ impl<T: McpClient> ToolActor<T> {
                 tracing_context,
                 send,
             } => {
-                let tool = self.toolbox.fetch_tool(namespace, &request.name);
+                let tool = self.toolbox.fetch_tool(namespace, &request.name).await;
                 self.running_requests.push(Box::pin(async move {
                     let result = tool
                         .expect("Can never returned None until the Toolbox is caching the tool")

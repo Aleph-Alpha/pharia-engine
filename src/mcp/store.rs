@@ -103,15 +103,19 @@ impl McpServerStore {
         server: &McpServerUrl,
         client: &impl McpClient,
     ) -> Result<Vec<String>, anyhow::Error> {
-        client.list_tools(&server).await.inspect_err(|e| {
-            error!(
-                target: "pharia_kernel::mcp",
-                "Failed to fetch tools for server: {}\n caused by: {e:#}",
-                server.0
-            );
-        }).map(|mut list| {
-            list.sort();
-            list
-        })
+        client
+            .list_tools(&server)
+            .await
+            .inspect_err(|e| {
+                error!(
+                    target: "pharia_kernel::mcp",
+                    "Failed to fetch tools for server: {}\n caused by: {e:#}",
+                    server.0
+                );
+            })
+            .map(|mut list| {
+                list.sort();
+                list
+            })
     }
 }

@@ -44,14 +44,17 @@ where
         None
     }
 
-    pub fn fetch_tool(
-        &self,
+    pub async fn fetch_tool(
+        &mut self,
         namespace: Namespace,
         name: &str,
     ) -> Option<Box<dyn Tool + Send + Sync>>
     where
         T: McpClient + 'static,
     {
+        self.mcp_servers
+            .update_tool_list(self.client.as_ref())
+            .await;
         let urls = self.mcp_servers.list_in_namespace(&namespace).collect();
         let server = Toolbox::mcp_server_for_tool(urls, self.client.clone(), name.to_owned());
         Some(Box::new(McpTool::new(
@@ -176,7 +179,10 @@ pub mod tests {
                 McpServerUrl::from("http://localhost:8080"),
             )
             .await;
-        let tool = toolbox.fetch_tool(Namespace::dummy(), "test").unwrap();
+        let tool = toolbox
+            .fetch_tool(Namespace::dummy(), "test")
+            .await
+            .unwrap();
 
         let arguments = vec![];
         let modalities = tool
@@ -218,7 +224,10 @@ pub mod tests {
                 McpServerUrl::from("http://localhost:8080"),
             )
             .await;
-        let tool = toolbox.fetch_tool(Namespace::dummy(), "test").unwrap();
+        let tool = toolbox
+            .fetch_tool(Namespace::dummy(), "test")
+            .await
+            .unwrap();
         let result = tool.invoke(vec![], TracingContext::dummy()).await;
 
         assert!(matches!(
