@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
@@ -9,8 +11,10 @@ use double_trait::double;
 use crate::{
     mcp::{
         ConfiguredMcpServer, McpClient, McpClientImpl, McpServerStore, McpServerUrl, McpSubscriber,
+        McpTool, subscribers,
     },
     namespace_watcher::Namespace,
+    tool::Tool,
 };
 
 /// CSI facing interface, allows to invoke and list tools
@@ -27,13 +31,16 @@ pub struct Mcp {
 }
 
 impl Mcp {
-    pub fn new(subscriber: impl McpSubscriber) -> Self {
-        Self::with_client(McpClientImpl::new())
+    pub fn new(subscriber: impl McpSubscriber + Send + 'static) -> Self {
+        Self::with_client(McpClientImpl::new(), subscriber)
     }
 
-    pub fn with_client(client: impl McpClient) -> Self {
+    pub fn with_client(
+        client: impl McpClient,
+        subscriber: impl McpSubscriber + Send + 'static,
+    ) -> Self {
         let (send, receiver) = mpsc::channel::<McpMsg>(1);
-        let mut actor = McpActor::new(receiver, client);
+        let mut actor = McpActor::new(receiver, client, subscriber);
         let handle = tokio::spawn(async move { actor.run().await });
         Self { handle, send }
     }
@@ -85,21 +92,24 @@ enum McpMsg {
     },
 }
 
-struct McpActor<C> {
+struct McpActor<C, S> {
     store: McpServerStore,
     receiver: mpsc::Receiver<McpMsg>,
-    client: C,
+    client: Arc<C>,
+    subscriber: S,
 }
 
-impl<C> McpActor<C>
+impl<C, S> McpActor<C, S>
 where
     C: McpClient,
+    S: McpSubscriber,
 {
-    fn new(receiver: mpsc::Receiver<McpMsg>, client: C) -> Self {
+    fn new(receiver: mpsc::Receiver<McpMsg>, client: C, subscriber: S) -> Self {
         Self {
             store: McpServerStore::new(),
             receiver,
-            client,
+            client: Arc::new(client),
+            subscriber,
         }
     }
 
@@ -117,17 +127,32 @@ where
         match msg {
             McpMsg::Upsert { server } => {
                 self.store
-                    .upsert(server.namespace, server.url, &self.client)
+                    .upsert(server.namespace, server.url, self.client.as_ref())
                     .await;
+                self.report_updated_tools();
             }
             McpMsg::Remove { server } => {
                 self.store.remove(server.namespace, server.url);
+                self.report_updated_tools();
             }
             McpMsg::List { namespace, send } => {
                 let result = self.store.list_in_namespace(&namespace).collect();
                 drop(send.send(result));
             }
         }
+    }
+
+    fn report_updated_tools(&self) {
+        let tools = self
+            .store
+            .all_tools_by_name()
+            .map(|(qtn, desc)| {
+                let tool = McpTool::new(desc, self.client.clone());
+                let tool: Arc<dyn Tool + Send + Sync> = Arc::new(tool);
+                (qtn, tool)
+            })
+            .collect();
+        self.subscriber.report_updated_tools(tools);
     }
 }
 
