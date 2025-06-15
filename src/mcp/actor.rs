@@ -188,8 +188,8 @@ pub mod tests {
     use std::{
         collections::{HashMap, HashSet},
         sync::Mutex,
-        time::Instant,
     };
+    use tokio::time::{Instant as TokioInstant};
 
     use crate::{
         mcp::{McpClientDouble, subscribers::McpSubscriberDouble},
@@ -208,30 +208,30 @@ pub mod tests {
 
     use super::*;
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn tools_are_updated_regularly() {
-        // Given a client which reports an additional tool after 50 milliseconds
+        // Given a client which reports an additional tool after 30 seconds
         struct McpClientStub {
-            start: Instant,
+            start: TokioInstant,
         }
         impl McpClientDouble for McpClientStub {
             async fn list_tools(&self, _: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-                let elapsed = self.start.elapsed();
-                if elapsed >= Duration::from_millis(50) {
-                    Ok(vec!["tool_one".to_string(), "tool_two".to_string()])
-                } else {
-                    Ok(vec!["tool_one".to_string()])
-                }
+            let elapsed = self.start.elapsed();
+            if elapsed >= Duration::from_secs(30) {
+                Ok(vec!["tool_one".to_string(), "tool_two".to_string()])
+            } else {
+                Ok(vec!["tool_one".to_string()])
+            }
             }
         }
 
         let subscriber = RecordingSubscriber::new();
         let mcp = Mcp::new(
             McpClientStub {
-                start: Instant::now(),
+                start: TokioInstant::now(),
             },
             subscriber.clone(),
-            Duration::from_millis(50),
+            Duration::from_secs(60),
         )
         .api();
         // and a known mcp server
@@ -239,8 +239,8 @@ pub mod tests {
         let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
         mcp.upsert(server).await;
 
-        // When we wait for the actor to run for a while
-        tokio::time::sleep(Duration::from_millis(80)).await;
+        // When time advances for at least 60 seconds (the check interval)
+        tokio::time::advance(Duration::from_secs(80)).await;
 
         // Then the subscriber has been called with the updated tools
         let last_list = subscriber.calls().last().cloned().unwrap();
