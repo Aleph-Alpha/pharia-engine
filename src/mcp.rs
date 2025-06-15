@@ -1,5 +1,6 @@
 mod actor;
 mod client;
+mod mcp_tool;
 mod routes;
 mod store;
 mod subscribers;
@@ -7,8 +8,9 @@ mod subscribers;
 pub use self::{
     actor::{Mcp, McpApi, McpSender},
     client::{McpClient, McpClientImpl},
+    mcp_tool::McpTool,
     routes::{McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
-    store::{McpServerStore, McpToolDesc},
+    store::McpServerStore,
     subscribers::McpSubscriber,
 };
 
