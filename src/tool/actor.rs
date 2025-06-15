@@ -269,7 +269,7 @@ pub mod tests {
 
     use crate::{
         logging::TracingContext,
-        mcp::ToolClientDouble,
+        mcp::McpClientDouble,
         tool::{ToolRuntime, actor::ToolStoreApi},
     };
 
@@ -278,7 +278,7 @@ pub mod tests {
     /// Only report tools for one particular server address
     struct ToolClientMock;
 
-    impl ToolClientDouble for ToolClientMock {
+    impl McpClientDouble for ToolClientMock {
         async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             if url.0 == "http://localhost:8000/mcp" {
                 Ok(vec!["add".to_owned()])
@@ -386,7 +386,7 @@ pub mod tests {
         }
     }
 
-    impl ToolClientDouble for ToolClientSpy {
+    impl McpClientDouble for ToolClientSpy {
         async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             let mut queried = self.queried.lock().await;
             queried.insert(url.to_owned());
@@ -429,7 +429,7 @@ pub mod tests {
     // Given a tool client that knows about two mcp servers
     struct TwoServerClient;
 
-    impl ToolClientDouble for TwoServerClient {
+    impl McpClientDouble for TwoServerClient {
         async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             match url.0.as_ref() {
                 "http://localhost:8000/mcp" => Ok(vec!["search".to_owned()]),
@@ -497,7 +497,7 @@ pub mod tests {
 
     struct ClientOneGoodOtherBad;
 
-    impl ToolClientDouble for ClientOneGoodOtherBad {
+    impl McpClientDouble for ClientOneGoodOtherBad {
         async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             if url.0 == "http://localhost:8000/mcp" {
                 Ok(vec!["search".to_owned()])
@@ -532,7 +532,7 @@ pub mod tests {
     // Client that, independent of the mcp server, always reports the add tool to be available
     struct AddTool;
 
-    impl ToolClientDouble for AddTool {
+    impl McpClientDouble for AddTool {
         async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
             Ok(vec!["add".to_owned()])
         }
@@ -629,7 +629,7 @@ pub mod tests {
 
     struct SaboteurClient;
 
-    impl ToolClientDouble for SaboteurClient {
+    impl McpClientDouble for SaboteurClient {
         async fn invoke_tool(
             &self,
             name: &str,

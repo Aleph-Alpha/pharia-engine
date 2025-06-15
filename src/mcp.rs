@@ -15,7 +15,7 @@ pub use self::{
 };
 
 #[cfg(test)]
-pub use self::{actor::McpDouble, client::ToolClientDouble};
+pub use self::{actor::McpDouble, client::McpClientDouble};
 
 use crate::namespace_watcher::Namespace;
 use serde::{Deserialize, Serialize};

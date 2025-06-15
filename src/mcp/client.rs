@@ -49,7 +49,7 @@ impl McpClientImpl {
 }
 
 /// A client used by the MCP actor to interact with the MCP servers.
-#[cfg_attr(test, double(ToolClientDouble))]
+#[cfg_attr(test, double(McpClientDouble))]
 pub trait McpClient: Send + Sync + 'static {
     fn invoke_tool(
         &self,
