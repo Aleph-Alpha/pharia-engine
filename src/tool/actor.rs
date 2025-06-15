@@ -39,21 +39,6 @@ pub trait ToolStoreApi {
 /// CSI facing interface, allows to invoke and list tools
 #[cfg_attr(test, double(ToolRuntimeDouble))]
 pub trait ToolRuntimeApi {
-    fn invoke_tool_legacy(
-        &self,
-        request: InvokeRequest,
-        namespace: Namespace,
-        tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<ToolOutput, ToolError>> + Send {
-        self.invoke_tool(
-            QualifiedToolName {
-                namespace,
-                name: request.name,
-            },
-            request.arguments,
-            tracing_context,
-        )
-    }
 
     fn invoke_tool(
         &self,
@@ -330,12 +315,13 @@ pub mod tests {
         let tool = ToolRuntime::with_client(ToolClientMock).api();
 
         // When we invoke an unknown tool
-        let request = InvokeRequest {
+        let tool_name = QualifiedToolName {
+            namespace: Namespace::dummy(),
             name: "unknown".to_owned(),
-            arguments: vec![],
         };
+        let arguments = Vec::new();
         let result = tool
-            .invoke_tool_legacy(request, Namespace::dummy(), TracingContext::dummy())
+            .invoke_tool(tool_name, arguments, TracingContext::dummy())
             .await;
 
         // Then we get a tool not found error
@@ -355,12 +341,13 @@ pub mod tests {
             .api();
 
         // When we invoke a tool that the mock client supports for the configured namespace
-        let request = InvokeRequest {
+        let tool_name = QualifiedToolName {
+            namespace: namespace.clone(),
             name: "add".to_owned(),
-            arguments: vec![],
         };
+        let arguments = vec![];
         let result = tool
-            .invoke_tool_legacy(request, namespace, TracingContext::dummy())
+            .invoke_tool(tool_name, arguments, TracingContext::dummy())
             .await
             .unwrap();
 
@@ -381,16 +368,13 @@ pub mod tests {
             .api();
 
         // When we invoke a tool from a different namespace
-        let request = InvokeRequest {
+        let tool_name = QualifiedToolName {
+            namespace: Namespace::new("bar").unwrap(),
             name: "add".to_owned(),
-            arguments: vec![],
         };
+        let arguments = vec![];
         let result = tool
-            .invoke_tool_legacy(
-                request,
-                Namespace::new("bar").unwrap(),
-                TracingContext::dummy(),
-            )
+            .invoke_tool(tool_name, arguments, TracingContext::dummy())
             .await;
 
         // Then we get a tool not found error
@@ -502,15 +486,12 @@ pub mod tests {
             .api();
 
         // When we invoke the search tool
+        let tool_name = QualifiedToolName {
+            namespace: namespace.clone(),
+            name: "search".to_owned(),
+        };
         let result = tool
-            .invoke_tool_legacy(
-                InvokeRequest {
-                    name: "search".to_owned(),
-                    arguments: vec![],
-                },
-                namespace,
-                TracingContext::dummy(),
-            )
+            .invoke_tool(tool_name, vec![], TracingContext::dummy())
             .await
             .unwrap();
 
@@ -636,12 +617,13 @@ pub mod tests {
             .api();
 
         // When invoking a tool
-        let request = InvokeRequest {
+        let tool_name = QualifiedToolName {
+            namespace: namespace.clone(),
             name: "search".to_owned(),
-            arguments: vec![],
         };
+        let arguments = vec![];
         let result = tool
-            .invoke_tool_legacy(request, namespace, TracingContext::dummy())
+            .invoke_tool(tool_name, arguments, TracingContext::dummy())
             .await
             .unwrap();
 
@@ -687,15 +669,16 @@ pub mod tests {
         let api = tool.api();
 
         // When one hanging request is in progress
-        let request = InvokeRequest {
+        let tool_name = QualifiedToolName {
+            namespace: namespace.clone(),
             name: "divide".to_owned(),
-            arguments: vec![],
         };
-        let cloned_namespace = namespace.clone();
+        let cloned_api = api.clone();
         let handle = tokio::spawn(async move {
             drop(
-                api.invoke_tool_legacy(request, cloned_namespace, TracingContext::dummy())
-                    .await,
+            cloned_api
+                .invoke_tool(tool_name, vec![], TracingContext::dummy())
+                .await,
             );
         });
 
@@ -703,13 +686,12 @@ pub mod tests {
         tokio::time::sleep(Duration::from_millis(10)).await;
 
         // Then another request can still be answered
-        let request = InvokeRequest {
+        let tool_name = QualifiedToolName {
+            namespace: namespace.clone(),
             name: "add".to_owned(),
-            arguments: vec![],
         };
-        let result = tool
-            .api()
-            .invoke_tool_legacy(request, namespace, TracingContext::dummy())
+        let result = api
+            .invoke_tool(tool_name, vec![], TracingContext::dummy())
             .await
             .unwrap();
 

@@ -15,7 +15,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
-    tool::{InvokeRequest, ToolError, ToolOutput, ToolRuntimeApi},
+    tool::{InvokeRequest, QualifiedToolName, ToolError, ToolOutput, ToolRuntimeApi},
 };
 
 #[cfg(test)]
@@ -518,8 +518,11 @@ where
                         "invoke_tool",
                         tool_name = request.name
                     );
-                    self.tool
-                        .invoke_tool_legacy(request, namespace.clone(), context)
+                    let tool_name = QualifiedToolName {
+                        namespace: namespace.clone(),
+                        name: request.name,
+                    };
+                    self.tool.invoke_tool(tool_name, request.arguments, context)
                 })
                 .collect::<Vec<_>>(),
         )
