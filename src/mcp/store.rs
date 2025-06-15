@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use tracing::error;
 
 use crate::{
-    mcp::{McpClient, McpServerUrl},
+    mcp::{McpServerUrl, client::McpClient},
     namespace_watcher::Namespace,
     tool::QualifiedToolName,
 };

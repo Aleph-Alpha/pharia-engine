@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    mcp::{McpClient, McpServerStore, McpServerUrl},
     namespace_watcher::Namespace,
     tool::{QualifiedToolName, Tool},
 };
@@ -10,7 +9,6 @@ pub struct Toolbox {
     /// Tools reported by the MCP servers
     mcp_tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
     // Map of which MCP servers are configured for which namespace.
-    mcp_servers: McpServerStore,
     native_tools: NativeToolStore,
 }
 
@@ -18,7 +16,6 @@ impl Toolbox {
     pub fn new() -> Self {
         Self {
             mcp_tools: HashMap::new(),
-            mcp_servers: McpServerStore::new(),
             native_tools: NativeToolStore::new(),
         }
     }
@@ -29,13 +26,6 @@ impl Toolbox {
     ) -> Option<Arc<dyn Tool + Send + Sync>> {
         let tool = self.mcp_tools.get(qtn)?.clone();
         Some(tool)
-    }
-
-    pub fn list_mcp_servers_in_namespace(
-        &self,
-        namespace: &Namespace,
-    ) -> impl Iterator<Item = McpServerUrl> + '_ {
-        self.mcp_servers.list_in_namespace(namespace)
     }
 
     pub fn list_tools_in_namespace(&self, namespace: &Namespace) -> Vec<String> {
@@ -91,7 +81,6 @@ impl NativeToolStore {
 pub mod tests {
     use crate::{
         logging::TracingContext,
-        mcp::McpClientDouble,
         tool::{Argument, Modality, ToolError},
     };
 
@@ -99,25 +88,6 @@ pub mod tests {
 
     #[tokio::test]
     async fn invoke_tool_success() {
-        struct ToolClientStub;
-        impl McpClientDouble for ToolClientStub {
-            async fn invoke_tool(
-                &self,
-                _name: &str,
-                _args: Vec<Argument>,
-                _url: &McpServerUrl,
-                _tracing_context: TracingContext,
-            ) -> Result<Vec<Modality>, ToolError> {
-                Ok(vec![Modality::Text {
-                    text: "success".to_string(),
-                }])
-            }
-
-            async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-                Ok(vec!["test".to_string()])
-            }
-        }
-
         struct ToolStub;
 
         #[async_trait::async_trait]
@@ -166,30 +136,10 @@ pub mod tests {
 
     #[tokio::test]
     async fn fetch_missing_tool() {
-        struct ToolClientStub;
-        impl McpClientDouble for ToolClientStub {
-            async fn invoke_tool(
-                &self,
-                _name: &str,
-                _args: Vec<Argument>,
-                _url: &McpServerUrl,
-                _tracing_context: TracingContext,
-            ) -> Result<Vec<Modality>, ToolError> {
-                Ok(vec![])
-            }
-
-            async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-                Ok(vec![])
-            }
-        }
-
+        // Given an empty toolbox
         let mut toolbox = Toolbox::new();
-        // toolbox
-        //     .upsert_mcp_server(
-        //         Namespace::dummy(),
-        //         McpServerUrl::from("http://localhost:8080"),
-        //     )
-        //     .await;
+
+        // When we try to fetch a tool that does not exist
         let maybe_tool = toolbox
             .fetch_tool(&QualifiedToolName {
                 namespace: Namespace::dummy(),
@@ -197,6 +147,7 @@ pub mod tests {
             })
             .await;
 
+        // Then we expect it to return None
         assert!(maybe_tool.is_none());
     }
 }

@@ -8,7 +8,6 @@ use tokio::{
 
 use crate::{
     logging::TracingContext,
-    mcp::{McpClient, McpClientImpl},
     namespace_watcher::Namespace,
     tool::{
         Argument, Modality, QualifiedToolName, Tool, ToolError, ToolOutput,
@@ -61,11 +60,6 @@ pub struct ToolRuntime {
 
 impl ToolRuntime {
     pub fn new() -> Self {
-        let client = McpClientImpl::new();
-        Self::with_client(client)
-    }
-
-    pub fn with_client(client: impl McpClient) -> Self {
         let (send, receiver) = tokio::sync::mpsc::channel::<ToolMsg>(1);
         let mut actor = ToolActor::new(receiver);
         let handle = tokio::spawn(async move { actor.run().await });
@@ -225,55 +219,22 @@ pub struct InvokeRequest {
 
 #[cfg(test)]
 pub mod tests {
-    use core::panic;
-    use std::{collections::HashSet, sync::Arc, time::Duration};
+    use std::{sync::Arc, time::Duration};
 
     use async_trait::async_trait;
     use double_trait::Dummy;
-    use futures::future::pending;
-    use tokio::sync::Mutex;
 
     use crate::{
         logging::TracingContext,
-        mcp::{ConfiguredMcpServer, McpClientDouble, McpServerUrl},
-        tool::{actor::ToolStoreApi, ToolDouble, ToolRuntime},
+        tool::{ToolDouble, ToolRuntime, actor::ToolStoreApi},
     };
 
     use super::*;
 
-    /// Only report tools for one particular server address
-    struct ToolClientMock;
-
-    impl McpClientDouble for ToolClientMock {
-        async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-            if url.0 == "http://localhost:8000/mcp" {
-                Ok(vec!["add".to_owned()])
-            } else {
-                panic!("This client only knows the localhost:8000/mcp server")
-            }
-        }
-
-        async fn invoke_tool(
-            &self,
-            _name: &str,
-            _args: Vec<Argument>,
-            url: &McpServerUrl,
-            _tracing_context: TracingContext,
-        ) -> Result<Vec<Modality>, ToolError> {
-            if url.0 == "http://localhost:8000/mcp" {
-                Ok(vec![Modality::Text {
-                    text: "Success".to_owned(),
-                }])
-            } else {
-                panic!("This client only knows the localhost:8000 mcp server")
-            }
-        }
-    }
-
     #[tokio::test]
     async fn invoking_unknown_tool_without_servers_gives_tool_not_found() {
         // Given a tool client
-        let tool = ToolRuntime::with_client(ToolClientMock).api();
+        let tool = ToolRuntime::new().api();
 
         // When we invoke an unknown tool
         let tool_name = QualifiedToolName {
@@ -293,14 +254,15 @@ pub mod tests {
     async fn tool_from_different_namespace_is_not_available() {
         // Given an mcp server available for the foo namespace
         let foo = Namespace::new("foo").unwrap();
-        let tool = ToolRuntime::with_client(ToolClientMock).api();
+        let tool = ToolRuntime::new().api();
         tool.report_updated_tools(HashMap::from([(
             QualifiedToolName {
                 namespace: foo.clone(),
                 name: "add".to_owned(),
             },
             Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
-        )])).await;
+        )]))
+        .await;
 
         // When we invoke a tool from a different namespace
         let tool_name = QualifiedToolName {
@@ -316,57 +278,11 @@ pub mod tests {
         assert!(matches!(result, Err(ToolError::ToolNotFound(_))));
     }
 
-    // Given a tool client that knows about two mcp servers
-    struct TwoServerClient;
-
-    impl McpClientDouble for TwoServerClient {
-        async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-            match url.0.as_ref() {
-                "http://localhost:8000/mcp" => Ok(vec!["search".to_owned()]),
-                "http://localhost:8001/mcp" => Ok(vec!["calculator".to_owned()]),
-                _ => {
-                    panic!("Unknown mcp server asked for tools.")
-                }
-            }
-        }
-
-        async fn invoke_tool(
-            &self,
-            name: &str,
-            _args: Vec<Argument>,
-            url: &McpServerUrl,
-            _tracing_context: TracingContext,
-        ) -> Result<Vec<Modality>, ToolError> {
-            match url.0.as_ref() {
-                "http://localhost:8000/mcp" => {
-                    assert_eq!(name, "search");
-                    Ok(vec![Modality::Text {
-                        text: "search result".to_owned(),
-                    }])
-                }
-                "http://localhost:8001/mcp" => {
-                    assert_eq!(name, "calculator");
-                    Ok(vec![Modality::Text {
-                        text: "calculator result".to_owned(),
-                    }])
-                }
-                _ => Err(ToolError::Other(anyhow::anyhow!(
-                    "Requested rooted to the wrong server."
-                ))),
-            }
-        }
-    }
-
     #[tokio::test]
     async fn correct_tool_is_called() {
-        // Given a tool client that knows about two mcp servers
+        // Given a tool named search and another tool
         let namespace = Namespace::new("test").unwrap();
-        let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
-        ];
         struct ToolStub;
-
         #[async_trait]
         impl ToolDouble for ToolStub {
             async fn invoke(
@@ -379,7 +295,7 @@ pub mod tests {
                 }])
             }
         }
-        let tool_runtime = ToolRuntime::with_client(TwoServerClient).api();
+        let tool_runtime = ToolRuntime::new().api();
         let tools = HashMap::from([
             (
                 QualifiedToolName {
@@ -413,20 +329,11 @@ pub mod tests {
         assert!(matches!(&result[0], Modality::Text { text } if text == "search result"));
     }
 
-    // Client that, independent of the mcp server, always reports the add tool to be available
-    struct AddTool;
-
-    impl McpClientDouble for AddTool {
-        async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-            Ok(vec!["add".to_owned()])
-        }
-    }
-
     #[tokio::test]
     async fn tools_are_listed() {
         // Given a tools configured for a namespace
         let namespace = Namespace::new("test").unwrap();
-        let tool_runtime = ToolRuntime::with_client(AddTool).api();
+        let tool_runtime = ToolRuntime::new().api();
         tool_runtime
             .report_updated_tools(HashMap::from([(
                 QualifiedToolName {
@@ -442,30 +349,6 @@ pub mod tests {
 
         // Then we get the tools from the mcp server
         assert_eq!(result, vec!["add".to_owned()]);
-    }
-
-    struct CalculatorClient;
-
-    impl McpClientDouble for CalculatorClient {
-        async fn invoke_tool(
-            &self,
-            name: &str,
-            _args: Vec<Argument>,
-            _url: &McpServerUrl,
-            _tracing_context: TracingContext,
-        ) -> Result<Vec<Modality>, ToolError> {
-            match name {
-                "add" => Ok(vec![Modality::Text {
-                    text: "Success".to_owned(),
-                }]),
-                "divide" => pending().await,
-                _ => panic!("unknown function called"),
-            }
-        }
-
-        async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-            Ok(vec!["add".to_owned(), "divide".to_owned()])
-        }
     }
 
     #[tokio::test]
@@ -496,7 +379,7 @@ pub mod tests {
             }
         }
         let namespace = Namespace::new("test").unwrap();
-        let tool = ToolRuntime::with_client(CalculatorClient);
+        let tool = ToolRuntime::new();
         let api = tool.api();
         let tools = HashMap::from([
             (
