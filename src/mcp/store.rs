@@ -31,7 +31,7 @@ impl McpServerStore {
             .into_iter()
     }
 
-    pub fn upsert(&mut self, namespace: Namespace, server_to_upsert: McpServerUrl) {
+    pub async fn upsert(&mut self, namespace: Namespace, server_to_upsert: McpServerUrl) {
         if self.tools.get(&server_to_upsert).is_none() {
             // If the server is new, initialize its tool list.
             self.tools.insert(server_to_upsert.clone(), Vec::new());

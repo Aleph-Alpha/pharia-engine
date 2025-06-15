@@ -68,8 +68,8 @@ impl<T> Toolbox<T> {
         self.mcp_servers.list_in_namespace(namespace)
     }
 
-    pub fn upsert_mcp_server(&mut self, namespace: Namespace, url: McpServerUrl) {
-        self.mcp_servers.upsert(namespace, url);
+    pub async fn upsert_mcp_server(&mut self, namespace: Namespace, url: McpServerUrl) {
+        self.mcp_servers.upsert(namespace, url).await;
     }
 
     pub fn remove_mcp_server(&mut self, namespace: Namespace, url: McpServerUrl) {
@@ -173,7 +173,7 @@ pub mod tests {
         toolbox.upsert_mcp_server(
             Namespace::dummy(),
             McpServerUrl::from("http://localhost:8080"),
-        );
+        ).await;
         let tool = toolbox.fetch_tool(Namespace::dummy(), "test").unwrap();
 
         let arguments = vec![];
@@ -213,7 +213,7 @@ pub mod tests {
         toolbox.upsert_mcp_server(
             Namespace::dummy(),
             McpServerUrl::from("http://localhost:8080"),
-        );
+        ).await;
         let tool = toolbox.fetch_tool(Namespace::dummy(), "test").unwrap();
         let result = tool.invoke(vec![], TracingContext::dummy()).await;
 

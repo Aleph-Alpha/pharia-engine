@@ -179,7 +179,7 @@ impl<T: McpClient> ToolActor<T> {
         loop {
             select! {
                 msg = self.receiver.recv() => match msg {
-                    Some(msg) => self.act(msg),
+                    Some(msg) => self.act(msg).await,
                     None => break
                 },
                 () = self.running_requests.select_next_some(), if !self.running_requests.is_empty() => {}
@@ -187,7 +187,7 @@ impl<T: McpClient> ToolActor<T> {
         }
     }
 
-    fn act(&mut self, msg: ToolMsg) {
+    async fn act(&mut self, msg: ToolMsg) {
         match msg {
             ToolMsg::InvokeTool {
                 request,
@@ -219,7 +219,7 @@ impl<T: McpClient> ToolActor<T> {
             ToolMsg::UpsertToolServer {
                 server: ConfiguredMcpServer { url, namespace },
             } => {
-                self.toolbox.upsert_mcp_server(namespace, url);
+                self.toolbox.upsert_mcp_server(namespace, url).await;
             }
             ToolMsg::RemoveToolServer {
                 server: ConfiguredMcpServer { url, namespace },
