@@ -36,6 +36,32 @@ impl McpServerStore {
             .into_iter()
     }
 
+    /// List of all the tools of all the MCP servers configured for the given namespace.
+    pub fn list_tools_for_namespace(&self, namespace: &Namespace) -> Vec<McpToolDesc> {
+        let Some(servers) = self.servers.get(namespace) else {
+            // If we do not know the namespace, we assume there are no tools configured for it.
+            return Vec::new();
+        };
+        servers
+            .iter()
+            .map(|server| {
+                // For each server, we get the list of tools it provides.
+                (
+                    server,
+                    self.tools
+                        .get(server)
+                        .expect("Every MCP server stored must have a tool list."),
+                )
+            })
+            .flat_map(|(server, tool_list)| {
+                tool_list.iter().map(|tool_name| McpToolDesc {
+                    name: tool_name.clone(),
+                    server: server.clone(),
+                })
+            })
+            .collect()
+    }
+
     /// Updates the tool list for all configured MCP servers. `true` if the list of tools has
     /// changed.
     pub async fn update_tool_list(&mut self, client: &impl McpClient) -> bool {
@@ -118,4 +144,12 @@ impl McpServerStore {
                 list
             })
     }
+}
+
+/// Descripes an MCP tool, it should hold all the information needed to connect and invoke the tool.
+pub struct McpToolDesc {
+    /// The name of the tool, as reported by the MCP server.
+    pub name: String,
+    /// The URL of the MCP server providing the tool.
+    pub server: McpServerUrl,
 }
