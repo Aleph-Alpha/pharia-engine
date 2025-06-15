@@ -7,7 +7,7 @@ use tokio::{
 use double_trait::double;
 
 use crate::{
-    mcp::{ConfiguredMcpServer, McpServerStore, McpServerUrl},
+    mcp::{ConfiguredMcpServer, McpClient, McpClientImpl, McpServerStore, McpServerUrl},
     namespace_watcher::Namespace,
 };
 
@@ -26,8 +26,12 @@ pub struct Mcp {
 
 impl Mcp {
     pub fn new() -> Self {
-        let (send, receiver) = tokio::sync::mpsc::channel::<McpMsg>(1);
-        let mut actor = McpActor::new(receiver);
+        Self::with_client(McpClientImpl::new())
+    }
+
+    pub fn with_client(client: impl McpClient) -> Self {
+        let (send, receiver) = mpsc::channel::<McpMsg>(1);
+        let mut actor = McpActor::new(receiver, client);
         let handle = tokio::spawn(async move { actor.run().await });
         Self { handle, send }
     }
@@ -79,16 +83,18 @@ enum McpMsg {
     },
 }
 
-struct McpActor {
+struct McpActor<C> {
     store: McpServerStore,
     receiver: mpsc::Receiver<McpMsg>,
+    client: C,
 }
 
-impl McpActor {
-    fn new(receiver: mpsc::Receiver<McpMsg>) -> Self {
+impl<C> McpActor<C> {
+    fn new(receiver: mpsc::Receiver<McpMsg>, client: C) -> Self {
         Self {
             store: McpServerStore::new(),
             receiver,
+            client,
         }
     }
 
