@@ -35,18 +35,6 @@ where
     where
         T: McpClient + 'static,
     {
-        self.mcp_servers
-            .update_tool_list(self.client.as_ref())
-            .await;
-        self.mcp_tools = self
-            .mcp_servers
-            .all_tools_by_name()
-            .map(|(qtn, desc)| {
-                let tool = McpTool::new(desc, self.client.clone());
-                let tool: Arc<dyn Tool + Send + Sync> = Arc::new(tool);
-                (qtn, tool)
-            })
-            .collect();
         let tool = self.mcp_tools.get(qtn)?.clone();
         Some(tool)
     }
@@ -133,7 +121,29 @@ pub mod tests {
             }
         }
 
+        struct ToolStub;
+
+        #[async_trait::async_trait]
+        impl Tool for ToolStub {
+            async fn invoke(
+                &self,
+                _args: Vec<Argument>,
+                _tracing_context: TracingContext,
+            ) -> Result<Vec<Modality>, ToolError> {
+                Ok(vec![Modality::Text {
+                    text: "success".to_string(),
+                }])
+            }
+        }
+
         let mut toolbox = Toolbox::new(ToolClientStub);
+        toolbox.update_tools(HashMap::from([(
+            QualifiedToolName {
+                namespace: Namespace::dummy(),
+                name: "test".to_owned(),
+            },
+            Arc::new(ToolStub) as Arc<dyn Tool + Send + Sync>,
+        )]));
         toolbox
             .upsert_mcp_server(
                 Namespace::dummy(),
