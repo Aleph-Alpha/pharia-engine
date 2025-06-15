@@ -44,7 +44,6 @@ impl<T> Toolbox<T> {
         None
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     pub fn fetch_tool(
         &self,
         namespace: Namespace,
