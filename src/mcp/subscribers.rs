@@ -13,17 +13,11 @@ pub type ToolMap = HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>;
 #[cfg_attr(test, double(McpSubscriberDouble))]
 pub trait McpSubscriber {
     /// Let the subscriber know that the list of tools has been changed and report the new list
-    fn report_updated_tools(
-        &mut self,
-        tools: ToolMap,
-    ) -> impl Future<Output = ()> + Send;
+    fn report_updated_tools(&mut self, tools: ToolMap) -> impl Future<Output = ()> + Send;
 }
 
 impl McpSubscriber for ToolRuntimeSender {
-    async fn report_updated_tools(
-        &mut self,
-        tools: ToolMap,
-    ) {
+    async fn report_updated_tools(&mut self, tools: ToolMap) {
         ToolStoreApi::report_updated_tools(self, tools).await;
     }
 }

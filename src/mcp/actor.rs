@@ -194,7 +194,10 @@ pub mod tests {
     use tokio::time::Instant as TokioInstant;
 
     use crate::{
-        mcp::{subscribers::{McpSubscriberDouble, ToolMap}, McpClientDouble},
+        mcp::{
+            McpClientDouble,
+            subscribers::{McpSubscriberDouble, ToolMap},
+        },
         tool::QualifiedToolName,
     };
 
