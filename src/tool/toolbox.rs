@@ -28,22 +28,6 @@ where
         }
     }
 
-    async fn mcp_server_for_tool(
-        urls: Vec<McpServerUrl>,
-        client: Arc<T>,
-        name: String,
-    ) -> Option<McpServerUrl> {
-        for url in urls {
-            if let Ok(tools) = client.list_tools(&url).await {
-                if tools.contains(&name) {
-                    return Some(url);
-                }
-            }
-        }
-
-        None
-    }
-
     pub async fn fetch_tool(
         &mut self,
         namespace: Namespace,
@@ -57,14 +41,7 @@ where
             .await;
         let tools = self.mcp_servers.list_tools_for_namespace(&namespace);
         let tool_desc = tools.into_iter().find(|tool| tool.name == name)?;
-        let urls = self.mcp_servers.list_in_namespace(&namespace).collect();
-        let server = Toolbox::mcp_server_for_tool(urls, self.client.clone(), name.to_owned());
-        Some(Box::new(McpTool::new(
-            tool_desc,
-            name.to_owned(),
-            server,
-            self.client.clone(),
-        )))
+        Some(Box::new(McpTool::new(tool_desc, self.client.clone())))
     }
 
     pub fn list_mcp_servers_in_namespace(
@@ -91,29 +68,21 @@ where
     }
 }
 
-struct McpTool<C, U> {
+struct McpTool<C> {
     desc: McpToolDesc,
-    name: String,
-    url: U,
     client: Arc<C>,
 }
 
-impl<C, U> McpTool<C, U> {
-    pub fn new(desc: McpToolDesc, name: String, url: U, client: Arc<C>) -> Self {
-        Self {
-            desc,
-            name,
-            url,
-            client,
-        }
+impl<C> McpTool<C> {
+    pub fn new(desc: McpToolDesc, client: Arc<C>) -> Self {
+        Self { desc, client }
     }
 }
 
 #[async_trait]
-impl<C, U> Tool for McpTool<C, U>
+impl<C> Tool for McpTool<C>
 where
     C: McpClient,
-    U: Future<Output = Option<McpServerUrl>> + Send + Sync,
 {
     async fn invoke(
         self: Box<Self>,
@@ -230,9 +199,7 @@ pub mod tests {
                 McpServerUrl::from("http://localhost:8080"),
             )
             .await;
-        let maybe_tool = toolbox
-            .fetch_tool(Namespace::dummy(), "test")
-            .await;
+        let maybe_tool = toolbox.fetch_tool(Namespace::dummy(), "test").await;
 
         assert!(maybe_tool.is_none());
     }
