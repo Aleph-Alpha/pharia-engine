@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::{
     logging::TracingContext,
-    mcp::{McpServerStore, McpServerUrl, ToolClient},
+    mcp::{McpClient, McpServerStore, McpServerUrl},
     namespace_watcher::Namespace,
     tool::{Argument, Modality, Tool, ToolError},
 };
@@ -31,7 +31,7 @@ impl<T> Toolbox<T> {
         name: String,
     ) -> Option<McpServerUrl>
     where
-        T: ToolClient + 'static,
+        T: McpClient + 'static,
     {
         for url in urls {
             if let Ok(tools) = client.list_tools(&url).await {
@@ -51,7 +51,7 @@ impl<T> Toolbox<T> {
         name: &str,
     ) -> Option<Box<dyn Tool + Send + Sync>>
     where
-        T: ToolClient + 'static,
+        T: McpClient + 'static,
     {
         let urls = self.mcp_servers.list_in_namespace(&namespace).collect();
         let server = Toolbox::mcp_server_for_tool(urls, self.client.clone(), name.to_owned());
@@ -101,7 +101,7 @@ impl<C, U> McpTool<C, U> {
 #[async_trait]
 impl<C, U> Tool for McpTool<C, U>
 where
-    C: ToolClient,
+    C: McpClient,
     U: Future<Output = Option<McpServerUrl>> + Send + Sync,
 {
     async fn invoke(

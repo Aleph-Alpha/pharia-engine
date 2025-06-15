@@ -8,7 +8,7 @@ use tokio::{
 
 use crate::{
     logging::TracingContext,
-    mcp::{ConfiguredMcpServer, McpClient, McpServerUrl, ToolClient},
+    mcp::{ConfiguredMcpServer, McpClient, McpClientImpl, McpServerUrl},
     namespace_watcher::Namespace,
     tool::{
         Argument, Modality, ToolError, ToolOutput,
@@ -56,11 +56,11 @@ pub struct ToolRuntime {
 
 impl ToolRuntime {
     pub fn new() -> Self {
-        let client = McpClient::new();
+        let client = McpClientImpl::new();
         Self::with_client(client)
     }
 
-    pub fn with_client(client: impl ToolClient) -> Self {
+    pub fn with_client(client: impl McpClient) -> Self {
         let (send, receiver) = tokio::sync::mpsc::channel::<ToolMsg>(1);
         let mut actor = ToolActor::new(receiver, client);
         let handle = tokio::spawn(async move { actor.run().await });
@@ -157,13 +157,13 @@ enum ToolMsg {
     },
 }
 
-struct ToolActor<T: ToolClient> {
+struct ToolActor<T: McpClient> {
     toolbox: Toolbox<T>,
     receiver: mpsc::Receiver<ToolMsg>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
 }
 
-impl<T: ToolClient> ToolActor<T> {
+impl<T: McpClient> ToolActor<T> {
     fn new(receiver: mpsc::Receiver<ToolMsg>, client: T) -> Self {
         Self {
             toolbox: Toolbox::new(client),
@@ -238,7 +238,7 @@ impl<T: ToolClient> ToolActor<T> {
     /// tool names for the json schema. There would be the appropriate place to decide if the
     /// available information is enough.
     async fn tools(
-        client: &impl ToolClient,
+        client: &impl McpClient,
         servers: Vec<McpServerUrl>,
     ) -> HashMap<McpServerUrl, Vec<String>> {
         let results = join_all(servers.into_iter().map(|address| async move {
