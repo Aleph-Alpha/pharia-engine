@@ -73,6 +73,13 @@ where
     pub fn remove_native_tool(&self, tool: ConfiguredNativeTool) {
         self.native_tools.remove(tool);
     }
+
+    pub(crate) fn update_tools(
+        &mut self,
+        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync + 'static>>,
+    ) {
+        self.mcp_tools = tools;
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

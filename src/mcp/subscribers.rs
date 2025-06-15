@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::tool::{QualifiedToolName, Tool, ToolRuntimeSender};
+use crate::tool::{QualifiedToolName, Tool, ToolRuntimeSender, ToolStoreApi};
 
 #[cfg(test)]
 use double_trait::double;
@@ -11,11 +11,17 @@ use double_trait::double;
 #[cfg_attr(test, double(McpSubscriberDouble))]
 pub trait McpSubscriber {
     /// Let the subscriber know that the list of tools has been changed and report the new list
-    fn report_updated_tools(&self, tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>);
+    fn report_updated_tools(
+        &mut self,
+        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+    ) -> impl Future<Output = ()> + Send;
 }
 
 impl McpSubscriber for ToolRuntimeSender {
-    fn report_updated_tools(&self, tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>) {
-        // Do nothing for now
+    async fn report_updated_tools(
+        &mut self,
+        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+    ) {
+        ToolStoreApi::report_updated_tools(self, tools).await;
     }
 }
