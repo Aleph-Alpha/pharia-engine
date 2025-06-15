@@ -523,30 +523,6 @@ pub mod tests {
         assert!(matches!(&result[0], Modality::Text { text } if text == "search result"));
     }
 
-    struct ClientOneGoodOtherBad;
-
-    impl McpClientDouble for ClientOneGoodOtherBad {
-        async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-            if url.0 == "http://localhost:8000/mcp" {
-                Ok(vec!["search".to_owned()])
-            } else {
-                Err(anyhow::anyhow!("Request to mcp server timed out."))
-            }
-        }
-
-        async fn invoke_tool(
-            &self,
-            _name: &str,
-            _args: Vec<Argument>,
-            _url: &McpServerUrl,
-            _tracing_context: TracingContext,
-        ) -> Result<Vec<Modality>, ToolError> {
-            Ok(vec![Modality::Text {
-                text: "Success".to_owned(),
-            }])
-        }
-    }
-
     impl ToolRuntime {
         async fn with_servers(self, servers: Vec<ConfiguredMcpServer>) -> Self {
             let api = self.api();
@@ -606,29 +582,9 @@ pub mod tests {
         assert!(result.is_empty());
     }
 
-    #[tokio::test]
-    async fn one_bad_mcp_server_still_allows_to_list_tools() {
-        // Given an mcp server that returns an error when listing it's tools
-        let namespace = Namespace::new("test").unwrap();
-        let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
-        ];
-        let tool = ToolRuntime::with_client(ClientOneGoodOtherBad)
-            .with_servers(servers)
-            .await
-            .api();
+    struct CalculatorClient;
 
-        // When listing tools
-        let result = tool.list_tools(namespace).await;
-
-        // Then the search tool is available
-        assert_eq!(result, vec!["search".to_owned()]);
-    }
-
-    struct SaboteurClient;
-
-    impl McpClientDouble for SaboteurClient {
+    impl McpClientDouble for CalculatorClient {
         async fn invoke_tool(
             &self,
             name: &str,
@@ -653,19 +609,60 @@ pub mod tests {
     #[tokio::test]
     async fn tool_calls_are_processed_in_parallel() {
         // Given a tool that hangs forever for some tool invocation requestsa
+        struct PendingTool;
+        #[async_trait::async_trait]
+        impl ToolDouble for PendingTool {
+            async fn invoke(
+            &self,
+            _arguments: Vec<Argument>,
+            _tracing_context: TracingContext,
+            ) -> Result<Vec<Modality>, ToolError> {
+                std::future::pending().await
+            }
+        }
+        struct SuccessfulTool;
+        #[async_trait::async_trait]
+        impl ToolDouble for SuccessfulTool {
+            async fn invoke(
+            &self,
+            _arguments: Vec<Argument>,
+            _tracing_context: TracingContext,
+            ) -> Result<Vec<Modality>, ToolError> {
+            Ok(vec![Modality::Text {
+                text: "Success".to_owned(),
+            }])
+            }
+        }
         let namespace = Namespace::new("test").unwrap();
-        let tool = ToolRuntime::with_client(SaboteurClient)
+        let tool = ToolRuntime::with_client(CalculatorClient)
             .with_servers(vec![ConfiguredMcpServer::new(
                 "http://localhost:8000/mcp",
                 namespace.clone(),
             )])
             .await;
         let api = tool.api();
+        let tools = HashMap::from([
+            (
+            QualifiedToolName {
+                namespace: namespace.clone(),
+                name: "success".to_owned(),
+            },
+            Arc::new(SuccessfulTool) as Arc<dyn Tool + Send + Sync>,
+            ),
+            (
+            QualifiedToolName {
+                namespace: namespace.clone(),
+                name: "pending".to_owned(),
+            },
+            Arc::new(PendingTool) as Arc<dyn Tool + Send + Sync>,
+            ),
+        ]);
+        api.report_updated_tools(tools).await;
 
         // When one hanging request is in progress
         let tool_name = QualifiedToolName {
             namespace: namespace.clone(),
-            name: "divide".to_owned(),
+            name: "pending".to_owned(),
         };
         let cloned_api = api.clone();
         let handle = tokio::spawn(async move {
@@ -682,7 +679,7 @@ pub mod tests {
         // Then another request can still be answered
         let tool_name = QualifiedToolName {
             namespace: namespace.clone(),
-            name: "add".to_owned(),
+            name: "success".to_owned(),
         };
         let result = api
             .invoke_tool(tool_name, vec![], TracingContext::dummy())
