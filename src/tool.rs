@@ -5,13 +5,24 @@ mod toolbox;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::logging::TracingContext;
+use crate::{logging::TracingContext, namespace_watcher::Namespace};
 
 pub use self::{
     actor::{InvokeRequest, ToolRuntime, ToolRuntimeApi, ToolRuntimeSender, ToolStoreApi},
     tool_routes::{ToolProvider, http_tools_v1, openapi_tools_v1},
     toolbox::ConfiguredNativeTool,
 };
+
+/// A tool name that is qualified by a namespace. It can uniquely identify a tool across different
+/// namespaces.
+pub struct QualifiedToolName {
+    /// The namespace in which the tool is defined.
+    pub namespace: Namespace,
+    /// The name of the tool as it is known within the namespace. Currently this is identical to the
+    /// name of the tool as reported by the MCP server, yet it may diverge in the future in order to
+    /// disambiguate tools calls, in the case of name collisions.
+    pub name: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Argument {

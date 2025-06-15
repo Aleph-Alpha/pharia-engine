@@ -11,7 +11,7 @@ use crate::{
     mcp::{ConfiguredMcpServer, McpClient, McpClientImpl, McpServerUrl},
     namespace_watcher::Namespace,
     tool::{
-        Argument, Modality, ToolError, ToolOutput,
+        Argument, Modality, QualifiedToolName, ToolError, ToolOutput,
         toolbox::{ConfiguredNativeTool, Toolbox},
     },
 };
@@ -39,10 +39,26 @@ pub trait ToolStoreApi {
 /// CSI facing interface, allows to invoke and list tools
 #[cfg_attr(test, double(ToolRuntimeDouble))]
 pub trait ToolRuntimeApi {
-    fn invoke_tool(
+    fn invoke_tool_legacy(
         &self,
         request: InvokeRequest,
         namespace: Namespace,
+        tracing_context: TracingContext,
+    ) -> impl Future<Output = Result<ToolOutput, ToolError>> + Send {
+        self.invoke_tool(
+            QualifiedToolName {
+                namespace,
+                name: request.name,
+            },
+            request.arguments,
+            tracing_context,
+        )
+    }
+
+    fn invoke_tool(
+        &self,
+        tool: QualifiedToolName,
+        arguments: Vec<Argument>,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<ToolOutput, ToolError>> + Send;
 
@@ -80,14 +96,18 @@ impl ToolRuntime {
 impl ToolRuntimeApi for ToolRuntimeSender {
     async fn invoke_tool(
         &self,
-        request: InvokeRequest,
-        namespace: Namespace,
+        tool: QualifiedToolName,
+        arguments: Vec<Argument>,
         tracing_context: TracingContext,
     ) -> Result<ToolOutput, ToolError> {
         let (send, receive) = oneshot::channel();
+        let request = InvokeRequest {
+            name: tool.name,
+            arguments,
+        };
         let msg = ToolMsg::InvokeTool {
             request,
-            namespace,
+            namespace: tool.namespace,
             tracing_context,
             send,
         };
@@ -315,7 +335,7 @@ pub mod tests {
             arguments: vec![],
         };
         let result = tool
-            .invoke_tool(request, Namespace::dummy(), TracingContext::dummy())
+            .invoke_tool_legacy(request, Namespace::dummy(), TracingContext::dummy())
             .await;
 
         // Then we get a tool not found error
@@ -340,7 +360,7 @@ pub mod tests {
             arguments: vec![],
         };
         let result = tool
-            .invoke_tool(request, namespace, TracingContext::dummy())
+            .invoke_tool_legacy(request, namespace, TracingContext::dummy())
             .await
             .unwrap();
 
@@ -366,7 +386,7 @@ pub mod tests {
             arguments: vec![],
         };
         let result = tool
-            .invoke_tool(
+            .invoke_tool_legacy(
                 request,
                 Namespace::new("bar").unwrap(),
                 TracingContext::dummy(),
@@ -483,7 +503,7 @@ pub mod tests {
 
         // When we invoke the search tool
         let result = tool
-            .invoke_tool(
+            .invoke_tool_legacy(
                 InvokeRequest {
                     name: "search".to_owned(),
                     arguments: vec![],
@@ -621,7 +641,7 @@ pub mod tests {
             arguments: vec![],
         };
         let result = tool
-            .invoke_tool(request, namespace, TracingContext::dummy())
+            .invoke_tool_legacy(request, namespace, TracingContext::dummy())
             .await
             .unwrap();
 
@@ -674,7 +694,7 @@ pub mod tests {
         let cloned_namespace = namespace.clone();
         let handle = tokio::spawn(async move {
             drop(
-                api.invoke_tool(request, cloned_namespace, TracingContext::dummy())
+                api.invoke_tool_legacy(request, cloned_namespace, TracingContext::dummy())
                     .await,
             );
         });
@@ -689,7 +709,7 @@ pub mod tests {
         };
         let result = tool
             .api()
-            .invoke_tool(request, namespace, TracingContext::dummy())
+            .invoke_tool_legacy(request, namespace, TracingContext::dummy())
             .await
             .unwrap();
 
