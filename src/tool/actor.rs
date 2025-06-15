@@ -39,7 +39,6 @@ pub trait ToolStoreApi {
 /// CSI facing interface, allows to invoke and list tools
 #[cfg_attr(test, double(ToolRuntimeDouble))]
 pub trait ToolRuntimeApi {
-
     fn invoke_tool(
         &self,
         tool: QualifiedToolName,
@@ -86,13 +85,9 @@ impl ToolRuntimeApi for ToolRuntimeSender {
         tracing_context: TracingContext,
     ) -> Result<ToolOutput, ToolError> {
         let (send, receive) = oneshot::channel();
-        let request = InvokeRequest {
-            name: tool.name,
-            arguments,
-        };
         let msg = ToolMsg::InvokeTool {
-            request,
-            namespace: tool.namespace,
+            name: tool,
+            arguments,
             tracing_context,
             send,
         };
@@ -139,8 +134,8 @@ impl ToolStoreApi for ToolRuntimeSender {
 
 enum ToolMsg {
     InvokeTool {
-        request: InvokeRequest,
-        namespace: Namespace,
+        name: QualifiedToolName,
+        arguments: Vec<Argument>,
         tracing_context: TracingContext,
         send: oneshot::Sender<Result<Vec<Modality>, ToolError>>,
     },
@@ -195,19 +190,22 @@ impl<T: McpClient> ToolActor<T> {
     async fn act(&mut self, msg: ToolMsg) {
         match msg {
             ToolMsg::InvokeTool {
-                request,
-                namespace,
+                name: qualified_name,
+                arguments,
                 tracing_context,
                 send,
             } => {
-                let maybe_tool = self.toolbox.fetch_tool(namespace, &request.name).await;
+                let maybe_tool = self
+                    .toolbox
+                    .fetch_tool(qualified_name.namespace, &qualified_name.name)
+                    .await;
                 if let Some(tool) = maybe_tool {
                     self.running_requests.push(Box::pin(async move {
-                        let result = tool.invoke(request.arguments, tracing_context).await;
+                        let result = tool.invoke(arguments, tracing_context).await;
                         drop(send.send(result));
                     }));
                 } else {
-                    drop(send.send(Err(ToolError::ToolNotFound(request.name))));
+                    drop(send.send(Err(ToolError::ToolNotFound(qualified_name.name))));
                 }
             }
             ToolMsg::ListTools { namespace, send } => {
@@ -676,9 +674,9 @@ pub mod tests {
         let cloned_api = api.clone();
         let handle = tokio::spawn(async move {
             drop(
-            cloned_api
-                .invoke_tool(tool_name, vec![], TracingContext::dummy())
-                .await,
+                cloned_api
+                    .invoke_tool(tool_name, vec![], TracingContext::dummy())
+                    .await,
             );
         });
 
