@@ -32,11 +32,13 @@ pub struct Mcp {
 }
 
 impl Mcp {
-    pub fn new(subscriber: impl McpSubscriber + Send + 'static) -> Self {
-        Self::with_client(McpClientImpl::new(), subscriber, Duration::from_secs(60))
+    /// Construct directly from a subscriber, using the defaults sensible for production use.
+    pub fn from_subscriber(subscriber: impl McpSubscriber + Send + 'static) -> Self {
+        Self::new(McpClientImpl::new(), subscriber, Duration::from_secs(60))
     }
 
-    pub fn with_client(
+    /// More powerful constructor that comes in handy for testing.
+    pub fn new(
         client: impl McpClient,
         subscriber: impl McpSubscriber + Send + 'static,
         check_interval: Duration,
@@ -204,7 +206,7 @@ pub mod tests {
     #[tokio::test]
     async fn list_mcp_servers_none_configured() {
         // Given a MCP API that knows about no mcp servers
-        let mcp = Mcp::new(DummySubscriber).api();
+        let mcp = Mcp::from_subscriber(DummySubscriber).api();
 
         // When listing mcp servers for a namespace
         let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
@@ -216,7 +218,7 @@ pub mod tests {
     #[tokio::test]
     async fn upserted_server_is_listed() {
         // Given a MCP API that knows about no mcp servers
-        let mcp = Mcp::new(DummySubscriber).api();
+        let mcp = Mcp::from_subscriber(DummySubscriber).api();
 
         // When upserting mcp server for the namespace
         mcp.upsert(ConfiguredMcpServer::new(
@@ -259,7 +261,7 @@ pub mod tests {
                 Ok(vec!["new-tool".into()])
             }
         }
-        let mcp = Mcp::with_client(StubClient, SubscriberMock, Duration::from_secs(60)).api();
+        let mcp = Mcp::new(StubClient, SubscriberMock, Duration::from_secs(60)).api();
 
         // When upserting mcp server for the namespace
         mcp.upsert(ConfiguredMcpServer::new(
@@ -272,7 +274,7 @@ pub mod tests {
     #[tokio::test]
     async fn removed_server_is_not_listed() {
         // Given a MCP API that knows about one mcp server
-        let mcp = Mcp::new(DummySubscriber).api();
+        let mcp = Mcp::from_subscriber(DummySubscriber).api();
         mcp.upsert(ConfiguredMcpServer::new(
             "http://localhost:8000/mcp",
             Namespace::new("test").unwrap(),
@@ -294,7 +296,7 @@ pub mod tests {
     #[tokio::test]
     async fn adding_existing_tool_server_does_not_add_it_again() {
         // Given a tool client that knows about two mcp servers for a namespace
-        let mcp = Mcp::new(DummySubscriber).api();
+        let mcp = Mcp::from_subscriber(DummySubscriber).api();
         let namespace = Namespace::new("test").unwrap();
         let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
         mcp.upsert(server.clone()).await;
@@ -310,7 +312,7 @@ pub mod tests {
     #[tokio::test]
     async fn same_tool_server_can_be_configured_for_different_namespaces() {
         // Given a tool client
-        let mcp = Mcp::new(DummySubscriber).api();
+        let mcp = Mcp::from_subscriber(DummySubscriber).api();
         let first = Namespace::new("first").unwrap();
 
         // When adding the same tool server for two namespaces
@@ -333,7 +335,7 @@ pub mod tests {
     #[tokio::test]
     async fn list_tool_servers() {
         // Given a store with two mcp servers inserted for the namespace "test"
-        let mcp = Mcp::new(DummySubscriber).api();
+        let mcp = Mcp::from_subscriber(DummySubscriber).api();
         let namespace = Namespace::new("test").unwrap();
         mcp.upsert(ConfiguredMcpServer::new(
             "http://localhost:8000/mcp",
