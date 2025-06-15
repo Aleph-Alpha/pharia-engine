@@ -6,9 +6,6 @@ use tokio::{
     time::interval,
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 use crate::{
     mcp::{
         ConfiguredMcpServer, McpClient, McpClientImpl, McpServerStore, McpServerUrl, McpSubscriber,
@@ -17,6 +14,9 @@ use crate::{
     namespace_watcher::Namespace,
     tool::Tool,
 };
+#[cfg(test)]
+use double_trait::double;
+use futures::Future;
 
 /// CSI facing interface, allows to invoke and list tools
 #[cfg_attr(test, double(McpDouble))]
@@ -143,11 +143,6 @@ where
         }
     }
 
-    async fn check_for_changes(&mut self) {
-        // Default implementation does nothing.
-        // Override or implement as needed.
-    }
-
     async fn act(&mut self, msg: McpMsg) {
         match msg {
             McpMsg::Upsert { server } => {
@@ -164,6 +159,12 @@ where
                 let result = self.store.list_in_namespace(&namespace).collect();
                 drop(send.send(result));
             }
+        }
+    }
+
+    async fn check_for_changes(&mut self) {
+        if self.store.update_tool_list(self.client.as_ref()).await {
+            self.report_updated_tools().await;
         }
     }
 
@@ -184,7 +185,11 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use std::collections::{HashMap, HashSet};
+    use std::{
+        collections::{HashMap, HashSet},
+        sync::Mutex,
+        time::Instant,
+    };
 
     use crate::{
         mcp::{McpClientDouble, subscribers::McpSubscriberDouble},
@@ -202,6 +207,45 @@ pub mod tests {
     }
 
     use super::*;
+
+    #[tokio::test]
+    async fn tools_are_updated_regularly() {
+        // Given a client which reports an additional tool after 50 milliseconds
+        struct McpClientStub {
+            start: Instant,
+        }
+        impl McpClientDouble for McpClientStub {
+            async fn list_tools(&self, _: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+                let elapsed = self.start.elapsed();
+                if elapsed >= Duration::from_millis(50) {
+                    Ok(vec!["tool_one".to_string(), "tool_two".to_string()])
+                } else {
+                    Ok(vec!["tool_one".to_string()])
+                }
+            }
+        }
+
+        let subscriber = RecordingSubscriber::new();
+        let mcp = Mcp::new(
+            McpClientStub {
+                start: Instant::now(),
+            },
+            subscriber.clone(),
+            Duration::from_millis(50),
+        )
+        .api();
+        // and a known mcp server
+        let namespace = Namespace::new("test").unwrap();
+        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
+        mcp.upsert(server).await;
+
+        // When we wait for the actor to run for a while
+        tokio::time::sleep(Duration::from_millis(80)).await;
+
+        // Then the subscriber has been called with the updated tools
+        let last_list = subscriber.calls().last().cloned().unwrap();
+        assert_eq!(last_list.len(), 2);
+    }
 
     #[tokio::test]
     async fn list_mcp_servers_none_configured() {
@@ -357,5 +401,31 @@ pub mod tests {
             "http://localhost:8001/mcp".into(),
         ]);
         assert_eq!(result, expected);
+    }
+
+    #[derive(Clone)]
+    struct RecordingSubscriber {
+        calls: Arc<Mutex<Vec<HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>>>>,
+    }
+
+    impl RecordingSubscriber {
+        pub fn new() -> Self {
+            Self {
+                calls: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        pub fn calls(&self) -> Vec<HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>> {
+            self.calls.lock().unwrap().clone()
+        }
+    }
+
+    impl McpSubscriberDouble for RecordingSubscriber {
+        async fn report_updated_tools(
+            &mut self,
+            tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+        ) {
+            self.calls.lock().unwrap().push(tools);
+        }
     }
 }
