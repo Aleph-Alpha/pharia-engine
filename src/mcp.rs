@@ -7,10 +7,7 @@ mod subscribers;
 
 pub use self::{
     actor::{Mcp, McpApi, McpSender},
-    client::{McpClient, McpClientImpl},
-    mcp_tool::McpTool,
     routes::{McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
-    store::McpServerStore,
     subscribers::McpSubscriber,
 };
 
