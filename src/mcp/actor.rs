@@ -403,6 +403,48 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[tokio::test]
+    async fn one_bad_mcp_server_still_allows_to_list_other_tools() {
+        // Given an mcp server that returns an error when listing it's tools
+        let namespace = Namespace::new("test").unwrap();
+        let servers = vec![
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
+        ];
+        struct ClientOneGoodOtherBad;
+        impl McpClientDouble for ClientOneGoodOtherBad {
+            async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+                if url.0 == "http://localhost:8000/mcp" {
+                    Ok(vec!["one_tool".to_owned()])
+                } else {
+                    Err(anyhow::anyhow!("Request to mcp server timed out."))
+                }
+            }
+        }
+        let subscriber = RecordingSubscriber::new();
+        let mcp = Mcp::new(
+            ClientOneGoodOtherBad,
+            subscriber.clone(),
+            Duration::from_secs(60),
+        )
+        .api();
+
+        // When upserting both servers
+        mcp.upsert(servers[0].clone()).await;
+        mcp.upsert(servers[1].clone()).await;
+
+        // Then the search tool is listed
+        let tool_list = subscriber.calls().last().unwrap().clone();
+        assert!(
+            tool_list
+                .get(&QualifiedToolName {
+                    namespace: namespace.clone(),
+                    name: "one_tool".to_owned(),
+                })
+                .is_some()
+        )
+    }
+
     #[derive(Clone)]
     struct RecordingSubscriber {
         calls: Arc<Mutex<Vec<HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>>>>,
