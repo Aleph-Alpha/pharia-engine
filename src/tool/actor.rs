@@ -1,5 +1,5 @@
 use futures::{StreamExt, future::join_all, stream::FuturesUnordered};
-use std::{collections::HashMap, pin::Pin};
+use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -11,7 +11,7 @@ use crate::{
     mcp::{ConfiguredMcpServer, McpClient, McpClientImpl, McpServerUrl},
     namespace_watcher::Namespace,
     tool::{
-        Argument, Modality, QualifiedToolName, ToolError, ToolOutput,
+        Argument, Modality, QualifiedToolName, Tool, ToolError, ToolOutput,
         toolbox::{ConfiguredNativeTool, Toolbox},
     },
 };
@@ -26,6 +26,14 @@ use double_trait::double;
 /// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
 #[cfg_attr(test, double(ToolStoreDouble))]
 pub trait ToolStoreApi {
+    /// Update the list of tools known to the ToolRuntime.
+    ///
+    /// With the current execption of the native tools.
+    fn report_updated_tools(
+        &self,
+        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+    ) -> impl Future<Output = ()> + Send;
+
     fn mcp_upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn mcp_remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
 
@@ -130,6 +138,14 @@ impl ToolStoreApi for ToolRuntimeSender {
         let msg = ToolMsg::RemoveNativeTool { tool };
         self.0.send(msg).await.unwrap();
     }
+
+    async fn report_updated_tools(
+        &self,
+        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+    ) {
+        let msg = ToolMsg::UpdatedTools { tools };
+        self.0.send(msg).await.unwrap();
+    }
 }
 
 enum ToolMsg {
@@ -154,6 +170,9 @@ enum ToolMsg {
     },
     RemoveNativeTool {
         tool: ConfiguredNativeTool,
+    },
+    UpdatedTools {
+        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
     },
 }
 
@@ -216,6 +235,9 @@ impl<T: McpClient> ToolActor<T> {
                     let result = result.into_values().flatten().collect();
                     drop(send.send(result));
                 }));
+            }
+            ToolMsg::UpdatedTools { tools } => {
+                self.toolbox.update_tools(tools);
             }
             ToolMsg::UpsertToolServer {
                 server: ConfiguredMcpServer { url, namespace },
