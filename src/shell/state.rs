@@ -11,10 +11,10 @@ use crate::{
     skill_runtime::{SkillRuntimeMsg, SkillRuntimeProvider},
     skill_store::{SkillStoreMsg, SkillStoreProvider},
     tokenizers::TokenizerSender,
-    tool::{ToolProvider, ToolSender},
+    tool::{ToolProvider, ToolRuntimeSender},
 };
 
-type CsiDriversImpl = CsiDrivers<InferenceSender, SearchSender, TokenizerSender, ToolSender>;
+type CsiDriversImpl = CsiDrivers<InferenceSender, SearchSender, TokenizerSender, ToolRuntimeSender>;
 
 #[derive(Clone)]
 pub struct ShellState {
@@ -76,7 +76,7 @@ impl SkillStoreProvider for ShellState {
 }
 
 impl ToolProvider for ShellState {
-    type Tool = ToolSender;
+    type Tool = ToolRuntimeSender;
 
     fn tool(&self) -> &Self::Tool {
         // The tool actor is used to  list tools for the shell as well as implementing tool calling

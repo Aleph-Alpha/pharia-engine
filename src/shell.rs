@@ -51,7 +51,7 @@ use crate::{
         SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
         openapi_skill_store_v1,
     },
-    tool::{ToolApi, ToolProvider, http_tools_v1, openapi_tools_v1},
+    tool::{ToolRuntimeApi, ToolProvider, http_tools_v1, openapi_tools_v1},
 };
 
 pub use self::state::ShellState;
@@ -76,7 +76,7 @@ impl Shell {
         T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
         T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
         T::McpServerStore: McpApi + Clone + Send + Sync + 'static,
-        T::Tool: ToolApi + Clone + Send + Sync + 'static,
+        T::Tool: ToolRuntimeApi + Clone + Send + Sync + 'static,
     {
         let addr = addr.into();
         // It is important to construct the listener outside of the `spawn` invocation. We need to
@@ -118,7 +118,7 @@ where
     T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
     T::McpServerStore: McpApi + Clone + Send + Sync + 'static,
-    T::Tool: ToolApi + Clone + Send + Sync + 'static,
+    T::Tool: ToolRuntimeApi + Clone + Send + Sync + 'static,
 {
     Router::new()
         .merge(http_tools_v1(feature_set))
@@ -151,7 +151,7 @@ where
     T::SkillRuntime: SkillRuntimeApi + Clone + Send + Sync + 'static,
     T::SkillStore: SkillStoreApi + Clone + Send + Sync + 'static,
     T::McpServerStore: McpApi + Clone + Send + Sync + 'static,
-    T::Tool: ToolApi + Clone + Send + Sync + 'static,
+    T::Tool: ToolRuntimeApi + Clone + Send + Sync + 'static,
 {
     let api_docs = open_api_docs(feature_set);
     Router::new()

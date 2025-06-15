@@ -5,12 +5,12 @@ use axum::{
 };
 use utoipa::OpenApi;
 
-use crate::{FeatureSet, namespace_watcher::Namespace, tool::ToolApi};
+use crate::{FeatureSet, namespace_watcher::Namespace, tool::ToolRuntimeApi};
 
 pub fn http_tools_v1<T>(feature_set: FeatureSet) -> Router<T>
 where
     T: Send + Sync + Clone + ToolProvider + 'static,
-    T::Tool: ToolApi + Send + Clone,
+    T::Tool: ToolRuntimeApi + Send + Clone,
 {
     // Additional routes for beta features, please keep them in sync with the API documentation.
     if feature_set == FeatureSet::Beta {
@@ -71,7 +71,7 @@ async fn list_tools<T>(
     State(ToolState(tool)): State<ToolState<T>>,
 ) -> Json<Vec<String>>
 where
-    T: ToolApi,
+    T: ToolRuntimeApi,
 {
     let mut tools = tool.list_tools(namespace).await;
     tools.sort();
@@ -87,7 +87,7 @@ mod tests {
     use tower::ServiceExt as _;
 
     use super::{ToolProvider, http_tools_v1};
-    use crate::{FeatureSet, namespace_watcher::Namespace, tool::actor::ToolDouble};
+    use crate::{FeatureSet, namespace_watcher::Namespace, tool::actor::ToolRuntimeDouble};
 
     #[derive(Clone)]
     struct ProviderStub<T> {
@@ -113,7 +113,7 @@ mod tests {
         // Given a tool mock that returns an unordered list of tools
         #[derive(Clone)]
         struct ToolMock;
-        impl ToolDouble for ToolMock {
+        impl ToolRuntimeDouble for ToolMock {
             async fn list_tools(&self, namespace: Namespace) -> Vec<String> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
                 vec!["divide".to_owned(), "add".to_owned()]

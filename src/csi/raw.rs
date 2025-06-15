@@ -15,7 +15,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
-    tool::{InvokeRequest, ToolApi, ToolError, ToolOutput},
+    tool::{InvokeRequest, ToolRuntimeApi, ToolError, ToolOutput},
 };
 
 #[cfg(test)]
@@ -143,7 +143,7 @@ where
     I: InferenceApi + Send + Sync,
     S: SearchApi + Send + Sync,
     Tz: TokenizerApi + Send + Sync,
-    Tl: ToolApi + Send + Sync,
+    Tl: ToolRuntimeApi + Send + Sync,
 {
     async fn explain(
         &self,
