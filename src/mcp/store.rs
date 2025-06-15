@@ -4,7 +4,7 @@ use tracing::error;
 
 use crate::{
     mcp::{McpClient, McpServerUrl},
-    namespace_watcher::Namespace,
+    namespace_watcher::Namespace, tool::QualifiedToolName,
 };
 
 /// Remembers MCP servers configured for each namespace, as well as the tools provided by each
@@ -34,32 +34,6 @@ impl McpServerStore {
             .cloned()
             .unwrap_or_default()
             .into_iter()
-    }
-
-    /// List of all the tools of all the MCP servers configured for the given namespace.
-    pub fn list_tools_for_namespace(&self, namespace: &Namespace) -> Vec<McpToolDesc> {
-        let Some(servers) = self.servers.get(namespace) else {
-            // If we do not know the namespace, we assume there are no tools configured for it.
-            return Vec::new();
-        };
-        servers
-            .iter()
-            .map(|server| {
-                // For each server, we get the list of tools it provides.
-                (
-                    server,
-                    self.tools
-                        .get(server)
-                        .expect("Every MCP server stored must have a tool list."),
-                )
-            })
-            .flat_map(|(server, tool_list)| {
-                tool_list.iter().map(|tool_name| McpToolDesc {
-                    name: tool_name.clone(),
-                    server: server.clone(),
-                })
-            })
-            .collect()
     }
 
     /// Updates the tool list for all configured MCP servers. `true` if the list of tools has
@@ -123,6 +97,31 @@ impl McpServerStore {
         }
     }
 
+    /// A complete list of all tools across all namespaces indexed by their qualified name.
+    pub fn all_tools_by_name(&self) -> impl Iterator<Item = (QualifiedToolName, McpToolDesc)> + '_ {
+        self.servers.iter().flat_map(|(namespace, servers)|{
+            servers.iter().cloned().map(|s| (namespace.clone(), s))
+        }).flat_map(|(namespace, server)|{
+            self.tools.get(&server).expect("Every MCP server stored must have a tool list.")
+                .iter()
+                .cloned().map(move |t| {(namespace.clone(), server.clone(), t)})
+        }).map(|(namespace, server, tool_name)| {
+            (
+                QualifiedToolName {
+                    namespace,
+                    // Currently the tool name used to invoke the tool via CSI is the same as the
+                    // name reported by the MCP server, but this may change in the future, to avoid
+                    // name collisions
+                    name: tool_name.clone(),
+                },
+                McpToolDesc {
+                    name: tool_name,
+                    server,
+                },
+            )
+        })
+    }
+
     /// Fetches the list of tools for the given MCP server. The returned list is sorted, so that the
     /// list can be compared trivially later.
     async fn fetch_tools_for(
@@ -147,6 +146,7 @@ impl McpServerStore {
 }
 
 /// Descripes an MCP tool, it should hold all the information needed to connect and invoke the tool.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct McpToolDesc {
     /// The name of the tool, as reported by the MCP server.
     pub name: String,

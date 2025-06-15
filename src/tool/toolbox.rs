@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     mcp::{McpClient, McpServerStore, McpServerUrl, McpTool},
@@ -35,8 +35,8 @@ where
         self.mcp_servers
             .update_tool_list(self.client.as_ref())
             .await;
-        let tools = self.mcp_servers.list_tools_for_namespace(&qtn.namespace);
-        let tool_desc = tools.into_iter().find(|tool| tool.name == qtn.name)?;
+        let all_tools: HashMap<_, _> = self.mcp_servers.all_tools_by_name().collect();
+        let tool_desc = all_tools.get(qtn)?.clone();
         Some(Box::new(McpTool::new(tool_desc, self.client.clone())))
     }
 
