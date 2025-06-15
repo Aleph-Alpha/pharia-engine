@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{mcp::McpServerUrl, namespace_watcher::Namespace};
+use crate::{
+    mcp::{McpClient, McpServerUrl},
+    namespace_watcher::Namespace,
+};
 
 /// Remembers MCP servers configured for each namespace, as well as the tools provided by each
 /// server.
@@ -31,7 +34,12 @@ impl McpServerStore {
             .into_iter()
     }
 
-    pub async fn upsert(&mut self, namespace: Namespace, server_to_upsert: McpServerUrl) {
+    pub async fn upsert(
+        &mut self,
+        namespace: Namespace,
+        server_to_upsert: McpServerUrl,
+        client: &impl McpClient,
+    ) {
         if self.tools.get(&server_to_upsert).is_none() {
             // If the server is new, initialize its tool list.
             self.tools.insert(server_to_upsert.clone(), Vec::new());

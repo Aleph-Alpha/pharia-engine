@@ -16,7 +16,10 @@ pub struct Toolbox<T> {
     pub client: Arc<T>,
 }
 
-impl<T> Toolbox<T> {
+impl<T> Toolbox<T>
+where
+    T: McpClient + 'static,
+{
     pub fn new(client: T) -> Self {
         Self {
             mcp_servers: McpServerStore::new(),
@@ -29,10 +32,7 @@ impl<T> Toolbox<T> {
         urls: Vec<McpServerUrl>,
         client: Arc<T>,
         name: String,
-    ) -> Option<McpServerUrl>
-    where
-        T: McpClient + 'static,
-    {
+    ) -> Option<McpServerUrl> {
         for url in urls {
             if let Ok(tools) = client.list_tools(&url).await {
                 if tools.contains(&name) {
@@ -69,7 +69,7 @@ impl<T> Toolbox<T> {
     }
 
     pub async fn upsert_mcp_server(&mut self, namespace: Namespace, url: McpServerUrl) {
-        self.mcp_servers.upsert(namespace, url).await;
+        self.mcp_servers.upsert(namespace, url, &*self.client).await;
     }
 
     pub fn remove_mcp_server(&mut self, namespace: Namespace, url: McpServerUrl) {

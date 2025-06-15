@@ -89,7 +89,10 @@ struct McpActor<C> {
     client: C,
 }
 
-impl<C> McpActor<C> {
+impl<C> McpActor<C>
+where
+    C: McpClient,
+{
     fn new(receiver: mpsc::Receiver<McpMsg>, client: C) -> Self {
         Self {
             store: McpServerStore::new(),
@@ -111,7 +114,9 @@ impl<C> McpActor<C> {
     async fn act(&mut self, msg: McpMsg) {
         match msg {
             McpMsg::Upsert { server } => {
-                self.store.upsert(server.namespace, server.url).await;
+                self.store
+                    .upsert(server.namespace, server.url, &self.client)
+                    .await;
             }
             McpMsg::Remove { server } => {
                 self.store.remove(server.namespace, server.url);
