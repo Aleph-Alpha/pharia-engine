@@ -7,7 +7,9 @@ use tokio::{
 use double_trait::double;
 
 use crate::{
-    mcp::{ConfiguredMcpServer, McpClient, McpClientImpl, McpServerStore, McpServerUrl},
+    mcp::{
+        ConfiguredMcpServer, McpClient, McpClientImpl, McpServerStore, McpServerUrl, McpSubscriber,
+    },
     namespace_watcher::Namespace,
 };
 
@@ -25,7 +27,7 @@ pub struct Mcp {
 }
 
 impl Mcp {
-    pub fn new() -> Self {
+    pub fn new(subscriber: impl McpSubscriber) -> Self {
         Self::with_client(McpClientImpl::new())
     }
 
@@ -134,12 +136,14 @@ pub mod tests {
 
     use std::collections::HashSet;
 
+    use double_trait::Dummy;
+
     use super::*;
 
     #[tokio::test]
     async fn list_mcp_servers_none_configured() {
         // Given a MCP API that knows about no mcp servers
-        let mcp = Mcp::new().api();
+        let mcp = Mcp::new(Dummy).api();
 
         // When listing mcp servers for a namespace
         let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
@@ -151,7 +155,7 @@ pub mod tests {
     #[tokio::test]
     async fn upserted_server_is_listed() {
         // Given a MCP API that knows about no mcp servers
-        let mcp = Mcp::new().api();
+        let mcp = Mcp::new(Dummy).api();
 
         // When upserting mcp server for the namespace
         mcp.upsert(ConfiguredMcpServer::new(
@@ -172,7 +176,7 @@ pub mod tests {
     #[tokio::test]
     async fn removed_server_is_not_listed() {
         // Given a MCP API that knows about one mcp server
-        let mcp = Mcp::new().api();
+        let mcp = Mcp::new(Dummy).api();
         mcp.upsert(ConfiguredMcpServer::new(
             "http://localhost:8000/mcp",
             Namespace::new("test").unwrap(),
@@ -194,7 +198,7 @@ pub mod tests {
     #[tokio::test]
     async fn adding_existing_tool_server_does_not_add_it_again() {
         // Given a tool client that knows about two mcp servers for a namespace
-        let mcp = Mcp::new().api();
+        let mcp = Mcp::new(Dummy).api();
         let namespace = Namespace::new("test").unwrap();
         let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
         mcp.upsert(server.clone()).await;
@@ -210,7 +214,7 @@ pub mod tests {
     #[tokio::test]
     async fn same_tool_server_can_be_configured_for_different_namespaces() {
         // Given a tool client
-        let mcp = Mcp::new().api();
+        let mcp = Mcp::new(Dummy).api();
         let first = Namespace::new("first").unwrap();
 
         // When adding the same tool server for two namespaces
@@ -233,7 +237,7 @@ pub mod tests {
     #[tokio::test]
     async fn list_tool_servers() {
         // Given a store with two mcp servers inserted for the namespace "test"
-        let mcp = Mcp::new().api();
+        let mcp = Mcp::new(Dummy).api();
         let namespace = Namespace::new("test").unwrap();
         mcp.upsert(ConfiguredMcpServer::new(
             "http://localhost:8000/mcp",

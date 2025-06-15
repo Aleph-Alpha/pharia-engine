@@ -37,8 +37,8 @@ pub trait ToolStoreApi {
 }
 
 /// CSI facing interface, allows to invoke and list tools
-#[cfg_attr(test, double(ToolDouble))]
-pub trait ToolApi {
+#[cfg_attr(test, double(ToolRuntimeDouble))]
+pub trait ToolRuntimeApi {
     fn invoke_tool(
         &self,
         request: InvokeRequest,
@@ -67,8 +67,8 @@ impl ToolRuntime {
         Self { handle, send }
     }
 
-    pub fn api(&self) -> ToolSender {
-        ToolSender(self.send.clone())
+    pub fn api(&self) -> ToolRuntimeSender {
+        ToolRuntimeSender(self.send.clone())
     }
 
     pub async fn wait_for_shutdown(self) {
@@ -77,7 +77,7 @@ impl ToolRuntime {
     }
 }
 
-impl ToolApi for ToolSender {
+impl ToolRuntimeApi for ToolRuntimeSender {
     async fn invoke_tool(
         &self,
         request: InvokeRequest,
@@ -108,9 +108,9 @@ impl ToolApi for ToolSender {
 /// Opaque wrapper around a sender to the tool actor, so we do not need to expose our message
 /// type.
 #[derive(Clone)]
-pub struct ToolSender(mpsc::Sender<ToolMsg>);
+pub struct ToolRuntimeSender(mpsc::Sender<ToolMsg>);
 
-impl ToolStoreApi for ToolSender {
+impl ToolStoreApi for ToolRuntimeSender {
     async fn mcp_upsert(&self, server: ConfiguredMcpServer) {
         let msg = ToolMsg::UpsertToolServer { server };
         self.0.send(msg).await.unwrap();
