@@ -518,7 +518,8 @@ where
                         "invoke_tool",
                         tool_name = request.name
                     );
-                    self.tool.invoke_tool(request, namespace.clone(), context)
+                    self.tool
+                        .invoke_tool_legacy(request, namespace.clone(), context)
                 })
                 .collect::<Vec<_>>(),
         )
