@@ -170,10 +170,12 @@ pub mod tests {
         }
 
         let mut toolbox = Toolbox::new(ToolClientStub);
-        toolbox.upsert_mcp_server(
-            Namespace::dummy(),
-            McpServerUrl::from("http://localhost:8080"),
-        ).await;
+        toolbox
+            .upsert_mcp_server(
+                Namespace::dummy(),
+                McpServerUrl::from("http://localhost:8080"),
+            )
+            .await;
         let tool = toolbox.fetch_tool(Namespace::dummy(), "test").unwrap();
 
         let arguments = vec![];
@@ -210,10 +212,12 @@ pub mod tests {
         }
 
         let mut toolbox = Toolbox::new(ToolClientStub);
-        toolbox.upsert_mcp_server(
-            Namespace::dummy(),
-            McpServerUrl::from("http://localhost:8080"),
-        ).await;
+        toolbox
+            .upsert_mcp_server(
+                Namespace::dummy(),
+                McpServerUrl::from("http://localhost:8080"),
+            )
+            .await;
         let tool = toolbox.fetch_tool(Namespace::dummy(), "test").unwrap();
         let result = tool.invoke(vec![], TracingContext::dummy()).await;
 
