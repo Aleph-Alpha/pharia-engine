@@ -197,7 +197,7 @@ impl<T: McpClient> ToolActor<T> {
             } => {
                 let maybe_tool = self
                     .toolbox
-                    .fetch_tool(qualified_name.namespace, &qualified_name.name)
+                    .fetch_tool(&qualified_name)
                     .await;
                 if let Some(tool) = maybe_tool {
                     self.running_requests.push(Box::pin(async move {
