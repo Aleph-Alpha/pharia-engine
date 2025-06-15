@@ -195,10 +195,7 @@ impl<T: McpClient> ToolActor<T> {
                 tracing_context,
                 send,
             } => {
-                let maybe_tool = self
-                    .toolbox
-                    .fetch_tool(&qualified_name)
-                    .await;
+                let maybe_tool = self.toolbox.fetch_tool(&qualified_name).await;
                 if let Some(tool) = maybe_tool {
                     self.running_requests.push(Box::pin(async move {
                         let result = tool.invoke(arguments, tracing_context).await;

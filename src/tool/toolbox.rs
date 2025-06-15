@@ -31,16 +31,24 @@ where
     pub async fn fetch_tool(
         &mut self,
         qtn: &QualifiedToolName,
-    ) -> Option<Box<dyn Tool + Send + Sync>>
+    ) -> Option<Arc<dyn Tool + Send + Sync>>
     where
         T: McpClient + 'static,
     {
         self.mcp_servers
             .update_tool_list(self.client.as_ref())
             .await;
-        let all_tools: HashMap<_, _> = self.mcp_servers.all_tools_by_name().collect();
-        let tool_desc = all_tools.get(qtn)?.clone();
-        Some(Box::new(McpTool::new(tool_desc, self.client.clone())))
+        self.mcp_tools = self
+            .mcp_servers
+            .all_tools_by_name()
+            .map(|(qtn, desc)| {
+                let tool = McpTool::new(desc, self.client.clone());
+                let tool: Arc<dyn Tool + Send + Sync> = Arc::new(tool);
+                (qtn, tool)
+            })
+            .collect();
+        let tool = self.mcp_tools.get(qtn)?.clone();
+        Some(tool)
     }
 
     pub fn list_mcp_servers_in_namespace(

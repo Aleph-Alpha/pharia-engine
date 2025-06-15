@@ -11,11 +11,11 @@ use double_trait::double;
 #[cfg_attr(test, double(McpSubscriberDouble))]
 pub trait McpSubscriber {
     /// Let the subscriber know that the list of tools has been changed and report the new list
-    fn report_updated_tools(&self, tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send>>);
+    fn report_updated_tools(&self, tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>);
 }
 
 impl McpSubscriber for ToolRuntimeSender {
-    fn report_updated_tools(&self, tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send>>) {
+    fn report_updated_tools(&self, tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>) {
         // Do nothing for now
     }
 }

@@ -4,7 +4,8 @@ use tracing::error;
 
 use crate::{
     mcp::{McpClient, McpServerUrl},
-    namespace_watcher::Namespace, tool::QualifiedToolName,
+    namespace_watcher::Namespace,
+    tool::QualifiedToolName,
 };
 
 /// Remembers MCP servers configured for each namespace, as well as the tools provided by each
@@ -99,27 +100,34 @@ impl McpServerStore {
 
     /// A complete list of all tools across all namespaces indexed by their qualified name.
     pub fn all_tools_by_name(&self) -> impl Iterator<Item = (QualifiedToolName, McpToolDesc)> + '_ {
-        self.servers.iter().flat_map(|(namespace, servers)|{
-            servers.iter().cloned().map(|s| (namespace.clone(), s))
-        }).flat_map(|(namespace, server)|{
-            self.tools.get(&server).expect("Every MCP server stored must have a tool list.")
-                .iter()
-                .cloned().map(move |t| {(namespace.clone(), server.clone(), t)})
-        }).map(|(namespace, server, tool_name)| {
-            (
-                QualifiedToolName {
-                    namespace,
-                    // Currently the tool name used to invoke the tool via CSI is the same as the
-                    // name reported by the MCP server, but this may change in the future, to avoid
-                    // name collisions
-                    name: tool_name.clone(),
-                },
-                McpToolDesc {
-                    name: tool_name,
-                    server,
-                },
-            )
-        })
+        self.servers
+            .iter()
+            .flat_map(|(namespace, servers)| {
+                servers.iter().cloned().map(|s| (namespace.clone(), s))
+            })
+            .flat_map(|(namespace, server)| {
+                self.tools
+                    .get(&server)
+                    .expect("Every MCP server stored must have a tool list.")
+                    .iter()
+                    .cloned()
+                    .map(move |t| (namespace.clone(), server.clone(), t))
+            })
+            .map(|(namespace, server, tool_name)| {
+                (
+                    QualifiedToolName {
+                        namespace,
+                        // Currently the tool name used to invoke the tool via CSI is the same as the
+                        // name reported by the MCP server, but this may change in the future, to avoid
+                        // name collisions
+                        name: tool_name.clone(),
+                    },
+                    McpToolDesc {
+                        name: tool_name,
+                        server,
+                    },
+                )
+            })
     }
 
     /// Fetches the list of tools for the given MCP server. The returned list is sorted, so that the
