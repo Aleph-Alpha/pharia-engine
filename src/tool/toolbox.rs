@@ -99,7 +99,7 @@ impl NativeToolStore {
 pub mod tests {
     use crate::{
         logging::TracingContext,
-        mcp::ToolClientDouble,
+        mcp::McpClientDouble,
         tool::{Argument, Modality, ToolError},
     };
 
@@ -108,7 +108,7 @@ pub mod tests {
     #[tokio::test]
     async fn invoke_tool_success() {
         struct ToolClientStub;
-        impl ToolClientDouble for ToolClientStub {
+        impl McpClientDouble for ToolClientStub {
             async fn invoke_tool(
                 &self,
                 _name: &str,
@@ -158,7 +158,7 @@ pub mod tests {
     #[tokio::test]
     async fn fetch_missing_tool() {
         struct ToolClientStub;
-        impl ToolClientDouble for ToolClientStub {
+        impl McpClientDouble for ToolClientStub {
             async fn invoke_tool(
                 &self,
                 _name: &str,

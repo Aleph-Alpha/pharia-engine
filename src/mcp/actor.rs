@@ -11,7 +11,7 @@ use double_trait::double;
 use crate::{
     mcp::{
         ConfiguredMcpServer, McpClient, McpClientImpl, McpServerStore, McpServerUrl, McpSubscriber,
-        McpTool, subscribers,
+        McpTool,
     },
     namespace_watcher::Namespace,
     tool::Tool,
@@ -159,9 +159,11 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
 
     use double_trait::Dummy;
+
+    use crate::{mcp::{subscribers::McpSubscriberDouble, McpClientDouble}, tool::QualifiedToolName};
 
     use super::*;
 
@@ -196,6 +198,41 @@ pub mod tests {
         // Then we get the mcp server
         let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
         assert_eq!(result, vec![McpServerUrl::new("http://localhost:8000/mcp")]);
+    }
+
+    #[tokio::test]
+    async fn report_tools_after_upserting_server() {
+        // Given a MCP API that knows about no mcp servers
+        struct SubscriberMock;
+        impl McpSubscriberDouble for SubscriberMock {
+            fn report_updated_tools(
+                &self,
+                tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+            ) {
+                // Then the tool reported by the server is reported to the subscriber
+                let expected_tool_name = QualifiedToolName {
+                    namespace: Namespace::new("test-namespace").unwrap(),
+                    name: "new-tool".to_owned()
+                };
+                assert_eq!(tools.len(), 1);
+                assert!(tools.contains_key(&expected_tool_name));
+            }
+        }
+        struct StubClient;
+        impl McpClientDouble for StubClient {
+            async fn list_tools(&self,_: &McpServerUrl,) -> Result<Vec<String> ,anyhow::Error> {
+                // Simulate a tool server that has one tool
+                Ok(vec!["new-tool".into()])
+            }
+        }
+        let mcp = Mcp::with_client(StubClient, SubscriberMock).api();
+
+        // When upserting mcp server for the namespace
+        mcp.upsert(ConfiguredMcpServer::new(
+            "http://localhost:8000/mcp",
+            Namespace::new("test-namespace").unwrap(),
+        ))
+        .await;
     }
 
     #[tokio::test]
