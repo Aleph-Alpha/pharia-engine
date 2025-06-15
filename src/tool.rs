@@ -15,6 +15,7 @@ pub use self::{
 
 /// A tool name that is qualified by a namespace. It can uniquely identify a tool across different
 /// namespaces.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct QualifiedToolName {
     /// The namespace in which the tool is defined.
     pub namespace: Namespace,
