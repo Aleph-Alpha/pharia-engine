@@ -350,9 +350,6 @@ where
                     namespace.clone(),
                 ))
                 .await;
-            self.tool_store_api
-                .mcp_upsert(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
-                .await;
         }
         for mcp_server in mcp_server_diff.removed {
             self.mcp_store_api
@@ -360,9 +357,6 @@ where
                     mcp_server.clone(),
                     namespace.clone(),
                 ))
-                .await;
-            self.tool_store_api
-                .mcp_remove(ConfiguredMcpServer::new(mcp_server, namespace.clone()))
                 .await;
         }
 
@@ -782,16 +776,6 @@ pub mod tests {
         }
     }
 
-    impl ToolStoreDouble for McpServerStoreSpy {
-        async fn mcp_upsert(&self, server: ConfiguredMcpServer) {
-            self.upserted.lock().await.push(server);
-        }
-
-        async fn mcp_remove(&self, server: ConfiguredMcpServer) {
-            self.removed.lock().await.push(server);
-        }
-    }
-
     impl McpDouble for McpServerStoreSpy {
         async fn upsert(&self, server: ConfiguredMcpServer) {
             self.upserted.lock().await.push(server);
@@ -805,13 +789,12 @@ pub mod tests {
     #[tokio::test]
     async fn new_mcp_server_is_upserted() {
         // Given a namespace description watcher with empty descriptions
-        let tool_store = McpServerStoreSpy::new();
         let mcp_store = McpServerStoreSpy::new();
         let descriptions = HashMap::new();
         let config = Box::new(PendingConfig);
         let mut watcher = NamespaceWatcherActor::with_tool_store_api(
             descriptions,
-            tool_store.clone(),
+            Dummy,
             mcp_store.clone(),
             config,
         );
@@ -828,14 +811,6 @@ pub mod tests {
             .await;
 
         // Then the new mcp servers is upserted
-        let upserted = tool_store.upserted.lock().await.clone();
-        assert_eq!(
-            upserted,
-            vec![ConfiguredMcpServer::new(
-                "http://localhost:8000/mcp",
-                namespace.clone()
-            )]
-        );
         let upserted = mcp_store.upserted.lock().await.clone();
         assert_eq!(
             upserted,
@@ -849,7 +824,6 @@ pub mod tests {
     #[tokio::test]
     async fn dropped_mcp_server_is_removed() {
         // Given a namespace description watcher and a tool store that both know about an mcp server
-        let tool_store = McpServerStoreSpy::new();
         let mcp_store = McpServerStoreSpy::new();
 
         let namespace = Namespace::new("dummy-namespace").unwrap();
@@ -864,7 +838,7 @@ pub mod tests {
         let config = Box::new(PendingConfig);
         let mut watcher = NamespaceWatcherActor::with_tool_store_api(
             descriptions,
-            tool_store.clone(),
+            Dummy,
             mcp_store.clone(),
             config,
         );
@@ -881,14 +855,6 @@ pub mod tests {
             .await;
 
         // Then the tool store is notified that the mcp server is removed
-        let removed = tool_store.removed.lock().await.clone();
-        assert_eq!(
-            removed,
-            vec![ConfiguredMcpServer::new(
-                "http://localhost:8000/mcp",
-                namespace.clone()
-            )]
-        );
         let removed = mcp_store.removed.lock().await.clone();
         assert_eq!(
             removed,
