@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
+    time::interval,
 };
 
 #[cfg(test)]
@@ -32,15 +33,16 @@ pub struct Mcp {
 
 impl Mcp {
     pub fn new(subscriber: impl McpSubscriber + Send + 'static) -> Self {
-        Self::with_client(McpClientImpl::new(), subscriber)
+        Self::with_client(McpClientImpl::new(), subscriber, Duration::from_secs(60))
     }
 
     pub fn with_client(
         client: impl McpClient,
         subscriber: impl McpSubscriber + Send + 'static,
+        check_interval: Duration,
     ) -> Self {
         let (send, receiver) = mpsc::channel::<McpMsg>(1);
-        let mut actor = McpActor::new(receiver, client, subscriber);
+        let mut actor = McpActor::new(receiver, client, subscriber, check_interval);
         let handle = tokio::spawn(async move { actor.run().await });
         Self { handle, send }
     }
@@ -97,6 +99,7 @@ struct McpActor<C, S> {
     receiver: mpsc::Receiver<McpMsg>,
     client: Arc<C>,
     subscriber: S,
+    check_interval: Duration,
 }
 
 impl<C, S> McpActor<C, S>
@@ -104,23 +107,43 @@ where
     C: McpClient,
     S: McpSubscriber,
 {
-    fn new(receiver: mpsc::Receiver<McpMsg>, client: C, subscriber: S) -> Self {
+    fn new(
+        receiver: mpsc::Receiver<McpMsg>,
+        client: C,
+        subscriber: S,
+        check_interval: Duration,
+    ) -> Self {
         Self {
             store: McpServerStore::new(),
             receiver,
             client: Arc::new(client),
             subscriber,
+            check_interval,
         }
     }
 
     async fn run(&mut self) {
+        // Time interval to check for changes in tool servers (or retry if we failed to fetch them).
+        let mut check_interval = interval(self.check_interval);
+
         loop {
-            let msg = self.receiver.recv().await;
-            match msg {
-                Some(msg) => self.act(msg).await,
-                None => break,
+            tokio::select! {
+                msg = self.receiver.recv() => {
+                    match msg {
+                        Some(msg) => self.act(msg).await,
+                        None => break,
+                    }
+                }
+                _ = check_interval.tick() => {
+                    self.check_for_changes().await;
+                }
             }
         }
+    }
+
+    async fn check_for_changes(&mut self) {
+        // Default implementation does nothing.
+        // Override or implement as needed.
     }
 
     async fn act(&mut self, msg: McpMsg) {
@@ -236,7 +259,7 @@ pub mod tests {
                 Ok(vec!["new-tool".into()])
             }
         }
-        let mcp = Mcp::with_client(StubClient, SubscriberMock).api();
+        let mcp = Mcp::with_client(StubClient, SubscriberMock, Duration::from_secs(60)).api();
 
         // When upserting mcp server for the namespace
         mcp.upsert(ConfiguredMcpServer::new(
