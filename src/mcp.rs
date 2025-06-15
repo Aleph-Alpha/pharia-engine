@@ -7,7 +7,7 @@ pub use self::{
     actor::{Mcp, McpApi, McpSender},
     client::{McpClient, McpClientImpl},
     routes::{McpServerStoreProvider, http_mcp_servers_v1, openapi_mcp_servers_v1},
-    store::McpServerStore,
+    store::{McpServerStore, McpToolDesc},
 };
 
 #[cfg(test)]

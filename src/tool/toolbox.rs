@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::{
     logging::TracingContext,
-    mcp::{McpClient, McpServerStore, McpServerUrl},
+    mcp::{McpClient, McpServerStore, McpServerUrl, McpToolDesc},
     namespace_watcher::Namespace,
     tool::{Argument, Modality, Tool, ToolError},
 };
@@ -55,9 +55,12 @@ where
         self.mcp_servers
             .update_tool_list(self.client.as_ref())
             .await;
+        let tools = self.mcp_servers.list_tools_for_namespace(&namespace);
+        let tool_desc = tools.into_iter().find(|tool| tool.name == name)?;
         let urls = self.mcp_servers.list_in_namespace(&namespace).collect();
         let server = Toolbox::mcp_server_for_tool(urls, self.client.clone(), name.to_owned());
         Some(Box::new(McpTool::new(
+            tool_desc,
             name.to_owned(),
             server,
             self.client.clone(),
@@ -89,14 +92,20 @@ where
 }
 
 struct McpTool<C, U> {
+    desc: McpToolDesc,
     name: String,
     url: U,
     client: Arc<C>,
 }
 
 impl<C, U> McpTool<C, U> {
-    pub fn new(name: String, url: U, client: Arc<C>) -> Self {
-        Self { name, url, client }
+    pub fn new(desc: McpToolDesc, name: String, url: U, client: Arc<C>) -> Self {
+        Self {
+            desc,
+            name,
+            url,
+            client,
+        }
     }
 }
 
