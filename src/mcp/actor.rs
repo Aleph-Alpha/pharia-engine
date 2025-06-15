@@ -194,7 +194,7 @@ pub mod tests {
     use tokio::time::Instant as TokioInstant;
 
     use crate::{
-        mcp::{McpClientDouble, subscribers::McpSubscriberDouble},
+        mcp::{subscribers::{McpSubscriberDouble, ToolMap}, McpClientDouble},
         tool::QualifiedToolName,
     };
 
@@ -408,11 +408,6 @@ pub mod tests {
     #[tokio::test]
     async fn one_bad_mcp_server_still_allows_to_list_other_tools() {
         // Given an mcp server that returns an error when listing it's tools
-        let namespace = Namespace::new("test").unwrap();
-        let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
-        ];
         struct ClientOneGoodOtherBad;
         impl McpClientDouble for ClientOneGoodOtherBad {
             async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
@@ -423,6 +418,11 @@ pub mod tests {
                 }
             }
         }
+        let namespace = Namespace::new("test").unwrap();
+        let servers = [
+            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
+            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
+        ];
         let subscriber = RecordingSubscriber::new();
         let mcp = Mcp::new(
             ClientOneGoodOtherBad,
@@ -437,19 +437,15 @@ pub mod tests {
 
         // Then the search tool is listed
         let tool_list = subscriber.calls().last().unwrap().clone();
-        assert!(
-            tool_list
-                .get(&QualifiedToolName {
-                    namespace: namespace.clone(),
-                    name: "one_tool".to_owned(),
-                })
-                .is_some()
-        )
+        assert!(tool_list.contains_key(&QualifiedToolName {
+            namespace: namespace.clone(),
+            name: "one_tool".to_owned(),
+        }));
     }
 
     #[derive(Clone)]
     struct RecordingSubscriber {
-        calls: Arc<Mutex<Vec<HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>>>>,
+        calls: Arc<Mutex<Vec<ToolMap>>>,
     }
 
     impl RecordingSubscriber {
@@ -459,7 +455,7 @@ pub mod tests {
             }
         }
 
-        pub fn calls(&self) -> Vec<HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>> {
+        pub fn calls(&self) -> Vec<ToolMap> {
             self.calls.lock().unwrap().clone()
         }
     }

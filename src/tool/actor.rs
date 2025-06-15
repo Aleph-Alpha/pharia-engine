@@ -25,7 +25,7 @@ use double_trait::double;
 /// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
 #[cfg_attr(test, double(ToolStoreDouble))]
 pub trait ToolStoreApi {
-    /// Update the list of tools known to the `ToolRuntime``.
+    /// Update the list of tools known to the `ToolRuntime`.
     ///
     /// With the current execption of the native tools.
     fn report_updated_tools(
@@ -281,7 +281,6 @@ pub mod tests {
     #[tokio::test]
     async fn correct_tool_is_called() {
         // Given a tool named search and another tool
-        let namespace = Namespace::new("test").unwrap();
         struct ToolStub;
         #[async_trait]
         impl ToolDouble for ToolStub {
@@ -295,6 +294,7 @@ pub mod tests {
                 }])
             }
         }
+        let namespace = Namespace::new("test").unwrap();
         let tool_runtime = ToolRuntime::new().api();
         let tools = HashMap::from([
             (
