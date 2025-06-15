@@ -189,7 +189,7 @@ pub mod tests {
         collections::{HashMap, HashSet},
         sync::Mutex,
     };
-    use tokio::time::{Instant as TokioInstant};
+    use tokio::time::Instant as TokioInstant;
 
     use crate::{
         mcp::{McpClientDouble, subscribers::McpSubscriberDouble},
@@ -216,12 +216,12 @@ pub mod tests {
         }
         impl McpClientDouble for McpClientStub {
             async fn list_tools(&self, _: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
-            let elapsed = self.start.elapsed();
-            if elapsed >= Duration::from_secs(30) {
-                Ok(vec!["tool_one".to_string(), "tool_two".to_string()])
-            } else {
-                Ok(vec!["tool_one".to_string()])
-            }
+                let elapsed = self.start.elapsed();
+                if elapsed >= Duration::from_secs(30) {
+                    Ok(vec!["tool_one".to_string(), "tool_two".to_string()])
+                } else {
+                    Ok(vec!["tool_one".to_string()])
+                }
             }
         }
 
