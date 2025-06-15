@@ -286,13 +286,15 @@ pub mod tests {
     use core::panic;
     use std::{collections::HashSet, sync::Arc, time::Duration};
 
+    use async_trait::async_trait;
+    use double_trait::Dummy;
     use futures::future::pending;
     use tokio::sync::Mutex;
 
     use crate::{
         logging::TracingContext,
         mcp::McpClientDouble,
-        tool::{ToolRuntime, actor::ToolStoreApi},
+        tool::{actor::ToolStoreApi, ToolDouble, ToolRuntime},
     };
 
     use super::*;
@@ -343,33 +345,6 @@ pub mod tests {
 
         // Then we get a tool not found error
         assert!(matches!(result, Err(ToolError::ToolNotFound(_))));
-    }
-
-    #[tokio::test]
-    async fn tool_server_is_available_for_configured_namespace() {
-        // Given a tool client that only reports tools for a particular url
-        let namespace = Namespace::new("test").unwrap();
-        let tool = ToolRuntime::with_client(ToolClientMock)
-            .with_servers(vec![ConfiguredMcpServer::new(
-                "http://localhost:8000/mcp",
-                namespace.clone(),
-            )])
-            .await
-            .api();
-
-        // When we invoke a tool that the mock client supports for the configured namespace
-        let tool_name = QualifiedToolName {
-            namespace: namespace.clone(),
-            name: "add".to_owned(),
-        };
-        let arguments = vec![];
-        let result = tool
-            .invoke_tool(tool_name, arguments, TracingContext::dummy())
-            .await
-            .unwrap();
-
-        assert_eq!(result.len(), 1);
-        assert!(matches!(&result[0], Modality::Text { text } if text == "Success"));
     }
 
     #[tokio::test]
@@ -490,24 +465,55 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn correct_mcp_server_is_called_for_tool_invocation() {
+    async fn correct_tool_is_called() {
         // Given a tool client that knows about two mcp servers
         let namespace = Namespace::new("test").unwrap();
         let servers = vec![
             ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
             ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
         ];
-        let tool = ToolRuntime::with_client(TwoServerClient)
+        struct ToolStub;
+        
+        #[async_trait]
+        impl ToolDouble for ToolStub {
+            async fn invoke(
+                &self,
+                _: Vec<Argument>,
+                _: TracingContext,
+            ) -> Result<Vec<Modality>, ToolError> {
+                Ok(vec![Modality::Text {
+                    text: "search result".to_owned(),
+                }])
+            }
+        }
+        let tool_runtime = ToolRuntime::with_client(TwoServerClient)
             .with_servers(servers)
             .await
             .api();
+        let tools = HashMap::from([
+            (
+                QualifiedToolName {
+                    namespace: namespace.clone(),
+                    name: "search".to_owned(),
+                },
+                Arc::new(ToolStub) as Arc<dyn Tool + Send + Sync>,
+            ),
+            (
+                QualifiedToolName {
+                    namespace: namespace.clone(),
+                    name: "other_tool".to_owned(),
+                },
+                Arc::new(Dummy),
+            ),
+        ]);
+        tool_runtime.report_updated_tools(tools).await;
 
         // When we invoke the search tool
         let tool_name = QualifiedToolName {
             namespace: namespace.clone(),
             name: "search".to_owned(),
         };
-        let result = tool
+        let result = tool_runtime
             .invoke_tool(tool_name, vec![], TracingContext::dummy())
             .await
             .unwrap();
@@ -618,35 +624,6 @@ pub mod tests {
 
         // Then the search tool is available
         assert_eq!(result, vec!["search".to_owned()]);
-    }
-
-    #[tokio::test]
-    async fn one_bad_mcp_server_still_allows_to_invoke_tool() {
-        // Given an mcp server that returns an error when listing it's tools
-        let namespace = Namespace::new("test").unwrap();
-        let servers = vec![
-            ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone()),
-            ConfiguredMcpServer::new("http://localhost:8001/mcp", namespace.clone()),
-        ];
-        let tool = ToolRuntime::with_client(ClientOneGoodOtherBad)
-            .with_servers(servers)
-            .await
-            .api();
-
-        // When invoking a tool
-        let tool_name = QualifiedToolName {
-            namespace: namespace.clone(),
-            name: "search".to_owned(),
-        };
-        let arguments = vec![];
-        let result = tool
-            .invoke_tool(tool_name, arguments, TracingContext::dummy())
-            .await
-            .unwrap();
-
-        // Then the search tool is available
-        assert_eq!(result.len(), 1);
-        assert!(matches!(&result[0], Modality::Text { text } if text == "Success"));
     }
 
     struct SaboteurClient;

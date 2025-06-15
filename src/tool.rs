@@ -13,6 +13,9 @@ pub use self::{
     toolbox::ConfiguredNativeTool,
 };
 
+#[cfg(test)]
+use double_trait::double;
+
 /// A tool name that is qualified by a namespace. It can uniquely identify a tool across different
 /// namespaces.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -54,6 +57,7 @@ pub enum ToolError {
 }
 
 #[async_trait]
+#[cfg_attr(test, double(ToolDouble))]
 pub trait Tool {
     async fn invoke(
         &self,
