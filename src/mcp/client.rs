@@ -16,11 +16,11 @@ use crate::{
 #[cfg(test)]
 use double_trait::double;
 
-pub struct McpClient {
+pub struct McpClientImpl {
     client: Client,
 }
 
-impl McpClient {
+impl McpClientImpl {
     pub fn new() -> Self {
         let client = Client::new();
         Self { client }
@@ -34,7 +34,7 @@ struct ToolCallResult {
     is_error: bool,
 }
 
-impl McpClient {
+impl McpClientImpl {
     fn parse_tool_call_result(result: ToolCallResult) -> Result<ToolOutput, ToolError> {
         if result.is_error {
             let Modality::Text { text } = result
@@ -49,7 +49,7 @@ impl McpClient {
 }
 
 #[cfg_attr(test, double(ToolClientDouble))]
-pub trait ToolClient: Send + Sync + 'static {
+pub trait McpClient: Send + Sync + 'static {
     fn invoke_tool(
         &self,
         name: &str,
@@ -64,7 +64,7 @@ pub trait ToolClient: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send + Sync;
 }
 
-impl ToolClient for McpClient {
+impl McpClient for McpClientImpl {
     async fn invoke_tool(
         &self,
         name: &str,
@@ -149,7 +149,7 @@ impl ToolClient for McpClient {
     }
 }
 
-impl McpClient {
+impl McpClientImpl {
     /// The initialization phase MUST be the first interaction between client and server.
     /// During this phase, the client and server:
     /// - Establish protocol version compatibility
@@ -289,7 +289,7 @@ pub mod tests {
     async fn tools_can_be_listed() {
         // Given a MCP server
         let mcp = given_sse_mcp_server().await;
-        let client = McpClient::new();
+        let client = McpClientImpl::new();
 
         // When listing tools
         let tools = client.list_tools(&mcp.address().into()).await.unwrap();
@@ -314,7 +314,7 @@ pub mod tests {
                 value: json!(2).to_string().into_bytes(),
             },
         ];
-        let client = McpClient::new();
+        let client = McpClientImpl::new();
         let response = client
             .invoke_tool(
                 "add",
@@ -343,7 +343,7 @@ pub mod tests {
                 value: json!(2).to_string().into_bytes(),
             },
         ];
-        let client = McpClient::new();
+        let client = McpClientImpl::new();
         let response = client
             .invoke_tool(
                 "add",
@@ -362,7 +362,7 @@ pub mod tests {
     async fn invoke_unknown_tool_gives_error() {
         let mcp = given_sse_mcp_server().await;
 
-        let client = McpClient::new();
+        let client = McpClientImpl::new();
         let response = client
             .invoke_tool(
                 "unknown",
@@ -379,7 +379,7 @@ pub mod tests {
     async fn invoke_saboteur_tool_results_in_error() {
         let mcp = given_sse_mcp_server().await;
 
-        let client = McpClient::new();
+        let client = McpClientImpl::new();
         let response = client
             .invoke_tool(
                 "saboteur",
@@ -399,7 +399,7 @@ pub mod tests {
     async fn initialize_request() {
         let mcp = given_sse_mcp_server().await;
 
-        let client = McpClient::new();
+        let client = McpClientImpl::new();
         client.initialize(&mcp.address().into()).await.unwrap();
     }
 
@@ -410,7 +410,7 @@ pub mod tests {
             is_error: false,
         };
 
-        let result = McpClient::parse_tool_call_result(result);
+        let result = McpClientImpl::parse_tool_call_result(result);
 
         assert!(result.is_ok());
     }
