@@ -9,7 +9,7 @@ use crate::{
 
 use super::{client::McpClient, store::McpToolDesc};
 
-/// Implementation of [`crate::tool::Tool`] sepecific to Model Context Protocol (MCP) tools.
+/// Implementation of [`crate::tool::Tool`] specific to Model Context Protocol (MCP) tools.
 pub struct McpTool<C> {
     desc: McpToolDesc,
     client: Arc<C>,

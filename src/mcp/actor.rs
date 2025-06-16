@@ -20,7 +20,9 @@ use crate::{
 use double_trait::double;
 use futures::Future;
 
-/// CSI facing interface, allows to invoke and list tools
+/// Interface offered by the MCP actor.
+///
+/// Allows the MCP actor to be notified about changes in the list of configured MCP servers.
 #[cfg_attr(test, double(McpDouble))]
 pub trait McpApi {
     fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
