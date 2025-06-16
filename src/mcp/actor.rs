@@ -4,12 +4,11 @@
 //! and consumes a [`McpSubscriber`] to notify other components when the available tool set
 //! changes. The actor periodically polls configured servers to discover new tools.
 
-use std::{sync::Arc, time::Duration};
+use std::{pin::Pin, sync::Arc, time::Duration};
 
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
-    time::interval,
 };
 
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
 };
 #[cfg(test)]
 use double_trait::double;
-use futures::Future;
+use futures::{Future, StreamExt, stream::FuturesUnordered};
 
 /// Interface offered by the MCP actor.
 ///
@@ -106,12 +105,17 @@ enum McpMsg {
     },
 }
 
+/// A request to fetch tools for a given MCP server.
+type ToolServerRequest =
+    Pin<Box<dyn Future<Output = Result<(McpServerUrl, Vec<String>), anyhow::Error>> + Send>>;
+
 struct McpActor<C, S> {
     store: McpServerStore,
     receiver: mpsc::Receiver<McpMsg>,
     client: Arc<C>,
     subscriber: S,
     check_interval: Duration,
+    running_requests: FuturesUnordered<ToolServerRequest>,
 }
 
 impl<C, S> McpActor<C, S>
@@ -131,37 +135,64 @@ where
             client: Arc::new(client),
             subscriber,
             check_interval,
+            running_requests: FuturesUnordered::new(),
         }
     }
 
     async fn run(&mut self) {
-        // Time interval to check for changes in tool servers (or retry if we failed to fetch them).
-        let mut check_interval = interval(self.check_interval);
-
+        // This select statement ensure that we can always accept and handle incoming messages,
+        // even if requests to some mcp servers are pending. Also, if a mcp server is slow to
+        // respond, it does not block updates from other mcp servers to be propagated.
         loop {
             tokio::select! {
+                // Listen for incoming messages and act on them directly.
                 msg = self.receiver.recv() => {
                     match msg {
                         Some(msg) => self.act(msg).await,
                         None => break,
                     }
                 }
-                // moving the check for change to the outside of the select will make it concurrent
-                // only the insert should be in the branch
-                _ = check_interval.tick() => {
-                    self.check_for_changes().await;
+                // Wait for the next mcp server to be up for refresh, then add it to the backlog.
+                next_up_for_refresh = self.store.wait_for_next_refresh(self.check_interval) => {
+                    if let Some(server) = next_up_for_refresh {
+                        self.add_to_backlog(server);
+                    }
                 }
+                // Continuously poll the backlog. Once a task in the backlog is completed, set the
+                // tools in the store. If the list of tools has changed, report the updated tools
+                // to the subscriber.
+                result = self.running_requests.select_next_some(), if !self.running_requests.is_empty() => {
+                    if let Ok((server, tools)) = result {
+                        let updated = self.store.update_tools(server, tools);
+                        if updated {
+                            self.report_updated_tools().await;
+                        }
+                    }
+                    // In the error case, we do not need to do anything. The tool list is already initialized
+                    // with an empty list, so no update is required there.
+                }
+
             }
         }
+    }
+
+    /// Create a new background task to fetch the tools for a given server.
+    fn add_to_backlog(&mut self, server: McpServerUrl) {
+        let client = self.client.clone();
+        let request = Box::pin(async move {
+            McpServerStore::fetch_tools_for(&server, client.as_ref())
+                .await
+                .map(|tools| (server, tools))
+        });
+        self.running_requests.push(request);
     }
 
     async fn act(&mut self, msg: McpMsg) {
         match msg {
             McpMsg::Upsert { server } => {
-                self.store
-                    .upsert(server.namespace, server.url, self.client.as_ref())
-                    .await;
-                self.report_updated_tools().await;
+                let url = server.url.clone();
+                self.store.upsert(server.namespace, server.url);
+                self.add_to_backlog(url);
             }
             McpMsg::Remove { server } => {
                 self.store.remove(server.namespace, server.url);
@@ -171,12 +202,6 @@ where
                 let result = self.store.list_in_namespace(&namespace).collect();
                 drop(send.send(result));
             }
-        }
-    }
-
-    async fn check_for_changes(&mut self) {
-        if self.store.update_tool_list(self.client.as_ref()).await {
-            self.report_updated_tools().await;
         }
     }
 
@@ -251,7 +276,7 @@ pub mod tests {
                 if *timeout {
                     pending().await
                 } else {
-                    Ok(vec!["list_fishes".to_owned(), "catch_fish".to_owned()])
+                    Ok(vec!["list_fish".to_owned(), "catch_fish".to_owned()])
                 }
             }
         }
@@ -524,6 +549,9 @@ pub mod tests {
         // When upserting both servers
         mcp.upsert(servers[0].clone()).await;
         mcp.upsert(servers[1].clone()).await;
+
+        // And waiting shortly for the actor to poll the task
+        tokio::time::sleep(Duration::from_millis(10)).await;
 
         // Then the search tool is listed
         let tool_list = subscriber.calls().last().unwrap().clone();

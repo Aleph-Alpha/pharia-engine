@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use tokio::time::Instant;
 use tracing::error;
@@ -9,18 +12,23 @@ use crate::{
     tool::QualifiedToolName,
 };
 
-/// A list of tools that have been fetched from an MCP server.
+/// A cached list of tools from an MCP server.
 struct CachedTools {
-    pub tools: Vec<String>,
-    last_checked: Option<Instant>,
+    tools: Vec<String>,
+    /// The time when the list of tools was last updated.
+    last_checked: Instant,
 }
 
 impl CachedTools {
-    pub fn new(tools: Vec<String>) -> Self {
+    pub fn now(tools: Vec<String>) -> Self {
         Self {
             tools,
-            last_checked: None,
+            last_checked: Instant::now(),
         }
+    }
+
+    pub fn update_last_checked(&mut self) {
+        self.last_checked = Instant::now();
     }
 }
 
@@ -42,12 +50,33 @@ impl McpServerStore {
         }
     }
 
+    pub async fn wait_for_next_refresh(
+        &mut self,
+        update_interval: Duration,
+    ) -> Option<McpServerUrl> {
+        if let Some((server, cached_tools)) = self.next_in_line_for_refresh() {
+            // Sleep until last refresh + update_interval
+            let wait_until = cached_tools.last_checked + update_interval;
+            tokio::time::sleep_until(wait_until).await;
+            // Set the last refresh to now for this server. The correct way would be to update it
+            // to the time when the refresh is completed. However, not updating would set the
+            // server up for immediate requeue.
+            cached_tools.update_last_checked();
+            Some(server.clone())
+        } else {
+            // We sleep here, as there are no servers to refresh. The alternative would be
+            // returning directly, but this would lead to a busy loop in the select statement.
+            tokio::time::sleep(update_interval).await;
+            None
+        }
+    }
+
     /// The Mcp server that is up next for refresh.
     ///
     /// Returns None if there are no servers to refresh.
-    fn _next_in_line_for_refresh(&self) -> Option<(&McpServerUrl, &CachedTools)> {
+    fn next_in_line_for_refresh(&mut self) -> Option<(&McpServerUrl, &mut CachedTools)> {
         self.tools
-            .iter()
+            .iter_mut()
             .min_by_key(|(_, tools)| tools.last_checked)
     }
 
@@ -62,44 +91,27 @@ impl McpServerStore {
             .into_iter()
     }
 
-    /// Once a new task is due, this function will return the next future to be executed
-    // pub async fn next_refresh(&self) -> Option<impl Future<Output = ()> + Send> {
-
-    /// Updates the tool list for all configured MCP servers. `true` if the list of tools has
-    /// changed.
-    pub async fn update_tool_list(&mut self, client: &impl McpClient) -> bool {
-        let mut any_changes_so_far = false;
-        for (server, tools_known) in &mut self.tools {
-            let Ok(up_to_date_tools) = Self::fetch_tools_for(server, client).await else {
-                // If we cannot fetch the tools, we will not update the list. We will try again
-                // later.
-                continue;
-            };
-            if up_to_date_tools != tools_known.tools {
-                // If the tool list has changed, we update it.
-                tools_known.tools = up_to_date_tools;
-                any_changes_so_far = true;
-            }
+    /// Sets the tool list for a given MCP server and reports if there have been changes.
+    pub fn update_tools(&mut self, server: McpServerUrl, tools: Vec<String>) -> bool {
+        let previous = self.tools.get_mut(&server);
+        if let Some(previous) = previous {
+            let updated = previous.tools != tools;
+            // We do not update the time, as it was set when the task was fetched
+            previous.tools = tools;
+            updated
+        } else {
+            self.tools.insert(server, CachedTools::now(tools));
+            true
         }
-        any_changes_so_far
     }
 
-    pub async fn upsert(
-        &mut self,
-        namespace: Namespace,
-        server_to_upsert: McpServerUrl,
-        client: &impl McpClient,
-    ) {
+    pub fn upsert(&mut self, namespace: Namespace, server_to_upsert: McpServerUrl) {
         if !self.tools.contains_key(&server_to_upsert) {
-            // If the server is new, initialize its tool list.
-            let tools = Self::fetch_tools_for(&server_to_upsert, client)
-                .await
-                // If we cannot fetch the tools, we still need to keep track of the server. We will
-                // provide only an empty tool list. If the error is temporary we will eventually be
-                // able to fetch the tools, using our regular update.
-                .unwrap_or_default();
+            // Initialize the server with an empty tool list.
+            // Last updated is set to now, as there is a running request pushed for
+            // this server.
             self.tools
-                .insert(server_to_upsert.clone(), CachedTools::new(tools));
+                .insert(server_to_upsert.clone(), CachedTools::now(vec![]));
         }
         self.servers
             .entry(namespace)
@@ -160,7 +172,7 @@ impl McpServerStore {
 
     /// Fetches the list of tools for the given MCP server. The returned list is sorted, so that the
     /// list can be compared trivially later.
-    async fn fetch_tools_for(
+    pub async fn fetch_tools_for(
         server: &McpServerUrl,
         client: &impl McpClient,
     ) -> Result<Vec<String>, anyhow::Error> {
@@ -204,7 +216,7 @@ pub mod tests {
     }
 
     impl CachedTools {
-        fn last_checked(last_checked: Option<Instant>) -> Self {
+        fn last_checked(last_checked: Instant) -> Self {
             Self {
                 tools: vec![],
                 last_checked,
@@ -214,40 +226,108 @@ pub mod tests {
 
     #[tokio::test]
     async fn next_refresh_without_any_servers() {
-        let store = McpServerStore::new();
-        assert!(store._next_in_line_for_refresh().is_none());
+        let mut store = McpServerStore::new();
+        assert!(store.next_in_line_for_refresh().is_none());
     }
 
     #[tokio::test]
     async fn oldest_server_is_returned() {
         // Given a store with two servers that have been checked at different times
-        let first_tools = CachedTools::last_checked(Some(Instant::now() - Duration::from_secs(1)));
-        let second_tools = CachedTools::last_checked(Some(Instant::now() - Duration::from_secs(2)));
-        let store = McpServerStore::new()
+        let first_tools = CachedTools::last_checked(Instant::now() - Duration::from_secs(1));
+        let second_tools = CachedTools::last_checked(Instant::now() - Duration::from_secs(2));
+        let mut store = McpServerStore::new()
             .with_tool(McpServerUrl::new("http://first.com/mcp"), first_tools)
             .with_tool(McpServerUrl::new("http://second.com/mcp"), second_tools);
 
         // When we call next_refresh
-        let next = store._next_in_line_for_refresh().unwrap();
+        let next = store.next_in_line_for_refresh().unwrap();
 
         // Then the oldest server is returned
         assert_eq!(next.0, &McpServerUrl::new("http://second.com/mcp"));
     }
 
     #[tokio::test]
-    async fn never_refreshed_servers_are_first_in_line() {
-        // Given a store with two servers, one that has never been checked and one that has been
-        // checked in the past.
-        let first_tools = CachedTools::last_checked(None);
-        let second_tools = CachedTools::last_checked(Some(Instant::now() - Duration::from_secs(2)));
-        let store = McpServerStore::new()
-            .with_tool(McpServerUrl::new("http://first.com/mcp"), first_tools)
-            .with_tool(McpServerUrl::new("http://second.com/mcp"), second_tools);
+    async fn overdue_server_is_returned_directly() {
+        // Given a store with a server that is overdue for refresh
+        let first_tools = CachedTools::last_checked(Instant::now() - Duration::from_secs(2));
+        let mut store =
+            McpServerStore::new().with_tool(McpServerUrl::new("http://first.com/mcp"), first_tools);
+        let update_interval = Duration::from_secs(1);
 
-        // When we call next_refresh
-        let next = store._next_in_line_for_refresh().unwrap();
+        // When we wait for the next refresh
+        let next = tokio::time::timeout(
+            Duration::from_millis(10),
+            store.wait_for_next_refresh(update_interval),
+        )
+        .await
+        .unwrap()
+        .unwrap();
 
-        // Then the server that has never been checked is returned
-        assert_eq!(next.0, &McpServerUrl::new("http://first.com/mcp"));
+        // Then the server is returned directly
+        assert_eq!(next, McpServerUrl::new("http://first.com/mcp"));
+    }
+
+    #[tokio::test]
+    async fn recently_checked_server_is_not_returned_directly() {
+        // Given a store with a server that has been checked just now
+        let first_tools = CachedTools::last_checked(Instant::now());
+        let mut store =
+            McpServerStore::new().with_tool(McpServerUrl::new("http://first.com/mcp"), first_tools);
+        let update_interval = Duration::from_secs(1);
+
+        // When we wait for the next refresh
+        let next = tokio::time::timeout(
+            Duration::from_millis(10),
+            store.wait_for_next_refresh(update_interval),
+        )
+        .await;
+
+        // Then the server is not returned
+        assert!(next.is_err());
+    }
+
+    #[tokio::test]
+    async fn update_tools_reports_changes() {
+        // Given a store with a server that has never been checked
+        let mut store = McpServerStore::new();
+
+        // When we notify the store about an update
+        let server = McpServerUrl::new("http://first.com/mcp");
+        let tools = vec!["tool1".to_string(), "tool2".to_string()];
+        let updated = store.update_tools(server, tools);
+
+        // Then a change is reported
+        assert!(updated);
+    }
+
+    #[tokio::test]
+    async fn changes_to_existing_server_are_reported() {
+        // Given a store with a server that has a list of tools
+        let mut store = McpServerStore::new();
+        let server = McpServerUrl::new("http://first.com/mcp");
+        let tools = vec!["tool1".to_string(), "tool2".to_string()];
+        store.update_tools(server.clone(), tools);
+
+        // When we notify the store about an update
+        let tools = vec!["tool1".to_string(), "tool3".to_string()];
+        let updated = store.update_tools(server, tools);
+
+        // Then a change is reported
+        assert!(updated);
+    }
+
+    #[tokio::test]
+    async fn no_changes_means_no_update() {
+        // Given a store with a server that has a list of tools
+        let mut store = McpServerStore::new();
+        let server = McpServerUrl::new("http://first.com/mcp");
+        let tools = vec!["tool1".to_string(), "tool2".to_string()];
+        store.update_tools(server.clone(), tools.clone());
+
+        // When we notify the store about the same tools
+        let updated = store.update_tools(server, tools);
+
+        // Then no change is reported
+        assert!(!updated);
     }
 }
