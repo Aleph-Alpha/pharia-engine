@@ -5,10 +5,17 @@ use crate::{
     tool::{QualifiedToolName, Tool},
 };
 
+/// Registry of all tools known to the kernel.
+///
+/// The toolbox maintains two separate catalogs:
+/// 1. `mcp_tools` – tools announced by remote MCP servers.
+/// 2. `native_tools` – tools implemented directly inside the kernel.
+///
+/// The toolbox is periodically notified about new tools.
 pub struct Toolbox {
     /// Tools reported by the MCP servers
     mcp_tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
-    // Map of which MCP servers are configured for which namespace.
+    /// Tools offered by the Kernel itself
     native_tools: NativeToolStore,
 }
 
