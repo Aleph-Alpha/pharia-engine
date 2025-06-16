@@ -146,6 +146,8 @@ where
                         None => break,
                     }
                 }
+                // moving the check for change to the outside of the select will make it concurrent
+                // only the insert should be in the branch
                 _ = check_interval.tick() => {
                     self.check_for_changes().await;
                 }
