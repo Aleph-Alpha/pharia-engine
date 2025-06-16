@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use tokio::time::Instant;
 use tracing::error;
 
 use crate::{
@@ -8,6 +9,21 @@ use crate::{
     tool::QualifiedToolName,
 };
 
+/// A list of tools that have been fetched from an MCP server.
+struct CachedTools {
+    pub tools: Vec<String>,
+    _last_checked: Option<Instant>,
+}
+
+impl CachedTools {
+    pub fn new(tools: Vec<String>) -> Self {
+        Self {
+            tools,
+            _last_checked: None,
+        }
+    }
+}
+
 /// Remembers MCP servers configured for each namespace, as well as the tools provided by each
 /// server.
 pub struct McpServerStore {
@@ -15,7 +31,7 @@ pub struct McpServerStore {
     servers: HashMap<Namespace, HashSet<McpServerUrl>>,
     /// Names of tools provided by each MCP server. Tool contains one entry for each unique MCP
     /// server URL.
-    tools: HashMap<McpServerUrl, Vec<String>>,
+    tools: HashMap<McpServerUrl, CachedTools>,
 }
 
 impl McpServerStore {
@@ -37,6 +53,9 @@ impl McpServerStore {
             .into_iter()
     }
 
+    /// Once a new task is due, this function will return the next future to be executed
+    // pub async fn next_refresh(&self) -> Option<impl Future<Output = ()> + Send> {
+
     /// Updates the tool list for all configured MCP servers. `true` if the list of tools has
     /// changed.
     pub async fn update_tool_list(&mut self, client: &impl McpClient) -> bool {
@@ -47,9 +66,9 @@ impl McpServerStore {
                 // later.
                 continue;
             };
-            if up_to_date_tools != *tools_known {
+            if up_to_date_tools != tools_known.tools {
                 // If the tool list has changed, we update it.
-                *tools_known = up_to_date_tools;
+                tools_known.tools = up_to_date_tools;
                 any_changes_so_far = true;
             }
         }
@@ -70,7 +89,8 @@ impl McpServerStore {
                 // provide only an empty tool list. If the error is temporary we will eventually be
                 // able to fetch the tools, using our regular update.
                 .unwrap_or_default();
-            self.tools.insert(server_to_upsert.clone(), tools);
+            self.tools
+                .insert(server_to_upsert.clone(), CachedTools::new(tools));
         }
         self.servers
             .entry(namespace)
@@ -107,6 +127,7 @@ impl McpServerStore {
                 self.tools
                     .get(&server)
                     .expect("Every MCP server stored must have a tool list.")
+                    .tools
                     .iter()
                     .cloned()
                     .map(move |t| (namespace.clone(), server.clone(), t))
