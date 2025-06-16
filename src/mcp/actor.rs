@@ -1,3 +1,9 @@
+//! MCP server management and tool discovery.
+//!
+//! This module provides the [`McpApi`] trait for managing MCP servers (upsert, remove, list)
+//! and consumes a [`McpSubscriber`] to notify other components when the available tool set
+//! changes. The actor periodically polls configured servers to discover new tools.
+
 use std::{sync::Arc, time::Duration};
 
 use tokio::{
