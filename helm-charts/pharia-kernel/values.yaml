@@ -12,10 +12,41 @@ global:
     # -- Additional annotations globally defined for all ingress-resources. This can be used to add ingress controller specific annotations.
     additionalAnnotations: {}
 image:
+  registry: alephalpha.jfrog.io
   repository: alephalpha.jfrog.io/container-images/pharia-kernel
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
+
+envVars:
+  values:
+    AUTHORIZATION_URL: "{{ .Values.authorizationAddress }}"
+    DOCUMENT_INDEX_URL: "{{ .Values.documentIndexAddress }}"
+    INFERENCE_URL: "{{ .Values.inferenceAddress }}"
+    LOG_LEVEL: "{{ .Values.logLevel }}"
+    OTEL_ENDPOINT: "{{ .Values.openTelemetryEndpoint }}"
+    OTEL_SAMPLING_RATIO: "{{ .Values.openTelemetrySamplingRatio }}"
+    WASMTIME_CACHE_DIR: "/app/.cache"
+  configmap:
+    AUTHORIZATION_URL:
+      name: "{{ .Values.global.phariaAIConfigMap }}"
+      key: "PHARIA_IAM_URL"
+    INFERENCE_URL:
+      name: "{{ .Values.global.phariaAIConfigMap }}"
+      key: "API_SCHEDULER_URL"
+    DOCUMENT_INDEX_URL:
+      name: "{{ .Values.global.phariaAIConfigMap }}"
+      key: "DOCUMENT_INDEX_URL"
+  resourceFields:
+    MEMORY_REQUEST:
+      resource: requests.memory
+    MEMORY_LIMIT:
+      resource: limits.memory
+    WASMTIME_CACHE_SIZE_REQUEST:
+      resource: requests.ephemeral-storage
+    WASMTIME_CACHE_SIZE_LIMIT:
+      resource: limits.ephemeral-storage
+
 nameOverride: pharia-kernel
 fullnameOverride: pharia-kernel
 imagePullSecrets: []

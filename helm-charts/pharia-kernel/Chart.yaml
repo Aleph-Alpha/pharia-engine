@@ -22,7 +22,7 @@ appVersion: 0.12.17
 
 dependencies:
   - name: pharia-common
-    version: 0.2.25
+    version: 0.2.27
     repository: oci://alephalpha.jfrog.io/helm
     import-values:
       - defaults
