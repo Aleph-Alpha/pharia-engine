@@ -195,6 +195,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
+    use futures::future::pending;
     use std::{
         collections::{HashMap, HashSet},
         sync::Mutex,
@@ -220,6 +221,33 @@ pub mod tests {
     }
 
     use super::*;
+
+    #[tokio::test]
+    async fn upserting_pending_tool_server_does_not_block() {
+        // Given a client that hangs forever
+        struct McpClientStub;
+        impl McpClientDouble for McpClientStub {
+            async fn list_tools(&self, _: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+                pending().await
+            }
+        }
+
+        // When upserting a tool server
+        let mcp = Mcp::new(McpClientStub, DummySubscriber, Duration::from_secs(1000)).api();
+        mcp.upsert(ConfiguredMcpServer::new(
+            "http://localhost:8000/mcp",
+            Namespace::new("test").unwrap(),
+        ))
+        .await;
+
+        // Then the mcp actor still responds to other requests
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            mcp.mcp_list(Namespace::new("test").unwrap()),
+        )
+        .await
+        .unwrap();
+    }
 
     #[tokio::test(start_paused = true)]
     async fn tools_are_updated_regularly() {
