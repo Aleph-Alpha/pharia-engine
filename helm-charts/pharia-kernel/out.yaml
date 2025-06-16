@@ -1,0 +1,393 @@
+---
+# Source: pharia-kernel/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pharia-kernel
+  labels:
+    app: pharia-kernel
+    helm.sh/chart: pharia-kernel-0.2.64
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/managed-by: Helm
+  annotations: {}
+automountServiceAccountToken: true
+---
+# Source: pharia-kernel/templates/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pharia-kernel-config
+data:
+  config.toml: |
+    [namespaces.assistant-dev]
+    config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/assistant-dev.toml/raw?ref=main"
+    registry = "registry.gitlab.aleph-alpha.de"
+    base-repository = "engineering/pharia-ai-skills/assistant"
+    
+    [namespaces.chat-dev]
+    config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/chat-dev.toml/raw?ref=main"
+    registry = "alephalpha.jfrog.io"
+    base-repository = "assistant-kernel-skills"
+    
+    [namespaces.jfrog]
+    config-url = "https://alephalpha.jfrog.io/artifactory/pharia-kernel-files/namespaces/playground/namespace.toml"
+    registry = "alephalpha.jfrog.io"
+    base-repository = "pharia-kernel-images/namespaces/playground"
+    
+    [namespaces.kernel]
+    config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/kernel.toml/raw?ref=main"
+    registry = "registry.gitlab.aleph-alpha.de"
+    base-repository = "engineering/pharia-ai-skills/kernel"
+    
+    [namespaces.nls]
+    config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1216/repository/files/namespace.toml/raw?ref=main"
+    registry = "registry.gitlab.aleph-alpha.de"
+    base-repository = "engineering/nls-skills/skills"
+    
+    [namespaces.orchestrator-dev]
+    config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/orchestrator-dev.toml/raw?ref=main"
+    registry = "alephalpha.jfrog.io"
+    base-repository = "assistant-kernel-skills"
+    
+    [namespaces.playground]
+    config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
+    registry = "registry.gitlab.aleph-alpha.de"
+    base-repository = "engineering/pharia-kernel-playground/skills"
+---
+# Source: pharia-kernel/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: pharia-kernel
+  labels:
+    app: pharia-kernel
+    helm.sh/chart: pharia-kernel-0.2.64
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 9000
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/instance: test
+---
+# Source: pharia-kernel/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pharia-kernel
+  labels:
+    app: pharia-kernel
+    helm.sh/chart: pharia-kernel-0.2.64
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pharia-kernel
+      app.kubernetes.io/instance: test
+  template:
+    metadata:
+      labels:
+        app: pharia-kernel
+        helm.sh/chart: pharia-kernel-0.2.64
+        app.kubernetes.io/name: pharia-kernel
+        app.kubernetes.io/instance: test
+        app.kubernetes.io/version: "0.12.17"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      imagePullSecrets:
+        - name: docker-jfrog
+      serviceAccountName: pharia-kernel
+      securityContext:
+        runAsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 2000
+      containers:
+        - name: pharia-kernel
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          image: "alephalpha.jfrog.io/container-images/pharia-kernel:0.12.17"
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 9000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            failureThreshold: 2
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
+          resources:
+            limits:
+              cpu: "4"
+              ephemeral-storage: 8Gi
+              memory: 8Gi
+            requests:
+              cpu: "2"
+              ephemeral-storage: 4Gi
+              memory: 4Gi
+          volumeMounts:
+            - mountPath: /app/config.toml
+              name: config-volume
+              readOnly: true
+              subPath: config.toml
+            - mountPath: /app/.cache
+              name: ephemeral
+          command: []
+          args: []
+          env:
+            - name: MEMORY_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: pharia-kernel
+                  resource: requests.memory
+                  divisor: "1"
+            - name: MEMORY_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: pharia-kernel
+                  resource: limits.memory
+                  divisor: "1"
+            - name: WASMTIME_CACHE_DIR
+              value: /app/.cache
+            - name: WASMTIME_CACHE_SIZE_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: pharia-kernel
+                  resource: requests.ephemeral-storage
+                  divisor: "1"
+            - name: WASMTIME_CACHE_SIZE_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: pharia-kernel
+                  resource: limits.ephemeral-storage
+                  divisor: "1"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: OTEL_ENDPOINT
+              value: "http://opentelemetry-collector.tracing:4317"
+            - name: NAMESPACES__PLAYGROUND__CONFIG_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: playgroundSkillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__PLAYGROUND__REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  key: playgroundSkillRegistryUser
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__PLAYGROUND__REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: playgroundSkillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__NLS__CONFIG_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: nlsSkillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__NLS__REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  key: nlsSkillRegistryUser
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__NLS__REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: nlsSkillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__ASSISTANT_DEV__CONFIG_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: skillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__ASSISTANT_DEV__REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  key: skillRegistryUser
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__ASSISTANT_DEV__REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: skillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__ORCHESTRATOR_DEV__CONFIG_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: skillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__ORCHESTRATOR_DEV__REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  key: registryUser
+                  name: jfrog-credentials-secret
+            - name: NAMESPACES__ORCHESTRATOR_DEV__REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: registryToken
+                  name: jfrog-credentials-secret
+            - name: NAMESPACES__CHAT_DEV__CONFIG_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: skillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__CHAT_DEV__REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  key: registryUser
+                  name: jfrog-credentials-secret
+            - name: NAMESPACES__CHAT_DEV__REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: registryToken
+                  name: jfrog-credentials-secret
+            - name: NAMESPACES__KERNEL__CONFIG_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: skillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__KERNEL__REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  key: skillRegistryUser
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__KERNEL__REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: skillRegistryPassword
+                  name: pharia-kernel-secrets
+            - name: NAMESPACES__JFROG__CONFIG_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: registryToken
+                  name: jfrog-credentials-secret
+            - name: NAMESPACES__JFROG__REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  key: registryUser
+                  name: jfrog-credentials-secret
+            - name: NAMESPACES__JFROG__REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: registryPassword
+                  name: jfrog-credentials-secret
+      volumes:
+        - configMap:
+            name: pharia-kernel-config
+          name: config-volume
+        - emptyDir:
+            sizeLimit: 4Gi
+          name: ephemeral
+      nodeSelector:
+        {}
+      affinity:
+        {}
+      tolerations:
+        []
+---
+# Source: pharia-kernel/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pharia-kernel
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: pharia-kernel.local
+      http:
+        paths:
+          - backend:
+              service:
+                name: pharia-kernel
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - secretName: 
+      hosts:
+        - pharia-kernel.local
+---
+# Source: pharia-kernel/templates/prometheusServiceMonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pharia-kernel
+  labels:
+    app: pharia-kernel
+    helm.sh/chart: pharia-kernel-0.2.64
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  endpoints:
+    - interval: 30s
+      path: /
+      port: metrics
+  namespaceSelector:
+    matchNames:
+    - pharia-ai
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pharia-kernel
+      app.kubernetes.io/instance: test
+---
+# Source: pharia-kernel/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "pharia-kernel-test-connection"
+  labels:
+    app: pharia-kernel
+    helm.sh/chart: pharia-kernel-0.2.64
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['pharia-kernel.pharia-ai.svc.cluster.local:80/skill.wit']
+  restartPolicy: Never
