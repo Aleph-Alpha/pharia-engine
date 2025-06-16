@@ -11,7 +11,7 @@ use crate::{
 /// Remembers MCP servers configured for each namespace, as well as the tools provided by each
 /// server.
 pub struct McpServerStore {
-    /// All configuerd MCP servers grouped by namespace.
+    /// All configured MCP servers grouped by namespace.
     servers: HashMap<Namespace, HashSet<McpServerUrl>>,
     /// Names of tools provided by each MCP server. Tool contains one entry for each unique MCP
     /// server URL.
@@ -151,7 +151,7 @@ impl McpServerStore {
     }
 }
 
-/// Descripes an MCP tool, it should hold all the information needed to connect and invoke the tool.
+/// Describes an MCP tool, it should hold all the information needed to connect and invoke the tool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct McpToolDesc {
     /// The name of the tool, as reported by the MCP server.

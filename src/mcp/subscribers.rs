@@ -7,9 +7,14 @@ use double_trait::double;
 
 pub type ToolMap = HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>;
 
-/// Sibling trait for [`McpApi`] that allows to send messages to the MCP actor. This trait is used
-/// by the MCP actor to send messages to receipients of tools. Outside of test code this is
-/// implemented by the [`crate::tool::ToolRuntimeApi`]
+/// The `McpActor` watches a list of MCP servers and reports changes in the list of tools.
+///
+/// This trait is the interface for a recipient that is notified about new tools. Outside of test
+/// code, this is implemented by the [`crate::tool::ToolRuntimeApi`].
+///
+/// For the actor, it represents the outgoing interface, while its sibling trait
+/// [`crate::mcp::McpApi`] represents the incoming interface by which the actor is notified about
+/// new MCP servers.
 #[cfg_attr(test, double(McpSubscriberDouble))]
 pub trait McpSubscriber {
     /// Let the subscriber know that the list of tools has been changed and report the new list

@@ -27,7 +27,7 @@ use double_trait::double;
 pub trait ToolStoreApi {
     /// Update the list of tools known to the `ToolRuntime`.
     ///
-    /// With the current execption of the native tools.
+    /// With the current exception of the native tools.
     fn report_updated_tools(
         &self,
         tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
@@ -353,7 +353,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn tool_calls_are_processed_in_parallel() {
-        // Given a tool that hangs forever for some tool invocation requestsa
+        // Given a tool that hangs forever for some tool invocation requests
         struct PendingTool;
         #[async_trait::async_trait]
         impl ToolDouble for PendingTool {
