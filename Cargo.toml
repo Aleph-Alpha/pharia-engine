@@ -82,7 +82,7 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.3.0" }
 wasmtime = "32.0.0"
-wit-parser = "0.234.0"
+wit-parser = "0.235.0"
 url = "2.5.4"
 thiserror = "2.0.12"
 tokenizers = { version = "0.21.1", default-features = false, features = [
@@ -132,7 +132,7 @@ jsonschema = "0.30.0"
 rayon = "1.10.0"
 serde-bool = "0.1.3"
 async-stream = "0.3.6"
-jiff = { version = "0.2.13", features = ["serde"] }
+jiff = { version = "0.2.15", features = ["serde"] }
 moka = { version = "0.12.10", features = ["sync"] }
 bytesize = { version = "2.0.1", features = ["serde"] }
 # We use this middleware to extract tracing information in our shell and start spans for each incoming request.
@@ -152,11 +152,11 @@ tempfile = "3.20.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.45.0", features = ["test-util"] }
 tokio-test = "0.4.4"
-wat = "1.234.0"
+wat = "1.235.0"
 metrics-util = "0.19.1"
 reqwest = { version = "0.12.20", features = ["stream"] }
 opentelemetry-stdout = "0.30.0"
-double-trait = "0.2.3"
+double-trait = "0.2.4"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
