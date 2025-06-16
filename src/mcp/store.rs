@@ -105,8 +105,10 @@ impl McpServerStore {
         }
     }
 
-    pub fn upsert(&mut self, namespace: Namespace, server_to_upsert: McpServerUrl) {
-        if !self.tools.contains_key(&server_to_upsert) {
+    /// Add a new server for a given namespace. Returns if the server is new or already known.
+    pub fn upsert(&mut self, namespace: Namespace, server_to_upsert: McpServerUrl) -> bool {
+        let new_server = !self.tools.contains_key(&server_to_upsert);
+        if new_server {
             // Initialize the server with an empty tool list.
             // Last updated is set to now, as there is a running request pushed for
             // this server.
@@ -117,6 +119,7 @@ impl McpServerStore {
             .entry(namespace)
             .or_default()
             .insert(server_to_upsert);
+        new_server
     }
 
     pub fn remove(&mut self, namespace: Namespace, server_to_remove: McpServerUrl) {
@@ -329,5 +332,32 @@ pub mod tests {
 
         // Then no change is reported
         assert!(!updated);
+    }
+
+    #[tokio::test]
+    async fn upsert_returns_if_server_is_new() {
+        // Given a store that does not know about a server
+        let mut store = McpServerStore::new();
+
+        // When upserting the server
+        let server = McpServerUrl::new("http://first.com/mcp");
+        let new_server = store.upsert(Namespace::new("first").unwrap(), server.clone());
+
+        // Then the server is considered as new
+        assert!(new_server);
+    }
+
+    #[tokio::test]
+    async fn known_server_is_not_considered_new() {
+        // Given a store that knows about a server
+        let mut store = McpServerStore::new();
+        let server = McpServerUrl::new("http://first.com/mcp");
+        store.upsert(Namespace::new("first").unwrap(), server.clone());
+
+        // When upserting the server for a different namespace
+        let new_server = store.upsert(Namespace::new("second").unwrap(), server.clone());
+
+        // Then the server is not considered as new
+        assert!(!new_server);
     }
 }

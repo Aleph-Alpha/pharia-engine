@@ -190,9 +190,10 @@ where
     async fn act(&mut self, msg: McpMsg) {
         match msg {
             McpMsg::Upsert { server } => {
-                let url = server.url.clone();
-                self.store.upsert(server.namespace, server.url);
-                self.add_to_backlog(url);
+                let new_server = self.store.upsert(server.namespace, server.url.clone());
+                if new_server {
+                    self.add_to_backlog(server.url);
+                }
             }
             McpMsg::Remove { server } => {
                 self.store.remove(server.namespace, server.url);
