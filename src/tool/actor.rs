@@ -18,11 +18,11 @@ use crate::{
 #[cfg(test)]
 use double_trait::double;
 
-/// Interact with tool server storage.
+/// Interact with tool storage.
 ///
-/// Whereas the [`ToolApi`] allows to interact with tools (and does not care that they are
-/// implemented with different MCP Servers), the [`McpServerStore`] allows someone else (e.g.
-/// the `NamespaceDescriptionLoaders`) to notify about new or removed tool servers.
+/// Whereas the [`ToolRuntimeApi`] allows to interact with tools (and does not care that they are
+/// implemented with different MCP servers), the [`ToolStoreApi`] allows someone else (e.g.
+/// the `McpActor`) to notify about new or removed tools.
 #[cfg_attr(test, double(ToolStoreDouble))]
 pub trait ToolStoreApi {
     /// Update the list of tools known to the `ToolRuntime`.
