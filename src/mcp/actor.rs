@@ -196,10 +196,8 @@ where
 pub mod tests {
 
     use futures::future::pending;
-    use std::{
-        collections::{HashMap, HashSet},
-        sync::Mutex,
-    };
+    use std::collections::{HashMap, HashSet};
+    use std::sync::Mutex;
     use tokio::time::Instant as TokioInstant;
 
     use crate::{
@@ -221,6 +219,57 @@ pub mod tests {
     }
 
     use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn tool_update_happens_in_background() {
+        use tokio::sync::Mutex;
+
+        // Given a client that optionally timeout
+        #[derive(Clone)]
+        struct SaboteurClient {
+            timeout: Arc<Mutex<bool>>,
+        }
+
+        impl SaboteurClient {
+            fn new() -> Self {
+                Self {
+                    timeout: Arc::new(Mutex::new(false)),
+                }
+            }
+
+            pub async fn set_blocking(&self) {
+                let mut timeout = self.timeout.lock().await;
+                *timeout = true;
+            }
+        }
+
+        impl McpClientDouble for SaboteurClient {
+            async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+                let timeout = self.timeout.lock().await;
+                if *timeout {
+                    pending().await
+                } else {
+                    Ok(vec!["list_fishes".to_owned(), "catch_fish".to_owned()])
+                }
+            }
+        }
+
+        // And given the mcp actor is configured with this mcp server
+        let namespace = Namespace::new("pike").unwrap();
+        let server = ConfiguredMcpServer::new("http://localhost:8000/mcp", namespace.clone());
+        let client = SaboteurClient::new();
+        let mcp = Mcp::new(client.clone(), DummySubscriber, Duration::from_millis(10)).api();
+        mcp.upsert(server).await;
+
+        // When the client blocks and the background update is running
+        client.set_blocking().await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        // Then the list of tools can still be fetched as the update happens in the background
+        tokio::time::timeout(Duration::from_secs(1), mcp.mcp_list(namespace))
+            .await
+            .unwrap();
+    }
 
     #[tokio::test]
     async fn upserting_pending_tool_server_does_not_block() {
