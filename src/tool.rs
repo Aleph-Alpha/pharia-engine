@@ -16,6 +16,20 @@ pub use self::{
 #[cfg(test)]
 use double_trait::double;
 
+/// Interface offered by individual tools.
+///
+/// Introducing this interface allows us to introduce different tool concepts like mcp tools and
+/// native tools.
+#[async_trait]
+#[cfg_attr(test, double(ToolDouble))]
+pub trait Tool {
+    async fn invoke(
+        &self,
+        arguments: Vec<Argument>,
+        tracing_context: TracingContext,
+    ) -> Result<Vec<Modality>, ToolError>;
+}
+
 /// A tool name that is qualified by a namespace. It can uniquely identify a tool across different
 /// namespaces.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -54,16 +68,6 @@ pub enum ToolError {
     ToolNotFound(String),
     #[error("The tool call could not be executed, original error: {0}")]
     Other(#[from] anyhow::Error),
-}
-
-#[async_trait]
-#[cfg_attr(test, double(ToolDouble))]
-pub trait Tool {
-    async fn invoke(
-        &self,
-        arguments: Vec<Argument>,
-        tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError>;
 }
 
 #[cfg(test)]
