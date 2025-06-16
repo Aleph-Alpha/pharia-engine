@@ -1,3 +1,12 @@
+//! Actor-based tool runtime for concurrent tool execution.
+//!
+//! Implements [`ToolRuntimeApi`] for invoking and listing tools, and [`ToolStoreApi`] for
+//! updating the available tool set. The actor manages a [`Toolbox`] and executes multiple tool
+//! calls concurrently.
+//!
+//! The [`ToolRuntimeApi`] is consumed by the [`crate::csi::RawCsi`] and the tool routes, whereas
+//! the [`ToolStoreApi`] is consumed by the `McpActor`.
+
 use futures::{StreamExt, stream::FuturesUnordered};
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::{
