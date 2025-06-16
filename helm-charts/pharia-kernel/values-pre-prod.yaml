@@ -1,0 +1,156 @@
+enabled: true
+# TODO: pharia-kernel image missing at Harbor (uild pipeline currently at Github -> push to Harbor not supported)
+imagePullSecrets:
+  - name: docker-jfrog
+# image:
+#   repository: harbor.management-prod01.stackit.run/pharia-kernel-images/pharia-kernel
+#   pullPolicy: IfNotPresent
+defaultNamespacesEnabled: true
+namespaces:
+  playground:
+    configUrl: https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main
+    registry: registry.gitlab.aleph-alpha.de
+    baseRepository: engineering/pharia-kernel-playground/skills
+  nls:
+    configUrl: https://gitlab.aleph-alpha.de/api/v4/projects/1216/repository/files/namespace.toml/raw?ref=main
+    registry: registry.gitlab.aleph-alpha.de
+    baseRepository: engineering/nls-skills/skills
+  assistant-dev:
+    configUrl: https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/assistant-dev.toml/raw?ref=main
+    registry: registry.gitlab.aleph-alpha.de
+    baseRepository: engineering/pharia-ai-skills/assistant
+  orchestrator-dev:
+    configUrl: https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/orchestrator-dev.toml/raw?ref=main
+    registry: alephalpha.jfrog.io
+    baseRepository: assistant-kernel-skills
+  chat-dev:
+    configUrl: https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/chat-dev.toml/raw?ref=main
+    registry: alephalpha.jfrog.io
+    baseRepository: assistant-kernel-skills
+  kernel:
+    configUrl: https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/kernel.toml/raw?ref=main
+    registry: registry.gitlab.aleph-alpha.de
+    baseRepository: engineering/pharia-ai-skills/kernel
+  jfrog:
+    configUrl: https://alephalpha.jfrog.io/artifactory/pharia-kernel-files/namespaces/playground/namespace.toml
+    registry: alephalpha.jfrog.io
+    baseRepository: pharia-kernel-images/namespaces/playground
+env:
+  - name: NAMESPACES__PLAYGROUND__CONFIG_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: playgroundSkillRegistryPassword
+  - name: NAMESPACES__PLAYGROUND__REGISTRY_USER
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: playgroundSkillRegistryUser
+  - name: NAMESPACES__PLAYGROUND__REGISTRY_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: playgroundSkillRegistryPassword
+  - name: NAMESPACES__NLS__CONFIG_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: nlsSkillRegistryPassword
+  - name: NAMESPACES__NLS__REGISTRY_USER
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: nlsSkillRegistryUser
+  - name: NAMESPACES__NLS__REGISTRY_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: nlsSkillRegistryPassword
+  - name: NAMESPACES__ASSISTANT_DEV__CONFIG_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: skillRegistryPassword
+  - name: NAMESPACES__ASSISTANT_DEV__REGISTRY_USER
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: skillRegistryUser
+  - name: NAMESPACES__ASSISTANT_DEV__REGISTRY_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: skillRegistryPassword
+  - name: NAMESPACES__ORCHESTRATOR_DEV__CONFIG_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: skillRegistryPassword
+  - name: NAMESPACES__ORCHESTRATOR_DEV__REGISTRY_USER
+    valueFrom:
+      secretKeyRef:
+        name: jfrog-credentials-secret
+        key: registryUser
+  - name: NAMESPACES__ORCHESTRATOR_DEV__REGISTRY_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: jfrog-credentials-secret
+        key: registryToken
+  - name: NAMESPACES__CHAT_DEV__CONFIG_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: skillRegistryPassword
+  - name: NAMESPACES__CHAT_DEV__REGISTRY_USER
+    valueFrom:
+      secretKeyRef:
+        name: jfrog-credentials-secret
+        key: registryUser
+  - name: NAMESPACES__CHAT_DEV__REGISTRY_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: jfrog-credentials-secret
+        key: registryToken
+  - name: NAMESPACES__KERNEL__CONFIG_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: skillRegistryPassword
+  - name: NAMESPACES__KERNEL__REGISTRY_USER
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: skillRegistryUser
+  - name: NAMESPACES__KERNEL__REGISTRY_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: pharia-kernel-secrets
+        key: skillRegistryPassword
+  - name: NAMESPACES__JFROG__CONFIG_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: jfrog-credentials-secret
+        key: registryToken
+  - name: NAMESPACES__JFROG__REGISTRY_USER
+    valueFrom:
+      secretKeyRef:
+        name: jfrog-credentials-secret
+        key: registryUser
+  - name: NAMESPACES__JFROG__REGISTRY_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: jfrog-credentials-secret
+        key: registryPassword
+serviceMonitor:
+  enabled: true
+resources:
+  limits:
+    cpu: "4"
+    memory: 8Gi
+  requests:
+    cpu: "2"
+    memory: 4Gi
+openTelemetryEndpoint: http://opentelemetry-collector.tracing:4317
+ingress:
+  tls:
+    enabled: true
