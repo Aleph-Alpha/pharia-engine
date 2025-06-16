@@ -19,3 +19,10 @@ version: 0.2.64
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: 0.12.17
+
+dependencies:
+  - name: pharia-common
+    version: 0.2.25
+    repository: oci://alephalpha.jfrog.io/helm
+    import-values:
+      - defaults
