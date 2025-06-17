@@ -475,13 +475,13 @@ where
                         .unwrap_or_else(|_| Duration::default());
                     warn!(
                         parent: tracing_context.span(),
-                        "Retrying operation: {e} attempt #{n_past_retries}. Sleeping {duration:?} before the next attempt"
+                        "Retrying operation: Attempt #{n_past_retries}.\n{e:#}\n\nSleeping {duration:?} before the next attempt"
                     );
                     tokio::time::sleep(duration).await;
                     n_past_retries += 1;
                 }
                 RetryDecision::DoNotRetry => {
-                    error!(parent: tracing_context.span(), "Error after all retries: {e}");
+                    error!(parent: tracing_context.span(), "Error after all retries: {e:#}");
                     return Err(e);
                 }
             },
@@ -492,7 +492,7 @@ where
                 | aleph_alpha_client::Error::InvalidStream { .. }
                 | aleph_alpha_client::Error::InvalidTokenizer { .. }),
             ) => {
-                error!(parent: tracing_context.span(), "Unrecoverable inference error: {e}");
+                error!(parent: tracing_context.span(), "Unrecoverable inference error: {e:#}");
                 return Err(e);
             }
         }

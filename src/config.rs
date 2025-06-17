@@ -166,11 +166,11 @@ impl AppConfig {
             .add_source(env)
             .build()
             .inspect_err(|e| {
-                eprintln!("Error building app config: {e}");
+                eprintln!("Error building app config: {e:#}");
             })?
             .try_deserialize::<Self>()
             .inspect_err(|e| {
-                eprintln!("Error deserializing app config: {e}");
+                eprintln!("Error deserializing app config: {e:#}");
             })?;
 
         if config.inference_url.is_empty() {
