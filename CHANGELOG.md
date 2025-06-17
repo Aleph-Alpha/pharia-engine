@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.17...pharia-kernel-v0.13.0)
+
+### Features
+
+- Add target and context to error messages - ([745b1e4](https://github.com/Aleph-Alpha/pharia-kernel/commit/745b1e4de144a26249faa790c81b72d3e4297104))
+- Improve error logging - ([d5e7e79](https://github.com/Aleph-Alpha/pharia-kernel/commit/d5e7e79d64e69c594812c8ec0b94e5678f27230f))
+- Mcp Actor keeps an up to date tool list and informs tool runtime - ([bac24e8](https://github.com/Aleph-Alpha/pharia-kernel/commit/bac24e8a65e31f30ce21cd961ebbb193d52ef7f0))
+- Print causes for error fetching namespace description - ([4e67ee7](https://github.com/Aleph-Alpha/pharia-kernel/commit/4e67ee761c3d0a949f09fe2320674f876e3427ce))
+- Allow configuring native_tools, no computing of diffs yet - ([a158e3a](https://github.com/Aleph-Alpha/pharia-kernel/commit/a158e3a45505824753a2adc8558e542a8c27ccb2))
+- Remove beta flag from configuration parsing - ([1426390](https://github.com/Aleph-Alpha/pharia-kernel/commit/142639035fed58156c9c5fffa7a7387b5f264804))
+- Log invalid input - ([b01ecb0](https://github.com/Aleph-Alpha/pharia-kernel/commit/b01ecb029290c5bcdbfebdc125e04db2cb773b30))
+
+### Fixes
+
+- Only schedule special tool update if server is new - ([88fcb6a](https://github.com/Aleph-Alpha/pharia-kernel/commit/88fcb6ab4f46e2ad4dc595a53fbfd2b87e54143b))
+- Do not block message queue of mcp actor - ([f8ee81f](https://github.com/Aleph-Alpha/pharia-kernel/commit/f8ee81fe9521f35a475b5f4e98da030e46f96169))
+
+### Documentation
+
+- Specify purpose of tool actor module - ([76c12df](https://github.com/Aleph-Alpha/pharia-kernel/commit/76c12df8860564bdb0913578203f5235b96f0ef3))
+- Fix doc string on ToolStoreApi - ([aba9fca](https://github.com/Aleph-Alpha/pharia-kernel/commit/aba9fca9bf78499981ea9f31bf7e3f89a4eaa9f9))
+- Add module docstring for mcp actor - ([9e06391](https://github.com/Aleph-Alpha/pharia-kernel/commit/9e063912d10ce41cf8fb79b86b63dc8c5f418a6b))
+- Update docstrings and fix typos - ([ffdfe40](https://github.com/Aleph-Alpha/pharia-kernel/commit/ffdfe4037dd3507957d77189260d96a70357d7c2))
+- Update docstring for tool trait and move to top of module - ([337f6a4](https://github.com/Aleph-Alpha/pharia-kernel/commit/337f6a46ad274e85bf4e77d53db9a0c44849265f))
+- Update comment for native tools - ([c45a1c2](https://github.com/Aleph-Alpha/pharia-kernel/commit/c45a1c2d4dc465e2ddd79bc14529c07a90198e39))
+
+### Performance
+
+- [**breaking**] Cached mcp servers are used in tool invocations - ([55b728b](https://github.com/Aleph-Alpha/pharia-kernel/commit/55b728b909824bc2f422f62b11be16152ea20626))
+
+### Builds
+
+- *(deps)* Bump the minor group with 15 updates - ([0248efc](https://github.com/Aleph-Alpha/pharia-kernel/commit/0248efc4977cc5a72497a7ff0e92f19a04ae9578))
+- *(deps)* Bump the minor group across 1 directory with 12 updates - ([cb414c1](https://github.com/Aleph-Alpha/pharia-kernel/commit/cb414c11d3ca40114828d7af7bf2eb9597272306))
+
+
 ## [0.12.17](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.16...pharia-kernel-v0.12.17)
 
 ### Features
