@@ -60,28 +60,32 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: pharia-kernel
   labels:
-    app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.65
-    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/component: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.13.0"
     app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  ports:
-    - port: 80
-      targetPort: http
-      protocol: TCP
-      name: http
-    - port: 9000
-      targetPort: metrics
-      protocol: TCP
-      name: metrics
-  selector:
     app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/version: 0.13.0
+    helm.sh/chart: pharia-kernel-0.2.65
+    pharia.ai/edition: ""
+    pharia.ai/featureSet: ""
+  name: pharia-kernel
+  namespace: pharia-ai
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - name: metrics
+    port: 9000
+    protocol: TCP
+    targetPort: metrics
+  selector:
     app.kubernetes.io/instance: test
+    app.kubernetes.io/name: pharia-kernel
+  sessionAffinity: None
+  type: ClusterIP
 ---
 # Source: pharia-kernel/templates/deployment.yaml
 apiVersion: apps/v1
@@ -266,6 +270,13 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 15
         name: pharia-kernel
+        ports:
+        - containerPort: 8081
+          name: http
+          protocol: TCP
+        - containerPort: 9000
+          name: metrics
+          protocol: TCP
         readinessProbe:
           failureThreshold: 2
           httpGet:

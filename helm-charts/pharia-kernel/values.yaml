@@ -89,6 +89,15 @@ securityContext:
 
 service:
   type: ClusterIP
+  ports:
+    - name: http
+      servicePort: 80
+      containerPort: 8081
+      protocol: TCP
+    - name: metrics
+      servicePort: 9000
+      containerPort: 9000
+      protocol: TCP
   port: 80
   portName: http
   targetPort: 8081
