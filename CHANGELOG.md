@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.0...pharia-kernel-v0.13.1)
+
+### Features
+
+- Respect OS certificate store for outgoing http requests - ([d3b757b](https://github.com/Aleph-Alpha/pharia-kernel/commit/d3b757b15e92be0dc192c4f29909065eaf9cebc3))
+
+### Documentation
+
+- Explain why we use `rust-tls-native-roots` - ([357d862](https://github.com/Aleph-Alpha/pharia-kernel/commit/357d862beab206daaaa452553a465e265030184e))
+
+
 ## [0.13.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.12.17...pharia-kernel-v0.13.0)
 
 ### Features
