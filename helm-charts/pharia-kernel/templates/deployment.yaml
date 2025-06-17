@@ -1,0 +1,10 @@
+{{- template "pharia-common.deployment" (dict "customTemplate" "pharia-kernel.deployment" "rootContext" $ "resourceContextName" "") -}}
+
+{{- define "pharia-kernel.deployment" -}}
+## Define overrides for your resource here
+spec:
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+{{- end }}
