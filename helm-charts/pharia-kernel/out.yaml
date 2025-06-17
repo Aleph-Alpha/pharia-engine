@@ -326,28 +326,34 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: pharia-kernel
   annotations:
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-body-size: 20m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  labels:
+    app.kubernetes.io/component: pharia-kernel
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/version: 0.13.0
+    helm.sh/chart: pharia-kernel-0.2.65
+    pharia.ai/edition: ""
+    pharia.ai/featureSet: ""
+  name: pharia-kernel
+  namespace: pharia-ai
 spec:
   ingressClassName: nginx
   rules:
-    - host: pharia-kernel.local
-      http:
-        paths:
-          - backend:
-              service:
-                name: pharia-kernel
-                port:
-                  name: http
-            path: /
-            pathType: Prefix
-  tls:
-    - secretName: 
-      hosts:
-        - pharia-kernel.local
+  - host: pharia-kernel.local
+    http:
+      paths:
+      - backend:
+          service:
+            name: pharia-kernel
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
 ---
 # Source: pharia-kernel/templates/prometheusServiceMonitor.yaml
 apiVersion: monitoring.coreos.com/v1
