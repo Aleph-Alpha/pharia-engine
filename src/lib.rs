@@ -88,12 +88,12 @@ impl Kernel {
         let loaders = Box::new(
             NamespaceDescriptionLoaders::new(app_config.namespaces().clone())
                 .context("Unable to read the configuration for namespaces")
-                .inspect_err(|e| error!("{e}"))?,
+                .inspect_err(|e| error!(target: "pharia_kernel::initialization", "{e:#}"))?,
         );
         let engine = Arc::new(
             Engine::new(app_config.engine_config())
                 .context("engine creation failed")
-                .inspect_err(|e| error!("{e}"))?,
+                .inspect_err(|e| error!(target: "pharia_kernel::initialization", "{e:#}"))?,
         );
 
         // Boot up the drivers which power the CSI.
