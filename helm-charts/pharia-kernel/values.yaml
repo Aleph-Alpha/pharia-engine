@@ -11,6 +11,7 @@ global:
     ingressDomain: local
     # -- Additional annotations globally defined for all ingress-resources. This can be used to add ingress controller specific annotations.
     additionalAnnotations: {}
+backwardsCompatibility: true
 image:
   repository: alephalpha.jfrog.io/container-images/pharia-kernel
   pullPolicy: Always
