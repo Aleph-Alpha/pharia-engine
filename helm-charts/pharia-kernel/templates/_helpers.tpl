@@ -60,3 +60,42 @@ Create the name of the service account to use
 {{- define "pharia-kernel.serviceAccountName" -}}
 {{- include "pharia-kernel.fullname" . }}
 {{- end }}
+
+{{/*
+Generate environment variables for default namespaces
+*/}}
+{{- define "pharia-kernel.defaultNamespacesEnvVars" -}}
+{{- if .Values.global.phariaAIConfigMap }}
+{{- $phariaAIConfigMap := .Values.global.phariaAIConfigMap -}}
+{{- $imagePullOpaqueSecretName := .Values.global.imagePullOpaqueSecretName -}}
+{{- range .Values.defaultNamespaces }}
+- name: NAMESPACES__{{ . | upper }}__CONFIG_URL
+  valueFrom:
+    configMapKeyRef:
+      name: {{ $phariaAIConfigMap }}
+      key: NAMESPACES__{{ . | upper }}__CONFIG_URL
+- name: NAMESPACES__{{ . | upper }}__REGISTRY
+  valueFrom:
+    configMapKeyRef:
+      name: {{ $phariaAIConfigMap }}
+      key: NAMESPACES__{{ . | upper }}__REGISTRY
+- name: NAMESPACES__{{ . | upper }}__BASE_REPOSITORY
+  valueFrom:
+    configMapKeyRef:
+      name: {{ $phariaAIConfigMap }}
+      key: NAMESPACES__{{ . | upper }}__BASE_REPOSITORY
+{{- if $imagePullOpaqueSecretName }}
+- name: NAMESPACES__{{ . | upper }}__REGISTRY_USER
+  valueFrom:
+    secretKeyRef:
+      name: {{ $imagePullOpaqueSecretName }}
+      key: registryUser
+- name: NAMESPACES__{{ . | upper }}__REGISTRY_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $imagePullOpaqueSecretName }}
+      key: registryPassword
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
