@@ -152,5 +152,6 @@ resources:
     memory: 4Gi
 openTelemetryEndpoint: http://opentelemetry-collector.tracing:4317
 ingress:
+  enabled: true
   tls:
     enabled: true
