@@ -6,10 +6,10 @@ metadata:
   name: pharia-kernel
   labels:
     app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.64
+    helm.sh/chart: pharia-kernel-0.2.65
     app.kubernetes.io/name: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/version: "0.13.0"
     app.kubernetes.io/managed-by: Helm
   annotations: {}
 automountServiceAccountToken: true
@@ -63,10 +63,10 @@ metadata:
   name: pharia-kernel
   labels:
     app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.64
+    helm.sh/chart: pharia-kernel-0.2.65
     app.kubernetes.io/name: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/version: "0.13.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   type: ClusterIP
@@ -83,17 +83,17 @@ spec:
     app.kubernetes.io/name: pharia-kernel
     app.kubernetes.io/instance: test
 ---
-# Source: pharia-kernel/templates/deployment.yaml
+# Source: pharia-kernel/templates/deployment-old.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pharia-kernel
   labels:
     app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.64
+    helm.sh/chart: pharia-kernel-0.2.65
     app.kubernetes.io/name: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/version: "0.13.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
@@ -105,10 +105,10 @@ spec:
     metadata:
       labels:
         app: pharia-kernel
-        helm.sh/chart: pharia-kernel-0.2.64
+        helm.sh/chart: pharia-kernel-0.2.65
         app.kubernetes.io/name: pharia-kernel
         app.kubernetes.io/instance: test
-        app.kubernetes.io/version: "0.12.17"
+        app.kubernetes.io/version: "0.13.0"
         app.kubernetes.io/managed-by: Helm
     spec:
       imagePullSecrets:
@@ -127,7 +127,7 @@ spec:
               - ALL
             seccompProfile:
               type: RuntimeDefault
-          image: "alephalpha.jfrog.io/container-images/pharia-kernel:0.12.17"
+          image: "alephalpha.jfrog.io/container-images/pharia-kernel:0.13.0"
           imagePullPolicy: Always
           ports:
             - name: http
@@ -352,10 +352,10 @@ metadata:
   name: pharia-kernel
   labels:
     app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.64
+    helm.sh/chart: pharia-kernel-0.2.65
     app.kubernetes.io/name: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/version: "0.13.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   endpoints:
@@ -377,10 +377,10 @@ metadata:
   name: "pharia-kernel-test-connection"
   labels:
     app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.64
+    helm.sh/chart: pharia-kernel-0.2.65
     app.kubernetes.io/name: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.12.17"
+    app.kubernetes.io/version: "0.13.0"
     app.kubernetes.io/managed-by: Helm
   annotations:
     "helm.sh/hook": test
