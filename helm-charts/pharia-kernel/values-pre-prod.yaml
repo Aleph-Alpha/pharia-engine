@@ -1,9 +1,11 @@
 enabled: true
 # TODO: pharia-kernel image missing at Harbor (uild pipeline currently at Github -> push to Harbor not supported)
-imagePullSecrets:
-  - name: docker-jfrog
+image:
+  pullSecrets:
+    - name: docker-jfrog
 # image:
-#   repository: harbor.management-prod01.stackit.run/pharia-kernel-images/pharia-kernel
+#   registry: harbor.management-prod01.stackit.run
+#   repository: pharia-kernel-images/pharia-kernel
 #   pullPolicy: IfNotPresent
 defaultNamespacesEnabled: true
 namespaces:
@@ -152,6 +154,5 @@ resources:
     memory: 4Gi
 openTelemetryEndpoint: http://opentelemetry-collector.tracing:4317
 ingress:
-  enabled: true
   tls:
     enabled: true

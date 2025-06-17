@@ -307,6 +307,8 @@ spec:
           subPath: config.toml
         - mountPath: /app/.cache
           name: ephemeral
+      imagePullSecrets:
+      - name: docker-jfrog
       securityContext:
         runAsGroup: 2000
         runAsNonRoot: true
