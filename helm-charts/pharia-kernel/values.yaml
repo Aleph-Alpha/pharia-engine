@@ -11,12 +11,58 @@ global:
     ingressDomain: local
     # -- Additional annotations globally defined for all ingress-resources. This can be used to add ingress controller specific annotations.
     additionalAnnotations: {}
-backwardsCompatibility: true
+backwardsCompatibility: false
 image:
+  registry: alephalpha.jfrog.io
   repository: alephalpha.jfrog.io/container-images/pharia-kernel
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
+
+envVars:
+  values:
+    AUTHORIZATION_URL: "{{ .Values.authorizationAddress }}"
+    DOCUMENT_INDEX_URL: "{{ .Values.documentIndexAddress }}"
+    INFERENCE_URL: "{{ .Values.inferenceAddress }}"
+    LOG_LEVEL: "{{ .Values.logLevel }}"
+    OTEL_ENDPOINT: "{{ .Values.openTelemetryEndpoint }}"
+    OTEL_SAMPLING_RATIO: "{{ .Values.openTelemetrySamplingRatio }}"
+    WASMTIME_CACHE_DIR: "/app/.cache"
+  configmap:
+    AUTHORIZATION_URL:
+      name: "{{ .Values.global.phariaAIConfigMap }}"
+      key: "PHARIA_IAM_URL"
+    INFERENCE_URL:
+      name: "{{ .Values.global.phariaAIConfigMap }}"
+      key: "API_SCHEDULER_URL"
+    DOCUMENT_INDEX_URL:
+      name: "{{ .Values.global.phariaAIConfigMap }}"
+      key: "DOCUMENT_INDEX_URL"
+  resourceFields:
+    MEMORY_REQUEST:
+      resource: requests.memory
+    MEMORY_LIMIT:
+      resource: limits.memory
+    WASMTIME_CACHE_SIZE_REQUEST:
+      resource: requests.ephemeral-storage
+    WASMTIME_CACHE_SIZE_LIMIT:
+      resource: limits.ephemeral-storage
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 15
+  failureThreshold: 2
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 2
+
 nameOverride: pharia-kernel
 fullnameOverride: pharia-kernel
 imagePullSecrets: []
@@ -26,6 +72,13 @@ podSecurityContext:
   runAsNonRoot: true
   runAsUser: 2000
   runAsGroup: 2000
+containerSecurityContext:
+  capabilities:
+    drop:
+      - ALL
+  allowPrivilegeEscalation: false
+  seccompProfile:
+    type: RuntimeDefault
 securityContext:
   capabilities:
     drop:
@@ -33,6 +86,7 @@ securityContext:
   allowPrivilegeEscalation: false
   seccompProfile:
     type: RuntimeDefault
+
 service:
   type: ClusterIP
   port: 80
@@ -45,6 +99,7 @@ service:
   metricsTargetPort: 9000
   metricsTargetPortName: metrics
   metricsProtocol: TCP
+
 serviceMonitor:
   enabled: false
 # -- Specify the default namespaces for PhariaKernel, which provide the default skills.
@@ -122,6 +177,20 @@ volumeMounts:
     readOnly: true
   - name: ephemeral
     mountPath: /app/.cache
-nodeSelector: {}
-tolerations: []
-affinity: {}
+
+# volume mounts required for securityContext.readOnlyRootFilesystem: true
+extraVolumeMounts:
+  - name: config-volume
+    mountPath: /app/config.toml
+    subPath: config.toml
+    readOnly: true
+  - name: ephemeral
+    mountPath: /app/.cache
+
+extraVolumes:
+  - name: config-volume
+    configMap:
+      name: pharia-kernel-config
+  - name: ephemeral
+    emptyDir:
+      sizeLimit: 4Gi
