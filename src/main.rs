@@ -12,6 +12,7 @@ async fn main() -> Result<(), Error> {
     initialize_metrics(app_config.metrics_address())?;
 
     info!(
+        target: "pharia-kernel::config",
         "Cache Configuration: Skill Cache = {} | Wasmtime Cache = {}",
         app_config.desired_skill_cache_memory_usage(),
         app_config.wasmtime_cache_size().unwrap_or_default()

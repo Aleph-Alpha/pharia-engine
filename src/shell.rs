@@ -84,14 +84,14 @@ impl Shell {
         let listener = TcpListener::bind(addr)
             .await
             .context(format!("Could not bind a tcp listener to '{addr}'"))?;
-        info!("Listening on: {addr}");
+        info!(target: "pharia-kernel::http", "Listening on: {addr}");
 
         let handle = tokio::spawn(async move {
             let res = axum::serve(listener, http(feature_set, app_state))
                 .with_graceful_shutdown(shutdown_signal)
                 .await;
             if let Err(e) = res {
-                error!("Error terminating shell: {e}");
+                error!(target: "pharia-kernel::http", "Error terminating shell: {e:#}");
             }
         });
         Ok(Self { handle })
@@ -209,7 +209,7 @@ where
 {
     let context = TracingContext::current();
     if let Some(bearer) = bearer {
-        let context = context!(context, "pharia_kernel::authorization", "check_permissions");
+        let context = context!(context, "pharia-kernel::authorization", "check_permissions");
         match authorization_api
             .0
             .check_permission(bearer.token().to_owned(), context)

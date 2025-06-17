@@ -328,7 +328,7 @@ impl RunMessageStreamMsg {
         };
         let start = Instant::now();
         let result = {
-            let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
+            let context = context!(tracing_context, "pharia-kernel::skill-runtime", "skill_execution", skill=%skill_path);
             let contextual_csi = InvocationContext::new(
                 csi_apis,
                 skill_path.namespace.clone(),
@@ -430,7 +430,7 @@ fn log_skill_result<T>(
     match result {
         Ok(_) => {
             info!(
-                target: "pharia_kernel::skill_execution",
+                target: "pharia-kernel::skill-execution",
                 parent: tracing_context.span(),
                 skill=%skill_path,
                 message="Skill executed successfully"
@@ -438,19 +438,19 @@ fn log_skill_result<T>(
         }
         Err(error) => match error.tracing_level() {
             Level::ERROR => error!(
-                target: "pharia_kernel::skill_execution",
+                target: "pharia-kernel::skill-execution",
                 parent: tracing_context.span(),
                 skill=%skill_path,
                 message="Skill invocation failed"
             ),
             Level::WARN => warn!(
-                target: "pharia_kernel::skill_execution",
+                target: "pharia-kernel::skill-execution",
                 parent: tracing_context.span(),
                 skill=%skill_path,
                 message="Skill invocation failed"
             ),
             Level::INFO => info!(
-                target: "pharia_kernel::skill_execution",
+                target: "pharia-kernel::skill-execution",
                 parent: tracing_context.span(),
                 skill=%skill_path,
                 message="Skill invocation failed"
@@ -503,7 +503,7 @@ impl RunFunctionMsg {
 
         let start = Instant::now();
         let result = {
-            let context = context!(tracing_context, "pharia_kernel::skill_runtime", "skill_execution", skill=%skill_path);
+            let context = context!(tracing_context, "pharia-kernel::skill-runtime", "skill_execution", skill=%skill_path);
             let contextual_csi = InvocationContext::new(
                 csi_apis,
                 skill_path.namespace.clone(),

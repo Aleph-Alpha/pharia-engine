@@ -70,7 +70,11 @@ impl SkillCache {
                 .max_capacity(capacity.as_u64())
                 .eviction_listener(|key, _, removal_cause| {
                     if removal_cause.was_evicted() {
-                        info!("Cache: {key} evicted. Cause: {:?}", removal_cause);
+                        info!(
+                            target: "pharia-kernel::skill-store",
+                            "Cache: {key} evicted. Cause: {:?}",
+                            removal_cause
+                        );
                     }
                 })
                 .build(),

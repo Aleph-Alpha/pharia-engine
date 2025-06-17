@@ -54,7 +54,7 @@ where
     }
 
     pub fn upsert_skill(&mut self, skill: ConfiguredSkill) {
-        info!("New or changed skill: {skill}");
+        info!(target: "pharia-kernel::skill-store", "New or changed skill: {skill}");
         let skill_path = skill.path();
         if self
             .known_skills
@@ -66,7 +66,7 @@ where
     }
 
     pub fn remove_skill(&mut self, skill: &SkillPath) {
-        info!("Removed skill: {skill}");
+        info!(target: "pharia-kernel::skill-store", "Removed skill: {skill}");
         self.known_skills.remove(skill);
         self.invalidate(skill);
     }
@@ -481,7 +481,7 @@ where
                 // will only wait on messages until we have a cache.
                 result = self.provider.refresh_oldest_digest(self.digest_update_interval), if self.provider.list_cached_skills().next().is_some() => {
                     if let Err(e) = result {
-                        error!("Error refreshing digest: {e}");
+                        error!(target: "pharia-kernel::skill-store", "Error refreshing digest: {e:#}");
                     }
                 },
                 // FuturesUnordered will let them run in parallel. It will

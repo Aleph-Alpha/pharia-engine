@@ -86,7 +86,7 @@ impl SkillRegistry for OciRegistry {
                     if anyhow_is_skill_not_found(&e) {
                         Ok(None)
                     } else {
-                        error!(parent: tracing_context.span(), "Error retrieving skill from registry: {e}");
+                        error!(parent: tracing_context.span(), "Error retrieving skill from registry: {e:#}");
                         Err(RegistryError::SkillRetrievalError(e.to_string()))
                     }
                 }
