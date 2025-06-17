@@ -95,7 +95,7 @@ impl HostStreamOutput for LinkedCtx {
         let sender = self
             .resource_table
             .get(&output)
-            .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
+            .inspect_err(|e| error!("Failed to push stream to resource table: {e:#}"))
             .expect("Failed to push stream to resource table");
         let event = match item {
             MessageItem::MessageBegin(_) => SkillEvent::MessageBegin,
@@ -119,7 +119,7 @@ impl HostStreamOutput for LinkedCtx {
         debug_assert!(output.owned());
         self.resource_table
             .delete(output)
-            .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
+            .inspect_err(|e| error!("Failed to delete stream from resource table: {e:#}"))
             .expect("Failed to delete stream from resource table");
         Ok(())
     }

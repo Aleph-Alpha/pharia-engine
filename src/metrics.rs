@@ -30,7 +30,7 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
             EXPONENTIAL_SECONDS,
         )
         .inspect_err(|e| {
-            error!("Error setting buckets for metric: {e}");
+            error!("Error setting buckets for metric: {e:#}");
         })?
         .set_buckets_for_metric(
             Matcher::Full(
@@ -41,7 +41,7 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
             EXPONENTIAL_SECONDS,
         )
         .inspect_err(|e| {
-            error!("Error setting buckets for metric: {e}");
+            error!("Error setting buckets for metric: {e:#}");
         })?
         .set_buckets_for_metric(
             Matcher::Full(
@@ -52,12 +52,12 @@ pub fn initialize_metrics(addr: impl Into<SocketAddr>) -> anyhow::Result<()> {
             EXPONENTIAL_SECONDS,
         )
         .inspect_err(|e| {
-            error!("Error setting buckets for metric: {e}");
+            error!("Error setting buckets for metric: {e:#}");
         })?
         .with_http_listener(addr)
         .install()
         .inspect_err(|e| {
-            error!("Error installing metrics: {e}");
+            error!("Error installing metrics: {e:#}");
         })?;
 
     Ok(())

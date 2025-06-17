@@ -184,7 +184,7 @@ impl McpServerStore {
             .await
             .inspect_err(|e| {
                 error!(
-                    target: "pharia_kernel::mcp",
+                    target: "pharia-kernel::mcp",
                     "Failed to fetch tools for server: {}\n caused by: {e:#}",
                     server.0
                 );

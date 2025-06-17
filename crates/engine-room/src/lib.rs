@@ -366,6 +366,7 @@ fn pooling_allocator_is_supported() -> bool {
         config.memory_reservation(1 << BITS_TO_TEST);
         let Ok(engine) = WasmtimeEngine::new(&config) else {
             info!(
+                target: "pharia-kernel::skill-runtime",
                 "unable to create an engine to test the pooling allocator, disabling pooling allocation"
             );
             return false;
@@ -375,7 +376,10 @@ fn pooling_allocator_is_supported() -> bool {
         // page size here from the maximum size.
         let ty = MemoryType::new64(0, Some(1 << (BITS_TO_TEST - 16)));
         Memory::new(&mut store, ty).inspect_err(|_| {
-            info!("Pooling allocation not supported on this system. Falling back to mmap-based implementation.");
+            info!(
+                target: "pharia-kernel::skill-runtime",
+                "Pooling allocation not supported on this system. Falling back to mmap-based implementation."
+            );
         }).is_ok()
     });
     *USE_POOLING

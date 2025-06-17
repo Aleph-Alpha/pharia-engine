@@ -107,14 +107,14 @@ impl TracingContext {
                             Ok(value) => {
                                 headers.insert("tracestate", value);
                             }
-                            Err(err) => {
-                                error!(parent: self.span(), "Found invalid header value: {err}");
+                            Err(e) => {
+                                error!(parent: self.span(), "Found invalid header value: {e:#}");
                             }
                         }
                     }
                 }
-                Err(err) => {
-                    error!(parent: self.span(), "Found invalid header value: {err}");
+                Err(e) => {
+                    error!(parent: self.span(), "Found invalid header value: {e:#}");
                 }
             }
         }
@@ -217,7 +217,7 @@ impl TracingContext {
 pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGuard> {
     // We write the errors to stderr as logging/tracing is not yet initialized
     let env_filter = EnvFilter::from_str(otel_config.log_level).inspect_err(|e| {
-        eprintln!("Error parsing log level: {e}");
+        eprintln!("Error parsing log level: {e:#}");
     })?;
     let registry = tracing_subscriber::registry()
         .with(env_filter)
@@ -228,7 +228,7 @@ pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGua
             .with_endpoint(endpoint)
             .build()
             .inspect_err(|e| {
-                eprintln!("Error building span exporter: {e}");
+                eprintln!("Error building span exporter: {e:#}");
             })?;
         let tracer_provider = tracer_provider(exporter, otel_config.sampling_ratio)?;
         init_propagator();
@@ -238,6 +238,7 @@ pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGua
         let layer = tracing_opentelemetry::layer().with_tracer(tracer);
         registry.with(layer).init();
         info!(
+            target: "pharia-kernel::logging",
             "Initialized OpenTelemetry tracer provider with endpoint: {}",
             endpoint
         );

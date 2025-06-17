@@ -418,7 +418,7 @@ impl HostCompletionStream for LinkedCtx {
         let stream_id = self.ctx.completion_stream_new(init.into()).await;
         self.resource_table
             .push(stream_id)
-            .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
+            .inspect_err(|e| error!("Failed to push stream to resource table: {e:#}"))
             .expect("Failed to push stream to resource table")
     }
 
@@ -427,7 +427,7 @@ impl HostCompletionStream for LinkedCtx {
         let stream_id = self
             .resource_table
             .get(&stream)
-            .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
+            .inspect_err(|e| error!("Failed to get stream from resource table: {e:#}"))
             .expect("Failed to get stream from resource table");
         self.ctx
             .completion_stream_next(stream_id)
@@ -440,7 +440,7 @@ impl HostCompletionStream for LinkedCtx {
         let stream_id = self
             .resource_table
             .delete(stream)
-            .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
+            .inspect_err(|e| error!("Failed to delete stream from resource table: {e:#}"))
             .expect("Failed to delete stream from resource table");
         self.ctx.completion_stream_drop(stream_id).await;
         Ok(())
@@ -452,7 +452,7 @@ impl HostChatStream for LinkedCtx {
         let stream_id = self.ctx.chat_stream_new(init.into()).await;
         self.resource_table
             .push(stream_id)
-            .inspect_err(|e| error!("Failed to push stream to resource table: {e}"))
+            .inspect_err(|e| error!("Failed to push stream to resource table: {e:#}"))
             .expect("Failed to push stream to resource table")
     }
 
@@ -461,7 +461,7 @@ impl HostChatStream for LinkedCtx {
         let stream_id = self
             .resource_table
             .get(&stream)
-            .inspect_err(|e| error!("Failed to get stream from resource table: {e}"))
+            .inspect_err(|e| error!("Failed to get stream from resource table: {e:#}"))
             .expect("Failed to get stream from resource table");
         self.ctx.chat_stream_next(stream_id).await.map(Into::into)
     }
@@ -471,7 +471,7 @@ impl HostChatStream for LinkedCtx {
         let stream_id = self
             .resource_table
             .delete(stream)
-            .inspect_err(|e| error!("Failed to delete stream from resource table: {e}"))
+            .inspect_err(|e| error!("Failed to delete stream from resource table: {e:#}"))
             .expect("Failed to delete stream from resource table");
         self.ctx.chat_stream_drop(stream_id).await;
         Ok(())

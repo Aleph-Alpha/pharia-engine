@@ -34,8 +34,8 @@ impl FromStr for FeatureSet {
             Ok(FeatureSet::Stable(n))
         } else {
             warn!(
-                "Failed to parse feature set: '{}. Falling back to stable feature set.",
-                s
+                target: "pharia-kernel::config",
+                "Failed to parse feature set: '{s:#}'. Falling back to stable feature set.",
             );
             Ok(Self::default())
         }
