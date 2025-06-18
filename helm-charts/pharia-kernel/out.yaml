@@ -6,10 +6,10 @@ metadata:
   name: pharia-kernel
   labels:
     app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.65
+    helm.sh/chart: pharia-kernel-0.2.66
     app.kubernetes.io/name: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.13.0"
+    app.kubernetes.io/version: "0.13.1"
     app.kubernetes.io/managed-by: Helm
   annotations: {}
 automountServiceAccountToken: true
@@ -65,8 +65,8 @@ metadata:
     app.kubernetes.io/instance: test
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: pharia-kernel
-    app.kubernetes.io/version: 0.13.0
-    helm.sh/chart: pharia-kernel-0.2.65
+    app.kubernetes.io/version: 0.13.1
+    helm.sh/chart: pharia-kernel-0.2.66
     pharia.ai/edition: ""
     pharia.ai/featureSet: ""
   name: pharia-kernel
@@ -98,8 +98,8 @@ metadata:
     app.kubernetes.io/instance: test
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: pharia-kernel
-    app.kubernetes.io/version: 0.13.0
-    helm.sh/chart: pharia-kernel-0.2.65
+    app.kubernetes.io/version: 0.13.1
+    helm.sh/chart: pharia-kernel-0.2.66
     pharia.ai/edition: ""
     pharia.ai/featureSet: ""
   name: pharia-kernel
@@ -121,8 +121,8 @@ spec:
         app.kubernetes.io/instance: test
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: pharia-kernel
-        app.kubernetes.io/version: 0.13.0
-        helm.sh/chart: pharia-kernel-0.2.65
+        app.kubernetes.io/version: 0.13.1
+        helm.sh/chart: pharia-kernel-0.2.66
         pharia.ai/edition: ""
         pharia.ai/featureSet: ""
     spec:
@@ -260,7 +260,7 @@ spec:
             secretKeyRef:
               key: registryPassword
               name: jfrog-credentials-secret
-        image: alephalpha.jfrog.io/container-images/pharia-kernel:0.13.0
+        image: alephalpha.jfrog.io/container-images/pharia-kernel:0.13.1
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 2
@@ -335,8 +335,8 @@ metadata:
     app.kubernetes.io/instance: test
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: pharia-kernel
-    app.kubernetes.io/version: 0.13.0
-    helm.sh/chart: pharia-kernel-0.2.65
+    app.kubernetes.io/version: 0.13.1
+    helm.sh/chart: pharia-kernel-0.2.66
     pharia.ai/edition: ""
     pharia.ai/featureSet: ""
   name: pharia-kernel
@@ -355,30 +355,33 @@ spec:
         path: /
         pathType: Prefix
 ---
-# Source: pharia-kernel/templates/prometheusServiceMonitor.yaml
+# Source: pharia-kernel/templates/service-monitor.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: pharia-kernel
   labels:
-    app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.65
-    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/component: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.13.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/version: 0.13.1
+    helm.sh/chart: pharia-kernel-0.2.66
+    pharia.ai/edition: ""
+    pharia.ai/featureSet: ""
+  name: pharia-kernel
+  namespace: pharia-ai
 spec:
   endpoints:
-    - interval: 30s
-      path: /
-      port: metrics
+  - interval: 30s
+    path: /
+    port: metrics
   namespaceSelector:
     matchNames:
     - pharia-ai
   selector:
     matchLabels:
-      app.kubernetes.io/name: pharia-kernel
       app.kubernetes.io/instance: test
+      app.kubernetes.io/name: pharia-kernel
 ---
 # Source: pharia-kernel/templates/tests/test-connection.yaml
 apiVersion: v1
@@ -387,10 +390,10 @@ metadata:
   name: "pharia-kernel-test-connection"
   labels:
     app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.65
+    helm.sh/chart: pharia-kernel-0.2.66
     app.kubernetes.io/name: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.13.0"
+    app.kubernetes.io/version: "0.13.1"
     app.kubernetes.io/managed-by: Helm
   annotations:
     "helm.sh/hook": test

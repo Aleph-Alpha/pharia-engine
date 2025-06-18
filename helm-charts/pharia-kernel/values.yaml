@@ -111,6 +111,10 @@ service:
 
 serviceMonitor:
   enabled: false
+  endpoints:
+    - interval: 30s
+      path: /
+      port: metrics
 # -- Specify the default namespaces for PhariaKernel, which provide the default skills.
 # If the default namespaces are configured, any duplicate namespaces in `pharia-kernel.namespaces` are ignored
 # because these are backed by environment variables, which have higher precedence.
