@@ -62,14 +62,21 @@ pub enum Modality {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ToolError {
-    // We plan on passing this error variant to the Skills and model.
+    /// We assume there might be something wrong with the input to the tool.
+    /// This could be wrong arguments, or wrong type of arguments.
+    /// The model should get the opportunity to retry.
     #[error("{0}")]
-    ToolCallFailed(String),
-    // This variant should also be exposed to the Skill, as the model can recover from this.
+    LogicError(String),
+    /// This error could mean that there is something wrong in the Skill code (the developer
+    /// specified a tool that never existed). It could also mean a runtime error (the tool was
+    /// removed from the server). It could also be a logic error from the model, where it chose
+    /// to call a tool that is not available.
     #[error("Tool {0} not found on any server.")]
     ToolNotFound(String),
+    /// We assume something to be wrong with the runtime. We would want to retry. Otherwise, we
+    /// would stop skill execution. We would not pass this to the mode.
     #[error("The tool call could not be executed, original error: {0}")]
-    Other(#[from] anyhow::Error),
+    RuntimeError(#[from] anyhow::Error),
 }
 
 #[cfg(test)]
