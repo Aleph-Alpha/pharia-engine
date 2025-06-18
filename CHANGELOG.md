@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.1...pharia-kernel-v0.13.2)
+
+### Fixes
+
+- Server sent events can span multiple http chunks - ([aedec1c](https://github.com/Aleph-Alpha/pharia-kernel/commit/aedec1c8671efa30494fa184d6824b5d497b694a))
+
+
 ## [0.13.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.0...pharia-kernel-v0.13.1)
 
 ### Features
