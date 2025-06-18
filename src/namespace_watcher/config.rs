@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::PathBuf};
 use url::Url;
 use utoipa::ToSchema;
 
-use crate::{mcp::McpServerUrl, skill_loader::RegistryConfig, tool::NativeTool};
+use crate::{mcp::McpServerUrl, skill_loader::RegistryConfig, tool::NativeToolName};
 
 use super::{
     NamespaceDescriptionLoader,
@@ -161,7 +161,7 @@ pub enum NamespaceConfig {
         #[serde(default)]
         mcp_servers: Vec<McpServerUrl>,
         #[serde(default)]
-        native_tools: Vec<NativeTool>,
+        native_tools: Vec<NativeToolName>,
     },
     /// Rather than referencing a configuration where skills are listed, this variant just lists
     /// them in place in the application config. As such these skills are owned by the operators.
@@ -175,7 +175,7 @@ pub enum NamespaceConfig {
         #[serde(default)]
         mcp_servers: Vec<McpServerUrl>,
         #[serde(default)]
-        native_tools: Vec<NativeTool>,
+        native_tools: Vec<NativeToolName>,
     },
 }
 
