@@ -23,9 +23,19 @@ pub struct Toolbox {
 
 impl Toolbox {
     pub fn new() -> Self {
+        let mut native_tools = HashMap::new();
+        for tool in [NativeToolName::Add, NativeToolName::Subtract] {
+            native_tools.insert(
+                QualifiedToolName {
+                    namespace: Namespace::new("test-beta").unwrap(),
+                    name: tool.name().to_owned(),
+                },
+                tool.tool(),
+            );
+        }
         Self {
             mcp_tools: HashMap::new(),
-            native_tools: HashMap::new(),
+            native_tools,
         }
     }
 
@@ -173,6 +183,18 @@ pub mod tests {
 
         // Then we expect it to return the tool
         assert!(tool.is_some());
+    }
+
+    #[tokio::test]
+    async fn hardcoded_native_tools_are_listed_in_test_namespace() {
+        // Given a toolbox
+        let toolbox = Toolbox::new();
+
+        // When we list the tools in the `test-beta` namespace
+        let tools = toolbox.list_tools_in_namespace(&Namespace::new("test-beta").unwrap());
+
+        // Then we expect the tools to be listed
+        assert_eq!(tools, vec!["add", "subtract"]);
     }
 
     #[tokio::test]
