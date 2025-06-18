@@ -41,7 +41,7 @@ impl McpClientImpl {
                 .content
                 .first()
                 .ok_or(anyhow!("No content in tool call response"))?;
-            Err(ToolError::ToolCallFailed(text.to_owned()))
+            Err(ToolError::LogicError(text.to_owned()))
         } else {
             Ok(result.content)
         }
@@ -222,7 +222,7 @@ impl McpClientImpl {
             .map_err(anyhow::Error::from)?;
 
         if !response.status().is_success() {
-            return Err(ToolError::Other(anyhow!(
+            return Err(ToolError::RuntimeError(anyhow!(
                 "Failed to send initialized notification"
             )));
         }
@@ -399,7 +399,7 @@ pub mod tests {
             )
             .await
             .unwrap_err();
-        assert!(matches!(response, ToolError::ToolCallFailed(_)));
+        assert!(matches!(response, ToolError::LogicError(_)));
     }
 
     #[tokio::test]
