@@ -64,7 +64,7 @@ impl TestFileRegistry {
             [local]
             path = {json_masked_string_with_quotes}
             skills = [{{"name"="{skills}"}}]
-            mcp_servers = ["{mcp_servers}"]"#,
+            mcp-servers = ["{mcp_servers}"]"#,
         ))
         .unwrap()
     }

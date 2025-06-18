@@ -155,6 +155,7 @@ pub enum NamespaceConfig {
     },
     /// For development it is convenient to just watch a local repository for changing skills
     /// without the need for reconfiguration.
+    #[serde(rename_all = "kebab-case")]
     Watch {
         directory: PathBuf,
         // Setting a default here for backwards compatibility and convience
@@ -167,6 +168,7 @@ pub enum NamespaceConfig {
     /// them in place in the application config. As such these skills are owned by the operators.
     /// This behavior is especially useful to make sure certain skills are found in integration
     /// tests.
+    #[serde(rename_all = "kebab-case")]
     InPlace {
         skills: Vec<SkillDescription>,
         #[serde(flatten)]
@@ -286,7 +288,7 @@ mod tests {
             r#"
             [local]
             directory = "skills"
-            mcp_servers = ["http://localhost:8000/mcp"]
+            mcp-servers = ["http://localhost:8000/mcp"]
             "#,
         )
         .unwrap();
@@ -327,7 +329,7 @@ mod tests {
         let config = NamespaceConfigs::from_toml(
             r#"
             [local]
-            mcp_servers = ["http://localhost:8000/mcp"]
+            mcp-servers = ["http://localhost:8000/mcp"]
             skills = [{"name"="dummy-skill"}]
             path = "skills"
             "#,
