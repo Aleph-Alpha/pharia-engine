@@ -366,7 +366,7 @@ where
         for tool in native_tool_diff.added {
             self.tool_store_api
                 .native_tool_upsert(ConfiguredNativeTool {
-                    tool,
+                    name: tool,
                     namespace: namespace.clone(),
                 })
                 .await;
@@ -374,7 +374,7 @@ where
         for tool in native_tool_diff.removed {
             self.tool_store_api
                 .native_tool_remove(ConfiguredNativeTool {
-                    tool,
+                    name: tool,
                     namespace: namespace.clone(),
                 })
                 .await;
@@ -919,7 +919,7 @@ pub mod tests {
         assert_eq!(
             upserted,
             &[ConfiguredNativeTool {
-                tool: NativeToolName::Add,
+                name: NativeToolName::Add,
                 namespace: namespace.clone(),
             }]
         );
@@ -964,7 +964,7 @@ pub mod tests {
         assert_eq!(
             removed,
             &[ConfiguredNativeTool {
-                tool: NativeToolName::Subtract,
+                name: NativeToolName::Subtract,
                 namespace
             }]
         );
