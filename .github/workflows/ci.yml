@@ -45,7 +45,7 @@ jobs:
           targets: wasm32-wasip2
       - uses: taiki-e/install-action@v2
         with:
-          tool: wasm-tools,cargo-nextest
+          tool: wasm-tools,cargo-nextest@0.9.98
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
         with:
