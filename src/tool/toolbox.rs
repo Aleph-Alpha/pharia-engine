@@ -51,11 +51,12 @@ impl Toolbox {
     }
 
     pub fn upsert_native_tool(&mut self, tool: ConfiguredNativeTool) {
-        self.native_tools.upsert(tool);
+        self.native_tools
+            .upsert(tool.qualified_tool(), tool.name.tool());
     }
 
     pub fn remove_native_tool(&mut self, tool: ConfiguredNativeTool) {
-        self.native_tools.remove(tool);
+        self.native_tools.remove(tool.qualified_tool());
     }
 
     pub(crate) fn update_tools(
@@ -68,8 +69,17 @@ impl Toolbox {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ConfiguredNativeTool {
-    pub tool: NativeToolName,
+    pub name: NativeToolName,
     pub namespace: Namespace,
+}
+
+impl ConfiguredNativeTool {
+    pub fn qualified_tool(&self) -> QualifiedToolName {
+        QualifiedToolName {
+            namespace: self.namespace.clone(),
+            name: self.name.name().to_owned(),
+        }
+    }
 }
 
 struct NativeToolStore {
@@ -97,20 +107,12 @@ impl NativeToolStore {
         })
     }
 
-    fn upsert(&mut self, tool: ConfiguredNativeTool) {
-        let qualified_tool = QualifiedToolName {
-            namespace: tool.namespace,
-            name: tool.tool.name().to_owned(),
-        };
-        self.tools.insert(qualified_tool, tool.tool.tool());
+    fn upsert(&mut self, name: QualifiedToolName, tool: Arc<dyn Tool + Send + Sync>) {
+        self.tools.insert(name, tool);
     }
 
-    fn remove(&mut self, tool: ConfiguredNativeTool) {
-        let qualified_tool = QualifiedToolName {
-            namespace: tool.namespace,
-            name: tool.tool.name().to_owned(),
-        };
-        self.tools.remove(&qualified_tool);
+    fn remove(&mut self, name: QualifiedToolName) {
+        self.tools.remove(&name);
     }
 }
 
@@ -192,7 +194,7 @@ pub mod tests {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeToolName::Add,
+            name: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
 
@@ -211,7 +213,7 @@ pub mod tests {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeToolName::Add,
+            name: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
 
@@ -227,11 +229,11 @@ pub mod tests {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeToolName::Add,
+            name: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
         toolbox.remove_native_tool(ConfiguredNativeTool {
-            tool: NativeToolName::Add,
+            name: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
 
@@ -263,11 +265,11 @@ pub mod tests {
             ),
         ]));
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeToolName::Add,
+            name: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeToolName::Subtract,
+            name: NativeToolName::Subtract,
             namespace: Namespace::dummy(),
         });
 
