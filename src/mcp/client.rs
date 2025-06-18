@@ -257,29 +257,55 @@ impl McpClientImpl {
                 Ok(serde_json::from_value::<JsonRpcResponse<T>>(data)?.result)
             }
             "text/event-stream" => {
-                // We may get different type of results in the stream.
-                // A client may send different notification types before sending the result we are interested in.
-                // For now, we ignore these notification, which can include progress notifications, but also
-                // log messages. See <https://modelcontextprotocol.io/specification/2025-03-26/basic#notifications>
-                let mut stream = response.bytes_stream();
-                while let Some(Ok(item)) = stream.next().await {
-                    let item = String::from_utf8(item.to_vec())?;
-                    let data = item
-                        .split("data: ")
-                        .nth(1)
-                        .ok_or_else(|| anyhow!("No data in stream"))?;
-                    if let Ok(value) = serde_json::from_str::<JsonRpcResponse<T>>(data) {
-                        return Ok(value.result);
-                    }
-                }
-                Err(anyhow!("Expected JSON-RPC response not found in stream"))
+                // Collect bytes from the SSE stream until we have a complete event containing
+                // the JSON-RPC response we are interested in.
+                let stream = response.bytes_stream();
+                let value: JsonRpcResponse<T> =
+                    Self::json_rpc_result_from_sse_stream(stream).await?;
+                Ok(value.result)
             }
             _ => Err(anyhow!("unexpected content type"))?,
         }
     }
+
+    /// Parse an SSE `bytes_stream` and find the first occurence of <T> contained in a `data:`
+    /// field. SSE events can span multiple chunks, and multiple events can be in a single chunk.
+    async fn json_rpc_result_from_sse_stream<T, S>(mut stream: S) -> anyhow::Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+        S: futures::Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Unpin,
+    {
+        let mut buffer = String::new();
+
+        while let Some(chunk) = stream.next().await {
+            let item = String::from_utf8_lossy(&chunk?).replace("\r\n", "\n");
+            buffer.push_str(&item);
+
+            // There might be multiple events in a single chunk.
+            while let Some(pos) = buffer.find("\n\n") {
+                let event = &buffer[..pos];
+
+                for line in event.lines() {
+                    if let Some(data) = line.strip_prefix("data: ") {
+                        if let Ok(value) = serde_json::from_str::<T>(data) {
+                            return Ok(value);
+                        }
+                    }
+                }
+
+                // Remove the processed event from the buffer
+                buffer = buffer[pos + 2..].to_string();
+            }
+        }
+
+        Err(anyhow!("Expected JSON-RPC response not found in stream"))
+    }
 }
+
 #[cfg(test)]
 pub mod tests {
+    use bytes::Bytes;
+    use futures::stream;
     use test_skills::{given_json_mcp_server, given_sse_mcp_server};
 
     use crate::tool::Argument;
@@ -414,5 +440,81 @@ pub mod tests {
         let result = McpClientImpl::parse_tool_call_result(result);
 
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn json_rpc_response_can_span_multiple_sse_chunks() {
+        // Given a SSE event split across two chunks
+        let chunks = vec!["event: message\ndata: 4", "2\n\n"];
+        let stream = stream::iter(
+            chunks
+                .into_iter()
+                .map(|chunk| Ok::<_, reqwest::Error>(Bytes::from(chunk))),
+        );
+
+        // Then we get the parsed result
+        let parsed: i32 = McpClientImpl::json_rpc_result_from_sse_stream(stream)
+            .await
+            .unwrap();
+
+        assert_eq!(parsed, 42);
+    }
+
+    #[tokio::test]
+    async fn json_rpc_response_with_crlf_line_endings() {
+        // Given a SSE event that contains CRLF line endings
+        let sse_event = "event: message\r\ndata: 123\r\n\r\n";
+
+        // When the stream is parsed
+        let test_stream = stream::iter(vec![Ok::<_, reqwest::Error>(Bytes::from(sse_event))]);
+
+        // Then we get the parsed result
+        let parsed: i32 = McpClientImpl::json_rpc_result_from_sse_stream(test_stream)
+            .await
+            .unwrap();
+
+        assert_eq!(parsed, 123);
+    }
+
+    #[tokio::test]
+    async fn skips_uninteresting_events() {
+        // Given a SSE stream that contains one uninteresting event and one interesting event
+        let chunks = vec![
+            "event: message\ndata: northern-pike\n\n",
+            "event: message\ndata: 42\n\n",
+        ];
+        let stream = stream::iter(
+            chunks
+                .into_iter()
+                .map(|chunk| Ok::<_, reqwest::Error>(Bytes::from(chunk))),
+        );
+
+        // When the stream is parsed
+        let parsed: i32 = McpClientImpl::json_rpc_result_from_sse_stream(stream)
+            .await
+            .unwrap();
+
+        // Then we get the interesting event
+        assert_eq!(parsed, 42);
+    }
+
+    #[tokio::test]
+    async fn multiple_events_in_single_chunk() {
+        // Given a SSE stream that contains an uninteresting event and an interesting event in the
+        // same chunk
+        let chunks = vec!["event: message\ndata: northern-pike\n\nevent: message\ndata: 42\n\n"];
+        let stream = stream::iter(
+            chunks
+                .into_iter()
+                .map(|chunk| Ok::<_, reqwest::Error>(Bytes::from(chunk))),
+        );
+
+        // When the stream is parsed
+        let parsed: i32 = McpClientImpl::json_rpc_result_from_sse_stream(stream)
+            .await
+            .unwrap();
+
+        // Then we get the interesting event
+        assert_eq!(parsed, 42);
     }
 }

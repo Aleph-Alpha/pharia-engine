@@ -4254,6 +4254,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "axum-tracing-opentelemetry",
+ "bytes",
  "bytesize",
  "config",
  "derive_more",

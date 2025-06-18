@@ -147,6 +147,7 @@ bytesize = { version = "2.0.1", features = ["serde"] }
 axum-tracing-opentelemetry = { version = "0.29.0", features = [
     "tracing_level_info",
 ] }
+bytes = "1.10.1"
 
 [dev-dependencies]
 test-skills = { path = "./crates/test-skills" }
