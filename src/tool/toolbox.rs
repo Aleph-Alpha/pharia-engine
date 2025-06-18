@@ -18,20 +18,21 @@ pub struct Toolbox {
     /// Tools reported by the MCP servers
     mcp_tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
     /// Tools offered by the Kernel itself
-    native_tools: NativeToolStore,
+    native_tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
 }
 
 impl Toolbox {
     pub fn new() -> Self {
         Self {
             mcp_tools: HashMap::new(),
-            native_tools: NativeToolStore::new(),
+            native_tools: HashMap::new(),
         }
     }
 
     pub fn fetch_tool(&mut self, qtn: &QualifiedToolName) -> Option<Arc<dyn Tool + Send + Sync>> {
         self.native_tools
-            .fetch(qtn)
+            .get(qtn)
+            .cloned()
             .or_else(|| self.mcp_tools.get(qtn).cloned())
     }
 
@@ -45,18 +46,24 @@ impl Toolbox {
                     None
                 }
             })
-            .chain(self.native_tools.list(namespace))
+            .chain(self.native_tools.keys().filter_map(|qtn| {
+                if qtn.namespace == *namespace {
+                    Some(qtn.name.clone())
+                } else {
+                    None
+                }
+            }))
             .sorted()
             .collect()
     }
 
     pub fn upsert_native_tool(&mut self, tool: ConfiguredNativeTool) {
         self.native_tools
-            .upsert(tool.qualified_tool(), tool.name.tool());
+            .insert(tool.qualified_tool(), tool.name.tool());
     }
 
     pub fn remove_native_tool(&mut self, tool: ConfiguredNativeTool) {
-        self.native_tools.remove(tool.qualified_tool());
+        self.native_tools.remove(&tool.qualified_tool());
     }
 
     pub(crate) fn update_tools(
@@ -79,40 +86,6 @@ impl ConfiguredNativeTool {
             namespace: self.namespace.clone(),
             name: self.name.name().to_owned(),
         }
-    }
-}
-
-struct NativeToolStore {
-    tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
-}
-
-impl NativeToolStore {
-    fn new() -> Self {
-        Self {
-            tools: HashMap::new(),
-        }
-    }
-
-    fn fetch(&self, qtn: &QualifiedToolName) -> Option<Arc<dyn Tool + Send + Sync>> {
-        self.tools.get(qtn).cloned()
-    }
-
-    fn list(&self, namespace: &Namespace) -> impl Iterator<Item = String> {
-        self.tools.keys().filter_map(|qtn| {
-            if qtn.namespace == *namespace {
-                Some(qtn.name.clone())
-            } else {
-                None
-            }
-        })
-    }
-
-    fn upsert(&mut self, name: QualifiedToolName, tool: Arc<dyn Tool + Send + Sync>) {
-        self.tools.insert(name, tool);
-    }
-
-    fn remove(&mut self, name: QualifiedToolName) {
-        self.tools.remove(&name);
     }
 }
 
