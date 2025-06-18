@@ -9,7 +9,7 @@ use axum::http::HeaderValue;
 use reqwest::{StatusCode, header::AUTHORIZATION};
 use serde::{Deserialize, Serialize};
 
-use crate::{http::HttpClient, mcp::McpServerUrl};
+use crate::{http::HttpClient, mcp::McpServerUrl, tool::NativeTool};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NamespaceDescriptionError {
@@ -74,7 +74,7 @@ pub struct NamespaceDescription {
     #[serde(default)]
     pub mcp_servers: Vec<McpServerUrl>,
     #[serde(default)]
-    pub native_tools: Vec<String>,
+    pub native_tools: Vec<NativeTool>,
 }
 
 impl NamespaceDescription {
@@ -95,14 +95,14 @@ impl NamespaceDescription {
 pub struct WatchLoader {
     directory: PathBuf,
     mcp_servers: Vec<McpServerUrl>,
-    native_tools: Vec<String>,
+    native_tools: Vec<NativeTool>,
 }
 
 impl WatchLoader {
     pub fn new(
         directory: PathBuf,
         mcp_servers: Vec<McpServerUrl>,
-        native_tools: Vec<String>,
+        native_tools: Vec<NativeTool>,
     ) -> Self {
         Self {
             directory,
@@ -252,10 +252,20 @@ pub mod tests {
     fn native_tools_are_loaded_from_config() {
         let config = r#"
         skills = []
-        native_tools = ["test_add"]
+        native_tools = ["add", "subtract"]
         "#;
         let tc = NamespaceDescription::from_str(config).unwrap();
-        assert_eq!(tc.native_tools, vec!["test_add".to_owned()]);
+        assert_eq!(tc.native_tools, vec![NativeTool::Add, NativeTool::Subtract]);
+    }
+
+    #[test]
+    fn invalid_native_tools_are_rejected() {
+        let config = r#"
+        skills = []
+        native_tools = ["invalid"]
+        "#;
+        let tc = NamespaceDescription::from_str(config);
+        assert!(tc.is_err());
     }
 
     #[test]

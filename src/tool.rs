@@ -10,7 +10,7 @@ use crate::{logging::TracingContext, namespace_watcher::Namespace};
 pub use self::{
     actor::{InvokeRequest, ToolRuntime, ToolRuntimeApi, ToolRuntimeSender, ToolStoreApi},
     tool_routes::{ToolProvider, http_tools_v1, openapi_tools_v1},
-    toolbox::ConfiguredNativeTool,
+    toolbox::{ConfiguredNativeTool, NativeTool},
 };
 
 #[cfg(test)]
