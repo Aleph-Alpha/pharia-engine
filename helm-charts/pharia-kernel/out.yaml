@@ -1,18 +1,20 @@
 ---
 # Source: pharia-kernel/templates/serviceaccount.yaml
 apiVersion: v1
+automountServiceAccountToken: true
 kind: ServiceAccount
 metadata:
-  name: pharia-kernel
   labels:
-    app: pharia-kernel
-    helm.sh/chart: pharia-kernel-0.2.66
-    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/component: pharia-kernel
     app.kubernetes.io/instance: test
-    app.kubernetes.io/version: "0.13.1"
     app.kubernetes.io/managed-by: Helm
-  annotations: {}
-automountServiceAccountToken: true
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/version: 0.13.1
+    helm.sh/chart: pharia-kernel-0.2.66
+    pharia.ai/edition: ""
+    pharia.ai/featureSet: ""
+  name: pharia-kernel
+  namespace: pharia-ai
 ---
 # Source: pharia-kernel/templates/config.yaml
 apiVersion: v1
