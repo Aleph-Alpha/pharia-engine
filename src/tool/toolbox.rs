@@ -39,6 +39,7 @@ impl Toolbox {
     pub fn list_tools_in_namespace(&self, namespace: &Namespace) -> Vec<String> {
         self.mcp_tools
             .keys()
+            .chain(self.native_tools.keys())
             .filter_map(|qtn| {
                 if qtn.namespace == *namespace {
                     Some(qtn.name.clone())
@@ -46,13 +47,6 @@ impl Toolbox {
                     None
                 }
             })
-            .chain(self.native_tools.keys().filter_map(|qtn| {
-                if qtn.namespace == *namespace {
-                    Some(qtn.name.clone())
-                } else {
-                    None
-                }
-            }))
             .sorted()
             .collect()
     }
