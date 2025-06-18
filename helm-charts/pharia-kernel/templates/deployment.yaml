@@ -1,4 +1,6 @@
+{{- if not .Values.backwardsCompatibility }}
 {{- template "pharia-common.deployment" (dict "customTemplate" "pharia-kernel.deployment" "rootContext" $ "resourceContextName" "") -}}
+{{- end -}}
 
 {{- define "pharia-kernel.deployment" -}}
 ## Define overrides for your resource here
