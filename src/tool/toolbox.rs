@@ -1,4 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+
+use itertools::Itertools;
 
 use crate::{
     namespace_watcher::Namespace,
@@ -42,14 +47,16 @@ impl Toolbox {
                     None
                 }
             })
+            .chain(self.native_tools.list(namespace))
+            .sorted()
             .collect()
     }
 
-    pub fn upsert_native_tool(&self, tool: ConfiguredNativeTool) {
+    pub fn upsert_native_tool(&mut self, tool: ConfiguredNativeTool) {
         self.native_tools.upsert(tool);
     }
 
-    pub fn remove_native_tool(&self, tool: ConfiguredNativeTool) {
+    pub fn remove_native_tool(&mut self, tool: ConfiguredNativeTool) {
         self.native_tools.remove(tool);
     }
 
@@ -61,28 +68,46 @@ impl Toolbox {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ConfiguredNativeTool {
     pub name: String,
     pub namespace: Namespace,
 }
 
-struct NativeToolStore;
+struct NativeToolStore {
+    tools: HashSet<ConfiguredNativeTool>,
+}
 
 impl NativeToolStore {
     fn new() -> Self {
-        Self
+        Self {
+            tools: HashSet::new(),
+        }
     }
 
-    #[allow(clippy::unused_self)]
-    fn upsert(&self, _tool: ConfiguredNativeTool) {}
+    fn list(&self, namespace: &Namespace) -> impl Iterator<Item = String> {
+        self.tools.iter().filter_map(|tool| {
+            if tool.namespace == *namespace {
+                Some(tool.name.clone())
+            } else {
+                None
+            }
+        })
+    }
 
-    #[allow(clippy::unused_self)]
-    fn remove(&self, _tool: ConfiguredNativeTool) {}
+    fn upsert(&mut self, tool: ConfiguredNativeTool) {
+        self.tools.insert(tool);
+    }
+
+    fn remove(&mut self, tool: ConfiguredNativeTool) {
+        self.tools.remove(&tool);
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
+    use double_trait::Dummy;
+
     use crate::{
         logging::TracingContext,
         tool::{Argument, Modality, ToolError},
@@ -150,5 +175,81 @@ pub mod tests {
 
         // Then we expect it to return None
         assert!(maybe_tool.is_none());
+    }
+
+    #[tokio::test]
+    async fn upserted_native_tool_is_listed() {
+        // Given a toolbox with a native tool
+        let mut toolbox = Toolbox::new();
+        toolbox.upsert_native_tool(ConfiguredNativeTool {
+            name: "test".to_owned(),
+            namespace: Namespace::dummy(),
+        });
+
+        // When we list the tools
+        let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
+
+        // Then we expect the tool to be listed
+        assert_eq!(tools, vec!["test"]);
+    }
+
+    #[tokio::test]
+    async fn removed_native_tool_is_not_listed() {
+        // Given a toolbox with a native tool
+        let mut toolbox = Toolbox::new();
+        toolbox.upsert_native_tool(ConfiguredNativeTool {
+            name: "a".to_owned(),
+            namespace: Namespace::dummy(),
+        });
+        toolbox.upsert_native_tool(ConfiguredNativeTool {
+            name: "b".to_owned(),
+            namespace: Namespace::dummy(),
+        });
+        toolbox.remove_native_tool(ConfiguredNativeTool {
+            name: "a".to_owned(),
+            namespace: Namespace::dummy(),
+        });
+
+        // When we list the tools
+        let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
+
+        // Then we expect the tool to be listed
+        assert_eq!(tools, vec!["b"]);
+    }
+
+    #[tokio::test]
+    async fn tools_are_sorted() {
+        // Given a toolbox with MCP tools and native tools
+        let mut toolbox = Toolbox::new();
+        toolbox.update_tools(HashMap::from([
+            (
+                QualifiedToolName {
+                    namespace: Namespace::dummy(),
+                    name: "a".to_owned(),
+                },
+                Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
+            ),
+            (
+                QualifiedToolName {
+                    namespace: Namespace::dummy(),
+                    name: "c".to_owned(),
+                },
+                Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
+            ),
+        ]));
+        toolbox.upsert_native_tool(ConfiguredNativeTool {
+            name: "b".to_owned(),
+            namespace: Namespace::dummy(),
+        });
+        toolbox.upsert_native_tool(ConfiguredNativeTool {
+            name: "d".to_owned(),
+            namespace: Namespace::dummy(),
+        });
+
+        // When we list the tools
+        let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
+
+        // Then we expect the tool to be listed
+        assert_eq!(tools, vec!["a", "b", "c", "d"]);
     }
 }
