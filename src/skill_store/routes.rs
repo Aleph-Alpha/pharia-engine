@@ -47,7 +47,7 @@ pub fn openapi_skill_store_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenA
 }
 
 #[derive(OpenApi)]
-#[openapi(paths())]
+#[openapi(paths(skills))]
 struct SkillStoreOpenApiDoc;
 
 #[derive(OpenApi)]
