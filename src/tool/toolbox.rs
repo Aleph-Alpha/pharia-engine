@@ -3,14 +3,11 @@ use std::{
     sync::Arc,
 };
 
-use async_trait::async_trait;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 
 use crate::{
-    logging::TracingContext,
     namespace_watcher::Namespace,
-    tool::{Argument, Modality, QualifiedToolName, Tool, ToolError},
+    tool::{NativeTool, QualifiedToolName, Tool},
 };
 
 /// Registry of all tools known to the kernel.
@@ -69,33 +66,6 @@ impl Toolbox {
         tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync + 'static>>,
     ) {
         self.mcp_tools = tools;
-    }
-}
-
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq, Hash)]
-#[serde(rename_all = "snake_case")]
-pub enum NativeTool {
-    Add,
-    Subtract,
-}
-
-impl NativeTool {
-    fn name(&self) -> &str {
-        match self {
-            NativeTool::Add => "add",
-            NativeTool::Subtract => "subtract",
-        }
-    }
-}
-
-#[async_trait]
-impl Tool for NativeTool {
-    async fn invoke(
-        &self,
-        _args: Vec<Argument>,
-        _tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError> {
-        unimplemented!()
     }
 }
 

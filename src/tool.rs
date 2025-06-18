@@ -1,4 +1,5 @@
 mod actor;
+mod native_tool;
 mod tool_routes;
 mod toolbox;
 
@@ -9,8 +10,9 @@ use crate::{logging::TracingContext, namespace_watcher::Namespace};
 
 pub use self::{
     actor::{InvokeRequest, ToolRuntime, ToolRuntimeApi, ToolRuntimeSender, ToolStoreApi},
+    native_tool::NativeTool,
     tool_routes::{ToolProvider, http_tools_v1, openapi_tools_v1},
-    toolbox::{ConfiguredNativeTool, NativeTool},
+    toolbox::ConfiguredNativeTool,
 };
 
 #[cfg(test)]
