@@ -1,13 +1,10 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use itertools::Itertools;
 
 use crate::{
     namespace_watcher::Namespace,
-    tool::{NativeTool, QualifiedToolName, Tool},
+    tool::{NativeToolName, QualifiedToolName, Tool},
 };
 
 /// Registry of all tools known to the kernel.
@@ -69,34 +66,31 @@ impl Toolbox {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ConfiguredNativeTool {
-    pub tool: NativeTool,
+    pub tool: NativeToolName,
     pub namespace: Namespace,
 }
 
 struct NativeToolStore {
-    tools: HashSet<ConfiguredNativeTool>,
+    tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
 }
 
 impl NativeToolStore {
     fn new() -> Self {
         Self {
-            tools: HashSet::new(),
+            tools: HashMap::new(),
         }
     }
 
     fn fetch(&self, qtn: &QualifiedToolName) -> Option<Arc<dyn Tool + Send + Sync>> {
-        self.tools
-            .iter()
-            .find(|tool| tool.tool.name() == qtn.name)
-            .map(|tool| Arc::new(tool.tool.clone()) as Arc<dyn Tool + Send + Sync>)
+        self.tools.get(qtn).cloned()
     }
 
     fn list(&self, namespace: &Namespace) -> impl Iterator<Item = String> {
-        self.tools.iter().filter_map(|tool| {
-            if tool.namespace == *namespace {
-                Some(tool.tool.name().to_owned())
+        self.tools.keys().filter_map(|qtn| {
+            if qtn.namespace == *namespace {
+                Some(qtn.name.clone())
             } else {
                 None
             }
@@ -104,11 +98,19 @@ impl NativeToolStore {
     }
 
     fn upsert(&mut self, tool: ConfiguredNativeTool) {
-        self.tools.insert(tool);
+        let qualified_tool = QualifiedToolName {
+            namespace: tool.namespace,
+            name: tool.tool.name().to_owned(),
+        };
+        self.tools.insert(qualified_tool, tool.tool.tool());
     }
 
     fn remove(&mut self, tool: ConfiguredNativeTool) {
-        self.tools.remove(&tool);
+        let qualified_tool = QualifiedToolName {
+            namespace: tool.namespace,
+            name: tool.tool.name().to_owned(),
+        };
+        self.tools.remove(&qualified_tool);
     }
 }
 
@@ -190,7 +192,7 @@ pub mod tests {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeTool::Add,
+            tool: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
 
@@ -209,7 +211,7 @@ pub mod tests {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeTool::Add,
+            tool: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
 
@@ -225,11 +227,11 @@ pub mod tests {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeTool::Add,
+            tool: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
         toolbox.remove_native_tool(ConfiguredNativeTool {
-            tool: NativeTool::Add,
+            tool: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
 
@@ -261,11 +263,11 @@ pub mod tests {
             ),
         ]));
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeTool::Add,
+            tool: NativeToolName::Add,
             namespace: Namespace::dummy(),
         });
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            tool: NativeTool::Subtract,
+            tool: NativeToolName::Subtract,
             namespace: Namespace::dummy(),
         });
 

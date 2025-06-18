@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     logging::TracingContext,
     tool::{Argument, Modality, Tool, ToolError},
@@ -7,16 +9,61 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum NativeTool {
+pub enum NativeToolName {
     Add,
     Subtract,
 }
 
-impl NativeTool {
+impl NativeToolName {
+    pub fn tool(&self) -> Arc<dyn Tool + Send + Sync + 'static> {
+        match self {
+            NativeToolName::Add => Arc::new(Add),
+            NativeToolName::Subtract => Arc::new(Subtract),
+        }
+    }
+}
+
+struct Add;
+
+#[async_trait]
+impl Tool for Add {
+    async fn invoke(
+        &self,
+        args: Vec<Argument>,
+        _tracing_context: TracingContext,
+    ) -> Result<Vec<Modality>, ToolError> {
+        let args = Arguments(args);
+        let a: i32 = args.get("a")?;
+        let b: i32 = args.get("b")?;
+        Ok(vec![Modality::Text {
+            text: (a + b).to_string(),
+        }])
+    }
+}
+
+struct Subtract;
+
+#[async_trait]
+impl Tool for Subtract {
+    async fn invoke(
+        &self,
+        args: Vec<Argument>,
+        _tracing_context: TracingContext,
+    ) -> Result<Vec<Modality>, ToolError> {
+        let args = Arguments(args);
+        let a: i32 = args.get("a")?;
+        let b: i32 = args.get("b")?;
+        Ok(vec![Modality::Text {
+            text: (a - b).to_string(),
+        }])
+    }
+}
+
+impl NativeToolName {
     pub fn name(&self) -> &str {
         match self {
-            NativeTool::Add => "add",
-            NativeTool::Subtract => "subtract",
+            NativeToolName::Add => "add",
+            NativeToolName::Subtract => "subtract",
         }
     }
 }
@@ -42,7 +89,7 @@ impl Arguments {
 }
 
 #[async_trait]
-impl Tool for NativeTool {
+impl Tool for NativeToolName {
     async fn invoke(
         &self,
         args: Vec<Argument>,
@@ -50,14 +97,14 @@ impl Tool for NativeTool {
     ) -> Result<Vec<Modality>, ToolError> {
         let args = Arguments(args);
         match self {
-            NativeTool::Add => {
+            NativeToolName::Add => {
                 let a: i32 = args.get("a")?;
                 let b: i32 = args.get("b")?;
                 Ok(vec![Modality::Text {
                     text: (a + b).to_string(),
                 }])
             }
-            NativeTool::Subtract => {
+            NativeToolName::Subtract => {
                 let a: i32 = args.get("a")?;
                 let b: i32 = args.get("b")?;
                 Ok(vec![Modality::Text {
@@ -89,7 +136,7 @@ mod tests {
         ];
 
         // When the tool is invoked
-        let result = NativeTool::Add
+        let result = NativeToolName::Add
             .invoke(args, TracingContext::dummy())
             .await
             .unwrap();

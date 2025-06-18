@@ -10,7 +10,7 @@ use crate::{
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
-    tool::{ConfiguredNativeTool, NativeTool, ToolStoreApi},
+    tool::{ConfiguredNativeTool, NativeToolName, ToolStoreApi},
 };
 
 use super::{
@@ -167,16 +167,16 @@ impl Diff {
 
 #[derive(Debug)]
 struct NativeToolDiff {
-    added: Vec<NativeTool>,
-    removed: Vec<NativeTool>,
+    added: Vec<NativeToolName>,
+    removed: Vec<NativeToolName>,
 }
 
 impl NativeToolDiff {
-    fn new(added: Vec<NativeTool>, removed: Vec<NativeTool>) -> Self {
+    fn new(added: Vec<NativeToolName>, removed: Vec<NativeToolName>) -> Self {
         Self { added, removed }
     }
 
-    fn compute(existing: &[NativeTool], incoming: &[NativeTool]) -> Self {
+    fn compute(existing: &[NativeToolName], incoming: &[NativeToolName]) -> Self {
         let existing = existing.iter().collect::<HashSet<_>>();
         let incoming = incoming.iter().collect::<HashSet<_>>();
 
@@ -494,11 +494,11 @@ pub mod tests {
 
     #[test]
     fn native_tool_diff_is_computed() {
-        let existing = vec![NativeTool::Subtract];
-        let incoming = vec![NativeTool::Add];
+        let existing = vec![NativeToolName::Subtract];
+        let incoming = vec![NativeToolName::Add];
         let diff = NativeToolDiff::compute(&existing, &incoming);
-        assert_eq!(diff.added, vec![NativeTool::Add]);
-        assert_eq!(diff.removed, vec![NativeTool::Subtract]);
+        assert_eq!(diff.added, vec![NativeToolName::Add]);
+        assert_eq!(diff.removed, vec![NativeToolName::Subtract]);
     }
 
     pub struct ToolStoreDummy;
@@ -908,7 +908,7 @@ pub mod tests {
         let descriptions = NamespaceDescription {
             skills: Vec::new(),
             mcp_servers: Vec::new(),
-            native_tools: vec![NativeTool::Add],
+            native_tools: vec![NativeToolName::Add],
         };
         watcher
             .report_changes_in_namespace(&namespace, Ok(descriptions))
@@ -919,7 +919,7 @@ pub mod tests {
         assert_eq!(
             upserted,
             &[ConfiguredNativeTool {
-                tool: NativeTool::Add,
+                tool: NativeToolName::Add,
                 namespace: namespace.clone(),
             }]
         );
@@ -936,7 +936,7 @@ pub mod tests {
             namespace.clone(),
             NamespaceDescription {
                 skills: Vec::new(),
-                native_tools: vec![NativeTool::Subtract],
+                native_tools: vec![NativeToolName::Subtract],
                 mcp_servers: Vec::new(),
             },
         )]);
@@ -964,7 +964,7 @@ pub mod tests {
         assert_eq!(
             removed,
             &[ConfiguredNativeTool {
-                tool: NativeTool::Subtract,
+                tool: NativeToolName::Subtract,
                 namespace
             }]
         );
