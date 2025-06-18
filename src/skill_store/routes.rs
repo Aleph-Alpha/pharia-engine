@@ -73,7 +73,7 @@ where
     }
 }
 
-/// List of configured Skills.
+/// List of configured Skills
 #[utoipa::path(
     get,
     operation_id = "skills",
@@ -95,7 +95,7 @@ where
     Json(response)
 }
 
-/// List of configured Skills (Beta).
+/// List of configured Skills
 #[utoipa::path(
     get,
     operation_id = "skills",
