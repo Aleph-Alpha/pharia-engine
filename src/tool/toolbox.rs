@@ -3,11 +3,14 @@ use std::{
     sync::Arc,
 };
 
+use async_trait::async_trait;
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 
 use crate::{
+    logging::TracingContext,
     namespace_watcher::Namespace,
-    tool::{QualifiedToolName, Tool},
+    tool::{Argument, Modality, QualifiedToolName, Tool, ToolError},
 };
 
 /// Registry of all tools known to the kernel.
@@ -33,8 +36,9 @@ impl Toolbox {
     }
 
     pub fn fetch_tool(&mut self, qtn: &QualifiedToolName) -> Option<Arc<dyn Tool + Send + Sync>> {
-        let tool = self.mcp_tools.get(qtn)?.clone();
-        Some(tool)
+        self.native_tools
+            .fetch(qtn)
+            .or_else(|| self.mcp_tools.get(qtn).cloned())
     }
 
     pub fn list_tools_in_namespace(&self, namespace: &Namespace) -> Vec<String> {
@@ -68,9 +72,36 @@ impl Toolbox {
     }
 }
 
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeTool {
+    Add,
+    Subtract,
+}
+
+impl NativeTool {
+    fn name(&self) -> &str {
+        match self {
+            NativeTool::Add => "add",
+            NativeTool::Subtract => "subtract",
+        }
+    }
+}
+
+#[async_trait]
+impl Tool for NativeTool {
+    async fn invoke(
+        &self,
+        _args: Vec<Argument>,
+        _tracing_context: TracingContext,
+    ) -> Result<Vec<Modality>, ToolError> {
+        unimplemented!()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ConfiguredNativeTool {
-    pub name: String,
+    pub tool: NativeTool,
     pub namespace: Namespace,
 }
 
@@ -85,10 +116,17 @@ impl NativeToolStore {
         }
     }
 
+    fn fetch(&self, qtn: &QualifiedToolName) -> Option<Arc<dyn Tool + Send + Sync>> {
+        self.tools
+            .iter()
+            .find(|tool| tool.tool.name() == qtn.name)
+            .map(|tool| Arc::new(tool.tool.clone()) as Arc<dyn Tool + Send + Sync>)
+    }
+
     fn list(&self, namespace: &Namespace) -> impl Iterator<Item = String> {
         self.tools.iter().filter_map(|tool| {
             if tool.namespace == *namespace {
-                Some(tool.name.clone())
+                Some(tool.tool.name().to_owned())
             } else {
                 None
             }
@@ -178,11 +216,30 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn fetch_native_tool() {
+        // Given a toolbox with a native tool
+        let mut toolbox = Toolbox::new();
+        toolbox.upsert_native_tool(ConfiguredNativeTool {
+            tool: NativeTool::Add,
+            namespace: Namespace::dummy(),
+        });
+
+        // When we fetch the tool
+        let tool = toolbox.fetch_tool(&QualifiedToolName {
+            namespace: Namespace::dummy(),
+            name: "add".to_owned(),
+        });
+
+        // Then we expect it to return the tool
+        assert!(tool.is_some());
+    }
+
+    #[tokio::test]
     async fn upserted_native_tool_is_listed() {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            name: "test".to_owned(),
+            tool: NativeTool::Add,
             namespace: Namespace::dummy(),
         });
 
@@ -190,7 +247,7 @@ pub mod tests {
         let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
 
         // Then we expect the tool to be listed
-        assert_eq!(tools, vec!["test"]);
+        assert_eq!(tools, vec!["add"]);
     }
 
     #[tokio::test]
@@ -198,23 +255,19 @@ pub mod tests {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            name: "a".to_owned(),
-            namespace: Namespace::dummy(),
-        });
-        toolbox.upsert_native_tool(ConfiguredNativeTool {
-            name: "b".to_owned(),
+            tool: NativeTool::Add,
             namespace: Namespace::dummy(),
         });
         toolbox.remove_native_tool(ConfiguredNativeTool {
-            name: "a".to_owned(),
+            tool: NativeTool::Add,
             namespace: Namespace::dummy(),
         });
 
         // When we list the tools
         let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
 
-        // Then we expect the tool to be listed
-        assert_eq!(tools, vec!["b"]);
+        // Then we expect the tool to be not listed
+        assert!(tools.is_empty());
     }
 
     #[tokio::test]
@@ -232,24 +285,24 @@ pub mod tests {
             (
                 QualifiedToolName {
                     namespace: Namespace::dummy(),
-                    name: "c".to_owned(),
+                    name: "b".to_owned(),
                 },
                 Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
             ),
         ]));
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            name: "b".to_owned(),
+            tool: NativeTool::Add,
             namespace: Namespace::dummy(),
         });
         toolbox.upsert_native_tool(ConfiguredNativeTool {
-            name: "d".to_owned(),
+            tool: NativeTool::Subtract,
             namespace: Namespace::dummy(),
         });
 
         // When we list the tools
         let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
 
-        // Then we expect the tool to be listed
-        assert_eq!(tools, vec!["a", "b", "c", "d"]);
+        // Then we expect the tool list to be sorted
+        assert_eq!(tools, vec!["a", "add", "b", "subtract"]);
     }
 }

@@ -10,7 +10,7 @@ use crate::{
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     skills::SkillPath,
-    tool::{ConfiguredNativeTool, ToolStoreApi},
+    tool::{ConfiguredNativeTool, NativeTool, ToolStoreApi},
 };
 
 use super::{
@@ -167,16 +167,16 @@ impl Diff {
 
 #[derive(Debug)]
 struct NativeToolDiff {
-    added: Vec<String>,
-    removed: Vec<String>,
+    added: Vec<NativeTool>,
+    removed: Vec<NativeTool>,
 }
 
 impl NativeToolDiff {
-    fn new(added: Vec<String>, removed: Vec<String>) -> Self {
+    fn new(added: Vec<NativeTool>, removed: Vec<NativeTool>) -> Self {
         Self { added, removed }
     }
 
-    fn compute(existing: &[String], incoming: &[String]) -> Self {
+    fn compute(existing: &[NativeTool], incoming: &[NativeTool]) -> Self {
         let existing = existing.iter().collect::<HashSet<_>>();
         let incoming = incoming.iter().collect::<HashSet<_>>();
 
@@ -363,18 +363,18 @@ where
         // propagate native tool changes
         let native_tool_diff =
             NativeToolDiff::compute(&existing.native_tools, &incoming.native_tools);
-        for name in native_tool_diff.added {
+        for tool in native_tool_diff.added {
             self.tool_store_api
                 .native_tool_upsert(ConfiguredNativeTool {
-                    name,
+                    tool,
                     namespace: namespace.clone(),
                 })
                 .await;
         }
-        for name in native_tool_diff.removed {
+        for tool in native_tool_diff.removed {
             self.tool_store_api
                 .native_tool_remove(ConfiguredNativeTool {
-                    name,
+                    tool,
                     namespace: namespace.clone(),
                 })
                 .await;
@@ -494,11 +494,11 @@ pub mod tests {
 
     #[test]
     fn native_tool_diff_is_computed() {
-        let existing = vec!["keep_tool_name".into(), "remove_tool_name".into()];
-        let incoming = vec!["keep_tool_name".into(), "add_tool_name".into()];
+        let existing = vec![NativeTool::Subtract];
+        let incoming = vec![NativeTool::Add];
         let diff = NativeToolDiff::compute(&existing, &incoming);
-        assert_eq!(diff.added, vec!["add_tool_name".to_owned()]);
-        assert_eq!(diff.removed, vec!["remove_tool_name".to_owned()]);
+        assert_eq!(diff.added, vec![NativeTool::Add]);
+        assert_eq!(diff.removed, vec![NativeTool::Subtract]);
     }
 
     pub struct ToolStoreDummy;
@@ -908,7 +908,7 @@ pub mod tests {
         let descriptions = NamespaceDescription {
             skills: Vec::new(),
             mcp_servers: Vec::new(),
-            native_tools: vec!["newly_added_tool".to_owned()],
+            native_tools: vec![NativeTool::Add],
         };
         watcher
             .report_changes_in_namespace(&namespace, Ok(descriptions))
@@ -919,7 +919,7 @@ pub mod tests {
         assert_eq!(
             upserted,
             &[ConfiguredNativeTool {
-                name: "newly_added_tool".to_owned(),
+                tool: NativeTool::Add,
                 namespace: namespace.clone(),
             }]
         );
@@ -936,7 +936,7 @@ pub mod tests {
             namespace.clone(),
             NamespaceDescription {
                 skills: Vec::new(),
-                native_tools: vec!["remove_me".to_owned()],
+                native_tools: vec![NativeTool::Subtract],
                 mcp_servers: Vec::new(),
             },
         )]);
@@ -964,7 +964,7 @@ pub mod tests {
         assert_eq!(
             removed,
             &[ConfiguredNativeTool {
-                name: "remove_me".to_owned(),
+                tool: NativeTool::Subtract,
                 namespace
             }]
         );
