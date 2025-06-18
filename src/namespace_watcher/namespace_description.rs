@@ -69,6 +69,7 @@ pub trait NamespaceDescriptionLoader {
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
 pub struct NamespaceDescription {
     pub skills: Vec<SkillDescription>,
     #[serde(default)]
@@ -239,7 +240,7 @@ pub mod tests {
     fn mcp_servers_are_loaded_from_config() {
         let config = r#"
         skills = []
-        mcp_servers = ["localhost:8000", "localhost:8001"]
+        mcp-servers = ["localhost:8000", "localhost:8001"]
         "#;
         let tc = NamespaceDescription::from_str(config).unwrap();
         assert_eq!(
@@ -252,7 +253,7 @@ pub mod tests {
     fn native_tools_are_loaded_from_config() {
         let config = r#"
         skills = []
-        native_tools = ["add", "subtract"]
+        native-tools = ["add", "subtract"]
         "#;
         let tc = NamespaceDescription::from_str(config).unwrap();
         assert_eq!(
@@ -265,7 +266,7 @@ pub mod tests {
     fn invalid_native_tools_are_rejected() {
         let config = r#"
         skills = []
-        native_tools = ["invalid"]
+        native-tools = ["invalid"]
         "#;
         let tc = NamespaceDescription::from_str(config);
         assert!(tc.is_err());
