@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.2...pharia-kernel-v0.13.3)
+
+### Features
+
+- List hardcoded native tools in test-beta namespace - ([df7ef5f](https://github.com/Aleph-Alpha/pharia-kernel/commit/df7ef5f33e2faf90c623f0b2d029038c1e266a5b))
+- Implement invoke for native tool - ([4b63024](https://github.com/Aleph-Alpha/pharia-kernel/commit/4b6302467d5e5fb46f87eef9d69089e1b4c4f6e2))
+- Fetch native tools - ([f82d0b0](https://github.com/Aleph-Alpha/pharia-kernel/commit/f82d0b00660dd345f040fab1cb7d8f84f42044d0))
+- List native tools - ([a5737c8](https://github.com/Aleph-Alpha/pharia-kernel/commit/a5737c80963e7dcdd43fe008bf9255eb61e843a9))
+
+### Fixes
+
+- Native tools and mcp servers are configured in kebab-case - ([95bc0af](https://github.com/Aleph-Alpha/pharia-kernel/commit/95bc0afd611140f0150e47c1bfa6c549bc7e9ed8))
+
+### Documentation
+
+- Update description of skills route - ([db4c7c0](https://github.com/Aleph-Alpha/pharia-kernel/commit/db4c7c04ccf762a42caf01d9e5b24e38c64d6c9f))
+- Fix missing skills route for non-beta OpenAPI docs - ([33d0cbe](https://github.com/Aleph-Alpha/pharia-kernel/commit/33d0cbe263a9ce5ba5c68912e14f57c4d6522c98))
+
+### Builds
+
+- *(deps)* Bump the minor group with 8 updates - ([2071682](https://github.com/Aleph-Alpha/pharia-kernel/commit/207168220d9478b3981937d7de88cfa90a65e5bb))
+
+
 ## [0.13.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.1...pharia-kernel-v0.13.2)
 
 ### Fixes
