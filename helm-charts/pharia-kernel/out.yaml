@@ -18,45 +18,55 @@ metadata:
 ---
 # Source: pharia-kernel/templates/config.yaml
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: pharia-kernel-config
 data:
   config.toml: |
     [namespaces.assistant-dev]
     config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/assistant-dev.toml/raw?ref=main"
     registry = "registry.gitlab.aleph-alpha.de"
     base-repository = "engineering/pharia-ai-skills/assistant"
-    
+
     [namespaces.chat-dev]
     config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/chat-dev.toml/raw?ref=main"
     registry = "alephalpha.jfrog.io"
     base-repository = "assistant-kernel-skills"
-    
+
     [namespaces.jfrog]
     config-url = "https://alephalpha.jfrog.io/artifactory/pharia-kernel-files/namespaces/playground/namespace.toml"
     registry = "alephalpha.jfrog.io"
     base-repository = "pharia-kernel-images/namespaces/playground"
-    
+
     [namespaces.kernel]
     config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/kernel.toml/raw?ref=main"
     registry = "registry.gitlab.aleph-alpha.de"
     base-repository = "engineering/pharia-ai-skills/kernel"
-    
+
     [namespaces.nls]
     config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1216/repository/files/namespace.toml/raw?ref=main"
     registry = "registry.gitlab.aleph-alpha.de"
     base-repository = "engineering/nls-skills/skills"
-    
+
     [namespaces.orchestrator-dev]
     config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/1040/repository/files/orchestrator-dev.toml/raw?ref=main"
     registry = "alephalpha.jfrog.io"
     base-repository = "assistant-kernel-skills"
-    
+
     [namespaces.playground]
     config-url = "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
     registry = "registry.gitlab.aleph-alpha.de"
     base-repository = "engineering/pharia-kernel-playground/skills"
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: pharia-kernel
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: pharia-kernel
+    app.kubernetes.io/version: 0.13.1
+    helm.sh/chart: pharia-kernel-0.2.66
+    pharia.ai/edition: ""
+    pharia.ai/featureSet: ""
+  name: pharia-kernel-config
+  namespace: pharia-ai
 ---
 # Source: pharia-kernel/templates/service.yaml
 apiVersion: v1
@@ -117,7 +127,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: bcbf06b374bbde683f85785d725f68e7a01131efa4a1f2cd52dba2f180266f2e
+        checksum/config: d1b6423e3f6698f8f981584de5ad50e63364a10d5c6bba2017d443d68e63b893
       labels:
         app.kubernetes.io/component: pharia-kernel
         app.kubernetes.io/instance: test
