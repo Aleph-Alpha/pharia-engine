@@ -18,6 +18,8 @@ jobs:
     env:
       ARTIFACTORY_URL: https://alephalpha.jfrog.io
       ARTIFACTORY_HOST: alephalpha.jfrog.io
+      ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
+      ARTIFACTORY_HELM_REPOSITORY: pharia-kernel-helm
     steps:
       - uses: actions/checkout@v4
 
@@ -90,3 +92,38 @@ jobs:
             kubectl logs $pod --previous || kubectl logs $pod || echo "No logs available for $pod"
             echo "---"
           done
+
+      - name: Build Chart
+        if: success() && contains(github.event.pull_request.labels.*.name, 'nightly')
+        run: |
+          # Version
+          ORIGINAL_VERSION=$(yq ".version" "helm-charts/pharia-kernel/Chart.yaml")
+
+          # Get the short commit hash
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+
+          # Add commit hash and -nightly suffix to the version
+          NIGHTLY_VERSION="${ORIGINAL_VERSION}-${COMMIT_HASH}-nightly"
+
+          # Set the version in the environment
+          echo "CHART_VERSION=$NIGHTLY_VERSION" >> $GITHUB_ENV
+
+          # Create a temporary copy of the chart with modified version
+          cp -r "helm-charts/pharia-kernel" "/tmp/pharia-kernel"
+          yq -i ".version = \"$NIGHTLY_VERSION\"" "/tmp/pharia-kernel/Chart.yaml"
+
+          # Update dependencies and package the chart
+          helm dependency update "/tmp/pharia-kernel"
+          helm package "/tmp/pharia-kernel"
+
+      - name: Push Helm charts
+        if: success() && contains(github.event.pull_request.labels.*.name, 'nightly')
+        uses: appany/helm-oci-chart-releaser@v0.4.2
+        with:
+          name: pharia-kernel
+          repository: ${{ env.ARTIFACTORY_HELM_REPOSITORY }}
+          tag: ${{ env.CHART_VERSION }}
+          path: helm-charts/pharia-kernel
+          registry: ${{ env.ARTIFACTORY_HOST }}
+          registry_username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
+          registry_password: ${{ env.JFROG_ACCESS_TOKEN }}
