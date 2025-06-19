@@ -1,0 +1,92 @@
+name: Helm Chart Update
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - helm-charts/**
+      - .github/workflows/helm.yaml
+
+jobs:
+  test:
+    name: Test Helm Chart
+    runs-on: cpu-runner-8c-32gb-01
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARTIFACTORY_URL: https://alephalpha.jfrog.io
+      ARTIFACTORY_HOST: alephalpha.jfrog.io
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create kind cluster with registry
+        id: kind
+        uses: helm/kind-action@v1
+        with:
+          registry: true
+          registry_name: local-registry
+          registry_port: 5001
+
+      - name: Get JFrog Artifactory login credentials
+        uses: ./.github/actions/jfrog
+
+      - name: Test Helm chart
+        run: |
+          helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} -p ${{ env.JFROG_ACCESS_TOKEN }} ${{ env.ARTIFACTORY_HOST }}
+          helm dependency update helm-charts/pharia-kernel
+          helm install pharia-kernel helm-charts/pharia-kernel \
+              --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
+              --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
+              --set "namespaces.playground.registryPassword=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
+              --set "imagePullSecretCustom.username=${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}" \
+              --set "imagePullSecretCustom.password=${{ env.JFROG_ACCESS_TOKEN }}" \
+              -f helm-charts/pharia-kernel/values-kind.yaml \
+              --wait --timeout 300s --debug
+
+          helm test pharia-kernel
+
+          kubectl port-forward service/pharia-kernel 8082:80 &
+
+          while ! nc -vz localhost 8082 > /dev/null 2>&1 ; do
+            echo "Waiting for port-forward to be ready..."
+            sleep 10
+          done
+
+          ./tests/test-list-skills.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
+          ./tests/test-run-skill.sh "${{ secrets.PHARIA_AI_TOKEN }}" http://127.0.0.1:8082
+
+          helm uninstall pharia-kernel
+
+      - name: Debug deployment failure
+        if: failure()
+        run: |
+          echo "=== DEBUGGING DEPLOYMENT FAILURE ==="
+          
+          echo "--- Checking pods in default namespace ---"
+          kubectl get pods -o wide
+          
+          echo "--- Describing pods in default namespace ---"
+          kubectl describe pods
+          
+          echo "--- Checking events in default namespace ---"
+          kubectl get events --sort-by='.metadata.creationTimestamp' 
+
+          echo "--- Checking deployments ---"
+          kubectl get deployments -o wide
+          kubectl get deploy -o yaml
+          
+          echo "--- Checking secrets ---"
+          kubectl get secrets -o wide
+          kubectl get secrets -o yaml
+
+          echo "--- Checking services ---"
+          kubectl get services
+          
+          echo "--- Checking pod logs (if any pods exist) ---"
+          for pod in $(kubectl get pods -o name 2>/dev/null || true); do
+            echo "Logs for $pod:"
+            kubectl logs $pod --previous || kubectl logs $pod || echo "No logs available for $pod"
+            echo "---"
+          done

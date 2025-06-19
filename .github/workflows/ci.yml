@@ -9,6 +9,9 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - "helm-charts/**"
+      - ".github/workflows/helm.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -205,11 +208,15 @@ jobs:
           bash -x ./tests/test-image.sh 8081 127.0.0.1
 
   test-helm-chart:
+    name: Test Helm Chart
     runs-on: cpu-runner-8c-32gb-01
     needs: [build-image]
     permissions:
       contents: read
+      id-token: write
     env:
+      ARTIFACTORY_URL: https://alephalpha.jfrog.io
+      ARTIFACTORY_HOST: alephalpha.jfrog.io
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v4
@@ -243,18 +250,26 @@ jobs:
           registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
           tls-verify: false
 
+      - name: Get JFrog Artifactory login credentials
+        uses: ./.github/actions/jfrog
+
       - name: Test Helm chart
         env:
           LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
         run: |
+          helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} -p ${{ env.JFROG_ACCESS_TOKEN }} ${{ env.ARTIFACTORY_HOST }}
+          helm dependency update helm-charts/pharia-kernel
+
           helm install pharia-kernel helm-charts/pharia-kernel \
               -f helm-charts/pharia-kernel/values-kind.yaml \
-              --set "image.repository=$LOCAL_REGISTRY/pharia-kernel" \
+              --set "image.registry=$LOCAL_REGISTRY" \
+              --set "image.repository=pharia-kernel" \
               --set "image.tag=$IMAGE_ID" \
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
               --set "namespaces.playground.registryPassword=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
-              --wait --timeout 10m
+              --wait --timeout 3m --debug
+
           helm test pharia-kernel
 
           kubectl port-forward service/pharia-kernel 8082:80 &
@@ -274,7 +289,10 @@ jobs:
     needs: [build-image]
     permissions:
       contents: read
+      id-token: write
     env:
+      ARTIFACTORY_URL: https://alephalpha.jfrog.io
+      ARTIFACTORY_HOST: alephalpha.jfrog.io
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v4
@@ -308,19 +326,27 @@ jobs:
           registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
           tls-verify: false
 
+      - name: Get JFrog Artifactory login credentials
+        uses: ./.github/actions/jfrog
+
       - name: Test Helm chart Beta
         env:
           LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
         run: |
+          helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} -p ${{ env.JFROG_ACCESS_TOKEN }} ${{ env.ARTIFACTORY_HOST }}
+          helm dependency update helm-charts/pharia-kernel
+
           helm install pharia-kernel helm-charts/pharia-kernel \
               -f helm-charts/pharia-kernel/values-kind.yaml \
-              --set "image.repository=$LOCAL_REGISTRY/pharia-kernel" \
+              --set "image.registry=$LOCAL_REGISTRY" \
+              --set "image.repository=pharia-kernel" \
               --set "image.tag=$IMAGE_ID" \
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
               --set "namespaces.playground.registryPassword=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "global.phariaAiFeatureSet=BETA" \
-              --wait --timeout 10m
+              --wait --timeout 3m --debug
+
           helm test pharia-kernel
 
           kubectl port-forward service/pharia-kernel 8083:80 &
