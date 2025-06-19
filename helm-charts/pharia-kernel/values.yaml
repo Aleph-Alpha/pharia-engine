@@ -14,7 +14,7 @@ global:
 backwardsCompatibility: false
 image:
   registry: alephalpha.jfrog.io
-  repository: alephalpha.jfrog.io/container-images/pharia-kernel
+  repository: container-images/pharia-kernel
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
