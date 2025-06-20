@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.3...pharia-kernel-v0.13.4)
+
+### Documentation
+
+- Fix list_mcp_servers response example - ([c5376f8](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5376f85b252b367d80b2f0985432593abdf32b0))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 5 updates - ([b856d61](https://github.com/Aleph-Alpha/pharia-kernel/commit/b856d610c6fb6a8e377ff2c1a4a613d95a940257))
+
+
 ## [0.13.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.2...pharia-kernel-v0.13.3)
 
 ### Features
