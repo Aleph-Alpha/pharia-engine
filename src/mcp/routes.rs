@@ -67,7 +67,7 @@ where
     tag = "tools",
     security(("api_token" = [])),
     responses(
-        (status = 200, body=Vec<String>, example = json!(["localhost:8080/my_tool"])),
+        (status = 200, body=Vec<String>, example = json!(["http://localhost:8000/mcp"])),
     ),
 )]
 async fn list_mcp_servers<M>(
