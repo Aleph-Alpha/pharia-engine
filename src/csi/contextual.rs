@@ -78,7 +78,7 @@ pub trait ContextualCsi {
     fn invoke_tool(
         &self,
         requests: Vec<InvokeRequest>,
-    ) -> impl Future<Output = Result<Vec<ToolOutput>, ToolError>> + Send;
+    ) -> impl Future<Output = Vec<Result<ToolOutput, ToolError>>> + Send;
 }
 
 /// Takes a [`RawCsi`] and converts it into a [`ContextualCsi`] by binding the namespace and api
@@ -224,12 +224,11 @@ where
     fn invoke_tool(
         &self,
         requests: Vec<InvokeRequest>,
-    ) -> impl Future<Output = Result<Vec<ToolOutput>, ToolError>> + Send {
-        let fut = self.raw_csi.invoke_tool(
+    ) -> impl Future<Output = Vec<Result<ToolOutput, ToolError>>> + Send {
+        self.raw_csi.invoke_tool(
             self.namespace.clone(),
             self.tracing_context.clone(),
             requests,
-        );
-        async move { fut.await.into_iter().collect::<Result<_, _>>() }
+        )
     }
 }
