@@ -62,19 +62,21 @@ pub enum Modality {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ToolError {
-    /// We assume there might be something wrong with the input to the tool.
-    /// This could be wrong arguments, or wrong type of arguments.
-    /// The model should get the opportunity to retry.
+    /// The tool call was executed, but it exited with an error. The model should get the
+    /// opportunity to retry. There are two general causes for this, which we can not distinguish:
+    ///
+    /// 1. The tool had an internal error.
+    /// 2. The provided arguments were not correct.
     #[error("{0}")]
-    LogicError(String),
+    ToolExecution(String),
     /// This error could mean that there is something wrong in the Skill code (the developer
     /// specified a tool that never existed). It could also mean a runtime error (the tool was
     /// removed from the server). It could also be a logic error from the model, where it chose
     /// to call a tool that is not available.
     #[error("Tool {0} not found on any server.")]
     ToolNotFound(String),
-    /// We assume something to be wrong with the runtime. We would want to retry. Otherwise, we
-    /// would stop skill execution. We would not pass this to the mode.
+    /// An error was encountered connecting to the tool. An example would be a timeout to an MCP
+    /// server, or a server returning an invalid payload.
     #[error("The tool call could not be executed, original error: {0}")]
     RuntimeError(#[from] anyhow::Error),
 }
