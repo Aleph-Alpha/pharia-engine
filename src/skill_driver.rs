@@ -11,7 +11,7 @@ use tokio::{
 
 use crate::{
     chunking::{Chunk, ChunkRequest},
-    csi::{ChatStreamId, CompletionStreamId, ContextualCsi, Csi},
+    csi::{ChatStreamId, CompletionStreamId, ContextualCsi, Csi, ToolResult},
     inference::{
         ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
         Explanation, ExplanationRequest, InferenceError,
@@ -21,7 +21,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
-    tool::{InvokeRequest, ToolOutput},
+    tool::InvokeRequest,
 };
 
 pub struct SkillDriver {
@@ -302,17 +302,13 @@ where
         }
     }
 
-    async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolOutput> {
-        match self
-            .contextual_csi
+    async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolResult> {
+        self.contextual_csi
             .invoke_tool(requests)
             .await
             .into_iter()
-            .collect::<Result<_, _>>()
-        {
-            Ok(value) => value,
-            Err(error) => self.send_error(error.into()).await,
-        }
+            .map(|result| result.map_err(|error| error.to_string()))
+            .collect()
     }
 }
 
@@ -407,7 +403,7 @@ impl Csi for SkillMetadataCtx {
         self.send_error().await
     }
 
-    async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<ToolOutput> {
+    async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<ToolResult> {
         self.send_error().await
     }
 }

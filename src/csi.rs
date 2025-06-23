@@ -53,7 +53,7 @@ pub trait Csi {
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>>;
     async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;
     async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
-    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<ToolOutput>;
+    async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<ToolResult>;
 }
 
 /// While the [`crate::csi::RawCsi`] knows about the [`crate::tool::ToolError`] enum, the CSI does

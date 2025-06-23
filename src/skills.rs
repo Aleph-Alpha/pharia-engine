@@ -541,7 +541,7 @@ pub mod tests {
 
     use crate::{
         csi::{
-            CsiDouble, CsiError,
+            CsiDouble, CsiError, ToolResult,
             tests::{
                 ContextualCsiDouble, CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub,
                 CsiCompleteWithEchoMock, CsiGreetingMock, CsiSearchMock,
@@ -553,7 +553,7 @@ pub mod tests {
         },
         logging::TracingContext,
         skill_driver::SkillInvocationCtx,
-        tool::{InvokeRequest, Modality, ToolOutput},
+        tool::{InvokeRequest, Modality},
     };
 
     use super::*;
@@ -1106,7 +1106,7 @@ pub mod tests {
 
     #[async_trait]
     impl CsiDouble for CsiAddToolFake {
-        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolOutput> {
+        async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolResult> {
             requests
                 .iter()
                 .map(|request| {
@@ -1119,9 +1119,9 @@ pub mod tests {
                         .parse::<i32>()
                         .unwrap();
                     let sum = a + b;
-                    vec![Modality::Text {
+                    Ok(vec![Modality::Text {
                         text: sum.to_string(),
-                    }]
+                    }])
                 })
                 .collect()
         }
