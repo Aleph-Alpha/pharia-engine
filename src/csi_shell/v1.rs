@@ -15,7 +15,7 @@ use axum_extra::{
 use derive_more::{From, Into};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::{
     chunking,
@@ -114,14 +114,14 @@ struct InvokeRequests {
 
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum ToolOutput {
+enum ToolModality {
     Text { text: String },
 }
 
-impl From<tool::Modality> for ToolOutput {
+impl From<tool::Modality> for ToolModality {
     fn from(value: tool::Modality) -> Self {
         match value {
-            tool::Modality::Text { text } => ToolOutput::Text { text },
+            tool::Modality::Text { text } => ToolModality::Text { text },
         }
     }
 }
@@ -130,7 +130,7 @@ async fn invoke_tool<C>(
     State(CsiState(csi)): State<CsiState<C>>,
     _bearer: TypedHeader<Authorization<Bearer>>,
     Json(requests): Json<InvokeRequests>,
-) -> Result<Json<Vec<Vec<ToolOutput>>>, CsiShellError>
+) -> Json<Vec<Value>>
 where
     C: RawCsi,
 {
@@ -141,15 +141,22 @@ where
             tracing_context,
             requests.requests.into_iter().map(Into::into).collect(),
         )
-        .await
-        .into_iter()
-        .collect::<Result<Vec<Vec<tool::Modality>>, _>>()?;
+        .await;
 
+    // Even a tool error means returning a 200, as the error is part of the json response.
     let results = results
         .into_iter()
-        .map(|r| r.into_iter().map(Into::into).collect())
+        .map(|result| match result {
+            Ok(result) => json!(
+                result
+                    .into_iter()
+                    .map(Into::into)
+                    .collect::<Vec<ToolModality>>()
+            ),
+            Err(err) => json!(err.to_string()),
+        })
         .collect();
-    Ok(Json(results))
+    Json(results)
 }
 
 async fn select_language<C>(
@@ -1266,6 +1273,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn tool_invokation_error_is_returned_as_string() {
+        // Given a csi that always returns an error
+        #[derive(Clone)]
+        struct ToolSaboteur;
+        impl RawCsiDouble for ToolSaboteur {
+            async fn invoke_tool(
+                &self,
+                _namespace: Namespace,
+                _tracing_context: TracingContext,
+                _requests: Vec<InvokeRequest>,
+            ) -> Vec<Result<ToolOutput, ToolError>> {
+                vec![Err(ToolError::ToolExecution("Out of cheese!".to_string()))]
+            }
+        }
+
+        #[derive(Clone)]
+        struct CsiProviderStub;
+        impl CsiProvider for CsiProviderStub {
+            type Csi = ToolSaboteur;
+            fn csi(&self) -> &Self::Csi {
+                &ToolSaboteur
+            }
+        }
+
+        // When we send a request to the invoke_tool endpoint
+        let body = json!({
+            "namespace": "dummy",
+            "requests": []
+        });
+        let response = http()
+            .with_state(CsiProviderStub)
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, "Bearer test")
+                    .uri("/invoke_tool")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the response is successful, but it contains the error
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert_eq!(body, "[\"Out of cheese!\"]");
+    }
+
+    #[tokio::test]
     async fn tool_invokation_via_csi_shell() {
         // Given a csi mock that asserts on the input and returns a fixed output
         #[derive(Clone)]
@@ -1331,7 +1389,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(body, "[[{\"type\":\"text\",\"text\":\"3\"}]]");
+        assert_eq!(body, "[[{\"text\":\"3\",\"type\":\"text\"}]]");
     }
 
     #[tokio::test]
