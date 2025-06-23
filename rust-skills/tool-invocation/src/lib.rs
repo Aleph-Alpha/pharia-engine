@@ -31,8 +31,8 @@ impl Guest for Skill {
                 },
             ],
         };
-        let mut result = invoke_tool(&[request]).pop().unwrap();
-        let Modality::Text(text) = result.remove(0);
+        let result = invoke_tool(&[request]).pop().unwrap();
+        let Modality::Text(text) = result.unwrap().remove(0);
         let number = serde_json::from_str::<i32>(&text).unwrap();
         Ok(json!(number).to_string().into_bytes())
     }

@@ -79,11 +79,11 @@ impl Arguments {
             .0
             .iter()
             .find(|arg| arg.name == name)
-            .ok_or(ToolError::LogicError(format!(
+            .ok_or(ToolError::ToolExecution(format!(
                 "Argument {name} not specified"
             )))?;
         serde_json::from_slice(&arg.value).map_err(|e| {
-            ToolError::LogicError(format!("Error deserializing argument {name}: {e:#}"))
+            ToolError::ToolExecution(format!("Error deserializing argument {name}: {e:#}"))
         })
     }
 }

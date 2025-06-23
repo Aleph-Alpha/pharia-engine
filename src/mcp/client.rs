@@ -41,7 +41,7 @@ impl McpClientImpl {
                 .content
                 .first()
                 .ok_or(anyhow!("No content in tool call response"))?;
-            Err(ToolError::LogicError(text.to_owned()))
+            Err(ToolError::ToolExecution(text.to_owned()))
         } else {
             Ok(result.content)
         }
@@ -399,7 +399,7 @@ pub mod tests {
             )
             .await
             .unwrap_err();
-        assert!(matches!(response, ToolError::LogicError(_)));
+        assert!(matches!(response, ToolError::ToolExecution(_)));
     }
 
     #[tokio::test]
