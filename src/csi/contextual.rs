@@ -225,10 +225,11 @@ where
         &self,
         requests: Vec<InvokeRequest>,
     ) -> impl Future<Output = Result<Vec<ToolOutput>, ToolError>> + Send {
-        self.raw_csi.invoke_tool(
+        let fut = self.raw_csi.invoke_tool(
             self.namespace.clone(),
             self.tracing_context.clone(),
             requests,
-        )
+        );
+        async move { fut.await.into_iter().collect::<Result<_, _>>() }
     }
 }
