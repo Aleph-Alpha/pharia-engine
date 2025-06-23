@@ -303,7 +303,13 @@ where
     }
 
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolOutput> {
-        match self.contextual_csi.invoke_tool(requests).await {
+        match self
+            .contextual_csi
+            .invoke_tool(requests)
+            .await
+            .into_iter()
+            .collect::<Result<_, _>>()
+        {
             Ok(value) => value,
             Err(error) => self.send_error(error.into()).await,
         }
