@@ -1,4 +1,4 @@
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -102,7 +102,7 @@ pub trait RawCsi {
         namespace: Namespace,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
-    ) -> impl Future<Output = Result<Vec<ToolOutput>, ToolError>> + Send;
+    ) -> impl Future<Output = Vec<Result<ToolOutput, ToolError>>> + Send;
 }
 
 /// Errors which occurr during interacting with the outside world via CSIs.
@@ -493,7 +493,7 @@ where
         namespace: Namespace,
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
-    ) -> Result<Vec<ToolOutput>, ToolError> {
+    ) -> Vec<Result<ToolOutput, ToolError>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "invoke_tool")])
             .increment(requests.len() as u64);
 
@@ -508,7 +508,7 @@ where
             tracing_context
         };
 
-        try_join_all(
+        join_all(
             requests
                 .into_iter()
                 .map(|request| {

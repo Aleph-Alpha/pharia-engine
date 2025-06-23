@@ -141,7 +141,10 @@ where
             tracing_context,
             requests.requests.into_iter().map(Into::into).collect(),
         )
-        .await?;
+        .await
+        .into_iter()
+        .collect::<Result<Vec<Vec<tool::Modality>>, _>>()?;
+
     let results = results
         .into_iter()
         .map(|r| r.into_iter().map(Into::into).collect())
@@ -1273,14 +1276,14 @@ mod tests {
                 _namespace: Namespace,
                 _tracing_context: TracingContext,
                 mut requests: Vec<InvokeRequest>,
-            ) -> Result<Vec<ToolOutput>, ToolError> {
+            ) -> Vec<Result<ToolOutput, ToolError>> {
                 let InvokeRequest { name, arguments } = requests.remove(0);
                 let expected_args = vec![Argument::new("a", "1"), Argument::new("b", "2")];
                 assert_eq!(arguments, expected_args);
                 assert_eq!(name, "add");
-                Ok(vec![vec![Modality::Text {
+                vec![Ok(vec![Modality::Text {
                     text: "3".to_string(),
-                }]])
+                }])]
             }
         }
 

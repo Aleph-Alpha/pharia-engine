@@ -56,6 +56,15 @@ pub trait Csi {
     async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<ToolOutput>;
 }
 
+/// While the [`crate::csi::RawCsi`] knows about the [`crate::tool::ToolError`] enum, the CSI does
+/// not. For all it cares, all errors are represented as error messages that can be exposed to the
+/// Skill. In all other CSI methods, we do not have an error concept. In the error case, we stop
+/// Skill execution, as we assume that there is nothing the Skill could do to recover.
+/// For tool calls however, there are many scenarios, especially when a tool is invoked by a model,
+/// in which an error message could help the model to recover. Examples are badly formatted tool
+/// input or a misspelled tool name.
+pub type ToolResult = Result<ToolOutput, String>;
+
 #[cfg(test)]
 pub mod tests {
     pub use contextual::ContextualCsiDouble;
