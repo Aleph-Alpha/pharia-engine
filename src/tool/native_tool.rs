@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 pub enum NativeToolName {
     Add,
     Subtract,
+    Saboteur,
 }
 
 impl NativeToolName {
@@ -19,7 +20,26 @@ impl NativeToolName {
         match self {
             NativeToolName::Add => Arc::new(Add),
             NativeToolName::Subtract => Arc::new(Subtract),
+            NativeToolName::Saboteur => Arc::new(Saboteur),
         }
+    }
+
+    /// The list of tools that are configured in the test namespace.
+    pub fn configured_in_test_namespace() -> &'static [Self] {
+        &[Self::Add, Self::Subtract, Self::Saboteur]
+    }
+}
+
+struct Saboteur;
+
+#[async_trait]
+impl Tool for Saboteur {
+    async fn invoke(
+        &self,
+        _args: Vec<Argument>,
+        _tracing_context: TracingContext,
+    ) -> Result<Vec<Modality>, ToolError> {
+        Err(ToolError::ToolExecution("Out of cheese.".to_string()))
     }
 }
 
@@ -64,6 +84,7 @@ impl NativeToolName {
         match self {
             NativeToolName::Add => "add",
             NativeToolName::Subtract => "subtract",
+            NativeToolName::Saboteur => "saboteur",
         }
     }
 }
@@ -88,33 +109,6 @@ impl Arguments {
     }
 }
 
-#[async_trait]
-impl Tool for NativeToolName {
-    async fn invoke(
-        &self,
-        args: Vec<Argument>,
-        _tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError> {
-        let args = Arguments(args);
-        match self {
-            NativeToolName::Add => {
-                let a: i32 = args.get("a")?;
-                let b: i32 = args.get("b")?;
-                Ok(vec![Modality::Text {
-                    text: (a + b).to_string(),
-                }])
-            }
-            NativeToolName::Subtract => {
-                let a: i32 = args.get("a")?;
-                let b: i32 = args.get("b")?;
-                Ok(vec![Modality::Text {
-                    text: (a - b).to_string(),
-                }])
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -136,10 +130,7 @@ mod tests {
         ];
 
         // When the tool is invoked
-        let result = NativeToolName::Add
-            .invoke(args, TracingContext::dummy())
-            .await
-            .unwrap();
+        let result = Add.invoke(args, TracingContext::dummy()).await.unwrap();
 
         // Then the result is the sum of the two numbers
         assert_eq!(

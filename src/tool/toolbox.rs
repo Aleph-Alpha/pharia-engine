@@ -24,7 +24,7 @@ pub struct Toolbox {
 impl Toolbox {
     pub fn new() -> Self {
         let mut native_tools = HashMap::new();
-        for tool in [NativeToolName::Add, NativeToolName::Subtract] {
+        for tool in NativeToolName::configured_in_test_namespace() {
             native_tools.insert(
                 QualifiedToolName {
                     namespace: Namespace::new("test-beta").unwrap(),
@@ -194,7 +194,7 @@ pub mod tests {
         let tools = toolbox.list_tools_in_namespace(&Namespace::new("test-beta").unwrap());
 
         // Then we expect the tools to be listed
-        assert_eq!(tools, vec!["add", "subtract"]);
+        assert_eq!(tools, vec!["add", "saboteur", "subtract"]);
     }
 
     #[tokio::test]

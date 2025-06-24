@@ -253,12 +253,16 @@ pub mod tests {
     fn native_tools_are_loaded_from_config() {
         let config = r#"
         skills = []
-        native-tools = ["add", "subtract"]
+        native-tools = ["add", "subtract", "saboteur"]
         "#;
         let tc = NamespaceDescription::from_str(config).unwrap();
         assert_eq!(
             tc.native_tools,
-            vec![NativeToolName::Add, NativeToolName::Subtract]
+            vec![
+                NativeToolName::Add,
+                NativeToolName::Subtract,
+                NativeToolName::Saboteur,
+            ]
         );
     }
 
