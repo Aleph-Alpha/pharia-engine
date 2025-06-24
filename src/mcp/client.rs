@@ -53,22 +53,28 @@ impl McpClientImpl {
 /// With models making the decision on which tools to call, they need information about what the
 /// tool does and what the input schema is.
 #[derive(PartialEq, Eq, Clone)]
-pub struct ToolInformation(String);
+pub struct ToolInformation {
+    name: String,
+    description: String,
+}
 
 impl ToolInformation {
-    pub fn new(name: String) -> Self {
-        Self(name)
+    pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+        }
     }
 
     pub fn name(&self) -> &str {
-        &self.0
+        &self.name
     }
 }
 
 /// Tools are sorted by their name.
 impl Ord for ToolInformation {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
+        self.name.cmp(&other.name)
     }
 }
 
@@ -148,10 +154,12 @@ impl McpClient for McpClientImpl {
     }
 
     async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<ToolInformation>, anyhow::Error> {
+        // See <https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool>
+        // for the defintion of the ToolDescription struct.
         #[derive(Deserialize)]
         struct ToolDescription {
-            // there is a lot more fields here, but we need to start somewhere
             name: String,
+            description: String,
         }
 
         #[derive(Deserialize)]
@@ -179,7 +187,7 @@ impl McpClient for McpClientImpl {
         Ok(result
             .tools
             .into_iter()
-            .map(|tool| ToolInformation::new(tool.name))
+            .map(|tool| ToolInformation::new(tool.name, tool.description))
             .collect())
     }
 }
@@ -346,6 +354,19 @@ pub mod tests {
 
     use super::*;
 
+    impl ToolInformation {
+        pub fn with_name(name: impl Into<String>) -> Self {
+            Self {
+                name: name.into(),
+                description: String::new(),
+            }
+        }
+
+        pub fn description(&self) -> &str {
+            &self.description
+        }
+    }
+
     #[tokio::test]
     async fn tools_can_be_listed() {
         // Given a MCP server
@@ -360,6 +381,19 @@ pub mod tests {
         assert_eq!(names.len(), 2);
         assert!(names.contains(&"add"));
         assert!(names.contains(&"saboteur"));
+    }
+
+    #[tokio::test]
+    async fn tool_description_is_returned() {
+        // Given a MCP server
+        let mcp = given_sse_mcp_server().await;
+        let client = McpClientImpl::new();
+
+        // When listing tools
+        let tools = client.list_tools(&mcp.address().into()).await.unwrap();
+
+        let add = tools.iter().find(|t| t.name() == "add").unwrap();
+        assert_eq!(add.description(), "Add two numbers");
     }
 
     #[tokio::test]
