@@ -3,14 +3,14 @@ use futures::StreamExt;
 use reqwest::{Client, Response, header};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::{cmp::Ordering, collections::HashMap};
+use std::collections::HashMap;
 use tracing::{error, info};
 
 use crate::{
     context,
     logging::TracingContext,
     mcp::McpServerUrl,
-    tool::{Argument, Modality, ToolError, ToolOutput},
+    tool::{Argument, Modality, ToolError, ToolInformation, ToolOutput},
 };
 
 #[cfg(test)]
@@ -45,48 +45,6 @@ impl McpClientImpl {
         } else {
             Ok(result.content)
         }
-    }
-}
-
-/// The information about a tool that is returned by the MCP server.
-///
-/// With models making the decision on which tools to call, they need information about what the
-/// tool does and what the input schema is.
-#[derive(PartialEq, Eq, Clone)]
-pub struct ToolInformation {
-    name: String,
-    description: String,
-    input_schema: Value,
-}
-
-impl ToolInformation {
-    pub fn new(
-        name: impl Into<String>,
-        description: impl Into<String>,
-        input_schema: Value,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            description: description.into(),
-            input_schema,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-/// Tools are sorted by their name.
-impl Ord for ToolInformation {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.name.cmp(&other.name)
-    }
-}
-
-impl PartialOrd for ToolInformation {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
     }
 }
 
@@ -361,24 +319,6 @@ pub mod tests {
     use crate::tool::Argument;
 
     use super::*;
-
-    impl ToolInformation {
-        pub fn with_name(name: impl Into<String>) -> Self {
-            Self {
-                name: name.into(),
-                description: String::new(),
-                input_schema: Value::Null,
-            }
-        }
-
-        pub fn description(&self) -> &str {
-            &self.description
-        }
-
-        pub fn input_schema(&self) -> &Value {
-            &self.input_schema
-        }
-    }
 
     #[tokio::test]
     async fn tools_can_be_listed() {

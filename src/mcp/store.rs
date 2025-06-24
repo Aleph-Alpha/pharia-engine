@@ -7,12 +7,9 @@ use tokio::time::Instant;
 use tracing::error;
 
 use crate::{
-    mcp::{
-        McpServerUrl,
-        client::{McpClient, ToolInformation},
-    },
+    mcp::{McpServerUrl, client::McpClient},
     namespace_watcher::Namespace,
-    tool::QualifiedToolName,
+    tool::{QualifiedToolName, ToolInformation},
 };
 
 /// A cached list of tools from an MCP server.
