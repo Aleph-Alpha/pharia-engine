@@ -7,20 +7,23 @@ use tokio::time::Instant;
 use tracing::error;
 
 use crate::{
-    mcp::{McpServerUrl, client::McpClient},
+    mcp::{
+        McpServerUrl,
+        client::{McpClient, ToolInformation},
+    },
     namespace_watcher::Namespace,
     tool::QualifiedToolName,
 };
 
 /// A cached list of tools from an MCP server.
 struct CachedTools {
-    tools: Vec<String>,
+    tools: Vec<ToolInformation>,
     /// The time when the list of tools was last updated.
     last_checked: Instant,
 }
 
 impl CachedTools {
-    pub fn now(tools: Vec<String>) -> Self {
+    pub fn now(tools: Vec<ToolInformation>) -> Self {
         Self {
             tools,
             last_checked: Instant::now(),
@@ -92,7 +95,7 @@ impl McpServerStore {
     }
 
     /// Sets the tool list for a given MCP server and reports if there have been changes.
-    pub fn update_tools(&mut self, server: McpServerUrl, tools: Vec<String>) -> bool {
+    pub fn update_tools(&mut self, server: McpServerUrl, tools: Vec<ToolInformation>) -> bool {
         let previous = self.tools.get_mut(&server);
         if let Some(previous) = previous {
             let updated = previous.tools != tools;
@@ -156,17 +159,17 @@ impl McpServerStore {
                     .cloned()
                     .map(move |t| (namespace.clone(), server.clone(), t))
             })
-            .map(|(namespace, server, tool_name)| {
+            .map(|(namespace, server, tool)| {
                 (
                     QualifiedToolName {
                         namespace,
                         // Currently the tool name used to invoke the tool via CSI is the same as the
                         // name reported by the MCP server, but this may change in the future, to avoid
                         // name collisions
-                        name: tool_name.clone(),
+                        name: tool.name().to_owned(),
                     },
                     McpToolDesc {
-                        name: tool_name,
+                        name: tool.name().to_owned(),
                         server,
                     },
                 )
@@ -178,7 +181,7 @@ impl McpServerStore {
     pub async fn fetch_tools_for(
         server: &McpServerUrl,
         client: &impl McpClient,
-    ) -> Result<Vec<String>, anyhow::Error> {
+    ) -> Result<Vec<ToolInformation>, anyhow::Error> {
         client
             .list_tools(server)
             .await
@@ -296,7 +299,10 @@ pub mod tests {
 
         // When we notify the store about an update
         let server = McpServerUrl::new("http://first.com/mcp");
-        let tools = vec!["tool1".to_string(), "tool2".to_string()];
+        let tools = vec![
+            ToolInformation::new("tool1".to_string()),
+            ToolInformation::new("tool2".to_string()),
+        ];
         let updated = store.update_tools(server, tools);
 
         // Then a change is reported
@@ -308,11 +314,17 @@ pub mod tests {
         // Given a store with a server that has a list of tools
         let mut store = McpServerStore::new();
         let server = McpServerUrl::new("http://first.com/mcp");
-        let tools = vec!["tool1".to_string(), "tool2".to_string()];
+        let tools = vec![
+            ToolInformation::new("tool1".to_string()),
+            ToolInformation::new("tool2".to_string()),
+        ];
         store.update_tools(server.clone(), tools);
 
         // When we notify the store about an update
-        let tools = vec!["tool1".to_string(), "tool3".to_string()];
+        let tools = vec![
+            ToolInformation::new("tool1".to_string()),
+            ToolInformation::new("tool3".to_string()),
+        ];
         let updated = store.update_tools(server, tools);
 
         // Then a change is reported
@@ -324,7 +336,10 @@ pub mod tests {
         // Given a store with a server that has a list of tools
         let mut store = McpServerStore::new();
         let server = McpServerUrl::new("http://first.com/mcp");
-        let tools = vec!["tool1".to_string(), "tool2".to_string()];
+        let tools = vec![
+            ToolInformation::new("tool1".to_string()),
+            ToolInformation::new("tool2".to_string()),
+        ];
         store.update_tools(server.clone(), tools.clone());
 
         // When we notify the store about the same tools

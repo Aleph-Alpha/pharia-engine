@@ -3,7 +3,7 @@ use futures::StreamExt;
 use reqwest::{Client, Response, header};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 use tracing::{error, info};
 
 use crate::{
@@ -48,6 +48,36 @@ impl McpClientImpl {
     }
 }
 
+/// The information about a tool that is returned by the MCP server.
+///
+/// With models making the decision on which tools to call, they need information about what the
+/// tool does and what the input schema is.
+#[derive(PartialEq, Eq, Clone)]
+pub struct ToolInformation(String);
+
+impl ToolInformation {
+    pub fn new(name: String) -> Self {
+        Self(name)
+    }
+
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Tools are sorted by their name.
+impl Ord for ToolInformation {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl PartialOrd for ToolInformation {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 /// A client used by the MCP actor to interact with the MCP servers.
 #[cfg_attr(test, double(McpClientDouble))]
 pub trait McpClient: Send + Sync + 'static {
@@ -62,7 +92,7 @@ pub trait McpClient: Send + Sync + 'static {
     fn list_tools(
         &self,
         url: &McpServerUrl,
-    ) -> impl Future<Output = Result<Vec<String>, anyhow::Error>> + Send + Sync;
+    ) -> impl Future<Output = Result<Vec<ToolInformation>, anyhow::Error>> + Send + Sync;
 }
 
 impl McpClient for McpClientImpl {
@@ -117,7 +147,7 @@ impl McpClient for McpClientImpl {
         result
     }
 
-    async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+    async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<ToolInformation>, anyhow::Error> {
         #[derive(Deserialize)]
         struct ToolDescription {
             // there is a lot more fields here, but we need to start somewhere
@@ -146,7 +176,11 @@ impl McpClient for McpClientImpl {
             .map_err(anyhow::Error::from)?;
 
         let result = Self::json_rpc_result_from_http::<ListToolsResult>(response).await?;
-        Ok(result.tools.into_iter().map(|tool| tool.name).collect())
+        Ok(result
+            .tools
+            .into_iter()
+            .map(|tool| ToolInformation::new(tool.name))
+            .collect())
     }
 }
 
@@ -320,11 +354,12 @@ pub mod tests {
 
         // When listing tools
         let tools = client.list_tools(&mcp.address().into()).await.unwrap();
+        let names = tools.iter().map(ToolInformation::name).collect::<Vec<_>>();
 
         // Then the add tool is listed
-        assert_eq!(tools.len(), 2);
-        assert!(tools.contains(&"add".to_owned()));
-        assert!(tools.contains(&"saboteur".to_owned()));
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"add"));
+        assert!(names.contains(&"saboteur"));
     }
 
     #[tokio::test]
