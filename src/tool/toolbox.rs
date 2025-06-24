@@ -107,7 +107,7 @@ pub mod tests {
 
     use crate::{
         logging::TracingContext,
-        tool::{Argument, Modality, ToolError},
+        tool::{Argument, Modality, ToolDouble, ToolError},
     };
 
     use super::*;
@@ -117,7 +117,7 @@ pub mod tests {
         struct ToolStub;
 
         #[async_trait::async_trait]
-        impl Tool for ToolStub {
+        impl ToolDouble for ToolStub {
             async fn invoke(
                 &self,
                 _args: Vec<Argument>,

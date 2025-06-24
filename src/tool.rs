@@ -33,6 +33,8 @@ pub trait Tool {
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
     ) -> Result<Vec<Modality>, ToolError>;
+
+    fn description(&self) -> ToolDescription;
 }
 
 /// The information about a tool that is returned by the MCP server.
