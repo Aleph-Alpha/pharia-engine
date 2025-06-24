@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.4...pharia-kernel-v0.13.5)
+
+### Features
+
+- Introduce native tool saboteur - ([5cd0cf6](https://github.com/Aleph-Alpha/pharia-kernel/commit/5cd0cf6f0b35ac92aac75ff143a5657ad95ca5b0))
+- Tool invocation errors are part of csi shell body - ([32e9cc3](https://github.com/Aleph-Alpha/pharia-kernel/commit/32e9cc3053d16fbc89bd72815ce93c2861f4e39d))
+- Pass tool errors to skills - ([9edb767](https://github.com/Aleph-Alpha/pharia-kernel/commit/9edb7677e7ba290fd7ce514c8a9f415c1b74a954))
+- Expose tool errors in the wit world - ([8285a9a](https://github.com/Aleph-Alpha/pharia-kernel/commit/8285a9a58dbf24f2dc1c16a7f60507ea65d7548c))
+
+
 ## [0.13.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.3...pharia-kernel-v0.13.4)
 
 ### Documentation
