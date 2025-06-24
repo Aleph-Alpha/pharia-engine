@@ -14,12 +14,12 @@ use tokio::{
 use crate::{
     mcp::{
         ConfiguredMcpServer, McpServerUrl, McpSubscriber,
-        client::{McpClient, McpClientImpl, ToolInformation},
+        client::{McpClient, McpClientImpl},
         mcp_tool::McpTool,
         store::McpServerStore,
     },
     namespace_watcher::Namespace,
-    tool::Tool,
+    tool::{Tool, ToolInformation},
 };
 #[cfg(test)]
 use double_trait::double;
@@ -229,13 +229,12 @@ pub mod tests {
     use std::sync::Mutex;
     use tokio::time::Instant as TokioInstant;
 
-    use crate::mcp::client::ToolInformation;
     use crate::{
         mcp::{
             McpClientDouble,
             subscribers::{McpSubscriberDouble, ToolMap},
         },
-        tool::QualifiedToolName,
+        tool::{QualifiedToolName, ToolInformation},
     };
 
     struct DummySubscriber;

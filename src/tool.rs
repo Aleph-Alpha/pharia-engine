@@ -3,8 +3,11 @@ mod native_tool;
 mod tool_routes;
 mod toolbox;
 
+use std::cmp::Ordering;
+
 use async_trait::async_trait;
 use serde::Deserialize;
+use serde_json::Value;
 
 use crate::{logging::TracingContext, namespace_watcher::Namespace};
 
@@ -30,6 +33,48 @@ pub trait Tool {
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
     ) -> Result<Vec<Modality>, ToolError>;
+}
+
+/// The information about a tool that is returned by the MCP server.
+///
+/// With models making the decision on which tools to call, they need information about what the
+/// tool does and what the input schema is.
+#[derive(PartialEq, Eq, Clone)]
+pub struct ToolInformation {
+    name: String,
+    description: String,
+    input_schema: Value,
+}
+
+impl ToolInformation {
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        input_schema: Value,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            input_schema,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+/// Tools are sorted by their name.
+impl Ord for ToolInformation {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.name.cmp(&other.name)
+    }
+}
+
+impl PartialOrd for ToolInformation {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 /// A tool name that is qualified by a namespace. It can uniquely identify a tool across different
@@ -83,5 +128,27 @@ pub enum ToolError {
 
 #[cfg(test)]
 pub mod tests {
+    use serde_json::Value;
+
+    use crate::tool::ToolInformation;
+
     pub use super::actor::ToolStoreDouble;
+
+    impl ToolInformation {
+        pub fn with_name(name: impl Into<String>) -> Self {
+            Self {
+                name: name.into(),
+                description: String::new(),
+                input_schema: Value::Null,
+            }
+        }
+
+        pub fn description(&self) -> &str {
+            &self.description
+        }
+
+        pub fn input_schema(&self) -> &Value {
+            &self.input_schema
+        }
+    }
 }
