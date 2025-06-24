@@ -41,7 +41,7 @@ pub trait Tool {
 ///
 /// With models making the decision on which tools to call, they need information about what the
 /// tool does and what the input schema is.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct ToolDescription {
     name: String,
     description: String,

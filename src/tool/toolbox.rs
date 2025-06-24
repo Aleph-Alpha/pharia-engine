@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     namespace_watcher::Namespace,
-    tool::{NativeToolName, QualifiedToolName, Tool},
+    tool::{NativeToolName, QualifiedToolName, Tool, ToolDescription},
 };
 
 /// Registry of all tools known to the kernel.
@@ -54,13 +54,13 @@ impl Toolbox {
             .or_else(|| self.mcp_tools.get(qtn).cloned())
     }
 
-    pub fn list_tools_in_namespace(&self, namespace: &Namespace) -> Vec<String> {
+    pub fn list_tools_in_namespace(&self, namespace: &Namespace) -> Vec<ToolDescription> {
         self.mcp_tools
-            .keys()
-            .chain(self.native_tools.keys())
-            .filter_map(|qtn| {
+            .iter()
+            .chain(self.native_tools.iter())
+            .filter_map(|(qtn, tool)| {
                 if qtn.namespace == *namespace {
-                    Some(qtn.name.clone())
+                    Some(tool.description())
                 } else {
                     None
                 }
@@ -103,7 +103,7 @@ impl ConfiguredNativeTool {
 
 #[cfg(test)]
 pub mod tests {
-    use double_trait::Dummy;
+    use serde_json::Value;
 
     use crate::{
         logging::TracingContext,
@@ -174,8 +174,8 @@ pub mod tests {
         assert!(maybe_tool.is_none());
     }
 
-    #[tokio::test]
-    async fn fetch_native_tool() {
+    #[test]
+    fn fetch_native_tool() {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
@@ -193,20 +193,21 @@ pub mod tests {
         assert!(tool.is_some());
     }
 
-    #[tokio::test]
-    async fn hardcoded_native_tools_are_listed_in_test_namespace() {
+    #[test]
+    fn hardcoded_native_tools_are_listed_in_test_namespace() {
         // Given a toolbox
         let toolbox = Toolbox::new();
 
         // When we list the tools in the `test-beta` namespace
         let tools = toolbox.list_tools_in_namespace(&Namespace::new("test-beta").unwrap());
+        let names = tools.iter().map(ToolDescription::name).collect::<Vec<_>>();
 
         // Then we expect the tools to be listed
-        assert_eq!(tools, vec!["add", "saboteur", "subtract"]);
+        assert_eq!(names, vec!["add", "saboteur", "subtract"]);
     }
 
-    #[tokio::test]
-    async fn upserted_native_tool_is_listed() {
+    #[test]
+    fn upserted_native_tool_is_listed() {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
@@ -216,13 +217,14 @@ pub mod tests {
 
         // When we list the tools
         let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
+        let names = tools.iter().map(ToolDescription::name).collect::<Vec<_>>();
 
         // Then we expect the tool to be listed
-        assert_eq!(tools, vec!["add"]);
+        assert_eq!(names, vec!["add"]);
     }
 
-    #[tokio::test]
-    async fn removed_native_tool_is_not_listed() {
+    #[test]
+    fn removed_native_tool_is_not_listed() {
         // Given a toolbox with a native tool
         let mut toolbox = Toolbox::new();
         toolbox.upsert_native_tool(ConfiguredNativeTool {
@@ -241,8 +243,23 @@ pub mod tests {
         assert!(tools.is_empty());
     }
 
-    #[tokio::test]
-    async fn tools_are_sorted() {
+    #[test]
+    fn tools_are_sorted() {
+        struct ToolStub {
+            name: String,
+        }
+
+        impl ToolStub {
+            fn new(name: impl Into<String>) -> Self {
+                Self { name: name.into() }
+            }
+        }
+
+        impl ToolDouble for ToolStub {
+            fn description(&self) -> ToolDescription {
+                ToolDescription::new(self.name.clone(), "I do nothing", Value::Null)
+            }
+        }
         // Given a toolbox with MCP tools and native tools
         let mut toolbox = Toolbox::new();
         toolbox.update_tools(HashMap::from([
@@ -251,14 +268,14 @@ pub mod tests {
                     namespace: Namespace::dummy(),
                     name: "a".to_owned(),
                 },
-                Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
+                Arc::new(ToolStub::new("a")) as Arc<dyn Tool + Send + Sync>,
             ),
             (
                 QualifiedToolName {
                     namespace: Namespace::dummy(),
                     name: "b".to_owned(),
                 },
-                Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
+                Arc::new(ToolStub::new("b")) as Arc<dyn Tool + Send + Sync>,
             ),
         ]));
         toolbox.upsert_native_tool(ConfiguredNativeTool {
@@ -272,8 +289,9 @@ pub mod tests {
 
         // When we list the tools
         let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
+        let names = tools.iter().map(ToolDescription::name).collect::<Vec<_>>();
 
         // Then we expect the tool list to be sorted
-        assert_eq!(tools, vec!["a", "add", "b", "subtract"]);
+        assert_eq!(names, vec!["a", "add", "b", "subtract"]);
     }
 }
