@@ -283,8 +283,8 @@ pub mod tests {
                     pending().await
                 } else {
                     Ok(vec![
-                        ToolInformation::new("list_fish".to_owned()),
-                        ToolInformation::new("catch_fish".to_owned()),
+                        ToolInformation::with_name("list_fish"),
+                        ToolInformation::with_name("catch_fish"),
                     ])
                 }
             }
@@ -351,11 +351,11 @@ pub mod tests {
                 let elapsed = self.start.elapsed();
                 if elapsed >= Duration::from_secs(30) {
                     Ok(vec![
-                        ToolInformation::new("tool_one".to_string()),
-                        ToolInformation::new("tool_two".to_string()),
+                        ToolInformation::with_name("tool_one"),
+                        ToolInformation::with_name("tool_two"),
                     ])
                 } else {
-                    Ok(vec![ToolInformation::new("tool_one".to_string())])
+                    Ok(vec![ToolInformation::with_name("tool_one")])
                 }
             }
         }
@@ -440,7 +440,7 @@ pub mod tests {
                 _: &McpServerUrl,
             ) -> Result<Vec<ToolInformation>, anyhow::Error> {
                 // Simulate a tool server that has one tool
-                Ok(vec![ToolInformation::new("new-tool".into())])
+                Ok(vec![ToolInformation::with_name("new-tool")])
             }
         }
         let mcp = Mcp::new(StubClient, SubscriberMock, Duration::from_secs(60)).api();
@@ -551,7 +551,7 @@ pub mod tests {
                 url: &McpServerUrl,
             ) -> Result<Vec<ToolInformation>, anyhow::Error> {
                 if url.0 == "http://localhost:8000/mcp" {
-                    Ok(vec![ToolInformation::new("one_tool".to_owned())])
+                    Ok(vec![ToolInformation::with_name("one_tool")])
                 } else {
                     Err(anyhow::anyhow!("Request to mcp server timed out."))
                 }

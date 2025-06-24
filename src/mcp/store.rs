@@ -300,8 +300,8 @@ pub mod tests {
         // When we notify the store about an update
         let server = McpServerUrl::new("http://first.com/mcp");
         let tools = vec![
-            ToolInformation::new("tool1".to_string()),
-            ToolInformation::new("tool2".to_string()),
+            ToolInformation::with_name("tool1"),
+            ToolInformation::with_name("tool2"),
         ];
         let updated = store.update_tools(server, tools);
 
@@ -315,15 +315,15 @@ pub mod tests {
         let mut store = McpServerStore::new();
         let server = McpServerUrl::new("http://first.com/mcp");
         let tools = vec![
-            ToolInformation::new("tool1".to_string()),
-            ToolInformation::new("tool2".to_string()),
+            ToolInformation::with_name("tool1"),
+            ToolInformation::with_name("tool2"),
         ];
         store.update_tools(server.clone(), tools);
 
         // When we notify the store about an update
         let tools = vec![
-            ToolInformation::new("tool1".to_string()),
-            ToolInformation::new("tool3".to_string()),
+            ToolInformation::with_name("tool1"),
+            ToolInformation::with_name("tool3"),
         ];
         let updated = store.update_tools(server, tools);
 
@@ -337,8 +337,8 @@ pub mod tests {
         let mut store = McpServerStore::new();
         let server = McpServerUrl::new("http://first.com/mcp");
         let tools = vec![
-            ToolInformation::new("tool1".to_string()),
-            ToolInformation::new("tool2".to_string()),
+            ToolInformation::with_name("tool1"),
+            ToolInformation::with_name("tool2"),
         ];
         store.update_tools(server.clone(), tools.clone());
 
