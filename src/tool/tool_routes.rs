@@ -5,7 +5,11 @@ use axum::{
 };
 use utoipa::OpenApi;
 
-use crate::{FeatureSet, namespace_watcher::Namespace, tool::ToolRuntimeApi};
+use crate::{
+    FeatureSet,
+    namespace_watcher::Namespace,
+    tool::{ToolDescription, ToolRuntimeApi},
+};
 
 pub fn http_tools_v1<T>(feature_set: FeatureSet) -> Router<T>
 where
@@ -63,23 +67,51 @@ where
     tag = "tools",
     security(("api_token" = [])),
     responses(
-        (status = 200, body=Vec<String>, example = json!(["add", "divide"])),
+        (status = 200, body=Vec<ToolDescription>, example = json!([
+            {
+                "name": "add",
+                "description": "Add two numbers",
+                "inputSchema": {
+                    "properties": {
+                        "a": {
+                            "title": "A",
+                            "type": "integer"
+                        },
+                        "b": {
+                            "title": "B",
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "a",
+                        "b"
+                    ],
+                    "title": "addArguments",
+                    "type": "object"
+                }
+            },
+            {
+                "name": "saboteur",
+                "description": "I have ran out of cheese.",
+                "inputSchema": {
+                    "properties": {},
+                    "title": "saboteurArguments",
+                    "type": "object"
+                }
+            },
+        ])),
     ),
 )]
 async fn list_tools<T>(
     Path(namespace): Path<Namespace>,
     State(ToolState(tool)): State<ToolState<T>>,
-) -> Json<Vec<String>>
+) -> Json<Vec<ToolDescription>>
 where
     T: ToolRuntimeApi,
 {
-    let tools = tool.list_tools(namespace).await;
-    let mut names = tools
-        .iter()
-        .map(|t| t.name().to_owned())
-        .collect::<Vec<_>>();
-    names.sort();
-    Json(names)
+    let mut tools = tool.list_tools(namespace).await;
+    tools.sort();
+    Json(tools)
 }
 
 #[cfg(test)]
@@ -88,6 +120,7 @@ mod tests {
     use axum::{body::Body, http::Request};
     use http_body_util::BodyExt as _;
     use reqwest::Method;
+    use serde_json::json;
     use tower::ServiceExt as _;
 
     use super::{ToolProvider, http_tools_v1};
@@ -122,8 +155,8 @@ mod tests {
             async fn list_tools(&self, namespace: Namespace) -> Vec<ToolDescription> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
                 vec![
-                    ToolDescription::with_name("divide"),
-                    ToolDescription::with_name("add"),
+                    ToolDescription::new("divide", "Divide two numbers", json!({})),
+                    ToolDescription::new("add", "Add two numbers", json!({})),
                 ]
             }
         }
@@ -146,6 +179,9 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(answer, "[\"add\",\"divide\"]");
+        assert_eq!(
+            answer,
+            "[{\"name\":\"add\",\"description\":\"Add two numbers\",\"input_schema\":{}},{\"name\":\"divide\",\"description\":\"Divide two numbers\",\"input_schema\":{}}]"
+        );
     }
 }

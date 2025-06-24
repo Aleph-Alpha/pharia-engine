@@ -6,8 +6,9 @@ mod toolbox;
 use std::cmp::Ordering;
 
 use async_trait::async_trait;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use utoipa::ToSchema;
 
 use crate::{logging::TracingContext, namespace_watcher::Namespace};
 
@@ -41,7 +42,7 @@ pub trait Tool {
 ///
 /// With models making the decision on which tools to call, they need information about what the
 /// tool does and what the input schema is.
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, ToSchema)]
 pub struct ToolDescription {
     name: String,
     description: String,
