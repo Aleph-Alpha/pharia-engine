@@ -141,7 +141,9 @@ impl McpServerStore {
     }
 
     /// A complete list of all tools across all namespaces indexed by their qualified name.
-    pub fn all_tools_by_name(&self) -> impl Iterator<Item = (QualifiedToolName, McpToolDesc)> + '_ {
+    pub fn all_tools_by_name(
+        &self,
+    ) -> impl Iterator<Item = (QualifiedToolName, ToolDescription, McpServerUrl)> + '_ {
         self.servers
             .iter()
             .flat_map(|(namespace, servers)| {
@@ -165,10 +167,8 @@ impl McpServerStore {
                         // name collisions
                         name: tool.name().to_owned(),
                     },
-                    McpToolDesc {
-                        name: tool.name().to_owned(),
-                        server,
-                    },
+                    tool,
+                    server,
                 )
             })
     }
@@ -194,15 +194,6 @@ impl McpServerStore {
                 list
             })
     }
-}
-
-/// Describes an MCP tool, it should hold all the information needed to connect and invoke the tool.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct McpToolDesc {
-    /// The name of the tool, as reported by the MCP server.
-    pub name: String,
-    /// The URL of the MCP server providing the tool.
-    pub server: McpServerUrl,
 }
 
 #[cfg(test)]
