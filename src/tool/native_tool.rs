@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use crate::{
     logging::TracingContext,
-    tool::{Argument, Modality, Tool, ToolError},
+    tool::{Argument, Modality, Tool, ToolDescription, ToolError},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 /// Native tool names specify which (native) tools can be configured per namespace.
 /// A user may list any of these in the namespace config to make them available.
@@ -40,6 +41,15 @@ impl Tool for Saboteur {
     ) -> Result<Vec<Modality>, ToolError> {
         Err(ToolError::ToolExecution("Out of cheese.".to_string()))
     }
+
+    fn description(&self) -> ToolDescription {
+        let schema = json!({
+            "properties": {},
+            "title": "saboteurArguments",
+            "type": "object"
+        });
+        ToolDescription::new("saboteur", "A tool that always raises an error.", schema)
+    }
 }
 
 struct Add;
@@ -58,6 +68,30 @@ impl Tool for Add {
             text: (a + b).to_string(),
         }])
     }
+
+    fn description(&self) -> ToolDescription {
+        let schema = json!(
+            {
+                "properties": {
+                    "a": {
+                        "title": "A",
+                        "type": "integer"
+                    },
+                    "b": {
+                        "title": "B",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "a",
+                    "b"
+                ],
+                "title": "addArguments",
+                "type": "object"
+            }
+        );
+        ToolDescription::new("add", "Add two numbers", schema)
+    }
 }
 
 struct Subtract;
@@ -75,6 +109,30 @@ impl Tool for Subtract {
         Ok(vec![Modality::Text {
             text: (a - b).to_string(),
         }])
+    }
+
+    fn description(&self) -> ToolDescription {
+        let schema = json!(
+            {
+                "properties": {
+                    "a": {
+                        "title": "A",
+                        "type": "integer"
+                    },
+                    "b": {
+                        "title": "B",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "a",
+                    "b"
+                ],
+                "title": "addArguments",
+                "type": "object"
+            }
+        );
+        ToolDescription::new("subtract", "Subtract two numbers", schema)
     }
 }
 

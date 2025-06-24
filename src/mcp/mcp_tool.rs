@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::{
     logging::TracingContext,
-    tool::{Argument, Modality, Tool, ToolError},
+    tool::{Argument, Modality, Tool, ToolDescription, ToolError},
 };
 
 use super::{client::McpClient, store::McpToolDesc};
@@ -39,5 +39,9 @@ where
                 tracing_context,
             )
             .await
+    }
+
+    fn description(&self) -> ToolDescription {
+        unimplemented!()
     }
 }
