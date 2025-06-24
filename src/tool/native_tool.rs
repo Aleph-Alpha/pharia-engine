@@ -7,6 +7,10 @@ use crate::{
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+/// Native tool names specify which (native) tools can be configured per namespace.
+/// A user may list any of these in the namespace config to make them available.
+/// For the `test-beta` namespace, we offer a set of the native tools, which is defined in
+/// [`crate::tool::toolbox::Toolbox`].
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum NativeToolName {
@@ -22,11 +26,6 @@ impl NativeToolName {
             NativeToolName::Subtract => Arc::new(Subtract),
             NativeToolName::Saboteur => Arc::new(Saboteur),
         }
-    }
-
-    /// The list of tools that are configured in the test namespace.
-    pub fn configured_in_test_namespace() -> &'static [Self] {
-        &[Self::Add, Self::Subtract, Self::Saboteur]
     }
 }
 

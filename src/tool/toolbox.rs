@@ -22,9 +22,17 @@ pub struct Toolbox {
 }
 
 impl Toolbox {
+    // The list of tools that are configured per default in the test-beta namespace.
+    // This namespace allows fast testing of the tool feature.
+    const NATIVE_TOOLS_IN_TEST_BETA: &[NativeToolName] = &[
+        NativeToolName::Add,
+        NativeToolName::Subtract,
+        NativeToolName::Saboteur,
+    ];
+
     pub fn new() -> Self {
         let mut native_tools = HashMap::new();
-        for tool in NativeToolName::configured_in_test_namespace() {
+        for tool in Self::NATIVE_TOOLS_IN_TEST_BETA {
             native_tools.insert(
                 QualifiedToolName {
                     namespace: Namespace::new("test-beta").unwrap(),
