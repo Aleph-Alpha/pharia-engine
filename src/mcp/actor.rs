@@ -14,7 +14,7 @@ use tokio::{
 use crate::{
     mcp::{
         ConfiguredMcpServer, McpServerUrl, McpSubscriber,
-        client::{McpClient, McpClientImpl},
+        client::{McpClient, McpClientImpl, ToolInformation},
         mcp_tool::McpTool,
         store::McpServerStore,
     },
@@ -106,8 +106,9 @@ enum McpMsg {
 }
 
 /// A request to fetch tools for a given MCP server.
-type ToolServerRequest =
-    Pin<Box<dyn Future<Output = Result<(McpServerUrl, Vec<String>), anyhow::Error>> + Send>>;
+type ToolServerRequest = Pin<
+    Box<dyn Future<Output = Result<(McpServerUrl, Vec<ToolInformation>), anyhow::Error>> + Send>,
+>;
 
 struct McpActor<C, S> {
     store: McpServerStore,
@@ -228,6 +229,7 @@ pub mod tests {
     use std::sync::Mutex;
     use tokio::time::Instant as TokioInstant;
 
+    use crate::mcp::client::ToolInformation;
     use crate::{
         mcp::{
             McpClientDouble,
@@ -272,12 +274,18 @@ pub mod tests {
         }
 
         impl McpClientDouble for SaboteurClient {
-            async fn list_tools(&self, _url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            async fn list_tools(
+                &self,
+                _url: &McpServerUrl,
+            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
                 let timeout = self.timeout.lock().await;
                 if *timeout {
                     pending().await
                 } else {
-                    Ok(vec!["list_fish".to_owned(), "catch_fish".to_owned()])
+                    Ok(vec![
+                        ToolInformation::new("list_fish".to_owned()),
+                        ToolInformation::new("catch_fish".to_owned()),
+                    ])
                 }
             }
         }
@@ -304,7 +312,10 @@ pub mod tests {
         // Given a client that hangs forever
         struct McpClientStub;
         impl McpClientDouble for McpClientStub {
-            async fn list_tools(&self, _: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            async fn list_tools(
+                &self,
+                _: &McpServerUrl,
+            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
                 pending().await
             }
         }
@@ -333,12 +344,18 @@ pub mod tests {
             start: TokioInstant,
         }
         impl McpClientDouble for McpClientStub {
-            async fn list_tools(&self, _: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            async fn list_tools(
+                &self,
+                _: &McpServerUrl,
+            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
                 let elapsed = self.start.elapsed();
                 if elapsed >= Duration::from_secs(30) {
-                    Ok(vec!["tool_one".to_string(), "tool_two".to_string()])
+                    Ok(vec![
+                        ToolInformation::new("tool_one".to_string()),
+                        ToolInformation::new("tool_two".to_string()),
+                    ])
                 } else {
-                    Ok(vec!["tool_one".to_string()])
+                    Ok(vec![ToolInformation::new("tool_one".to_string())])
                 }
             }
         }
@@ -418,9 +435,12 @@ pub mod tests {
         }
         struct StubClient;
         impl McpClientDouble for StubClient {
-            async fn list_tools(&self, _: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            async fn list_tools(
+                &self,
+                _: &McpServerUrl,
+            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
                 // Simulate a tool server that has one tool
-                Ok(vec!["new-tool".into()])
+                Ok(vec![ToolInformation::new("new-tool".into())])
             }
         }
         let mcp = Mcp::new(StubClient, SubscriberMock, Duration::from_secs(60)).api();
@@ -526,9 +546,12 @@ pub mod tests {
         // Given an mcp server that returns an error when listing it's tools
         struct ClientOneGoodOtherBad;
         impl McpClientDouble for ClientOneGoodOtherBad {
-            async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<String>, anyhow::Error> {
+            async fn list_tools(
+                &self,
+                url: &McpServerUrl,
+            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
                 if url.0 == "http://localhost:8000/mcp" {
-                    Ok(vec!["one_tool".to_owned()])
+                    Ok(vec![ToolInformation::new("one_tool".to_owned())])
                 } else {
                     Err(anyhow::anyhow!("Request to mcp server timed out."))
                 }
