@@ -56,13 +56,19 @@ impl McpClientImpl {
 pub struct ToolInformation {
     name: String,
     description: String,
+    input_schema: Value,
 }
 
 impl ToolInformation {
-    pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        input_schema: Value,
+    ) -> Self {
         Self {
             name: name.into(),
             description: description.into(),
+            input_schema,
         }
     }
 
@@ -157,9 +163,11 @@ impl McpClient for McpClientImpl {
         // See <https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool>
         // for the defintion of the ToolDescription struct.
         #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
         struct ToolDescription {
             name: String,
             description: String,
+            input_schema: Value,
         }
 
         #[derive(Deserialize)]
@@ -187,7 +195,7 @@ impl McpClient for McpClientImpl {
         Ok(result
             .tools
             .into_iter()
-            .map(|tool| ToolInformation::new(tool.name, tool.description))
+            .map(|tool| ToolInformation::new(tool.name, tool.description, tool.input_schema))
             .collect())
     }
 }
@@ -359,11 +367,16 @@ pub mod tests {
             Self {
                 name: name.into(),
                 description: String::new(),
+                input_schema: Value::Null,
             }
         }
 
         pub fn description(&self) -> &str {
             &self.description
+        }
+
+        pub fn input_schema(&self) -> &Value {
+            &self.input_schema
         }
     }
 
@@ -394,6 +407,37 @@ pub mod tests {
 
         let add = tools.iter().find(|t| t.name() == "add").unwrap();
         assert_eq!(add.description(), "Add two numbers");
+    }
+
+    #[tokio::test]
+    async fn tool_input_schema_is_returned() {
+        // Given a MCP server
+        let mcp = given_sse_mcp_server().await;
+        let client = McpClientImpl::new();
+
+        // When listing tools
+        let tools = client.list_tools(&mcp.address().into()).await.unwrap();
+
+        let add = tools.iter().find(|t| t.name() == "add").unwrap();
+        let input_schema = add.input_schema();
+        assert_eq!(
+            input_schema,
+            &json!({
+                "properties":  {
+                    "a":  {
+                        "title": "A",
+                        "type": "integer"
+                    },
+                    "b": {
+                        "title": "B",
+                        "type": "integer"
+                    }
+                },
+                "required":  ["a", "b"],
+                "title": "addArguments",
+                "type": "object"
+            })
+        );
     }
 
     #[tokio::test]
