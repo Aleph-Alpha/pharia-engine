@@ -212,7 +212,7 @@ where
             .store
             .all_tools_by_name()
             .map(|(qtn, desc)| {
-                let tool = McpTool::new(desc, self.client.clone());
+                let tool = McpTool::new(desc.clone(), desc.server, self.client.clone());
                 let tool: Arc<dyn Tool + Send + Sync> = Arc::new(tool);
                 (qtn, tool)
             })
