@@ -40,13 +40,13 @@ pub trait Tool {
 /// With models making the decision on which tools to call, they need information about what the
 /// tool does and what the input schema is.
 #[derive(PartialEq, Eq, Clone)]
-pub struct ToolInformation {
+pub struct ToolDescription {
     name: String,
     description: String,
     input_schema: Value,
 }
 
-impl ToolInformation {
+impl ToolDescription {
     pub fn new(
         name: impl Into<String>,
         description: impl Into<String>,
@@ -65,13 +65,13 @@ impl ToolInformation {
 }
 
 /// Tools are sorted by their name.
-impl Ord for ToolInformation {
+impl Ord for ToolDescription {
     fn cmp(&self, other: &Self) -> Ordering {
         self.name.cmp(&other.name)
     }
 }
 
-impl PartialOrd for ToolInformation {
+impl PartialOrd for ToolDescription {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -130,11 +130,11 @@ pub enum ToolError {
 pub mod tests {
     use serde_json::Value;
 
-    use crate::tool::ToolInformation;
+    use crate::tool::ToolDescription;
 
     pub use super::actor::ToolStoreDouble;
 
-    impl ToolInformation {
+    impl ToolDescription {
         pub fn with_name(name: impl Into<String>) -> Self {
             Self {
                 name: name.into(),

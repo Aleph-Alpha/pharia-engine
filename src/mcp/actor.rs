@@ -19,7 +19,7 @@ use crate::{
         store::McpServerStore,
     },
     namespace_watcher::Namespace,
-    tool::{Tool, ToolInformation},
+    tool::{Tool, ToolDescription},
 };
 #[cfg(test)]
 use double_trait::double;
@@ -107,7 +107,7 @@ enum McpMsg {
 
 /// A request to fetch tools for a given MCP server.
 type ToolServerRequest = Pin<
-    Box<dyn Future<Output = Result<(McpServerUrl, Vec<ToolInformation>), anyhow::Error>> + Send>,
+    Box<dyn Future<Output = Result<(McpServerUrl, Vec<ToolDescription>), anyhow::Error>> + Send>,
 >;
 
 struct McpActor<C, S> {
@@ -234,7 +234,7 @@ pub mod tests {
             McpClientDouble,
             subscribers::{McpSubscriberDouble, ToolMap},
         },
-        tool::{QualifiedToolName, ToolInformation},
+        tool::{QualifiedToolName, ToolDescription},
     };
 
     struct DummySubscriber;
@@ -276,14 +276,14 @@ pub mod tests {
             async fn list_tools(
                 &self,
                 _url: &McpServerUrl,
-            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
+            ) -> Result<Vec<ToolDescription>, anyhow::Error> {
                 let timeout = self.timeout.lock().await;
                 if *timeout {
                     pending().await
                 } else {
                     Ok(vec![
-                        ToolInformation::with_name("list_fish"),
-                        ToolInformation::with_name("catch_fish"),
+                        ToolDescription::with_name("list_fish"),
+                        ToolDescription::with_name("catch_fish"),
                     ])
                 }
             }
@@ -314,7 +314,7 @@ pub mod tests {
             async fn list_tools(
                 &self,
                 _: &McpServerUrl,
-            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
+            ) -> Result<Vec<ToolDescription>, anyhow::Error> {
                 pending().await
             }
         }
@@ -346,15 +346,15 @@ pub mod tests {
             async fn list_tools(
                 &self,
                 _: &McpServerUrl,
-            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
+            ) -> Result<Vec<ToolDescription>, anyhow::Error> {
                 let elapsed = self.start.elapsed();
                 if elapsed >= Duration::from_secs(30) {
                     Ok(vec![
-                        ToolInformation::with_name("tool_one"),
-                        ToolInformation::with_name("tool_two"),
+                        ToolDescription::with_name("tool_one"),
+                        ToolDescription::with_name("tool_two"),
                     ])
                 } else {
-                    Ok(vec![ToolInformation::with_name("tool_one")])
+                    Ok(vec![ToolDescription::with_name("tool_one")])
                 }
             }
         }
@@ -437,9 +437,9 @@ pub mod tests {
             async fn list_tools(
                 &self,
                 _: &McpServerUrl,
-            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
+            ) -> Result<Vec<ToolDescription>, anyhow::Error> {
                 // Simulate a tool server that has one tool
-                Ok(vec![ToolInformation::with_name("new-tool")])
+                Ok(vec![ToolDescription::with_name("new-tool")])
             }
         }
         let mcp = Mcp::new(StubClient, SubscriberMock, Duration::from_secs(60)).api();
@@ -548,9 +548,9 @@ pub mod tests {
             async fn list_tools(
                 &self,
                 url: &McpServerUrl,
-            ) -> Result<Vec<ToolInformation>, anyhow::Error> {
+            ) -> Result<Vec<ToolDescription>, anyhow::Error> {
                 if url.0 == "http://localhost:8000/mcp" {
-                    Ok(vec![ToolInformation::with_name("one_tool")])
+                    Ok(vec![ToolDescription::with_name("one_tool")])
                 } else {
                     Err(anyhow::anyhow!("Request to mcp server timed out."))
                 }

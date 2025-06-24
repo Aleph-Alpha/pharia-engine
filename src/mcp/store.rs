@@ -9,18 +9,18 @@ use tracing::error;
 use crate::{
     mcp::{McpServerUrl, client::McpClient},
     namespace_watcher::Namespace,
-    tool::{QualifiedToolName, ToolInformation},
+    tool::{QualifiedToolName, ToolDescription},
 };
 
 /// A cached list of tools from an MCP server.
 struct CachedTools {
-    tools: Vec<ToolInformation>,
+    tools: Vec<ToolDescription>,
     /// The time when the list of tools was last updated.
     last_checked: Instant,
 }
 
 impl CachedTools {
-    pub fn now(tools: Vec<ToolInformation>) -> Self {
+    pub fn now(tools: Vec<ToolDescription>) -> Self {
         Self {
             tools,
             last_checked: Instant::now(),
@@ -92,7 +92,7 @@ impl McpServerStore {
     }
 
     /// Sets the tool list for a given MCP server and reports if there have been changes.
-    pub fn update_tools(&mut self, server: McpServerUrl, tools: Vec<ToolInformation>) -> bool {
+    pub fn update_tools(&mut self, server: McpServerUrl, tools: Vec<ToolDescription>) -> bool {
         let previous = self.tools.get_mut(&server);
         if let Some(previous) = previous {
             let updated = previous.tools != tools;
@@ -178,7 +178,7 @@ impl McpServerStore {
     pub async fn fetch_tools_for(
         server: &McpServerUrl,
         client: &impl McpClient,
-    ) -> Result<Vec<ToolInformation>, anyhow::Error> {
+    ) -> Result<Vec<ToolDescription>, anyhow::Error> {
         client
             .list_tools(server)
             .await
@@ -297,8 +297,8 @@ pub mod tests {
         // When we notify the store about an update
         let server = McpServerUrl::new("http://first.com/mcp");
         let tools = vec![
-            ToolInformation::with_name("tool1"),
-            ToolInformation::with_name("tool2"),
+            ToolDescription::with_name("tool1"),
+            ToolDescription::with_name("tool2"),
         ];
         let updated = store.update_tools(server, tools);
 
@@ -312,15 +312,15 @@ pub mod tests {
         let mut store = McpServerStore::new();
         let server = McpServerUrl::new("http://first.com/mcp");
         let tools = vec![
-            ToolInformation::with_name("tool1"),
-            ToolInformation::with_name("tool2"),
+            ToolDescription::with_name("tool1"),
+            ToolDescription::with_name("tool2"),
         ];
         store.update_tools(server.clone(), tools);
 
         // When we notify the store about an update
         let tools = vec![
-            ToolInformation::with_name("tool1"),
-            ToolInformation::with_name("tool3"),
+            ToolDescription::with_name("tool1"),
+            ToolDescription::with_name("tool3"),
         ];
         let updated = store.update_tools(server, tools);
 
@@ -334,8 +334,8 @@ pub mod tests {
         let mut store = McpServerStore::new();
         let server = McpServerUrl::new("http://first.com/mcp");
         let tools = vec![
-            ToolInformation::with_name("tool1"),
-            ToolInformation::with_name("tool2"),
+            ToolDescription::with_name("tool1"),
+            ToolDescription::with_name("tool2"),
         ];
         store.update_tools(server.clone(), tools.clone());
 
