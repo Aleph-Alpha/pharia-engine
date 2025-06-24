@@ -19,7 +19,7 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     tool::{
-        Argument, Modality, QualifiedToolName, Tool, ToolError, ToolOutput,
+        Argument, Modality, QualifiedToolName, Tool, ToolDescription, ToolError, ToolOutput,
         toolbox::{ConfiguredNativeTool, Toolbox},
     },
 };
@@ -59,7 +59,8 @@ pub trait ToolRuntimeApi {
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<ToolOutput, ToolError>> + Send;
 
-    fn list_tools(&self, namespace: Namespace) -> impl Future<Output = Vec<String>> + Send;
+    fn list_tools(&self, namespace: Namespace)
+    -> impl Future<Output = Vec<ToolDescription>> + Send;
 }
 
 pub struct ToolRuntime {
@@ -105,7 +106,7 @@ impl ToolRuntimeApi for ToolRuntimeSender {
         receive.await.unwrap()
     }
 
-    async fn list_tools(&self, namespace: Namespace) -> Vec<String> {
+    async fn list_tools(&self, namespace: Namespace) -> Vec<ToolDescription> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::ListTools { send, namespace };
         self.0.send(msg).await.unwrap();
@@ -147,7 +148,7 @@ enum ToolMsg {
     },
     ListTools {
         namespace: Namespace,
-        send: oneshot::Sender<Vec<String>>,
+        send: oneshot::Sender<Vec<ToolDescription>>,
     },
     UpsertNativeTool {
         tool: ConfiguredNativeTool,
@@ -232,6 +233,7 @@ pub mod tests {
 
     use async_trait::async_trait;
     use double_trait::Dummy;
+    use serde_json::json;
 
     use crate::{
         logging::TracingContext,
@@ -340,6 +342,13 @@ pub mod tests {
 
     #[tokio::test]
     async fn tools_are_listed() {
+        struct ToolStub;
+
+        impl ToolDouble for ToolStub {
+            fn description(&self) -> ToolDescription {
+                ToolDescription::new("catch_fish", "Catch a fish", json!({}))
+            }
+        }
         // Given a tools configured for a namespace
         let namespace = Namespace::new("test").unwrap();
         let tool_runtime = ToolRuntime::new().api();
@@ -349,15 +358,22 @@ pub mod tests {
                     namespace: namespace.clone(),
                     name: "add".to_owned(),
                 },
-                Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
+                Arc::new(ToolStub) as Arc<dyn Tool + Send + Sync>,
             )]))
             .await;
 
         // When listing listing tools for that namespace
         let result = tool_runtime.list_tools(namespace).await;
 
-        // Then we get the tools from the mcp server
-        assert_eq!(result, vec!["add".to_owned()]);
+        // Then we get the tool description from the tool
+        assert_eq!(
+            result,
+            vec![ToolDescription::new(
+                "catch_fish",
+                "Catch a fish",
+                json!({})
+            )]
+        );
     }
 
     #[tokio::test]

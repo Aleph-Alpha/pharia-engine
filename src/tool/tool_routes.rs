@@ -73,9 +73,13 @@ async fn list_tools<T>(
 where
     T: ToolRuntimeApi,
 {
-    let mut tools = tool.list_tools(namespace).await;
-    tools.sort();
-    Json(tools)
+    let tools = tool.list_tools(namespace).await;
+    let mut names = tools
+        .iter()
+        .map(|t| t.name().to_owned())
+        .collect::<Vec<_>>();
+    names.sort();
+    Json(names)
 }
 
 #[cfg(test)]
@@ -87,6 +91,7 @@ mod tests {
     use tower::ServiceExt as _;
 
     use super::{ToolProvider, http_tools_v1};
+    use crate::tool::ToolDescription;
     use crate::{FeatureSet, namespace_watcher::Namespace, tool::actor::ToolRuntimeDouble};
 
     #[derive(Clone)]
@@ -114,9 +119,12 @@ mod tests {
         #[derive(Clone)]
         struct ToolMock;
         impl ToolRuntimeDouble for ToolMock {
-            async fn list_tools(&self, namespace: Namespace) -> Vec<String> {
+            async fn list_tools(&self, namespace: Namespace) -> Vec<ToolDescription> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
-                vec!["divide".to_owned(), "add".to_owned()]
+                vec![
+                    ToolDescription::with_name("divide"),
+                    ToolDescription::with_name("add"),
+                ]
             }
         }
         let app_state = ProviderStub::new(ToolMock);
