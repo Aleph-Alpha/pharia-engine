@@ -217,8 +217,41 @@ async fn tools_can_be_listed() {
         .unwrap();
 
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
-    let tools: Vec<String> = resp.json().await.unwrap();
-    assert_eq!(tools, vec!["add", "saboteur"]);
+    let tools: Value = resp.json().await.unwrap();
+    let expected = json!([
+        {
+            "name": "add",
+            "description": "Add two numbers",
+            "input_schema": {
+                "properties": {
+                    "a": {
+                        "title": "A",
+                        "type": "integer"
+                    },
+                    "b": {
+                        "title": "B",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "a",
+                    "b"
+                ],
+                "title": "addArguments",
+                "type": "object"
+            },
+        },
+        {
+            "name": "saboteur",
+            "description": "I have ran out of cheese.",
+            "input_schema": {
+                "properties": {},
+                "title": "saboteurArguments",
+                "type": "object"
+            },
+        },
+    ]);
+    assert_eq!(tools, expected);
 }
 
 #[tokio::test]

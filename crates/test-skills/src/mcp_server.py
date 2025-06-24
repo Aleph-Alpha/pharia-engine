@@ -50,7 +50,7 @@ def main():
 
     @mcp.tool()
     def saboteur() -> str:
-        """Sabotage the add function"""
+        """I have ran out of cheese."""
         raise Exception("Out of cheese.")
 
     mcp.run(transport="streamable-http")
