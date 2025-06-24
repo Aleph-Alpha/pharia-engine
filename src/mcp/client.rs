@@ -10,7 +10,7 @@ use crate::{
     context,
     logging::TracingContext,
     mcp::McpServerUrl,
-    tool::{Argument, Modality, ToolError, ToolInformation, ToolOutput},
+    tool::{Argument, Modality, ToolDescription, ToolError, ToolOutput},
 };
 
 #[cfg(test)]
@@ -62,7 +62,7 @@ pub trait McpClient: Send + Sync + 'static {
     fn list_tools(
         &self,
         url: &McpServerUrl,
-    ) -> impl Future<Output = Result<Vec<ToolInformation>, anyhow::Error>> + Send + Sync;
+    ) -> impl Future<Output = Result<Vec<ToolDescription>, anyhow::Error>> + Send + Sync;
 }
 
 impl McpClient for McpClientImpl {
@@ -117,12 +117,12 @@ impl McpClient for McpClientImpl {
         result
     }
 
-    async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<ToolInformation>, anyhow::Error> {
+    async fn list_tools(&self, url: &McpServerUrl) -> Result<Vec<ToolDescription>, anyhow::Error> {
         // See <https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool>
         // for the defintion of the ToolDescription struct.
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct ToolDescription {
+        struct ToolDescriptionDeserializer {
             name: String,
             description: String,
             input_schema: Value,
@@ -130,7 +130,7 @@ impl McpClient for McpClientImpl {
 
         #[derive(Deserialize)]
         struct ListToolsResult {
-            tools: Vec<ToolDescription>,
+            tools: Vec<ToolDescriptionDeserializer>,
         }
 
         self.initialize(url).await?;
@@ -153,7 +153,7 @@ impl McpClient for McpClientImpl {
         Ok(result
             .tools
             .into_iter()
-            .map(|tool| ToolInformation::new(tool.name, tool.description, tool.input_schema))
+            .map(|tool| ToolDescription::new(tool.name, tool.description, tool.input_schema))
             .collect())
     }
 }
@@ -328,7 +328,7 @@ pub mod tests {
 
         // When listing tools
         let tools = client.list_tools(&mcp.address().into()).await.unwrap();
-        let names = tools.iter().map(ToolInformation::name).collect::<Vec<_>>();
+        let names = tools.iter().map(ToolDescription::name).collect::<Vec<_>>();
 
         // Then the add tool is listed
         assert_eq!(names.len(), 2);
