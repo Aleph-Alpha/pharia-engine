@@ -215,7 +215,6 @@ jobs:
       contents: read
       id-token: write
     env:
-      ARTIFACTORY_URL: https://alephalpha.jfrog.io
       ARTIFACTORY_HOST: alephalpha.jfrog.io
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
@@ -252,6 +251,8 @@ jobs:
 
       - name: Get JFrog Artifactory login credentials
         uses: ./.github/actions/jfrog
+        env:
+          ARTIFACTORY_URL: https://alephalpha.jfrog.io
 
       - name: Test Helm chart
         env:
@@ -291,7 +292,6 @@ jobs:
       contents: read
       id-token: write
     env:
-      ARTIFACTORY_URL: https://alephalpha.jfrog.io
       ARTIFACTORY_HOST: alephalpha.jfrog.io
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
@@ -328,6 +328,8 @@ jobs:
 
       - name: Get JFrog Artifactory login credentials
         uses: ./.github/actions/jfrog
+        env:
+          ARTIFACTORY_URL: https://alephalpha.jfrog.io
 
       - name: Test Helm chart Beta
         env:
