@@ -90,7 +90,7 @@ wasmtime = "32.0.0"
 wit-parser = "0.235.0"
 url = "2.5.4"
 thiserror = "2.0.12"
-tokenizers = { version = "0.21.1", default-features = false, features = [
+tokenizers = { version = "0.21.2", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
