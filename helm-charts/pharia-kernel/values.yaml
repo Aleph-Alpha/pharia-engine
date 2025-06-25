@@ -178,7 +178,7 @@ resources:
 volumes:
   - name: config-volume
     configMap:
-      name: pharia-kernel-config
+      name: pharia-kernel
   - name: ephemeral
     emptyDir:
       sizeLimit: 4Gi
@@ -202,7 +202,7 @@ extraVolumeMounts:
 extraVolumes:
   - name: config-volume
     configMap:
-      name: pharia-kernel-config
+      name: pharia-kernel
   - name: ephemeral
     emptyDir:
       sizeLimit: 4Gi
