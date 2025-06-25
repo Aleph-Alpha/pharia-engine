@@ -9,9 +9,6 @@ on:
   pull_request:
     branches:
       - main
-    paths-ignore:
-      - "helm-charts/**"
-      - ".github/workflows/helm.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
