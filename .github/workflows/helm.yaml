@@ -36,7 +36,7 @@ jobs:
 
       - name: Test Helm chart
         run: |
-          helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} -p ${{ env.JFROG_ACCESS_TOKEN }} ${{ env.ARTIFACTORY_HOST }}
+          echo $JFROG_ACCESS_TOKEN | helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} --password-stdin ${{ env.ARTIFACTORY_HOST }}
           helm dependency update helm-charts/pharia-kernel
           helm install pharia-kernel helm-charts/pharia-kernel \
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
