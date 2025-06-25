@@ -257,7 +257,7 @@ jobs:
         env:
           LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
         run: |
-          helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} -p ${{ env.JFROG_ACCESS_TOKEN }} ${{ env.ARTIFACTORY_HOST }}
+          echo $JFROG_ACCESS_TOKEN | helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} --password-stdin ${{ env.ARTIFACTORY_HOST }}
           helm dependency update helm-charts/pharia-kernel
 
           helm install pharia-kernel helm-charts/pharia-kernel \
@@ -333,7 +333,7 @@ jobs:
         env:
           LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
         run: |
-          helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} -p ${{ env.JFROG_ACCESS_TOKEN }} ${{ env.ARTIFACTORY_HOST }}
+          echo $JFROG_ACCESS_TOKEN | helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} --password-stdin ${{ env.ARTIFACTORY_HOST }}
           helm dependency update helm-charts/pharia-kernel
 
           helm install pharia-kernel helm-charts/pharia-kernel \
