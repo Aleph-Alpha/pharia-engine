@@ -205,7 +205,6 @@ jobs:
           bash -x ./tests/test-image.sh 8081 127.0.0.1
 
   test-helm-chart:
-    name: Test Helm Chart
     runs-on: cpu-runner-8c-32gb-01
     needs: [build-image]
     permissions:
