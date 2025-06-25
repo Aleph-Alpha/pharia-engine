@@ -481,3 +481,4 @@ jobs:
           registry: ${{ env.ARTIFACTORY_HOST }}
           registry_username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
           registry_password: ${{ env.JFROG_ACCESS_TOKEN }}
+          update_dependencies: 'true'
