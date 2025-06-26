@@ -245,16 +245,20 @@ jobs:
           registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
           tls-verify: false
 
-      - name: Get JFrog Artifactory login credentials
-        uses: ./.github/actions/jfrog
+      - name: Set up JFrog CLI with OIDC
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
         env:
-          ARTIFACTORY_URL: https://alephalpha.jfrog.io
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+        with:
+          oidc-provider-name: github
+          oidc-audience: ${{ vars.ARTIFACTORY_URL }}
 
       - name: Test Helm chart
         env:
           LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
         run: |
-          echo $JFROG_ACCESS_TOKEN | helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} --password-stdin ${{ env.ARTIFACTORY_HOST }}
+          echo ${{ steps.jfrog.outputs.oidc-token }} | helm registry login -u ${{ steps.jfrog.outputs.oidc-user }} --password-stdin ${{ env.ARTIFACTORY_HOST }}
           helm dependency update helm-charts/pharia-kernel
 
           helm install pharia-kernel helm-charts/pharia-kernel \
@@ -322,16 +326,20 @@ jobs:
           registry: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
           tls-verify: false
 
-      - name: Get JFrog Artifactory login credentials
-        uses: ./.github/actions/jfrog
+      - name: Set up JFrog CLI with OIDC
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
         env:
-          ARTIFACTORY_URL: https://alephalpha.jfrog.io
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+        with:
+          oidc-provider-name: github
+          oidc-audience: ${{ vars.ARTIFACTORY_URL }}
 
       - name: Test Helm chart Beta
         env:
           LOCAL_REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
         run: |
-          echo $JFROG_ACCESS_TOKEN | helm registry login -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} --password-stdin ${{ env.ARTIFACTORY_HOST }}
+          echo ${{ steps.jfrog.outputs.oidc-token }} | helm registry login -u ${{ steps.jfrog.outputs.oidc-user }} --password-stdin ${{ env.ARTIFACTORY_HOST }}
           helm dependency update helm-charts/pharia-kernel
 
           helm install pharia-kernel helm-charts/pharia-kernel \
@@ -395,15 +403,21 @@ jobs:
       - name: Tag image as latest
         run: podman tag pharia-kernel:${{ env.IMAGE_ID }} pharia-kernel:latest
 
-      - name: Get JFrog Artifactory login credentials
-        uses: ./.github/actions/jfrog
+      - name: Set up JFrog CLI with OIDC
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+        with:
+          oidc-provider-name: github
+          oidc-audience: ${{ vars.ARTIFACTORY_URL }}
 
       - name: Log in to JFrog Artifactory
         uses: redhat-actions/podman-login@v1
         with:
           registry: ${{ env.ARTIFACTORY_REPOSITORY }}
-          username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
-          password: ${{ env.JFROG_ACCESS_TOKEN }}
+          username: ${{ steps.jfrog.outputs.oidc-user }}
+          password: ${{ steps.jfrog.outputs.oidc-token }}
 
       - name: Push to JFrog Artifactory
         id: push
@@ -417,7 +431,7 @@ jobs:
 
       - name: Attach Trivy report to Image
         run: |
-          oras login ${{ env.ARTIFACTORY_HOST }} -u ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }} -p ${{ env.JFROG_ACCESS_TOKEN }}
+          oras login ${{ env.ARTIFACTORY_HOST }} -u ${{ steps.jfrog.outputs.oidc-user }} -p ${{ steps.jfrog.outputs.oidc-token }}
           oras attach --artifact-type "application/aa.trivy.report" --annotation "created-by=Github-CI" --annotation "content=report.json" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID report.json
           oras attach --artifact-type "application/aa.trivy.sbom"   --annotation "created-by=Github-CI" --annotation "content=sbom.json" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID sbom.json
           oras attach --artifact-type "application/aa.trivy.triage" --annotation "created-by=Github-CI" --annotation "content=triage.toml" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID triage.toml
@@ -475,6 +489,6 @@ jobs:
           tag: ${{ env.CHART_VERSION }}
           path: helm-charts/pharia-kernel
           registry: ${{ env.ARTIFACTORY_HOST }}
-          registry_username: ${{ env.JFROG_ACCESS_TOKEN_SUBJECT }}
-          registry_password: ${{ env.JFROG_ACCESS_TOKEN }}
+          registry_username: ${{ steps.jfrog.outputs.oidc-user }}
+          registry_password: ${{ steps.jfrog.outputs.oidc-token }}
           update_dependencies: 'true'

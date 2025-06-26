@@ -27,8 +27,14 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Get JFrog Artifactory login credentials
-        uses: ./.github/actions/jfrog
+      - name: Set up JFrog CLI with OIDC
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+        with:
+          oidc-provider-name: github
+          oidc-audience: ${{ vars.ARTIFACTORY_URL }}
 
       - name: Run release-plz
         uses: release-plz/action@v0.5
@@ -37,7 +43,7 @@ jobs:
           registry: jfrog
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
-          CARGO_REGISTRIES_JFROG_TOKEN: "Bearer ${{ env.JFROG_ACCESS_TOKEN }}"
+          CARGO_REGISTRIES_JFROG_TOKEN: "Bearer ${{ steps.jfrog.outputs.oidc-token }}"
 
   release-plz-pr:
     name: Release-plz PR
@@ -56,8 +62,14 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Get JFrog Artifactory login credentials
-        uses: ./.github/actions/jfrog
+      - name: Set up JFrog CLI with OIDC
+        id: jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ vars.ARTIFACTORY_URL }}
+        with:
+          oidc-provider-name: github
+          oidc-audience: ${{ vars.ARTIFACTORY_URL }}
 
       - name: Run release-plz
         id: release-plz
@@ -67,7 +79,7 @@ jobs:
           registry: jfrog
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
-          CARGO_REGISTRIES_JFROG_TOKEN: "Bearer ${{ env.JFROG_ACCESS_TOKEN }}"
+          CARGO_REGISTRIES_JFROG_TOKEN: "Bearer ${{ steps.jfrog.outputs.oidc-token }}"
 
       - if: ${{ steps.release-plz.outputs.prs_created }}
         name: Update Helm chart
