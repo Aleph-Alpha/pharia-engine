@@ -553,7 +553,7 @@ pub mod tests {
         },
         logging::TracingContext,
         skill_driver::SkillInvocationCtx,
-        tool::{InvokeRequest, Modality},
+        tool::{InvokeRequest, Modality, ToolDescription},
     };
 
     use super::*;
@@ -1124,6 +1124,20 @@ pub mod tests {
                     }])
                 })
                 .collect()
+        }
+
+        async fn list_tools(&mut self) -> Vec<ToolDescription> {
+            vec![ToolDescription::new(
+                "add",
+                "Add two numbers",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": "number" },
+                        "b": { "type": "number" }
+                    }
+                }),
+            )]
         }
     }
 
