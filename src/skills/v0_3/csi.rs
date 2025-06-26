@@ -16,7 +16,10 @@ use pharia::skill::{
         Logprobs, Message, MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
-    tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, ToolResult},
+    tool::{
+        Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, ToolDescription,
+        ToolResult,
+    },
 };
 use tracing::error;
 use wasmtime::component::{Resource, bindgen};
@@ -43,6 +46,30 @@ impl ToolHost for LinkedCtx {
             .into_iter()
             .map(|result| result.map(|values| values.into_iter().map(Into::into).collect()))
             .collect()
+    }
+
+    async fn list_tools(&mut self) -> Vec<ToolDescription> {
+        self.ctx
+            .list_tools()
+            .await
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    }
+}
+
+impl From<tool::ToolDescription> for ToolDescription {
+    fn from(description: tool::ToolDescription) -> Self {
+        let tool::ToolDescription {
+            name,
+            description,
+            input_schema,
+        } = description;
+        Self {
+            name,
+            description,
+            input_schema: serde_json::to_vec(&input_schema).unwrap(),
+        }
     }
 }
 

@@ -21,7 +21,7 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
-    tool::InvokeRequest,
+    tool::{InvokeRequest, ToolDescription},
 };
 
 pub struct SkillDriver {
@@ -310,6 +310,10 @@ where
             .map(|result| result.map_err(|error| error.to_string()))
             .collect()
     }
+
+    async fn list_tools(&mut self) -> Vec<ToolDescription> {
+        self.contextual_csi.list_tools().await
+    }
 }
 
 /// We know that skill metadata will not invoke any CSI functions, but still need to provide an
@@ -404,6 +408,10 @@ impl Csi for SkillMetadataCtx {
     }
 
     async fn invoke_tool(&mut self, _request: Vec<InvokeRequest>) -> Vec<ToolResult> {
+        self.send_error().await
+    }
+
+    async fn list_tools(&mut self) -> Vec<ToolDescription> {
         self.send_error().await
     }
 }
