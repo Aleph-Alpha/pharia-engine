@@ -16,10 +16,7 @@ use pharia::skill::{
         Logprobs, Message, MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
-    tool::{
-        Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, ToolDescription,
-        ToolResult,
-    },
+    tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
 };
 use tracing::error;
 use wasmtime::component::{Resource, bindgen};
@@ -48,7 +45,7 @@ impl ToolHost for LinkedCtx {
             .collect()
     }
 
-    async fn list_tools(&mut self) -> Vec<ToolDescription> {
+    async fn list_tools(&mut self) -> Vec<Tool> {
         self.ctx
             .list_tools()
             .await
@@ -58,7 +55,7 @@ impl ToolHost for LinkedCtx {
     }
 }
 
-impl From<tool::ToolDescription> for ToolDescription {
+impl From<tool::ToolDescription> for Tool {
     fn from(description: tool::ToolDescription) -> Self {
         let tool::ToolDescription {
             name,
