@@ -72,6 +72,7 @@ where
         .route("/document_metadata", post(document_metadata))
         .route("/explain", post(explain))
         .route("/invoke_tool", post(invoke_tool))
+        .route("/list_tools", post(list_tools))
         .route("/search", post(search))
         .route("/select_language", post(select_language))
 }
@@ -155,6 +156,51 @@ where
             ),
             Err(err) => json!(err.to_string()),
         })
+        .collect();
+    Json(results)
+}
+
+#[derive(Serialize)]
+struct ToolDescription {
+    name: String,
+    description: String,
+    input_schema: Value,
+}
+
+impl From<tool::ToolDescription> for ToolDescription {
+    fn from(value: tool::ToolDescription) -> Self {
+        let tool::ToolDescription {
+            name,
+            description,
+            input_schema,
+        } = value;
+        Self {
+            name,
+            description,
+            input_schema,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ListToolsRequest {
+    namespace: Namespace,
+}
+
+async fn list_tools<C>(
+    State(CsiState(csi)): State<CsiState<C>>,
+    _bearer: TypedHeader<Authorization<Bearer>>,
+    Json(request): Json<ListToolsRequest>,
+) -> Json<Vec<ToolDescription>>
+where
+    C: RawCsi,
+{
+    let tracing_context = TracingContext::current();
+    let results = csi
+        .list_tools(request.namespace, tracing_context)
+        .await
+        .into_iter()
+        .map(Into::into)
         .collect();
     Json(results)
 }
@@ -1321,6 +1367,71 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert_eq!(body, "[\"Out of cheese!\"]");
+    }
+
+    #[tokio::test]
+    async fn csi_shell_can_list_tools() {
+        // Given a csi mock that always returns a single tool for the 42 namespace
+        #[derive(Clone)]
+        struct RawCsiMock;
+
+        impl RawCsiDouble for RawCsiMock {
+            async fn list_tools(
+                &self,
+                namespace: Namespace,
+                _tracing_context: TracingContext,
+            ) -> Vec<tool::ToolDescription> {
+                assert_eq!(namespace.as_str(), "42");
+                vec![tool::ToolDescription {
+                    name: "add".to_string(),
+                    description: "Add two numbers".to_string(),
+                    input_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "a": {"type": "number"},
+                            "b": {"type": "number"},
+                        },
+                        "required": ["a", "b"],
+                    }),
+                }]
+            }
+        }
+
+        #[derive(Clone)]
+        struct CsiProviderStub;
+        impl CsiProvider for CsiProviderStub {
+            type Csi = RawCsiMock;
+            fn csi(&self) -> &Self::Csi {
+                &RawCsiMock
+            }
+        }
+
+        // When we send a request to the list_tools endpoint
+        let body = json!({
+            "namespace": "42",
+        });
+        let response = http()
+            .with_state(CsiProviderStub)
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, "Bearer test")
+                    .uri("/list_tools")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the response is successful and contains the expected tool
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert_eq!(
+            body,
+            "[{\"name\":\"add\",\"description\":\"Add two numbers\",\"input_schema\":{\"properties\":{\"a\":{\"type\":\"number\"},\"b\":{\"type\":\"number\"}},\"required\":[\"a\",\"b\"],\"type\":\"object\"}}]"
+        );
     }
 
     #[tokio::test]
