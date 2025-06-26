@@ -44,9 +44,9 @@ pub trait Tool {
 /// tool does and what the input schema is.
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, ToSchema)]
 pub struct ToolDescription {
-    name: String,
-    description: String,
-    input_schema: Value,
+    pub name: String,
+    pub description: String,
+    pub input_schema: Value,
 }
 
 impl ToolDescription {

@@ -1,7 +1,7 @@
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
-use pharia::skill::tool::{Argument, InvokeRequest, invoke_tool};
+use pharia::skill::tool::{Argument, InvokeRequest, invoke_tool, list_tools};
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::pharia::skill::tool::Modality;
 
@@ -17,6 +17,12 @@ struct Skill;
 
 impl Guest for Skill {
     fn run(input: Vec<u8>) -> Result<Vec<u8>, Error> {
+        let descriptions = list_tools();
+        let add = descriptions.iter().find(|d| d.name == "add").unwrap();
+
+        // load the schema into a json value
+        let _schema = serde_json::from_slice::<Value>(&add.input_schema).unwrap();
+
         let arguments = serde_json::from_slice::<Arguments>(&input).unwrap();
         let request = InvokeRequest {
             tool_name: "add".to_owned(),

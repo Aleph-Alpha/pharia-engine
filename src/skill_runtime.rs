@@ -536,6 +536,7 @@ pub mod tests {
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         skills::{SkillDouble, SkillError, SkillEvent},
+        tool::ToolDescription,
     };
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -914,5 +915,76 @@ pub mod tests {
         ) -> Result<(), SkillError> {
             Err(SkillError::IsFunction)
         }
+    }
+
+    #[tokio::test]
+    async fn skill_context_lists_tools() {
+        // Given a skill that spies on the list of tools
+        struct ToolSpySkill;
+
+        #[async_trait]
+        impl SkillDouble for ToolSpySkill {
+            async fn run_as_function(
+                &self,
+                _engine: &Engine,
+                mut ctx: Box<dyn Csi + Send>,
+                _input: Value,
+                _tracing_context: &TracingContext,
+            ) -> Result<Value, SkillError> {
+                let tools = ctx.list_tools().await;
+                Ok(json!(tools))
+            }
+        }
+
+        // And given a runtime that knows two tools
+        #[derive(Clone)]
+        struct CsiWithTools;
+
+        impl RawCsiDouble for CsiWithTools {
+            async fn list_tools(
+                &self,
+                _namespace: Namespace,
+                _tracing_context: TracingContext,
+            ) -> Vec<ToolDescription> {
+                let add = ToolDescription {
+                    name: "add".to_owned(),
+                    description: "Add two numbers".to_owned(),
+                    input_schema: Value::Null,
+                };
+                let subtract = ToolDescription {
+                    name: "subtract".to_owned(),
+                    description: "Subtract two numbers".to_owned(),
+                    input_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "a": { "type": "number" },
+                            "b": { "type": "number" }
+                        },
+                    }),
+                };
+                vec![add, subtract]
+            }
+        }
+        let engine = Arc::new(Engine::default());
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(ToolSpySkill)));
+        let runtime = SkillRuntime::new(engine, CsiWithTools, store);
+
+        // When running the skill
+        let tools = runtime
+            .api()
+            .run_function(
+                SkillPath::local("any_path"),
+                json!({}),
+                "dummy_token".to_owned(),
+                TracingContext::dummy(),
+            )
+            .await
+            .unwrap();
+
+        // Then the skill should list the two tools
+        assert_eq!(
+            tools,
+            json!([{"name": "add", "description": "Add two numbers", "input_schema": null}, {"name": "subtract", "description": "Subtract two numbers", "input_schema": {"type": "object", "properties": {"a": {"type": "number"}, "b": {"type": "number"}}}}])
+        );
     }
 }

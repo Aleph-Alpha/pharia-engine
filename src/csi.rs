@@ -16,7 +16,7 @@ use crate::{
     },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    tool::{InvokeRequest, ToolOutput},
+    tool::{InvokeRequest, ToolDescription, ToolOutput},
 };
 
 #[cfg(test)]
@@ -54,6 +54,7 @@ pub trait Csi {
     async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;
     async fn documents(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Document>;
     async fn invoke_tool(&mut self, request: Vec<InvokeRequest>) -> Vec<ToolResult>;
+    async fn list_tools(&mut self) -> Vec<ToolDescription>;
 }
 
 /// While the [`crate::csi::RawCsi`] knows about the [`crate::tool::ToolError`] enum, the CSI does

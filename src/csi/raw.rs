@@ -15,7 +15,9 @@ use crate::{
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchApi, SearchRequest, SearchResult},
     tokenizers::TokenizerApi,
-    tool::{InvokeRequest, QualifiedToolName, ToolError, ToolOutput, ToolRuntimeApi},
+    tool::{
+        InvokeRequest, QualifiedToolName, ToolDescription, ToolError, ToolOutput, ToolRuntimeApi,
+    },
 };
 
 #[cfg(test)]
@@ -103,6 +105,12 @@ pub trait RawCsi {
         tracing_context: TracingContext,
         requests: Vec<InvokeRequest>,
     ) -> impl Future<Output = Vec<Result<ToolOutput, ToolError>>> + Send;
+
+    fn list_tools(
+        &self,
+        namespace: Namespace,
+        tracing_context: TracingContext,
+    ) -> impl Future<Output = Vec<ToolDescription>> + Send;
 }
 
 /// Errors which occurr during interacting with the outside world via CSIs.
@@ -527,6 +535,22 @@ where
                 .collect::<Vec<_>>(),
         )
         .await
+    }
+
+    async fn list_tools(
+        &self,
+        namespace: Namespace,
+        tracing_context: TracingContext,
+    ) -> Vec<ToolDescription> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "list_tools")]).increment(1);
+
+        let _tracing_context = context!(
+            tracing_context,
+            "pharia-kernel::csi",
+            "list_tools",
+            namespace = namespace.to_string()
+        );
+        self.tool.list_tools(namespace).await
     }
 }
 
