@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.8](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.7...pharia-kernel-v0.13.8)
+
+### Features
+
+- Expose list tools via csi shell - ([72d5736](https://github.com/Aleph-Alpha/pharia-kernel/commit/72d573636f4defa7fd18bca1378d8c2c655c93b7))
+- Expose list tools in wit world - ([2e26361](https://github.com/Aleph-Alpha/pharia-kernel/commit/2e263612d15946a2035cd2bde88f020005cb01b5))
+
+### Fixes
+
+- Bump wit version which was missed before - ([8a6dd06](https://github.com/Aleph-Alpha/pharia-kernel/commit/8a6dd06732b755c3208534dad4ac31cd2a4f3099))
+
+### Documentation
+
+- Fix typo - ([f1c37b0](https://github.com/Aleph-Alpha/pharia-kernel/commit/f1c37b064c5edff6c1167bb5e24bc26d97d4a79d))
+
+
 ## [0.13.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.5...pharia-kernel-v0.13.6)
 
 ### Features
