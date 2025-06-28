@@ -1,5 +1,7 @@
-{{- template "pharia-common.configmap" (dict "value" (list . "pharia-kernel.configmap") "context" $) -}}
-{{- define "pharia-kernel.configmap" -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pharia-kernel
 data:
   config.toml: |
     {{- if .Values.namespaces }}
@@ -25,4 +27,3 @@ data:
     {{- end }}
     {{ end }}
     {{- end }}
-{{- end -}}
