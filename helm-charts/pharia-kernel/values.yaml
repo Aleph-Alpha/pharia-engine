@@ -11,7 +11,6 @@ global:
     ingressDomain: local
     # -- Additional annotations globally defined for all ingress-resources. This can be used to add ingress controller specific annotations.
     additionalAnnotations: {}
-backwardsCompatibility: false
 image:
   registry: alephalpha.jfrog.io
   repository: container-images/pharia-kernel
@@ -19,7 +18,7 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
-envVars:
+env:
   values:
     AUTHORIZATION_URL: "{{ .Values.authorizationAddress }}"
     DOCUMENT_INDEX_URL: "{{ .Values.documentIndexAddress }}"
