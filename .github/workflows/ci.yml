@@ -269,6 +269,7 @@ jobs:
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
               --set "namespaces.playground.registryPassword=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
+              --set "backwardsCompatibility=true" \
               --wait --timeout 3m --debug
 
           helm test pharia-kernel
@@ -350,6 +351,7 @@ jobs:
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
               --set "namespaces.playground.registryPassword=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
+              --set "backwardsCompatibility=true" \
               --set "global.phariaAiFeatureSet=BETA" \
               --wait --timeout 3m --debug
 
