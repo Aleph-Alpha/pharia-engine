@@ -66,7 +66,7 @@ nameOverride: pharia-kernel
 fullnameOverride: pharia-kernel
 imagePullSecrets: []
 podAnnotations: {}
-podLabels:
+podLabels: {}
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 2000
