@@ -47,7 +47,7 @@ fn consume(input: SampleRequest) -> String {
     let memory = consume_memory(mem_size);
     let memory = match memory {
         Ok(val) => val,
-        Err(err) => return format!("execution failed while allocating memory with {}", err),
+        Err(err) => return format!("execution failed while allocating memory with {err}"),
     };
     let mut wait_msg = "".to_owned();
     if input.wait_time > 0 {
