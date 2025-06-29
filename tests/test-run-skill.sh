@@ -10,7 +10,9 @@ RESPONSE_CODE=$(curl -w '%{http_code}' -s -o output.result \
                 -H 'Content-Type: application/json' \
                 -d '{"topic": "Oat milk"}' )
 
+echo "Skill response:"
 cat output.result
+echo ""
 
 if [ "$RESPONSE_CODE" = "200" ]; then
     exit 0
