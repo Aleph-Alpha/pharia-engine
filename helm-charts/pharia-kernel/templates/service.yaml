@@ -1,4 +1,3 @@
 {{- template "pharia-common.service" (dict "customTemplate" "pharia-kernel.service" "rootContext" $ "resourceContextName" "") -}}
 {{- define "pharia-kernel.service" -}}
-## Define overrides for your resource here
 {{- end -}}
