@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use axum::http::HeaderValue;
 use reqwest::{StatusCode, header::AUTHORIZATION};
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 use crate::{http::HttpClient, mcp::McpServerUrl, tool::NativeToolName};
 
@@ -201,10 +202,15 @@ impl NamespaceDescriptionLoader for HttpLoader {
                 .expect("Status must be set if an error is generated because it is set")
                 .is_client_error()
             {
-                if e.status().unwrap() == StatusCode::TOO_MANY_REQUESTS {
-                    NamespaceDescriptionError::Recoverable(e.into())
-                } else {
-                    NamespaceDescriptionError::Unrecoverable(e.into())
+                match e.status().unwrap() {
+                    StatusCode::TOO_MANY_REQUESTS => {
+                        NamespaceDescriptionError::Recoverable(e.into())
+                    }
+                    StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                        error!("The token provided by the operator seems invalid or expired. Please check that a valid token is configured for the namespace.");
+                        NamespaceDescriptionError::Unrecoverable(e.into())
+                    }
+                    _ => NamespaceDescriptionError::Unrecoverable(e.into()),
                 }
             } else {
                 NamespaceDescriptionError::Recoverable(e.into())
