@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.10](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.9...pharia-kernel-v0.13.10)
+
+### Features
+
+- Stablize tool interface as wit package version v0.3.11 - ([0ae6f54](https://github.com/Aleph-Alpha/pharia-kernel/commit/0ae6f54c9d8c210278f535111bf444f305fd4aec))
+- Include environment variable name in error message - ([97ea9fa](https://github.com/Aleph-Alpha/pharia-kernel/commit/97ea9faebfe2c6aff5a94605fd2b67c8563e0c75))
+- Log error if 401/403 when accessing registry - ([0a065d2](https://github.com/Aleph-Alpha/pharia-kernel/commit/0a065d280e2b12d8fd655262eddcb7606be5de03))
+
+
 ## [0.13.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.8...pharia-kernel-v0.13.9)
 
 ### Documentation
