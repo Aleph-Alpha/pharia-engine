@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 
 use crate::pharia::skill::tool::Modality;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill", features: ["tool"] });
+wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
 
 #[derive(Deserialize)]
 struct Arguments {
