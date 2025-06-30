@@ -10,7 +10,9 @@ use reqwest::{StatusCode, header::AUTHORIZATION};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::{http::HttpClient, mcp::McpServerUrl, tool::NativeToolName};
+use crate::{
+    http::HttpClient, mcp::McpServerUrl, namespace_watcher::Namespace, tool::NativeToolName,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NamespaceDescriptionError {
@@ -170,14 +172,16 @@ pub struct HttpLoader {
     client: HttpClient,
     url: String,
     token: Option<String>,
+    namespace: Namespace,
 }
 impl HttpLoader {
-    pub fn from_url(url: &str, token: Option<String>) -> Self {
+    pub fn from_url(namespace: &Namespace, url: &str, token: Option<String>) -> Self {
         Self {
             // We do not need retries for namespace observing, as we do it continuously anyway.
             client: HttpClient::new(false),
             url: url.to_owned(),
             token,
+            namespace: namespace.clone(),
         }
     }
 }
@@ -207,7 +211,13 @@ impl NamespaceDescriptionLoader for HttpLoader {
                         NamespaceDescriptionError::Recoverable(e.into())
                     }
                     StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-                        error!("The token provided by the operator seems invalid or expired. Please check that a valid token is configured for the namespace.");
+                        error!(
+                            "The token provided by the operator seems invalid or expired. Please \
+                            check that a valid token is configured. This could mean either in the \
+                            environment variable NAMESPACES__{ns}__CONFIG_ACCESS_TOKEN or in the \
+                            config.toml file as config-access-token for the namespace {ns}",
+                            ns = self.namespace
+                        );
                         NamespaceDescriptionError::Unrecoverable(e.into())
                     }
                     _ => NamespaceDescriptionError::Unrecoverable(e.into()),

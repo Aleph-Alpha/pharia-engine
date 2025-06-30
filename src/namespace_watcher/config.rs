@@ -194,6 +194,7 @@ impl NamespaceConfig {
 
     pub fn loader(
         &self,
+        namespace: &Namespace,
     ) -> anyhow::Result<Box<dyn NamespaceDescriptionLoader + Send + Sync + 'static>> {
         match self {
             NamespaceConfig::TeamOwned {
@@ -205,6 +206,7 @@ impl NamespaceConfig {
                 let url = Url::parse(config_url)?;
                 match url.scheme() {
                     "https" | "http" => Ok(Box::new(HttpLoader::from_url(
+                        namespace,
                         config_url,
                         config_access_token.clone(),
                     ))),
@@ -295,7 +297,7 @@ mod tests {
         let namespace = Namespace::new("local").unwrap();
 
         // When converting it to a loader
-        let local_namespace = config.get(&namespace).unwrap().loader().unwrap();
+        let local_namespace = config.get(&namespace).unwrap().loader(&namespace).unwrap();
 
         // Then the loader reports the mcp server
         let description = local_namespace.description().await.unwrap();
@@ -338,7 +340,7 @@ mod tests {
 
         // When converting it to a loader
         let namespace = Namespace::new("local").unwrap();
-        let local_namespace = config.get(&namespace).unwrap().loader().unwrap();
+        let local_namespace = config.get(&namespace).unwrap().loader(&namespace).unwrap();
 
         // Then the loader reports the mcp server
         let description = local_namespace.description().await.unwrap();
