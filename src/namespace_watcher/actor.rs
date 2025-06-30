@@ -37,7 +37,7 @@ impl NamespaceDescriptionLoaders {
             .into_iter()
             .map(|(namespace, config)| {
                 config
-                    .loader()
+                    .loader(&namespace)
                     .with_context(|| {
                         format!("Unable to load configuration of namespace: '{namespace:?}'")
                     })
