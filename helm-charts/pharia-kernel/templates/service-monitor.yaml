@@ -1,3 +1,0 @@
-{{- template "pharia-common.serviceMonitor" (dict "customTemplate" "pharia-kernel.serviceMonitor" "rootContext" $ "resourceContextName" "") -}}
-{{- define "pharia-kernel.serviceMonitor" -}}
-{{- end -}}
