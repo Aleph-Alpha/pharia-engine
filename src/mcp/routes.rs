@@ -11,17 +11,12 @@ use crate::{
     namespace_watcher::Namespace,
 };
 
-pub fn http_mcp_servers_v1<T>(feature_set: FeatureSet) -> Router<T>
+pub fn http_mcp_servers_v1<T>(_feature_set: FeatureSet) -> Router<T>
 where
     T: Send + Sync + Clone + McpServerStoreProvider + 'static,
     T::McpServerStore: McpApi + Send + Clone,
 {
-    // Additional routes for beta features, please keep them in sync with the API documentation.
-    if feature_set == FeatureSet::Beta {
-        Router::new().route("/mcp_servers/{namespace}", get(list_mcp_servers))
-    } else {
-        Router::new()
-    }
+    Router::new().route("/mcp_servers/{namespace}", get(list_mcp_servers))
 }
 
 pub fn openapi_mcp_servers_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
@@ -33,7 +28,7 @@ pub fn openapi_mcp_servers_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenA
 }
 
 #[derive(OpenApi)]
-#[openapi(paths())]
+#[openapi(paths(list_mcp_servers))]
 struct McpOpenApiDoc;
 
 #[derive(OpenApi)]
@@ -89,7 +84,9 @@ mod tests {
     use tower::ServiceExt as _;
 
     use super::{McpServerStoreProvider, McpServerUrl, http_mcp_servers_v1};
-    use crate::{FeatureSet, mcp::McpDouble, namespace_watcher::Namespace};
+    use crate::{
+        feature_set::PRODUCTION_FEATURE_SET, mcp::McpDouble, namespace_watcher::Namespace,
+    };
 
     #[derive(Clone)]
     struct ProviderStub<T> {
@@ -121,7 +118,7 @@ mod tests {
             }
         }
         let app_state = ProviderStub::new(McpServerMock);
-        let http = http_mcp_servers_v1(FeatureSet::Beta).with_state(app_state);
+        let http = http_mcp_servers_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
 
         // When
         let resp = http

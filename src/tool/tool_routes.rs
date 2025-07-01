@@ -11,17 +11,12 @@ use crate::{
     tool::{ToolDescription, ToolRuntimeApi},
 };
 
-pub fn http_tools_v1<T>(feature_set: FeatureSet) -> Router<T>
+pub fn http_tools_v1<T>(_feature_set: FeatureSet) -> Router<T>
 where
     T: Send + Sync + Clone + ToolProvider + 'static,
     T::Tool: ToolRuntimeApi + Send + Clone,
 {
-    // Additional routes for beta features, please keep them in sync with the API documentation.
-    if feature_set == FeatureSet::Beta {
-        Router::new().route("/tools/{namespace}", get(list_tools))
-    } else {
-        Router::new()
-    }
+    Router::new().route("/tools/{namespace}", get(list_tools))
 }
 
 pub fn openapi_tools_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
@@ -33,7 +28,7 @@ pub fn openapi_tools_v1(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
 }
 
 #[derive(OpenApi)]
-#[openapi(paths())]
+#[openapi(paths(list_tools))]
 struct ToolOpenApiDoc;
 
 #[derive(OpenApi)]
@@ -124,8 +119,9 @@ mod tests {
     use tower::ServiceExt as _;
 
     use super::{ToolProvider, http_tools_v1};
+    use crate::feature_set::PRODUCTION_FEATURE_SET;
     use crate::tool::ToolDescription;
-    use crate::{FeatureSet, namespace_watcher::Namespace, tool::actor::ToolRuntimeDouble};
+    use crate::{namespace_watcher::Namespace, tool::actor::ToolRuntimeDouble};
 
     #[derive(Clone)]
     struct ProviderStub<T> {
@@ -161,7 +157,7 @@ mod tests {
             }
         }
         let app_state = ProviderStub::new(ToolMock);
-        let http = http_tools_v1(FeatureSet::Beta).with_state(app_state);
+        let http = http_tools_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
 
         // When
         let resp = http
