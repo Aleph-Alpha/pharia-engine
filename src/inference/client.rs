@@ -490,7 +490,8 @@ where
                 | aleph_alpha_client::Error::Other(_)
                 | aleph_alpha_client::Error::ClientTimeout(_)
                 | aleph_alpha_client::Error::InvalidStream { .. }
-                | aleph_alpha_client::Error::InvalidTokenizer { .. }),
+                | aleph_alpha_client::Error::InvalidTokenizer { .. }
+                | aleph_alpha_client::Error::ModelNotFound),
             ) => {
                 error!(parent: tracing_context.span(), "Unrecoverable inference error: {e:#}");
                 return Err(e);
@@ -503,6 +504,13 @@ where
 pub enum InferenceError {
     #[error("Unauthorized")]
     Unauthorized,
+    #[error(
+        "The Skill tried to access a model that was not found. Please check the provided model \
+        name. You can query the list of available models at the `models` endpoint of the \
+        inference API. If you believe the model should be available, contact the operator of your \
+        PhariaAI instance."
+    )]
+    ModelNotFound,
     #[error(transparent)]
     Other(#[from] anyhow::Error), // default is an anyhow error
 }
@@ -511,6 +519,7 @@ impl From<aleph_alpha_client::Error> for InferenceError {
     fn from(err: aleph_alpha_client::Error) -> Self {
         match err {
             aleph_alpha_client::Error::Http { status: 401, .. } => InferenceError::Unauthorized,
+            aleph_alpha_client::Error::ModelNotFound => InferenceError::ModelNotFound,
             _ => InferenceError::Other(err.into()),
         }
     }
