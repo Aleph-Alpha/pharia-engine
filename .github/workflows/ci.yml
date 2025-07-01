@@ -263,7 +263,8 @@ jobs:
 
           helm install pharia-kernel helm-charts/pharia-kernel \
               -f helm-charts/pharia-kernel/values-kind.yaml \
-              --set "image.repository=$LOCAL_REGISTRY/pharia-kernel" \
+              --set "image.registry=$LOCAL_REGISTRY" \
+              --set "image.repository=pharia-kernel" \
               --set "image.tag=$IMAGE_ID" \
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
@@ -343,7 +344,8 @@ jobs:
 
           helm install pharia-kernel helm-charts/pharia-kernel \
               -f helm-charts/pharia-kernel/values-kind.yaml \
-              --set "image.repository=$LOCAL_REGISTRY/pharia-kernel" \
+              --set "image.registry=$LOCAL_REGISTRY" \
+              --set "image.repository=pharia-kernel" \
               --set "image.tag=$IMAGE_ID" \
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
