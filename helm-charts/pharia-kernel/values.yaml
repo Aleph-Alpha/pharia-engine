@@ -58,7 +58,7 @@ containerSecurityContext:
   allowPrivilegeEscalation: false
   seccompProfile:
     type: RuntimeDefault
-env:
+envVars:
   values:
     LOG_LEVEL: "{{ .Values.logLevel }}"
     OTEL_ENDPOINT: "{{ .Values.openTelemetryEndpoint }}"
