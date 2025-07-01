@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.12](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.11...pharia-kernel-v0.13.12)
+
+### Features
+
+- Promote list_mcp_servers and list_tools routes - ([54311ba](https://github.com/Aleph-Alpha/pharia-kernel/commit/54311ba53ca97a47ede73c3b8d99ea53ee34803e))
+- Better error message on model not found - ([56d2de2](https://github.com/Aleph-Alpha/pharia-kernel/commit/56d2de214b08a0831afb86d4bcb2bbe547aea9e8))
+
+
 ## [0.13.10](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.9...pharia-kernel-v0.13.10)
 
 ### Features
