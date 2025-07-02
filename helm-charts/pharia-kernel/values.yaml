@@ -103,6 +103,7 @@ extraVolumeMounts:
 # The recommended resources are set as the default. As the requirements are highly usage-dependent,
 # adjust them as necessary.
 resources:
+  divisor: 1
   limits:
     cpu: "4"
     memory: 8Gi
