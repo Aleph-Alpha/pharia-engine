@@ -89,7 +89,7 @@ envVars:
 extraVolumes:
   - name: config-volume
     configMap:
-      name: pharia-kernel
+      name: '{{ include "pharia-common.names.fullname" . }}'
   - name: ephemeral
     emptyDir:
       sizeLimit: 4Gi
