@@ -55,7 +55,7 @@ oci-wasm = "0.3.0"
 # for Saas applications, which can be frequently deployed by the dev team. Since the Kernel is
 # operated independently on premise it is not a fit for us, and the operation team on the customer
 # side need a way to inject their own Certificates roots.
-reqwest = { version = "0.12.20", features = [
+reqwest = { version = "0.12.22", features = [
     "brotli",
     "deflate",
     "gzip",
@@ -160,7 +160,7 @@ tokio = { version = "1.45.0", features = ["test-util"] }
 tokio-test = "0.4.4"
 wat = "1.235.0"
 metrics-util = "0.20.0"
-reqwest = { version = "0.12.20", features = ["stream"] }
+reqwest = { version = "0.12.22", features = ["stream"] }
 opentelemetry-stdout = "0.30.0"
 double-trait = "0.2.4"
 
