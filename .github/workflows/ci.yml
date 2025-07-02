@@ -155,6 +155,7 @@ jobs:
           input: "/tmp/pharia-kernel.tar"
           output: "sbom.json"
           scan-type: "fs"
+          scanners: "license,vuln,secret"
 
       - name: Vulnerability scanning with Trivy
         uses: aquasecurity/trivy-action@0.32.0
