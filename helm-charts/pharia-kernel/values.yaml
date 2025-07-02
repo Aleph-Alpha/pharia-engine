@@ -80,16 +80,12 @@ envVars:
   resourceFields:
     MEMORY_REQUEST:
       resource: requests.memory
-      divisor: 1
     MEMORY_LIMIT:
       resource: limits.memory
-      divisor: 1
     WASMTIME_CACHE_SIZE_REQUEST:
       resource: requests.ephemeral-storage
-      divisor: 1
     WASMTIME_CACHE_SIZE_LIMIT:
       resource: limits.ephemeral-storage
-      divisor: 1
 extraVolumes:
   - name: config-volume
     configMap:
@@ -107,16 +103,15 @@ extraVolumeMounts:
 # The recommended resources are set as the default. As the requirements are highly usage-dependent,
 # adjust them as necessary.
 resources:
+  divisor: 1
   limits:
     cpu: "4"
     memory: 8Gi
     ephemeral-storage: 8Gi
-    divisor: 1
   requests:
     cpu: "2"
     memory: 4Gi
     ephemeral-storage: 4Gi
-    divisor: 1
 livenessProbe:
   httpGet:
     path: /health
