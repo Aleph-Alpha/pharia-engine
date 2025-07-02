@@ -80,16 +80,16 @@ envVars:
   resourceFields:
     MEMORY_REQUEST:
       resource: requests.memory
-      divisor: requests.divisor
+      divisor: 1
     MEMORY_LIMIT:
       resource: limits.memory
-      divisor: limits.divisor
+      divisor: 1
     WASMTIME_CACHE_SIZE_REQUEST:
       resource: requests.ephemeral-storage
-      divisor: requests.divisor
+      divisor: 1
     WASMTIME_CACHE_SIZE_LIMIT:
       resource: limits.ephemeral-storage
-      divisor: limits.divisor
+      divisor: 1
 extraVolumes:
   - name: config-volume
     configMap:
