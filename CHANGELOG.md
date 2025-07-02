@@ -513,7 +513,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 3 updates - ([b382143](https://github.com/Aleph-Alpha/pharia-kernel/commit/b3821432507472feadf47b4718d359a4835d51cb))
+- *(deps)* Bump the minor group with 3 updates - ([b382143](https://github.com/Aleph-Alpha/pharia-kernel/commit/b3821432507472feadf47b4718d359a4835d51cb))
 
 ## [0.11.10](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.9...v0.11.10)
 
@@ -533,7 +533,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 8 updates - ([28aee9a](https://github.com/Aleph-Alpha/pharia-kernel/commit/28aee9ad3281332698ddfe70b4326ee8832a4fd4))
+- *(deps)* Bump the minor group with 8 updates - ([28aee9a](https://github.com/Aleph-Alpha/pharia-kernel/commit/28aee9ad3281332698ddfe70b4326ee8832a4fd4))
 
 ## [0.11.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.8...v0.11.9)
 
@@ -550,7 +550,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 3 updates - ([677ad11](https://github.com/Aleph-Alpha/pharia-kernel/commit/677ad114eb6275dfc86faa3f02818c8271f0bed5))
+- *(deps)* Bump the minor group with 3 updates - ([677ad11](https://github.com/Aleph-Alpha/pharia-kernel/commit/677ad114eb6275dfc86faa3f02818c8271f0bed5))
 
 ## [0.11.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.6...v0.11.7)
 
@@ -572,8 +572,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 5 updates - ([16e5695](https://github.com/Aleph-Alpha/pharia-kernel/commit/16e56952decc44cd6018b3657e89917d4ad8ec19))
-- _(deps)_ Bump the minor group with 9 updates - ([5fe763f](https://github.com/Aleph-Alpha/pharia-kernel/commit/5fe763fb64432389fbf7bb24ae30c926caf6e6e6))
+- *(deps)* Bump the minor group with 5 updates - ([16e5695](https://github.com/Aleph-Alpha/pharia-kernel/commit/16e56952decc44cd6018b3657e89917d4ad8ec19))
+- *(deps)* Bump the minor group with 9 updates - ([5fe763f](https://github.com/Aleph-Alpha/pharia-kernel/commit/5fe763fb64432389fbf7bb24ae30c926caf6e6e6))
 
 ## [0.11.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.5...v0.11.6)
 
@@ -588,7 +588,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 10 updates - ([875b4d1](https://github.com/Aleph-Alpha/pharia-kernel/commit/875b4d1567031dd26e52c13b7938a733d56834cf))
+- *(deps)* Bump the minor group with 10 updates - ([875b4d1](https://github.com/Aleph-Alpha/pharia-kernel/commit/875b4d1567031dd26e52c13b7938a733d56834cf))
 
 ## [0.11.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.4...v0.11.5)
 
@@ -623,9 +623,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the wasmtime group with 17 updates - ([3b14786](https://github.com/Aleph-Alpha/pharia-kernel/commit/3b14786a7f3513179b36a4324653158ad1f141ef))
-- _(deps)_ Bump the minor group with 83 updates - ([027e75b](https://github.com/Aleph-Alpha/pharia-kernel/commit/027e75bd4da90b17942d155aa9e41d785e6141ab))
-- _(deps)_ Bump the minor group with 2 updates - ([04f3fb0](https://github.com/Aleph-Alpha/pharia-kernel/commit/04f3fb084485358b1e809f86265eb32733514f50))
+- *(deps)* Bump the wasmtime group with 17 updates - ([3b14786](https://github.com/Aleph-Alpha/pharia-kernel/commit/3b14786a7f3513179b36a4324653158ad1f141ef))
+- *(deps)* Bump the minor group with 83 updates - ([027e75b](https://github.com/Aleph-Alpha/pharia-kernel/commit/027e75bd4da90b17942d155aa9e41d785e6141ab))
+- *(deps)* Bump the minor group with 2 updates - ([04f3fb0](https://github.com/Aleph-Alpha/pharia-kernel/commit/04f3fb084485358b1e809f86265eb32733514f50))
 
 ## [0.11.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.11.0...v0.11.1)
 
@@ -646,9 +646,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 5 updates - ([2e0ebc8](https://github.com/Aleph-Alpha/pharia-kernel/commit/2e0ebc81b8907f2329ad4dc00024d8b2bc0e48d2))
-- _(deps)_ Bump rustls from 0.23.24 to 0.23.25 in the minor group - ([0e2ad64](https://github.com/Aleph-Alpha/pharia-kernel/commit/0e2ad64a6b2776a09384c554238ab3611d87cd13))
-- _(deps)_ Bump the minor group across 1 directory with 16 updates - ([3522689](https://github.com/Aleph-Alpha/pharia-kernel/commit/352268918c28fbf9025858744a98be72c816a5de))
+- *(deps)* Bump the minor group with 5 updates - ([2e0ebc8](https://github.com/Aleph-Alpha/pharia-kernel/commit/2e0ebc81b8907f2329ad4dc00024d8b2bc0e48d2))
+- *(deps)* Bump rustls from 0.23.24 to 0.23.25 in the minor group - ([0e2ad64](https://github.com/Aleph-Alpha/pharia-kernel/commit/0e2ad64a6b2776a09384c554238ab3611d87cd13))
+- *(deps)* Bump the minor group across 1 directory with 16 updates - ([3522689](https://github.com/Aleph-Alpha/pharia-kernel/commit/352268918c28fbf9025858744a98be72c816a5de))
 
 ## [0.10.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.10.1...v0.10.2)
 
@@ -662,7 +662,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group across 1 directory with 11 updates - ([be6d7f0](https://github.com/Aleph-Alpha/pharia-kernel/commit/be6d7f0bc604279aa697c95041b994a12eba9057))
+- *(deps)* Bump the minor group across 1 directory with 11 updates - ([be6d7f0](https://github.com/Aleph-Alpha/pharia-kernel/commit/be6d7f0bc604279aa697c95041b994a12eba9057))
 
 ## [0.10.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.10.0...v0.10.1)
 
@@ -698,11 +698,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 3 updates - ([b7c721f](https://github.com/Aleph-Alpha/pharia-kernel/commit/b7c721f58ddf9613c1c98a51c7e2addfa8ef2d5f))
-- _(deps)_ Bump the minor group with 11 updates - ([2ee4d97](https://github.com/Aleph-Alpha/pharia-kernel/commit/2ee4d97abf628f175b0dac46bf7c05733f75daef))
-- _(deps)_ Bump the minor group with 14 updates - ([7aa855e](https://github.com/Aleph-Alpha/pharia-kernel/commit/7aa855eca0a1ab6919a8b17fb72681acd2f9e94a))
-- _(deps)_ Bump the minor group with 24 updates - ([4c640e7](https://github.com/Aleph-Alpha/pharia-kernel/commit/4c640e74ecf843ad984b71fde6314e7911abd0c8))
-- _(deps)_ Bump the minor group with 48 updates - ([93da08b](https://github.com/Aleph-Alpha/pharia-kernel/commit/93da08b0ed19e2d058cb49f07487a8406524f322))
+- *(deps)* Bump the minor group with 3 updates - ([b7c721f](https://github.com/Aleph-Alpha/pharia-kernel/commit/b7c721f58ddf9613c1c98a51c7e2addfa8ef2d5f))
+- *(deps)* Bump the minor group with 11 updates - ([2ee4d97](https://github.com/Aleph-Alpha/pharia-kernel/commit/2ee4d97abf628f175b0dac46bf7c05733f75daef))
+- *(deps)* Bump the minor group with 14 updates - ([7aa855e](https://github.com/Aleph-Alpha/pharia-kernel/commit/7aa855eca0a1ab6919a8b17fb72681acd2f9e94a))
+- *(deps)* Bump the minor group with 24 updates - ([4c640e7](https://github.com/Aleph-Alpha/pharia-kernel/commit/4c640e74ecf843ad984b71fde6314e7911abd0c8))
+- *(deps)* Bump the minor group with 48 updates - ([93da08b](https://github.com/Aleph-Alpha/pharia-kernel/commit/93da08b0ed19e2d058cb49f07487a8406524f322))
 - Standardize operation ID in OpenAPI - ([22b1fd7](https://github.com/Aleph-Alpha/pharia-kernel/commit/22b1fd7b3529927593ecc3a2cff2bc8ef794bec4))
 
 ## [0.9.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.8...v0.9.9)
@@ -727,7 +727,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 40 updates - ([d36df6d](https://github.com/Aleph-Alpha/pharia-kernel/commit/d36df6d512d25c38527b85ee5c0c316f374cf00d))
+- *(deps)* Bump the minor group with 40 updates - ([d36df6d](https://github.com/Aleph-Alpha/pharia-kernel/commit/d36df6d512d25c38527b85ee5c0c316f374cf00d))
 
 ## [0.9.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.5...v0.9.6)
 
@@ -737,9 +737,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the wasmtime group with 16 updates - ([50cd082](https://github.com/Aleph-Alpha/pharia-kernel/commit/50cd082531f08f6204e45fa822fc467cda26337a))
-- _(deps)_ Bump the minor group with 8 updates - ([3c166b5](https://github.com/Aleph-Alpha/pharia-kernel/commit/3c166b5b3caa6a3bd8dcb9d65575a8212268f98c))
-- _(deps)_ Bump the minor group with 7 updates - ([fa8c199](https://github.com/Aleph-Alpha/pharia-kernel/commit/fa8c19903d9d3392a3e504554f564486135863e8))
+- *(deps)* Bump the wasmtime group with 16 updates - ([50cd082](https://github.com/Aleph-Alpha/pharia-kernel/commit/50cd082531f08f6204e45fa822fc467cda26337a))
+- *(deps)* Bump the minor group with 8 updates - ([3c166b5](https://github.com/Aleph-Alpha/pharia-kernel/commit/3c166b5b3caa6a3bd8dcb9d65575a8212268f98c))
+- *(deps)* Bump the minor group with 7 updates - ([fa8c199](https://github.com/Aleph-Alpha/pharia-kernel/commit/fa8c19903d9d3392a3e504554f564486135863e8))
 
 ## [0.9.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.4...v0.9.5)
 
@@ -767,10 +767,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 3 updates - ([578238d](https://github.com/Aleph-Alpha/pharia-kernel/commit/578238d84cee8aa85b861837ed8c7d89e85102a0))
-- _(deps)_ Bump the minor group with 14 updates - ([4d04a75](https://github.com/Aleph-Alpha/pharia-kernel/commit/4d04a758c62e40fbced8b23a451922ddb9e14886))
-- _(deps)_ Bump fake from 3.1.0 to 4.0.0 - ([2a6227e](https://github.com/Aleph-Alpha/pharia-kernel/commit/2a6227ec2d4d1c7920fdd97847eba12c9ab1159e))
-- _(deps)_ Bump aleph-alpha-client in the minor group - ([326ad40](https://github.com/Aleph-Alpha/pharia-kernel/commit/326ad4060c80659dd2c78aed0014e1ce6cde24c4))
+- *(deps)* Bump the minor group with 3 updates - ([578238d](https://github.com/Aleph-Alpha/pharia-kernel/commit/578238d84cee8aa85b861837ed8c7d89e85102a0))
+- *(deps)* Bump the minor group with 14 updates - ([4d04a75](https://github.com/Aleph-Alpha/pharia-kernel/commit/4d04a758c62e40fbced8b23a451922ddb9e14886))
+- *(deps)* Bump fake from 3.1.0 to 4.0.0 - ([2a6227e](https://github.com/Aleph-Alpha/pharia-kernel/commit/2a6227ec2d4d1c7920fdd97847eba12c9ab1159e))
+- *(deps)* Bump aleph-alpha-client in the minor group - ([326ad40](https://github.com/Aleph-Alpha/pharia-kernel/commit/326ad4060c80659dd2c78aed0014e1ce6cde24c4))
 
 ## [0.9.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.9.2...v0.9.3)
 
@@ -804,7 +804,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 3 updates - ([6902d38](https://github.com/Aleph-Alpha/pharia-kernel/commit/6902d381f3ddcd5c591ae2e859d852bdd7a4e0dd))
+- *(deps)* Bump the minor group with 3 updates - ([6902d38](https://github.com/Aleph-Alpha/pharia-kernel/commit/6902d381f3ddcd5c591ae2e859d852bdd7a4e0dd))
 
 ## [0.8.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.9...v0.8.0)
 
@@ -824,9 +824,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 6 updates - ([c8013b6](https://github.com/Aleph-Alpha/pharia-kernel/commit/c8013b6fbbc7afb4dbe60a3178c4462afd1b04c2))
-- _(deps)_ Bump the minor group across 1 directory with 7 updates - ([66eae10](https://github.com/Aleph-Alpha/pharia-kernel/commit/66eae1015d584fa8c360833d7e21c29a7bde794f))
-- _(deps)_ Update aleph-alpha-client to 0.19.0 - ([cf20c00](https://github.com/Aleph-Alpha/pharia-kernel/commit/cf20c009223419a0cb8ae47abb193f05191fbcd9))
+- *(deps)* Bump the minor group with 6 updates - ([c8013b6](https://github.com/Aleph-Alpha/pharia-kernel/commit/c8013b6fbbc7afb4dbe60a3178c4462afd1b04c2))
+- *(deps)* Bump the minor group across 1 directory with 7 updates - ([66eae10](https://github.com/Aleph-Alpha/pharia-kernel/commit/66eae1015d584fa8c360833d7e21c29a7bde794f))
+- *(deps)* Update aleph-alpha-client to 0.19.0 - ([cf20c00](https://github.com/Aleph-Alpha/pharia-kernel/commit/cf20c009223419a0cb8ae47abb193f05191fbcd9))
 
 ## [0.7.9](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.8...v0.7.9)
 
@@ -855,7 +855,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group across 1 directory with 8 updates - ([af91400](https://github.com/Aleph-Alpha/pharia-kernel/commit/af914005462cab6cbe7acf3ad58c9b3c59d605d0))
+- *(deps)* Bump the minor group across 1 directory with 8 updates - ([af91400](https://github.com/Aleph-Alpha/pharia-kernel/commit/af914005462cab6cbe7acf3ad58c9b3c59d605d0))
 
 ## [0.7.7](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.6...v0.7.7)
 
@@ -874,10 +874,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 4 updates - ([147043b](https://github.com/Aleph-Alpha/pharia-kernel/commit/147043b47e048e0f0894f5cd0569afeb3188b3ad))
-- _(deps)_ Bump derive_more from 1.0.0 to 2.0.1 - ([d98a1d8](https://github.com/Aleph-Alpha/pharia-kernel/commit/d98a1d89b646fc78c87b7aa84f791e3d03ca59f0))
-- _(deps)_ Bump the minor group with 7 updates - ([babfd16](https://github.com/Aleph-Alpha/pharia-kernel/commit/babfd16229ffe0b987b254e44959bee9c60c7557))
-- _(deps)_ Bump the minor group across 1 directory with 10 updates - ([ad9de3a](https://github.com/Aleph-Alpha/pharia-kernel/commit/ad9de3a6f13f67626fed09cf8ca832d29fe76b92))
+- *(deps)* Bump the minor group with 4 updates - ([147043b](https://github.com/Aleph-Alpha/pharia-kernel/commit/147043b47e048e0f0894f5cd0569afeb3188b3ad))
+- *(deps)* Bump derive_more from 1.0.0 to 2.0.1 - ([d98a1d8](https://github.com/Aleph-Alpha/pharia-kernel/commit/d98a1d89b646fc78c87b7aa84f791e3d03ca59f0))
+- *(deps)* Bump the minor group with 7 updates - ([babfd16](https://github.com/Aleph-Alpha/pharia-kernel/commit/babfd16229ffe0b987b254e44959bee9c60c7557))
+- *(deps)* Bump the minor group across 1 directory with 10 updates - ([ad9de3a](https://github.com/Aleph-Alpha/pharia-kernel/commit/ad9de3a6f13f67626fed09cf8ca832d29fe76b92))
 
 ## [0.7.6](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.5...v0.7.6)
 
@@ -902,7 +902,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group across 1 directory with 13 updates - ([484473d](https://github.com/Aleph-Alpha/pharia-kernel/commit/484473d911ddd67a3a3f5155bbfde7435062c6ff))
+- *(deps)* Bump the minor group across 1 directory with 13 updates - ([484473d](https://github.com/Aleph-Alpha/pharia-kernel/commit/484473d911ddd67a3a3f5155bbfde7435062c6ff))
 
 ## [0.7.4](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.3...v0.7.4)
 
@@ -926,9 +926,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 6 updates - ([8c7adae](https://github.com/Aleph-Alpha/pharia-kernel/commit/8c7adaebec273ec408569339af30a6895e1a694c))
-- _(deps)_ Bump the minor group with 37 updates - ([c5dccba](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5dccba5c9e02e4130a49b411df02c6711fb5bc4))
-- _(deps)_ Bump the wasmtime group with 15 updates - ([debd8ba](https://github.com/Aleph-Alpha/pharia-kernel/commit/debd8ba147fa6f275e40895bb1a2e21dc2051c3a))
+- *(deps)* Bump the minor group with 6 updates - ([8c7adae](https://github.com/Aleph-Alpha/pharia-kernel/commit/8c7adaebec273ec408569339af30a6895e1a694c))
+- *(deps)* Bump the minor group with 37 updates - ([c5dccba](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5dccba5c9e02e4130a49b411df02c6711fb5bc4))
+- *(deps)* Bump the wasmtime group with 15 updates - ([debd8ba](https://github.com/Aleph-Alpha/pharia-kernel/commit/debd8ba147fa6f275e40895bb1a2e21dc2051c3a))
 
 ## [0.7.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.1...v0.7.2)
 
@@ -942,9 +942,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 5 updates - ([3cc6c61](https://github.com/Aleph-Alpha/pharia-kernel/commit/3cc6c612f9986b5ad7a20058f2e6ac82425c663c))
-- _(deps)_ Text-splitter 0.22 - ([6f8b518](https://github.com/Aleph-Alpha/pharia-kernel/commit/6f8b5181b5f104f9bb8c6b18b33e80d8667deb86))
-- _(deps)_ Bump the minor group with 4 updates - ([6713297](https://github.com/Aleph-Alpha/pharia-kernel/commit/67132973557dd8ab501d1ab8808be3ceb0909638))
+- *(deps)* Bump the minor group with 5 updates - ([3cc6c61](https://github.com/Aleph-Alpha/pharia-kernel/commit/3cc6c612f9986b5ad7a20058f2e6ac82425c663c))
+- *(deps)* Text-splitter 0.22 - ([6f8b518](https://github.com/Aleph-Alpha/pharia-kernel/commit/6f8b5181b5f104f9bb8c6b18b33e80d8667deb86))
+- *(deps)* Bump the minor group with 4 updates - ([6713297](https://github.com/Aleph-Alpha/pharia-kernel/commit/67132973557dd8ab501d1ab8808be3ceb0909638))
 - Remove docs from container - ([e8e038f](https://github.com/Aleph-Alpha/pharia-kernel/commit/e8e038fd6bb11b43a5af05c20c46b99a3720f326))
 
 ## [0.7.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.7.0...v0.7.1)
@@ -965,10 +965,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 34 updates - ([849b80c](https://github.com/Aleph-Alpha/pharia-kernel/commit/849b80c9540e1208b20da1d1d1b74dce349e25a7))
-- _(deps)_ Bump the minor group with 2 updates - ([14fd7db](https://github.com/Aleph-Alpha/pharia-kernel/commit/14fd7db14e5b74315e4bcd62a41ca8fbb5f9da15))
-- _(deps)_ Bump the minor group with 14 updates - ([f3a5266](https://github.com/Aleph-Alpha/pharia-kernel/commit/f3a5266f102d4cb2970798650fcd4277f87ec6cb))
-- _(deps)_ Bump the minor group with 5 updates - ([9360c1c](https://github.com/Aleph-Alpha/pharia-kernel/commit/9360c1c0a1cb60d46598c431bae2102d53afa3b6))
+- *(deps)* Bump the minor group with 34 updates - ([849b80c](https://github.com/Aleph-Alpha/pharia-kernel/commit/849b80c9540e1208b20da1d1d1b74dce349e25a7))
+- *(deps)* Bump the minor group with 2 updates - ([14fd7db](https://github.com/Aleph-Alpha/pharia-kernel/commit/14fd7db14e5b74315e4bcd62a41ca8fbb5f9da15))
+- *(deps)* Bump the minor group with 14 updates - ([f3a5266](https://github.com/Aleph-Alpha/pharia-kernel/commit/f3a5266f102d4cb2970798650fcd4277f87ec6cb))
+- *(deps)* Bump the minor group with 5 updates - ([9360c1c](https://github.com/Aleph-Alpha/pharia-kernel/commit/9360c1c0a1cb60d46598c431bae2102d53afa3b6))
 
 ## [0.7.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.6.0...v0.7.0)
 
@@ -1004,9 +1004,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 8 updates - ([49c3237](https://github.com/Aleph-Alpha/pharia-kernel/commit/49c32377f97a9c364e695baad8bd30c436093579))
-- _(deps)_ Bump the minor group with 7 updates - ([cd86400](https://github.com/Aleph-Alpha/pharia-kernel/commit/cd86400a3475fb142a66a31ec2c371744217fe08))
-- _(deps)_ Bump tempfile from 3.14.0 to 3.15.0 in the minor group - ([936aeba](https://github.com/Aleph-Alpha/pharia-kernel/commit/936aeba6106a0e026ba6a42185472c37b4307fb4))
+- *(deps)* Bump the minor group with 8 updates - ([49c3237](https://github.com/Aleph-Alpha/pharia-kernel/commit/49c32377f97a9c364e695baad8bd30c436093579))
+- *(deps)* Bump the minor group with 7 updates - ([cd86400](https://github.com/Aleph-Alpha/pharia-kernel/commit/cd86400a3475fb142a66a31ec2c371744217fe08))
+- *(deps)* Bump tempfile from 3.14.0 to 3.15.0 in the minor group - ([936aeba](https://github.com/Aleph-Alpha/pharia-kernel/commit/936aeba6106a0e026ba6a42185472c37b4307fb4))
 
 ## [0.5.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.14...v0.5.0)
 
@@ -1031,12 +1031,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 6 updates - ([213aa5a](https://github.com/Aleph-Alpha/pharia-kernel/commit/213aa5a874c403cb798bacb8841478b406124803))
-- _(deps)_ Bump the minor group with 4 updates - ([dc99868](https://github.com/Aleph-Alpha/pharia-kernel/commit/dc998685b287155d0fba92e95ef9d3ebb35e6f46))
-- _(deps)_ Bump the wasmtime group with 15 updates - ([01ff0fd](https://github.com/Aleph-Alpha/pharia-kernel/commit/01ff0fdf7f38ef00f24d86ada81178e55f2798ce))
-- _(deps)_ Bump the minor group with 7 updates - ([6c6df44](https://github.com/Aleph-Alpha/pharia-kernel/commit/6c6df442213578d204542e161d9402dcb9f44548))
-- _(deps)_ Bump unicase from 2.8.0 to 2.8.1 in the minor group - ([9e89c51](https://github.com/Aleph-Alpha/pharia-kernel/commit/9e89c5192092e3779bb0e91c1241cb5d937d3f94))
-- _(deps)_ Bump the minor group with 9 updates - ([3e60602](https://github.com/Aleph-Alpha/pharia-kernel/commit/3e60602202af6673dcc3b7301d239eb88116401f))
+- *(deps)* Bump the minor group with 6 updates - ([213aa5a](https://github.com/Aleph-Alpha/pharia-kernel/commit/213aa5a874c403cb798bacb8841478b406124803))
+- *(deps)* Bump the minor group with 4 updates - ([dc99868](https://github.com/Aleph-Alpha/pharia-kernel/commit/dc998685b287155d0fba92e95ef9d3ebb35e6f46))
+- *(deps)* Bump the wasmtime group with 15 updates - ([01ff0fd](https://github.com/Aleph-Alpha/pharia-kernel/commit/01ff0fdf7f38ef00f24d86ada81178e55f2798ce))
+- *(deps)* Bump the minor group with 7 updates - ([6c6df44](https://github.com/Aleph-Alpha/pharia-kernel/commit/6c6df442213578d204542e161d9402dcb9f44548))
+- *(deps)* Bump unicase from 2.8.0 to 2.8.1 in the minor group - ([9e89c51](https://github.com/Aleph-Alpha/pharia-kernel/commit/9e89c5192092e3779bb0e91c1241cb5d937d3f94))
+- *(deps)* Bump the minor group with 9 updates - ([3e60602](https://github.com/Aleph-Alpha/pharia-kernel/commit/3e60602202af6673dcc3b7301d239eb88116401f))
 
 ## [0.4.14](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.13...v0.4.14)
 
@@ -1054,7 +1054,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 5 updates - ([57d2588](https://github.com/Aleph-Alpha/pharia-kernel/commit/57d258846d6733ed9e63b1c96748737a910c6b09))
+- *(deps)* Bump the minor group with 5 updates - ([57d2588](https://github.com/Aleph-Alpha/pharia-kernel/commit/57d258846d6733ed9e63b1c96748737a910c6b09))
 
 ## [0.4.13](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.12...v0.4.13)
 
@@ -1115,10 +1115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 7 updates - ([525469f](https://github.com/Aleph-Alpha/pharia-kernel/commit/525469fc49149bdd20742c7fce36afbd8ba23cc2))
-- _(deps)_ Bump the minor group with 3 updates - ([c5327a5](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5327a5c37717d5b1e217d4277a9ee9921b6aad1))
-- _(deps)_ Bump the minor group with 5 updates - ([ed232d9](https://github.com/Aleph-Alpha/pharia-kernel/commit/ed232d95353a90bba7cc4bd5b27d840227c1dcd8))
-- _(deps)_ Bump aleph-alpha-client in the minor group - ([97c44ac](https://github.com/Aleph-Alpha/pharia-kernel/commit/97c44acab321165d2aed61414fdb63e22098084b))
+- *(deps)* Bump the minor group with 7 updates - ([525469f](https://github.com/Aleph-Alpha/pharia-kernel/commit/525469fc49149bdd20742c7fce36afbd8ba23cc2))
+- *(deps)* Bump the minor group with 3 updates - ([c5327a5](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5327a5c37717d5b1e217d4277a9ee9921b6aad1))
+- *(deps)* Bump the minor group with 5 updates - ([ed232d9](https://github.com/Aleph-Alpha/pharia-kernel/commit/ed232d95353a90bba7cc4bd5b27d840227c1dcd8))
+- *(deps)* Bump aleph-alpha-client in the minor group - ([97c44ac](https://github.com/Aleph-Alpha/pharia-kernel/commit/97c44acab321165d2aed61414fdb63e22098084b))
 
 ## [0.4.5](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.4...v0.4.5)
 
@@ -1145,7 +1145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 8 updates - ([b01512e](https://github.com/Aleph-Alpha/pharia-kernel/commit/b01512eb101627b5f79e52e8104a89e217ab0002))
+- *(deps)* Bump the minor group with 8 updates - ([b01512e](https://github.com/Aleph-Alpha/pharia-kernel/commit/b01512eb101627b5f79e52e8104a89e217ab0002))
 
 ## [0.4.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.2...v0.4.3)
 
@@ -1156,13 +1156,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 4 updates - ([968ac0e](https://github.com/Aleph-Alpha/pharia-kernel/commit/968ac0e712c9559cfbc70eeb2df2af9085f6efa1))
+- *(deps)* Bump the minor group with 4 updates - ([968ac0e](https://github.com/Aleph-Alpha/pharia-kernel/commit/968ac0e712c9559cfbc70eeb2df2af9085f6efa1))
 
 ## [0.4.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.1...v0.4.2)
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 2 updates - ([0a83ead](https://github.com/Aleph-Alpha/pharia-kernel/commit/0a83ead829ad89a076dd3b17c6675cba556ecbd1))
+- *(deps)* Bump the minor group with 2 updates - ([0a83ead](https://github.com/Aleph-Alpha/pharia-kernel/commit/0a83ead829ad89a076dd3b17c6675cba556ecbd1))
 
 ## [0.4.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.4.0...v0.4.1)
 
@@ -1183,7 +1183,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 18 updates - ([46e094b](https://github.com/Aleph-Alpha/pharia-kernel/commit/46e094b4ae28117d63d00b922fd69f9325180380))
+- *(deps)* Bump the minor group with 18 updates - ([46e094b](https://github.com/Aleph-Alpha/pharia-kernel/commit/46e094b4ae28117d63d00b922fd69f9325180380))
 
 ## [0.3.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.3.1...v0.3.2)
 
@@ -1193,7 +1193,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group across 1 directory with 19 updates - ([ded5b89](https://github.com/Aleph-Alpha/pharia-kernel/commit/ded5b895209c595d9bade684ca422977f89e9163))
+- *(deps)* Bump the minor group across 1 directory with 19 updates - ([ded5b89](https://github.com/Aleph-Alpha/pharia-kernel/commit/ded5b895209c595d9bade684ca422977f89e9163))
 
 ## [0.3.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.3.0...v0.3.1)
 
@@ -1225,18 +1225,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 15 updates - ([9508430](https://github.com/Aleph-Alpha/pharia-kernel/commit/95084308131bd1d806d2b73351e45f7e1764a029))
-- _(deps)_ Bump the wasmtime group with 15 updates - ([a0a878a](https://github.com/Aleph-Alpha/pharia-kernel/commit/a0a878a619c5e9168647dbca76d9a21bbb922e24))
-- _(deps)_ Bump rustls from 0.23.17 to 0.23.18 in the cargo group - ([5175d3f](https://github.com/Aleph-Alpha/pharia-kernel/commit/5175d3fee79f2cda7448379c4ab226117990340d))
+- *(deps)* Bump the minor group with 15 updates - ([9508430](https://github.com/Aleph-Alpha/pharia-kernel/commit/95084308131bd1d806d2b73351e45f7e1764a029))
+- *(deps)* Bump the wasmtime group with 15 updates - ([a0a878a](https://github.com/Aleph-Alpha/pharia-kernel/commit/a0a878a619c5e9168647dbca76d9a21bbb922e24))
+- *(deps)* Bump rustls from 0.23.17 to 0.23.18 in the cargo group - ([5175d3f](https://github.com/Aleph-Alpha/pharia-kernel/commit/5175d3fee79f2cda7448379c4ab226117990340d))
 
 ## [0.2.3](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.2.2...v0.2.3)
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 8 updates - ([f0178e4](https://github.com/Aleph-Alpha/pharia-kernel/commit/f0178e4fcc9d9f497f564ce3ebae5c73216299a2))
-- _(deps)_ Bump the minor group with 2 updates - ([1723639](https://github.com/Aleph-Alpha/pharia-kernel/commit/1723639589ac6d2c6309ab281ee9f0398bfeab67))
-- _(deps)_ Bump the minor group across 1 directory with 11 updates - ([04466b0](https://github.com/Aleph-Alpha/pharia-kernel/commit/04466b03015fec77fd795c3ca9e9907fb5e691e0))
-- _(deps)_ Bump the minor group with 5 updates - ([c97cf9e](https://github.com/Aleph-Alpha/pharia-kernel/commit/c97cf9ef41bf0486bd5ca9bc654fe60e21f22a7f))
+- *(deps)* Bump the minor group with 8 updates - ([f0178e4](https://github.com/Aleph-Alpha/pharia-kernel/commit/f0178e4fcc9d9f497f564ce3ebae5c73216299a2))
+- *(deps)* Bump the minor group with 2 updates - ([1723639](https://github.com/Aleph-Alpha/pharia-kernel/commit/1723639589ac6d2c6309ab281ee9f0398bfeab67))
+- *(deps)* Bump the minor group across 1 directory with 11 updates - ([04466b0](https://github.com/Aleph-Alpha/pharia-kernel/commit/04466b03015fec77fd795c3ca9e9907fb5e691e0))
+- *(deps)* Bump the minor group with 5 updates - ([c97cf9e](https://github.com/Aleph-Alpha/pharia-kernel/commit/c97cf9ef41bf0486bd5ca9bc654fe60e21f22a7f))
 
 ## [0.2.2](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.2.1...v0.2.2)
 
@@ -1246,8 +1246,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 10 updates - ([99fb63c](https://github.com/Aleph-Alpha/pharia-kernel/commit/99fb63cb07f57909c3c9caf0300e6853bb9e3c4c))
-- _(deps)_ Bump the minor group with 6 updates - ([59527d1](https://github.com/Aleph-Alpha/pharia-kernel/commit/59527d172baa1bfe98c9dd3e8491e164d18a8ac7))
+- *(deps)* Bump the minor group with 10 updates - ([99fb63c](https://github.com/Aleph-Alpha/pharia-kernel/commit/99fb63cb07f57909c3c9caf0300e6853bb9e3c4c))
+- *(deps)* Bump the minor group with 6 updates - ([59527d1](https://github.com/Aleph-Alpha/pharia-kernel/commit/59527d172baa1bfe98c9dd3e8491e164d18a8ac7))
 
 ## [0.2.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.1.1...v0.2.0)
 
@@ -1265,16 +1265,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Builds
 
-- _(deps)_ Bump the minor group with 4 updates - ([5b5175c](https://github.com/Aleph-Alpha/pharia-kernel/commit/5b5175cbb994e896d986b0c328478edebe0ee6b3))
+- *(deps)* Bump the minor group with 4 updates - ([5b5175c](https://github.com/Aleph-Alpha/pharia-kernel/commit/5b5175cbb994e896d986b0c328478edebe0ee6b3))
 
 ## [0.1.1](https://github.com/Aleph-Alpha/pharia-kernel/compare/v0.1.0...v0.1.1)
 
 ### Builds
 
-- _(deps)_ Bump thiserror from 1.0.68 to 2.0.0 - ([5644b23](https://github.com/Aleph-Alpha/pharia-kernel/commit/5644b234da0a343940cbd4242e2c729e4bd2a509))
-- _(deps)_ Bump appany/helm-oci-chart-releaser from 0.3.0 to 0.4.2 - ([683c028](https://github.com/Aleph-Alpha/pharia-kernel/commit/683c028a897eb0521bc22a7b3c738e3ce5879295))
-- _(deps)_ Bump the minor group across 1 directory with 14 updates - ([957ebaf](https://github.com/Aleph-Alpha/pharia-kernel/commit/957ebaf24b944d9a79ebbb08939d008bf9e1278d))
-- _(deps)_ Bump wasmtime from 26.0.0 to 26.0.1 in the cargo group - ([d82ff04](https://github.com/Aleph-Alpha/pharia-kernel/commit/d82ff04ffcf43db5657b6465e4efbba7e868d706))
+- *(deps)* Bump thiserror from 1.0.68 to 2.0.0 - ([5644b23](https://github.com/Aleph-Alpha/pharia-kernel/commit/5644b234da0a343940cbd4242e2c729e4bd2a509))
+- *(deps)* Bump appany/helm-oci-chart-releaser from 0.3.0 to 0.4.2 - ([683c028](https://github.com/Aleph-Alpha/pharia-kernel/commit/683c028a897eb0521bc22a7b3c738e3ce5879295))
+- *(deps)* Bump the minor group across 1 directory with 14 updates - ([957ebaf](https://github.com/Aleph-Alpha/pharia-kernel/commit/957ebaf24b944d9a79ebbb08939d008bf9e1278d))
+- *(deps)* Bump wasmtime from 26.0.0 to 26.0.1 in the cargo group - ([d82ff04](https://github.com/Aleph-Alpha/pharia-kernel/commit/d82ff04ffcf43db5657b6465e4efbba7e868d706))
 
 ## [0.1.0]
 
