@@ -4,7 +4,7 @@ PhariaKernel allows you to execute Cognitive Business Units called skills. These
 
 ## Contributing
 
-In this repository we stick to Conventional commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
+In this repository we stick to Conventional Commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
 
 ### Release
 
