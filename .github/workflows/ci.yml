@@ -166,6 +166,16 @@ jobs:
           exit-code: "1"
           output: "report.json"
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-cyclonedx,cyclonedx
+
+      - name: Generate SBOM with CycloneDX
+        run: cargo cyclonedx --format json --manifest-path Cargo.toml
+
+      - name: Merge SBOMs
+        run: cyclonedx merge --input-files sbom.json pharia-kernel.cdx.json --output-format json --output-file sbom.json
+
       - name: Upload scanning artifacts
         uses: actions/upload-artifact@v4
         with:
