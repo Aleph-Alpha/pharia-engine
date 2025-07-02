@@ -16,7 +16,6 @@ imagePullSecretCustom:
   create: true
   registry: alephalpha.jfrog.io
 resources:
-  divisor: 1
   limits:
     cpu: "1"
     memory: 1Gi

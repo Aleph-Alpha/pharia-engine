@@ -79,12 +79,16 @@ envVars:
       key: "DOCUMENT_INDEX_URL"
   resourceFields:
     MEMORY_REQUEST:
+      divisor: 1
       resource: requests.memory
     MEMORY_LIMIT:
+      divisor: 1
       resource: limits.memory
     WASMTIME_CACHE_SIZE_REQUEST:
+      divisor: 1
       resource: requests.ephemeral-storage
     WASMTIME_CACHE_SIZE_LIMIT:
+      divisor: 1
       resource: limits.ephemeral-storage
 extraVolumes:
   - name: config-volume
@@ -103,7 +107,6 @@ extraVolumeMounts:
 # The recommended resources are set as the default. As the requirements are highly usage-dependent,
 # adjust them as necessary.
 resources:
-  divisor: 1
   limits:
     cpu: "4"
     memory: 8Gi
