@@ -484,7 +484,6 @@ mod tests {
     use std::vec;
 
     use engine_room::LinkerImpl;
-    use tokio::sync::oneshot;
 
     use crate::{csi::tests::ContextualCsiDouble, skill_driver::SkillInvocationCtx};
 
@@ -514,7 +513,7 @@ mod tests {
                 ))])
             }
         }
-        let (send_rt_err, _) = oneshot::channel();
+        let (send_rt_err, _) = mpsc::channel(1);
         let skill_ctx: Box<dyn Csi + Send> =
             Box::new(SkillInvocationCtx::new(send_rt_err, ContextualCsiMock));
         let mut ctx = LinkerImpl::new(skill_ctx);

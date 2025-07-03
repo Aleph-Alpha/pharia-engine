@@ -532,7 +532,6 @@ pub mod tests {
         given_rust_skill_greet_v0_3, given_rust_skill_search, given_skill_tool_invocation,
         given_streaming_output_skill,
     };
-    use tokio::sync::oneshot;
 
     use crate::{
         csi::{
@@ -640,7 +639,7 @@ pub mod tests {
 
         let skill_bytes = given_rust_skill_explain().bytes();
         let engine = Engine::default();
-        let (send, _) = oneshot::channel();
+        let (send, _) = mpsc::channel(1);
         let ctx = Box::new(SkillInvocationCtx::new(send, ContextualCsiStub));
         let skill =
             load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();

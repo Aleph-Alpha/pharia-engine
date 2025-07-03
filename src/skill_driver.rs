@@ -43,7 +43,7 @@ impl SkillDriver {
         tracing_context: &TracingContext,
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
-        let (send_rt_err, mut recv_rt_err) = oneshot::channel();
+        let (send_rt_err, mut recv_rt_err) = mpsc::channel(1);
         let csi = Box::new(SkillInvocationCtx::new(send_rt_err, contextual_csi));
 
         let (send_inner, mut recv_inner) = mpsc::channel(1);
@@ -62,7 +62,7 @@ impl SkillDriver {
                 // receiver of events before the handler.
                 biased;
 
-                Ok(error) = &mut recv_rt_err => {
+                Some(error) = recv_rt_err.recv() => {
                     let error = SkillExecutionError::RuntimeError(error.to_string());
                     drop(sender
                         .send(SkillExecutionEvent::Error(error.clone()))
@@ -112,12 +112,12 @@ impl SkillDriver {
         contextual_csi: impl ContextualCsi + Send + Sync + 'static,
         tracing_context: &TracingContext,
     ) -> Result<Value, SkillExecutionError> {
-        let (send_rt_err, recv_rt_err) = oneshot::channel();
+        let (send_rt_err, mut recv_rt_err) = mpsc::channel(1);
         let csi = Box::new(SkillInvocationCtx::new(send_rt_err, contextual_csi));
         select! {
             result = skill.run_as_function(&self.engine, csi, input, tracing_context) => result.map_err(Into::into),
             // An error occurred during skill execution.
-            Ok(error) = recv_rt_err => Err(SkillExecutionError::RuntimeError(error.to_string()))
+            Some(error) = recv_rt_err.recv() => Err(SkillExecutionError::RuntimeError(error.to_string()))
         }
     }
 
@@ -143,7 +143,7 @@ pub struct SkillInvocationCtx<C> {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
-    send_rt_error: Option<oneshot::Sender<anyhow::Error>>,
+    send_rt_error: Option<mpsc::Sender<anyhow::Error>>,
     /// Provides the CSI functionality to Skills while encapsulating knowledge about the invocation.
     contextual_csi: C,
     /// ID counter for stored streams.
@@ -158,7 +158,7 @@ pub struct SkillInvocationCtx<C> {
 }
 
 impl<C> SkillInvocationCtx<C> {
-    pub fn new(send_rt_err: oneshot::Sender<anyhow::Error>, contextual_csi: C) -> Self {
+    pub fn new(send_rt_err: mpsc::Sender<anyhow::Error>, contextual_csi: C) -> Self {
         SkillInvocationCtx {
             send_rt_error: Some(send_rt_err),
             contextual_csi,
@@ -182,6 +182,7 @@ impl<C> SkillInvocationCtx<C> {
             .take()
             .expect("Only one error must be send during skill invocation")
             .send(error)
+            .await
             .unwrap();
         pending().await
     }
@@ -683,7 +684,7 @@ mod test {
             }
         }
 
-        let (send, _) = oneshot::channel();
+        let (send, _) = mpsc::channel(1);
         let mut invocation_ctx = SkillInvocationCtx::new(send, ContextualCsiStub);
 
         // When chunking a short text
@@ -721,7 +722,7 @@ mod test {
             }
         }
 
-        let (send, recv) = oneshot::channel();
+        let (send, mut recv) = mpsc::channel(1);
         let mut invocation_ctx = SkillInvocationCtx::new(send, ContextualCsiSaboteur);
 
         // When chunking a short text
@@ -737,7 +738,7 @@ mod test {
             character_offsets: false,
         };
         let error = select! {
-            error = recv => error.unwrap(),
+            Some(error) = recv.recv() => error,
             _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
         };
 
@@ -781,7 +782,7 @@ mod test {
                 receiver
             }
         }
-        let (send, _) = oneshot::channel();
+        let (send, _) = mpsc::channel(1);
         let mut ctx = SkillInvocationCtx::new(send, ContextualCsiStub);
         let request = CompletionRequest::new("prompt", "model");
 
@@ -855,7 +856,7 @@ mod test {
                 receiver
             }
         }
-        let (send, _) = oneshot::channel();
+        let (send, _) = mpsc::channel(1);
         let mut ctx = SkillInvocationCtx::new(send, ContextualCsiStub);
         let request = ChatRequest {
             model: "model".to_owned(),
