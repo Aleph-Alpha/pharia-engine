@@ -143,7 +143,7 @@ pub struct SkillInvocationCtx<C> {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
-    send_rt_error: Option<mpsc::Sender<anyhow::Error>>,
+    send_rt_error: mpsc::Sender<anyhow::Error>,
     /// Provides the CSI functionality to Skills while encapsulating knowledge about the invocation.
     contextual_csi: C,
     /// ID counter for stored streams.
@@ -160,7 +160,7 @@ pub struct SkillInvocationCtx<C> {
 impl<C> SkillInvocationCtx<C> {
     pub fn new(send_rt_err: mpsc::Sender<anyhow::Error>, contextual_csi: C) -> Self {
         SkillInvocationCtx {
-            send_rt_error: Some(send_rt_err),
+            send_rt_error: send_rt_err,
             contextual_csi,
             current_stream_id: 0,
             chat_streams: HashMap::new(),
@@ -178,12 +178,7 @@ impl<C> SkillInvocationCtx<C> {
 
     /// Never return, we did report the error via the send error channel.
     async fn send_error<T>(&mut self, error: anyhow::Error) -> T {
-        self.send_rt_error
-            .take()
-            .expect("Only one error must be send during skill invocation")
-            .send(error)
-            .await
-            .unwrap();
+        self.send_rt_error.send(error).await.unwrap();
         pending().await
     }
 }
