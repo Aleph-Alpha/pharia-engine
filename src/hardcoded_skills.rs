@@ -16,6 +16,7 @@ use crate::{
         AnySkillManifest, Engine, JsonSchema, Signature, Skill, SkillError, SkillEvent,
         SkillMetadataV0_3, SkillPath,
     },
+    tool::{Argument, InvokeRequest, Modality},
 };
 
 /// Hardcoded skills are provided in beta systems for testing.
@@ -26,6 +27,7 @@ pub fn hardcoded_skill(path: &SkillPath) -> Option<Arc<dyn Skill>> {
             "hello" => Some(Arc::new(SkillHello)),
             "saboteur" => Some(Arc::new(SkillSaboteur)),
             "tell_me_a_joke" => Some(Arc::new(SkillTellMeAJoke)),
+            "tool_caller" => Some(Arc::new(SkillToolCaller)),
             _ => None,
         }
     } else {
@@ -36,6 +38,77 @@ pub fn hardcoded_skill(path: &SkillPath) -> Option<Arc<dyn Skill>> {
 pub struct SkillHello;
 pub struct SkillSaboteur;
 pub struct SkillTellMeAJoke;
+
+/// A `message_stream` skill that invokes a tool.
+pub struct SkillToolCaller;
+
+#[async_trait]
+impl Skill for SkillToolCaller {
+    async fn manifest(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn Csi + Send>,
+        _tracing_context: &TracingContext,
+    ) -> Result<AnySkillManifest, SkillError> {
+        Ok(AnySkillManifest::V0)
+    }
+
+    async fn run_as_function(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn Csi + Send>,
+        _input: Value,
+        _tracing_context: &TracingContext,
+    ) -> Result<Value, SkillError> {
+        Err(SkillError::UserCode(
+            "I am a `message_stream` skill. Use the `message_stream` endpoint to invoke me."
+                .to_owned(),
+        ))
+    }
+
+    async fn run_as_message_stream(
+        &self,
+        _engine: &Engine,
+        mut ctx: Box<dyn Csi + Send>,
+        _input: Value,
+        sender: mpsc::Sender<SkillEvent>,
+        _tracing_context: &TracingContext,
+    ) -> Result<(), SkillError> {
+        let result = ctx
+            .invoke_tool(vec![InvokeRequest {
+                name: "add".to_owned(),
+                arguments: vec![
+                    Argument {
+                        name: "a".to_owned(),
+                        value: json!("1").to_string().into_bytes(),
+                    },
+                    Argument {
+                        name: "b".to_owned(),
+                        value: json!("2").to_string().into_bytes(),
+                    },
+                ],
+            }])
+            .await
+            .into_iter()
+            .nth(0)
+            .ok_or(SkillError::UserCode("Tool invocation failed".to_owned()))?
+            .map_err(|e| SkillError::UserCode(e.to_string()))?;
+
+        match result.first() {
+            Some(Modality::Text { text }) => {
+                sender.send(SkillEvent::MessageBegin).await.unwrap();
+                sender
+                    .send(SkillEvent::MessageAppend { text: text.clone() })
+                    .await
+                    .unwrap();
+            }
+            _ => {
+                return Err(SkillError::UserCode("Tool invocation failed".to_owned()));
+            }
+        }
+        Ok(())
+    }
+}
 
 #[async_trait]
 impl Skill for SkillHello {

@@ -530,13 +530,13 @@ pub mod tests {
 
     use crate::{
         csi::{Csi, tests::RawCsiDouble},
-        hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke},
+        hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke, SkillToolCaller},
         inference::{ChatEvent, ChatRequest, InferenceError},
         namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         skills::{SkillDouble, SkillError, SkillEvent},
-        tool::ToolDescription,
+        tool::{InvokeRequest, Modality, ToolDescription, ToolError},
     };
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -697,6 +697,56 @@ pub mod tests {
         assert!(result_first.is_ok());
         assert!(result_second.is_ok());
 
+        runtime.wait_for_shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn tool_caller_skill() {
+        #[derive(Clone)]
+        struct ToolCallerCsi;
+        impl RawCsiDouble for ToolCallerCsi {
+            async fn invoke_tool(
+                &self,
+                _namespace: Namespace,
+                _tracing_context: TracingContext,
+                _requests: Vec<InvokeRequest>,
+            ) -> Vec<Result<Vec<Modality>, ToolError>> {
+                vec![Ok(vec![Modality::Text {
+                    text: "3".to_string(),
+                }])]
+            }
+        }
+
+        // Given
+        let engine = Arc::new(Engine::default());
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillToolCaller)));
+        let runtime = SkillRuntime::new(engine, ToolCallerCsi, store);
+
+        // When
+        let mut recv = runtime
+            .api()
+            .run_message_stream(
+                SkillPath::new(Namespace::new("test-beta").unwrap(), "tool_caller"),
+                json!(""),
+                "TOKEN_NOT_REQUIRED".to_owned(),
+                TracingContext::dummy(),
+            )
+            .await;
+
+        // Then
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            SkillExecutionEvent::MessageBegin
+        );
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            SkillExecutionEvent::MessageAppend {
+                text: "3".to_string()
+            }
+        );
+        assert!(recv.recv().await.is_none());
+
+        // Cleanup
         runtime.wait_for_shutdown().await;
     }
 
