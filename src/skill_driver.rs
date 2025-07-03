@@ -43,8 +43,8 @@ impl SkillDriver {
         tracing_context: &TracingContext,
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
-        let (send_rt_err, mut recv_rt_err) = mpsc::channel(1);
-        let csi = Box::new(SkillInvocationCtx::new(send_rt_err, contextual_csi));
+        let (send_rt_event, mut recv_rt_event) = mpsc::channel(1);
+        let csi = Box::new(SkillInvocationCtx::new(send_rt_event, contextual_csi));
 
         let (send_inner, mut recv_inner) = mpsc::channel(1);
 
@@ -62,12 +62,14 @@ impl SkillDriver {
                 // receiver of events before the handler.
                 biased;
 
-                Some(error) = recv_rt_err.recv() => {
-                    let error = SkillExecutionError::RuntimeError(error.to_string());
-                    drop(sender
-                        .send(SkillExecutionEvent::Error(error.clone()))
-                        .await);
-                    break Err(error)
+                Some(event) = recv_rt_event.recv() => {
+                    match event {
+                        SkillCtxEvent::Quit(error) => {
+                            let error = SkillExecutionError::RuntimeError(error.to_string());
+                            drop(sender.send(SkillExecutionEvent::Error(error.clone())).await);
+                            break Err(error);
+                        }
+                    }
                 }
                 Some(skill_event) = recv_inner.recv() => {
                     let execution_event =
@@ -112,12 +114,14 @@ impl SkillDriver {
         contextual_csi: impl ContextualCsi + Send + Sync + 'static,
         tracing_context: &TracingContext,
     ) -> Result<Value, SkillExecutionError> {
-        let (send_rt_err, mut recv_rt_err) = mpsc::channel(1);
-        let csi = Box::new(SkillInvocationCtx::new(send_rt_err, contextual_csi));
+        let (send_rt_event, mut recv_rt_event) = mpsc::channel(1);
+        let csi = Box::new(SkillInvocationCtx::new(send_rt_event, contextual_csi));
         select! {
             result = skill.run_as_function(&self.engine, csi, input, tracing_context) => result.map_err(Into::into),
             // An error occurred during skill execution.
-            Some(error) = recv_rt_err.recv() => Err(SkillExecutionError::RuntimeError(error.to_string()))
+            Some(event) = recv_rt_event.recv() => match event {
+                SkillCtxEvent::Quit(error) => Err(SkillExecutionError::RuntimeError(error.to_string())),
+            }
         }
     }
 
@@ -136,6 +140,15 @@ impl SkillDriver {
     }
 }
 
+/// Events emitted by the Skill Invocation Context.
+///
+/// The caller can choose appropriate action. For example, if an unrecoverable error occurs while
+/// resolving a csi call, this event guides the caller to terminate the skill execution.
+pub enum SkillCtxEvent {
+    /// An unrecoverable error occurred. Skill execution should be terminated.
+    Quit(anyhow::Error),
+}
+
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
 /// calls to csi, to the respective drivers and forwarding runtime errors directly to the actor
 /// so the User defined code must not worry about accidental complexity.
@@ -143,7 +156,7 @@ pub struct SkillInvocationCtx<C> {
     /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
     /// can drop the future invoking the skill, and report the error appropriately to user and
     /// operator.
-    send_rt_error: mpsc::Sender<anyhow::Error>,
+    send_rt_event: mpsc::Sender<SkillCtxEvent>,
     /// Provides the CSI functionality to Skills while encapsulating knowledge about the invocation.
     contextual_csi: C,
     /// ID counter for stored streams.
@@ -158,9 +171,9 @@ pub struct SkillInvocationCtx<C> {
 }
 
 impl<C> SkillInvocationCtx<C> {
-    pub fn new(send_rt_err: mpsc::Sender<anyhow::Error>, contextual_csi: C) -> Self {
+    pub fn new(send_rt_event: mpsc::Sender<SkillCtxEvent>, contextual_csi: C) -> Self {
         SkillInvocationCtx {
-            send_rt_error: send_rt_err,
+            send_rt_event,
             contextual_csi,
             current_stream_id: 0,
             chat_streams: HashMap::new(),
@@ -178,7 +191,10 @@ impl<C> SkillInvocationCtx<C> {
 
     /// Never return, we did report the error via the send error channel.
     async fn send_error<T>(&mut self, error: anyhow::Error) -> T {
-        self.send_rt_error.send(error).await.unwrap();
+        self.send_rt_event
+            .send(SkillCtxEvent::Quit(error))
+            .await
+            .unwrap();
         pending().await
     }
 }
@@ -733,7 +749,9 @@ mod test {
             character_offsets: false,
         };
         let error = select! {
-            Some(error) = recv.recv() => error,
+            Some(event) = recv.recv() => match event {
+                SkillCtxEvent::Quit(error) => error,
+            },
             _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
         };
 
