@@ -69,6 +69,7 @@ impl SkillDriver {
                             drop(sender.send(SkillExecutionEvent::Error(error.clone())).await);
                             break Err(error);
                         }
+                        SkillCtxEvent::ToolCall { name } => {}
                     }
                 }
                 Some(skill_event) = recv_inner.recv() => {
@@ -118,10 +119,9 @@ impl SkillDriver {
         let csi = Box::new(SkillInvocationCtx::new(send_rt_event, contextual_csi));
         select! {
             result = skill.run_as_function(&self.engine, csi, input, tracing_context) => result.map_err(Into::into),
-            // An error occurred during skill execution.
-            Some(event) = recv_rt_event.recv() => match event {
-                SkillCtxEvent::Quit(error) => Err(SkillExecutionError::RuntimeError(error.to_string())),
-            }
+            // An error occurred during skill execution. We ignore any other events for running
+            // functions for now.
+            Some(SkillCtxEvent::Quit(error)) = recv_rt_event.recv() => Err(SkillExecutionError::RuntimeError(error.to_string())),
         }
     }
 
@@ -147,6 +147,8 @@ impl SkillDriver {
 pub enum SkillCtxEvent {
     /// An unrecoverable error occurred. Skill execution should be terminated.
     Quit(anyhow::Error),
+    /// A request for a tool call has been made.
+    ToolCall { name: String },
 }
 
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
@@ -676,6 +678,7 @@ mod test {
             TokenUsage,
         },
         skills::{SkillDouble, SkillError},
+        tool::{Modality, ToolError},
     };
     use anyhow::{anyhow, bail};
     use double_trait::Dummy;
@@ -751,6 +754,7 @@ mod test {
         let error = select! {
             Some(event) = recv.recv() => match event {
                 SkillCtxEvent::Quit(error) => error,
+                SkillCtxEvent::ToolCall { .. } => unreachable!(),
             },
             _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
         };
@@ -1309,5 +1313,57 @@ mod test {
                 .unwrap();
             Ok(())
         }
+    }
+
+    #[tokio::test]
+    async fn skill_with_tool_call_event_is_executed_normally() {
+        // Given a skill that interacts with a skill invocation context in such a way that the
+        // context emits a tool call event.
+        struct SkillWithToolCall;
+
+        #[async_trait]
+        impl SkillDouble for SkillWithToolCall {
+            async fn run_as_function(
+                &self,
+                _engine: &Engine,
+                mut ctx: Box<dyn Csi + Send>,
+                _input: Value,
+                _tracing_context: &TracingContext,
+            ) -> Result<Value, SkillError> {
+                ctx.invoke_tool(vec![InvokeRequest {
+                    name: "test-tool".to_owned(),
+                    arguments: vec![],
+                }])
+                .await;
+                Ok(json!({}))
+            }
+        }
+
+        struct ContextualCsiStub;
+        impl ContextualCsiDouble for ContextualCsiStub {
+            async fn invoke_tool(
+                &self,
+                _requests: Vec<InvokeRequest>,
+            ) -> Vec<Result<Vec<Modality>, ToolError>> {
+                vec![Ok(vec![])]
+            }
+        }
+
+        let engine = Arc::new(Engine::default());
+        let driver = SkillDriver::new(engine);
+
+        // When
+        let skill = Arc::new(SkillWithToolCall);
+        let result = driver
+            .run_function(
+                skill,
+                json!({}),
+                ContextualCsiStub,
+                &TracingContext::dummy(),
+            )
+            .await;
+
+        // Then
+        assert!(result.is_ok());
     }
 }
