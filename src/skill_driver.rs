@@ -69,7 +69,7 @@ impl SkillDriver {
                             drop(sender.send(SkillExecutionEvent::Error(error.clone())).await);
                             break Err(error);
                         }
-                        SkillCtxEvent::ToolCall { name } => {}
+                        SkillCtxEvent::ToolCall { tools } => {}
                     }
                 }
                 Some(skill_event) = recv_inner.recv() => {
@@ -148,7 +148,7 @@ pub enum SkillCtxEvent {
     /// An unrecoverable error occurred. Skill execution should be terminated.
     Quit(anyhow::Error),
     /// A request for a tool call has been made.
-    ToolCall { name: String },
+    ToolCall { tools: Vec<String> },
 }
 
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
@@ -317,6 +317,14 @@ where
     }
 
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolResult> {
+        let tools = requests
+            .iter()
+            .map(|request| request.name.clone())
+            .collect();
+        self.send_rt_event
+            .send(SkillCtxEvent::ToolCall { tools })
+            .await
+            .unwrap();
         self.contextual_csi
             .invoke_tool(requests)
             .await
