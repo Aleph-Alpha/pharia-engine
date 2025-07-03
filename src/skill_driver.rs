@@ -43,13 +43,18 @@ impl SkillDriver {
         tracing_context: &TracingContext,
         sender: mpsc::Sender<SkillExecutionEvent>,
     ) -> Result<(), SkillExecutionError> {
-        let (send_rt_event, mut recv_rt_event) = mpsc::channel(1);
-        let csi = Box::new(SkillInvocationCtx::new(send_rt_event, contextual_csi));
+        let (send_ctx_event, mut recv_ctx_event) = mpsc::channel(1);
+        let csi = Box::new(SkillInvocationCtx::new(send_ctx_event, contextual_csi));
 
-        let (send_inner, mut recv_inner) = mpsc::channel(1);
+        let (send_skill_event, mut recv_skill_event) = mpsc::channel(1);
 
-        let mut execute_skill =
-            skill.run_as_message_stream(&self.engine, csi, input, send_inner, tracing_context);
+        let mut execute_skill = skill.run_as_message_stream(
+            &self.engine,
+            csi,
+            input,
+            send_skill_event,
+            tracing_context,
+        );
 
         let mut translator = EventTranslator::new();
 
@@ -62,17 +67,19 @@ impl SkillDriver {
                 // receiver of events before the handler.
                 biased;
 
-                Some(event) = recv_rt_event.recv() => {
+                Some(event) = recv_ctx_event.recv() => {
                     match event {
                         SkillCtxEvent::Quit(error) => {
                             let error = SkillExecutionError::RuntimeError(error.to_string());
                             drop(sender.send(SkillExecutionEvent::Error(error.clone())).await);
                             break Err(error);
                         }
-                        SkillCtxEvent::ToolCall { tools } => {}
+                        SkillCtxEvent::ToolCall { tools } => {
+                            drop(sender.send(SkillExecutionEvent::ToolCall { tools }).await);
+                        }
                     }
                 }
-                Some(skill_event) = recv_inner.recv() => {
+                Some(skill_event) = recv_skill_event.recv() => {
                     let execution_event =
                         translator.translate_to_execution_event(skill_event);
                     let maybe_error = execution_event.execution_error().cloned();
@@ -96,7 +103,7 @@ impl SkillDriver {
 
         // In case the skill invocation finishes faster than we could extract the last event. I.e.
         // the event is placed in the channel, yet the receiver did not pick it up yet.
-        if let Ok(skill_event) = recv_inner.try_recv() {
+        if let Ok(skill_event) = recv_skill_event.try_recv() {
             let execution_event = translator.translate_to_execution_event(skill_event);
             let maybe_error = execution_event.execution_error().cloned();
             drop(sender.send(execution_event).await);
@@ -145,7 +152,9 @@ impl SkillDriver {
 /// The caller can choose appropriate action. For example, if an unrecoverable error occurs while
 /// resolving a csi call, this event guides the caller to terminate the skill execution.
 pub enum SkillCtxEvent {
-    /// An unrecoverable error occurred. Skill execution should be terminated.
+    /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
+    /// can drop the future invoking the skill, and report the error appropriately to user and
+    /// operator.
     Quit(anyhow::Error),
     /// A request for a tool call has been made.
     ToolCall { tools: Vec<String> },
@@ -155,9 +164,7 @@ pub enum SkillCtxEvent {
 /// calls to csi, to the respective drivers and forwarding runtime errors directly to the actor
 /// so the User defined code must not worry about accidental complexity.
 pub struct SkillInvocationCtx<C> {
-    /// This is used to send any runtime error (as opposed to logic error) back to the actor, so it
-    /// can drop the future invoking the skill, and report the error appropriately to user and
-    /// operator.
+    /// This channel is used to notify the caller about events that happened around skill execution.
     send_rt_event: mpsc::Sender<SkillCtxEvent>,
     /// Provides the CSI functionality to Skills while encapsulating knowledge about the invocation.
     contextual_csi: C,
@@ -448,12 +455,14 @@ pub enum SkillExecutionEvent {
     /// time to start rendering that speech bubble.
     MessageBegin,
     /// Send at the end of each message. Can carry an arbitrary payload, to make messages more of a
-    /// dropin for classical functions. Might be refined in the future. We anticipate the stop
+    /// drop-in for classical functions. Might be refined in the future. We anticipate the stop
     /// reason to be very useful for end applications. We also introduce end messages to keep the
     /// door open for multiple messages in a stream.
     MessageEnd { payload: Value },
     /// Append the internal string to the current message
     MessageAppend { text: String },
+    /// The Skill has requested a tool call.
+    ToolCall { tools: Vec<String> },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
     Error(SkillExecutionError),
@@ -674,7 +683,7 @@ impl From<SkillError> for SkillExecutionError {
 
 #[cfg(test)]
 mod test {
-    use std::panic;
+    use std::{panic, time::Duration};
 
     use super::*;
     use crate::{
@@ -1325,8 +1334,7 @@ mod test {
 
     #[tokio::test]
     async fn skill_with_tool_call_event_is_executed_normally() {
-        // Given a skill that interacts with a skill invocation context in such a way that the
-        // context emits a tool call event.
+        // Given a skill that does a tool call
         struct SkillWithToolCall;
 
         #[async_trait]
@@ -1347,6 +1355,7 @@ mod test {
             }
         }
 
+        // And given a stub csi
         struct ContextualCsiStub;
         impl ContextualCsiDouble for ContextualCsiStub {
             async fn invoke_tool(
@@ -1372,6 +1381,68 @@ mod test {
             .await;
 
         // Then
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn tool_call_event_is_forwarded_for_message_stream() {
+        // Given a skill that does a tool call
+        struct SkillWithToolCall;
+
+        #[async_trait]
+        impl SkillDouble for SkillWithToolCall {
+            async fn run_as_message_stream(
+                &self,
+                _engine: &Engine,
+                mut ctx: Box<dyn Csi + Send>,
+                _input: Value,
+                _sender: mpsc::Sender<SkillEvent>,
+                _tracing_context: &TracingContext,
+            ) -> Result<(), SkillError> {
+                ctx.invoke_tool(vec![InvokeRequest {
+                    name: "test-tool".to_owned(),
+                    arguments: vec![],
+                }])
+                .await;
+                // sleep for a short while to give the invoker the chance to receive the tool event
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                Ok(())
+            }
+        }
+
+        // And given a stub csi
+        struct ContextualCsiStub;
+        impl ContextualCsiDouble for ContextualCsiStub {
+            async fn invoke_tool(
+                &self,
+                _requests: Vec<InvokeRequest>,
+            ) -> Vec<Result<Vec<Modality>, ToolError>> {
+                vec![Ok(vec![])]
+            }
+        }
+
+        let engine = Arc::new(Engine::default());
+        let driver = SkillDriver::new(engine);
+
+        // When running the skill as message stream
+        let (send, mut recv) = mpsc::channel(1);
+        let skill = Arc::new(SkillWithToolCall);
+        let result = driver
+            .run_message_stream(
+                skill,
+                json!({}),
+                ContextualCsiStub,
+                &TracingContext::dummy(),
+                send,
+            )
+            .await;
+
+        // Then we receive a tool call event
+        let event = recv.recv().await.unwrap();
+        assert!(matches!(
+            event,
+            SkillExecutionEvent::ToolCall { tools } if tools == vec!["test-tool"]
+        ));
         assert!(result.is_ok());
     }
 }
