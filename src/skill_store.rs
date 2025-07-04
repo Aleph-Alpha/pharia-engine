@@ -11,11 +11,11 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::{Namespace, SkillDescription},
     skill_cache::SkillCache,
+    skill_common::{Skill, SkillPath},
     skill_loader::{
         ConfiguredSkill, LoadedSkill, ProgrammableSkill, SkillDescriptionFilterType,
         SkillFetchError, SkillLoaderApi,
     },
-    skills::{Skill, SkillPath},
 };
 use anyhow::anyhow;
 use bytesize::ByteSize;
@@ -582,8 +582,9 @@ pub mod tests {
     use crate::{
         namespace_watcher::Namespace,
         registries::{Digest, RegistryError},
+        skill_common::SkillPath,
         skill_loader::{LoadedSkill, SkillLoader, SkillLoaderMsg},
-        skills::{Engine, SkillPath},
+        skills::Engine,
     };
 
     use super::*;

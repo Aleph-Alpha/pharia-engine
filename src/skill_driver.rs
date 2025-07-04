@@ -20,7 +20,7 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    skills::{AnySkillManifest, Skill, SkillError, SkillEvent, SkillLoadError},
+    skill_common::{AnySkillManifest, Skill, SkillError, SkillEvent, SkillLoadError},
     tool::{InvokeRequest, ToolDescription},
 };
 
@@ -715,7 +715,7 @@ mod test {
             ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, TextScore,
             TokenUsage,
         },
-        skills::{SkillDouble, SkillError},
+        skill_common::{SkillDouble, SkillError},
         tool::{ToolError, ToolOutput},
     };
     use anyhow::{anyhow, bail};

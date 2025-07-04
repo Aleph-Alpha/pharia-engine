@@ -17,9 +17,9 @@ use crate::{
     context,
     csi::{InvocationContext, RawCsi},
     logging::TracingContext,
+    skill_common::{AnySkillManifest, Skill, SkillPath},
     skill_driver::SkillDriver,
     skill_store::{SkillStoreApi, SkillStoreError},
-    skills::{AnySkillManifest, Skill, SkillPath},
 };
 
 #[cfg(test)]
@@ -503,9 +503,10 @@ pub mod tests {
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke, SkillToolCaller},
         inference::{ChatEvent, ChatRequest, InferenceError},
         namespace_watcher::Namespace,
+        skill_common::{SkillDouble, SkillError, SkillEvent},
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
-        skills::{Engine, SkillDouble, SkillError, SkillEvent},
+        skills::Engine,
         tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
     };
     use anyhow::anyhow;
