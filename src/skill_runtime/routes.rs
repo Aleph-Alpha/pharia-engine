@@ -235,7 +235,10 @@ impl From<SkillExecutionEvent> for Event {
                 .event("message")
                 .json_data(MessageEvent::Append { text })
                 .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::ToolCall { tool } => Self::default().event("tool"),
+            SkillExecutionEvent::ToolCall { tool } => Self::default()
+                .event("tool")
+                .json_data(MessageEvent::ToolBegin { tool })
+                .expect("`json_data` must only be called once."),
             SkillExecutionEvent::Error(error) => Self::default()
                 .event("error")
                 .json_data(SseErrorEvent {
@@ -250,8 +253,17 @@ impl From<SkillExecutionEvent> for Event {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum MessageEvent {
     Begin,
-    Append { text: String },
-    End { payload: Value },
+    Append {
+        text: String,
+    },
+    End {
+        payload: Value,
+    },
+    // While the enum variants do not differ in the body, they are distinguished by the event field.
+    #[serde(rename = "begin")]
+    ToolBegin {
+        tool: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -717,5 +729,41 @@ mod tests {
             }
             recv
         }
+    }
+
+    #[tokio::test]
+    async fn stream_endpoint_tool_calling_skill() {
+        // Given
+        let event = SkillExecutionEvent::ToolCall {
+            tool: "add".to_string(),
+        };
+        let skill_runtime = EventStreamStub::new(vec![event]);
+        let app_state = ProviderStub::new(skill_runtime);
+        let http = http_skill_runtime_v1(FeatureSet::Beta).with_state(app_state);
+
+        // When asking for a message stream
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/skills/local/saboteur/message-stream")
+                    .body(Body::from("\"\""))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get a OK response that contains an error
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = "\
+            event: tool\n\
+            data: {\"type\":\"begin\",\"tool\":\"add\"}\n\n";
+        assert_eq!(body_text, expected_body);
     }
 }
