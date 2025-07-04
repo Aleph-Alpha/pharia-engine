@@ -246,6 +246,11 @@ impl Engine {
 
 pub type LinkedCtx = LinkerImpl<Box<dyn Csi + Send>>;
 
+/// A Skill encapsulates business logic to solve a particular problem.
+///
+/// It interacts with the world through the Cognitive System Interface (CSI).
+/// While we support skills that are written in WASM, there are also other implementations
+/// like [`crate::hardcoded_skills::hardcoded_skill`] that are also supported.
 #[async_trait]
 #[cfg_attr(test, double(SkillDouble))]
 pub trait Skill: Send + Sync {
@@ -274,6 +279,60 @@ pub trait Skill: Send + Sync {
     ) -> Result<(), SkillError>;
 }
 
+/// WebAssembly implementation of the Skill interface.
+pub struct SkillImpl<T> {
+    engine: Arc<Engine>,
+    pre: T,
+}
+
+impl<T> SkillImpl<T> {
+    pub fn new(engine: Arc<Engine>, pre: T) -> Self {
+        Self { engine, pre }
+    }
+}
+
+#[async_trait]
+impl<T> Skill for SkillImpl<T>
+where
+    T: Skill,
+{
+    async fn manifest(
+        &self,
+        _engine: &Engine,
+        _ctx: Box<dyn Csi + Send>,
+        _tracing_context: &TracingContext,
+    ) -> Result<AnySkillManifest, SkillError> {
+        self.pre
+            .manifest(&self.engine, _ctx, _tracing_context)
+            .await
+    }
+
+    async fn run_as_function(
+        &self,
+        _engine: &Engine,
+        ctx: Box<dyn Csi + Send>,
+        input: Value,
+        tracing_context: &TracingContext,
+    ) -> Result<Value, SkillError> {
+        self.pre
+            .run_as_function(&self.engine, ctx, input, tracing_context)
+            .await
+    }
+
+    async fn run_as_message_stream(
+        &self,
+        _engine: &Engine,
+        ctx: Box<dyn Csi + Send>,
+        input: Value,
+        sender: mpsc::Sender<SkillEvent>,
+        tracing_context: &TracingContext,
+    ) -> Result<(), SkillError> {
+        self.pre
+            .run_as_message_stream(&self.engine, ctx, input, sender, tracing_context)
+            .await
+    }
+}
+
 /// Factory for creating skills. Responsible for inspecting the skill bytes, and instantiatnig the
 /// right Skill type. The skill is pre-initialized i.e. already attached to their corresponding
 /// linker. This allows for as much initialization work to be done at load time as possible, which
@@ -288,20 +347,23 @@ pub fn load_skill_from_wasm_bytes(
 
     match skill_world {
         SupportedSkillWorld::V0_2Function => {
-            let skill = v0_2::SkillPre::new(pre).map_err(|e| {
+            let skill_pre = v0_2::SkillPre::new(pre).map_err(|e| {
                 error!(parent: tracing_context.span(), "Failed to create skill from pre-instantiation");
                 SkillLoadError::SkillPreError(e.to_string())
             })?;
+            let skill = SkillImpl::new(engine, skill_pre);
             Ok(Box::new(skill))
         }
         SupportedSkillWorld::V0_3Function => {
-            let skill = v0_3::skill::SkillPre::new(pre)
+            let skill_pre = v0_3::skill::SkillPre::new(pre)
                 .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
+            let skill = SkillImpl::new(engine, skill_pre);
             Ok(Box::new(skill))
         }
         SupportedSkillWorld::V0_3MessageStream => {
-            let skill = v0_3::message_stream_skill::MessageStreamSkillPre::new(pre)
+            let skill_pre = v0_3::message_stream_skill::MessageStreamSkillPre::new(pre)
                 .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
+            let skill = SkillImpl::new(engine, skill_pre);
             Ok(Box::new(skill))
         }
     }
