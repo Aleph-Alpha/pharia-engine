@@ -48,13 +48,8 @@ impl SkillDriver {
 
         let (send_skill_event, mut recv_skill_event) = mpsc::channel(1);
 
-        let mut execute_skill = skill.run_as_message_stream(
-            &self.engine,
-            csi,
-            input,
-            send_skill_event,
-            tracing_context,
-        );
+        let mut execute_skill =
+            skill.run_as_message_stream(csi, input, send_skill_event, tracing_context);
 
         let mut translator = EventTranslator::new();
 
@@ -128,7 +123,7 @@ impl SkillDriver {
         let (send_rt_event, mut recv_rt_event) = mpsc::channel(1);
         let csi = Box::new(SkillInvocationCtx::new(send_rt_event, contextual_csi));
         select! {
-            result = skill.run_as_function(&self.engine, csi, input, tracing_context) => result.map_err(Into::into),
+            result = skill.run_as_function(csi, input, tracing_context) => result.map_err(Into::into),
             // An error occurred during skill execution. We ignore any other events for running
             // functions for now.
             Some(SkillCtxEvent::Quit(error)) = recv_rt_event.recv() => Err(SkillExecutionError::RuntimeError(error.to_string())),
@@ -143,7 +138,7 @@ impl SkillDriver {
         let (send_rt_err, recv_rt_err) = oneshot::channel();
         let ctx = Box::new(SkillMetadataCtx::new(send_rt_err));
         select! {
-            result = skill.manifest(self.engine.as_ref(), ctx, tracing_context) => result.map_err(Into::into),
+            result = skill.manifest(ctx, tracing_context) => result.map_err(Into::into),
             // An error occurred during skill execution.
             Ok(_error) = recv_rt_err => Err(SkillExecutionError::CsiUseFromMetadata)
         }
@@ -972,7 +967,6 @@ mod test {
         impl SkillDouble for CsiFromMetadataSkill {
             async fn manifest(
                 &self,
-                _engine: &Engine,
                 mut ctx: Box<dyn Csi + Send>,
                 _tracing_context: &TracingContext,
             ) -> Result<AnySkillManifest, SkillError> {
@@ -1010,7 +1004,6 @@ mod test {
         impl SkillDouble for SkillDoubleUsingExplain {
             async fn run_as_function(
                 &self,
-                _engine: &Engine,
                 mut ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _tracing_context: &TracingContext,
@@ -1105,7 +1098,6 @@ mod test {
     impl SkillDouble for MessageStreamSkillWithCsi {
         async fn run_as_message_stream(
             &self,
-            _engine: &Engine,
             mut ctx: Box<dyn Csi + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
@@ -1254,7 +1246,6 @@ mod test {
         impl SkillDouble for BuggyStreamingSkill {
             async fn run_as_message_stream(
                 &self,
-                _engine: &Engine,
                 _ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 sender: mpsc::Sender<SkillEvent>,
@@ -1304,7 +1295,6 @@ mod test {
     impl SkillDouble for SkillGreetCompletion {
         async fn run_as_function(
             &self,
-            _engine: &Engine,
             mut ctx: Box<dyn Csi + Send>,
             _input: Value,
             _tracing_context: &TracingContext,
@@ -1333,7 +1323,6 @@ mod test {
 
         async fn run_as_message_stream(
             &self,
-            _engine: &Engine,
             _ctx: Box<dyn Csi + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
@@ -1350,7 +1339,6 @@ mod test {
     impl SkillDouble for SkillSaboteurInvalidMessageOutput {
         async fn run_as_message_stream(
             &self,
-            _engine: &Engine,
             _ctx: Box<dyn Csi + Send>,
             _input: Value,
             sender: mpsc::Sender<SkillEvent>,
@@ -1375,7 +1363,6 @@ mod test {
         impl SkillDouble for SkillWithToolCall {
             async fn run_as_function(
                 &self,
-                _engine: &Engine,
                 mut ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _tracing_context: &TracingContext,
@@ -1427,7 +1414,6 @@ mod test {
         impl SkillDouble for SkillWithToolCall {
             async fn run_as_message_stream(
                 &self,
-                _engine: &Engine,
                 mut ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _sender: mpsc::Sender<SkillEvent>,

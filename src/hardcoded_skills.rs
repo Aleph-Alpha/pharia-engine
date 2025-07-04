@@ -13,8 +13,8 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     skills::{
-        AnySkillManifest, Engine, JsonSchema, Signature, Skill, SkillError, SkillEvent,
-        SkillMetadataV0_3, SkillPath,
+        AnySkillManifest, JsonSchema, Signature, Skill, SkillError, SkillEvent, SkillMetadataV0_3,
+        SkillPath,
     },
     tool::{Argument, InvokeRequest},
 };
@@ -46,7 +46,6 @@ pub struct SkillToolCaller;
 impl Skill for SkillToolCaller {
     async fn manifest(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
@@ -55,7 +54,6 @@ impl Skill for SkillToolCaller {
 
     async fn run_as_function(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
@@ -68,7 +66,6 @@ impl Skill for SkillToolCaller {
 
     async fn run_as_message_stream(
         &self,
-        _engine: &Engine,
         mut ctx: Box<dyn Csi + Send>,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
@@ -109,7 +106,6 @@ impl Skill for SkillToolCaller {
 impl Skill for SkillHello {
     async fn manifest(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
@@ -118,7 +114,6 @@ impl Skill for SkillHello {
 
     async fn run_as_function(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
@@ -128,7 +123,6 @@ impl Skill for SkillHello {
 
     async fn run_as_message_stream(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
@@ -159,7 +153,6 @@ impl Skill for SkillHello {
 impl Skill for SkillSaboteur {
     async fn manifest(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
@@ -168,7 +161,6 @@ impl Skill for SkillSaboteur {
 
     async fn run_as_function(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
@@ -178,7 +170,6 @@ impl Skill for SkillSaboteur {
 
     async fn run_as_message_stream(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _sender: mpsc::Sender<SkillEvent>,
@@ -192,7 +183,6 @@ impl Skill for SkillSaboteur {
 impl Skill for SkillTellMeAJoke {
     async fn manifest(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
@@ -201,7 +191,6 @@ impl Skill for SkillTellMeAJoke {
 
     async fn run_as_function(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
@@ -211,7 +200,6 @@ impl Skill for SkillTellMeAJoke {
 
     async fn run_as_message_stream(
         &self,
-        _engine: &Engine,
         mut ctx: Box<dyn Csi + Send>,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
@@ -276,7 +264,6 @@ impl SkillChat {
 impl Skill for SkillChat {
     async fn manifest(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
@@ -303,7 +290,6 @@ impl Skill for SkillChat {
 
     async fn run_as_function(
         &self,
-        _engine: &Engine,
         _ctx: Box<dyn Csi + Send>,
         _input: Value,
         _tracing_context: &TracingContext,
@@ -313,7 +299,6 @@ impl Skill for SkillChat {
 
     async fn run_as_message_stream(
         &self,
-        _engine: &Engine,
         mut ctx: Box<dyn Csi + Send>,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
