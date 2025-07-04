@@ -102,10 +102,23 @@ pub enum SkillLoadError {
     UnsupportedWorld,
 }
 
-pub type LinkedCtx = LinkerImpl<Box<dyn Csi + Send>>;
+type LinkedCtx = LinkerImpl<Box<dyn Csi + Send>>;
 
+/// WebAssembly implementation of the Skill interface.
+struct WasmSkill<T> {
+    engine: Arc<Engine>,
+    pre: T,
+}
+
+impl<T> WasmSkill<T> {
+    pub fn new(engine: Arc<Engine>, pre: T) -> Self {
+        Self { engine, pre }
+    }
+}
+
+/// What we expect from WASM components that want to be executed by our runtime.
 #[async_trait]
-pub trait WasmSkill: Send + Sync {
+trait WasmExecutable: Send + Sync {
     async fn manifest(
         &self,
         engine: &Engine,
@@ -131,22 +144,10 @@ pub trait WasmSkill: Send + Sync {
     ) -> Result<(), SkillError>;
 }
 
-/// WebAssembly implementation of the Skill interface.
-pub struct SkillImpl<T> {
-    engine: Arc<Engine>,
-    pre: T,
-}
-
-impl<T> SkillImpl<T> {
-    pub fn new(engine: Arc<Engine>, pre: T) -> Self {
-        Self { engine, pre }
-    }
-}
-
 #[async_trait]
-impl<T> Skill for SkillImpl<T>
+impl<T> Skill for WasmSkill<T>
 where
-    T: WasmSkill,
+    T: WasmExecutable,
 {
     async fn manifest(
         &self,
@@ -200,19 +201,19 @@ pub fn load_skill_from_wasm_bytes(
                 error!(parent: tracing_context.span(), "Failed to create skill from pre-instantiation");
                 SkillLoadError::SkillPreError(e.to_string())
             })?;
-            let skill = SkillImpl::new(engine, skill_pre);
+            let skill = WasmSkill::new(engine, skill_pre);
             Ok(Box::new(skill))
         }
         SupportedSkillWorld::V0_3Function => {
             let skill_pre = v0_3::skill::SkillPre::new(pre)
                 .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
-            let skill = SkillImpl::new(engine, skill_pre);
+            let skill = WasmSkill::new(engine, skill_pre);
             Ok(Box::new(skill))
         }
         SupportedSkillWorld::V0_3MessageStream => {
             let skill_pre = v0_3::message_stream_skill::MessageStreamSkillPre::new(pre)
                 .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
-            let skill = SkillImpl::new(engine, skill_pre);
+            let skill = WasmSkill::new(engine, skill_pre);
             Ok(Box::new(skill))
         }
     }
