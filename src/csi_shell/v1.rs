@@ -150,8 +150,7 @@ where
         .map(|result| match result {
             Ok(result) => json!(
                 result
-                    .0
-                    .into_iter()
+                    .into_modalities()
                     .map(Into::into)
                     .collect::<Vec<ToolModality>>()
             ),
