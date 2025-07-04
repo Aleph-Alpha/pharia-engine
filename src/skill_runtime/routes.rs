@@ -242,7 +242,22 @@ impl From<SkillExecutionEvent> for Event {
             SkillExecutionEvent::ToolEnd { name, result } => Self::default()
                 .event("tool")
                 .json_data(match result {
-                    Ok(content) => MessageEvent::ToolEnd { name, content },
+                    Ok(content) => {
+                        {
+                            // While the responsibility for truncating the output could also be
+                            // delegated further to the creation of the `SkillCtxEvent` in the
+                            // skill runtime, it is a choice specific to the message stream endpoint
+                            // (in order to not send potentially large outputs to the client).
+                            if content.len() > 200 {
+                                MessageEvent::ToolEnd {
+                                    name,
+                                    content: content[..200].to_string() + "...",
+                                }
+                            } else {
+                                MessageEvent::ToolEnd { name, content }
+                            }
+                        }
+                    }
                     Err(error) => MessageEvent::ToolError {
                         name,
                         message: error,
@@ -798,6 +813,47 @@ mod tests {
             data: {\"type\":\"end\",\"name\":\"add\",\"content\":\"3\"}\n\n\
             event: tool\n\
             data: {\"type\":\"error\",\"name\":\"add\",\"message\":\"Out of cheese\"}\n\n";
+        assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
+    async fn big_tool_output_is_truncated() {
+        // Given a tool result with a big output
+        let events = vec![SkillExecutionEvent::ToolEnd {
+            name: "add".to_string(),
+            result: Ok("a".repeat(1000)),
+        }];
+
+        let skill_runtime = EventStreamStub::new(events);
+        let app_state = ProviderStub::new(skill_runtime);
+        let http = http_skill_runtime_v1(FeatureSet::Beta).with_state(app_state);
+
+        // When asking for a message stream
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, dummy_auth_value())
+                    .uri("/skills/local/saboteur/message-stream")
+                    .body(Body::from("\"\""))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the output is truncated
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body = format!(
+            "\
+            event: tool\n\
+            data: {{\"type\":\"end\",\"name\":\"add\",\"content\":\"{}...\"}}\n\n",
+            "a".repeat(200)
+        );
         assert_eq!(body_text, expected_body);
     }
 }
