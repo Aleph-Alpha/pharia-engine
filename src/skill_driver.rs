@@ -74,11 +74,11 @@ impl SkillDriver {
                             drop(sender.send(SkillExecutionEvent::Error(error.clone())).await);
                             break Err(error);
                         }
-                        SkillCtxEvent::ToolBegin { tool } => {
-                            drop(sender.send(SkillExecutionEvent::ToolBegin { tool }).await);
+                        SkillCtxEvent::ToolBegin { name } => {
+                            drop(sender.send(SkillExecutionEvent::ToolBegin { name }).await);
                         }
-                        SkillCtxEvent::ToolEnd { tool, result } => {
-                            drop(sender.send(SkillExecutionEvent::ToolEnd { tool, result }).await);
+                        SkillCtxEvent::ToolEnd { name, result } => {
+                            drop(sender.send(SkillExecutionEvent::ToolEnd { name, result }).await);
                         }
                     }
                 }
@@ -160,10 +160,10 @@ pub enum SkillCtxEvent {
     /// operator.
     Quit(anyhow::Error),
     /// A request for a tool call has been made.
-    ToolBegin { tool: String },
+    ToolBegin { name: String },
     /// A tool call has been completed.
     ToolEnd {
-        tool: String,
+        name: String,
         result: Result<(), String>,
     },
 }
@@ -338,7 +338,7 @@ where
             .collect::<Vec<_>>();
         for name in &names {
             self.send_rt_event
-                .send(SkillCtxEvent::ToolBegin { tool: name.clone() })
+                .send(SkillCtxEvent::ToolBegin { name: name.clone() })
                 .await
                 .unwrap();
         }
@@ -357,7 +357,7 @@ where
         for (name, result) in names.iter().zip(results.iter()) {
             self.send_rt_event
                 .send(SkillCtxEvent::ToolEnd {
-                    tool: name.clone(),
+                    name: name.clone(),
                     result: match result {
                         Ok(_) => Ok(()),
                         Err(error) => Err(error.to_string()),
@@ -491,10 +491,10 @@ pub enum SkillExecutionEvent {
     /// Append the internal string to the current message
     MessageAppend { text: String },
     /// The Skill has requested a tool call.
-    ToolBegin { tool: String },
+    ToolBegin { name: String },
     /// A tool call has been completed. Can be success or error.
     ToolEnd {
-        tool: String,
+        name: String,
         result: Result<(), String>,
     },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
@@ -1482,11 +1482,11 @@ mod test {
         assert_eq!(events.len(), 2);
         assert!(matches!(
             &events[0],
-            SkillExecutionEvent::ToolBegin { tool } if tool == "test-tool"
+            SkillExecutionEvent::ToolBegin { name } if name == "test-tool"
         ));
         assert!(matches!(
             &events[1],
-            SkillExecutionEvent::ToolEnd { tool, result } if tool == "test-tool" && result.is_ok()
+            SkillExecutionEvent::ToolEnd { name, result } if name == "test-tool" && result.is_ok()
         ));
         assert!(task.await.is_ok());
     }
@@ -1539,14 +1539,14 @@ mod test {
         }
         assert_eq!(events.len(), 4);
         assert!(
-            matches!(&events[0], SkillCtxEvent::ToolBegin { tool } if tool == "count-the-fish")
+            matches!(&events[0], SkillCtxEvent::ToolBegin { name } if name == "count-the-fish")
         );
-        assert!(matches!(&events[1], SkillCtxEvent::ToolBegin { tool } if tool == "catch-a-fish"));
+        assert!(matches!(&events[1], SkillCtxEvent::ToolBegin { name } if name == "catch-a-fish"));
         assert!(
-            matches!(&events[2], SkillCtxEvent::ToolEnd { tool, result } if tool == "count-the-fish" && result.is_ok())
+            matches!(&events[2], SkillCtxEvent::ToolEnd { name, result } if name == "count-the-fish" && result.is_ok())
         );
         assert!(
-            matches!(&events[3], SkillCtxEvent::ToolEnd { tool, result: Err(result) } if tool == "catch-a-fish" && result == "No fish caught.")
+            matches!(&events[3], SkillCtxEvent::ToolEnd { name, result: Err(result) } if name == "catch-a-fish" && result == "No fish caught.")
         );
         assert!(task.await.is_ok());
     }

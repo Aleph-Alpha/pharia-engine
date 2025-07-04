@@ -742,13 +742,13 @@ pub mod tests {
         assert_eq!(
             events[0],
             SkillExecutionEvent::ToolBegin {
-                tool: "add".to_string()
+                name: "add".to_string()
             }
         );
         assert_eq!(
             events[1],
             SkillExecutionEvent::ToolEnd {
-                tool: "add".to_string(),
+                name: "add".to_string(),
                 result: Ok(()),
             }
         );
