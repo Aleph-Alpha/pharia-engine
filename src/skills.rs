@@ -1,7 +1,11 @@
 mod v0_2;
 mod v0_3;
 
-use std::{fmt, path::Path, sync::LazyLock};
+use std::{
+    fmt,
+    path::Path,
+    sync::{Arc, LazyLock},
+};
 
 use async_trait::async_trait;
 use engine_room::LinkerImpl;
@@ -275,7 +279,7 @@ pub trait Skill: Send + Sync {
 /// linker. This allows for as much initialization work to be done at load time as possible, which
 /// can be cached across multiple invocations.
 pub fn load_skill_from_wasm_bytes(
-    engine: &Engine,
+    engine: Arc<Engine>,
     bytes: impl AsRef<[u8]>,
     tracing_context: TracingContext,
 ) -> Result<Box<dyn Skill>, SkillLoadError> {
@@ -589,10 +593,11 @@ pub mod tests {
     async fn python_greeting_skill() {
         let skill = given_python_skill_greet_v0_3();
         let skill_ctx = Box::new(CsiGreetingMock);
-        let engine = Engine::default();
+        let engine = Arc::new(Engine::default());
 
         let skill =
-            load_skill_from_wasm_bytes(&engine, skill.bytes(), TracingContext::dummy()).unwrap();
+            load_skill_from_wasm_bytes(engine.clone(), skill.bytes(), TracingContext::dummy())
+                .unwrap();
         let actual = skill
             .run_as_function(&engine, skill_ctx, json!("Homer"), &TracingContext::dummy())
             .await
@@ -604,10 +609,11 @@ pub mod tests {
     #[tokio::test]
     async fn rust_greeting_skill() {
         let skill_bytes = given_rust_skill_greet_v0_2().bytes();
-        let engine = Engine::default();
+        let engine = Arc::new(Engine::default());
 
         let skill =
-            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
+            load_skill_from_wasm_bytes(engine.clone(), skill_bytes, TracingContext::dummy())
+                .unwrap();
         let actual = skill
             .run_as_function(
                 &engine,
@@ -638,11 +644,12 @@ pub mod tests {
         }
 
         let skill_bytes = given_rust_skill_explain().bytes();
-        let engine = Engine::default();
         let (send, _) = mpsc::channel(1);
+        let engine = Arc::new(Engine::default());
         let ctx = Box::new(SkillInvocationCtx::new(send, ContextualCsiStub));
         let skill =
-            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
+            load_skill_from_wasm_bytes(engine.clone(), skill_bytes, TracingContext::dummy())
+                .unwrap();
         let actual = skill
             .run_as_function(
                 &engine,
@@ -660,9 +667,9 @@ pub mod tests {
     async fn skill_metadata_v0_2_is_empty() {
         // Given a skill is linked againts skill package v0.2
         let test_skill = given_rust_skill_greet_v0_2();
-        let engine = Engine::default();
+        let engine = Arc::new(Engine::default());
         let skill =
-            load_skill_from_wasm_bytes(&engine, test_skill.bytes(), TracingContext::dummy())
+            load_skill_from_wasm_bytes(engine.clone(), test_skill.bytes(), TracingContext::dummy())
                 .unwrap();
 
         // When metadata for a skill is requested
@@ -679,9 +686,10 @@ pub mod tests {
     async fn skill_metadata_invalid_output() {
         // Given a skill runtime that always returns an invalid output skill
         let skill_bytes = given_invalid_output_skill().bytes();
-        let engine = Engine::default();
+        let engine = Arc::new(Engine::default());
         let skill =
-            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
+            load_skill_from_wasm_bytes(engine.clone(), skill_bytes, TracingContext::dummy())
+                .unwrap();
 
         // When metadata for a skill is requested
         let metadata_result = skill
@@ -743,8 +751,9 @@ pub mod tests {
         // Given a skill loaded by our engine
         let test_skill = given_rust_skill_greet_v0_3();
         let wasm = test_skill.bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -763,8 +772,9 @@ pub mod tests {
         // Given a skill loaded by our engine
         let test_skill = given_rust_skill_complete_with_echo();
         let wasm = test_skill.bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiCompleteWithEchoMock);
 
         // When invoked with a json string
@@ -783,8 +793,9 @@ pub mod tests {
         // Given a skill loaded by our engine
         let test_skills = given_rust_skill_greet_v0_2();
         let wasm = test_skills.bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -802,8 +813,9 @@ pub mod tests {
     async fn can_load_and_run_search_skill() {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_search().bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiSearchMock);
 
         // When invoked with a json string
@@ -838,8 +850,9 @@ pub mod tests {
         ];
         let test_skill = given_complete_stream_skill();
         let wasm = test_skill.bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiCompleteStreamStub::new(events));
 
         // When invoked with a json string
@@ -879,8 +892,9 @@ pub mod tests {
         ];
         let test_skill = given_chat_stream_skill();
         let wasm = test_skill.bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiChatStreamStub::new(events));
 
         // When invoked with a json string
@@ -924,8 +938,9 @@ pub mod tests {
         ];
         let test_skill = given_streaming_output_skill();
         let wasm = test_skill.bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiChatStreamStub::new(events));
         let (send, mut recv) = mpsc::channel(3);
 
@@ -957,8 +972,9 @@ pub mod tests {
     async fn can_load_and_run_chat_skill() {
         // Given a skill loaded by our engine
         let wasm = given_rust_skill_chat().bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiChatStub);
 
         // When invoked with a json string
@@ -977,9 +993,10 @@ pub mod tests {
     async fn can_load_and_run_v0_2_py_module() {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_2();
-        let engine = Engine::default();
+        let engine = Arc::new(Engine::default());
         let skill =
-            load_skill_from_wasm_bytes(&engine, skill.bytes(), TracingContext::dummy()).unwrap();
+            load_skill_from_wasm_bytes(engine.clone(), skill.bytes(), TracingContext::dummy())
+                .unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -997,9 +1014,10 @@ pub mod tests {
     async fn can_load_and_run_v0_3_py_module() {
         // Given a skill loaded by our engine
         let skill = given_python_skill_greet_v0_3();
-        let engine = Engine::default();
+        let engine = Arc::new(Engine::default());
         let skill =
-            load_skill_from_wasm_bytes(&engine, skill.bytes(), TracingContext::dummy()).unwrap();
+            load_skill_from_wasm_bytes(engine.clone(), skill.bytes(), TracingContext::dummy())
+                .unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1061,8 +1079,9 @@ pub mod tests {
     async fn can_call_pre_instantiated_multiple_times() {
         let test_skill = given_rust_skill_greet_v0_2();
         let wasm = test_skill.bytes();
-        let engine = Engine::default();
-        let skill = load_skill_from_wasm_bytes(&engine, wasm, TracingContext::dummy()).unwrap();
+        let engine = Arc::new(Engine::default());
+        let skill =
+            load_skill_from_wasm_bytes(engine.clone(), wasm, TracingContext::dummy()).unwrap();
         let ctx = Box::new(CsiGreetingMock);
 
         // When invoked with a json string
@@ -1137,9 +1156,10 @@ pub mod tests {
     async fn tool_invocation_skill() {
         // given a skill that calls a tool
         let skill_bytes = given_skill_tool_invocation().bytes();
-        let engine = Engine::default();
+        let engine = Arc::new(Engine::default());
         let skill =
-            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
+            load_skill_from_wasm_bytes(engine.clone(), skill_bytes, TracingContext::dummy())
+                .unwrap();
 
         // when the skill is run
         let response = skill
@@ -1164,9 +1184,10 @@ pub mod tests {
     async fn skill_metadata_v0_3() {
         // Given a skill runtime api that always returns a v0.3 skill
         let skill_bytes = given_rust_skill_greet_v0_3().bytes();
-        let engine = Engine::default();
+        let engine = Arc::new(Engine::default());
         let skill =
-            load_skill_from_wasm_bytes(&engine, skill_bytes, TracingContext::dummy()).unwrap();
+            load_skill_from_wasm_bytes(engine.clone(), skill_bytes, TracingContext::dummy())
+                .unwrap();
 
         // When metadata for a skill is requested
         let metadata = skill
