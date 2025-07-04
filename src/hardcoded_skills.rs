@@ -16,7 +16,7 @@ use crate::{
         AnySkillManifest, Engine, JsonSchema, Signature, Skill, SkillError, SkillEvent,
         SkillMetadataV0_3, SkillPath,
     },
-    tool::{Argument, InvokeRequest, Modality},
+    tool::{Argument, InvokeRequest},
 };
 
 /// Hardcoded skills are provided in beta systems for testing.
@@ -94,18 +94,13 @@ impl Skill for SkillToolCaller {
             .ok_or(SkillError::UserCode("Tool invocation failed".to_owned()))?
             .map_err(|e| SkillError::UserCode(e.to_string()))?;
 
-        match result.first() {
-            Some(Modality::Text { text }) => {
-                sender.send(SkillEvent::MessageBegin).await.unwrap();
-                sender
-                    .send(SkillEvent::MessageAppend { text: text.clone() })
-                    .await
-                    .unwrap();
-            }
-            _ => {
-                return Err(SkillError::UserCode("Tool invocation failed".to_owned()));
-            }
-        }
+        sender.send(SkillEvent::MessageBegin).await.unwrap();
+        sender
+            .send(SkillEvent::MessageAppend {
+                text: result.text(),
+            })
+            .await
+            .unwrap();
         Ok(())
     }
 }

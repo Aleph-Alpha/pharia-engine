@@ -107,7 +107,7 @@ pub mod tests {
 
     use crate::{
         logging::TracingContext,
-        tool::{Argument, Modality, ToolDouble, ToolError},
+        tool::{Argument, ToolDouble, ToolError, ToolOutput},
     };
 
     use super::*;
@@ -122,10 +122,8 @@ pub mod tests {
                 &self,
                 _args: Vec<Argument>,
                 _tracing_context: TracingContext,
-            ) -> Result<Vec<Modality>, ToolError> {
-                Ok(vec![Modality::Text {
-                    text: "success".to_string(),
-                }])
+            ) -> Result<ToolOutput, ToolError> {
+                Ok(ToolOutput::from_text("success"))
             }
         }
 
@@ -146,17 +144,12 @@ pub mod tests {
             .unwrap();
 
         let arguments = vec![];
-        let modalities = tool
+        let output = tool
             .invoke(arguments, TracingContext::dummy())
             .await
             .unwrap();
 
-        assert_eq!(
-            &modalities,
-            &[Modality::Text {
-                text: "success".to_string()
-            }]
-        );
+        assert_eq!(output.text(), "success");
     }
 
     #[tokio::test]

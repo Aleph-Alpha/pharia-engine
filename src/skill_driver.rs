@@ -729,7 +729,7 @@ mod test {
             TokenUsage,
         },
         skills::{SkillDouble, SkillError},
-        tool::{Modality, ToolError},
+        tool::{ToolError, ToolOutput},
     };
     use anyhow::{anyhow, bail};
     use double_trait::Dummy;
@@ -1395,8 +1395,8 @@ mod test {
             async fn invoke_tool(
                 &self,
                 _requests: Vec<InvokeRequest>,
-            ) -> Vec<Result<Vec<Modality>, ToolError>> {
-                vec![Ok(vec![])]
+            ) -> Vec<Result<ToolOutput, ToolError>> {
+                vec![Ok(ToolOutput::empty())]
             }
         }
 
@@ -1450,8 +1450,8 @@ mod test {
             async fn invoke_tool(
                 &self,
                 _requests: Vec<InvokeRequest>,
-            ) -> Vec<Result<Vec<Modality>, ToolError>> {
-                vec![Ok(vec![])]
+            ) -> Vec<Result<ToolOutput, ToolError>> {
+                vec![Ok(ToolOutput::empty())]
             }
         }
 
@@ -1499,11 +1499,11 @@ mod test {
             async fn invoke_tool(
                 &self,
                 requests: Vec<InvokeRequest>,
-            ) -> Vec<Result<Vec<Modality>, ToolError>> {
+            ) -> Vec<Result<ToolOutput, ToolError>> {
                 requests
                     .iter()
                     .map(|request| match request.name.as_str() {
-                        "count-the-fish" => Ok(vec![]),
+                        "count-the-fish" => Ok(ToolOutput::empty()),
                         "catch-a-fish" => {
                             Err(ToolError::ToolExecution("No fish caught.".to_owned()))
                         }

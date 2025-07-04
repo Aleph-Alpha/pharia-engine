@@ -150,6 +150,7 @@ where
         .map(|result| match result {
             Ok(result) => json!(
                 result
+                    .0
                     .into_iter()
                     .map(Into::into)
                     .collect::<Vec<ToolModality>>()
@@ -1303,7 +1304,7 @@ mod tests {
     use crate::{
         csi::tests::RawCsiDouble,
         namespace_watcher::Namespace,
-        tool::{Argument, InvokeRequest, Modality, ToolError, ToolOutput},
+        tool::{Argument, InvokeRequest, ToolError, ToolOutput},
     };
 
     use super::*;
@@ -1450,9 +1451,7 @@ mod tests {
                 let expected_args = vec![Argument::new("a", "1"), Argument::new("b", "2")];
                 assert_eq!(arguments, expected_args);
                 assert_eq!(name, "add");
-                vec![Ok(vec![Modality::Text {
-                    text: "3".to_string(),
-                }])]
+                vec![Ok(ToolOutput::from_text("3"))]
             }
         }
 

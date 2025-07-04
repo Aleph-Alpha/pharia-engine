@@ -19,7 +19,7 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     tool::{
-        Argument, Modality, QualifiedToolName, Tool, ToolDescription, ToolError, ToolOutput,
+        Argument, QualifiedToolName, Tool, ToolDescription, ToolError, ToolOutput,
         toolbox::{ConfiguredNativeTool, Toolbox},
     },
 };
@@ -144,7 +144,7 @@ enum ToolMsg {
         name: QualifiedToolName,
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
-        send: oneshot::Sender<Result<Vec<Modality>, ToolError>>,
+        send: oneshot::Sender<Result<ToolOutput, ToolError>>,
     },
     ListTools {
         namespace: Namespace,
@@ -299,10 +299,8 @@ pub mod tests {
                 &self,
                 _: Vec<Argument>,
                 _: TracingContext,
-            ) -> Result<Vec<Modality>, ToolError> {
-                Ok(vec![Modality::Text {
-                    text: "search result".to_owned(),
-                }])
+            ) -> Result<ToolOutput, ToolError> {
+                Ok(ToolOutput::from_text("search result"))
             }
         }
         let namespace = Namespace::new("test").unwrap();
@@ -336,8 +334,7 @@ pub mod tests {
             .unwrap();
 
         // Then we get the result from the brave_search server
-        assert_eq!(result.len(), 1);
-        assert!(matches!(&result[0], Modality::Text { text } if text == "search result"));
+        assert_eq!(result.text(), "search result");
     }
 
     #[tokio::test]
@@ -386,7 +383,7 @@ pub mod tests {
                 &self,
                 _arguments: Vec<Argument>,
                 _tracing_context: TracingContext,
-            ) -> Result<Vec<Modality>, ToolError> {
+            ) -> Result<ToolOutput, ToolError> {
                 std::future::pending().await
             }
         }
@@ -397,10 +394,8 @@ pub mod tests {
                 &self,
                 _arguments: Vec<Argument>,
                 _tracing_context: TracingContext,
-            ) -> Result<Vec<Modality>, ToolError> {
-                Ok(vec![Modality::Text {
-                    text: "Success".to_owned(),
-                }])
+            ) -> Result<ToolOutput, ToolError> {
+                Ok(ToolOutput::from_text("Success"))
             }
         }
         let namespace = Namespace::new("test").unwrap();
@@ -451,8 +446,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.len(), 1);
-        assert!(matches!(&result[0], Modality::Text { text } if text == "Success"));
+        assert_eq!(result.text(), "Success");
 
         drop(handle);
     }

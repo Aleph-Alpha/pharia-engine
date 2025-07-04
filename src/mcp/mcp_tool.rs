@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::{
     logging::TracingContext,
     mcp::McpServerUrl,
-    tool::{Argument, Modality, Tool, ToolDescription, ToolError},
+    tool::{Argument, Tool, ToolDescription, ToolError, ToolOutput},
 };
 
 use super::client::McpClient;
@@ -37,7 +37,7 @@ where
         &self,
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         self.client
             .invoke_tool(self.desc.name(), arguments, &self.server, tracing_context)
             .await
