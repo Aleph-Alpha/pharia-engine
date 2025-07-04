@@ -242,7 +242,7 @@ impl From<SkillExecutionEvent> for Event {
             SkillExecutionEvent::ToolEnd { name, result } => Self::default()
                 .event("tool")
                 .json_data(match result {
-                    Ok(()) => MessageEvent::ToolEnd { name },
+                    Ok(content) => MessageEvent::ToolEnd { name, content },
                     Err(error) => MessageEvent::ToolError {
                         name,
                         message: error,
@@ -277,6 +277,7 @@ enum MessageEvent {
     #[serde(rename = "end")]
     ToolEnd {
         name: String,
+        content: String,
     },
     #[serde(rename = "error")]
     ToolError {
@@ -759,7 +760,7 @@ mod tests {
             },
             SkillExecutionEvent::ToolEnd {
                 name: "add".to_string(),
-                result: Ok(()),
+                result: Ok("3".to_owned()),
             },
             SkillExecutionEvent::ToolEnd {
                 name: "add".to_string(),
@@ -794,7 +795,7 @@ mod tests {
             event: tool\n\
             data: {\"type\":\"begin\",\"name\":\"add\"}\n\n\
             event: tool\n\
-            data: {\"type\":\"end\",\"name\":\"add\"}\n\n\
+            data: {\"type\":\"end\",\"name\":\"add\",\"content\":\"3\"}\n\n\
             event: tool\n\
             data: {\"type\":\"error\",\"name\":\"add\",\"message\":\"Out of cheese\"}\n\n";
         assert_eq!(body_text, expected_body);
