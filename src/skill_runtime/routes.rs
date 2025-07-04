@@ -235,13 +235,19 @@ impl From<SkillExecutionEvent> for Event {
                 .event("message")
                 .json_data(MessageEvent::Append { text })
                 .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::ToolBegin { tool } => Self::default()
+            SkillExecutionEvent::ToolBegin { name } => Self::default()
                 .event("tool")
-                .json_data(MessageEvent::ToolBegin { tool })
+                .json_data(MessageEvent::ToolBegin { name })
                 .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::ToolEnd { tool, result } => Self::default()
+            SkillExecutionEvent::ToolEnd { name, result } => Self::default()
                 .event("tool")
-                .json_data(MessageEvent::ToolEnd { tool })
+                .json_data(match result {
+                    Ok(()) => MessageEvent::ToolEnd { name },
+                    Err(error) => MessageEvent::ToolError {
+                        name,
+                        message: error,
+                    },
+                })
                 .expect("`json_data` must only be called once."),
             SkillExecutionEvent::Error(error) => Self::default()
                 .event("error")
@@ -266,11 +272,16 @@ enum MessageEvent {
     // While the enum variants do not differ in the body, they are distinguished by the event field.
     #[serde(rename = "begin")]
     ToolBegin {
-        tool: String,
+        name: String,
     },
     #[serde(rename = "end")]
     ToolEnd {
-        tool: String,
+        name: String,
+    },
+    #[serde(rename = "error")]
+    ToolError {
+        name: String,
+        message: String,
     },
 }
 
@@ -744,11 +755,15 @@ mod tests {
         // Given
         let events = vec![
             SkillExecutionEvent::ToolBegin {
-                tool: "add".to_string(),
+                name: "add".to_string(),
             },
             SkillExecutionEvent::ToolEnd {
-                tool: "add".to_string(),
+                name: "add".to_string(),
                 result: Ok(()),
+            },
+            SkillExecutionEvent::ToolEnd {
+                name: "add".to_string(),
+                result: Err("Out of cheese".to_owned()),
             },
         ];
         let skill_runtime = EventStreamStub::new(events);
@@ -777,9 +792,11 @@ mod tests {
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
         let expected_body = "\
             event: tool\n\
-            data: {\"type\":\"begin\",\"tool\":\"add\"}\n\n\
+            data: {\"type\":\"begin\",\"name\":\"add\"}\n\n\
             event: tool\n\
-            data: {\"type\":\"end\",\"tool\":\"add\"}\n\n";
+            data: {\"type\":\"end\",\"name\":\"add\"}\n\n\
+            event: tool\n\
+            data: {\"type\":\"error\",\"name\":\"add\",\"message\":\"Out of cheese\"}\n\n";
         assert_eq!(body_text, expected_body);
     }
 }
