@@ -80,11 +80,11 @@ impl Skill for SkillToolCaller {
                 arguments: vec![
                     Argument {
                         name: "a".to_owned(),
-                        value: json!("1").to_string().into_bytes(),
+                        value: json!(1).to_string().into_bytes(),
                     },
                     Argument {
                         name: "b".to_owned(),
-                        value: json!("2").to_string().into_bytes(),
+                        value: json!(2).to_string().into_bytes(),
                     },
                 ],
             }])
