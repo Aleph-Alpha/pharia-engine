@@ -110,7 +110,7 @@ impl Kernel {
         };
 
         let registry_config = app_config.namespaces().registry_config();
-        let skill_loader = SkillLoader::from_config(engine.clone(), registry_config);
+        let skill_loader = SkillLoader::from_config(engine, registry_config);
         let skill_store = SkillStore::new(
             skill_loader.api(),
             app_config.namespace_update_interval(),
@@ -118,7 +118,7 @@ impl Kernel {
         );
 
         // Boot up the runtime we need to execute Skills
-        let skill_runtime = SkillRuntime::new(engine, csi_drivers.clone(), skill_store.api());
+        let skill_runtime = SkillRuntime::new(csi_drivers.clone(), skill_store.api());
 
         let mut namespace_watcher = NamespaceWatcher::with_config(
             skill_store.api(),

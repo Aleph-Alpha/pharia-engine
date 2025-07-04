@@ -1361,12 +1361,9 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::default());
-        let driver = SkillDriver::new(engine);
-
         // When
         let skill = Arc::new(SkillWithToolCall);
-        let result = driver
+        let result = SkillDriver
             .run_function(
                 skill,
                 json!({}),
@@ -1415,15 +1412,12 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::default());
-        let driver = SkillDriver::new(engine);
-
         // When running the skill as message stream
         let (send, mut recv) = mpsc::channel(1);
         let skill = Arc::new(SkillWithToolCall);
 
         let task = tokio::task::spawn(async move {
-            driver
+            SkillDriver
                 .run_message_stream(
                     skill,
                     json!({}),
