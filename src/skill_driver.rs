@@ -78,6 +78,7 @@ impl SkillDriver {
                             drop(sender.send(SkillExecutionEvent::ToolBegin { tool }).await);
                         }
                         SkillCtxEvent::ToolEnd { tool } => {
+                            drop(sender.send(SkillExecutionEvent::ToolEnd { tool }).await);
                         }
                     }
                 }
@@ -482,6 +483,8 @@ pub enum SkillExecutionEvent {
     MessageAppend { text: String },
     /// The Skill has requested a tool call.
     ToolBegin { tool: String },
+    /// A tool call has been completed successfully.
+    ToolEnd { tool: String },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
     Error(SkillExecutionError),
@@ -1404,7 +1407,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn tool_call_event_is_forwarded_for_message_stream() {
+    async fn tool_call_event_are_forwarded_for_message_stream() {
         // Given a skill that does a tool call
         struct SkillWithToolCall;
 
@@ -1446,23 +1449,34 @@ mod test {
         // When running the skill as message stream
         let (send, mut recv) = mpsc::channel(1);
         let skill = Arc::new(SkillWithToolCall);
-        let result = driver
-            .run_message_stream(
-                skill,
-                json!({}),
-                ContextualCsiStub,
-                &TracingContext::dummy(),
-                send,
-            )
-            .await;
+
+        let task = tokio::task::spawn(async move {
+            driver
+                .run_message_stream(
+                    skill,
+                    json!({}),
+                    ContextualCsiStub,
+                    &TracingContext::dummy(),
+                    send,
+                )
+                .await
+        });
 
         // Then we receive a tool call event
-        let event = recv.recv().await.unwrap();
+        let mut events = Vec::new();
+        while let Some(event) = recv.recv().await {
+            events.push(event);
+        }
+        assert_eq!(events.len(), 2);
         assert!(matches!(
-            event,
+            &events[0],
             SkillExecutionEvent::ToolBegin { tool } if tool == "test-tool"
         ));
-        assert!(result.is_ok());
+        assert!(matches!(
+            &events[1],
+            SkillExecutionEvent::ToolEnd { tool } if tool == "test-tool"
+        ));
+        assert!(task.await.is_ok());
     }
 
     #[tokio::test]
