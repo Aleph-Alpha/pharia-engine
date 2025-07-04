@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use exports::pharia::skill::skill_handler::SkillMetadata;
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
@@ -8,7 +7,10 @@ use wasmtime::component::bindgen;
 use crate::{
     csi::Csi,
     logging::TracingContext,
-    skills::{AnySkillManifest, Engine, LinkedCtx, Signature, SkillError, SkillEvent},
+    skill_common::{AnySkillManifest, Signature, SkillError, SkillEvent, SkillMetadataV0_3},
+    skills::{
+        Engine, LinkedCtx, v0_3::skill::exports::pharia::skill::skill_handler::SkillMetadata,
+    },
 };
 
 bindgen!({
@@ -23,13 +25,6 @@ bindgen!({
         "pharia:skill/language": super::csi::pharia::skill::language,
     }
 });
-
-/// Metadata for a skill at wit version 0.3
-#[derive(Debug, Clone)]
-pub struct SkillMetadataV0_3 {
-    pub description: Option<String>,
-    pub signature: Signature,
-}
 
 impl TryFrom<SkillMetadata> for SkillMetadataV0_3 {
     type Error = anyhow::Error;

@@ -7,8 +7,8 @@ use serde::Deserialize;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{
-    FeatureSet, namespace_watcher::Namespace, skill_loader::SkillDescriptionFilterType,
-    skill_store::SkillStoreApi, skills::SkillPath,
+    FeatureSet, namespace_watcher::Namespace, skill_common::SkillPath,
+    skill_loader::SkillDescriptionFilterType, skill_store::SkillStoreApi,
 };
 
 pub fn http_skill_store_v0<T>(_feature_set: FeatureSet) -> Router<T>
@@ -211,11 +211,11 @@ mod tests {
     use crate::{
         feature_set::PRODUCTION_FEATURE_SET,
         namespace_watcher::Namespace,
+        skill_common::SkillPath,
         skill_loader::SkillDescriptionFilterType,
         skill_store::{
             SkillStoreApiDouble, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
         },
-        skills::SkillPath,
     };
 
     #[derive(Clone)]
