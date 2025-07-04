@@ -19,7 +19,7 @@ use crate::{
     logging::TracingContext,
     skill_driver::SkillDriver,
     skill_store::{SkillStoreApi, SkillStoreError},
-    skills::{AnySkillManifest, Engine, Skill, SkillPath},
+    skills::{AnySkillManifest, Skill, SkillPath},
 };
 
 #[cfg(test)]
@@ -41,11 +41,7 @@ pub struct SkillRuntime {
 
 impl SkillRuntime {
     /// Create a new skill runtime with the default web assembly runtime
-    pub fn new<C>(
-        engine: Arc<Engine>,
-        csi_apis: C,
-        store: impl SkillStoreApi + Send + Sync + 'static,
-    ) -> Self
+    pub fn new<C>(csi_apis: C, store: impl SkillStoreApi + Send + Sync + 'static) -> Self
     where
         C: RawCsi + Clone + Send + Sync + 'static,
     {
@@ -509,7 +505,7 @@ pub mod tests {
         namespace_watcher::Namespace,
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
-        skills::{SkillDouble, SkillError, SkillEvent},
+        skills::{Engine, SkillDouble, SkillError, SkillEvent},
         tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
     };
     use anyhow::anyhow;
@@ -527,7 +523,7 @@ pub mod tests {
     async fn errors_for_non_existing_skill() {
         // Given a skill actor connected to an empty skill store
         let store = SkillStoreStub::with_fetch_response(None);
-        let skill_actor = SkillRuntime::new(Arc::new(Engine::default()), Dummy, store);
+        let skill_actor = SkillRuntime::new(Dummy, store);
 
         // When asking the skill actor to run the skill
         let result = skill_actor
@@ -552,12 +548,12 @@ pub mod tests {
         // Given a skill executer with no skills
         let engine = Arc::new(Engine::default());
         let registry_config = RegistryConfig::empty();
-        let skill_loader = SkillLoader::from_config(engine.clone(), registry_config).api();
+        let skill_loader = SkillLoader::from_config(engine, registry_config).api();
 
         let skill_store =
             SkillStore::new(skill_loader, Duration::from_secs(10), ByteSize(u64::MAX));
         let csi_apis = Dummy;
-        let executer = SkillRuntime::new(engine, csi_apis, skill_store.api());
+        let executer = SkillRuntime::new(csi_apis, skill_store.api());
         let api = executer.api();
 
         // When a skill is requested, but it is not listed in the namespace
@@ -586,11 +582,10 @@ pub mod tests {
         // Given
         let skill = GreetSkill;
         let csi = Dummy;
-        let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(skill)));
 
         // When
-        let runtime = SkillRuntime::new(engine, csi, store);
+        let runtime = SkillRuntime::new(csi, store);
         let result = runtime
             .api()
             .run_function(
@@ -635,9 +630,8 @@ pub mod tests {
 
         let (send, _recv) = broadcast::channel(2);
         let skill = SkillAssertConcurrent { send: send.clone() };
-        let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(skill)));
-        let runtime = SkillRuntime::new(engine, Dummy, store);
+        let runtime = SkillRuntime::new(Dummy, store);
 
         // When invoking two skills in parallel
         let token = "TOKEN_NOT_REQUIRED";
@@ -689,9 +683,8 @@ pub mod tests {
         }
 
         // Given
-        let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillToolCaller)));
-        let runtime = SkillRuntime::new(engine, ToolCallerCsi, store);
+        let runtime = SkillRuntime::new(ToolCallerCsi, store);
 
         // When
         let mut recv = runtime
@@ -738,9 +731,8 @@ pub mod tests {
     #[tokio::test]
     async fn stream_hello_test() {
         // Given
-        let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillHello)));
-        let runtime = SkillRuntime::new(engine, Dummy, store);
+        let runtime = SkillRuntime::new(Dummy, store);
 
         // When
         let mut recv = runtime
@@ -803,9 +795,8 @@ pub mod tests {
     #[tokio::test]
     async fn stream_saboteur_test() {
         // Given
-        let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillSaboteur)));
-        let runtime = SkillRuntime::new(engine, Dummy, store);
+        let runtime = SkillRuntime::new(Dummy, store);
 
         // When
         let mut recv = runtime
@@ -890,9 +881,8 @@ pub mod tests {
         }
 
         // Given
-        let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillTellMeAJoke)));
-        let runtime = SkillRuntime::new(engine, RawCsiSaboteur, store);
+        let runtime = SkillRuntime::new(RawCsiSaboteur, store);
         let skill_path = SkillPath::new(Namespace::new("test-beta").unwrap(), "tell_me_a_joke");
 
         // When
@@ -994,9 +984,8 @@ pub mod tests {
                 vec![add, subtract]
             }
         }
-        let engine = Arc::new(Engine::default());
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(ToolSpySkill)));
-        let runtime = SkillRuntime::new(engine, CsiWithTools, store);
+        let runtime = SkillRuntime::new(CsiWithTools, store);
 
         // When running the skill
         let tools = runtime
