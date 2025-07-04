@@ -714,7 +714,7 @@ pub mod tests {
             events[1],
             SkillExecutionEvent::ToolEnd {
                 name: "add".to_string(),
-                result: Ok("3".to_string()),
+                result: Ok(()),
             }
         );
         assert_eq!(events[2], SkillExecutionEvent::MessageBegin);
