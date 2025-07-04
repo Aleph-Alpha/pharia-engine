@@ -24,8 +24,9 @@ use wit_parser::{
 use crate::{
     csi::Csi,
     logging::TracingContext,
-    skill::{AnySkillManifest, Skill, SkillError, SkillEvent, SkillLoadError},
+    skill::{AnySkillManifest, Skill, SkillError, SkillEvent},
 };
+use thiserror::Error;
 use tracing::error;
 
 /// Wasmtime engine that is configured with linkers for all of the supported versions of
@@ -75,6 +76,30 @@ impl Engine {
     fn store(&self, skill_ctx: Box<dyn Csi + Send>) -> Store<LinkedCtx> {
         self.engine.store(skill_ctx)
     }
+}
+
+/// Failures which occur when loading a skill from Web Assembly bytes.
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum SkillLoadError {
+    #[error("Failed to pre-instantiate the skill: {0}")]
+    SkillPreError(String),
+    #[error("Failed to pre-instantiate the component: {0}")]
+    LinkerError(String),
+    #[error("Failed to instantiate the component: {0}")]
+    ComponentError(String),
+    #[error("Skill version {0} is no longer supported by the Kernel. Try upgrading your SDK.")]
+    NoLongerSupported(String),
+    #[error(
+        "Skill version {0} is not supported by this Kernel installation yet. Try updating your \
+        Kernel version or downgrading your SDK."
+    )]
+    NotSupportedYet(String),
+    #[error("Error decoding Wasm component: {0}")]
+    WasmDecodeError(String),
+    #[error("Web Assembly is not a component.")]
+    NotComponent,
+    #[error("Web assembly component is not using a supported pharia:skill world.")]
+    UnsupportedWorld,
 }
 
 pub type LinkedCtx = LinkerImpl<Box<dyn Csi + Send>>;

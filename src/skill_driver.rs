@@ -20,8 +20,9 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    skill::{AnySkillManifest, Skill, SkillError, SkillEvent, SkillLoadError},
+    skill::{AnySkillManifest, Skill, SkillError, SkillEvent},
     tool::{InvokeRequest, ToolDescription},
+    wasm::SkillLoadError,
 };
 
 pub struct SkillDriver;

@@ -12,12 +12,13 @@ use crate::namespace_watcher::{Namespace, Registry, SkillDescription};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
-use crate::skill::{Skill, SkillLoadError, SkillPath};
-use crate::wasm::{Engine, load_skill_from_wasm_bytes};
+use crate::skill::{Skill, SkillPath};
+use crate::wasm::{Engine, SkillLoadError, load_skill_from_wasm_bytes};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
 use std::{future::Future, pin::Pin};
+use thiserror::Error;
 
 #[derive(Debug)]
 pub enum SkillDescriptionFilterType {
@@ -85,7 +86,7 @@ impl ProgrammableSkill {
     }
 }
 
-#[derive(Debug, thiserror::Error, Clone)]
+#[derive(Debug, Error, Clone)]
 pub enum SkillFetchError {
     #[error(transparent)]
     RegistryError(#[from] RegistryError),
