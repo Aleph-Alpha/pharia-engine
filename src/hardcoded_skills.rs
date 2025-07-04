@@ -12,7 +12,7 @@ use crate::{
     inference::{ChatEvent, ChatParams, ChatRequest, Message},
     logging::TracingContext,
     namespace_watcher::Namespace,
-    skill_common::{
+    skill::{
         AnySkillManifest, JsonSchema, Signature, Skill, SkillError, SkillEvent, SkillMetadataV0_3,
         SkillPath,
     },

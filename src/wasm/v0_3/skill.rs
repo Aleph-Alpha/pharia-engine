@@ -7,7 +7,7 @@ use wasmtime::component::bindgen;
 use crate::{
     csi::Csi,
     logging::TracingContext,
-    skill_common::{AnySkillManifest, Signature, SkillError, SkillEvent, SkillMetadataV0_3},
+    skill::{AnySkillManifest, Signature, SkillError, SkillEvent, SkillMetadataV0_3},
     wasm::{Engine, LinkedCtx, v0_3::skill::exports::pharia::skill::skill_handler::SkillMetadata},
 };
 

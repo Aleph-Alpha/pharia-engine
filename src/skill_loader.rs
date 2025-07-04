@@ -12,7 +12,7 @@ use crate::namespace_watcher::{Namespace, Registry, SkillDescription};
 use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
-use crate::skill_common::{Skill, SkillLoadError, SkillPath};
+use crate::skill::{Skill, SkillLoadError, SkillPath};
 use crate::wasm::{Engine, load_skill_from_wasm_bytes};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
@@ -362,7 +362,7 @@ pub mod tests {
     use crate::{
         namespace_watcher::Registry,
         registries::tests::{NeverResolvingRegistry, ReadyRegistry},
-        skill_common::SkillPath,
+        skill::SkillPath,
         wasm::Engine,
     };
 

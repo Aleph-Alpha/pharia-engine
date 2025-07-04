@@ -22,7 +22,7 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     shell::HttpError,
-    skill_common::{AnySkillManifest, JsonSchema, Signature, SkillPath},
+    skill::{AnySkillManifest, JsonSchema, Signature, SkillPath},
     skill_driver::{SkillExecutionError, SkillExecutionEvent},
     skill_runtime::SkillRuntimeApi,
 };
@@ -424,7 +424,7 @@ mod tests {
         feature_set::PRODUCTION_FEATURE_SET,
         logging::TracingContext,
         shell::tests::dummy_auth_value,
-        skill_common::{AnySkillManifest, JsonSchema, Signature, SkillMetadataV0_3, SkillPath},
+        skill::{AnySkillManifest, JsonSchema, Signature, SkillMetadataV0_3, SkillPath},
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
         skill_runtime::{SkillRuntimeDouble, http_skill_runtime_v1, routes::SkillRuntimeProvider},
     };
