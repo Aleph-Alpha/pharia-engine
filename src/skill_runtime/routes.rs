@@ -132,6 +132,26 @@ where
             description = "A stream of substrings composing a message",
             body=Value,
             content(("text/event-stream", examples(
+                ("Tool Caller" = (
+                    summary = "Namespace: `example`, Skill: `tool_caller`",
+                    description = "The `tool_caller` Skill in the `example` namespace calls a tool.",
+                    value = json!("\
+                        event: tool\n\
+                        data: {\"type\":\"begin\",\"name\":\"add\"}\n\
+                        \n\
+                        event: tool\n\
+                        data: {\"type\":\"end\",\"name\":\"add\"}\n\
+                        \n\
+                        event: message\n\
+                        data: {\"type\":\"begin\"}\n\
+                        \n\
+                        event: message\n\
+                        data: {\"type\":\"append\",\"text\":\"The result of calling the add tool for a=1 and b=2 is: 3\"}\n\
+                        \n\
+                        event: message\n\
+                        data: {\"type\":\"end\",\"payload\":null}\n\
+                    ")
+                )),
                 ("Tell me a joke" = (
                     summary = "Namespace: `example`, Skill: `tell_me_a_joke`",
                     description = "The `tell_me_a_joke` Skill in the `example` namespace streams a joke.",

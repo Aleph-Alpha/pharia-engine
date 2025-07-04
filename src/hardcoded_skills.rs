@@ -94,7 +94,14 @@ impl Skill for SkillToolCaller {
         sender.send(SkillEvent::MessageBegin).await.unwrap();
         sender
             .send(SkillEvent::MessageAppend {
-                text: result.text(),
+                text: "The result of calling the add tool for a=1 and b=2 is: ".to_owned()
+                    + &result.text(),
+            })
+            .await
+            .unwrap();
+        sender
+            .send(SkillEvent::MessageEnd {
+                payload: json!(null),
             })
             .await
             .unwrap();
