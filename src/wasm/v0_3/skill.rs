@@ -8,9 +8,7 @@ use crate::{
     csi::Csi,
     logging::TracingContext,
     skill_common::{AnySkillManifest, Signature, SkillError, SkillEvent, SkillMetadataV0_3},
-    skills::{
-        Engine, LinkedCtx, v0_3::skill::exports::pharia::skill::skill_handler::SkillMetadata,
-    },
+    wasm::{Engine, LinkedCtx, v0_3::skill::exports::pharia::skill::skill_handler::SkillMetadata},
 };
 
 bindgen!({
@@ -47,7 +45,7 @@ impl TryFrom<SkillMetadata> for SkillMetadataV0_3 {
 }
 
 #[async_trait]
-impl crate::skills::WasmSkill for SkillPre<LinkedCtx> {
+impl crate::wasm::WasmSkill for SkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         engine: &Engine,

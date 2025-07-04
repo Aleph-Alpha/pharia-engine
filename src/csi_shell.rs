@@ -23,7 +23,7 @@ use serde_json::{Value, json};
 use crate::{
     csi::{CsiError, RawCsi},
     logging::TracingContext,
-    skills::SupportedVersion,
+    wasm::SupportedVersion,
 };
 
 pub fn http<T>() -> Router<T>
