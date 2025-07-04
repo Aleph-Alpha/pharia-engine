@@ -45,7 +45,7 @@ impl TryFrom<SkillMetadata> for SkillMetadataV0_3 {
 }
 
 #[async_trait]
-impl crate::wasm::WasmSkill for SkillPre<LinkedCtx> {
+impl crate::wasm::WasmExecutable for SkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         engine: &Engine,
