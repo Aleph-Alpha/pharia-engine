@@ -77,7 +77,7 @@ impl SkillDriver {
                         SkillCtxEvent::ToolBegin { tool } => {
                             drop(sender.send(SkillExecutionEvent::ToolBegin { tool }).await);
                         }
-                        SkillCtxEvent::ToolEnd { tool } => {
+                        SkillCtxEvent::ToolEnd { tool, result } => {
                             drop(sender.send(SkillExecutionEvent::ToolEnd { tool }).await);
                         }
                     }
@@ -162,7 +162,10 @@ pub enum SkillCtxEvent {
     /// A request for a tool call has been made.
     ToolBegin { tool: String },
     /// A tool call has been completed.
-    ToolEnd { tool: String },
+    ToolEnd {
+        tool: String,
+        result: Result<(), String>,
+    },
 }
 
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
@@ -348,12 +351,18 @@ where
             .await
             .into_iter()
             .map(|result| result.map_err(|error| error.to_string()))
-            .collect();
+            .collect::<Vec<_>>();
 
         // The order of the results is guaranteed to be the same as the order of the requests.
-        for name in &names {
+        for (name, result) in names.iter().zip(results.iter()) {
             self.send_rt_event
-                .send(SkillCtxEvent::ToolEnd { tool: name.clone() })
+                .send(SkillCtxEvent::ToolEnd {
+                    tool: name.clone(),
+                    result: match result {
+                        Ok(_) => Ok(()),
+                        Err(error) => Err(error.to_string()),
+                    },
+                })
                 .await
                 .unwrap();
         }
@@ -483,7 +492,7 @@ pub enum SkillExecutionEvent {
     MessageAppend { text: String },
     /// The Skill has requested a tool call.
     ToolBegin { tool: String },
-    /// A tool call has been completed successfully.
+    /// A tool call has been completed. Can be success or error.
     ToolEnd { tool: String },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
@@ -1486,9 +1495,18 @@ mod test {
         impl ContextualCsiDouble for StubCsi {
             async fn invoke_tool(
                 &self,
-                _requests: Vec<InvokeRequest>,
+                requests: Vec<InvokeRequest>,
             ) -> Vec<Result<Vec<Modality>, ToolError>> {
-                vec![Ok(vec![])]
+                requests
+                    .iter()
+                    .map(|request| match request.name.as_str() {
+                        "count-the-fish" => Ok(vec![]),
+                        "catch-a-fish" => {
+                            Err(ToolError::ToolExecution("No fish caught.".to_owned()))
+                        }
+                        _ => unreachable!(),
+                    })
+                    .collect()
             }
         }
 
@@ -1521,8 +1539,12 @@ mod test {
             matches!(&events[0], SkillCtxEvent::ToolBegin { tool } if tool == "count-the-fish")
         );
         assert!(matches!(&events[1], SkillCtxEvent::ToolBegin { tool } if tool == "catch-a-fish"));
-        assert!(matches!(&events[2], SkillCtxEvent::ToolEnd { tool } if tool == "count-the-fish"));
-        assert!(matches!(&events[3], SkillCtxEvent::ToolEnd { tool } if tool == "catch-a-fish"));
+        assert!(
+            matches!(&events[2], SkillCtxEvent::ToolEnd { tool, result } if tool == "count-the-fish" && result.is_ok())
+        );
+        assert!(
+            matches!(&events[3], SkillCtxEvent::ToolEnd { tool, result: Err(result) } if tool == "catch-a-fish" && result == "No fish caught.")
+        );
         assert!(task.await.is_ok());
     }
 }
