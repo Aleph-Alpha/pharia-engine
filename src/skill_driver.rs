@@ -77,6 +77,8 @@ impl SkillDriver {
                         SkillCtxEvent::ToolBegin { tool } => {
                             drop(sender.send(SkillExecutionEvent::ToolBegin { tool }).await);
                         }
+                        SkillCtxEvent::ToolEnd { tool } => {
+                        }
                     }
                 }
                 Some(skill_event) = recv_skill_event.recv() => {
@@ -158,6 +160,8 @@ pub enum SkillCtxEvent {
     Quit(anyhow::Error),
     /// A request for a tool call has been made.
     ToolBegin { tool: String },
+    /// A tool call has been completed.
+    ToolEnd { tool: String },
 }
 
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
@@ -324,20 +328,35 @@ where
     }
 
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolResult> {
-        for request in &requests {
+        let names = requests
+            .iter()
+            .map(|request| request.name.clone())
+            .collect::<Vec<_>>();
+        for name in &names {
             self.send_rt_event
-                .send(SkillCtxEvent::ToolBegin {
-                    tool: request.name.clone(),
-                })
+                .send(SkillCtxEvent::ToolBegin { tool: name.clone() })
                 .await
                 .unwrap();
         }
-        self.contextual_csi
+        // While from a skill point of view, it is fine that all tool results are returned at once,
+        // in here we would profit if tool results where queried individually from the contextual
+        // csi. This would allow us to notify the caller earlier about the result of a tool call.
+        let results = self
+            .contextual_csi
             .invoke_tool(requests)
             .await
             .into_iter()
             .map(|result| result.map_err(|error| error.to_string()))
-            .collect()
+            .collect();
+
+        // The order of the results is guaranteed to be the same as the order of the requests.
+        for name in &names {
+            self.send_rt_event
+                .send(SkillCtxEvent::ToolEnd { tool: name.clone() })
+                .await
+                .unwrap();
+        }
+        results
     }
 
     async fn list_tools(&mut self) -> Vec<ToolDescription> {
@@ -771,7 +790,7 @@ mod test {
         let error = select! {
             Some(event) = recv.recv() => match event {
                 SkillCtxEvent::Quit(error) => error,
-                SkillCtxEvent::ToolBegin { .. } => unreachable!(),
+                SkillCtxEvent::ToolBegin { .. } | SkillCtxEvent::ToolEnd { .. } => unreachable!(),
             },
             _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
         };
@@ -1444,5 +1463,52 @@ mod test {
             SkillExecutionEvent::ToolBegin { tool } if tool == "test-tool"
         ));
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn tool_end_event_is_produced_for_each_tool_call() {
+        // Given a stub csi
+        struct StubCsi;
+        impl ContextualCsiDouble for StubCsi {
+            async fn invoke_tool(
+                &self,
+                _requests: Vec<InvokeRequest>,
+            ) -> Vec<Result<Vec<Modality>, ToolError>> {
+                vec![Ok(vec![])]
+            }
+        }
+
+        // Given a Skill invocation ctx
+        let (send, mut recv) = mpsc::channel(1);
+        let mut ctx = SkillInvocationCtx::new(send, StubCsi);
+
+        // When spawning an invoke tool call into a tokio task
+        let task = tokio::task::spawn(async move {
+            ctx.invoke_tool(vec![
+                InvokeRequest {
+                    name: "count-the-fish".to_owned(),
+                    arguments: vec![],
+                },
+                InvokeRequest {
+                    name: "catch-a-fish".to_owned(),
+                    arguments: vec![],
+                },
+            ])
+            .await
+        });
+
+        // Then we receive two tool started and two tool ended events
+        let mut events = Vec::new();
+        while let Some(event) = recv.recv().await {
+            events.push(event);
+        }
+        assert_eq!(events.len(), 4);
+        assert!(
+            matches!(&events[0], SkillCtxEvent::ToolBegin { tool } if tool == "count-the-fish")
+        );
+        assert!(matches!(&events[1], SkillCtxEvent::ToolBegin { tool } if tool == "catch-a-fish"));
+        assert!(matches!(&events[2], SkillCtxEvent::ToolEnd { tool } if tool == "count-the-fish"));
+        assert!(matches!(&events[3], SkillCtxEvent::ToolEnd { tool } if tool == "catch-a-fish"));
+        assert!(task.await.is_ok());
     }
 }
