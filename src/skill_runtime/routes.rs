@@ -239,6 +239,10 @@ impl From<SkillExecutionEvent> for Event {
                 .event("tool")
                 .json_data(MessageEvent::ToolBegin { tool })
                 .expect("`json_data` must only be called once."),
+            SkillExecutionEvent::ToolEnd { tool } => Self::default()
+                .event("tool")
+                .json_data(MessageEvent::ToolEnd { tool })
+                .expect("`json_data` must only be called once."),
             SkillExecutionEvent::Error(error) => Self::default()
                 .event("error")
                 .json_data(SseErrorEvent {
@@ -262,6 +266,10 @@ enum MessageEvent {
     // While the enum variants do not differ in the body, they are distinguished by the event field.
     #[serde(rename = "begin")]
     ToolBegin {
+        tool: String,
+    },
+    #[serde(rename = "end")]
+    ToolEnd {
         tool: String,
     },
 }
@@ -734,10 +742,15 @@ mod tests {
     #[tokio::test]
     async fn stream_endpoint_tool_calling_skill() {
         // Given
-        let event = SkillExecutionEvent::ToolBegin {
-            tool: "add".to_string(),
-        };
-        let skill_runtime = EventStreamStub::new(vec![event]);
+        let events = vec![
+            SkillExecutionEvent::ToolBegin {
+                tool: "add".to_string(),
+            },
+            SkillExecutionEvent::ToolEnd {
+                tool: "add".to_string(),
+            },
+        ];
+        let skill_runtime = EventStreamStub::new(events);
         let app_state = ProviderStub::new(skill_runtime);
         let http = http_skill_runtime_v1(FeatureSet::Beta).with_state(app_state);
 
@@ -763,7 +776,9 @@ mod tests {
         let body_text = resp.into_body().collect().await.unwrap().to_bytes();
         let expected_body = "\
             event: tool\n\
-            data: {\"type\":\"begin\",\"tool\":\"add\"}\n\n";
+            data: {\"type\":\"begin\",\"tool\":\"add\"}\n\n\
+            event: tool\n\
+            data: {\"type\":\"end\",\"tool\":\"add\"}\n\n";
         assert_eq!(body_text, expected_body);
     }
 }

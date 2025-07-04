@@ -734,23 +734,30 @@ pub mod tests {
             .await;
 
         // Then
+        let mut events = Vec::new();
+        while let Some(event) = recv.recv().await {
+            events.push(event);
+        }
+        assert_eq!(events.len(), 4);
         assert_eq!(
-            recv.recv().await.unwrap(),
+            events[0],
             SkillExecutionEvent::ToolBegin {
                 tool: "add".to_string()
             }
         );
         assert_eq!(
-            recv.recv().await.unwrap(),
-            SkillExecutionEvent::MessageBegin
+            events[1],
+            SkillExecutionEvent::ToolEnd {
+                tool: "add".to_string()
+            }
         );
+        assert_eq!(events[2], SkillExecutionEvent::MessageBegin);
         assert_eq!(
-            recv.recv().await.unwrap(),
+            events[3],
             SkillExecutionEvent::MessageAppend {
                 text: "3".to_string()
             }
         );
-        assert!(recv.recv().await.is_none());
 
         // Cleanup
         runtime.wait_for_shutdown().await;
