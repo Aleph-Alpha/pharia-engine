@@ -20,21 +20,13 @@ use crate::{
     logging::TracingContext,
     namespace_watcher::Namespace,
     search::{Document, DocumentPath, SearchRequest, SearchResult},
-    skills::{AnySkillManifest, Engine, Skill, SkillError, SkillEvent, SkillLoadError},
+    skills::{AnySkillManifest, Skill, SkillError, SkillEvent, SkillLoadError},
     tool::{InvokeRequest, ToolDescription},
 };
 
-pub struct SkillDriver {
-    /// Used to execute skills. We will share the engine with multiple running skills, and skill
-    /// provider to convert bytes into executable skills.
-    engine: Arc<Engine>,
-}
+pub struct SkillDriver;
 
 impl SkillDriver {
-    pub fn new(engine: Arc<Engine>) -> Self {
-        Self { engine }
-    }
-
     pub async fn run_message_stream(
         &self,
         skill: Arc<dyn Skill>,
@@ -981,11 +973,8 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::default());
-        let skill_driver = SkillDriver::new(engine);
-
         // When metadata for a skill is requested
-        let metadata = skill_driver
+        let metadata = SkillDriver
             .metadata(Arc::new(CsiFromMetadataSkill), &TracingContext::dummy())
             .await;
 
@@ -1040,9 +1029,7 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::default());
-        let runtime = SkillDriver::new(engine);
-        let resp = runtime
+        let resp = SkillDriver
             .run_function(
                 Arc::new(SkillDoubleUsingExplain),
                 json!({"prompt": "An apple a day", "target": " keeps the doctor away"}),
@@ -1051,7 +1038,7 @@ mod test {
             )
             .await;
 
-        drop(runtime);
+        // drop(runtime);
 
         assert_eq!(resp.unwrap(), json!([{"start": 0, "length": 2}]));
     }
@@ -1071,11 +1058,9 @@ mod test {
         // Given a skill using csi and a csi that fails
         // Note we are using a skill which actually invokes the csi
         let skill = Arc::new(SkillGreetCompletion);
-        let engine = Arc::new(Engine::default());
-        let driver = SkillDriver::new(engine);
 
         // When trying to generate a greeting for Homer using the greet skill
-        let result = driver
+        let result = SkillDriver
             .run_function(
                 skill,
                 json!("Homer"),
@@ -1138,13 +1123,11 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::default());
-        let driver = SkillDriver::new(engine);
+        let skill = Arc::new(MessageStreamSkillWithCsi);
 
         // When
-        let skill = Arc::new(MessageStreamSkillWithCsi);
         let (send, _) = mpsc::channel(1);
-        let result = driver
+        let result = SkillDriver
             .run_message_stream(
                 skill.clone(),
                 json!({}),
@@ -1161,13 +1144,11 @@ mod test {
     #[tokio::test]
     async fn message_stream_skill_error_is_forwarded_as_error() {
         // Given a skill that returns a user error when run as message stream
-        let engine = Arc::new(Engine::default());
-        let driver = SkillDriver::new(engine);
+        let skill = Arc::new(SkillGreetCompletion);
 
         // When running it as a message stream
-        let skill = Arc::new(SkillGreetCompletion);
         let (send, _) = mpsc::channel(1);
-        let result = driver
+        let result = SkillDriver
             .run_message_stream(
                 skill.clone(),
                 json!({}),
@@ -1184,13 +1165,11 @@ mod test {
     #[tokio::test]
     async fn message_stream_skill_completes_successfully() {
         // Given a message stream skill that does not use the CSI
-        let engine = Arc::new(Engine::default());
-        let driver = SkillDriver::new(engine);
+        let skill = Arc::new(SkillHello);
 
         // When running it
-        let skill = Arc::new(SkillHello);
         let (send, _) = mpsc::channel(1);
-        let result = driver
+        let result = SkillDriver
             .run_message_stream(
                 skill.clone(),
                 json!({}),
@@ -1207,13 +1186,11 @@ mod test {
     #[tokio::test]
     async fn should_translate_json_errors_emitted_by_message_stream() {
         // Given a skill that emits a JSON error
-        let engine = Arc::new(Engine::default());
-        let driver = SkillDriver::new(engine);
+        let skill = Arc::new(SkillSaboteurInvalidMessageOutput);
 
         // When
-        let skill = Arc::new(SkillSaboteurInvalidMessageOutput);
         let (send, mut recv) = mpsc::channel(1);
-        let result = driver
+        let result = SkillDriver
             .run_message_stream(
                 skill.clone(),
                 json!({}),
@@ -1261,13 +1238,10 @@ mod test {
             }
         }
 
-        let engine = Arc::new(Engine::default());
-        let driver = SkillDriver::new(engine);
-
         // When
         let skill = Arc::new(BuggyStreamingSkill);
         let (send, mut recv) = mpsc::channel(1);
-        let result = driver
+        let result = SkillDriver
             .run_message_stream(
                 skill.clone(),
                 json!({}),
