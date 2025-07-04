@@ -10,7 +10,7 @@ use crate::{
     context,
     logging::TracingContext,
     mcp::McpServerUrl,
-    tool::{Argument, Modality, ToolDescription, ToolError, ToolOutput},
+    tool::{Argument, ToolDescription, ToolError, ToolOutput},
 };
 
 #[cfg(test)]
@@ -37,12 +37,7 @@ struct ToolCallResult {
 impl McpClientImpl {
     fn parse_tool_call_result(result: ToolCallResult) -> Result<ToolOutput, ToolError> {
         if result.is_error {
-            let Modality::Text { text } = result
-                .content
-                .0
-                .first()
-                .ok_or(anyhow!("No content in tool call response"))?;
-            Err(ToolError::ToolExecution(text.to_owned()))
+            Err(ToolError::ToolExecution(result.content.text()))
         } else {
             Ok(result.content)
         }

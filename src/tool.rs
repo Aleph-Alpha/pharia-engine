@@ -98,9 +98,10 @@ pub struct Argument {
     pub value: Vec<u8>,
 }
 
+/// The output of a (successful) tool call.
 #[derive(Deserialize, Debug)]
 #[serde(transparent)]
-pub struct ToolOutput(pub Vec<Modality>);
+pub struct ToolOutput(Vec<Modality>);
 
 impl ToolOutput {
     /// Construct a new tool output with a single text modality.
@@ -116,6 +117,10 @@ impl ToolOutput {
             })
             .collect::<Vec<_>>()
             .join("\n\n")
+    }
+
+    pub fn into_modalities(self) -> impl Iterator<Item = Modality> {
+        self.0.into_iter()
     }
 }
 
