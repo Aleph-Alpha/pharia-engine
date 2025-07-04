@@ -314,7 +314,7 @@ impl SkillLoaderActor {
         let skill = spawn_blocking(move || {
             let load_context =
                 context!(&tracing_context, "pharia-kernel::skill-loader", "compile",);
-            load_skill_from_wasm_bytes(engine.as_ref(), bytes, load_context)
+            load_skill_from_wasm_bytes(engine, bytes, load_context)
         })
         .await
         .expect("Spawned linking thread must run to completion without being poisoned.")?;
