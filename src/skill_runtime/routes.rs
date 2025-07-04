@@ -239,7 +239,7 @@ impl From<SkillExecutionEvent> for Event {
                 .event("tool")
                 .json_data(MessageEvent::ToolBegin { tool })
                 .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::ToolEnd { tool } => Self::default()
+            SkillExecutionEvent::ToolEnd { tool, result } => Self::default()
                 .event("tool")
                 .json_data(MessageEvent::ToolEnd { tool })
                 .expect("`json_data` must only be called once."),
@@ -748,6 +748,7 @@ mod tests {
             },
             SkillExecutionEvent::ToolEnd {
                 tool: "add".to_string(),
+                result: Ok(()),
             },
         ];
         let skill_runtime = EventStreamStub::new(events);

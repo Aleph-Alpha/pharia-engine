@@ -78,7 +78,7 @@ impl SkillDriver {
                             drop(sender.send(SkillExecutionEvent::ToolBegin { tool }).await);
                         }
                         SkillCtxEvent::ToolEnd { tool, result } => {
-                            drop(sender.send(SkillExecutionEvent::ToolEnd { tool }).await);
+                            drop(sender.send(SkillExecutionEvent::ToolEnd { tool, result }).await);
                         }
                     }
                 }
@@ -493,7 +493,10 @@ pub enum SkillExecutionEvent {
     /// The Skill has requested a tool call.
     ToolBegin { tool: String },
     /// A tool call has been completed. Can be success or error.
-    ToolEnd { tool: String },
+    ToolEnd {
+        tool: String,
+        result: Result<(), String>,
+    },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
     Error(SkillExecutionError),
@@ -1483,7 +1486,7 @@ mod test {
         ));
         assert!(matches!(
             &events[1],
-            SkillExecutionEvent::ToolEnd { tool } if tool == "test-tool"
+            SkillExecutionEvent::ToolEnd { tool, result } if tool == "test-tool" && result.is_ok()
         ));
         assert!(task.await.is_ok());
     }

@@ -748,7 +748,8 @@ pub mod tests {
         assert_eq!(
             events[1],
             SkillExecutionEvent::ToolEnd {
-                tool: "add".to_string()
+                tool: "add".to_string(),
+                result: Ok(()),
             }
         );
         assert_eq!(events[2], SkillExecutionEvent::MessageBegin);
