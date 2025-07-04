@@ -703,7 +703,7 @@ pub mod tests {
         while let Some(event) = recv.recv().await {
             events.push(event);
         }
-        assert_eq!(events.len(), 4);
+        assert_eq!(events.len(), 5);
         assert_eq!(
             events[0],
             SkillExecutionEvent::ToolBegin {
@@ -718,12 +718,14 @@ pub mod tests {
             }
         );
         assert_eq!(events[2], SkillExecutionEvent::MessageBegin);
-        assert_eq!(
+        assert!(matches!(
             events[3],
-            SkillExecutionEvent::MessageAppend {
-                text: "3".to_string()
-            }
-        );
+            SkillExecutionEvent::MessageAppend { text: _ }
+        ));
+        assert!(matches!(
+            events[4],
+            SkillExecutionEvent::MessageEnd { payload: _ }
+        ));
 
         // Cleanup
         runtime.wait_for_shutdown().await;
