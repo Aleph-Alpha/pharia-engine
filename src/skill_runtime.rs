@@ -736,7 +736,7 @@ pub mod tests {
         // Then
         assert_eq!(
             recv.recv().await.unwrap(),
-            SkillExecutionEvent::ToolCall {
+            SkillExecutionEvent::ToolBegin {
                 tool: "add".to_string()
             }
         );

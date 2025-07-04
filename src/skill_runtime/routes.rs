@@ -235,7 +235,7 @@ impl From<SkillExecutionEvent> for Event {
                 .event("message")
                 .json_data(MessageEvent::Append { text })
                 .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::ToolCall { tool } => Self::default()
+            SkillExecutionEvent::ToolBegin { tool } => Self::default()
                 .event("tool")
                 .json_data(MessageEvent::ToolBegin { tool })
                 .expect("`json_data` must only be called once."),
@@ -734,7 +734,7 @@ mod tests {
     #[tokio::test]
     async fn stream_endpoint_tool_calling_skill() {
         // Given
-        let event = SkillExecutionEvent::ToolCall {
+        let event = SkillExecutionEvent::ToolBegin {
             tool: "add".to_string(),
         };
         let skill_runtime = EventStreamStub::new(vec![event]);

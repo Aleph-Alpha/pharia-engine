@@ -74,8 +74,8 @@ impl SkillDriver {
                             drop(sender.send(SkillExecutionEvent::Error(error.clone())).await);
                             break Err(error);
                         }
-                        SkillCtxEvent::ToolCall { tool } => {
-                            drop(sender.send(SkillExecutionEvent::ToolCall { tool }).await);
+                        SkillCtxEvent::ToolBegin { tool } => {
+                            drop(sender.send(SkillExecutionEvent::ToolBegin { tool }).await);
                         }
                     }
                 }
@@ -157,7 +157,7 @@ pub enum SkillCtxEvent {
     /// operator.
     Quit(anyhow::Error),
     /// A request for a tool call has been made.
-    ToolCall { tool: String },
+    ToolBegin { tool: String },
 }
 
 /// Implementation of [`Csi`] provided to skills. It is responsible for forwarding the function
@@ -326,7 +326,7 @@ where
     async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolResult> {
         for request in &requests {
             self.send_rt_event
-                .send(SkillCtxEvent::ToolCall {
+                .send(SkillCtxEvent::ToolBegin {
                     tool: request.name.clone(),
                 })
                 .await
@@ -462,7 +462,7 @@ pub enum SkillExecutionEvent {
     /// Append the internal string to the current message
     MessageAppend { text: String },
     /// The Skill has requested a tool call.
-    ToolCall { tool: String },
+    ToolBegin { tool: String },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
     Error(SkillExecutionError),
@@ -771,7 +771,7 @@ mod test {
         let error = select! {
             Some(event) = recv.recv() => match event {
                 SkillCtxEvent::Quit(error) => error,
-                SkillCtxEvent::ToolCall { .. } => unreachable!(),
+                SkillCtxEvent::ToolBegin { .. } => unreachable!(),
             },
             _ = invocation_ctx.chunk(vec![request])  => unreachable!(),
         };
@@ -1441,7 +1441,7 @@ mod test {
         let event = recv.recv().await.unwrap();
         assert!(matches!(
             event,
-            SkillExecutionEvent::ToolCall { tool } if tool == "test-tool"
+            SkillExecutionEvent::ToolBegin { tool } if tool == "test-tool"
         ));
         assert!(result.is_ok());
     }
