@@ -235,7 +235,7 @@ impl From<SkillExecutionEvent> for Event {
                 .event("message")
                 .json_data(MessageEvent::Append { text })
                 .expect("`json_data` must only be called once."),
-            SkillExecutionEvent::ToolCall { tools } => Self::default().event("tool"),
+            SkillExecutionEvent::ToolCall { tool } => Self::default().event("tool"),
             SkillExecutionEvent::Error(error) => Self::default()
                 .event("error")
                 .json_data(SseErrorEvent {
