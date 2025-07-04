@@ -8,7 +8,7 @@ use wasmtime::component::{Resource, bindgen};
 use crate::{
     csi::Csi,
     logging::TracingContext,
-    skills::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent},
+    wasm::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent},
 };
 
 pub type StreamOutput = mpsc::Sender<SkillEvent>;
@@ -28,7 +28,7 @@ bindgen!({
 });
 
 #[async_trait]
-impl crate::skills::WasmSkill for MessageStreamSkillPre<LinkedCtx> {
+impl crate::wasm::WasmSkill for MessageStreamSkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         _engine: &Engine,

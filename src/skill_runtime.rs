@@ -506,8 +506,8 @@ pub mod tests {
         skill_common::{SkillDouble, SkillError, SkillEvent},
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
-        skills::Engine,
         tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
+        wasm::Engine,
     };
     use anyhow::anyhow;
     use async_trait::async_trait;

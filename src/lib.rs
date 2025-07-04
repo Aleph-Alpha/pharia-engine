@@ -21,9 +21,9 @@ mod skill_driver;
 mod skill_loader;
 mod skill_runtime;
 mod skill_store;
-mod skills;
 mod tokenizers;
 mod tool;
+mod wasm;
 
 use std::sync::Arc;
 
@@ -35,10 +35,10 @@ use search::Search;
 use shell::Shell;
 use skill_loader::SkillLoader;
 use skill_store::SkillStore;
-use skills::Engine;
 use tokenizers::Tokenizers;
 use tool::ToolRuntime;
 use tracing::error;
+use wasm::Engine;
 
 use crate::{csi::CsiDrivers, mcp::Mcp, shell::ShellState};
 

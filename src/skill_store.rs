@@ -584,7 +584,7 @@ pub mod tests {
         registries::{Digest, RegistryError},
         skill_common::SkillPath,
         skill_loader::{LoadedSkill, SkillLoader, SkillLoaderMsg},
-        skills::Engine,
+        wasm::Engine,
     };
 
     use super::*;

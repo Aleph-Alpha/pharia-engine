@@ -13,7 +13,7 @@ use crate::registries::{
     Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
 };
 use crate::skill_common::{Skill, SkillLoadError, SkillPath};
-use crate::skills::{Engine, load_skill_from_wasm_bytes};
+use crate::wasm::{Engine, load_skill_from_wasm_bytes};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use std::collections::HashMap;
@@ -363,7 +363,7 @@ pub mod tests {
         namespace_watcher::Registry,
         registries::tests::{NeverResolvingRegistry, ReadyRegistry},
         skill_common::SkillPath,
-        skills::Engine,
+        wasm::Engine,
     };
 
     use super::*;
