@@ -152,7 +152,7 @@ pub enum SkillCtxEvent {
     /// A tool call has been completed.
     ToolEnd {
         name: String,
-        result: Result<String, String>,
+        result: Result<(), String>,
     },
 }
 
@@ -347,7 +347,7 @@ where
                 .send(SkillCtxEvent::ToolEnd {
                     name: name.clone(),
                     result: match result {
-                        Ok(output) => Ok(output.text()),
+                        Ok(_) => Ok(()),
                         Err(error) => Err(error.to_string()),
                     },
                 })
@@ -483,7 +483,7 @@ pub enum SkillExecutionEvent {
     /// A tool call has been completed. Can be success or error.
     ToolEnd {
         name: String,
-        result: Result<String, String>,
+        result: Result<(), String>,
     },
     /// An error occurred during skill execution. This kind of error can happen after streaming has
     /// started
