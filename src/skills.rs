@@ -279,6 +279,33 @@ pub trait Skill: Send + Sync {
     ) -> Result<(), SkillError>;
 }
 
+#[async_trait]
+pub trait WasmSkill: Send + Sync {
+    async fn manifest(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn Csi + Send>,
+        tracing_context: &TracingContext,
+    ) -> Result<AnySkillManifest, SkillError>;
+
+    async fn run_as_function(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn Csi + Send>,
+        input: Value,
+        tracing_context: &TracingContext,
+    ) -> Result<Value, SkillError>;
+
+    async fn run_as_message_stream(
+        &self,
+        engine: &Engine,
+        ctx: Box<dyn Csi + Send>,
+        input: Value,
+        sender: mpsc::Sender<SkillEvent>,
+        tracing_context: &TracingContext,
+    ) -> Result<(), SkillError>;
+}
+
 /// WebAssembly implementation of the Skill interface.
 pub struct SkillImpl<T> {
     engine: Arc<Engine>,
@@ -294,7 +321,7 @@ impl<T> SkillImpl<T> {
 #[async_trait]
 impl<T> Skill for SkillImpl<T>
 where
-    T: Skill,
+    T: WasmSkill,
 {
     async fn manifest(
         &self,
