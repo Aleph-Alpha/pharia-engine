@@ -7,7 +7,7 @@ use serde::Deserialize;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{
-    FeatureSet, namespace_watcher::Namespace, skill_common::SkillPath,
+    FeatureSet, namespace_watcher::Namespace, skill::SkillPath,
     skill_loader::SkillDescriptionFilterType, skill_store::SkillStoreApi,
 };
 
@@ -211,7 +211,7 @@ mod tests {
     use crate::{
         feature_set::PRODUCTION_FEATURE_SET,
         namespace_watcher::Namespace,
-        skill_common::SkillPath,
+        skill::SkillPath,
         skill_loader::SkillDescriptionFilterType,
         skill_store::{
             SkillStoreApiDouble, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,

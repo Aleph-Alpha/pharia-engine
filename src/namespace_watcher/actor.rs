@@ -7,7 +7,7 @@ use tracing::error;
 
 use crate::{
     mcp::{ConfiguredMcpServer, McpApi, McpServerUrl},
-    skill_common::SkillPath,
+    skill::SkillPath,
     skill_loader::ConfiguredSkill,
     skill_store::SkillStoreApi,
     tool::{ConfiguredNativeTool, NativeToolName, ToolStoreApi},
@@ -397,7 +397,7 @@ pub mod tests {
     use crate::{
         mcp::McpDouble,
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
-        skill_common::SkillPath,
+        skill::SkillPath,
         skill_store::tests::SkillStoreMsg,
         tool::tests::ToolStoreDouble,
     };

@@ -385,7 +385,7 @@ pub mod tests {
         authorization::tests::StubAuthorization,
         feature_set::PRODUCTION_FEATURE_SET,
         logging::tests::given_tracing_subscriber,
-        skill_common::{AnySkillManifest, SkillPath},
+        skill::{AnySkillManifest, SkillPath},
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
         skill_runtime::SkillRuntimeDouble,
         tests::api_token,

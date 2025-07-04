@@ -10,8 +10,8 @@ use crate::{
     hardcoded_skills::{SkillChat, hardcoded_skill},
     logging::TracingContext,
     namespace_watcher::{Namespace, SkillDescription},
+    skill::{Skill, SkillPath},
     skill_cache::SkillCache,
-    skill_common::{Skill, SkillPath},
     skill_loader::{
         ConfiguredSkill, LoadedSkill, ProgrammableSkill, SkillDescriptionFilterType,
         SkillFetchError, SkillLoaderApi,
@@ -582,7 +582,7 @@ pub mod tests {
     use crate::{
         namespace_watcher::Namespace,
         registries::{Digest, RegistryError},
-        skill_common::SkillPath,
+        skill::SkillPath,
         skill_loader::{LoadedSkill, SkillLoader, SkillLoaderMsg},
         wasm::Engine,
     };

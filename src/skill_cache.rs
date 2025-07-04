@@ -8,7 +8,7 @@ use tracing::info;
 
 use crate::{
     registries::Digest,
-    skill_common::{Skill, SkillPath},
+    skill::{Skill, SkillPath},
     skill_loader::LoadedSkill,
 };
 

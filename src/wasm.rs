@@ -24,7 +24,7 @@ use wit_parser::{
 use crate::{
     csi::Csi,
     logging::TracingContext,
-    skill_common::{AnySkillManifest, Skill, SkillError, SkillEvent, SkillLoadError},
+    skill::{AnySkillManifest, Skill, SkillError, SkillEvent, SkillLoadError},
 };
 use tracing::error;
 
