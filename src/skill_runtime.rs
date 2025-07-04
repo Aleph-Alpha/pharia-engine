@@ -536,7 +536,7 @@ pub mod tests {
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         skills::{SkillDouble, SkillError, SkillEvent},
-        tool::{InvokeRequest, Modality, ToolDescription, ToolError},
+        tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
     };
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -710,10 +710,8 @@ pub mod tests {
                 _namespace: Namespace,
                 _tracing_context: TracingContext,
                 _requests: Vec<InvokeRequest>,
-            ) -> Vec<Result<Vec<Modality>, ToolError>> {
-                vec![Ok(vec![Modality::Text {
-                    text: "3".to_string(),
-                }])]
+            ) -> Vec<Result<ToolOutput, ToolError>> {
+                vec![Ok(ToolOutput::from_text("3"))]
             }
         }
 

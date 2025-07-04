@@ -33,7 +33,7 @@ pub trait Tool {
         &self,
         arguments: Vec<Argument>,
         tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError>;
+    ) -> Result<ToolOutput, ToolError>;
 
     fn description(&self) -> ToolDescription;
 }
@@ -98,7 +98,26 @@ pub struct Argument {
     pub value: Vec<u8>,
 }
 
-pub type ToolOutput = Vec<Modality>;
+#[derive(Deserialize, Debug)]
+#[serde(transparent)]
+pub struct ToolOutput(pub Vec<Modality>);
+
+impl ToolOutput {
+    /// Construct a new tool output with a single text modality.
+    pub fn from_text(text: impl Into<String>) -> Self {
+        Self(vec![Modality::Text { text: text.into() }])
+    }
+    /// Concatenate all text modalities into a single string.
+    pub fn text(&self) -> String {
+        self.0
+            .iter()
+            .map(|modality| match modality {
+                Modality::Text { text } => text.to_owned(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+}
 
 #[derive(Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -133,9 +152,15 @@ pub enum ToolError {
 pub mod tests {
     use serde_json::Value;
 
-    use crate::tool::ToolDescription;
+    use crate::tool::{ToolDescription, ToolOutput};
 
     pub use super::actor::ToolStoreDouble;
+
+    impl ToolOutput {
+        pub fn empty() -> Self {
+            Self(vec![])
+        }
+    }
 
     impl ToolDescription {
         pub fn with_name(name: impl Into<String>) -> Self {

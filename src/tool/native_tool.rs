@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     logging::TracingContext,
-    tool::{Argument, Modality, Tool, ToolDescription, ToolError},
+    tool::{Argument, Tool, ToolDescription, ToolError, ToolOutput},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -38,7 +38,7 @@ impl Tool for Saboteur {
         &self,
         _args: Vec<Argument>,
         _tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         Err(ToolError::ToolExecution("Out of cheese.".to_string()))
     }
 
@@ -60,13 +60,11 @@ impl Tool for Add {
         &self,
         args: Vec<Argument>,
         _tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         let args = Arguments(args);
         let a: i32 = args.get("a")?;
         let b: i32 = args.get("b")?;
-        Ok(vec![Modality::Text {
-            text: (a + b).to_string(),
-        }])
+        Ok(ToolOutput::from_text((a + b).to_string()))
     }
 
     fn description(&self) -> ToolDescription {
@@ -102,13 +100,11 @@ impl Tool for Subtract {
         &self,
         args: Vec<Argument>,
         _tracing_context: TracingContext,
-    ) -> Result<Vec<Modality>, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         let args = Arguments(args);
         let a: i32 = args.get("a")?;
         let b: i32 = args.get("b")?;
-        Ok(vec![Modality::Text {
-            text: (a - b).to_string(),
-        }])
+        Ok(ToolOutput::from_text((a - b).to_string()))
     }
 
     fn description(&self) -> ToolDescription {
@@ -190,11 +186,6 @@ mod tests {
         let result = Add.invoke(args, TracingContext::dummy()).await.unwrap();
 
         // Then the result is the sum of the two numbers
-        assert_eq!(
-            result,
-            vec![Modality::Text {
-                text: "3".to_string()
-            }]
-        );
+        assert_eq!(result.text(), "3");
     }
 }

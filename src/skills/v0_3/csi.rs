@@ -41,7 +41,7 @@ impl ToolHost for LinkedCtx {
             .invoke_tool(request.into_iter().map(Into::into).collect())
             .await
             .into_iter()
-            .map(|result| result.map(|values| values.into_iter().map(Into::into).collect()))
+            .map(|result| result.map(|values| values.0.into_iter().map(Into::into).collect()))
             .collect()
     }
 

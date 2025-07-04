@@ -547,7 +547,7 @@ pub mod tests {
         },
         logging::TracingContext,
         skill_driver::SkillInvocationCtx,
-        tool::{InvokeRequest, Modality, ToolDescription},
+        tool::{InvokeRequest, ToolDescription, ToolOutput},
     };
 
     use super::*;
@@ -1113,9 +1113,7 @@ pub mod tests {
                         .parse::<i32>()
                         .unwrap();
                     let sum = a + b;
-                    Ok(vec![Modality::Text {
-                        text: sum.to_string(),
-                    }])
+                    Ok(ToolOutput::from_text(sum.to_string()))
                 })
                 .collect()
         }

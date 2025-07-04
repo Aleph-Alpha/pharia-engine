@@ -39,6 +39,7 @@ impl McpClientImpl {
         if result.is_error {
             let Modality::Text { text } = result
                 .content
+                .0
                 .first()
                 .ok_or(anyhow!("No content in tool call response"))?;
             Err(ToolError::ToolExecution(text.to_owned()))
@@ -57,7 +58,7 @@ pub trait McpClient: Send + Sync + 'static {
         arguments: Vec<Argument>,
         url: &McpServerUrl,
         tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<Vec<Modality>, ToolError>> + Send;
+    ) -> impl Future<Output = Result<ToolOutput, ToolError>> + Send;
 
     fn list_tools(
         &self,
@@ -405,8 +406,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.len(), 1);
-        assert!(matches!(&response[0], Modality::Text { text } if text == "3"));
+        assert_eq!(response.text(), "3");
     }
 
     #[tokio::test]
@@ -434,8 +434,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.len(), 1);
-        assert!(matches!(&response[0], Modality::Text { text } if text == "3"));
+        assert_eq!(response.text(), "3");
     }
 
     #[tokio::test]
@@ -486,7 +485,7 @@ pub mod tests {
     #[test]
     fn parse_tool_call_result_with_empty_list() {
         let result = ToolCallResult {
-            content: vec![],
+            content: ToolOutput::empty(),
             is_error: false,
         };
 
