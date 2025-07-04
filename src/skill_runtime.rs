@@ -643,7 +643,6 @@ pub mod tests {
         impl SkillDouble for SkillAssertConcurrent {
             async fn run_as_function(
                 &self,
-                _engine: &Engine,
                 _ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _tracing_context: &TracingContext,
@@ -959,7 +958,6 @@ pub mod tests {
     impl SkillDouble for GreetSkill {
         async fn run_as_function(
             &self,
-            _engine: &Engine,
             _ctx: Box<dyn Csi + Send>,
             _input: Value,
             _tracing_context: &TracingContext,
@@ -969,7 +967,6 @@ pub mod tests {
 
         async fn run_as_message_stream(
             &self,
-            _engine: &Engine,
             _ctx: Box<dyn Csi + Send>,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
@@ -988,7 +985,6 @@ pub mod tests {
         impl SkillDouble for ToolSpySkill {
             async fn run_as_function(
                 &self,
-                _engine: &Engine,
                 mut ctx: Box<dyn Csi + Send>,
                 _input: Value,
                 _tracing_context: &TracingContext,
