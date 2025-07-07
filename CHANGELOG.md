@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.15](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.14...pharia-kernel-v0.13.15)
+
+### Features
+
+- Remove content from tool stream event - ([d530f7f](https://github.com/Aleph-Alpha/pharia-kernel/commit/d530f7fad75486dacd75b4ded44b2bec958920d1))
+- Truncate large tool responses in message stream route - ([0cbeec2](https://github.com/Aleph-Alpha/pharia-kernel/commit/0cbeec250fca281773390f976813e248c57c3f00))
+- Report tool output in stream - ([b118c9c](https://github.com/Aleph-Alpha/pharia-kernel/commit/b118c9c2bdddca3c6a2279890151da33a4ac2793))
+- Expose tool invocation errors in message stream - ([c907e28](https://github.com/Aleph-Alpha/pharia-kernel/commit/c907e284cc2060205771bab5e0c1be4aa19ecc7d))
+- Tool end events are exposed via routes - ([22bec69](https://github.com/Aleph-Alpha/pharia-kernel/commit/22bec696f2771af2865ca93b890b42cb055f30bc))
+- Tool begin event serialized via routes - ([b22d354](https://github.com/Aleph-Alpha/pharia-kernel/commit/b22d354e9d028513a3e3ab2f8e99021d789091cb))
+- Skill driver forwards skill ctx event - ([9ea981e](https://github.com/Aleph-Alpha/pharia-kernel/commit/9ea981e6f6256311c8e2408b35b87f728d7e2e0e))
+- Skill context emits tool call event - ([46e3c49](https://github.com/Aleph-Alpha/pharia-kernel/commit/46e3c49069d2a09b1566219857642378c411a266))
+- Add tool call hardcoded skill - ([3798d13](https://github.com/Aleph-Alpha/pharia-kernel/commit/3798d13f667db2daceadb653b6f55283b4771566))
+
+### Fixes
+
+- Tool caller sends arguments as json integers - ([16178bb](https://github.com/Aleph-Alpha/pharia-kernel/commit/16178bb78fc682ff72c8000275dd01e06b85bf04))
+
+### Documentation
+
+- Add tool caller to example responses - ([bd9d4c8](https://github.com/Aleph-Alpha/pharia-kernel/commit/bd9d4c893c72c0b13148fa8d249305806a68e9b8))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 7 updates - ([33224d5](https://github.com/Aleph-Alpha/pharia-kernel/commit/33224d52e5241b31d6e6eeb6f3808b2a23f5903e))
+
+
 ## [0.13.14](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.13...pharia-kernel-v0.13.14)
 
 ### Documentation
