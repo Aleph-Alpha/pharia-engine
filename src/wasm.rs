@@ -118,7 +118,7 @@ impl<T> WasmSkill<T> {
 
 /// What we expect from WASM components that want to be executed by our runtime.
 #[async_trait]
-trait WasmExecutable: Send + Sync {
+trait WasmExecutable {
     async fn manifest(
         &self,
         engine: &Engine,
@@ -147,7 +147,7 @@ trait WasmExecutable: Send + Sync {
 #[async_trait]
 impl<T> Skill for WasmSkill<T>
 where
-    T: WasmExecutable,
+    T: WasmExecutable + Send + Sync,
 {
     async fn manifest(
         &self,
