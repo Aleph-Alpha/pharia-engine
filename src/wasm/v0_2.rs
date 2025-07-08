@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use pharia::skill::csi::{
     ChatParams, ChatResponse, ChunkParams, Completion, CompletionParams, CompletionRequest,
     Document, DocumentPath, FinishReason, Host, IndexPath, Language, Message, Modality, Role,
@@ -22,7 +21,6 @@ use super::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent};
 
 bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true });
 
-#[async_trait]
 impl super::SkillComponent for SkillPre<LinkedCtx> {
     async fn manifest(
         &self,

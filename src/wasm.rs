@@ -117,31 +117,30 @@ impl<T> WasmSkill<T> {
 }
 
 /// What we expect from WASM components that want to be executed by our runtime.
-#[async_trait]
 trait SkillComponent {
-    async fn manifest(
+    fn manifest(
         &self,
         engine: &Engine,
         ctx: Box<dyn Csi + Send>,
         tracing_context: &TracingContext,
-    ) -> Result<AnySkillManifest, SkillError>;
+    ) -> impl Future<Output = Result<AnySkillManifest, SkillError>> + Send;
 
-    async fn run_as_function(
+    fn run_as_function(
         &self,
         engine: &Engine,
         ctx: Box<dyn Csi + Send>,
         input: Value,
         tracing_context: &TracingContext,
-    ) -> Result<Value, SkillError>;
+    ) -> impl Future<Output = Result<Value, SkillError>> + Send;
 
-    async fn run_as_message_stream(
+    fn run_as_message_stream(
         &self,
         engine: &Engine,
         ctx: Box<dyn Csi + Send>,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
         tracing_context: &TracingContext,
-    ) -> Result<(), SkillError>;
+    ) -> impl Future<Output = Result<(), SkillError>> + Send;
 }
 
 #[async_trait]

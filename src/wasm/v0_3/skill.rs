@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
@@ -44,7 +43,6 @@ impl TryFrom<SkillMetadata> for SkillMetadataV0_3 {
     }
 }
 
-#[async_trait]
 impl crate::wasm::SkillComponent for SkillPre<LinkedCtx> {
     async fn manifest(
         &self,
