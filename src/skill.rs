@@ -32,6 +32,13 @@ impl fmt::Display for SkillPath {
     }
 }
 
+/// A CSI implementation which can be switched at runtime.
+///
+/// Having this as an alias, allows us to change and experiment with the trait bounds faster as
+/// compared to editing all the signatures of all the implementations of [`Skill`] and
+/// [`SkillComponent`].
+pub type BoxedCsi = Box<dyn Csi + Send>;
+
 /// A Skill encapsulates business logic to solve a particular problem.
 ///
 /// It interacts with the world through the Cognitive System Interface (CSI).
@@ -42,20 +49,20 @@ impl fmt::Display for SkillPath {
 pub trait Skill: Send + Sync {
     async fn manifest(
         &self,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError>;
 
     async fn run_as_function(
         &self,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         input: Value,
         tracing_context: &TracingContext,
     ) -> Result<Value, SkillError>;
 
     async fn run_as_message_stream(
         &self,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
         tracing_context: &TracingContext,
