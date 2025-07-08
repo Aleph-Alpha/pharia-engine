@@ -28,7 +28,7 @@ bindgen!({
 });
 
 #[async_trait]
-impl crate::wasm::WasmExecutable for MessageStreamSkillPre<LinkedCtx> {
+impl crate::wasm::SkillComponent for MessageStreamSkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         _engine: &Engine,
