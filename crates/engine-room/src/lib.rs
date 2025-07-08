@@ -7,7 +7,6 @@
 
 use std::{
     borrow::Cow,
-    io::Write,
     path::PathBuf,
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
@@ -15,11 +14,10 @@ use std::{
 
 use bytesize::ByteSize;
 use moka::sync::Cache as MokaCache;
-use tempfile::TempPath;
 use tracing::info;
 use wasmtime::{
-    Cache, CacheStore, Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory,
-    MemoryType, OptLevel, Store, UpdateDeadline,
+    Cache, CacheConfig, CacheStore, Config, Engine as WasmtimeEngine, InstanceAllocationStrategy,
+    Memory, MemoryType, OptLevel, Store, UpdateDeadline,
     component::{Component, Linker},
 };
 use wasmtime_wasi::ResourceTable;
@@ -88,8 +86,7 @@ impl TryFrom<EngineConfig> for Config {
         }
 
         if let Some(wasmtime_cache) = wasmtime_cache {
-            let path = wasmtime_cache.config()?;
-            let cache = Cache::from_file(Some(&path))?;
+            let cache = Cache::new(wasmtime_cache.into_config())?;
             config.cache(Some(cache));
         }
 
@@ -113,22 +110,12 @@ impl WasmtimeCache {
         }
     }
 
-    /// For now, wasmtime only supports cache config from a file.
-    /// It will be able to be configured programatically once [this issue is resolved](https://github.com/bytecodealliance/wasmtime/issues/10638):
-    ///
-    /// Until then, we write it to a local file and return the path it was at.
-    fn config(&self) -> anyhow::Result<TempPath> {
-        let config = format!(
-            r#"[cache]
-directory = "{}"
-files-total-size-soft-limit = "{}"
-"#,
-            self.directory.display(),
-            self.size_limit.as_u64()
-        );
-        let mut file = tempfile::NamedTempFile::new()?;
-        file.write_all(config.as_bytes())?;
-        Ok(file.into_temp_path())
+    fn into_config(self) -> CacheConfig {
+        let mut cache_config = CacheConfig::new();
+        cache_config
+            .with_directory(self.directory)
+            .with_files_total_size_soft_limit(self.size_limit.as_u64());
+        cache_config
     }
 }
 
