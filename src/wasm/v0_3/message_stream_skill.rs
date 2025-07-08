@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use pharia::skill::streaming_output::{Host, HostStreamOutput, MessageItem};
 use serde_json::Value;
 use tokio::sync::mpsc;
@@ -27,7 +26,6 @@ bindgen!({
     },
 });
 
-#[async_trait]
 impl crate::wasm::SkillComponent for MessageStreamSkillPre<LinkedCtx> {
     async fn manifest(
         &self,
