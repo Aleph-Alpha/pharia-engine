@@ -23,7 +23,7 @@ use super::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent};
 bindgen!({ world: "skill", path: "./wit/skill@0.2", async: true });
 
 #[async_trait]
-impl super::WasmExecutable for SkillPre<LinkedCtx> {
+impl super::SkillComponent for SkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         _engine: &Engine,
