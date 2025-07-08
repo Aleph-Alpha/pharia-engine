@@ -14,15 +14,16 @@ use std::{
 };
 
 use bytesize::ByteSize;
-use moka::sync::Cache;
+use moka::sync::Cache as MokaCache;
 use tempfile::TempPath;
 use tracing::info;
 use wasmtime::{
-    CacheStore, Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory, MemoryType,
-    OptLevel, Store, UpdateDeadline,
+    Cache, CacheStore, Config, Engine as WasmtimeEngine, InstanceAllocationStrategy, Memory,
+    MemoryType, OptLevel, Store, UpdateDeadline,
     component::{Component, Linker},
 };
-use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiView};
+use wasmtime_wasi::ResourceTable;
+use wasmtime_wasi::p2::{IoView, WasiCtx, WasiView, add_to_linker_async};
 
 #[derive(Default)]
 pub struct EngineConfig {
@@ -88,7 +89,8 @@ impl TryFrom<EngineConfig> for Config {
 
         if let Some(wasmtime_cache) = wasmtime_cache {
             let path = wasmtime_cache.config()?;
-            config.cache_config_load(path)?;
+            let cache = Cache::from_file(Some(&path))?;
+            config.cache(Some(cache));
         }
 
         Ok(config)
@@ -118,7 +120,6 @@ impl WasmtimeCache {
     fn config(&self) -> anyhow::Result<TempPath> {
         let config = format!(
             r#"[cache]
-enabled = true
 directory = "{}"
 files-total-size-soft-limit = "{}"
 "#,
@@ -190,7 +191,7 @@ impl Engine {
         let mut linker = Linker::new(&self.inner);
         linker.allow_shadowing(allow_shadowing);
         // provide host implementation of WASI interfaces required by the component with wit-bindgen
-        wasmtime_wasi::add_to_linker_async(&mut linker)?;
+        add_to_linker_async(&mut linker)?;
         Ok(linker)
     }
 
@@ -306,7 +307,7 @@ struct IncrementalCompilationCache {
     /// Value: the compiled bytes
     /// Based on Embark's implementation: <https://github.com/bytecodealliance/wasmtime/issues/4155#issuecomment-2767249113>
     /// but we use moka's `Cache` with a maximum size instead of an unbounded `DashMap`.
-    cache: Cache<Vec<u8>, Vec<u8>>,
+    cache: MokaCache<Vec<u8>, Vec<u8>>,
 }
 
 impl IncrementalCompilationCache {
@@ -314,7 +315,7 @@ impl IncrementalCompilationCache {
     /// We use the stored bytes for key and value to determine the weight of each entry.
     fn new(max_cache_size: ByteSize) -> Self {
         Self {
-            cache: Cache::builder()
+            cache: MokaCache::builder()
                 .weigher(|k: &Vec<u8>, v: &Vec<u8>| {
                     (k.len() + v.len()).try_into().unwrap_or(u32::MAX)
                 })
