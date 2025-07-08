@@ -24,7 +24,7 @@ use wit_parser::{
 use crate::{
     csi::Csi,
     logging::TracingContext,
-    skill::{AnySkillManifest, Skill, SkillError, SkillEvent},
+    skill::{AnySkillManifest, BoxedCsi, Skill, SkillError, SkillEvent},
 };
 use thiserror::Error;
 use tracing::error;
@@ -121,14 +121,14 @@ trait SkillComponent {
     fn manifest(
         &self,
         engine: &Engine,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<AnySkillManifest, SkillError>> + Send;
 
     fn run_as_function(
         &self,
         engine: &Engine,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         input: Value,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<Value, SkillError>> + Send;
@@ -136,7 +136,7 @@ trait SkillComponent {
     fn run_as_message_stream(
         &self,
         engine: &Engine,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
         tracing_context: &TracingContext,
