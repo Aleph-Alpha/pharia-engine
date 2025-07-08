@@ -146,7 +146,7 @@ jobs:
           path: /tmp
 
       - name: Extract SBOM from tarball
-        uses: aquasecurity/trivy-action@0.31.0
+        uses: aquasecurity/trivy-action@0.32.0
         with:
           format: "cyclonedx"
           input: "/tmp/pharia-kernel.tar"
@@ -154,7 +154,7 @@ jobs:
           scan-type: "fs"
 
       - name: Vulnerability scanning with Trivy
-        uses: aquasecurity/trivy-action@0.31.0
+        uses: aquasecurity/trivy-action@0.32.0
         with:
           input: /tmp/pharia-kernel.tar
           trivyignores: ".trivyignore"
