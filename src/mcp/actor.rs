@@ -194,6 +194,11 @@ where
                 let new_server = self.store.upsert(server.namespace, server.url.clone());
                 if new_server {
                     self.add_to_backlog(server.url);
+                } else {
+                    // Report the updated tools. We would not notice a change in the tools for this
+                    // server. Nevertheless, we need to notify the subscriber, as the tools are new
+                    // for this namespace.
+                    self.report_updated_tools().await;
                 }
             }
             McpMsg::Remove { server } => {
@@ -584,6 +589,48 @@ pub mod tests {
         }));
     }
 
+    #[tokio::test]
+    async fn configuring_existing_server_for_new_namespace_triggers_update() {
+        struct McpClientStub;
+        impl McpClientDouble for McpClientStub {
+            async fn list_tools(
+                &self,
+                _: &McpServerUrl,
+            ) -> Result<Vec<ToolDescription>, anyhow::Error> {
+                Ok(vec![ToolDescription::with_name("one_tool")])
+            }
+        }
+
+        // Given a mcp actor that knows about one mcp server
+        let subscriber = RecordingSubscriber::new();
+        let mcp = Mcp::new(McpClientStub, subscriber.clone(), Duration::from_secs(60)).api();
+        let namespace = Namespace::new("test").unwrap();
+        mcp.upsert(ConfiguredMcpServer::new(
+            "http://localhost:8000/mcp",
+            namespace.clone(),
+        ))
+        .await;
+
+        // Wait for the first request to be processed
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        subscriber.reset();
+
+        // When configuring the same mcp server for a new namespace
+        let new_namespace = Namespace::new("new").unwrap();
+        mcp.upsert(ConfiguredMcpServer::new(
+            "http://localhost:8000/mcp",
+            new_namespace.clone(),
+        ))
+        .await;
+
+        // Wait for the second request to be processed
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Then the subscriber should have been notified again
+        let calls = subscriber.calls();
+        assert_eq!(calls.len(), 1);
+    }
+
     #[derive(Clone)]
     struct RecordingSubscriber {
         calls: Arc<Mutex<Vec<ToolMap>>>,
@@ -598,6 +645,10 @@ pub mod tests {
 
         pub fn calls(&self) -> Vec<ToolMap> {
             self.calls.lock().unwrap().clone()
+        }
+
+        pub fn reset(&self) {
+            self.calls.lock().unwrap().clear();
         }
     }
 
