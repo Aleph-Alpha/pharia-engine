@@ -84,11 +84,15 @@ impl McpServerStore {
         &self,
         namespace: &Namespace,
     ) -> impl Iterator<Item = McpServerUrl> + '_ {
-        self.servers
+        let mut servers = self
+            .servers
             .get(namespace)
             .cloned()
             .unwrap_or_default()
             .into_iter()
+            .collect::<Vec<_>>();
+        servers.sort();
+        servers.into_iter()
     }
 
     /// Sets the tool list for a given MCP server and reports if there have been changes.
@@ -362,5 +366,26 @@ pub mod tests {
 
         // Then the server is not considered as new
         assert!(!new_server);
+    }
+
+    #[tokio::test]
+    async fn list_in_namespace_returns_sorted_list() {
+        // Given a store with a server that has a list of tools
+        let mut store = McpServerStore::new();
+        let ordered = vec![
+            McpServerUrl::new("http://first.com/mcp"),
+            McpServerUrl::new("http://second.com/mcp"),
+            McpServerUrl::new("http://third.com/mcp"),
+        ];
+        let namespace = Namespace::new("first").unwrap();
+        for server in &ordered {
+            store.upsert(namespace.clone(), server.clone());
+        }
+
+        // When we list the servers in the namespace
+        let servers = store.list_in_namespace(&namespace);
+
+        // Then the servers are returned in sorted order
+        assert_eq!(servers.collect::<Vec<_>>(), ordered);
     }
 }
