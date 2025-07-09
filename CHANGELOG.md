@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.16](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.15...pharia-kernel-v0.13.16)
+
+### Features
+
+- Order mcp servers by name when listing - ([943dc4d](https://github.com/Aleph-Alpha/pharia-kernel/commit/943dc4d9bd8258e23ea3fe0d8a1ea36947853ba7))
+
+### Fixes
+
+- Report updated tools if existing mcp server is configured for new namespace - ([7e8c481](https://github.com/Aleph-Alpha/pharia-kernel/commit/7e8c4811d709505b2e1a179e2be8a57ddf0475d1))
+
+### Builds
+
+- *(deps)* Bump the minor group with 2 updates - ([7c7ecc6](https://github.com/Aleph-Alpha/pharia-kernel/commit/7c7ecc69e9c8dadc2050c111e351e10ed8b89caf))
+- *(deps)* Bump aquasecurity/trivy-action from 0.31.0 to 0.32.0 - ([13adb4a](https://github.com/Aleph-Alpha/pharia-kernel/commit/13adb4aa5f253abd07c54e3ee68ba8bc7af9f4e0))
+- *(deps)* Update to wasmtime 0.33.1 - ([e8e8fbb](https://github.com/Aleph-Alpha/pharia-kernel/commit/e8e8fbb0ccec91bbc03ff2670d78c867fc233abb))
+
+
 ## [0.13.15](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.14...pharia-kernel-v0.13.15)
 
 ### Features
