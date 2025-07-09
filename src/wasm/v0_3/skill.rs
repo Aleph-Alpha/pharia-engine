@@ -4,9 +4,8 @@ use tracing::{error, info, warn};
 use wasmtime::component::bindgen;
 
 use crate::{
-    csi::Csi,
     logging::TracingContext,
-    skill::{AnySkillManifest, Signature, SkillError, SkillEvent, SkillMetadataV0_3},
+    skill::{AnySkillManifest, BoxedCsi, Signature, SkillError, SkillEvent, SkillMetadataV0_3},
     wasm::{Engine, LinkedCtx, v0_3::skill::exports::pharia::skill::skill_handler::SkillMetadata},
 };
 
@@ -47,7 +46,7 @@ impl crate::wasm::SkillComponent for SkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         engine: &Engine,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         let mut store = engine.store(ctx);
@@ -69,7 +68,7 @@ impl crate::wasm::SkillComponent for SkillPre<LinkedCtx> {
     async fn run_as_function(
         &self,
         engine: &Engine,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         input: Value,
         tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -111,7 +110,7 @@ impl crate::wasm::SkillComponent for SkillPre<LinkedCtx> {
     async fn run_as_message_stream(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         _sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,

@@ -8,13 +8,12 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::{
-    csi::Csi,
     inference::{ChatEvent, ChatParams, ChatRequest, Message},
     logging::TracingContext,
     namespace_watcher::Namespace,
     skill::{
-        AnySkillManifest, JsonSchema, Signature, Skill, SkillError, SkillEvent, SkillMetadataV0_3,
-        SkillPath,
+        AnySkillManifest, BoxedCsi, JsonSchema, Signature, Skill, SkillError, SkillEvent,
+        SkillMetadataV0_3, SkillPath,
     },
     tool::{Argument, InvokeRequest},
 };
@@ -46,7 +45,7 @@ pub struct SkillToolCaller;
 impl Skill for SkillToolCaller {
     async fn manifest(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
@@ -54,7 +53,7 @@ impl Skill for SkillToolCaller {
 
     async fn run_as_function(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -66,7 +65,7 @@ impl Skill for SkillToolCaller {
 
     async fn run_as_message_stream(
         &self,
-        mut ctx: Box<dyn Csi + Send>,
+        mut ctx: BoxedCsi,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
@@ -113,7 +112,7 @@ impl Skill for SkillToolCaller {
 impl Skill for SkillHello {
     async fn manifest(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
@@ -121,7 +120,7 @@ impl Skill for SkillHello {
 
     async fn run_as_function(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -130,7 +129,7 @@ impl Skill for SkillHello {
 
     async fn run_as_message_stream(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
@@ -160,7 +159,7 @@ impl Skill for SkillHello {
 impl Skill for SkillSaboteur {
     async fn manifest(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0)
@@ -168,7 +167,7 @@ impl Skill for SkillSaboteur {
 
     async fn run_as_function(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -177,7 +176,7 @@ impl Skill for SkillSaboteur {
 
     async fn run_as_message_stream(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         _sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
@@ -190,7 +189,7 @@ impl Skill for SkillSaboteur {
 impl Skill for SkillTellMeAJoke {
     async fn manifest(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Err(SkillError::UserCode("I am a dummy Skill".to_owned()))
@@ -198,7 +197,7 @@ impl Skill for SkillTellMeAJoke {
 
     async fn run_as_function(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -207,7 +206,7 @@ impl Skill for SkillTellMeAJoke {
 
     async fn run_as_message_stream(
         &self,
-        mut ctx: Box<dyn Csi + Send>,
+        mut ctx: BoxedCsi,
         _input: Value,
         sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
@@ -271,7 +270,7 @@ impl SkillChat {
 impl Skill for SkillChat {
     async fn manifest(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         Ok(AnySkillManifest::V0_3(SkillMetadataV0_3 {
@@ -297,7 +296,7 @@ impl Skill for SkillChat {
 
     async fn run_as_function(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -306,7 +305,7 @@ impl Skill for SkillChat {
 
     async fn run_as_message_stream(
         &self,
-        mut ctx: Box<dyn Csi + Send>,
+        mut ctx: BoxedCsi,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
         _tracing_context: &TracingContext,
