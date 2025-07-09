@@ -17,7 +17,7 @@ pub use self::{actor::McpDouble, client::McpClientDouble};
 use crate::namespace_watcher::Namespace;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct McpServerUrl(pub String);
 
 impl McpServerUrl {
