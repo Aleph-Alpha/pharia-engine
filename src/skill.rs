@@ -37,7 +37,7 @@ impl fmt::Display for SkillPath {
 /// Having this as an alias, allows us to change and experiment with the trait bounds faster as
 /// compared to editing all the signatures of all the implementations of [`Skill`] and
 /// [`SkillComponent`].
-pub type BoxedCsi = Box<dyn Csi + Send>;
+pub type BoxedCsi = Box<dyn Csi + Send + Sync>;
 
 /// A Skill encapsulates business logic to solve a particular problem.
 ///
