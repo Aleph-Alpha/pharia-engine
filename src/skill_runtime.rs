@@ -499,11 +499,11 @@ pub mod tests {
     use std::time::Duration;
 
     use crate::{
-        csi::{Csi, tests::RawCsiDouble},
+        csi::tests::RawCsiDouble,
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke, SkillToolCaller},
         inference::{ChatEvent, ChatRequest, InferenceError},
         namespace_watcher::Namespace,
-        skill::{SkillDouble, SkillError, SkillEvent},
+        skill::{BoxedCsi, SkillDouble, SkillError, SkillEvent},
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
@@ -613,7 +613,7 @@ pub mod tests {
         impl SkillDouble for SkillAssertConcurrent {
             async fn run_as_function(
                 &self,
-                _ctx: Box<dyn Csi + Send>,
+                _ctx: BoxedCsi,
                 _input: Value,
                 _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {
@@ -922,7 +922,7 @@ pub mod tests {
     impl SkillDouble for GreetSkill {
         async fn run_as_function(
             &self,
-            _ctx: Box<dyn Csi + Send>,
+            _ctx: BoxedCsi,
             _input: Value,
             _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
@@ -931,7 +931,7 @@ pub mod tests {
 
         async fn run_as_message_stream(
             &self,
-            _ctx: Box<dyn Csi + Send>,
+            _ctx: BoxedCsi,
             _input: Value,
             _sender: mpsc::Sender<SkillEvent>,
             _tracing_context: &TracingContext,
@@ -949,7 +949,7 @@ pub mod tests {
         impl SkillDouble for ToolSpySkill {
             async fn run_as_function(
                 &self,
-                mut ctx: Box<dyn Csi + Send>,
+                mut ctx: BoxedCsi,
                 _input: Value,
                 _tracing_context: &TracingContext,
             ) -> Result<Value, SkillError> {

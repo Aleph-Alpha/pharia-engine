@@ -5,8 +5,8 @@ use tracing::error;
 use wasmtime::component::{Resource, bindgen};
 
 use crate::{
-    csi::Csi,
     logging::TracingContext,
+    skill::BoxedCsi,
     wasm::{AnySkillManifest, Engine, LinkedCtx, SkillError, SkillEvent},
 };
 
@@ -30,7 +30,7 @@ impl crate::wasm::SkillComponent for MessageStreamSkillPre<LinkedCtx> {
     async fn manifest(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         // Still need to define metadata for streaming skills
@@ -40,7 +40,7 @@ impl crate::wasm::SkillComponent for MessageStreamSkillPre<LinkedCtx> {
     async fn run_as_function(
         &self,
         _engine: &Engine,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _input: Value,
         _tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -50,7 +50,7 @@ impl crate::wasm::SkillComponent for MessageStreamSkillPre<LinkedCtx> {
     async fn run_as_message_stream(
         &self,
         engine: &Engine,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
         tracing_context: &TracingContext,

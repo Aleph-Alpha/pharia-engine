@@ -150,7 +150,7 @@ where
 {
     async fn manifest(
         &self,
-        _ctx: Box<dyn Csi + Send>,
+        _ctx: BoxedCsi,
         _tracing_context: &TracingContext,
     ) -> Result<AnySkillManifest, SkillError> {
         self.pre
@@ -160,7 +160,7 @@ where
 
     async fn run_as_function(
         &self,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         input: Value,
         tracing_context: &TracingContext,
     ) -> Result<Value, SkillError> {
@@ -171,7 +171,7 @@ where
 
     async fn run_as_message_stream(
         &self,
-        ctx: Box<dyn Csi + Send>,
+        ctx: BoxedCsi,
         input: Value,
         sender: mpsc::Sender<SkillEvent>,
         tracing_context: &TracingContext,
