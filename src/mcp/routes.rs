@@ -1,6 +1,8 @@
 use axum::{
     Json, Router,
     extract::{FromRef, Path, State},
+    http::StatusCode,
+    response::Result,
     routing::get,
 };
 use utoipa::OpenApi;
@@ -63,17 +65,20 @@ where
     security(("api_token" = [])),
     responses(
         (status = 200, body=Vec<String>, example = json!(["http://localhost:8000/mcp"])),
+        (status = 404, description = "Namespace not found"),
     ),
 )]
 async fn list_mcp_servers<M>(
     Path(namespace): Path<Namespace>,
     State(McpServerStoreState(mcp_servers)): State<McpServerStoreState<M>>,
-) -> Json<Vec<McpServerUrl>>
+) -> Result<Json<Vec<McpServerUrl>>, StatusCode>
 where
     M: McpApi,
 {
-    let servers = mcp_servers.mcp_list(namespace).await;
-    Json(servers)
+    match mcp_servers.mcp_list(namespace).await {
+        Some(servers) => Ok(Json(servers)),
+        None => Err(StatusCode::NOT_FOUND),
+    }
 }
 
 #[cfg(test)]
@@ -112,9 +117,9 @@ mod tests {
         #[derive(Clone)]
         struct McpServerMock;
         impl McpDouble for McpServerMock {
-            async fn mcp_list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
+            async fn mcp_list(&self, namespace: Namespace) -> Option<Vec<McpServerUrl>> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
-                vec![McpServerUrl("http://localhost:8083/mcp".to_owned())]
+                Some(vec![McpServerUrl("http://localhost:8083/mcp".to_owned())])
             }
         }
         let app_state = ProviderStub::new(McpServerMock);
@@ -137,5 +142,33 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let answer = String::from_utf8(body.to_vec()).unwrap();
         assert_eq!(answer, "[\"http://localhost:8083/mcp\"]");
+    }
+
+    #[tokio::test]
+    async fn listing_tools_for_non_existing_namespace_returns_404() {
+        // Given a an mcp server store that does not know about a namespace
+        #[derive(Clone)]
+        struct McpServerMock;
+        impl McpDouble for McpServerMock {
+            async fn mcp_list(&self, _namespace: Namespace) -> Option<Vec<McpServerUrl>> {
+                None
+            }
+        }
+        let app_state = ProviderStub::new(McpServerMock);
+        let http = http_mcp_servers_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/mcp_servers/my-test-namespace")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get a 404
+        assert_eq!(resp.status(), axum::http::StatusCode::NOT_FOUND);
     }
 }

@@ -35,7 +35,8 @@ impl CachedTools {
 /// Remembers MCP servers configured for each namespace, as well as the tools provided by each
 /// server.
 pub struct McpServerStore {
-    /// All configured MCP servers grouped by namespace.
+    /// List of configured MCP servers per namespace. The store knowns about all namespaces, even
+    /// if there are no MCP servers configured for them.
     servers: HashMap<Namespace, HashSet<McpServerUrl>>,
     /// Names of tools provided by each MCP server. Tool contains one entry for each unique MCP
     /// server URL.
@@ -80,19 +81,24 @@ impl McpServerStore {
             .min_by_key(|(_, tools)| tools.last_checked)
     }
 
+    /// List all mcp servers for a given namespace.
+    ///
+    /// Returns None if the namespace is not known to the store. A developer can ask the mcp routes
+    /// to list all mcp servers for a namespace. We want to cater this route from this actor alone,
+    /// but also want to give an error in case the namespace does not exist. This implies that the
+    /// store needs to know about all namespaces.
     pub fn list_in_namespace(
         &self,
         namespace: &Namespace,
-    ) -> impl Iterator<Item = McpServerUrl> + '_ {
+    ) -> Option<impl Iterator<Item = McpServerUrl> + '_> {
         let mut servers = self
             .servers
-            .get(namespace)
+            .get(namespace)?
+            .iter()
             .cloned()
-            .unwrap_or_default()
-            .into_iter()
             .collect::<Vec<_>>();
         servers.sort();
-        servers.into_iter()
+        Some(servers.into_iter())
     }
 
     /// Sets the tool list for a given MCP server and reports if there have been changes.
@@ -107,6 +113,19 @@ impl McpServerStore {
             self.tools.insert(server, CachedTools::now(tools));
             true
         }
+    }
+
+    /// Register a namespace with the store.
+    ///
+    /// See [`McpServerStore::list_in_namespace`] why we need to know about all namespaces in the
+    /// store. Since namespace are not dynamic, this is only called once at startup.
+    ///
+    /// The interface to get notified about namespace changes by the [`crate::NamespaceWatcher`]
+    /// becomes quite big (upsert, remove, register). The alternative is to not compute a diff
+    /// per namespace in the watcher, but rather notify the store periodically about the entire
+    /// state (all mcp servers for all namespaces).
+    pub fn register_namespace(&mut self, namespace: Namespace) {
+        self.servers.entry(namespace).or_default();
     }
 
     /// Add a new server for a given namespace. Returns if the server is new or already known.
@@ -129,9 +148,6 @@ impl McpServerStore {
     pub fn remove(&mut self, namespace: Namespace, server_to_remove: McpServerUrl) {
         if let Some(servers) = self.servers.get_mut(&namespace) {
             servers.remove(&server_to_remove);
-            if servers.is_empty() {
-                self.servers.remove(&namespace);
-            }
         }
         if self
             .servers
@@ -383,9 +399,50 @@ pub mod tests {
         }
 
         // When we list the servers in the namespace
-        let servers = store.list_in_namespace(&namespace);
+        let servers = store.list_in_namespace(&namespace).unwrap();
 
         // Then the servers are returned in sorted order
         assert_eq!(servers.collect::<Vec<_>>(), ordered);
+    }
+
+    #[tokio::test]
+    async fn listing_tools_for_unknown_namespace_returns_error() {
+        // Given a an mcp server store that does not know about a namespace
+        let store = McpServerStore::new();
+
+        // When we list the tools for the namespace
+        let namespace = Namespace::new("unknown").unwrap();
+        let tools = store.list_in_namespace(&namespace);
+
+        // Then we get an error
+        assert!(tools.is_none());
+    }
+
+    #[tokio::test]
+    async fn listing_tools_for_empty_namespace_returns_empty_list() {
+        // Given a an mcp server store that does not know about a namespace
+        let mut store = McpServerStore::new();
+        let namespace = Namespace::new("known-but-empty").unwrap();
+        store.register_namespace(namespace.clone());
+
+        // When we list the tools for the namespace
+        let mut tools = store.list_in_namespace(&namespace).unwrap();
+
+        // Then we get an empty list
+        assert!(tools.next().is_none());
+    }
+
+    #[tokio::test]
+    async fn removing_an_mcp_server_keeps_namespace_registered() {
+        // Given a an mcp server store that knows about a namespace
+        let mut store = McpServerStore::new();
+        let namespace = Namespace::new("known-but-empty").unwrap();
+        store.upsert(namespace.clone(), McpServerUrl::new("http://first.com/mcp"));
+
+        // When we remove the server
+        store.remove(namespace.clone(), McpServerUrl::new("http://first.com/mcp"));
+
+        // Then the namespace is still registered
+        assert!(store.list_in_namespace(&namespace).is_some());
     }
 }
