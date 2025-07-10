@@ -83,22 +83,23 @@ impl McpServerStore {
 
     /// List all mcp servers for a given namespace.
     ///
-    /// Returns None if the namespace is not known to the store. A developer can ask the mcp routes
+    /// Returns an error if the namespace is not known to the store. A developer can ask the mcp routes
     /// to list all mcp servers for a namespace. We want to cater this route from this actor alone,
     /// but also want to give an error in case the namespace does not exist. This implies that the
     /// store needs to know about all namespaces.
     pub fn list_in_namespace(
         &self,
         namespace: &Namespace,
-    ) -> Option<impl Iterator<Item = McpServerUrl> + '_> {
+    ) -> Result<impl Iterator<Item = McpServerUrl> + '_, NamespaceNotFound> {
         let mut servers = self
             .servers
-            .get(namespace)?
+            .get(namespace)
+            .ok_or(NamespaceNotFound)?
             .iter()
             .cloned()
             .collect::<Vec<_>>();
         servers.sort();
-        Some(servers.into_iter())
+        Ok(servers.into_iter())
     }
 
     /// Sets the tool list for a given MCP server and reports if there have been changes.
@@ -215,6 +216,9 @@ impl McpServerStore {
             })
     }
 }
+
+#[derive(Debug)]
+pub struct NamespaceNotFound;
 
 #[cfg(test)]
 pub mod tests {
@@ -415,7 +419,7 @@ pub mod tests {
         let tools = store.list_in_namespace(&namespace);
 
         // Then we get an error
-        assert!(tools.is_none());
+        assert!(tools.is_err());
     }
 
     #[tokio::test]
@@ -443,6 +447,6 @@ pub mod tests {
         store.remove(namespace.clone(), McpServerUrl::new("http://first.com/mcp"));
 
         // Then the namespace is still registered
-        assert!(store.list_in_namespace(&namespace).is_some());
+        assert!(store.list_in_namespace(&namespace).is_ok());
     }
 }

@@ -75,12 +75,13 @@ async fn list_mcp_servers<M>(
 where
     M: McpApi,
 {
-    match mcp_servers.mcp_list(namespace.clone()).await {
-        Some(servers) => Ok(Json(servers)),
-        None => Err((
+    if let Ok(servers) = mcp_servers.mcp_list(namespace.clone()).await {
+        Ok(Json(servers))
+    } else {
+        Err((
             StatusCode::NOT_FOUND,
             Json(format!("Namespace '{namespace}' not found")),
-        )),
+        ))
     }
 }
 
@@ -93,7 +94,9 @@ mod tests {
 
     use super::{McpServerStoreProvider, McpServerUrl, http_mcp_servers_v1};
     use crate::{
-        feature_set::PRODUCTION_FEATURE_SET, mcp::McpDouble, namespace_watcher::Namespace,
+        feature_set::PRODUCTION_FEATURE_SET,
+        mcp::{McpDouble, store::NamespaceNotFound},
+        namespace_watcher::Namespace,
     };
 
     #[derive(Clone)]
@@ -120,9 +123,12 @@ mod tests {
         #[derive(Clone)]
         struct McpServerMock;
         impl McpDouble for McpServerMock {
-            async fn mcp_list(&self, namespace: Namespace) -> Option<Vec<McpServerUrl>> {
+            async fn mcp_list(
+                &self,
+                namespace: Namespace,
+            ) -> Result<Vec<McpServerUrl>, NamespaceNotFound> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
-                Some(vec![McpServerUrl("http://localhost:8083/mcp".to_owned())])
+                Ok(vec![McpServerUrl("http://localhost:8083/mcp".to_owned())])
             }
         }
         let app_state = ProviderStub::new(McpServerMock);
@@ -153,8 +159,11 @@ mod tests {
         #[derive(Clone)]
         struct McpServerMock;
         impl McpDouble for McpServerMock {
-            async fn mcp_list(&self, _namespace: Namespace) -> Option<Vec<McpServerUrl>> {
-                None
+            async fn mcp_list(
+                &self,
+                _namespace: Namespace,
+            ) -> Result<Vec<McpServerUrl>, NamespaceNotFound> {
+                Err(NamespaceNotFound)
             }
         }
         let app_state = ProviderStub::new(McpServerMock);

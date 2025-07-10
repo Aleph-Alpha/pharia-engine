@@ -16,7 +16,7 @@ use crate::{
         ConfiguredMcpServer, McpServerUrl, McpSubscriber,
         client::{McpClient, McpClientImpl},
         mcp_tool::McpTool,
-        store::McpServerStore,
+        store::{McpServerStore, NamespaceNotFound},
     },
     namespace_watcher::Namespace,
     tool::{Tool, ToolDescription},
@@ -36,7 +36,7 @@ pub trait McpApi {
     fn mcp_list(
         &self,
         namespace: Namespace,
-    ) -> impl Future<Output = Option<Vec<McpServerUrl>>> + Send;
+    ) -> impl Future<Output = Result<Vec<McpServerUrl>, NamespaceNotFound>> + Send;
 }
 
 pub struct Mcp {
@@ -93,7 +93,7 @@ impl McpApi for McpSender {
         self.0.send(msg).await.unwrap();
     }
 
-    async fn mcp_list(&self, namespace: Namespace) -> Option<Vec<McpServerUrl>> {
+    async fn mcp_list(&self, namespace: Namespace) -> Result<Vec<McpServerUrl>, NamespaceNotFound> {
         let (send, receive) = oneshot::channel();
         let msg = McpMsg::List { namespace, send };
         self.0.send(msg).await.unwrap();
@@ -113,7 +113,7 @@ enum McpMsg {
     },
     List {
         namespace: Namespace,
-        send: oneshot::Sender<Option<Vec<McpServerUrl>>>,
+        send: oneshot::Sender<Result<Vec<McpServerUrl>, NamespaceNotFound>>,
     },
 }
 
@@ -326,6 +326,7 @@ pub mod tests {
         // Then the list of tools can still be fetched as the update happens in the background
         tokio::time::timeout(Duration::from_secs(1), mcp.mcp_list(namespace))
             .await
+            .unwrap()
             .unwrap();
     }
 
@@ -356,6 +357,7 @@ pub mod tests {
             mcp.mcp_list(Namespace::new("test").unwrap()),
         )
         .await
+        .unwrap()
         .unwrap();
     }
 
