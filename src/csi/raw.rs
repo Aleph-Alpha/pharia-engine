@@ -553,7 +553,9 @@ where
         self.tool
             .list_tools(namespace)
             .await
-            .ok_or_else(|| anyhow::anyhow!("Namespace not found"))
+            // As long as namespaces can not be registered/unregistered dynamically, this error
+            // path should never be taken.
+            .map_err(|_| anyhow::anyhow!("Namespace disappeared while executing the Skill. This is a logical bug in the Kernel. Please contact the developers."))
     }
 }
 
