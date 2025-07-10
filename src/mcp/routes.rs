@@ -65,19 +65,22 @@ where
     security(("api_token" = [])),
     responses(
         (status = 200, body=Vec<String>, example = json!(["http://localhost:8000/mcp"])),
-        (status = 404, description = "Namespace not found"),
+        (status = 404, body=String, example = "Namespace 'unknown-namespace' not found"),
     ),
 )]
 async fn list_mcp_servers<M>(
     Path(namespace): Path<Namespace>,
     State(McpServerStoreState(mcp_servers)): State<McpServerStoreState<M>>,
-) -> Result<Json<Vec<McpServerUrl>>, StatusCode>
+) -> Result<Json<Vec<McpServerUrl>>, (StatusCode, Json<String>)>
 where
     M: McpApi,
 {
-    match mcp_servers.mcp_list(namespace).await {
+    match mcp_servers.mcp_list(namespace.clone()).await {
         Some(servers) => Ok(Json(servers)),
-        None => Err(StatusCode::NOT_FOUND),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(format!("Namespace '{namespace}' not found")),
+        )),
     }
 }
 
