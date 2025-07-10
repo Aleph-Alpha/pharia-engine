@@ -265,6 +265,7 @@ where
 
     async fn run(mut self) {
         let mut started = tokio::time::Instant::now();
+        self.report_all_namespaces().await;
         self.report_all_changes().await;
         let _ = self.ready.send(true);
         loop {
@@ -288,6 +289,14 @@ where
         for (namespace, description) in futures::future::join_all(futures).await {
             self.report_changes_in_namespace(&namespace, description)
                 .await;
+        }
+    }
+
+    /// The mcp store is interested to know about all namespaces, even if there are no MCP servers
+    /// configured for them.
+    async fn report_all_namespaces(&mut self) {
+        for namespace in self.config.namespaces() {
+            self.mcp_store_api.register_namespace(namespace).await;
         }
     }
 
@@ -565,6 +574,13 @@ pub mod tests {
         assert_eq!(diff.added_or_changed, vec![incoming]);
         assert!(diff.removed.is_empty());
     }
+    #[derive(Clone)]
+    struct McpStub;
+
+    impl McpDouble for McpStub {
+        /// The namespace watcher requires some implementation of `register_namespace` to boot up.
+        async fn register_namespace(&self, _namespace: Namespace) {}
+    }
 
     #[tokio::test]
     async fn load_config_during_first_pass() {
@@ -572,7 +588,7 @@ pub mod tests {
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
         let mut observer =
-            NamespaceWatcher::with_config(Dummy, ToolStoreDummy, Dummy, config, update_interval);
+            NamespaceWatcher::with_config(Dummy, ToolStoreDummy, McpStub, config, update_interval);
 
         // When waiting for the first pass
         let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
@@ -640,6 +656,54 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn on_start_reports_all_namespaces() {
+        // Given a mcp store spy
+        #[derive(Clone)]
+        struct McpStoreSpy {
+            registered: Arc<Mutex<Vec<Namespace>>>,
+        }
+
+        impl McpStoreSpy {
+            fn new() -> Self {
+                Self {
+                    registered: Arc::new(Mutex::new(vec![])),
+                }
+            }
+
+            async fn namespaces(&self) -> Vec<Namespace> {
+                self.registered.lock().await.clone()
+            }
+        }
+
+        impl McpDouble for McpStoreSpy {
+            async fn register_namespace(&self, namespace: Namespace) {
+                self.registered.lock().await.push(namespace);
+            }
+        }
+
+        // Given a namespace with an mcp server
+        let namespace = Namespace::new("dummy-namespace").unwrap();
+        let config = Box::new(StubConfig::new(HashMap::from([(
+            namespace.clone(),
+            vec![],
+        )])));
+
+        let mcp_store = McpStoreSpy::new();
+        let mut observer = NamespaceWatcher::with_config(
+            Dummy,
+            ToolStoreDummy,
+            mcp_store.clone(),
+            config,
+            Duration::from_millis(1),
+        );
+        observer.wait_for_ready().await;
+
+        // Then the mcp store is notified about all namespaces
+        let registered = mcp_store.namespaces().await;
+        assert_eq!(registered, vec![namespace]);
+    }
+
+    #[tokio::test]
     async fn on_start_reports_all_skills() {
         // Given some configured skills
         let dummy_namespace = Namespace::new("dummy-namespace").unwrap();
@@ -660,7 +724,7 @@ pub mod tests {
         let mut observer = NamespaceWatcher::with_config(
             sender,
             ToolStoreDummy,
-            Dummy,
+            McpStub,
             stub_config,
             update_interval,
         );
@@ -1041,7 +1105,7 @@ pub mod tests {
         let observer = NamespaceWatcher::with_config(
             sender,
             ToolStoreDummy,
-            Dummy,
+            McpStub,
             stub_config,
             update_interval,
         );
@@ -1074,7 +1138,7 @@ pub mod tests {
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
         let mut observer =
-            NamespaceWatcher::with_config(sender, ToolStoreDummy, Dummy, config, update_interval);
+            NamespaceWatcher::with_config(sender, ToolStoreDummy, McpStub, config, update_interval);
         observer.wait_for_ready().await;
         receiver.recv().await.unwrap();
 

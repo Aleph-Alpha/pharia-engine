@@ -32,7 +32,11 @@ use futures::{Future, StreamExt, stream::FuturesUnordered};
 pub trait McpApi {
     fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
-    fn mcp_list(&self, namespace: Namespace) -> impl Future<Output = Vec<McpServerUrl>> + Send;
+    fn register_namespace(&self, namespace: Namespace) -> impl Future<Output = ()> + Send;
+    fn mcp_list(
+        &self,
+        namespace: Namespace,
+    ) -> impl Future<Output = Option<Vec<McpServerUrl>>> + Send;
 }
 
 pub struct Mcp {
@@ -84,7 +88,12 @@ impl McpApi for McpSender {
         self.0.send(msg).await.unwrap();
     }
 
-    async fn mcp_list(&self, namespace: Namespace) -> Vec<McpServerUrl> {
+    async fn register_namespace(&self, namespace: Namespace) {
+        let msg = McpMsg::RegisterNamespace { namespace };
+        self.0.send(msg).await.unwrap();
+    }
+
+    async fn mcp_list(&self, namespace: Namespace) -> Option<Vec<McpServerUrl>> {
         let (send, receive) = oneshot::channel();
         let msg = McpMsg::List { namespace, send };
         self.0.send(msg).await.unwrap();
@@ -99,9 +108,12 @@ enum McpMsg {
     Remove {
         server: ConfiguredMcpServer,
     },
+    RegisterNamespace {
+        namespace: Namespace,
+    },
     List {
         namespace: Namespace,
-        send: oneshot::Sender<Vec<McpServerUrl>>,
+        send: oneshot::Sender<Option<Vec<McpServerUrl>>>,
     },
 }
 
@@ -206,8 +218,14 @@ where
                 self.report_updated_tools().await;
             }
             McpMsg::List { namespace, send } => {
-                let result = self.store.list_in_namespace(&namespace).collect();
+                let result = self
+                    .store
+                    .list_in_namespace(&namespace)
+                    .map(Iterator::collect);
                 drop(send.send(result));
+            }
+            McpMsg::RegisterNamespace { namespace } => {
+                self.store.register_namespace(namespace);
             }
         }
     }
@@ -388,11 +406,13 @@ pub mod tests {
 
     #[tokio::test]
     async fn list_mcp_servers_none_configured() {
-        // Given a MCP API that knows about no mcp servers
+        // Given a MCP API that knows about an empty namespace
         let mcp = Mcp::from_subscriber(DummySubscriber).api();
+        let namespace = Namespace::new("test").unwrap();
+        mcp.register_namespace(namespace.clone()).await;
 
         // When listing mcp servers for a namespace
-        let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
+        let result = mcp.mcp_list(namespace).await.unwrap();
 
         // Then we get an empty list
         assert!(result.is_empty());
@@ -410,12 +430,8 @@ pub mod tests {
         ))
         .await;
 
-        // Then we get an empty list for a namespace that does not have a mcp server
-        let result = mcp.mcp_list(Namespace::new("not-existing").unwrap()).await;
-        assert_eq!(result, vec![]);
-
         // Then we get the mcp server
-        let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
+        let result = mcp.mcp_list(Namespace::new("test").unwrap()).await.unwrap();
         assert_eq!(result, vec![McpServerUrl::new("http://localhost:8000/mcp")]);
     }
 
@@ -475,7 +491,7 @@ pub mod tests {
         .await;
 
         // Then we get an empty list
-        let result = mcp.mcp_list(Namespace::new("test").unwrap()).await;
+        let result = mcp.mcp_list(Namespace::new("test").unwrap()).await.unwrap();
         assert_eq!(result, vec![]);
     }
 
@@ -491,7 +507,7 @@ pub mod tests {
         mcp.upsert(server).await;
 
         // Then the list of tools is still the same
-        let mcp_servers = mcp.mcp_list(namespace).await;
+        let mcp_servers = mcp.mcp_list(namespace).await.unwrap();
         assert_eq!(mcp_servers, vec!["http://localhost:8000/mcp".into()]);
     }
 
@@ -511,10 +527,10 @@ pub mod tests {
         mcp.upsert(server).await;
 
         // Then the server is configured for both namespaces
-        let mcp_servers = mcp.mcp_list(first).await;
+        let mcp_servers = mcp.mcp_list(first).await.unwrap();
         assert_eq!(mcp_servers, vec![server_url.into()]);
 
-        let mcp_servers = mcp.mcp_list(second).await;
+        let mcp_servers = mcp.mcp_list(second).await.unwrap();
         assert_eq!(mcp_servers, vec![server_url.into()]);
     }
 
@@ -535,7 +551,8 @@ pub mod tests {
         .await;
 
         // When listing tool servers for that namespace
-        let result: HashSet<McpServerUrl> = mcp.mcp_list(namespace).await.into_iter().collect();
+        let result: HashSet<McpServerUrl> =
+            mcp.mcp_list(namespace).await.unwrap().into_iter().collect();
 
         // Then we get the two mcp servers
         let expected = HashSet::from([
