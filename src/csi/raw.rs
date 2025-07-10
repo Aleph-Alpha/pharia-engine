@@ -110,7 +110,7 @@ pub trait RawCsi {
         &self,
         namespace: Namespace,
         tracing_context: TracingContext,
-    ) -> impl Future<Output = Vec<ToolDescription>> + Send;
+    ) -> impl Future<Output = anyhow::Result<Vec<ToolDescription>>> + Send;
 }
 
 /// Errors which occurr during interacting with the outside world via CSIs.
@@ -541,7 +541,7 @@ where
         &self,
         namespace: Namespace,
         tracing_context: TracingContext,
-    ) -> Vec<ToolDescription> {
+    ) -> anyhow::Result<Vec<ToolDescription>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "list_tools")]).increment(1);
 
         let _tracing_context = context!(
@@ -550,7 +550,10 @@ where
             "list_tools",
             namespace = namespace.to_string()
         );
-        self.tool.list_tools(namespace).await
+        self.tool
+            .list_tools(namespace)
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Namespace not found"))
     }
 }
 

@@ -59,8 +59,13 @@ pub trait ToolRuntimeApi {
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<ToolOutput, ToolError>> + Send;
 
-    fn list_tools(&self, namespace: Namespace)
-    -> impl Future<Output = Vec<ToolDescription>> + Send;
+    /// List all tools for a given namespace.
+    ///
+    /// Returns `None` if the namespace does not exist.
+    fn list_tools(
+        &self,
+        namespace: Namespace,
+    ) -> impl Future<Output = Option<Vec<ToolDescription>>> + Send;
 }
 
 pub struct ToolRuntime {
@@ -106,7 +111,7 @@ impl ToolRuntimeApi for ToolRuntimeSender {
         receive.await.unwrap()
     }
 
-    async fn list_tools(&self, namespace: Namespace) -> Vec<ToolDescription> {
+    async fn list_tools(&self, namespace: Namespace) -> Option<Vec<ToolDescription>> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::ListTools { send, namespace };
         self.0.send(msg).await.unwrap();
@@ -148,7 +153,7 @@ enum ToolMsg {
     },
     ListTools {
         namespace: Namespace,
-        send: oneshot::Sender<Vec<ToolDescription>>,
+        send: oneshot::Sender<Option<Vec<ToolDescription>>>,
     },
     UpsertNativeTool {
         tool: ConfiguredNativeTool,
@@ -360,7 +365,7 @@ pub mod tests {
             .await;
 
         // When listing listing tools for that namespace
-        let result = tool_runtime.list_tools(namespace).await;
+        let result = tool_runtime.list_tools(namespace).await.unwrap();
 
         // Then we get the tool description from the tool
         assert_eq!(

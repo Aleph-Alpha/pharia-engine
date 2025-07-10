@@ -358,7 +358,10 @@ where
     }
 
     async fn list_tools(&mut self) -> Vec<ToolDescription> {
-        self.contextual_csi.list_tools().await
+        match self.contextual_csi.list_tools().await {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
     }
 }
 

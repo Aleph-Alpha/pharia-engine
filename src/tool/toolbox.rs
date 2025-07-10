@@ -54,8 +54,12 @@ impl Toolbox {
             .or_else(|| self.mcp_tools.get(qtn).cloned())
     }
 
-    pub fn list_tools_in_namespace(&self, namespace: &Namespace) -> Vec<ToolDescription> {
-        self.mcp_tools
+    /// List all tools in a given namespace.
+    ///
+    /// Returns `None` if the namespace does not exist.
+    pub fn list_tools_in_namespace(&self, namespace: &Namespace) -> Option<Vec<ToolDescription>> {
+        let tools = self
+            .mcp_tools
             .iter()
             .chain(self.native_tools.iter())
             .filter_map(|(qtn, tool)| {
@@ -66,7 +70,8 @@ impl Toolbox {
                 }
             })
             .sorted()
-            .collect()
+            .collect();
+        Some(tools)
     }
 
     pub fn upsert_native_tool(&mut self, tool: ConfiguredNativeTool) {
@@ -192,7 +197,9 @@ pub mod tests {
         let toolbox = Toolbox::new();
 
         // When we list the tools in the `test-beta` namespace
-        let tools = toolbox.list_tools_in_namespace(&Namespace::new("test-beta").unwrap());
+        let tools = toolbox
+            .list_tools_in_namespace(&Namespace::new("test-beta").unwrap())
+            .unwrap();
         let names = tools.iter().map(ToolDescription::name).collect::<Vec<_>>();
 
         // Then we expect the tools to be listed
@@ -209,7 +216,9 @@ pub mod tests {
         });
 
         // When we list the tools
-        let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
+        let tools = toolbox
+            .list_tools_in_namespace(&Namespace::dummy())
+            .unwrap();
         let names = tools.iter().map(ToolDescription::name).collect::<Vec<_>>();
 
         // Then we expect the tool to be listed
@@ -230,7 +239,9 @@ pub mod tests {
         });
 
         // When we list the tools
-        let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
+        let tools = toolbox
+            .list_tools_in_namespace(&Namespace::dummy())
+            .unwrap();
 
         // Then we expect the tool to be not listed
         assert!(tools.is_empty());
@@ -281,7 +292,9 @@ pub mod tests {
         });
 
         // When we list the tools
-        let tools = toolbox.list_tools_in_namespace(&Namespace::dummy());
+        let tools = toolbox
+            .list_tools_in_namespace(&Namespace::dummy())
+            .unwrap();
         let names = tools.iter().map(ToolDescription::name).collect::<Vec<_>>();
 
         // Then we expect the tool list to be sorted
