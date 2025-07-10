@@ -12,3 +12,10 @@ contact = "markus.klein@aleph-alpha.com"
 # acceptance = "We are not worried about wannacry we think security is a tinfoil hat wearing alarmist weirdo"
 # date = 2025-02-26
 # triaged_by = "flip flop"
+
+[trivy.CVE-2025-5702]
+base_score = "medium"
+description = "Power10 strcmp implementation writes to non-volatile registers"
+acceptance = "Safe Rust prevents comparing with uninitialized values"
+date = 2025-07-10
+triaged_by = "moritz.althaus@aleph-alpha.com"
