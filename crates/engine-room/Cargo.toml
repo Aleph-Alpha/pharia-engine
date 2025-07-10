@@ -9,8 +9,8 @@ bytesize = "2.0.1"
 moka = { version = "0.12.10", features = ["sync"] }
 tempfile = "3.20.0"
 tracing = "0.1.41"
-wasmtime = { version = "33.0.1", features = ["incremental-cache"] }
-wasmtime-wasi = "33.0.1"
+wasmtime = { version = "34.0.1", features = ["incremental-cache"] }
+wasmtime-wasi = "34.0.1"
 
 [dev-dependencies]
 divan = "0.1.21"
