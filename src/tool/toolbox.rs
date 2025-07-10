@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use itertools::Itertools;
 
 use crate::{
+    mcp::ToolMap,
     namespace_watcher::Namespace,
     tool::{NativeToolName, QualifiedToolName, Tool, ToolDescription},
 };
@@ -16,7 +17,7 @@ use crate::{
 /// The toolbox is periodically notified about new tools.
 pub struct Toolbox {
     /// Tools reported by the MCP servers
-    mcp_tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+    mcp_tools: ToolMap,
     /// Tools offered by the Kernel itself
     native_tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
 }
@@ -48,30 +49,35 @@ impl Toolbox {
     }
 
     pub fn fetch_tool(&mut self, qtn: &QualifiedToolName) -> Option<Arc<dyn Tool + Send + Sync>> {
-        self.native_tools
-            .get(qtn)
-            .cloned()
-            .or_else(|| self.mcp_tools.get(qtn).cloned())
+        self.native_tools.get(qtn).cloned().or_else(|| {
+            self.mcp_tools
+                .get(&qtn.namespace)
+                .and_then(|tools| tools.get(&qtn.name).cloned())
+        })
     }
 
     /// List all tools in a given namespace.
     ///
-    /// Returns `None` if the namespace does not exist.
+    /// Returns an error if the namespace does not exist.
     pub fn list_tools_in_namespace(
         &self,
         namespace: &Namespace,
     ) -> Result<Vec<ToolDescription>, NamespaceNotFound> {
+        // Find all native tools for the namespace
+        let native_tools = self.native_tools.iter().filter_map(|(qtn, tool)| {
+            if qtn.namespace == *namespace {
+                Some(tool.description())
+            } else {
+                None
+            }
+        });
         let tools = self
             .mcp_tools
-            .iter()
-            .chain(self.native_tools.iter())
-            .filter_map(|(qtn, tool)| {
-                if qtn.namespace == *namespace {
-                    Some(tool.description())
-                } else {
-                    None
-                }
-            })
+            .get(namespace)
+            .ok_or(NamespaceNotFound)?
+            .values()
+            .map(|tool| tool.description())
+            .chain(native_tools)
             .sorted()
             .collect();
         Ok(tools)
@@ -86,10 +92,7 @@ impl Toolbox {
         self.native_tools.remove(&tool.qualified_tool());
     }
 
-    pub(crate) fn update_tools(
-        &mut self,
-        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync + 'static>>,
-    ) {
+    pub(crate) fn update_tools(&mut self, tools: ToolMap) {
         self.mcp_tools = tools;
     }
 }
@@ -139,13 +142,14 @@ pub mod tests {
         }
 
         let mut toolbox = Toolbox::new();
-        toolbox.update_tools(HashMap::from([(
-            QualifiedToolName {
-                namespace: Namespace::dummy(),
-                name: "test".to_owned(),
-            },
-            Arc::new(ToolStub) as Arc<dyn Tool + Send + Sync>,
-        )]));
+        let tools = HashMap::from([(
+            Namespace::dummy(),
+            HashMap::from([(
+                "test".to_owned(),
+                Arc::new(ToolStub) as Arc<dyn Tool + Send + Sync>,
+            )]),
+        )]);
+        toolbox.update_tools(tools);
 
         let tool = toolbox
             .fetch_tool(&QualifiedToolName {
@@ -199,7 +203,7 @@ pub mod tests {
 
     #[test]
     fn hardcoded_native_tools_are_listed_in_test_namespace() {
-        // Given a toolbox
+        // Given a toolbox that has been notified about about tools
         let toolbox = Toolbox::new();
 
         // When we list the tools in the `test-beta` namespace
@@ -249,7 +253,7 @@ pub mod tests {
             .list_tools_in_namespace(&Namespace::dummy())
             .unwrap();
 
-        // Then we expect the tool to be not listed
+        // Then the namespace still exists, but it is empty
         assert!(tools.is_empty());
     }
 
@@ -272,22 +276,21 @@ pub mod tests {
         }
         // Given a toolbox with MCP tools and native tools
         let mut toolbox = Toolbox::new();
-        toolbox.update_tools(HashMap::from([
-            (
-                QualifiedToolName {
-                    namespace: Namespace::dummy(),
-                    name: "a".to_owned(),
-                },
-                Arc::new(ToolStub::new("a")) as Arc<dyn Tool + Send + Sync>,
-            ),
-            (
-                QualifiedToolName {
-                    namespace: Namespace::dummy(),
-                    name: "b".to_owned(),
-                },
-                Arc::new(ToolStub::new("b")) as Arc<dyn Tool + Send + Sync>,
-            ),
-        ]));
+        let tools = HashMap::from([(
+            Namespace::dummy(),
+            HashMap::from([
+                (
+                    "a".to_owned(),
+                    Arc::new(ToolStub::new("a")) as Arc<dyn Tool + Send + Sync>,
+                ),
+                (
+                    "b".to_owned(),
+                    Arc::new(ToolStub::new("b")) as Arc<dyn Tool + Send + Sync>,
+                ),
+            ]),
+        )]);
+        toolbox.update_tools(tools);
+
         toolbox.upsert_native_tool(ConfiguredNativeTool {
             name: NativeToolName::Add,
             namespace: Namespace::dummy(),
@@ -305,5 +308,17 @@ pub mod tests {
 
         // Then we expect the tool list to be sorted
         assert_eq!(names, vec!["a", "add", "b", "subtract"]);
+    }
+
+    #[test]
+    fn listing_tools_for_unknown_namespace_returns_error() {
+        // Given a toolbox
+        let toolbox = Toolbox::new();
+
+        // When we list the tools for an unknown namespace
+        let result = toolbox.list_tools_in_namespace(&Namespace::new("unknown").unwrap());
+
+        // Then we expect an error to be returned
+        assert!(matches!(result, Err(NamespaceNotFound)));
     }
 }

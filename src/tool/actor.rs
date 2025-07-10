@@ -217,20 +217,6 @@ impl ToolActor {
                 drop(send.send(tools));
             }
             ToolMsg::UpdatedTools { tools } => {
-                let tools = tools
-                    .into_iter()
-                    .flat_map(|(namespace, tools)| {
-                        tools.into_iter().map(move |(name, tool)| {
-                            (
-                                QualifiedToolName {
-                                    namespace: namespace.clone(),
-                                    name,
-                                },
-                                tool,
-                            )
-                        })
-                    })
-                    .collect();
                 self.toolbox.update_tools(tools);
             }
             ToolMsg::UpsertNativeTool { tool } => self.toolbox.upsert_native_tool(tool),
