@@ -4231,7 +4231,7 @@ dependencies = [
 
 [[package]]
 name = "pharia-kernel"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "aleph-alpha-client",
  "anyhow",
