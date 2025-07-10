@@ -106,7 +106,7 @@ async fn list_tools<T>(
 where
     T: ToolRuntimeApi,
 {
-    if let Some(mut tools) = tool.list_tools(namespace.clone()).await {
+    if let Ok(mut tools) = tool.list_tools(namespace.clone()).await {
         tools.sort();
         Ok(Json(tools))
     } else {
@@ -129,6 +129,7 @@ mod tests {
     use super::{ToolProvider, http_tools_v1};
     use crate::feature_set::PRODUCTION_FEATURE_SET;
     use crate::tool::ToolDescription;
+    use crate::tool::toolbox::NamespaceNotFound;
     use crate::{namespace_watcher::Namespace, tool::actor::ToolRuntimeDouble};
 
     #[derive(Clone)]
@@ -156,9 +157,12 @@ mod tests {
         #[derive(Clone)]
         struct ToolMock;
         impl ToolRuntimeDouble for ToolMock {
-            async fn list_tools(&self, namespace: Namespace) -> Option<Vec<ToolDescription>> {
+            async fn list_tools(
+                &self,
+                namespace: Namespace,
+            ) -> Result<Vec<ToolDescription>, NamespaceNotFound> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
-                Some(vec![
+                Ok(vec![
                     ToolDescription::new("divide", "Divide two numbers", json!({})),
                     ToolDescription::new("add", "Add two numbers", json!({})),
                 ])
@@ -195,8 +199,11 @@ mod tests {
         #[derive(Clone)]
         struct ToolMock;
         impl ToolRuntimeDouble for ToolMock {
-            async fn list_tools(&self, _namespace: Namespace) -> Option<Vec<ToolDescription>> {
-                None
+            async fn list_tools(
+                &self,
+                _namespace: Namespace,
+            ) -> Result<Vec<ToolDescription>, NamespaceNotFound> {
+                Err(NamespaceNotFound)
             }
         }
         let app_state = ProviderStub::new(ToolMock);

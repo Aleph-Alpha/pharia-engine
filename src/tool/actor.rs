@@ -20,7 +20,7 @@ use crate::{
     namespace_watcher::Namespace,
     tool::{
         Argument, QualifiedToolName, Tool, ToolDescription, ToolError, ToolOutput,
-        toolbox::{ConfiguredNativeTool, Toolbox},
+        toolbox::{ConfiguredNativeTool, NamespaceNotFound, Toolbox},
     },
 };
 
@@ -59,13 +59,10 @@ pub trait ToolRuntimeApi {
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<ToolOutput, ToolError>> + Send;
 
-    /// List all tools for a given namespace.
-    ///
-    /// Returns `None` if the namespace does not exist.
     fn list_tools(
         &self,
         namespace: Namespace,
-    ) -> impl Future<Output = Option<Vec<ToolDescription>>> + Send;
+    ) -> impl Future<Output = Result<Vec<ToolDescription>, NamespaceNotFound>> + Send;
 }
 
 pub struct ToolRuntime {
@@ -111,7 +108,10 @@ impl ToolRuntimeApi for ToolRuntimeSender {
         receive.await.unwrap()
     }
 
-    async fn list_tools(&self, namespace: Namespace) -> Option<Vec<ToolDescription>> {
+    async fn list_tools(
+        &self,
+        namespace: Namespace,
+    ) -> Result<Vec<ToolDescription>, NamespaceNotFound> {
         let (send, receive) = oneshot::channel();
         let msg = ToolMsg::ListTools { send, namespace };
         self.0.send(msg).await.unwrap();
@@ -153,7 +153,7 @@ enum ToolMsg {
     },
     ListTools {
         namespace: Namespace,
-        send: oneshot::Sender<Option<Vec<ToolDescription>>>,
+        send: oneshot::Sender<Result<Vec<ToolDescription>, NamespaceNotFound>>,
     },
     UpsertNativeTool {
         tool: ConfiguredNativeTool,

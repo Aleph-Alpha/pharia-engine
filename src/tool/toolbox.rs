@@ -57,7 +57,10 @@ impl Toolbox {
     /// List all tools in a given namespace.
     ///
     /// Returns `None` if the namespace does not exist.
-    pub fn list_tools_in_namespace(&self, namespace: &Namespace) -> Option<Vec<ToolDescription>> {
+    pub fn list_tools_in_namespace(
+        &self,
+        namespace: &Namespace,
+    ) -> Result<Vec<ToolDescription>, NamespaceNotFound> {
         let tools = self
             .mcp_tools
             .iter()
@@ -71,7 +74,7 @@ impl Toolbox {
             })
             .sorted()
             .collect();
-        Some(tools)
+        Ok(tools)
     }
 
     pub fn upsert_native_tool(&mut self, tool: ConfiguredNativeTool) {
@@ -90,6 +93,9 @@ impl Toolbox {
         self.mcp_tools = tools;
     }
 }
+
+#[derive(Debug)]
+pub struct NamespaceNotFound;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ConfiguredNativeTool {
