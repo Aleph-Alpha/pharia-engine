@@ -594,6 +594,28 @@ async fn list_mcp_servers_for_empty_namespace_returns_empty_list() {
 }
 
 #[tokio::test]
+async fn list_tools_for_empty_namespace_returns_empty_list() {
+    let kernel = TestKernel::with_skills(&[]).await;
+
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .get(format!("http://127.0.0.1:{}/v1/tools/local", kernel.port()))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value())
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let body = resp.bytes().await.unwrap();
+    let response: Value = serde_json::from_slice::<Value>(&body).unwrap();
+    assert_eq!(response, json!([]));
+
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
 async fn unsupported_newer_csi_version() {
     let kernel = TestKernel::with_skills(&[]).await;
 

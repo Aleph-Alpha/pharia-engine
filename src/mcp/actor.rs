@@ -226,6 +226,11 @@ where
             }
             McpMsg::RegisterNamespace { namespace } => {
                 self.store.register_namespace(namespace);
+                // Also notify the tool box about the new namespace.
+                // The toolbox needs knowledge about all existing namespaces, even if they do not
+                // have any tools. Therefore, when a namespace is registered, we need to report
+                // the empty list of tools.
+                self.report_updated_tools().await;
             }
         }
     }

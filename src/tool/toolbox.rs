@@ -14,6 +14,9 @@ use crate::{
 /// 2. `native_tools` – tools implemented directly inside the kernel.
 ///
 /// The toolbox is periodically notified about new tools.
+/// Even if a namespace does not have any tools, the toolbox does get notified about it via the
+/// [`Toolbox::update_tools`] method. This allows the toolbox to reason about if a namespace does
+/// not exist or is empty and answer queries about the tools in a namespace by itself.
 pub struct Toolbox {
     namespaces: HashMap<Namespace, ToolsInNamespace>,
 }
@@ -130,6 +133,10 @@ impl Toolbox {
             .remove_native_tool(tool.name.name());
     }
 
+    /// Update the list of tools known to the toolbox.
+    ///
+    /// The toolbox relies on the `McpActor` to notify it about tools. Even if there are no tools,
+    /// the knowledge about existing namespaces is needed.
     pub(crate) fn update_tools(
         &mut self,
         tools: HashMap<Namespace, HashMap<String, Arc<dyn Tool + Send + Sync>>>,
