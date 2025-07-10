@@ -3,57 +3,103 @@ use std::{collections::HashMap, sync::Arc};
 use itertools::Itertools;
 
 use crate::{
-    mcp::ToolMap,
     namespace_watcher::Namespace,
     tool::{NativeToolName, QualifiedToolName, Tool, ToolDescription},
 };
 
 /// Registry of all tools known to the kernel.
 ///
-/// The toolbox maintains two separate catalogs:
+/// The toolbox maintains two separate catalogs per namespace:
 /// 1. `mcp_tools` – tools announced by remote MCP servers.
 /// 2. `native_tools` – tools implemented directly inside the kernel.
 ///
 /// The toolbox is periodically notified about new tools.
 pub struct Toolbox {
-    /// Tools reported by the MCP servers
-    mcp_tools: ToolMap,
-    /// Tools offered by the Kernel itself
-    native_tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+    namespaces: HashMap<Namespace, ToolsInNamespace>,
 }
 
-impl Toolbox {
-    // The list of tools that are configured per default in the test-beta namespace.
-    // This namespace allows fast testing of the tool feature.
+/// Tools known to a given namespace.
+///
+/// While having a separate struct for this might seem a bit weird, having a top-level namespace
+/// representation in both the `mcp_tools` and `native_tools` members seems more awkward. Which
+/// member do you use to decide if a namespace exists or not?
+struct ToolsInNamespace {
+    /// Tools reported by the MCP servers
+    mcp_tools: HashMap<String, Arc<dyn Tool + Send + Sync>>,
+
+    /// Tools offered by the Kernel itself
+    native_tools: HashMap<String, Arc<dyn Tool + Send + Sync>>,
+}
+
+impl ToolsInNamespace {
+    /// The list of tools that are configured per default in the test-beta namespace.
+    /// This namespace allows fast testing of the tool feature.
     const NATIVE_TOOLS_IN_TEST_BETA: &[NativeToolName] = &[
         NativeToolName::Add,
         NativeToolName::Subtract,
         NativeToolName::Saboteur,
     ];
 
-    pub fn new() -> Self {
-        let mut native_tools = HashMap::new();
-        for tool in Self::NATIVE_TOOLS_IN_TEST_BETA {
-            native_tools.insert(
-                QualifiedToolName {
-                    namespace: Namespace::new("test-beta").unwrap(),
-                    name: tool.name().to_owned(),
-                },
-                tool.tool(),
-            );
-        }
+    fn new() -> Self {
         Self {
             mcp_tools: HashMap::new(),
-            native_tools,
+            native_tools: HashMap::new(),
         }
     }
 
+    /// The test-beta namespace offers a set of native tools per default.
+    pub fn test_beta() -> Self {
+        let mut test_beta = Self::new();
+        for tool in Self::NATIVE_TOOLS_IN_TEST_BETA {
+            test_beta.upsert_native_tool(tool);
+        }
+        test_beta
+    }
+
+    /// Native tools take precedence over MCP tools.
+    fn fetch_tool(&self, name: &str) -> Option<Arc<dyn Tool + Send + Sync>> {
+        self.native_tools
+            .get(name)
+            .cloned()
+            .or_else(|| self.mcp_tools.get(name).cloned())
+    }
+
+    fn list_tools(&self) -> Vec<ToolDescription> {
+        self.mcp_tools
+            .values()
+            .chain(self.native_tools.values())
+            .map(|tool| tool.description())
+            .sorted()
+            .collect()
+    }
+
+    fn upsert_native_tool(&mut self, tool: &NativeToolName) {
+        self.native_tools
+            .insert(tool.name().to_owned(), tool.tool());
+    }
+
+    fn remove_native_tool(&mut self, name: &str) {
+        self.native_tools.remove(name);
+    }
+
+    fn update_tools(&mut self, tools: HashMap<String, Arc<dyn Tool + Send + Sync>>) {
+        self.mcp_tools = tools;
+    }
+}
+
+impl Toolbox {
+    pub fn new() -> Self {
+        let mut namespaces = HashMap::new();
+        let test_beta = ToolsInNamespace::test_beta();
+        namespaces.insert(Namespace::new("test-beta").unwrap(), test_beta);
+
+        Self { namespaces }
+    }
+
     pub fn fetch_tool(&mut self, qtn: &QualifiedToolName) -> Option<Arc<dyn Tool + Send + Sync>> {
-        self.native_tools.get(qtn).cloned().or_else(|| {
-            self.mcp_tools
-                .get(&qtn.namespace)
-                .and_then(|tools| tools.get(&qtn.name).cloned())
-        })
+        self.namespaces
+            .get(&qtn.namespace)
+            .and_then(|namespace| namespace.fetch_tool(&qtn.name))
     }
 
     /// List all tools in a given namespace.
@@ -63,37 +109,37 @@ impl Toolbox {
         &self,
         namespace: &Namespace,
     ) -> Result<Vec<ToolDescription>, NamespaceNotFound> {
-        // Find all native tools for the namespace
-        let native_tools = self.native_tools.iter().filter_map(|(qtn, tool)| {
-            if qtn.namespace == *namespace {
-                Some(tool.description())
-            } else {
-                None
-            }
-        });
-        let tools = self
-            .mcp_tools
+        Ok(self
+            .namespaces
             .get(namespace)
             .ok_or(NamespaceNotFound)?
-            .values()
-            .map(|tool| tool.description())
-            .chain(native_tools)
-            .sorted()
-            .collect();
-        Ok(tools)
+            .list_tools())
     }
 
     pub fn upsert_native_tool(&mut self, tool: ConfiguredNativeTool) {
-        self.native_tools
-            .insert(tool.qualified_tool(), tool.name.tool());
+        self.namespaces
+            .entry(tool.namespace)
+            .or_insert_with(ToolsInNamespace::new)
+            .upsert_native_tool(&tool.name);
     }
 
     pub fn remove_native_tool(&mut self, tool: ConfiguredNativeTool) {
-        self.native_tools.remove(&tool.qualified_tool());
+        self.namespaces
+            .entry(tool.namespace)
+            .or_insert_with(ToolsInNamespace::new)
+            .remove_native_tool(tool.name.name());
     }
 
-    pub(crate) fn update_tools(&mut self, tools: ToolMap) {
-        self.mcp_tools = tools;
+    pub(crate) fn update_tools(
+        &mut self,
+        tools: HashMap<Namespace, HashMap<String, Arc<dyn Tool + Send + Sync>>>,
+    ) {
+        for (namespace, tools) in tools {
+            self.namespaces
+                .entry(namespace)
+                .or_insert_with(ToolsInNamespace::new)
+                .update_tools(tools);
+        }
     }
 }
 
@@ -104,15 +150,6 @@ pub struct NamespaceNotFound;
 pub struct ConfiguredNativeTool {
     pub name: NativeToolName,
     pub namespace: Namespace,
-}
-
-impl ConfiguredNativeTool {
-    pub fn qualified_tool(&self) -> QualifiedToolName {
-        QualifiedToolName {
-            namespace: self.namespace.clone(),
-            name: self.name.name().to_owned(),
-        }
-    }
 }
 
 #[cfg(test)]
