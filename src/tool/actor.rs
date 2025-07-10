@@ -17,6 +17,7 @@ use tokio::{
 
 use crate::{
     logging::TracingContext,
+    mcp::ToolMap,
     namespace_watcher::Namespace,
     tool::{
         Argument, QualifiedToolName, Tool, ToolDescription, ToolError, ToolOutput,
@@ -37,10 +38,7 @@ pub trait ToolStoreApi {
     /// Update the list of tools known to the `ToolRuntime`.
     ///
     /// With the current exception of the native tools.
-    fn report_updated_tools(
-        &self,
-        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
-    ) -> impl Future<Output = ()> + Send;
+    fn report_updated_tools(&self, tools: ToolMap) -> impl Future<Output = ()> + Send;
 
     // These could become a separate interface, if we decide to have a separate actor for managing
     // MCP servers.
@@ -137,7 +135,7 @@ impl ToolStoreApi for ToolRuntimeSender {
 
     async fn report_updated_tools(
         &self,
-        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+        tools: HashMap<Namespace, HashMap<String, Arc<dyn Tool + Send + Sync>>>,
     ) {
         let msg = ToolMsg::UpdatedTools { tools };
         self.0.send(msg).await.unwrap();
@@ -162,7 +160,7 @@ enum ToolMsg {
         tool: ConfiguredNativeTool,
     },
     UpdatedTools {
-        tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
+        tools: HashMap<Namespace, HashMap<String, Arc<dyn Tool + Send + Sync>>>,
     },
 }
 
@@ -219,6 +217,20 @@ impl ToolActor {
                 drop(send.send(tools));
             }
             ToolMsg::UpdatedTools { tools } => {
+                let tools = tools
+                    .into_iter()
+                    .flat_map(|(namespace, tools)| {
+                        tools.into_iter().map(move |(name, tool)| {
+                            (
+                                QualifiedToolName {
+                                    namespace: namespace.clone(),
+                                    name,
+                                },
+                                tool,
+                            )
+                        })
+                    })
+                    .collect();
                 self.toolbox.update_tools(tools);
             }
             ToolMsg::UpsertNativeTool { tool } => self.toolbox.upsert_native_tool(tool),
@@ -270,15 +282,15 @@ pub mod tests {
     async fn tool_from_different_namespace_is_not_available() {
         // Given an mcp server available for the foo namespace
         let foo = Namespace::new("foo").unwrap();
-        let tool = ToolRuntime::new().api();
-        tool.report_updated_tools(HashMap::from([(
-            QualifiedToolName {
-                namespace: foo.clone(),
-                name: "add".to_owned(),
-            },
-            Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
-        )]))
-        .await;
+        let tool_runtime = ToolRuntime::new().api();
+        let tools = HashMap::from([(
+            foo.clone(),
+            HashMap::from([(
+                "add".to_owned(),
+                Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
+            )]),
+        )]);
+        tool_runtime.report_updated_tools(tools).await;
 
         // When we invoke a tool from a different namespace
         let tool_name = QualifiedToolName {
@@ -286,7 +298,7 @@ pub mod tests {
             name: "add".to_owned(),
         };
         let arguments = vec![];
-        let result = tool
+        let result = tool_runtime
             .invoke_tool(tool_name, arguments, TracingContext::dummy())
             .await;
 
@@ -310,22 +322,19 @@ pub mod tests {
         }
         let namespace = Namespace::new("test").unwrap();
         let tool_runtime = ToolRuntime::new().api();
-        let tools = HashMap::from([
-            (
-                QualifiedToolName {
-                    namespace: namespace.clone(),
-                    name: "search".to_owned(),
-                },
-                Arc::new(ToolStub) as Arc<dyn Tool + Send + Sync>,
-            ),
-            (
-                QualifiedToolName {
-                    namespace: namespace.clone(),
-                    name: "other_tool".to_owned(),
-                },
-                Arc::new(Dummy),
-            ),
-        ]);
+        let tools = HashMap::from([(
+            namespace.clone(),
+            HashMap::from([
+                (
+                    "search".to_owned(),
+                    Arc::new(ToolStub) as Arc<dyn Tool + Send + Sync>,
+                ),
+                (
+                    "other_tool".to_owned(),
+                    Arc::new(Dummy) as Arc<dyn Tool + Send + Sync>,
+                ),
+            ]),
+        )]);
         tool_runtime.report_updated_tools(tools).await;
 
         // When we invoke the search tool
@@ -354,15 +363,14 @@ pub mod tests {
         // Given a tools configured for a namespace
         let namespace = Namespace::new("test").unwrap();
         let tool_runtime = ToolRuntime::new().api();
-        tool_runtime
-            .report_updated_tools(HashMap::from([(
-                QualifiedToolName {
-                    namespace: namespace.clone(),
-                    name: "add".to_owned(),
-                },
+        let tools = HashMap::from([(
+            namespace.clone(),
+            HashMap::from([(
+                "add".to_owned(),
                 Arc::new(ToolStub) as Arc<dyn Tool + Send + Sync>,
-            )]))
-            .await;
+            )]),
+        )]);
+        tool_runtime.report_updated_tools(tools).await;
 
         // When listing listing tools for that namespace
         let result = tool_runtime.list_tools(namespace).await.unwrap();
@@ -406,22 +414,19 @@ pub mod tests {
         let namespace = Namespace::new("test").unwrap();
         let tool = ToolRuntime::new();
         let api = tool.api();
-        let tools = HashMap::from([
-            (
-                QualifiedToolName {
-                    namespace: namespace.clone(),
-                    name: "success".to_owned(),
-                },
-                Arc::new(SuccessfulTool) as Arc<dyn Tool + Send + Sync>,
-            ),
-            (
-                QualifiedToolName {
-                    namespace: namespace.clone(),
-                    name: "pending".to_owned(),
-                },
-                Arc::new(PendingTool) as Arc<dyn Tool + Send + Sync>,
-            ),
-        ]);
+        let tools = HashMap::from([(
+            namespace.clone(),
+            HashMap::from([
+                (
+                    "success".to_owned(),
+                    Arc::new(SuccessfulTool) as Arc<dyn Tool + Send + Sync>,
+                ),
+                (
+                    "pending".to_owned(),
+                    Arc::new(PendingTool) as Arc<dyn Tool + Send + Sync>,
+                ),
+            ]),
+        )]);
         api.report_updated_tools(tools).await;
 
         // When one hanging request is in progress

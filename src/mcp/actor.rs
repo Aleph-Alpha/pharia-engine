@@ -233,11 +233,20 @@ where
     async fn report_updated_tools(&mut self) {
         let tools = self
             .store
-            .all_tools_by_name()
-            .map(|(qtn, desc, server)| {
-                let tool = McpTool::new(desc, server, self.client.clone());
-                let tool: Arc<dyn Tool + Send + Sync> = Arc::new(tool);
-                (qtn, tool)
+            .tools_by_namespace()
+            .into_iter()
+            .map(|(namespace, tools)| {
+                (
+                    namespace,
+                    tools
+                        .into_iter()
+                        .map(|(desc, server)| {
+                            let tool = McpTool::new(desc.clone(), server, self.client.clone());
+                            let tool: Arc<dyn Tool + Send + Sync> = Arc::new(tool);
+                            (desc.name, tool)
+                        })
+                        .collect(),
+                )
             })
             .collect();
         self.subscriber.report_updated_tools(tools).await;
@@ -248,7 +257,7 @@ where
 pub mod tests {
 
     use futures::future::pending;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
     use std::sync::Mutex;
     use tokio::time::Instant as TokioInstant;
 
@@ -257,15 +266,12 @@ pub mod tests {
             McpClientDouble,
             subscribers::{McpSubscriberDouble, ToolMap},
         },
-        tool::{QualifiedToolName, ToolDescription},
+        tool::ToolDescription,
     };
 
     struct DummySubscriber;
     impl McpSubscriberDouble for DummySubscriber {
-        async fn report_updated_tools(
-            &mut self,
-            _tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
-        ) {
+        async fn report_updated_tools(&mut self, _tools: ToolMap) {
             // Do nothing
         }
     }
@@ -402,8 +408,11 @@ pub mod tests {
         tokio::time::advance(Duration::from_secs(80)).await;
 
         // Then the subscriber has been called with the updated tools
-        let last_list = subscriber.calls().last().cloned().unwrap();
-        assert_eq!(last_list.len(), 2);
+        let namespaces = subscriber.calls().last().cloned().unwrap();
+        let tools = namespaces.get(&namespace).unwrap();
+        assert_eq!(tools.len(), 2);
+        assert!(tools.contains_key("tool_one"));
+        assert!(tools.contains_key("tool_two"));
     }
 
     #[tokio::test]
@@ -442,17 +451,12 @@ pub mod tests {
         // Given a MCP API that knows about no mcp servers
         struct SubscriberMock;
         impl McpSubscriberDouble for SubscriberMock {
-            async fn report_updated_tools(
-                &mut self,
-                tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
-            ) {
+            async fn report_updated_tools(&mut self, tools: ToolMap) {
                 // Then the tool reported by the server is reported to the subscriber
-                let expected_tool_name = QualifiedToolName {
-                    namespace: Namespace::new("test-namespace").unwrap(),
-                    name: "new-tool".to_owned(),
-                };
+                let namespace = Namespace::new("test-namespace").unwrap();
+                let tools = tools.get(&namespace).unwrap();
                 assert_eq!(tools.len(), 1);
-                assert!(tools.contains_key(&expected_tool_name));
+                assert!(tools.contains_key("new-tool"));
             }
         }
         struct StubClient;
@@ -601,11 +605,10 @@ pub mod tests {
         tokio::time::sleep(Duration::from_millis(10)).await;
 
         // Then the search tool is listed
-        let tool_list = subscriber.calls().last().unwrap().clone();
-        assert!(tool_list.contains_key(&QualifiedToolName {
-            namespace: namespace.clone(),
-            name: "one_tool".to_owned(),
-        }));
+        let namespaces = subscriber.calls().last().unwrap().clone();
+        let tools = namespaces.get(&namespace).unwrap();
+        assert_eq!(tools.len(), 1);
+        assert!(tools.contains_key("one_tool"));
     }
 
     #[tokio::test]
@@ -672,10 +675,7 @@ pub mod tests {
     }
 
     impl McpSubscriberDouble for RecordingSubscriber {
-        async fn report_updated_tools(
-            &mut self,
-            tools: HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>,
-        ) {
+        async fn report_updated_tools(&mut self, tools: ToolMap) {
             self.calls.lock().unwrap().push(tools);
         }
     }

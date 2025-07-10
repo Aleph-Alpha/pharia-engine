@@ -1,11 +1,15 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::tool::{QualifiedToolName, Tool, ToolRuntimeSender, ToolStoreApi};
+use crate::{
+    namespace_watcher::Namespace,
+    tool::{Tool, ToolRuntimeSender, ToolStoreApi},
+};
 
 #[cfg(test)]
 use double_trait::double;
 
-pub type ToolMap = HashMap<QualifiedToolName, Arc<dyn Tool + Send + Sync>>;
+/// Having the namespace as top-level key also allows to report namespaces without tools.
+pub type ToolMap = HashMap<Namespace, HashMap<String, Arc<dyn Tool + Send + Sync>>>;
 
 /// The `McpActor` watches a list of MCP servers and reports changes in the list of tools.
 ///
