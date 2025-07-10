@@ -1,6 +1,7 @@
 use axum::{
     Json, Router,
     extract::{FromRef, Path, State},
+    http::StatusCode,
     routing::get,
 };
 use utoipa::OpenApi;
@@ -95,18 +96,25 @@ where
                 }
             },
         ])),
+    (status = 404, body=String, example = json!("Namespace 'unknown-namespace' not found")),
     ),
 )]
 async fn list_tools<T>(
     Path(namespace): Path<Namespace>,
     State(ToolState(tool)): State<ToolState<T>>,
-) -> Json<Vec<ToolDescription>>
+) -> Result<Json<Vec<ToolDescription>>, (StatusCode, Json<String>)>
 where
     T: ToolRuntimeApi,
 {
-    let mut tools = tool.list_tools(namespace).await;
-    tools.sort();
-    Json(tools)
+    if let Some(mut tools) = tool.list_tools(namespace.clone()).await {
+        tools.sort();
+        Ok(Json(tools))
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(format!("Namespace '{namespace}' not found")),
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -148,12 +156,12 @@ mod tests {
         #[derive(Clone)]
         struct ToolMock;
         impl ToolRuntimeDouble for ToolMock {
-            async fn list_tools(&self, namespace: Namespace) -> Vec<ToolDescription> {
+            async fn list_tools(&self, namespace: Namespace) -> Option<Vec<ToolDescription>> {
                 assert_eq!(namespace, Namespace::new("my-test-namespace").unwrap());
-                vec![
+                Some(vec![
                     ToolDescription::new("divide", "Divide two numbers", json!({})),
                     ToolDescription::new("add", "Add two numbers", json!({})),
-                ]
+                ])
             }
         }
         let app_state = ProviderStub::new(ToolMock);
@@ -179,5 +187,34 @@ mod tests {
             answer,
             "[{\"name\":\"add\",\"description\":\"Add two numbers\",\"input_schema\":{}},{\"name\":\"divide\",\"description\":\"Divide two numbers\",\"input_schema\":{}}]"
         );
+    }
+
+    #[tokio::test]
+    async fn request_for_unknown_namespace_returns_404() {
+        // Given a tool that does not know about any namespace
+        #[derive(Clone)]
+        struct ToolMock;
+        impl ToolRuntimeDouble for ToolMock {
+            async fn list_tools(&self, _namespace: Namespace) -> Option<Vec<ToolDescription>> {
+                None
+            }
+        }
+        let app_state = ProviderStub::new(ToolMock);
+        let http = http_tools_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+
+        // When
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/tools/unknown-namespace")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get a 404
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 }

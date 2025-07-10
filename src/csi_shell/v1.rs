@@ -191,7 +191,7 @@ async fn list_tools<C>(
     State(CsiState(csi)): State<CsiState<C>>,
     _bearer: TypedHeader<Authorization<Bearer>>,
     Json(request): Json<ListToolsRequest>,
-) -> Json<Vec<ToolDescription>>
+) -> Result<Json<Vec<ToolDescription>>, CsiShellError>
 where
     C: RawCsi,
 {
@@ -199,10 +199,8 @@ where
     let results = csi
         .list_tools(request.namespace, tracing_context)
         .await
-        .into_iter()
-        .map(Into::into)
-        .collect();
-    Json(results)
+        .map(|v| v.into_iter().map(Into::into).collect())?;
+    Ok(Json(results))
 }
 
 async fn select_language<C>(
@@ -1380,9 +1378,9 @@ mod tests {
                 &self,
                 namespace: Namespace,
                 _tracing_context: TracingContext,
-            ) -> Vec<tool::ToolDescription> {
+            ) -> anyhow::Result<Vec<tool::ToolDescription>> {
                 assert_eq!(namespace.as_str(), "42");
-                vec![tool::ToolDescription {
+                Ok(vec![tool::ToolDescription {
                     name: "add".to_string(),
                     description: "Add two numbers".to_string(),
                     input_schema: json!({
@@ -1393,7 +1391,7 @@ mod tests {
                         },
                         "required": ["a", "b"],
                     }),
-                }]
+                }])
             }
         }
 

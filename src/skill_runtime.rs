@@ -967,7 +967,7 @@ pub mod tests {
                 &self,
                 _namespace: Namespace,
                 _tracing_context: TracingContext,
-            ) -> Vec<ToolDescription> {
+            ) -> anyhow::Result<Vec<ToolDescription>> {
                 let add = ToolDescription {
                     name: "add".to_owned(),
                     description: "Add two numbers".to_owned(),
@@ -984,7 +984,7 @@ pub mod tests {
                         },
                     }),
                 };
-                vec![add, subtract]
+                Ok(vec![add, subtract])
             }
         }
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(ToolSpySkill)));
