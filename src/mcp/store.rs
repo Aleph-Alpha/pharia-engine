@@ -9,7 +9,7 @@ use tracing::error;
 use crate::{
     mcp::{McpServerUrl, client::McpClient},
     namespace_watcher::Namespace,
-    tool::{QualifiedToolName, ToolDescription},
+    tool::ToolDescription,
 };
 
 /// A cached list of tools from an MCP server.
@@ -161,37 +161,27 @@ impl McpServerStore {
         }
     }
 
-    /// A complete list of all tools across all namespaces indexed by their qualified name.
-    pub fn all_tools_by_name(
-        &self,
-    ) -> impl Iterator<Item = (QualifiedToolName, ToolDescription, McpServerUrl)> + '_ {
+    pub fn tools_by_namespace(&self) -> HashMap<Namespace, Vec<(ToolDescription, McpServerUrl)>> {
         self.servers
             .iter()
-            .flat_map(|(namespace, servers)| {
-                servers.iter().cloned().map(|s| (namespace.clone(), s))
-            })
-            .flat_map(|(namespace, server)| {
-                self.tools
-                    .get(&server)
-                    .expect("Every MCP server stored must have a tool list.")
-                    .tools
-                    .iter()
-                    .cloned()
-                    .map(move |t| (namespace.clone(), server.clone(), t))
-            })
-            .map(|(namespace, server, tool)| {
+            .map(|(namespace, servers)| {
                 (
-                    QualifiedToolName {
-                        namespace,
-                        // Currently the tool name used to invoke the tool via CSI is the same as the
-                        // name reported by the MCP server, but this may change in the future, to avoid
-                        // name collisions
-                        name: tool.name().to_owned(),
-                    },
-                    tool,
-                    server,
+                    namespace.clone(),
+                    servers
+                        .iter()
+                        .flat_map(|server| {
+                            self.tools
+                                .get(server)
+                                .expect("Every MCP server stored must have a tool list.")
+                                .tools
+                                .iter()
+                                .cloned()
+                                .map(|t| (t, server.clone()))
+                        })
+                        .collect(),
                 )
             })
+            .collect()
     }
 
     /// Fetches the list of tools for the given MCP server. The returned list is sorted, so that the
