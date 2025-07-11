@@ -1,9 +1,9 @@
-use std::sync::Arc;
-
 use bytesize::ByteSize;
+use std::sync::Arc;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinHandle, spawn_blocking};
+use tracing::error;
 use tracing::warn;
 
 use crate::context;
@@ -313,10 +313,16 @@ impl SkillLoaderActor {
             SkillFetchError::SkillNotFound(skill.clone())
         })?;
         let size_loaded_from_registry = ByteSize(bytes.len() as u64);
+        let skill_name = skill.to_string();
         let skill = spawn_blocking(move || {
             let load_context =
                 context!(&tracing_context, "pharia-kernel::skill-loader", "compile",);
-            load_skill_from_wasm_bytes(engine, bytes, load_context)
+            load_skill_from_wasm_bytes(engine, bytes, load_context).inspect_err(|e| {
+                // While most context of errors is known exactly where they occur, we do want to
+                // include the skill name as part of the error messages, which is why we log this
+                // only here.
+                error!(parent: tracing_context.span(), "Failed to load skill {skill_name}: {e}");
+            })
         })
         .await
         .expect("Spawned linking thread must run to completion without being poisoned.")?;
