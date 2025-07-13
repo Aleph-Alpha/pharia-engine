@@ -174,7 +174,9 @@ jobs:
         run: cargo cyclonedx --format json --manifest-path Cargo.toml
 
       - name: Merge SBOMs
-        run: cyclonedx merge --input-files sbom.json pharia-kernel.cdx.json --output-format json --output-file sbom.json
+        run: |
+          CDX_FILES=$(find . -name "*.cdx.json" -type f | tr '\n' ' ')
+          cyclonedx merge --input-files sbom.json $CDX_FILES --output-format json --output-file sbom.json
 
       - name: Upload scanning artifacts
         uses: actions/upload-artifact@v4
