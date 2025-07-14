@@ -9,9 +9,10 @@ use derive_more::{From, Into};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::csi_shell::CsiShellError;
-use crate::logging::TracingContext;
-use crate::{chunking, csi::RawCsi, inference, language_selection, search};
+use crate::{
+    chunking, csi::RawCsi, csi_shell::CsiShellError, inference, language_selection,
+    logging::TracingContext, search,
+};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case", tag = "function")]

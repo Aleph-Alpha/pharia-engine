@@ -119,18 +119,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use axum::http::StatusCode;
-    use axum::{body::Body, http::Request};
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
     use http_body_util::BodyExt as _;
     use reqwest::Method;
     use serde_json::json;
     use tower::ServiceExt as _;
 
     use super::{ToolProvider, http_tools_v1};
-    use crate::feature_set::PRODUCTION_FEATURE_SET;
-    use crate::tool::ToolDescription;
-    use crate::tool::toolbox::NamespaceNotFound;
-    use crate::{namespace_watcher::Namespace, tool::actor::ToolRuntimeDouble};
+    use crate::{
+        feature_set::PRODUCTION_FEATURE_SET,
+        namespace_watcher::Namespace,
+        tool::{ToolDescription, actor::ToolRuntimeDouble, toolbox::NamespaceNotFound},
+    };
 
     #[derive(Clone)]
     struct ProviderStub<T> {

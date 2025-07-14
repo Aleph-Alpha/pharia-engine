@@ -262,8 +262,7 @@ where
 pub mod tests {
 
     use futures::future::pending;
-    use std::collections::HashSet;
-    use std::sync::Mutex;
+    use std::{collections::HashSet, sync::Mutex};
     use tokio::time::Instant as TokioInstant;
 
     use crate::{

@@ -487,15 +487,15 @@ impl Default for AppConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-    use std::{collections::HashMap, fs, time::Duration};
+    use std::{collections::HashMap, fs, io::Write, time::Duration};
 
     use config::Config;
     use tempfile::tempdir;
 
-    use crate::feature_set::PRODUCTION_FEATURE_SET;
-    use crate::namespace_watcher::tests::NamespaceConfig;
-    use crate::namespace_watcher::{Namespace, Registry};
+    use crate::{
+        feature_set::PRODUCTION_FEATURE_SET,
+        namespace_watcher::{Namespace, Registry, tests::NamespaceConfig},
+    };
 
     use super::*;
 

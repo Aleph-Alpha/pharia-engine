@@ -1,23 +1,22 @@
 use bytesize::ByteSize;
 use std::sync::Arc;
-use tokio::select;
-use tokio::sync::{mpsc, oneshot};
-use tokio::task::{JoinHandle, spawn_blocking};
-use tracing::error;
-use tracing::warn;
-
-use crate::context;
-use crate::logging::TracingContext;
-use crate::namespace_watcher::{Namespace, Registry, SkillDescription};
-use crate::registries::{
-    Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry,
+use tokio::{
+    select,
+    sync::{mpsc, oneshot},
+    task::{JoinHandle, spawn_blocking},
 };
-use crate::skill::{Skill, SkillPath};
-use crate::wasm::{Engine, SkillLoadError, load_skill_from_wasm_bytes};
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
-use std::collections::HashMap;
-use std::{future::Future, pin::Pin};
+use tracing::{error, warn};
+
+use crate::{
+    context,
+    logging::TracingContext,
+    namespace_watcher::{Namespace, Registry, SkillDescription},
+    registries::{Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry},
+    skill::{Skill, SkillPath},
+    wasm::{Engine, SkillLoadError, load_skill_from_wasm_bytes},
+};
+use futures::{StreamExt, stream::FuturesUnordered};
+use std::{collections::HashMap, future::Future, pin::Pin};
 use thiserror::Error;
 
 #[derive(Debug)]
