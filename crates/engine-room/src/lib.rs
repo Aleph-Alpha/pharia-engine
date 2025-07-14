@@ -20,8 +20,10 @@ use wasmtime::{
     Memory, MemoryType, OptLevel, Store, UpdateDeadline,
     component::{Component, Linker},
 };
-use wasmtime_wasi::ResourceTable;
-use wasmtime_wasi::p2::{IoView, WasiCtx, WasiView, add_to_linker_async};
+use wasmtime_wasi::{
+    ResourceTable,
+    p2::{IoView, WasiCtx, WasiView, add_to_linker_async},
+};
 
 #[derive(Default)]
 pub struct EngineConfig {

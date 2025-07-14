@@ -19,8 +19,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use bytesize::ByteSize;
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
+use futures::{StreamExt, stream::FuturesUnordered};
 use itertools::Itertools;
 use tokio::{
     select,

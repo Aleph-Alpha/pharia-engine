@@ -210,10 +210,7 @@ impl Kernel {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-    use std::future::ready;
-    use std::sync::LazyLock;
-    use std::time::Duration;
+    use std::{env, future::ready, sync::LazyLock, time::Duration};
 
     use dotenvy::dotenv;
     use tokio_test::assert_ok;

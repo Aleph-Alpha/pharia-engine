@@ -20,11 +20,10 @@ use opentelemetry::{
     trace::{TraceContextExt, TracerProvider},
 };
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
-use opentelemetry_sdk::trace::SpanExporter as SpanExporterTrait;
 use opentelemetry_sdk::{
     Resource,
     propagation::{BaggagePropagator, TraceContextPropagator},
-    trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
+    trace::{RandomIdGenerator, Sampler, SdkTracerProvider, SpanExporter as SpanExporterTrait},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
 use tracing::{Span, error, info};
