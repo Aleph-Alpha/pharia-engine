@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.18](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.17...pharia-kernel-v0.13.18)
+
+### Features
+
+- Include error in logs when skill execution fails - ([1d6e7cb](https://github.com/Aleph-Alpha/pharia-kernel/commit/1d6e7cbe850c55b2e6626423f67dcd34eafd0f71))
+- Log skill loading errors - ([d9c70ca](https://github.com/Aleph-Alpha/pharia-kernel/commit/d9c70ca464667d5753263194f4264e7ab0d4e0a8))
+- Better error msg for 404 mcp server result - ([b23ff38](https://github.com/Aleph-Alpha/pharia-kernel/commit/b23ff38d2d047dd381a0641c8cb5791b1396cb35))
+
+### Fixes
+
+- Notify tool box about all namespaces - ([a722280](https://github.com/Aleph-Alpha/pharia-kernel/commit/a7222802381cbf1685b1d056177d09c8fd7a277c))
+- Tool box can report error if namespace does not exist - ([5119e8f](https://github.com/Aleph-Alpha/pharia-kernel/commit/5119e8f536ed5cb240976d6502892fb1d70bb75d))
+- Return 404 when querying mcp-server list for non-existing namespace - ([ea6f119](https://github.com/Aleph-Alpha/pharia-kernel/commit/ea6f119e0227ce157cf8e8b339d631e8cf4050e0))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 9 updates - ([134f6f1](https://github.com/Aleph-Alpha/pharia-kernel/commit/134f6f12da92bcbc8765d142f22b9cb2ab2a28f4))
+- *(deps)* Bump the minor group across 1 directory with 4 updates - ([0f11a71](https://github.com/Aleph-Alpha/pharia-kernel/commit/0f11a7173df7a25678353522f3836b8c876a94e7))
+
+
 ## [0.13.16](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.15...pharia-kernel-v0.13.16)
 
 ### Features
