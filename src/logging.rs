@@ -26,11 +26,76 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, SdkTracerProvider, SpanExporter as SpanExporterTrait},
 };
 use opentelemetry_semantic_conventions::{SCHEMA_URL, resource::SERVICE_VERSION};
-use tracing::{Span, error, info};
+use tracing::{Level, Span, error, info};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{
+    EnvFilter,
+    fmt::time::{FormatTime, UtcTime},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+};
 
 use crate::config::OtelConfig;
+
+use std::fmt;
+use tracing_core::{Event, Subscriber};
+use tracing_subscriber::{
+    fmt::{
+        FmtContext, FormatEvent,
+        format::{FormatFields, Writer},
+    },
+    registry::LookupSpan,
+};
+
+/// An event formatter that renders event log messages without including span context.
+///
+/// Before, our logs were getting cluttered with http attributes coming from the axum middleware:
+///
+/// `2025-07-15T14:52:44.928603Z INFO HTTP request:skill_execution: pharia-kernel::skill-execution: skill=test-beta/hello Skill executed successfully http.request.method=POST network.protocol.version=1.1 server.address="127.0.0.1:8081" user_agent.original="PostmanRuntime/7.44.1"`
+///
+/// However, for our logs, we are mostly interested in the message itself. This formatter leads to
+/// logs like:
+///
+/// `2025-07-15T14:52:44.928603Z pharia-kernel::skill-execution: skill=test-beta/hello Skill executed successfully`
+struct NoSpan;
+
+impl<S, N> FormatEvent<S, N> for NoSpan
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'writer> FormatFields<'writer> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        mut w: Writer<'_>,
+        event: &Event<'_>,
+    ) -> fmt::Result {
+        // Grey color for time
+        write!(w, "\x1b[90m")?;
+        UtcTime::rfc_3339().format_time(&mut w)?;
+        write!(w, "\x1b[0m")?;
+
+        let level = *event.metadata().level();
+        let (open, close) = ansi_for_level(level);
+        write!(w, " {open}{level}{close}")?;
+
+        // Grey color for target (module path)
+        write!(w, " \x1b[90m{}\x1b[0m: ", event.metadata().target())?;
+        ctx.field_format().format_fields(w.by_ref(), event)?;
+        writeln!(w)?;
+        Ok(())
+    }
+}
+
+fn ansi_for_level(level: Level) -> (&'static str, &'static str) {
+    match level {
+        Level::TRACE => ("\x1b[34m", "\x1b[0m"),   // blue
+        Level::DEBUG => ("\x1b[36m", "\x1b[0m"),   // cyan
+        Level::INFO => ("\x1b[32m", "\x1b[0m"),    // green
+        Level::WARN => ("\x1b[33m", "\x1b[0m"),    // yellow
+        Level::ERROR => ("\x1b[1;31m", "\x1b[0m"), // bold red
+    }
+}
 
 /// Create new child context.
 ///
@@ -218,9 +283,11 @@ pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGua
     let env_filter = EnvFilter::from_str(otel_config.log_level).inspect_err(|e| {
         eprintln!("Error parsing log level: {e:#}");
     })?;
+    let fmt_layer = tracing_subscriber::fmt::layer().event_format(NoSpan);
+
     let registry = tracing_subscriber::registry()
         .with(env_filter)
-        .with(tracing_subscriber::fmt::layer());
+        .with(fmt_layer);
     let tracer_provider = if let Some(endpoint) = otel_config.endpoint {
         let exporter = SpanExporter::builder()
             .with_tonic()
