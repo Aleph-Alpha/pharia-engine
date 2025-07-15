@@ -416,18 +416,21 @@ fn log_skill_result<T>(
                 target: "pharia-kernel::skill-execution",
                 parent: tracing_context.span(),
                 skill=%skill_path,
+                error=%error,
                 message="Skill invocation failed"
             ),
             Level::WARN => warn!(
                 target: "pharia-kernel::skill-execution",
                 parent: tracing_context.span(),
                 skill=%skill_path,
+                error=%error,
                 message="Skill invocation failed"
             ),
             Level::INFO => info!(
                 target: "pharia-kernel::skill-execution",
                 parent: tracing_context.span(),
                 skill=%skill_path,
+                error=%error,
                 message="Skill invocation failed"
             ),
             _ => {}
