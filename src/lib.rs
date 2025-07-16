@@ -100,7 +100,7 @@ impl Kernel {
         // Boot up the drivers which power the CSI.
         let tokenizers = Tokenizers::new(app_config.inference_url().to_owned()).unwrap();
         let inference = Inference::new(app_config.inference_url().to_owned());
-        let search = Search::new(app_config.document_index_url().to_owned());
+        let search = Search::new(Some(app_config.document_index_url().to_owned()));
         let tool = ToolRuntime::new();
         let mcp = Mcp::from_subscriber(tool.api());
         let csi_drivers = CsiDrivers {

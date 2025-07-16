@@ -35,13 +35,13 @@ pub trait SearchClient: Send + Sync + 'static {
 
 /// A search client that always returns runtime errors.
 ///
-/// While the DocumentIndex powers all the vector search capabilities of the CSI, there is also
+/// While the `DocumentIndex` powers all the vector search capabilities of the CSI, there is also
 /// a broad subset of Skills that only make use of inference capabilities. In order to make the
-/// Kernel useful without other proprietary systems like the DocumentIndex, we provide a way to
-/// operate the Kernel without connecting to the DocumentIndex. If any Skill tries to access
-/// functionality that requires the DocumentIndex, the search implemenation will return an error
+/// Kernel useful without other proprietary systems like the `DocumentIndex`, we provide a way to
+/// operate the Kernel without connecting to the `DocumentIndex`. If any Skill tries to access
+/// functionality that requires the `DocumentIndex`, the search implemenation will return an error
 /// and Skill execution will be suspended.
-struct SearchNotConfigured;
+pub struct SearchNotConfigured;
 
 impl SearchNotConfigured {
     const ERROR_MESSAGE: &str = "No search backend is configured for this Kernel instance. If you \
@@ -49,33 +49,27 @@ impl SearchNotConfigured {
 }
 
 impl SearchClient for SearchNotConfigured {
-    fn search(
+    async fn search(
         &self,
         _index: IndexPath,
         _request: SearchRequest,
         _api_token: &str,
         _tracing_context: &TracingContext,
-    ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send {
-        async { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
-    }
+    ) -> anyhow::Result<Vec<SearchResult>> { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
 
-    fn document_metadata(
+    async fn document_metadata(
         &self,
         _document_path: DocumentPath,
         _api_token: &str,
         _tracing_context: &TracingContext,
-    ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send {
-        async { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
-    }
+    ) -> anyhow::Result<Option<Value>> { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
 
-    fn document(
+    async fn document(
         &self,
         _document_path: DocumentPath,
         _api_token: &str,
         _tracing_context: &TracingContext,
-    ) -> impl Future<Output = anyhow::Result<Document>> + Send {
-        async { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
-    }
+    ) -> anyhow::Result<Document> { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
 }
 
 /// Search a Document Index collection
@@ -644,5 +638,22 @@ pub mod tests {
 
         // Then we don't get any results
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_not_configured_returns_error() {
+        // Given a search client that is not configured
+        let client = SearchNotConfigured;
+
+        // When making a query
+        let index = IndexPath::new("Kernel", "test", "asym-64");
+        let api_token = "";
+        let request = SearchRequest::new(vec![], 1, None, true, vec![]);
+        let results = client
+            .search(index, request, api_token, &TracingContext::dummy())
+            .await;
+
+        // Then we get an error
+        assert!(results.is_err());
     }
 }
