@@ -33,6 +33,51 @@ pub trait SearchClient: Send + Sync + 'static {
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
 
+/// A search client that always returns runtime errors.
+///
+/// While the DocumentIndex powers all the vector search capabilities of the CSI, there is also
+/// a broad subset of Skills that only make use of inference capabilities. In order to make the
+/// Kernel useful without other proprietary systems like the DocumentIndex, we provide a way to
+/// operate the Kernel without connecting to the DocumentIndex. If any Skill tries to access
+/// functionality that requires the DocumentIndex, the search implemenation will return an error
+/// and Skill execution will be suspended.
+struct SearchNotConfigured;
+
+impl SearchNotConfigured {
+    const ERROR_MESSAGE: &str = "No search backend is configured for this Kernel instance. If you \
+    think this is an error, please contact your operator.";
+}
+
+impl SearchClient for SearchNotConfigured {
+    fn search(
+        &self,
+        _index: IndexPath,
+        _request: SearchRequest,
+        _api_token: &str,
+        _tracing_context: &TracingContext,
+    ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send {
+        async { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
+    }
+
+    fn document_metadata(
+        &self,
+        _document_path: DocumentPath,
+        _api_token: &str,
+        _tracing_context: &TracingContext,
+    ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send {
+        async { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
+    }
+
+    fn document(
+        &self,
+        _document_path: DocumentPath,
+        _api_token: &str,
+        _tracing_context: &TracingContext,
+    ) -> impl Future<Output = anyhow::Result<Document>> + Send {
+        async { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
+    }
+}
+
 /// Search a Document Index collection
 pub struct SearchRequest {
     /// What you want to search for
