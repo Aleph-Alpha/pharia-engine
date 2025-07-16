@@ -28,10 +28,6 @@ mod defaults {
         "https://inference-api.product.pharia.com".to_owned()
     }
 
-    pub fn document_index_url() -> String {
-        "https://document-index.product.pharia.com".to_owned()
-    }
-
     pub fn authorization_url() -> String {
         "https://pharia-iam.product.pharia.com".to_owned()
     }
@@ -86,8 +82,11 @@ pub struct AppConfig {
     #[serde(default = "defaults::inference_url")]
     inference_url: String,
     /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
-    #[serde(default = "defaults::document_index_url")]
-    document_index_url: String,
+    /// The Kernel supports running without a configured Document Index. This might be useful if
+    /// the Kernel runs outside of `PhariaAI`, or if no Document Index is available because of
+    /// resource constraints. In case skills try to use search functionality without a configured
+    /// Document Index, an error is returned and Skill execution is suspended.
+    document_index_url: Option<String>,
     /// This base URL is used to authorize an `PHARIA_AI_TOKEN` for use by the kernel
     #[serde(default = "defaults::authorization_url")]
     authorization_url: String,
@@ -248,13 +247,13 @@ impl AppConfig {
     }
 
     #[must_use]
-    pub fn document_index_url(&self) -> &str {
-        &self.document_index_url
+    pub fn document_index_url(&self) -> Option<&str> {
+        self.document_index_url.as_deref()
     }
 
     #[must_use]
-    pub fn with_document_index_url(mut self, url: String) -> Self {
-        self.document_index_url = url;
+    pub fn with_document_index_url(mut self, url: impl Into<String>) -> Self {
+        self.document_index_url = Some(url.into());
         self
     }
 
@@ -468,7 +467,7 @@ impl Default for AppConfig {
             kernel_address: defaults::kernel_address(),
             metrics_address: defaults::metrics_address(),
             inference_url: defaults::inference_url(),
-            document_index_url: defaults::document_index_url(),
+            document_index_url: None,
             authorization_url: defaults::authorization_url(),
             namespaces: NamespaceConfigs::default(),
             namespace_update_interval: defaults::namespace_update_interval(),
@@ -554,6 +553,10 @@ mod tests {
         assert_eq!(config.pharia_ai_feature_set(), FeatureSet::Stable(42));
         assert_eq!(config.kernel_address(), "192.123.1.1:8081".parse().unwrap());
         assert_eq!(config.log_level(), "dummy");
+        assert_eq!(
+            config.document_index_url(),
+            Some("https://document-index.product.pharia.com")
+        );
         assert_eq!(config.namespaces().len(), 1);
         assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
         Ok(())
@@ -575,10 +578,7 @@ mod tests {
             config.inference_url(),
             "https://inference-api.product.pharia.com"
         );
-        assert_eq!(
-            config.document_index_url(),
-            "https://document-index.product.pharia.com"
-        );
+        assert!(config.document_index_url().is_none());
         assert_eq!(
             config.authorization_url(),
             "https://pharia-iam.product.pharia.com"

@@ -87,6 +87,7 @@ impl TestKernel {
         let app_config = AppConfig::default()
             .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
             .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
+            .with_document_index_url("https://document-index.product.pharia.com")
             .with_namespaces(namespaces)
             .with_pharia_ai_feature_set(FeatureSet::Beta)
             .with_wasmtime_cache_size_request(Some(ByteSize::mib(512)))
@@ -313,8 +314,8 @@ async fn run_doc_metadata_skill() {
         .await
         .unwrap();
     let status = resp.status();
-    let value: Value = resp.json().await.unwrap();
     assert_eq!(status, axum::http::StatusCode::OK);
+    let value: Value = resp.json().await.unwrap();
     let first_text = value["url"].as_str().unwrap();
     assert!(first_text.starts_with("https://pharia-kernel"));
 
@@ -345,8 +346,8 @@ async fn run_complete_stream_skill() {
         .await
         .unwrap();
     let status = resp.status();
-    let value: Value = resp.json().await.unwrap();
     assert_eq!(status, axum::http::StatusCode::OK);
+    let value: Value = resp.json().await.unwrap();
     assert_eq!(
         value,
         json!([
@@ -383,8 +384,8 @@ async fn run_chat_stream_skill() {
         .await
         .unwrap();
     let status = resp.status();
-    let value: Value = resp.json().await.unwrap();
     assert_eq!(status, axum::http::StatusCode::OK);
+    let value: Value = resp.json().await.unwrap();
     let values = value.as_array().unwrap();
     assert_eq!(values[0], "assistant");
     let completion = values[1..values.len() - 2]
@@ -698,8 +699,8 @@ async fn search_via_remote_csi() {
         .await
         .unwrap();
     let status = resp.status();
-    let body = resp.text().await.unwrap();
     assert_eq!(status, axum::http::StatusCode::OK);
+    let body = resp.text().await.unwrap();
     assert!(body.to_lowercase().contains("kernel"));
 
     kernel.shutdown().await;

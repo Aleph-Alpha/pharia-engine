@@ -35,17 +35,18 @@ pub trait SearchClient: Send + Sync + 'static {
 
 /// A search client that always returns runtime errors.
 ///
-/// While the `DocumentIndex` powers all the vector search capabilities of the CSI, there is also
+/// While the `Document Index` powers all the vector search capabilities of the CSI, there is also
 /// a broad subset of Skills that only make use of inference capabilities. In order to make the
-/// Kernel useful without other proprietary systems like the `DocumentIndex`, we provide a way to
-/// operate the Kernel without connecting to the `DocumentIndex`. If any Skill tries to access
-/// functionality that requires the `DocumentIndex`, the search implemenation will return an error
+/// Kernel useful without other proprietary systems like the Document Index, we provide a way to
+/// operate the Kernel without connecting to the Document Index. If any Skill tries to access
+/// functionality that requires the Document Index, the search implementation will return an error
 /// and Skill execution will be suspended.
 pub struct SearchNotConfigured;
 
 impl SearchNotConfigured {
-    const ERROR_MESSAGE: &str = "No search backend is configured for this Kernel instance. If you \
-    think this is an error, please contact your operator.";
+    const ERROR_MESSAGE: &str = "Document Index is not configured. The Kernel is running without \
+    search capabilities. To enable search capabilities, please ask your operator to configure the \
+    Document Index URL in the Kernel configuration.";
 }
 
 impl SearchClient for SearchNotConfigured {
@@ -55,21 +56,27 @@ impl SearchClient for SearchNotConfigured {
         _request: SearchRequest,
         _api_token: &str,
         _tracing_context: &TracingContext,
-    ) -> anyhow::Result<Vec<SearchResult>> { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
+    ) -> anyhow::Result<Vec<SearchResult>> {
+        Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
+    }
 
     async fn document_metadata(
         &self,
         _document_path: DocumentPath,
         _api_token: &str,
         _tracing_context: &TracingContext,
-    ) -> anyhow::Result<Option<Value>> { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
+    ) -> anyhow::Result<Option<Value>> {
+        Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
+    }
 
     async fn document(
         &self,
         _document_path: DocumentPath,
         _api_token: &str,
         _tracing_context: &TracingContext,
-    ) -> anyhow::Result<Document> { Err(anyhow::anyhow!(Self::ERROR_MESSAGE)) }
+    ) -> anyhow::Result<Document> {
+        Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
+    }
 }
 
 /// Search a Document Index collection
