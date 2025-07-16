@@ -9,7 +9,7 @@ use tokio::{
 };
 use tracing::error;
 
-use crate::logging::TracingContext;
+use crate::{logging::TracingContext, search::client::SearchNotConfigured};
 
 use super::client::{
     Client, Cursor, Document, DocumentPath, Filter, IndexPath, Modality, SearchClient,
@@ -28,9 +28,17 @@ pub struct Search {
 impl Search {
     /// Starts a new search Actor. Calls to this method be balanced by calls to
     /// [`Self::shutdown`].
-    pub fn new(search_addr: String) -> Self {
-        let client = Client::new(search_addr);
-        Self::with_client(client)
+    ///
+    /// If `search_addr` is not provided, the search actor will boot up with client that always
+    /// returns an error. This can be useful if the `DocumentIndex` is not available, either because
+    /// the Kernel runs outside of `PhariaAI`, or because of resource constraints.
+    pub fn new(search_addr: Option<String>) -> Self {
+        if let Some(search_addr) = search_addr {
+            let client = Client::new(search_addr);
+            Self::with_client(client)
+        } else {
+            Self::with_client(SearchNotConfigured)
+        }
     }
 
     pub fn with_client(client: impl SearchClient) -> Self {
@@ -496,7 +504,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token().to_owned();
-        let search = Search::new(host);
+        let search = Search::new(Some(host));
 
         // When making a query on an existing collection
         let index = IndexPath::new("Kernel", "test", "asym-64");
@@ -525,7 +533,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token().to_owned();
-        let search = Search::new(host);
+        let search = Search::new(Some(host));
 
         // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
@@ -549,7 +557,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token().to_owned();
-        let search = Search::new(host);
+        let search = Search::new(Some(host));
         let max_results = 5;
         let min_score = 0.99;
 
@@ -574,7 +582,7 @@ pub mod tests {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
         let api_token = api_token().to_owned();
-        let search = Search::new(host);
+        let search = Search::new(Some(host));
 
         // When making a query on an existing collection
         let index = IndexPath::new("Kernel", "test", "asym-64");
@@ -593,6 +601,25 @@ pub mod tests {
 
         // Then we don't get any results
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_not_configured() {
+        // Given a search client that is not configured
+        let api_token = api_token().to_owned();
+        let search = Search::new(None);
+
+        // When making a query
+        let index = IndexPath::new("Kernel", "test", "asym-64");
+        let request = SearchRequest::new(index, "What is the Pharia Kernel?");
+        let results = search
+            .api()
+            .search(request, api_token, TracingContext::dummy())
+            .await;
+        search.wait_for_shutdown().await;
+
+        // Then we get an error
+        assert!(results.is_err());
     }
 
     /// This Client will only resolve a completion once the correct number of
