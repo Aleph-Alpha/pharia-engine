@@ -1,4 +1,4 @@
-use anyhow::{Ok, anyhow};
+use anyhow::anyhow;
 use bytesize::ByteSize;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use engine_room::{EngineConfig, WasmtimeCache};
@@ -54,6 +54,15 @@ where
     FeatureSet::from_str(&buf).map_err(serde::de::Error::custom)
 }
 
+fn deserialize_empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let url = Option::<String>::deserialize(deserializer)?
+        .and_then(|url| if url.is_empty() { None } else { Some(url) });
+    Ok(url)
+}
+
 fn deserialize_sampling_ratio<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
@@ -86,6 +95,7 @@ pub struct AppConfig {
     /// the Kernel runs outside of `PhariaAI`, or if no Document Index is available because of
     /// resource constraints. In case skills try to use search functionality without a configured
     /// Document Index, an error is returned and Skill execution is suspended.
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     document_index_url: Option<String>,
     /// This base URL is used to authorize an `PHARIA_AI_TOKEN` for use by the kernel
     #[serde(default = "defaults::authorization_url")]
@@ -513,6 +523,24 @@ mod tests {
 
         // Then the debug log level is only applied for PhariaKernel
         assert_eq!(config.log_level(), "info,pharia_kernel=debug");
+        Ok(())
+    }
+
+    #[test]
+    fn empty_document_index_url_is_none() -> anyhow::Result<()> {
+        // Given a config with an empty document index url
+        let env_vars = HashMap::from([("DOCUMENT_INDEX_URL".to_owned(), String::new())]);
+        let env_source = AppConfig::environment().source(Some(env_vars));
+        let dir = tempdir()?;
+        let file_path = dir.path().join("config.toml");
+        fs::File::create_new(&file_path)?;
+        let file_source = File::with_name(file_path.to_str().unwrap());
+
+        // When we load the config
+        let config = AppConfig::from_sources(file_source, env_source)?;
+
+        // Then the document index url is none
+        assert!(config.document_index_url().is_none());
         Ok(())
     }
 

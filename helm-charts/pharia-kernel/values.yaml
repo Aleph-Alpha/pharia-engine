@@ -21,6 +21,7 @@ openTelemetryEndpoint: ""
 openTelemetrySamplingRatio: ""
 authorizationAddress: ""
 inferenceAddress: ""
+# Address of the Document Index. The Document index is an optional dependency of the Kernel. If set to an empty string, the Kernel will run without search capabilities.
 documentIndexAddress: ""
 global:
   # Global config for all ingress resources
