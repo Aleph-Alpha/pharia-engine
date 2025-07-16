@@ -63,6 +63,7 @@ jobs:
       NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       PHARIA_AI_TOKEN: ${{ secrets.PHARIA_AI_TOKEN }}
       INFERENCE_URL: https://inference-api.product.pharia.com
+      DOCUMENT_INDEX_URL: https://document-index.product.pharia.com
       AUTHORIZATION_URL: https://pharia-iam.product.pharia.com
 
   lints:
@@ -215,7 +216,7 @@ jobs:
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
@@ -296,7 +297,7 @@ jobs:
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
@@ -370,7 +371,16 @@ jobs:
   deploy:
     if: github.event_name != 'pull_request'
     runs-on: cpu-runner-8c-32gb-01
-    needs: [build-image, security-scan, test-image, test-helm-chart, test-helm-chart-beta, tests, lints]
+    needs:
+      [
+        build-image,
+        security-scan,
+        test-image,
+        test-helm-chart,
+        test-helm-chart-beta,
+        tests,
+        lints,
+      ]
     concurrency: deploy-${{ github.ref }}
     permissions:
       contents: read
@@ -384,7 +394,7 @@ jobs:
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
@@ -491,4 +501,4 @@ jobs:
           registry: ${{ env.ARTIFACTORY_HOST }}
           registry_username: ${{ steps.jfrog.outputs.oidc-user }}
           registry_password: ${{ steps.jfrog.outputs.oidc-token }}
-          update_dependencies: 'true'
+          update_dependencies: "true"

@@ -7,7 +7,7 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
-use tracing::error;
+use tracing::{error, info};
 
 use crate::{logging::TracingContext, search::client::SearchNotConfigured};
 
@@ -30,13 +30,15 @@ impl Search {
     /// [`Self::shutdown`].
     ///
     /// If `search_addr` is not provided, the search actor will boot up with client that always
-    /// returns an error. This can be useful if the `DocumentIndex` is not available, either because
-    /// the Kernel runs outside of `PhariaAI`, or because of resource constraints.
+    /// returns an error. This can be useful if the Document Index is not available, either
+    /// because the Kernel runs outside of `PhariaAI`, or because of resource constraints.
     pub fn new(search_addr: Option<String>) -> Self {
         if let Some(search_addr) = search_addr {
+            info!(target: "pharia-kernel::search", "Using Document Index at {}", search_addr);
             let client = Client::new(search_addr);
             Self::with_client(client)
         } else {
+            info!(target: "pharia-kernel::search", "Document Index is not configured, running without search capabilities.");
             Self::with_client(SearchNotConfigured)
         }
     }
