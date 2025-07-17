@@ -8,7 +8,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::logging::TracingContext;
+use crate::{inference::InferenceNotConfigured, logging::TracingContext};
 
 pub trait TokenizerApi {
     fn tokenizer_by_model(
@@ -165,6 +165,21 @@ impl TokenizerClient for Client {
         )
         .await
         .map_err(anyhow::Error::from)
+    }
+}
+
+impl TokenizerClient for InferenceNotConfigured {
+    async fn tokenizer_by_model(
+        &self,
+        _model_name: &str,
+        _api_token: String,
+        _tracing_context: TracingContext,
+    ) -> anyhow::Result<Tokenizer> {
+        Err(anyhow::anyhow!(
+            "No inference backend configured. The Kernel is running without inference \
+            capabilities. To enable inference capabilities, please ask your operator to configure \
+            the Inference URL in the Kernel configuration."
+        ))
     }
 }
 

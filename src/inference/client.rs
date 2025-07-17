@@ -512,9 +512,9 @@ pub enum InferenceError {
     )]
     ModelNotFound,
     #[error(
-        "No inference backend configured. The Kernel is running without \
-    inference capabilities. To enable inference capabilities, please ask your operator to configure \
-    the Inference URL in the Kernel configuration."
+        "No inference backend configured. The Kernel is running without inference capabilities. To \
+        enable inference capabilities, please ask your operator to configure the Inference URL in \
+        the Kernel configuration."
     )]
     NotConfigured,
     #[error(transparent)]
