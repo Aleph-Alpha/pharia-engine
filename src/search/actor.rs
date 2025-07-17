@@ -38,7 +38,10 @@ impl Search {
             let client = Client::new(search_addr);
             Self::with_client(client)
         } else {
-            info!(target: "pharia-kernel::search", "Document Index is not configured, running without search capabilities.");
+            info!(
+                target: "pharia-kernel::search",
+                "Document Index is not configured, running without search capabilities."
+            );
             Self::with_client(SearchNotConfigured)
         }
     }
