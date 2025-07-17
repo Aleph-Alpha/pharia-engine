@@ -10,6 +10,7 @@ use tokio::{
 };
 
 use crate::logging::TracingContext;
+use tracing::{info, warn};
 
 use super::client::{InferenceClient, InferenceError};
 
@@ -27,9 +28,17 @@ impl Inference {
     /// [`Self::shutdown`].
     pub fn new(inference_addr: Option<String>) -> Self {
         if let Some(inference_addr) = inference_addr {
+            info!(
+                target: "pharia-kernel::inference",
+                "Using Aleph Alpha Inference at {}", inference_addr
+            );
             let client = Client::new(inference_addr, None).unwrap();
             Self::with_client(client)
         } else {
+            warn!(
+                target: "pharia-kernel::inference",
+                "No Aleph Alpha Inference URL configured, running without inference capabilities."
+            );
             Self::with_client(InferenceNotConfigured)
         }
     }
