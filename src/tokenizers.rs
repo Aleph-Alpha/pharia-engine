@@ -50,14 +50,22 @@ pub struct Tokenizers {
 }
 
 impl Tokenizers {
-    pub fn new(api_base_url: String) -> anyhow::Result<Self> {
+    pub fn new(api_base_url: Option<String>) -> Self {
+        if let Some(api_base_url) = api_base_url {
+            let client = Client::new(api_base_url, None).unwrap();
+            Self::with_client(client)
+        } else {
+            Self::with_client(InferenceNotConfigured)
+        }
+    }
+
+    fn with_client(client: impl TokenizerClient) -> Self {
         let (sender, receiver) = mpsc::channel(1);
-        let client = Client::new(api_base_url, None)?;
         let handle = tokio::spawn(async move {
             let mut actor = TokenizersActor::new(receiver, client);
             actor.run().await;
         });
-        Ok(Tokenizers { sender, handle })
+        Tokenizers { sender, handle }
     }
 
     pub fn api(&self) -> TokenizerSender {
@@ -142,13 +150,13 @@ where
     }
 }
 
-trait TokenizerClient {
+trait TokenizerClient: Send + Sync + 'static {
     fn tokenizer_by_model(
         &self,
         model_name: &str,
         api_token: String,
         tracing_context: TracingContext,
-    ) -> impl Future<Output = anyhow::Result<Tokenizer>>;
+    ) -> impl Future<Output = anyhow::Result<Tokenizer>> + Send;
 }
 
 impl TokenizerClient for Client {
@@ -232,7 +240,7 @@ pub mod tests {
         let api_token = api_token().to_owned();
 
         // When we can request a tokenizer from the AA API
-        let actor = Tokenizers::new(base_url.to_owned()).unwrap();
+        let actor = Tokenizers::new(Some(base_url.to_owned()));
         let api = actor.api();
         let tokenizer = api
             .tokenizer_by_model(api_token, TracingContext::dummy(), model_name.to_owned())
