@@ -82,13 +82,20 @@ pub struct AppConfig {
     /// Address to expose metrics on
     #[serde(default = "defaults::metrics_address")]
     metrics_address: SocketAddr,
-    /// This base URL is used to do inference against models hosted by the Aleph Alpha inference
-    /// stack, as well as used to fetch Tokenizers for said models.
-    /// The Kernel supports running without a configured Aleph Alpha inference. In case skills try
-    /// to use inference functionality without a configured inference URL, an error is returned and
-    /// skill execution is suspended.
+    /// Aleph Alpha inference base URL. It is used to do chat/completion requests against models
+    /// hosted by the Aleph Alpha inference stack, as well as used to fetch Tokenizers for said
+    /// models. Takes precedence over the `openai_inference_url` if both are set. If neither is set,
+    /// the Kernel will run without inference capabilities. In case skills try to use inference
+    /// functionality without a configured inference URL, an error is returned and skill execution
+    /// is suspended.
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     inference_url: Option<String>,
+    /// OpenAI-compatible inference. Set these variables and do not set the `inference_url`
+    /// variable in case you want to do chat requests against OpenAI-compatible inferences. Not all
+    /// model capabilities will be available to Skills if using OpenAI-compatible inferences. Only
+    /// chat requests are supported, completion, explanation and chunking requests are not.
+    #[serde(default)]
+    openai_inference: Option<OpenAiInference>,
     /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
     /// The Kernel supports running without a configured Document Index. This might be useful if
     /// the Kernel runs outside of `PhariaAI`, or if no Document Index is available because of
@@ -129,6 +136,15 @@ pub struct AppConfig {
     wasmtime_cache_size_limit: Option<ByteSize>,
 }
 
+/// Configuration for an OpenAI-compatible inference.
+#[derive(Clone, Deserialize, Debug)]
+pub struct OpenAiInference {
+    /// Base URL for OpenAI-compatible inference.
+    url: String,
+    /// Token to authenticate with the OpenAI-compatible inference.
+    token: String,
+}
+
 #[derive(Clone, Deserialize, Debug)]
 pub struct OtelConfig<'a> {
     /// Endpoint that traces are sent to. If set to None, no traces are emitted
@@ -137,6 +153,18 @@ pub struct OtelConfig<'a> {
     pub sampling_ratio: f64,
     /// Minimum log level for traces.
     pub log_level: &'a str,
+}
+
+/// Configuration for the inference backend that is used
+pub enum InferenceConfig<'a> {
+    /// Use the Aleph Alpha inference API.
+    AlephAlpha { url: &'a str },
+    /// Use any OpenAI-compatible inference. Only chat requests are supported, completion,
+    /// explanation and chunking requests are not.
+    OpenAi { url: &'a str, token: &'a str },
+    /// Kernel is running without any inference backend. Inference requests will lead to a runtime
+    /// error.
+    None,
 }
 
 /// `jiff::SignedDuration` can parse human readable strings like `1h30m` into `SignedDuration`.
@@ -250,6 +278,17 @@ impl AppConfig {
     }
 
     #[must_use]
+    pub fn openai_inference(&self) -> Option<&OpenAiInference> {
+        self.openai_inference.as_ref()
+    }
+
+    #[must_use]
+    pub fn with_openai_inference(mut self, openai: OpenAiInference) -> Self {
+        self.openai_inference = Some(openai);
+        self
+    }
+
+    #[must_use]
     pub fn document_index_url(&self) -> Option<&str> {
         self.document_index_url.as_deref()
     }
@@ -321,6 +360,21 @@ impl AppConfig {
             endpoint: self.otel_endpoint.as_deref(),
             sampling_ratio: self.otel_sampling_ratio,
             log_level: self.log_level.as_str(),
+        }
+    }
+
+    #[must_use]
+    pub fn as_inference_config(&self) -> InferenceConfig<'_> {
+        if let Some(url) = self.inference_url() {
+            // Default to the Aleph Alpha one
+            InferenceConfig::AlephAlpha { url }
+        } else if let Some(openai) = self.openai_inference() {
+            InferenceConfig::OpenAi {
+                url: openai.url.as_str(),
+                token: openai.token.as_str(),
+            }
+        } else {
+            InferenceConfig::None
         }
     }
 
@@ -470,6 +524,7 @@ impl Default for AppConfig {
             kernel_address: defaults::kernel_address(),
             metrics_address: defaults::metrics_address(),
             inference_url: None,
+            openai_inference: None,
             document_index_url: None,
             authorization_url: defaults::authorization_url(),
             namespaces: NamespaceConfigs::default(),
@@ -517,6 +572,61 @@ mod tests {
         // Then the debug log level is only applied for PhariaKernel
         assert_eq!(config.log_level(), "info,pharia_kernel=debug");
         Ok(())
+    }
+
+    #[test]
+    fn load_openai_inference() -> anyhow::Result<()> {
+        // Given environment variables for openai inference
+        let env_vars = HashMap::from([
+            (
+                "OPENAI_INFERENCE__URL".to_owned(),
+                "https://openai.com".to_owned(),
+            ),
+            (
+                "OPENAI_INFERENCE__TOKEN".to_owned(),
+                "sk-1234567890".to_owned(),
+            ),
+        ]);
+        let env_source = AppConfig::environment().source(Some(env_vars));
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("config.toml");
+        fs::File::create_new(&file_path).unwrap();
+        let file_source = File::with_name(file_path.to_str().unwrap());
+
+        // When we load the config
+        let config = AppConfig::from_sources(file_source, env_source)?;
+
+        // Then the openai inference is configured
+        assert!(matches!(
+            config.as_inference_config(),
+            InferenceConfig::OpenAi {
+                url: "https://openai.com",
+                token: "sk-1234567890"
+            }
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn aleph_alpha_inference_is_default() {
+        // Given an app config with both, an aleph alpha inference and an openai inference configured
+        let app_config = AppConfig::default()
+            .with_inference_url("https://inference-api.product.pharia.com")
+            .with_openai_inference(OpenAiInference {
+                url: "https://openai.com".to_owned(),
+                token: "sk-1234567890".to_owned(),
+            });
+
+        // When we convert it into an inference config
+        let config = app_config.as_inference_config();
+
+        // Then the aleph alpha inference is used
+        assert!(matches!(
+            config,
+            InferenceConfig::AlephAlpha {
+                url: "https://inference-api.product.pharia.com"
+            }
+        ));
     }
 
     #[test]
