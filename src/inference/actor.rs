@@ -9,7 +9,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::logging::TracingContext;
+use crate::{config::InferenceConfig, logging::TracingContext};
 use tracing::{info, warn};
 
 use super::client::{InferenceClient, InferenceError};
@@ -26,20 +26,30 @@ pub struct Inference {
 impl Inference {
     /// Starts a new inference Actor. Calls to this method be balanced by calls to
     /// [`Self::shutdown`].
-    pub fn new(inference_addr: Option<String>) -> Self {
-        if let Some(inference_addr) = inference_addr {
-            info!(
-                target: "pharia-kernel::inference",
-                "Using Aleph Alpha Inference at {}", inference_addr
-            );
-            let client = Client::new(inference_addr, None).unwrap();
-            Self::with_client(client)
-        } else {
-            warn!(
-                target: "pharia-kernel::inference",
-                "No Aleph Alpha Inference URL configured, running without inference capabilities."
-            );
-            Self::with_client(InferenceNotConfigured)
+    pub fn new(config: InferenceConfig<'_>) -> Self {
+        match config {
+            InferenceConfig::AlephAlpha { url } => {
+                info!(
+                    target: "pharia-kernel::inference",
+                    "Using Aleph Alpha Inference at {}", url
+                );
+                let client = Client::new(url, None).unwrap();
+                Self::with_client(client)
+            }
+            InferenceConfig::OpenAi { .. } => {
+                warn!(
+                    target: "pharia-kernel::inference",
+                    "OpenAI inference is not supported yet, running without inference capabilities."
+                );
+                Self::with_client(InferenceNotConfigured)
+            }
+            InferenceConfig::None => {
+                warn!(
+                    target: "pharia-kernel::inference",
+                    "No inference configured, running without inference capabilities."
+                );
+                Self::with_client(InferenceNotConfigured)
+            }
         }
     }
 

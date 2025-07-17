@@ -7,8 +7,9 @@ use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
+use tracing::warn;
 
-use crate::{inference::InferenceNotConfigured, logging::TracingContext};
+use crate::{config::InferenceConfig, inference::InferenceNotConfigured, logging::TracingContext};
 
 pub trait TokenizerApi {
     fn tokenizer_by_model(
@@ -50,11 +51,16 @@ pub struct Tokenizers {
 }
 
 impl Tokenizers {
-    pub fn new(api_base_url: Option<String>) -> Self {
-        if let Some(api_base_url) = api_base_url {
-            let client = Client::new(api_base_url, None).unwrap();
+    pub fn new(config: InferenceConfig<'_>) -> Self {
+        if let InferenceConfig::AlephAlpha { url } = config {
+            let client = Client::new(url, None).unwrap();
             Self::with_client(client)
         } else {
+            warn!(
+                target: "pharia-kernel::tokenizers",
+                "Chunking is only supported for models hosted by Aleph Alpha inference, \
+                running without tokenizer capabilities."
+            );
             Self::with_client(InferenceNotConfigured)
         }
     }
@@ -199,6 +205,7 @@ pub mod tests {
     use super::{Tokenizer, TokenizerApi};
 
     use crate::{
+        config::InferenceConfig,
         logging::TracingContext,
         tests::{api_token, inference_url},
         tokenizers::Tokenizers,
@@ -240,7 +247,7 @@ pub mod tests {
         let api_token = api_token().to_owned();
 
         // When we can request a tokenizer from the AA API
-        let actor = Tokenizers::new(Some(base_url.to_owned()));
+        let actor = Tokenizers::new(InferenceConfig::AlephAlpha { url: base_url });
         let api = actor.api();
         let tokenizer = api
             .tokenizer_by_model(api_token, TracingContext::dummy(), model_name.to_owned())

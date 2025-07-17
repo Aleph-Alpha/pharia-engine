@@ -32,7 +32,7 @@ impl Search {
     /// If `search_addr` is not provided, the search actor will boot up with client that always
     /// returns an error. This can be useful if the Document Index is not available, either
     /// because the Kernel runs outside of `PhariaAI`, or because of resource constraints.
-    pub fn new(search_addr: Option<String>) -> Self {
+    pub fn new(search_addr: Option<&str>) -> Self {
         if let Some(search_addr) = search_addr {
             info!(target: "pharia-kernel::search", "Using Document Index at {}", search_addr);
             let client = Client::new(search_addr);
@@ -507,7 +507,7 @@ pub mod tests {
     #[tokio::test]
     async fn search_request() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
+        let host = document_index_url();
         let api_token = api_token().to_owned();
         let search = Search::new(Some(host));
 
@@ -536,7 +536,7 @@ pub mod tests {
     #[tokio::test]
     async fn request_metadata() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
+        let host = document_index_url();
         let api_token = api_token().to_owned();
         let search = Search::new(Some(host));
 
@@ -560,7 +560,7 @@ pub mod tests {
     #[tokio::test]
     async fn min_score() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
+        let host = document_index_url();
         let api_token = api_token().to_owned();
         let search = Search::new(Some(host));
         let max_results = 5;
@@ -585,7 +585,7 @@ pub mod tests {
     #[tokio::test]
     async fn filter_index() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
+        let host = document_index_url();
         let api_token = api_token().to_owned();
         let search = Search::new(Some(host));
 

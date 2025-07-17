@@ -233,9 +233,9 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(host: String) -> Self {
+    pub fn new(host: impl Into<String>) -> Self {
         Self {
-            host,
+            host: host.into(),
             http: HttpClient::default(),
         }
     }
