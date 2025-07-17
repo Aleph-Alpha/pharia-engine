@@ -79,18 +79,21 @@ enum TokenizersMsg {
     },
 }
 
-struct TokenizersActor {
+struct TokenizersActor<C: TokenizerClient> {
     receiver: mpsc::Receiver<TokenizersMsg>,
     /// Used to connect to the Aleph Alpha inference API which does serve the tokenizers.
-    client: Client,
+    client: C,
     /// Cache Tokenizers by model name. Currently this is case sensitive, due to the AA API being
     /// case sensitive. We wrap tokenizers in `Arc` so we can send them in a fire and forget manner
     /// to the requesting skill runtime, and we do not need to worry about keeping them alive.
     cache: HashMap<String, Arc<Tokenizer>>,
 }
 
-impl TokenizersActor {
-    pub fn new(receiver: mpsc::Receiver<TokenizersMsg>, client: Client) -> Self {
+impl<C: TokenizerClient> TokenizersActor<C>
+where
+    C: TokenizerClient,
+{
+    pub fn new(receiver: mpsc::Receiver<TokenizersMsg>, client: C) -> Self {
         TokenizersActor {
             receiver,
             client,
@@ -120,11 +123,7 @@ impl TokenizersActor {
                     // Miss, we need to request and insert it first
                     match self
                         .client
-                        .tokenizer_by_model(
-                            &model_name,
-                            Some(api_token),
-                            tracing_context.as_inference_client_context(),
-                        )
+                        .tokenizer_by_model(&model_name, api_token, tracing_context)
                         .await
                     {
                         Ok(tokenizer) => {
@@ -132,18 +131,40 @@ impl TokenizersActor {
                             self.cache.insert(model_name, tokenizer.clone());
                             Ok(tokenizer)
                         }
-                        Err(e) => {
-                            let error: anyhow::Error = e.into();
-                            Err(error).with_context(|| {
-                                format!("Error fetching tokenizer for {model_name}")
-                            })
-                        }
+                        Err(e) => Err(e)
+                            .with_context(|| format!("Error fetching tokenizer for {model_name}")),
                     }
                 };
                 let send_result = send.send(tokenizer_result);
                 drop(send_result);
             }
         }
+    }
+}
+
+trait TokenizerClient {
+    fn tokenizer_by_model(
+        &self,
+        model_name: &str,
+        api_token: String,
+        tracing_context: TracingContext,
+    ) -> impl Future<Output = anyhow::Result<Tokenizer>>;
+}
+
+impl TokenizerClient for Client {
+    async fn tokenizer_by_model(
+        &self,
+        model_name: &str,
+        api_token: String,
+        tracing_context: TracingContext,
+    ) -> anyhow::Result<Tokenizer> {
+        self.tokenizer_by_model(
+            model_name,
+            Some(api_token),
+            tracing_context.as_inference_client_context(),
+        )
+        .await
+        .map_err(anyhow::Error::from)
     }
 }
 
