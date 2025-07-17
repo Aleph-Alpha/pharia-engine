@@ -24,10 +24,6 @@ mod defaults {
         "0.0.0.0:9000".parse().unwrap()
     }
 
-    pub fn inference_url() -> String {
-        "https://inference-api.product.pharia.com".to_owned()
-    }
-
     pub fn authorization_url() -> String {
         "https://pharia-iam.product.pharia.com".to_owned()
     }
@@ -88,8 +84,11 @@ pub struct AppConfig {
     metrics_address: SocketAddr,
     /// This base URL is used to do inference against models hosted by the Aleph Alpha inference
     /// stack, as well as used to fetch Tokenizers for said models.
-    #[serde(default = "defaults::inference_url")]
-    inference_url: String,
+    /// The Kernel supports running without a configured Aleph Alpha inference. In case skills try
+    /// to use inference functionality without a configured inference URL, an error is returned and
+    /// skill execution is suspended.
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    inference_url: Option<String>,
     /// This base URL is used to do search hosted by the Aleph Alpha Document Index.
     /// The Kernel supports running without a configured Document Index. This might be useful if
     /// the Kernel runs outside of `PhariaAI`, or if no Document Index is available because of
@@ -182,12 +181,6 @@ impl AppConfig {
                 eprintln!("Error deserializing app config: {e:#}");
             })?;
 
-        if config.inference_url.is_empty() {
-            let message = "The inference address must not be empty.";
-            eprintln!("{message}");
-            return Err(anyhow!(message));
-        }
-
         if config.authorization_url.is_empty() {
             let message = "The authorization address must not be empty.";
             eprintln!("{message}");
@@ -246,13 +239,13 @@ impl AppConfig {
     }
 
     #[must_use]
-    pub fn inference_url(&self) -> &str {
-        &self.inference_url
+    pub fn inference_url(&self) -> Option<&str> {
+        self.inference_url.as_deref()
     }
 
     #[must_use]
-    pub fn with_inference_url(mut self, url: String) -> Self {
-        self.inference_url = url;
+    pub fn with_inference_url(mut self, url: impl Into<String>) -> Self {
+        self.inference_url = Some(url.into());
         self
     }
 
@@ -476,7 +469,7 @@ impl Default for AppConfig {
             pharia_ai_feature_set: FeatureSet::default(),
             kernel_address: defaults::kernel_address(),
             metrics_address: defaults::metrics_address(),
-            inference_url: defaults::inference_url(),
+            inference_url: None,
             document_index_url: None,
             authorization_url: defaults::authorization_url(),
             namespaces: NamespaceConfigs::default(),
@@ -585,6 +578,10 @@ mod tests {
             config.document_index_url(),
             Some("https://document-index.product.pharia.com")
         );
+        assert_eq!(
+            config.inference_url(),
+            Some("https://inference-api.product.pharia.com")
+        );
         assert_eq!(config.namespaces().len(), 1);
         assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
         Ok(())
@@ -602,10 +599,7 @@ mod tests {
         assert_eq!(config.pharia_ai_feature_set(), PRODUCTION_FEATURE_SET);
         assert_eq!(config.kernel_address(), "0.0.0.0:8081".parse().unwrap());
         assert_eq!(config.metrics_address(), "0.0.0.0:9000".parse().unwrap());
-        assert_eq!(
-            config.inference_url(),
-            "https://inference-api.product.pharia.com"
-        );
+        assert!(config.inference_url().is_none());
         assert!(config.document_index_url().is_none());
         assert_eq!(
             config.authorization_url(),
