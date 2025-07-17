@@ -88,6 +88,7 @@ impl TestKernel {
             .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
             .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
             .with_document_index_url("https://document-index.product.pharia.com")
+            .with_inference_url("https://inference-api.product.pharia.com")
             .with_namespaces(namespaces)
             .with_pharia_ai_feature_set(FeatureSet::Beta)
             .with_wasmtime_cache_size_request(Some(ByteSize::mib(512)))
