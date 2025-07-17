@@ -25,9 +25,13 @@ pub struct Inference {
 impl Inference {
     /// Starts a new inference Actor. Calls to this method be balanced by calls to
     /// [`Self::shutdown`].
-    pub fn new(inference_addr: String) -> Self {
-        let client = Client::new(inference_addr, None).unwrap();
-        Self::with_client(client)
+    pub fn new(inference_addr: Option<String>) -> Self {
+        if let Some(inference_addr) = inference_addr {
+            let client = Client::new(inference_addr, None).unwrap();
+            Self::with_client(client)
+        } else {
+            Self::with_client(InferenceNotConfigured)
+        }
     }
 
     pub fn with_client(client: impl InferenceClient) -> Self {
@@ -194,6 +198,62 @@ impl InferenceApi for InferenceSender {
             .await
             .expect("all api handlers must be shutdown before actors");
         recv
+    }
+}
+
+/// An inference client that always returns runtime errors.
+///
+/// With the goal of supporting not only the Aleph Alphe inference API, but also configurable
+/// OpenAI-compatible inference APIs, we start with a configuration option of no inference backend
+/// at all.
+pub struct InferenceNotConfigured;
+
+impl InferenceClient for InferenceNotConfigured {
+    async fn complete(
+        &self,
+        _request: &CompletionRequest,
+        _api_token: String,
+        _tracing_context: &TracingContext,
+    ) -> Result<Completion, InferenceError> {
+        Err(InferenceError::NotConfigured)
+    }
+
+    async fn stream_completion(
+        &self,
+        _request: &CompletionRequest,
+        _api_token: String,
+        _tracing_context: &TracingContext,
+        _send: mpsc::Sender<CompletionEvent>,
+    ) -> Result<(), InferenceError> {
+        Err(InferenceError::NotConfigured)
+    }
+
+    async fn chat(
+        &self,
+        _request: &ChatRequest,
+        _api_token: String,
+        _tracing_context: &TracingContext,
+    ) -> Result<ChatResponse, InferenceError> {
+        Err(InferenceError::NotConfigured)
+    }
+
+    async fn stream_chat(
+        &self,
+        _request: &ChatRequest,
+        _api_token: String,
+        _tracing_context: &TracingContext,
+        _send: mpsc::Sender<ChatEvent>,
+    ) -> Result<(), InferenceError> {
+        Err(InferenceError::NotConfigured)
+    }
+
+    async fn explain(
+        &self,
+        _request: &ExplanationRequest,
+        _api_token: String,
+        _tracing_context: &TracingContext,
+    ) -> Result<Explanation, InferenceError> {
+        Err(InferenceError::NotConfigured)
     }
 }
 
