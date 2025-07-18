@@ -65,6 +65,8 @@ jobs:
       INFERENCE_URL: https://inference-api.product.pharia.com
       DOCUMENT_INDEX_URL: https://document-index.product.pharia.com
       AUTHORIZATION_URL: https://pharia-iam.product.pharia.com
+      OPENAI_INFERENCE__URL: https://api.openai.com/v1
+      OPENAI_INFERENCE__TOKEN: ${{ secrets.OPENAI_API_KEY }}
 
   lints:
     runs-on: ubuntu-latest

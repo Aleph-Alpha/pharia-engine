@@ -1,5 +1,6 @@
 mod actor;
 mod client;
+mod openai;
 
 pub use self::{
     actor::{

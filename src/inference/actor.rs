@@ -12,7 +12,10 @@ use tokio::{
 use crate::{config::InferenceConfig, logging::TracingContext};
 use tracing::{info, warn};
 
-use super::client::{InferenceClient, InferenceError};
+use super::{
+    client::{InferenceClient, InferenceError},
+    openai::OpenAiClient,
+};
 
 #[cfg(test)]
 use double_trait::double;
@@ -36,12 +39,13 @@ impl Inference {
                 let client = Client::new(url, None).unwrap();
                 Self::with_client(client)
             }
-            InferenceConfig::OpenAi { .. } => {
-                warn!(
+            InferenceConfig::OpenAi { url, token } => {
+                info!(
                     target: "pharia-kernel::inference",
-                    "OpenAI inference is not supported yet, running without inference capabilities."
+                    "Using OpenAI Inference API at {}", url
                 );
-                Self::with_client(InferenceNotConfigured)
+                let client = OpenAiClient::new(url, token);
+                Self::with_client(client)
             }
             InferenceConfig::None => {
                 warn!(
