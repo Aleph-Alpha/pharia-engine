@@ -236,6 +236,24 @@ mod tests {
         &INFERENCE_URL
     }
 
+    /// `OpenAI` API Key used by tests to authenticate requests.
+    pub fn openai_token() -> &'static str {
+        static OPENAI_API_KEY: LazyLock<String> = LazyLock::new(|| {
+            drop(dotenv());
+            env::var("OPENAI_INFERENCE__TOKEN").expect("OPENAI_INFERENCE__TOKEN variable not set")
+        });
+        &OPENAI_API_KEY
+    }
+
+    /// URL of an `OpenAI` compatible inference server used by tests.
+    pub fn openai_inference_url() -> &'static str {
+        static OPENAI_INFERENCE_URL: LazyLock<String> = LazyLock::new(|| {
+            drop(dotenv());
+            env::var("OPENAI_INFERENCE__URL").expect("OPENAI_INFERENCE__URL variable not set")
+        });
+        &OPENAI_INFERENCE_URL
+    }
+
     /// Authorization address used by tests.
     pub fn authorization_url() -> &'static str {
         static AUTHORIZATION_URL: LazyLock<String> = LazyLock::new(|| {

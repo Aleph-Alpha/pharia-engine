@@ -105,6 +105,33 @@ impl TestKernel {
         }
     }
 
+    async fn with_openai_inference(token: &str) -> Self {
+        let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
+        let shutdown_signal = async {
+            shutdown_capture.await.unwrap();
+        };
+        let port = free_test_port();
+        let metrics_port = free_test_port();
+        let app_config = AppConfig::default()
+            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
+            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
+            .with_document_index_url("https://document-index.product.pharia.com")
+            .with_openai_inference("https://api.openai.com/v1", token)
+            .with_pharia_ai_feature_set(FeatureSet::Beta)
+            .with_wasmtime_cache_size_request(Some(ByteSize::mib(512)))
+            .with_wasmtime_cache_dir(Some(std::path::absolute("./.wasmtime-cache").unwrap()))
+            .with_pooling_allocator(true);
+        let port = app_config.kernel_address().port();
+        // Wait for socket listener to be bound
+        let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
+
+        Self {
+            shutdown_trigger,
+            kernel,
+            port,
+        }
+    }
+
     async fn with_skills(skills: &[&str]) -> Self {
         Self::new(namespace_config(
             &PathBuf::from_str("./skills").unwrap(),
@@ -446,6 +473,53 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
     let completion = serde_json::from_slice::<Value>(&body).unwrap();
     assert!(completion["text"].as_str().unwrap().contains("Homer"));
     assert_eq!(completion["finish_reason"], "stop");
+
+    kernel.shutdown().await;
+}
+
+#[cfg_attr(not(feature = "test_inference"), ignore)]
+#[tokio::test]
+async fn openai_inference_backend() {
+    let token = openai_inference_token();
+    let kernel = TestKernel::with_openai_inference(token).await;
+
+    let req_client = reqwest::Client::new();
+    let resp = req_client
+        .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value())
+        .body(Body::from(
+            json!({
+                "version": "0.2",
+                "function": "chat",
+                "messages": [{"role": "user", "content": "Say hello to Homer"}],
+                "model": "gpt-4o-mini",
+                "params": {
+                    "max_tokens": 64,
+                    "temperature": null,
+                    "top_p": null,
+                }
+            })
+            .to_string(),
+        ))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let body = resp.bytes().await.unwrap();
+    let completion = serde_json::from_slice::<Value>(&body).unwrap();
+    assert!(
+        completion["message"]["role"]
+            .as_str()
+            .unwrap()
+            .contains("assistant")
+    );
+    assert!(matches!(
+        completion["finish_reason"].as_str().unwrap(),
+        "stop"
+    ));
 
     kernel.shutdown().await;
 }
@@ -959,6 +1033,15 @@ fn api_token() -> &'static str {
     API_TOKEN.get_or_init(|| {
         drop(dotenv());
         env::var("PHARIA_AI_TOKEN").expect("PHARIA_AI_TOKEN variable not set")
+    })
+}
+
+/// `OpenAI` Inference API Token used by tests to authenticate requests
+fn openai_inference_token() -> &'static str {
+    static OPENAI_INFERENCE_TOKEN: OnceLock<String> = OnceLock::new();
+    OPENAI_INFERENCE_TOKEN.get_or_init(|| {
+        drop(dotenv());
+        env::var("OPENAI_INFERENCE__TOKEN").expect("OPENAI_INFERENCE__TOKEN variable not set")
     })
 }
 

@@ -283,8 +283,15 @@ impl AppConfig {
     }
 
     #[must_use]
-    pub fn with_openai_inference(mut self, openai: OpenAiInference) -> Self {
-        self.openai_inference = Some(openai);
+    pub fn with_openai_inference(
+        mut self,
+        url: impl Into<String>,
+        token: impl Into<String>,
+    ) -> Self {
+        self.openai_inference = Some(OpenAiInference {
+            url: url.into(),
+            token: token.into(),
+        });
         self
     }
 
@@ -612,10 +619,7 @@ mod tests {
         // Given an app config with both, an aleph alpha inference and an openai inference configured
         let app_config = AppConfig::default()
             .with_inference_url("https://inference-api.product.pharia.com")
-            .with_openai_inference(OpenAiInference {
-                url: "https://openai.com".to_owned(),
-                token: "sk-1234567890".to_owned(),
-            });
+            .with_openai_inference("https://openai.com", "sk-1234567890");
 
         // When we convert it into an inference config
         let config = app_config.as_inference_config();
