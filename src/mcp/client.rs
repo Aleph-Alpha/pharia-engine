@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use reqwest::{Client, Response, header};
 use serde::Deserialize;
@@ -272,33 +273,24 @@ impl McpClientImpl {
         }
     }
 
-    /// Parse an SSE `bytes_stream` and find the first occurence of <T> contained in a `data:`
-    /// field. SSE events can span multiple chunks, and multiple events can be in a single chunk.
-    async fn json_rpc_result_from_sse_stream<T, S>(mut stream: S) -> anyhow::Result<T>
+    /// Parse a bytes stream containing SSE events and find the first occurrence of <T> contained
+    /// in a `data:` field. MCP might send multiple events, some of which we are not interested in.
+    /// These can include logging or other events that are not relevant to the JSON-RPC response we
+    /// are interested in.
+    async fn json_rpc_result_from_sse_stream<T, S>(stream: S) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
         S: futures::Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Unpin,
     {
-        let mut buffer = String::new();
+        let mut event_stream = stream.eventsource();
 
-        while let Some(chunk) = stream.next().await {
-            let item = String::from_utf8_lossy(&chunk?).replace("\r\n", "\n");
-            buffer.push_str(&item);
-
-            // There might be multiple events in a single chunk.
-            while let Some(pos) = buffer.find("\n\n") {
-                let event = &buffer[..pos];
-
-                for line in event.lines() {
-                    if let Some(data) = line.strip_prefix("data: ") {
-                        if let Ok(value) = serde_json::from_str::<T>(data) {
-                            return Ok(value);
-                        }
-                    }
+        while let Some(event) = event_stream.next().await {
+            // We ignore any errors, as we still have a chance to find the JSON-RPC response we are
+            // interested in.
+            if let Ok(event) = event {
+                if let Ok(value) = serde_json::from_str::<T>(&event.data) {
+                    return Ok(value);
                 }
-
-                // Remove the processed event from the buffer
-                buffer = buffer[pos + 2..].to_string();
             }
         }
 
