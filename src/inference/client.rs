@@ -67,12 +67,18 @@ pub trait InferenceClient: Send + Sync + 'static {
 }
 
 /// Create a new [`aleph_alpha_client::How`] based on the given api token and tracing context.
-fn how(auth: Authentication, tracing_context: &TracingContext) -> How {
-    How {
-        api_token: Some(auth.into_string()),
+fn how(auth: Authentication, tracing_context: &TracingContext) -> anyhow::Result<How> {
+    let api_token = auth.into_string().ok_or_else(|| {
+        anyhow::anyhow!(
+            "Doing an inference request against the Aleph Alpha inference API requires a PhariaAI \
+            token. Please provide a valid token in the Authorization header."
+        )
+    })?;
+    Ok(How {
+        api_token: Some(api_token),
         trace_context: tracing_context.as_inference_client_context(),
         ..Default::default()
-    }
+    })
 }
 
 impl InferenceClient for Client {
@@ -93,7 +99,7 @@ impl InferenceClient for Client {
             target,
             granularity: granularity.into(),
         };
-        let how = how(auth, tracing_context);
+        let how = how(auth, tracing_context)?;
         retry(|| self.explanation(&task, model, &how), tracing_context)
             .await?
             .try_into()
@@ -107,7 +113,7 @@ impl InferenceClient for Client {
     ) -> Result<ChatResponse, InferenceError> {
         let task = request.to_task_chat();
 
-        let how = how(auth, tracing_context);
+        let how = how(auth, tracing_context)?;
         retry(|| self.chat(&task, &request.model, &how), tracing_context)
             .await?
             .try_into()
@@ -122,7 +128,7 @@ impl InferenceClient for Client {
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let task = request.to_task_chat();
-        let how = how(auth, tracing_context);
+        let how = how(auth, tracing_context)?;
         let mut stream = retry(
             || self.stream_chat(&task, &request.model, &how),
             tracing_context,
@@ -176,7 +182,7 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
             echo: *echo,
         };
-        let how = how(auth, tracing_context);
+        let how = how(auth, tracing_context)?;
         retry(|| self.completion(&task, model, &how), tracing_context)
             .await?
             .try_into()
@@ -225,7 +231,7 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
             echo: *echo,
         };
-        let how = how(auth, tracing_context);
+        let how = how(auth, tracing_context)?;
         let mut stream = retry(
             || self.stream_completion(&task, model, &how),
             tracing_context,

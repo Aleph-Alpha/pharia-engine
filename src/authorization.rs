@@ -13,14 +13,14 @@ use crate::{http::HttpClient, logging::TracingContext};
 /// The authentication provided by incoming requests.
 /// When operating inside `PhariaAI`, this will be a `PHARIA_AI_TOKEN`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Authentication(String);
+pub struct Authentication(Option<String>);
 
 impl Authentication {
     pub fn new(token: impl Into<String>) -> Self {
-        Self(token.into())
+        Self(Some(token.into()))
     }
 
-    pub fn into_string(self) -> String {
+    pub fn into_string(self) -> Option<String> {
         self.0
     }
 }
@@ -205,10 +205,14 @@ impl AuthorizationClient for HttpAuthorizationClient {
 
         let required_permissions = [Permission::KernelAccess];
 
+        let Some(token) = auth.0 else {
+            return Ok(false);
+        };
+
         let mut builder = self
             .client
             .post(format!("{}/check_user", self.url))
-            .bearer_auth(auth.into_string());
+            .bearer_auth(token);
 
         builder = builder.headers(context.w3c_headers());
 
@@ -277,7 +281,11 @@ pub mod tests {
 
     impl Authentication {
         pub fn dummy() -> Self {
-            Self("dummy".to_owned())
+            Self(Some("dummy".to_owned()))
+        }
+
+        pub fn none() -> Self {
+            Self(None)
         }
     }
 
@@ -308,7 +316,7 @@ pub mod tests {
         // Given a client that is configured against the inference api
         let url = authorization_url();
         let client = HttpAuthorizationClient::new(url.to_owned());
-        let auth = Authentication(api_token().to_owned());
+        let auth = Authentication::new(api_token());
 
         // When the client is used to check a valid api token
         let result = client.token_valid(auth, TracingContext::dummy()).await;
@@ -375,5 +383,21 @@ pub mod tests {
 
         // Then the result is true
         assert!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn no_token_is_not_valid() {
+        // Given a client that is configured against the inference api
+        let url = authorization_url();
+        let client = HttpAuthorizationClient::new(url.to_owned());
+
+        // When the client is used to check a none token
+        let result = client
+            .token_valid(Authentication::none(), TracingContext::dummy())
+            .await
+            .unwrap();
+
+        // Then the result is false
+        assert!(!result);
     }
 }
