@@ -192,11 +192,9 @@ impl SkillLoader {
         engine_config: EngineConfig,
         registries: HashMap<Namespace, Arc<dyn SkillRegistry + Send + Sync>>,
     ) -> anyhow::Result<Self> {
-        let engine = Arc::new(
-            Engine::new(engine_config)
-                .context("engine creation failed")
-                .inspect_err(|e| error!(target: "pharia-kernel::initialization", "{e:#}"))?,
-        );
+        let engine = Engine::new(engine_config)
+            .context("engine creation failed")
+            .inspect_err(|e| error!(target: "pharia-kernel::skill-loader", "{e:#}"))?;
 
         let (sender, recv) = mpsc::channel(1);
         let handle = tokio::spawn(async move {
@@ -273,12 +271,12 @@ pub struct SkillLoaderActor {
 impl SkillLoaderActor {
     pub fn new(
         receiver: mpsc::Receiver<SkillLoaderMsg>,
-        engine: Arc<Engine>,
+        engine: Engine,
         registries: HashMap<Namespace, Arc<dyn SkillRegistry + Send + Sync>>,
     ) -> Self {
         Self {
             receiver,
-            engine,
+            engine: Arc::new(engine),
             registries,
             running_requests: FuturesUnordered::new(),
         }
