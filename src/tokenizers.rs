@@ -16,7 +16,7 @@ use crate::{
 pub trait TokenizerApi {
     fn tokenizer_by_model(
         &self,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
         model_name: String,
     ) -> impl Future<Output = anyhow::Result<Arc<Tokenizer>>> + Send;
@@ -30,13 +30,13 @@ pub struct TokenizerSender(mpsc::Sender<TokenizersMsg>);
 impl TokenizerApi for TokenizerSender {
     async fn tokenizer_by_model(
         &self,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
         model_name: String,
     ) -> anyhow::Result<Arc<Tokenizer>> {
         let (send, recv) = oneshot::channel();
         let msg = TokenizersMsg::TokenizerByModel {
-            authentication,
+            auth,
             tracing_context,
             model_name,
             send,
@@ -96,7 +96,7 @@ impl Tokenizers {
 
 enum TokenizersMsg {
     TokenizerByModel {
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
         model_name: String,
         send: oneshot::Sender<anyhow::Result<Arc<Tokenizer>>>,
@@ -134,7 +134,7 @@ where
     async fn act(&mut self, msg: TokenizersMsg) {
         match msg {
             TokenizersMsg::TokenizerByModel {
-                authentication,
+                auth,
                 tracing_context,
                 model_name,
                 send,
@@ -147,7 +147,7 @@ where
                     // Miss, we need to request and insert it first
                     match self
                         .client
-                        .tokenizer_by_model(&model_name, authentication, tracing_context)
+                        .tokenizer_by_model(&model_name, auth, tracing_context)
                         .await
                     {
                         Ok(tokenizer) => {
@@ -170,7 +170,7 @@ trait TokenizerClient: Send + Sync + 'static {
     fn tokenizer_by_model(
         &self,
         model_name: &str,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Tokenizer>> + Send;
 }
@@ -179,12 +179,12 @@ impl TokenizerClient for Client {
     async fn tokenizer_by_model(
         &self,
         model_name: &str,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Tokenizer> {
         self.tokenizer_by_model(
             model_name,
-            Some(authentication),
+            Some(auth.into_string()),
             tracing_context.as_inference_client_context(),
         )
         .await
@@ -196,7 +196,7 @@ impl TokenizerClient for InferenceNotConfigured {
     async fn tokenizer_by_model(
         &self,
         _model_name: &str,
-        _authentication: Authentication,
+        _auth: Authentication,
         _tracing_context: TracingContext,
     ) -> anyhow::Result<Tokenizer> {
         Err(anyhow::anyhow!(
@@ -234,7 +234,7 @@ pub mod tests {
     impl TokenizerApi for FakeTokenizers {
         async fn tokenizer_by_model(
             &self,
-            _authentication: Authentication,
+            _auth: Authentication,
             _tracing_context: TracingContext,
             model_name: String,
         ) -> anyhow::Result<Arc<Tokenizer>> {
@@ -254,7 +254,7 @@ pub mod tests {
         // Given a model name and the actual inference API
         let model_name = "pharia-1-llm-7b-control";
         let inference_url = inference_url();
-        let api_token = api_token().to_owned();
+        let api_token = Authentication::new(api_token());
 
         // When we can request a tokenizer from the AA API
         let actor = Tokenizers::new(TokenizersConfig::AlephAlpha { inference_url });

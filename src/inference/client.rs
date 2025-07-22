@@ -35,41 +35,41 @@ pub trait InferenceClient: Send + Sync + 'static {
     fn complete(
         &self,
         request: &CompletionRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<Completion, InferenceError>> + Send;
     fn stream_completion(
         &self,
         request: &CompletionRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn chat(
         &self,
         request: &ChatRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
     fn stream_chat(
         &self,
         request: &ChatRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn explain(
         &self,
         request: &ExplanationRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 }
 
 /// Create a new [`aleph_alpha_client::How`] based on the given api token and tracing context.
-fn how(authentication: Authentication, tracing_context: &TracingContext) -> How {
+fn how(auth: Authentication, tracing_context: &TracingContext) -> How {
     How {
-        api_token: Some(authentication),
+        api_token: Some(auth.into_string()),
         trace_context: tracing_context.as_inference_client_context(),
         ..Default::default()
     }
@@ -79,7 +79,7 @@ impl InferenceClient for Client {
     async fn explain(
         &self,
         request: &ExplanationRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<Explanation, InferenceError> {
         let ExplanationRequest {
@@ -93,7 +93,7 @@ impl InferenceClient for Client {
             target,
             granularity: granularity.into(),
         };
-        let how = how(authentication, tracing_context);
+        let how = how(auth, tracing_context);
         retry(|| self.explanation(&task, model, &how), tracing_context)
             .await?
             .try_into()
@@ -102,12 +102,12 @@ impl InferenceClient for Client {
     async fn chat(
         &self,
         request: &ChatRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let task = request.to_task_chat();
 
-        let how = how(authentication, tracing_context);
+        let how = how(auth, tracing_context);
         retry(|| self.chat(&task, &request.model, &how), tracing_context)
             .await?
             .try_into()
@@ -117,12 +117,12 @@ impl InferenceClient for Client {
     async fn stream_chat(
         &self,
         request: &ChatRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let task = request.to_task_chat();
-        let how = how(authentication, tracing_context);
+        let how = how(auth, tracing_context);
         let mut stream = retry(
             || self.stream_chat(&task, &request.model, &how),
             tracing_context,
@@ -138,7 +138,7 @@ impl InferenceClient for Client {
     async fn complete(
         &self,
         request: &CompletionRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<Completion, InferenceError> {
         let CompletionRequest {
@@ -176,7 +176,7 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
             echo: *echo,
         };
-        let how = how(authentication, tracing_context);
+        let how = how(auth, tracing_context);
         retry(|| self.completion(&task, model, &how), tracing_context)
             .await?
             .try_into()
@@ -186,7 +186,7 @@ impl InferenceClient for Client {
     async fn stream_completion(
         &self,
         request: &CompletionRequest,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: &TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> Result<(), InferenceError> {
@@ -225,7 +225,7 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
             echo: *echo,
         };
-        let how = how(authentication, tracing_context);
+        let how = how(auth, tracing_context);
         let mut stream = retry(
             || self.stream_completion(&task, model, &how),
             tracing_context,
@@ -549,7 +549,7 @@ mod tests {
     #[tokio::test]
     async fn explain() {
         // Given an inference client
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -560,14 +560,10 @@ mod tests {
             model: "pharia-1-llm-7b-control".to_string(),
             granularity: Granularity::Auto,
         };
-        let explanation = <Client as InferenceClient>::explain(
-            &client,
-            &request,
-            api_token,
-            &TracingContext::dummy(),
-        )
-        .await
-        .unwrap();
+        let explanation =
+            <Client as InferenceClient>::explain(&client, &request, auth, &TracingContext::dummy())
+                .await
+                .unwrap();
 
         // Then we explanation of five items
         assert_eq!(explanation.len(), 5);
@@ -645,7 +641,7 @@ mod tests {
     #[tokio::test]
     async fn test_chat_message_conversion() {
         // Given an inference client
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -660,7 +656,7 @@ mod tests {
         let chat_response = <Client as InferenceClient>::chat(
             &client,
             &chat_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -673,7 +669,7 @@ mod tests {
     #[tokio::test]
     async fn test_bad_token_gives_inference_client_error() {
         // Given an inference client and a bad token
-        let bad_api_token = "bad_api_token".to_owned();
+        let bad_auth = Authentication::new("bad_api_token");
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -688,7 +684,7 @@ mod tests {
         let chat_result = <Client as InferenceClient>::chat(
             &client,
             &chat_request,
-            bad_api_token,
+            bad_auth,
             &TracingContext::dummy(),
         )
         .await;
@@ -704,7 +700,7 @@ mod tests {
     #[tokio::test]
     async fn complete_response_with_special_tokens() {
         // Given an inference client
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -723,7 +719,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let completion_response = <Client as InferenceClient>::complete(
             &client,
             &completion_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -736,7 +732,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn frequency_penalty_for_chat() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -756,7 +752,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let chat_response = <Client as InferenceClient>::chat(
             &client,
             &chat_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -776,7 +772,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn sampling_parameters_for_completion() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -800,7 +796,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let completion_response = <Client as InferenceClient>::complete(
             &client,
             &completion_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -820,7 +816,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn top_logprobs_for_chat() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -837,7 +833,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let chat_response = <Client as InferenceClient>::chat(
             &client,
             &chat_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -854,7 +850,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn top_logprobs_for_completion() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -871,7 +867,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let completion_response = <Client as InferenceClient>::complete(
             &client,
             &completion_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -887,7 +883,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn usage_for_completion() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -903,7 +899,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let completion_response = <Client as InferenceClient>::complete(
             &client,
             &completion_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -917,7 +913,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn echo_parameter_leads_to_echo_in_completion() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -934,7 +930,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let completion_response = <Client as InferenceClient>::complete(
             &client,
             &completion_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -947,7 +943,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn usage_for_chat() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -963,7 +959,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let chat_response = <Client as InferenceClient>::chat(
             &client,
             &chat_request,
-            api_token,
+            auth,
             &TracingContext::dummy(),
         )
         .await
@@ -977,7 +973,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn completion_stream() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -996,7 +992,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             <Client as InferenceClient>::stream_completion(
                 &client,
                 &completion_request,
-                api_token,
+                auth,
                 &TracingContext::dummy(),
                 send,
             )
@@ -1024,7 +1020,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn chat_stream() {
         // Given
-        let api_token = api_token().to_owned();
+        let auth = Authentication::new(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -1046,7 +1042,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             <Client as InferenceClient>::stream_chat(
                 &client,
                 &chat_request,
-                api_token,
+                auth,
                 &TracingContext::dummy(),
                 send,
             )

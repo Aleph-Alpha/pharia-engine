@@ -1,6 +1,6 @@
 use crate::{
-    chunking, csi::RawCsi, csi_shell::CsiShellError, inference, language_selection,
-    logging::TracingContext, search,
+    authorization::Authentication, chunking, csi::RawCsi, csi_shell::CsiShellError, inference,
+    language_selection, logging::TracingContext, search,
 };
 /// CSI Shell version 0.2
 ///
@@ -37,7 +37,7 @@ impl CsiRequest {
     pub async fn respond<C>(
         self,
         drivers: &C,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> Result<Value, CsiShellError>
     where

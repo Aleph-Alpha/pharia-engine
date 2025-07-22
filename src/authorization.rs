@@ -12,7 +12,18 @@ use crate::{http::HttpClient, logging::TracingContext};
 
 /// The authentication provided by incoming requests.
 /// When operating inside `PhariaAI`, this will be a `PHARIA_AI_TOKEN`.
-pub type Authentication = String;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Authentication(String);
+
+impl Authentication {
+    pub fn new(token: impl Into<String>) -> Self {
+        Self(token.into())
+    }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
 
 pub struct Authorization {
     send: mpsc::Sender<AuthorizationMsg>,
@@ -83,7 +94,7 @@ impl<C: AuthorizationClient> AuthorizationActor<C> {
 pub trait AuthorizationApi {
     fn check_permission(
         &self,
-        authentication: Authentication,
+        auth: Authentication,
         context: TracingContext,
     ) -> impl Future<Output = Result<bool, AuthorizationClientError>> + Send;
 }
@@ -91,12 +102,12 @@ pub trait AuthorizationApi {
 impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
     async fn check_permission(
         &self,
-        authentication: Authentication,
+        auth: Authentication,
         context: TracingContext,
     ) -> Result<bool, AuthorizationClientError> {
         let (send, recv) = oneshot::channel();
         let msg = AuthorizationMsg::Auth {
-            authentication,
+            auth,
             context,
             send,
         };
@@ -110,7 +121,7 @@ impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
 
 pub enum AuthorizationMsg {
     Auth {
-        authentication: Authentication,
+        auth: Authentication,
         context: TracingContext,
         send: oneshot::Sender<Result<bool, AuthorizationClientError>>,
     },
@@ -120,11 +131,11 @@ impl AuthorizationMsg {
     async fn act(self, client: &impl AuthorizationClient) {
         match self {
             AuthorizationMsg::Auth {
-                authentication,
+                auth,
                 context,
                 send,
             } => {
-                let result = client.token_valid(authentication, context).await;
+                let result = client.token_valid(auth, context).await;
                 drop(send.send(result));
             }
         }
@@ -134,7 +145,7 @@ impl AuthorizationMsg {
 pub trait AuthorizationClient: Send + Sync + 'static {
     fn token_valid(
         &self,
-        authentication: Authentication,
+        auth: Authentication,
         context: TracingContext,
     ) -> impl Future<Output = Result<bool, AuthorizationClientError>> + Send;
 }
@@ -144,7 +155,7 @@ struct AlwaysValidClient;
 impl AuthorizationClient for AlwaysValidClient {
     async fn token_valid(
         &self,
-        _authentication: Authentication,
+        _auth: Authentication,
         _context: TracingContext,
     ) -> Result<bool, AuthorizationClientError> {
         Ok(true)
@@ -178,7 +189,7 @@ pub enum AuthorizationClientError {
 impl AuthorizationClient for HttpAuthorizationClient {
     async fn token_valid(
         &self,
-        authentication: Authentication,
+        auth: Authentication,
         context: TracingContext,
     ) -> Result<bool, AuthorizationClientError> {
         #[derive(Deserialize)]
@@ -197,7 +208,7 @@ impl AuthorizationClient for HttpAuthorizationClient {
         let mut builder = self
             .client
             .post(format!("{}/check_user", self.url))
-            .bearer_auth(api_token);
+            .bearer_auth(auth.into_string());
 
         builder = builder.headers(context.w3c_headers());
 
@@ -264,6 +275,12 @@ pub mod tests {
     use super::*;
     use crate::tests::{api_token, authorization_url};
 
+    impl Authentication {
+        pub fn dummy() -> Self {
+            Self("dummy".to_owned())
+        }
+    }
+
     #[derive(Debug, Clone)]
     pub struct StubAuthorization {
         /// Whether the permission check should succeed or not
@@ -279,7 +296,7 @@ pub mod tests {
     impl AuthorizationApi for StubAuthorization {
         async fn check_permission(
             &self,
-            _authentication: Authentication,
+            _auth: Authentication,
             _context: TracingContext,
         ) -> Result<bool, AuthorizationClientError> {
             Ok(self.response)
@@ -291,11 +308,10 @@ pub mod tests {
         // Given a client that is configured against the inference api
         let url = authorization_url();
         let client = HttpAuthorizationClient::new(url.to_owned());
+        let auth = Authentication(api_token().to_owned());
 
         // When the client is used to check a valid api token
-        let result = client
-            .token_valid(api_token().to_owned(), TracingContext::dummy())
-            .await;
+        let result = client.token_valid(auth, TracingContext::dummy()).await;
 
         // Then the result is true
         assert!(result.unwrap());
@@ -309,7 +325,7 @@ pub mod tests {
 
         // When the client is used to check an invalid api token
         let result = client
-            .token_valid("invalid".to_owned(), TracingContext::dummy())
+            .token_valid(Authentication::dummy(), TracingContext::dummy())
             .await;
 
         // Then the result is false
@@ -321,7 +337,7 @@ pub mod tests {
     impl AuthorizationClient for StubAuthorizationClient {
         async fn token_valid(
             &self,
-            _authentication: Authentication,
+            _auth: Authentication,
             _context: TracingContext,
         ) -> Result<bool, AuthorizationClientError> {
             Ok(true)
@@ -338,7 +354,7 @@ pub mod tests {
         let result = timeout(
             Duration::from_millis(10),
             auth.api()
-                .check_permission("valid".to_owned(), TracingContext::dummy()),
+                .check_permission(Authentication::dummy(), TracingContext::dummy()),
         )
         .await;
 
@@ -354,7 +370,7 @@ pub mod tests {
         // When checking permissions for a token
         let result = auth
             .api()
-            .check_permission("valid".to_owned(), TracingContext::dummy())
+            .check_permission(Authentication::dummy(), TracingContext::dummy())
             .await;
 
         // Then the result is true

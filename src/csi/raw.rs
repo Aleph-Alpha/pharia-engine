@@ -4,6 +4,7 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 
 use crate::{
+    authorization::Authentication,
     chunking::{self, Chunk, ChunkRequest},
     context,
     inference::{
@@ -30,42 +31,42 @@ use double_trait::double;
 pub trait RawCsi {
     fn explain(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<ExplanationRequest>,
     ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send;
 
     fn complete(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<CompletionRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send;
 
     fn completion_stream(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         request: CompletionRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send;
 
     fn chat(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<ChatRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
 
     fn chat_stream(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         request: ChatRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
 
     fn chunk(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<ChunkRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send;
@@ -80,21 +81,21 @@ pub trait RawCsi {
 
     fn search(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<SearchRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send;
 
     fn documents(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send;
 
     fn document_metadata(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send;
@@ -155,7 +156,7 @@ where
 {
     async fn explain(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<ExplanationRequest>,
     ) -> Result<Vec<Explanation>, CsiError> {
@@ -188,7 +189,7 @@ where
 
     async fn complete(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<CompletionRequest>,
     ) -> anyhow::Result<Vec<Completion>> {
@@ -226,7 +227,7 @@ where
 
     async fn completion_stream(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         request: CompletionRequest,
     ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
@@ -249,7 +250,7 @@ where
 
     async fn chat(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<ChatRequest>,
     ) -> anyhow::Result<Vec<ChatResponse>> {
@@ -287,7 +288,7 @@ where
 
     async fn chat_stream(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         request: ChatRequest,
     ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
@@ -305,7 +306,7 @@ where
 
     async fn chunk(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<ChunkRequest>,
     ) -> anyhow::Result<Vec<Vec<Chunk>>> {
@@ -379,7 +380,7 @@ where
 
     async fn search(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<SearchRequest>,
     ) -> anyhow::Result<Vec<Vec<SearchResult>>> {
@@ -417,7 +418,7 @@ where
 
     async fn documents(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> anyhow::Result<Vec<Document>> {
@@ -456,7 +457,7 @@ where
 
     async fn document_metadata(
         &self,
-        auth: String,
+        auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<DocumentPath>,
     ) -> anyhow::Result<Vec<Option<Value>>> {
@@ -572,7 +573,6 @@ mod tests {
             tests::{InferenceApiDouble, InferenceStub},
         },
         search::tests::SearchStub,
-        tests::api_token,
         tokenizers::tests::FakeTokenizers,
     };
 
@@ -601,7 +601,7 @@ mod tests {
         };
         let chunks = csi_apis
             .chunk(
-                "dummy_token".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
                 vec![request],
             )
@@ -628,7 +628,7 @@ mod tests {
             name: "docs".to_owned(),
         }];
         let documents = csi_apis
-            .documents("dummy_token".to_owned(), TracingContext::dummy(), request)
+            .documents(Authentication::dummy(), TracingContext::dummy(), request)
             .await
             .unwrap();
 
@@ -645,7 +645,7 @@ mod tests {
             async fn completion_stream(
                 &self,
                 _request: CompletionRequest,
-                _authentication: Authentication,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
             ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
                 let (send, recv) = mpsc::channel(3);
@@ -684,7 +684,7 @@ mod tests {
 
         let mut completion = csi_apis
             .completion_stream(
-                api_token().to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
                 completion_req,
             )
@@ -712,7 +712,7 @@ mod tests {
             async fn chat_stream(
                 &self,
                 _request: ChatRequest,
-                _authentication: Authentication,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
             ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
                 let (send, recv) = mpsc::channel(4);
@@ -759,7 +759,7 @@ mod tests {
         };
 
         let mut chat = csi_apis
-            .chat_stream(api_token().to_owned(), TracingContext::dummy(), chat_req)
+            .chat_stream(Authentication::dummy(), TracingContext::dummy(), chat_req)
             .await;
 
         let mut events = vec![];
@@ -800,7 +800,7 @@ mod tests {
 
         let completions = csi_apis
             .complete(
-                api_token().to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
                 vec![completion_req_1, completion_req_2],
             )
@@ -839,7 +839,7 @@ mod tests {
 
         let responses = csi_apis
             .document_metadata(
-                api_token().to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
                 vec![request_1, request_2],
             )

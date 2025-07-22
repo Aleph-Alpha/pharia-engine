@@ -36,7 +36,7 @@ use utoipa::{
 use utoipa_scalar::Scalar;
 
 use crate::{
-    authorization::{AuthorizationApi, AuthorizationProvider, AuthorizationState},
+    authorization::{Authentication, AuthorizationApi, AuthorizationProvider, AuthorizationState},
     context,
     csi::RawCsi,
     csi_shell::{self, CsiProvider},
@@ -210,11 +210,8 @@ where
     let context = TracingContext::current();
     if let Some(bearer) = bearer {
         let context = context!(context, "pharia-kernel::authorization", "check_permissions");
-        match authorization_api
-            .0
-            .check_permission(bearer.token().to_owned(), context)
-            .await
-        {
+        let auth = Authentication::new(bearer.token());
+        match authorization_api.0.check_permission(auth, context).await {
             Ok(allowed) => {
                 if !allowed {
                     return Err(ErrorResponse::from((
@@ -728,7 +725,7 @@ pub mod tests {
             &self,
             _skill_path: SkillPath,
             _input: Value,
-            _authentication: Authentication,
+            _auth: Authentication,
             _tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             Err((*self.make_error)())
@@ -750,7 +747,7 @@ pub mod tests {
     }
 
     struct SkillRuntimeSpyInner {
-        authentication: Authentication,
+        auth: Authentication,
         input: Value,
         skill_path: SkillPath,
         tracing_context: Vec<TracingContext>,
@@ -760,7 +757,7 @@ pub mod tests {
         pub fn new() -> Self {
             Self {
                 inner: Arc::new(Mutex::new(SkillRuntimeSpyInner {
-                    authentication: Authentication::new(),
+                    auth: Authentication::dummy(),
                     input: Value::default(),
                     skill_path: SkillPath::local("SKILL HAS NOT BEEN SEND"),
                     tracing_context: Vec::new(),
@@ -778,11 +775,11 @@ pub mod tests {
             &self,
             skill_path: SkillPath,
             input: Value,
-            authentication: Authentication,
+            auth: Authentication,
             tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             let mut inner = self.inner.lock().unwrap();
-            inner.authentication = authentication;
+            inner.auth = auth;
             inner.input = input;
             inner.skill_path = skill_path;
             inner.tracing_context.push(tracing_context);
@@ -793,11 +790,11 @@ pub mod tests {
             &self,
             skill_path: SkillPath,
             input: Value,
-            authentication: Authentication,
+            auth: Authentication,
             tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             let mut inner = self.inner.lock().unwrap();
-            inner.authentication = authentication;
+            inner.auth = auth;
             inner.input = input;
             inner.skill_path = skill_path;
             inner.tracing_context.push(tracing_context);

@@ -276,7 +276,7 @@ impl InferenceClient for OpenAiClient {
     async fn chat(
         &self,
         request: &inference::ChatRequest,
-        _authentication: Authentication,
+        _auth: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::ChatResponse, InferenceError> {
         let request = request.try_into()?;
@@ -288,7 +288,7 @@ impl InferenceClient for OpenAiClient {
     async fn stream_chat(
         &self,
         request: &inference::ChatRequest,
-        _authentication: Authentication,
+        _auth: Authentication,
         _tracing_context: &TracingContext,
         send: mpsc::Sender<inference::ChatEvent>,
     ) -> Result<(), InferenceError> {
@@ -308,7 +308,7 @@ impl InferenceClient for OpenAiClient {
     async fn complete(
         &self,
         _request: &inference::CompletionRequest,
-        _authentication: Authentication,
+        _auth: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::Completion, InferenceError> {
         Err(InferenceError::Other(anyhow::anyhow!(Self::NOT_SUPPORTED)))
@@ -317,7 +317,7 @@ impl InferenceClient for OpenAiClient {
     async fn stream_completion(
         &self,
         _request: &inference::CompletionRequest,
-        _authentication: Authentication,
+        _auth: Authentication,
         _tracing_context: &TracingContext,
         _send: mpsc::Sender<inference::CompletionEvent>,
     ) -> Result<(), InferenceError> {
@@ -327,7 +327,7 @@ impl InferenceClient for OpenAiClient {
     async fn explain(
         &self,
         _request: &inference::ExplanationRequest,
-        _authentication: Authentication,
+        _auth: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::Explanation, InferenceError> {
         Err(InferenceError::Other(anyhow::anyhow!(Self::NOT_SUPPORTED)))
@@ -340,6 +340,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::{
+        authorization::Authentication,
         inference::{
             ChatEvent, ChatParams, ChatRequest, InferenceError, Logprobs, Message,
             client::InferenceClient,
@@ -362,7 +363,7 @@ mod tests {
                 messages: vec![Message::new("user", "An apple a day")],
                 params: ChatParams::default(),
             },
-            "dummy-token".to_owned(),
+            Authentication::dummy(),
             &TracingContext::dummy(),
         )
         .await
@@ -392,7 +393,7 @@ mod tests {
                 messages: vec![Message::new("user", "An apple a day")],
                 params,
             },
-            "dummy-token".to_owned(),
+            Authentication::dummy(),
             &TracingContext::dummy(),
         )
         .await
@@ -421,7 +422,7 @@ mod tests {
                 messages: vec![Message::new("user", "An apple a day")],
                 params: ChatParams::default(),
             },
-            "dummy-token".to_owned(),
+            Authentication::dummy(),
             &TracingContext::dummy(),
         )
         .await;
@@ -445,7 +446,7 @@ mod tests {
                 messages: vec![Message::new("user", "An apple a day")],
                 params: ChatParams::default(),
             },
-            "dummy-token".to_owned(),
+            Authentication::dummy(),
             &TracingContext::dummy(),
         )
         .await;
@@ -476,7 +477,7 @@ mod tests {
                     messages: vec![Message::new("user", "An apple a day")],
                     params,
                 },
-                "dummy-token".to_owned(),
+                Authentication::dummy(),
                 &TracingContext::dummy(),
                 send,
             )

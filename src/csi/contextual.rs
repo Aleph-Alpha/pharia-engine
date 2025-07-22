@@ -92,7 +92,7 @@ pub struct InvocationContext<R> {
     // list of mcp servers a Skill may access.
     namespace: Namespace,
     // The authentication provided as part of the Skill invocation.
-    authentication: Authentication,
+    auth: Authentication,
     // Context that is used to situate certain actions in the overall context.
     tracing_context: TracingContext,
 }
@@ -101,13 +101,13 @@ impl<R> InvocationContext<R> {
     pub fn new(
         raw_csi: R,
         namespace: Namespace,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> Self {
         Self {
             raw_csi,
             namespace,
-            authentication,
+            auth,
             tracing_context,
         }
     }
@@ -121,66 +121,48 @@ where
         &self,
         requests: Vec<ExplanationRequest>,
     ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send {
-        self.raw_csi.explain(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            requests,
-        )
+        self.raw_csi
+            .explain(self.auth.clone(), self.tracing_context.clone(), requests)
     }
 
     fn complete(
         &self,
         requests: Vec<CompletionRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send {
-        self.raw_csi.complete(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            requests,
-        )
+        self.raw_csi
+            .complete(self.auth.clone(), self.tracing_context.clone(), requests)
     }
 
     fn completion_stream(
         &self,
         request: CompletionRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send {
-        self.raw_csi.completion_stream(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            request,
-        )
+        self.raw_csi
+            .completion_stream(self.auth.clone(), self.tracing_context.clone(), request)
     }
 
     fn chat(
         &self,
         requests: Vec<ChatRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send {
-        self.raw_csi.chat(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            requests,
-        )
+        self.raw_csi
+            .chat(self.auth.clone(), self.tracing_context.clone(), requests)
     }
 
     fn chat_stream(
         &self,
         request: ChatRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send {
-        self.raw_csi.chat_stream(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            request,
-        )
+        self.raw_csi
+            .chat_stream(self.auth.clone(), self.tracing_context.clone(), request)
     }
 
     fn chunk(
         &self,
         requests: Vec<ChunkRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send {
-        self.raw_csi.chunk(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            requests,
-        )
+        self.raw_csi
+            .chunk(self.auth.clone(), self.tracing_context.clone(), requests)
     }
 
     fn select_language(
@@ -195,33 +177,24 @@ where
         &self,
         requests: Vec<SearchRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send {
-        self.raw_csi.search(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            requests,
-        )
+        self.raw_csi
+            .search(self.auth.clone(), self.tracing_context.clone(), requests)
     }
 
     fn documents(
         &self,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send {
-        self.raw_csi.documents(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            requests,
-        )
+        self.raw_csi
+            .documents(self.auth.clone(), self.tracing_context.clone(), requests)
     }
 
     fn document_metadata(
         &self,
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send {
-        self.raw_csi.document_metadata(
-            self.authentication.clone(),
-            self.tracing_context.clone(),
-            requests,
-        )
+        self.raw_csi
+            .document_metadata(self.auth.clone(), self.tracing_context.clone(), requests)
     }
 
     fn invoke_tool(
