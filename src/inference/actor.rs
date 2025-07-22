@@ -9,7 +9,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::{config::InferenceConfig, logging::TracingContext};
+use crate::logging::TracingContext;
 use tracing::{info, warn};
 
 use super::{
@@ -19,6 +19,18 @@ use super::{
 
 #[cfg(test)]
 use double_trait::double;
+
+/// Configuration for the inference backend that is used
+pub enum InferenceConfig<'a> {
+    /// Use the Aleph Alpha inference API.
+    AlephAlpha { url: &'a str },
+    /// Use any OpenAI-compatible inference. Only chat requests are supported, completion,
+    /// explanation and chunking requests are not.
+    OpenAi { url: &'a str, token: &'a str },
+    /// Kernel is running without any inference backend. Inference requests will lead to a runtime
+    /// error.
+    None,
+}
 
 /// Handle to the inference actor. Spin this up in order to use the inference API.
 pub struct Inference {
