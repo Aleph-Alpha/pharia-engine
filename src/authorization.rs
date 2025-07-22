@@ -341,4 +341,19 @@ pub mod tests {
         // Then the message get's answered within 10ms
         assert!(result.unwrap().unwrap());
     }
+
+    #[tokio::test]
+    async fn always_valid_client_always_returns_true() {
+        // Given an authorization booted up without any url
+        let auth = Authorization::new(None);
+
+        // When checking permissions for a token
+        let result = auth
+            .api()
+            .check_permission("valid".to_owned(), TracingContext::dummy())
+            .await;
+
+        // Then the result is true
+        assert!(result.unwrap());
+    }
 }
