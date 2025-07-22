@@ -1,4 +1,6 @@
+use anyhow::Context;
 use bytesize::ByteSize;
+use engine_room::EngineConfig;
 use std::sync::Arc;
 use tokio::{
     select,
@@ -174,25 +176,34 @@ pub struct SkillLoader {
 }
 
 impl SkillLoader {
-    pub fn from_config(engine: Arc<Engine>, registry_config: RegistryConfig) -> Self {
+    pub fn from_config(
+        engine_config: EngineConfig,
+        registry_config: RegistryConfig,
+    ) -> anyhow::Result<Self> {
         let registries = registry_config
             .registries
             .iter()
             .map(|(k, v)| (k.to_owned(), v.into()))
             .collect();
-        Self::new(engine, registries)
+        Self::new(engine_config, registries)
     }
 
     pub fn new(
-        engine: Arc<Engine>,
+        engine_config: EngineConfig,
         registries: HashMap<Namespace, Arc<dyn SkillRegistry + Send + Sync>>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
+        let engine = Arc::new(
+            Engine::new(engine_config)
+                .context("engine creation failed")
+                .inspect_err(|e| error!(target: "pharia-kernel::initialization", "{e:#}"))?,
+        );
+
         let (sender, recv) = mpsc::channel(1);
         let handle = tokio::spawn(async move {
             let mut actor = SkillLoaderActor::new(recv, engine, registries);
             actor.run().await;
         });
-        SkillLoader { sender, handle }
+        Ok(SkillLoader { sender, handle })
     }
 
     pub fn api(&self) -> mpsc::Sender<SkillLoaderMsg> {
@@ -369,7 +380,6 @@ pub mod tests {
         namespace_watcher::Registry,
         registries::tests::{NeverResolvingRegistry, ReadyRegistry},
         skill::SkillPath,
-        wasm::Engine,
     };
 
     use super::*;
@@ -420,16 +430,25 @@ pub mod tests {
 
     impl SkillLoader {
         /// Skill loader loading skills from a local `skills` directory
-        pub fn with_file_registry(engine: Arc<Engine>, namespace: Namespace) -> Self {
+        pub fn with_file_registry(namespace: Namespace) -> Self {
             let registry_config = RegistryConfig::with_file_registry_named_skills(namespace);
-            SkillLoader::from_config(engine, registry_config)
+            SkillLoader::from_config(EngineConfig::default(), registry_config).unwrap()
+        }
+
+        pub fn with_registries(
+            registries: HashMap<Namespace, Arc<dyn SkillRegistry + Send + Sync>>,
+        ) -> Self {
+            SkillLoader::new(EngineConfig::default(), registries).unwrap()
+        }
+
+        pub fn from_registry_config(registry_config: RegistryConfig) -> Self {
+            SkillLoader::from_config(EngineConfig::default(), registry_config).unwrap()
         }
     }
 
     #[tokio::test(start_paused = true)]
     async fn test_skill_loader_fetches_multiple_skills_concurrently() {
         // Given a skill loader with two registries, one that never resolves and one that always does
-        let engine = Arc::new(Engine::default());
         let mut registries = HashMap::new();
 
         let never_resolving = Namespace::new("never-resolving").unwrap();
@@ -441,7 +460,7 @@ pub mod tests {
         let ready_registry = Arc::new(ReadyRegistry) as Arc<dyn SkillRegistry + Send + Sync>;
         registries.insert(ready.clone(), ready_registry);
 
-        let skill_loader = SkillLoader::new(engine, registries);
+        let skill_loader = SkillLoader::with_registries(registries);
         let never_resolving_skill_path = SkillPath::new(never_resolving, "dummy");
         let ready_skill_path = SkillPath::new(ready, "dummy");
 

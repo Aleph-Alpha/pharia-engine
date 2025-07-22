@@ -510,7 +510,6 @@ pub mod tests {
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
-        wasm::Engine,
     };
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -550,9 +549,8 @@ pub mod tests {
     #[tokio::test]
     async fn dedicated_error_for_skill_not_found() {
         // Given a skill executer with no skills
-        let engine = Arc::new(Engine::default());
         let registry_config = RegistryConfig::empty();
-        let skill_loader = SkillLoader::from_config(engine, registry_config).api();
+        let skill_loader = SkillLoader::from_registry_config(registry_config).api();
 
         let skill_store =
             SkillStore::new(skill_loader, Duration::from_secs(10), ByteSize(u64::MAX));
