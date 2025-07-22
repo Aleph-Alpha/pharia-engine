@@ -506,7 +506,7 @@ pub mod tests {
     async fn search_request() {
         // Given a search client pointed at the document index
         let host = document_index_url();
-        let api_token = Authentication::new(api_token());
+        let api_token = Authentication::with_token(api_token());
         let search = Search::new(Some(host));
 
         // When making a query on an existing collection
@@ -535,7 +535,7 @@ pub mod tests {
     async fn request_metadata() {
         // Given a search client pointed at the document index
         let host = document_index_url();
-        let api_token = Authentication::new(api_token());
+        let api_token = Authentication::with_token(api_token());
         let search = Search::new(Some(host));
 
         // When requesting metadata of an existing document
@@ -559,7 +559,7 @@ pub mod tests {
     async fn min_score() {
         // Given a search client pointed at the document index
         let host = document_index_url();
-        let api_token = Authentication::new(api_token());
+        let api_token = Authentication::with_token(api_token());
         let search = Search::new(Some(host));
         let max_results = 5;
         let min_score = 0.99;
@@ -584,7 +584,7 @@ pub mod tests {
     async fn filter_index() {
         // Given a search client pointed at the document index
         let host = document_index_url();
-        let api_token = Authentication::new(api_token());
+        let api_token = Authentication::with_token(api_token());
         let search = Search::new(Some(host));
 
         // When making a query on an existing collection
@@ -609,7 +609,7 @@ pub mod tests {
     #[tokio::test]
     async fn search_not_configured() {
         // Given a search client that is not configured
-        let api_token = Authentication::new(api_token());
+        let api_token = Authentication::with_token(api_token());
         let search = Search::new(None);
 
         // When making a query

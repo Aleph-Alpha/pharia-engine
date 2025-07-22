@@ -483,7 +483,7 @@ pub mod tests {
     async fn document_exists() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let auth = Authentication::new(api_token());
+        let auth = Authentication::with_token(api_token());
         let client = Client::new(host);
 
         // When requesting a document
@@ -501,7 +501,7 @@ pub mod tests {
     async fn document_not_found_is_err() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let auth = Authentication::new(api_token());
+        let auth = Authentication::with_token(api_token());
         let client = Client::new(host);
 
         // When requesting a document that does not exist
@@ -518,7 +518,7 @@ pub mod tests {
     async fn search_request() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let auth = Authentication::new(api_token());
+        let auth = Authentication::with_token(api_token());
         let client = Client::new(host);
 
         // When making a query on an existing collection
@@ -556,7 +556,7 @@ pub mod tests {
     async fn request_metadata() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let auth = Authentication::new(api_token());
+        let auth = Authentication::with_token(api_token());
         let client = Client::new(host);
 
         // When requesting metadata of an existing document
@@ -578,7 +578,7 @@ pub mod tests {
     async fn min_score() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let auth = Authentication::new(api_token());
+        let auth = Authentication::with_token(api_token());
         let client = Client::new(host);
         let max_results = 5;
         let min_score = 0.99;
@@ -608,7 +608,7 @@ pub mod tests {
         // Given a search request with a metadata filter for a created field
         let index = IndexPath::new("Kernel", "test", "asym-64");
         let host = document_index_url().to_owned();
-        let auth = Authentication::new(api_token());
+        let auth = Authentication::with_token(api_token());
         let client = Client::new(host);
 
         // When filtering for documents with metadata field created after 2100-01-01
@@ -640,7 +640,7 @@ pub mod tests {
         // Given a search request with a metadata filter for a created field
         let index = IndexPath::new("Kernel", "test", "asym-64");
         let host = document_index_url().to_owned();
-        let auth = Authentication::new(api_token());
+        let auth = Authentication::with_token(api_token());
         let client = Client::new(host);
 
         // When filtering for documents with metadata field created after 1970-07-01

@@ -13,7 +13,7 @@ use crate::{http::HttpClient, logging::TracingContext};
 /// The authentication provided by incoming requests.
 /// When operating inside `PhariaAI`, users are required to provide a valid `PhariaAI` token. This
 /// token is then used to authenticate all outgoing request, e.g. against the Aleph Alpha inference
-/// or the DocumentIndex.
+/// or the `DocumentIndex`.
 /// If the Kernel is being operated outside of `PhariaAI`, authentication for incoming requests is
 /// optional. Skills can still execute inference requests against OpenAI-compatible inference
 /// backends, if an api-token has been configured in the Kernel configuration. This e.g. allows
@@ -22,7 +22,11 @@ use crate::{http::HttpClient, logging::TracingContext};
 pub struct Authentication(Option<String>);
 
 impl Authentication {
-    pub fn new(token: impl Into<String>) -> Self {
+    pub fn new(maybe_token: Option<String>) -> Self {
+        Self(maybe_token)
+    }
+
+    pub fn with_token(token: impl Into<String>) -> Self {
         Self(Some(token.into()))
     }
 
@@ -190,6 +194,8 @@ pub enum AuthorizationClientError {
         if the problem persists you may want to contact the operators."
     )]
     Recoverable,
+    #[error("Bearer token expected")]
+    NoBearerToken,
 }
 
 impl AuthorizationClient for HttpAuthorizationClient {
@@ -212,7 +218,7 @@ impl AuthorizationClient for HttpAuthorizationClient {
         let required_permissions = [Permission::KernelAccess];
 
         let Some(token) = auth.0 else {
-            return Ok(false);
+            return Err(AuthorizationClientError::NoBearerToken);
         };
 
         let mut builder = self
@@ -318,7 +324,7 @@ pub mod tests {
         // Given a client that is configured against the inference api
         let url = authorization_url();
         let client = HttpAuthorizationClient::new(url.to_owned());
-        let auth = Authentication::new(api_token());
+        let auth = Authentication::with_token(api_token());
 
         // When the client is used to check a valid api token
         let result = client.token_valid(auth, TracingContext::dummy()).await;
@@ -335,7 +341,10 @@ pub mod tests {
 
         // When the client is used to check an invalid api token
         let result = client
-            .token_valid(Authentication::none(), TracingContext::dummy())
+            .token_valid(
+                Authentication::with_token("invalid"),
+                TracingContext::dummy(),
+            )
             .await;
 
         // Then the result is false
@@ -388,7 +397,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn no_token_is_not_valid() {
+    async fn no_token_is_an_error() {
         // Given a client that is configured against the inference api
         let url = authorization_url();
         let client = HttpAuthorizationClient::new(url.to_owned());
@@ -396,10 +405,12 @@ pub mod tests {
         // When the client is used to check a none token
         let result = client
             .token_valid(Authentication::none(), TracingContext::dummy())
-            .await
-            .unwrap();
+            .await;
 
-        // Then the result is false
-        assert!(!result);
+        // Then the result is an error
+        assert!(matches!(
+            result,
+            Err(AuthorizationClientError::NoBearerToken)
+        ));
     }
 }
