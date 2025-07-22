@@ -425,6 +425,7 @@ mod tests {
 
     use crate::{
         FeatureSet,
+        authorization::Authentication,
         feature_set::PRODUCTION_FEATURE_SET,
         logging::TracingContext,
         shell::tests::dummy_auth_value,
@@ -540,7 +541,7 @@ mod tests {
                 &self,
                 _skill_path: SkillPath,
                 _input: Value,
-                _api_token: String,
+                _authentication: Authentication,
                 _tracing_context: TracingContext,
             ) -> Result<Value, SkillExecutionError> {
                 Ok(json!("Result from Skill"))
@@ -759,7 +760,7 @@ mod tests {
             &self,
             _skill_path: SkillPath,
             _input: Value,
-            _api_token: String,
+            _authentication: Authentication,
             _tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             let (send, recv) = mpsc::channel(self.events.len());

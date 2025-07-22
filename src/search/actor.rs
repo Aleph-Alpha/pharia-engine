@@ -9,7 +9,9 @@ use tokio::{
 };
 use tracing::{error, info};
 
-use crate::{logging::TracingContext, search::client::SearchNotConfigured};
+use crate::{
+    authorization::Authentication, logging::TracingContext, search::client::SearchNotConfigured,
+};
 
 use super::client::{
     Client, Cursor, Document, DocumentPath, Filter, IndexPath, Modality, SearchClient,
@@ -72,19 +74,19 @@ pub trait SearchApi {
     fn search(
         &self,
         request: SearchRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
     fn document_metadata(
         &self,
         document_path: DocumentPath,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
     fn document(
         &self,
         document_path: DocumentPath,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
@@ -98,14 +100,14 @@ impl SearchApi for SearchSender {
     async fn search(
         &self,
         request: SearchRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let (send, recv) = oneshot::channel();
         let msg = SearchMsg::Search {
             request,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
         self.0
@@ -119,14 +121,14 @@ impl SearchApi for SearchSender {
     async fn document_metadata(
         &self,
         document_path: DocumentPath,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         let (send, recv) = oneshot::channel();
         let msg = SearchMsg::Metadata {
             document_path,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
         self.0
@@ -140,14 +142,14 @@ impl SearchApi for SearchSender {
     async fn document(
         &self,
         document_path: DocumentPath,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Document> {
         let (send, recv) = oneshot::channel();
         let msg = SearchMsg::Document {
             document_path,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
         self.0
@@ -248,19 +250,19 @@ enum SearchMsg {
     Search {
         request: SearchRequest,
         send: oneshot::Sender<anyhow::Result<Vec<SearchResult>>>,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     },
     Metadata {
         document_path: DocumentPath,
         send: oneshot::Sender<anyhow::Result<Option<Value>>>,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     },
     Document {
         document_path: DocumentPath,
         send: oneshot::Sender<anyhow::Result<Document>>,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     },
 }
@@ -271,31 +273,35 @@ impl SearchMsg {
             Self::Search {
                 request,
                 send,
-                api_token,
+                authentication,
                 tracing_context,
             } => {
-                let results = Self::search(client, request, &api_token, tracing_context).await;
+                let results = Self::search(client, request, &authentication, tracing_context).await;
                 drop(send.send(results));
             }
             Self::Metadata {
                 document_path,
                 send,
-                api_token,
+                authentication,
                 tracing_context,
             } => {
-                let results =
-                    Self::document_metadata(client, document_path, &api_token, tracing_context)
-                        .await;
+                let results = Self::document_metadata(
+                    client,
+                    document_path,
+                    &authentication,
+                    tracing_context,
+                )
+                .await;
                 drop(send.send(results));
             }
             Self::Document {
                 document_path,
                 send,
-                api_token,
+                authentication,
                 tracing_context,
             } => {
                 let results =
-                    Self::document(client, document_path, &api_token, tracing_context).await;
+                    Self::document(client, document_path, &authentication, tracing_context).await;
                 drop(send.send(results));
             }
         }
@@ -304,7 +310,7 @@ impl SearchMsg {
     async fn search(
         client: &impl SearchClient,
         request: SearchRequest,
-        api_token: &str,
+        authentication: &Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let SearchRequest {
@@ -325,7 +331,7 @@ impl SearchMsg {
                     true,
                     filters,
                 ),
-                api_token,
+                authentication,
                 &tracing_context,
             )
             .await?
@@ -384,22 +390,22 @@ impl SearchMsg {
     async fn document_metadata(
         client: &impl SearchClient,
         document_path: DocumentPath,
-        api_token: &str,
+        authentication: &Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         client
-            .document_metadata(document_path, api_token, &tracing_context)
+            .document_metadata(document_path, authentication, &tracing_context)
             .await
     }
 
     async fn document(
         client: &impl SearchClient,
         document_path: DocumentPath,
-        api_token: &str,
+        authentication: &Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Document> {
         client
-            .document(document_path, api_token, &tracing_context)
+            .document(document_path, authentication, &tracing_context)
             .await
     }
 }
@@ -461,7 +467,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             document_path: DocumentPath,
-            _api_token: String,
+            _authentication: Authentication,
             _tracing_context: TracingContext,
         ) -> anyhow::Result<Option<Value>> {
             (self.document_metadata)(document_path)
@@ -470,7 +476,7 @@ pub mod tests {
         async fn document(
             &self,
             document_path: DocumentPath,
-            _api_token: String,
+            _authentication: Authentication,
             _tracing_context: TracingContext,
         ) -> anyhow::Result<Document> {
             (self.document)(document_path)
@@ -647,7 +653,7 @@ pub mod tests {
             &self,
             _index: IndexPath,
             _request: ClientSearchRequest,
-            _api_token: &str,
+            _authentication: &str,
             _tracing_context: &TracingContext,
         ) -> anyhow::Result<Vec<ClientSearchResult>> {
             self.expected_concurrent_requests

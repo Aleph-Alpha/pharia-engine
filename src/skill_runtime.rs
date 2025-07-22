@@ -14,6 +14,7 @@ use tokio::{
 use tracing::{Level, error, info, warn};
 
 use crate::{
+    authorization::Authentication,
     context,
     csi::{InvocationContext, RawCsi},
     logging::TracingContext,
@@ -74,7 +75,7 @@ pub trait SkillRuntimeApi {
         &self,
         skill_path: SkillPath,
         input: Value,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send;
 
@@ -82,7 +83,7 @@ pub trait SkillRuntimeApi {
         &self,
         skill_path: SkillPath,
         input: Value,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = mpsc::Receiver<SkillExecutionEvent>> + Send;
 
@@ -98,7 +99,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         &self,
         skill_path: SkillPath,
         input: Value,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> Result<Value, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
@@ -106,7 +107,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             skill_path,
             input,
             send,
-            api_token,
+            authentication,
             tracing_context,
         });
         self.send(msg)
@@ -119,7 +120,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         &self,
         skill_path: SkillPath,
         input: Value,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> mpsc::Receiver<SkillExecutionEvent> {
         let (send, recv) = mpsc::channel::<SkillExecutionEvent>(1);
@@ -128,7 +129,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             skill_path,
             input,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
 
@@ -271,7 +272,7 @@ pub struct RunMessageStreamMsg {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: mpsc::Sender<SkillExecutionEvent>,
-    pub api_token: String,
+    pub authentication: Authentication,
     pub tracing_context: TracingContext,
 }
 
@@ -281,7 +282,7 @@ impl RunMessageStreamMsg {
             skill_path,
             input,
             send,
-            api_token,
+            authentication,
             tracing_context,
         } = self;
 
@@ -307,7 +308,7 @@ impl RunMessageStreamMsg {
             let contextual_csi = InvocationContext::new(
                 csi_apis,
                 skill_path.namespace.clone(),
-                api_token,
+                authentication,
                 context.clone(),
             );
             let result = SkillDriver
@@ -444,7 +445,7 @@ pub struct RunFunctionMsg {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: oneshot::Sender<Result<Value, SkillExecutionError>>,
-    pub api_token: String,
+    pub authentication: Authentication,
     pub tracing_context: TracingContext,
 }
 
@@ -454,7 +455,7 @@ impl RunFunctionMsg {
             skill_path,
             input,
             send,
-            api_token,
+            authentication,
             tracing_context,
         } = self;
 
@@ -480,7 +481,7 @@ impl RunFunctionMsg {
             let contextual_csi = InvocationContext::new(
                 csi_apis,
                 skill_path.namespace.clone(),
-                api_token,
+                authentication,
                 context.clone(),
             );
             let result = SkillDriver
@@ -835,7 +836,7 @@ pub mod tests {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
             send,
-            api_token: "dummy".to_owned(),
+            authentication: "dummy".to_owned(),
             tracing_context: TracingContext::dummy(),
         };
 

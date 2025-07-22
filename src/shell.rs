@@ -382,7 +382,7 @@ pub mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        authorization::tests::StubAuthorization,
+        authorization::{Authentication, tests::StubAuthorization},
         feature_set::PRODUCTION_FEATURE_SET,
         logging::tests::given_tracing_subscriber,
         skill::{AnySkillManifest, SkillPath},
@@ -728,7 +728,7 @@ pub mod tests {
             &self,
             _skill_path: SkillPath,
             _input: Value,
-            _api_token: String,
+            _authentication: Authentication,
             _tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             Err((*self.make_error)())
@@ -750,7 +750,7 @@ pub mod tests {
     }
 
     struct SkillRuntimeSpyInner {
-        api_token: String,
+        authentication: Authentication,
         input: Value,
         skill_path: SkillPath,
         tracing_context: Vec<TracingContext>,
@@ -760,7 +760,7 @@ pub mod tests {
         pub fn new() -> Self {
             Self {
                 inner: Arc::new(Mutex::new(SkillRuntimeSpyInner {
-                    api_token: String::new(),
+                    authentication: Authentication::new(),
                     input: Value::default(),
                     skill_path: SkillPath::local("SKILL HAS NOT BEEN SEND"),
                     tracing_context: Vec::new(),
@@ -778,11 +778,11 @@ pub mod tests {
             &self,
             skill_path: SkillPath,
             input: Value,
-            api_token: String,
+            authentication: Authentication,
             tracing_context: TracingContext,
         ) -> Result<Value, SkillExecutionError> {
             let mut inner = self.inner.lock().unwrap();
-            inner.api_token = api_token;
+            inner.authentication = authentication;
             inner.input = input;
             inner.skill_path = skill_path;
             inner.tracing_context.push(tracing_context);
@@ -793,11 +793,11 @@ pub mod tests {
             &self,
             skill_path: SkillPath,
             input: Value,
-            api_token: String,
+            authentication: Authentication,
             tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             let mut inner = self.inner.lock().unwrap();
-            inner.api_token = api_token;
+            inner.authentication = authentication;
             inner.input = input;
             inner.skill_path = skill_path;
             inner.tracing_context.push(tracing_context);

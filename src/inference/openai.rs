@@ -13,8 +13,8 @@ use futures::StreamExt;
 use tokio::sync::mpsc;
 
 use crate::{
-    inference,
-    inference::{InferenceError, client::InferenceClient},
+    authorization::Authentication,
+    inference::{self, InferenceError, client::InferenceClient},
     logging::TracingContext,
 };
 
@@ -276,7 +276,7 @@ impl InferenceClient for OpenAiClient {
     async fn chat(
         &self,
         request: &inference::ChatRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::ChatResponse, InferenceError> {
         let request = request.try_into()?;
@@ -288,7 +288,7 @@ impl InferenceClient for OpenAiClient {
     async fn stream_chat(
         &self,
         request: &inference::ChatRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
         send: mpsc::Sender<inference::ChatEvent>,
     ) -> Result<(), InferenceError> {
@@ -308,7 +308,7 @@ impl InferenceClient for OpenAiClient {
     async fn complete(
         &self,
         _request: &inference::CompletionRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::Completion, InferenceError> {
         Err(InferenceError::Other(anyhow::anyhow!(Self::NOT_SUPPORTED)))
@@ -317,7 +317,7 @@ impl InferenceClient for OpenAiClient {
     async fn stream_completion(
         &self,
         _request: &inference::CompletionRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
         _send: mpsc::Sender<inference::CompletionEvent>,
     ) -> Result<(), InferenceError> {
@@ -327,7 +327,7 @@ impl InferenceClient for OpenAiClient {
     async fn explain(
         &self,
         _request: &inference::ExplanationRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::Explanation, InferenceError> {
         Err(InferenceError::Other(anyhow::anyhow!(Self::NOT_SUPPORTED)))

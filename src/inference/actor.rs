@@ -9,7 +9,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::logging::TracingContext;
+use crate::{authorization::Authentication, logging::TracingContext};
 use tracing::{info, warn};
 
 use super::{
@@ -92,35 +92,35 @@ pub trait InferenceApi {
     fn explain(
         &self,
         request: ExplanationRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 
     fn complete(
         &self,
         request: CompletionRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Completion, InferenceError>> + Send;
 
     fn completion_stream(
         &self,
         request: CompletionRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send;
 
     fn chat(
         &self,
         request: ChatRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
 
     fn chat_stream(
         &self,
         request: ChatRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
 }
@@ -129,14 +129,14 @@ impl InferenceApi for InferenceSender {
     async fn explain(
         &self,
         request: ExplanationRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> Result<Explanation, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMsg::Explain {
             request,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
         self.0
@@ -152,14 +152,14 @@ impl InferenceApi for InferenceSender {
     async fn complete(
         &self,
         request: CompletionRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> Result<Completion, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMsg::Complete {
             request,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
         self.0
@@ -175,14 +175,14 @@ impl InferenceApi for InferenceSender {
     async fn completion_stream(
         &self,
         request: CompletionRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
         let (send, recv) = mpsc::channel(1);
         let msg = InferenceMsg::CompletionStream {
             request,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
         self.0
@@ -195,14 +195,14 @@ impl InferenceApi for InferenceSender {
     async fn chat(
         &self,
         request: ChatRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMsg::Chat {
             request,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
         self.0
@@ -218,14 +218,14 @@ impl InferenceApi for InferenceSender {
     async fn chat_stream(
         &self,
         request: ChatRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
         let (send, recv) = mpsc::channel(1);
         let msg = InferenceMsg::ChatStream {
             request,
             send,
-            api_token,
+            authentication,
             tracing_context,
         };
         self.0
@@ -247,7 +247,7 @@ impl InferenceClient for InferenceNotConfigured {
     async fn complete(
         &self,
         _request: &CompletionRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<Completion, InferenceError> {
         Err(InferenceError::NotConfigured)
@@ -256,7 +256,7 @@ impl InferenceClient for InferenceNotConfigured {
     async fn stream_completion(
         &self,
         _request: &CompletionRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
         _send: mpsc::Sender<CompletionEvent>,
     ) -> Result<(), InferenceError> {
@@ -266,7 +266,7 @@ impl InferenceClient for InferenceNotConfigured {
     async fn chat(
         &self,
         _request: &ChatRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         Err(InferenceError::NotConfigured)
@@ -275,7 +275,7 @@ impl InferenceClient for InferenceNotConfigured {
     async fn stream_chat(
         &self,
         _request: &ChatRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
         _send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
@@ -285,7 +285,7 @@ impl InferenceClient for InferenceNotConfigured {
     async fn explain(
         &self,
         _request: &ExplanationRequest,
-        _api_token: String,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<Explanation, InferenceError> {
         Err(InferenceError::NotConfigured)
@@ -560,31 +560,31 @@ enum InferenceMsg {
     Complete {
         request: CompletionRequest,
         send: oneshot::Sender<Result<Completion, InferenceError>>,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     },
     CompletionStream {
         request: CompletionRequest,
         send: mpsc::Sender<Result<CompletionEvent, InferenceError>>,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     },
     Chat {
         request: ChatRequest,
         send: oneshot::Sender<Result<ChatResponse, InferenceError>>,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     },
     ChatStream {
         request: ChatRequest,
         send: mpsc::Sender<Result<ChatEvent, InferenceError>>,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     },
     Explain {
         request: ExplanationRequest,
         send: oneshot::Sender<Result<Explanation, InferenceError>>,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     },
 }
@@ -596,24 +596,24 @@ impl InferenceMsg {
             Self::Complete {
                 request,
                 send,
-                api_token,
+                authentication,
                 tracing_context,
             } => {
                 let result = client
-                    .complete(&request, api_token.clone(), &tracing_context)
+                    .complete(&request, authentication.clone(), &tracing_context)
                     .await;
                 drop(send.send(result));
             }
             Self::CompletionStream {
                 request,
                 send,
-                api_token,
+                authentication,
                 tracing_context,
             } => {
                 let (event_send, mut event_recv) = mpsc::channel(1);
                 let mut stream = Box::pin(client.stream_completion(
                     &request,
-                    api_token,
+                    authentication,
                     &tracing_context,
                     event_send,
                 ));
@@ -646,21 +646,27 @@ impl InferenceMsg {
             Self::Chat {
                 request,
                 send,
-                api_token,
+                authentication,
                 tracing_context,
             } => {
-                let result = client.chat(&request, api_token, &tracing_context).await;
+                let result = client
+                    .chat(&request, authentication, &tracing_context)
+                    .await;
                 drop(send.send(result));
             }
             Self::ChatStream {
                 request,
                 send,
-                api_token,
+                authentication,
                 tracing_context,
             } => {
                 let (event_send, mut event_recv) = mpsc::channel(1);
-                let mut stream =
-                    Box::pin(client.stream_chat(&request, api_token, &tracing_context, event_send));
+                let mut stream = Box::pin(client.stream_chat(
+                    &request,
+                    authentication,
+                    &tracing_context,
+                    event_send,
+                ));
 
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
@@ -690,11 +696,11 @@ impl InferenceMsg {
             Self::Explain {
                 request,
                 send,
-                api_token,
+                authentication,
                 tracing_context,
             } => {
                 let result = client
-                    .explain(&request, api_token.clone(), &tracing_context)
+                    .explain(&request, authentication.clone(), &tracing_context)
                     .await;
                 drop(send.send(result));
             }
@@ -758,7 +764,7 @@ pub mod tests {
         async fn complete(
             &self,
             request: CompletionRequest,
-            _api_token: String,
+            _authentication: Authentication,
             _tracing_context: TracingContext,
         ) -> Result<Completion, InferenceError> {
             let completion = (self.complete)(request)?;
@@ -782,7 +788,7 @@ pub mod tests {
         async fn complete(
             &self,
             _params: &super::CompletionRequest,
-            _api_token: String,
+            _authentication: Authentication,
             _tracing_context: &TracingContext,
         ) -> Result<Completion, InferenceError> {
             let remaining = self
@@ -845,7 +851,7 @@ pub mod tests {
         async fn complete(
             &self,
             request: &CompletionRequest,
-            _api_token: String,
+            _authentication: Authentication,
             _tracing_context: &TracingContext,
         ) -> Result<Completion, InferenceError> {
             self.expected_concurrent_requests
