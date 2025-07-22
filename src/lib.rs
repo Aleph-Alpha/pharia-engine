@@ -25,8 +25,6 @@ mod tokenizers;
 mod tool;
 mod wasm;
 
-use std::sync::Arc;
-
 use anyhow::{Context, Error};
 use authorization::Authorization;
 use futures::Future;
@@ -38,7 +36,6 @@ use skill_store::SkillStore;
 use tokenizers::Tokenizers;
 use tool::ToolRuntime;
 use tracing::error;
-use wasm::Engine;
 
 use crate::{csi::CsiDrivers, mcp::Mcp, shell::ShellState};
 
@@ -91,12 +88,6 @@ impl Kernel {
                 .context("Unable to read the configuration for namespaces")
                 .inspect_err(|e| error!(target: "pharia-kernel::initialization", "{e:#}"))?,
         );
-        let engine = Arc::new(
-            Engine::new(app_config.engine_config())
-                .context("engine creation failed")
-                .inspect_err(|e| error!(target: "pharia-kernel::initialization", "{e:#}"))?,
-        );
-
         // Boot up the drivers which power the CSI.
         let tokenizers = Tokenizers::new(app_config.as_tokenizers_config());
         let inference = Inference::new(app_config.as_inference_config());
@@ -111,7 +102,7 @@ impl Kernel {
         };
 
         let registry_config = app_config.namespaces().registry_config();
-        let skill_loader = SkillLoader::from_config(engine, registry_config);
+        let skill_loader = SkillLoader::from_config(app_config.engine_config(), registry_config)?;
         let skill_store = SkillStore::new(
             skill_loader.api(),
             app_config.namespace_update_interval(),

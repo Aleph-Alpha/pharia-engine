@@ -583,7 +583,6 @@ pub mod tests {
         registries::{Digest, RegistryError},
         skill::SkillPath,
         skill_loader::{LoadedSkill, SkillLoader, SkillLoaderMsg},
-        wasm::Engine,
     };
 
     use super::*;
@@ -620,9 +619,8 @@ pub mod tests {
     }
 
     impl SkillStoreState<mpsc::Sender<SkillLoaderMsg>> {
-        fn with_namespace_and_skill(engine: Arc<Engine>, skill_path: &SkillPath) -> Self {
-            let skill_loader =
-                SkillLoader::with_file_registry(engine, skill_path.namespace.clone()).api();
+        fn with_namespace_and_skill(skill_path: &SkillPath) -> Self {
+            let skill_loader = SkillLoader::with_file_registry(skill_path.namespace.clone()).api();
 
             let mut provider = SkillStoreState::new(skill_loader, ByteSize(u64::MAX));
             let skill = ConfiguredSkill::from_path(skill_path);
@@ -891,8 +889,7 @@ pub mod tests {
     #[tokio::test]
     async fn skill_component_not_in_config() {
         let skill_path = SkillPath::dummy();
-        let engine = Arc::new(Engine::default());
-        let provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
+        let provider = SkillStoreState::with_namespace_and_skill(&skill_path);
 
         let result =
             provider.skill_description(&SkillPath::new(skill_path.namespace, "non_existing_skill"));
@@ -904,8 +901,7 @@ pub mod tests {
         // Given a provider with a skill in a particular namespace
         let namespace = Namespace::new("non-existing").unwrap();
         let existing = SkillPath::new(namespace.clone(), "existing_skill");
-        let engine = Arc::new(Engine::default());
-        let provider = SkillStoreState::with_namespace_and_skill(engine, &existing);
+        let provider = SkillStoreState::with_namespace_and_skill(&existing);
 
         // When requesting a different, non-existing skill in the same namespace
         let non_existing = SkillPath::new(namespace, "non_existing_skill");
@@ -919,8 +915,7 @@ pub mod tests {
     async fn cached_skill_removed() {
         // Given one cached skill
         let skill_path = SkillPath::local("greet");
-        let engine = Arc::new(Engine::default());
-        let mut provider = SkillStoreState::with_namespace_and_skill(engine.clone(), &skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
         provider.insert(
             skill_path.clone(),
             LoadedSkill::new(Arc::new(Dummy), Digest::new("dummy"), ByteSize(1)),
@@ -937,8 +932,7 @@ pub mod tests {
     async fn should_error_if_fetching_skill_from_invalid_namespace() {
         // given a skill in an invalid namespace
         let skill_path = SkillPath::local("greet_skill_v0_2");
-        let engine = Arc::new(Engine::default());
-        let mut provider = SkillStoreState::with_namespace_and_skill(engine, &skill_path);
+        let mut provider = SkillStoreState::with_namespace_and_skill(&skill_path);
         provider.add_invalid_namespace(skill_path.namespace.clone(), anyhow!(""));
 
         // when fetching the tag
@@ -987,11 +981,10 @@ pub mod tests {
     #[tokio::test]
     async fn should_list_skills_that_have_been_added() {
         // Given an empty provider
-        let engine = Arc::new(Engine::default());
         let first = SkillPath::local("one");
         let second = SkillPath::local("two");
 
-        let skill_loader = SkillLoader::with_file_registry(engine, first.namespace.clone()).api();
+        let skill_loader = SkillLoader::with_file_registry(first.namespace.clone()).api();
         let skill_store = SkillStore::from_loader(skill_loader);
         let api = skill_store.api();
 
