@@ -101,7 +101,9 @@ pub struct AppConfig {
     /// Document Index, an error is returned and Skill execution is suspended.
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     document_index_url: Option<String>,
-    /// This base URL is used to authorize an `PHARIA_AI_TOKEN` for use by the kernel
+    /// This base URL is used to authorize an `PHARIA_AI_TOKEN` for use by the kernel. The
+    /// implementation is specific to the authorization service used inside `PhariaAI`. If set to
+    /// `None`, the Kernel will not check the permissions of the provided tokens.
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     authorization_url: Option<String>,
     #[serde(default)]
