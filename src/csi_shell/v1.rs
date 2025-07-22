@@ -232,7 +232,7 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .search(
             auth,
@@ -257,7 +257,7 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .documents(
             auth,
@@ -278,7 +278,7 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .document_metadata(
             auth,
@@ -298,7 +298,7 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .chat(
             auth,
@@ -319,7 +319,7 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .chunk(
             auth,
@@ -344,7 +344,7 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .chunk(
             auth,
@@ -369,7 +369,7 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .explain(
             auth,
@@ -394,7 +394,7 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .complete(
             auth,
@@ -415,7 +415,7 @@ where
     C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let mut recv = csi
         .completion_stream(auth, tracing_context, request.into())
         .await;
@@ -491,7 +491,7 @@ where
     C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let mut recv = csi.chat_stream(auth, tracing_context, request.into()).await;
 
     let stream = try_stream! {

@@ -67,7 +67,7 @@ where
 {
     let drivers = csi;
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let result = match args {
         VersionedCsiRequest::V0_2(request) => {
             request.respond(&drivers, auth, tracing_context).await

@@ -36,7 +36,10 @@ use utoipa::{
 use utoipa_scalar::Scalar;
 
 use crate::{
-    authorization::{Authentication, AuthorizationApi, AuthorizationProvider, AuthorizationState},
+    authorization::{
+        Authentication, AuthorizationApi, AuthorizationClientError, AuthorizationProvider,
+        AuthorizationState,
+    },
     context,
     csi::RawCsi,
     csi_shell::{self, CsiProvider},
@@ -208,30 +211,30 @@ where
     A: AuthorizationApi,
 {
     let context = TracingContext::current();
-    if let Some(bearer) = bearer {
-        let context = context!(context, "pharia-kernel::authorization", "check_permissions");
-        let auth = Authentication::new(bearer.token());
-        match authorization_api.0.check_permission(auth, context).await {
-            Ok(allowed) => {
-                if !allowed {
-                    return Err(ErrorResponse::from((
-                        StatusCode::FORBIDDEN,
-                        "Bearer token invalid".to_owned(),
-                    )));
-                }
-            }
-            Err(e) => {
+    let context = context!(context, "pharia-kernel::authorization", "check_permissions");
+    let maybe_token = bearer.map(|b| b.token().to_owned());
+    let auth = Authentication::new(maybe_token);
+    match authorization_api.0.check_permission(auth, context).await {
+        Ok(allowed) => {
+            if !allowed {
                 return Err(ErrorResponse::from((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    e.to_string(),
+                    StatusCode::FORBIDDEN,
+                    "Bearer token invalid".to_owned(),
                 )));
             }
         }
-    } else {
-        return Err(ErrorResponse::from((
-            StatusCode::BAD_REQUEST,
-            "Bearer token expected".to_owned(),
-        )));
+        Err(AuthorizationClientError::Recoverable) => {
+            return Err(ErrorResponse::from((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                AuthorizationClientError::Recoverable.to_string(),
+            )));
+        }
+        Err(AuthorizationClientError::NoBearerToken) => {
+            return Err(ErrorResponse::from((
+                StatusCode::BAD_REQUEST,
+                AuthorizationClientError::NoBearerToken.to_string(),
+            )));
+        }
     }
     let response = next.run(request).await;
     Ok(response)
@@ -572,8 +575,24 @@ pub mod tests {
 
     #[tokio::test]
     async fn api_token_missing_in_run_skill() {
-        // Given
-        let app_state = AppStateDouble::dummy();
+        // Given an authorization api that expects a token to be provided
+        #[derive(Clone)]
+        struct AuthorizationMock;
+
+        impl AuthorizationApi for AuthorizationMock {
+            async fn check_permission(
+                &self,
+                auth: Authentication,
+                _context: TracingContext,
+            ) -> Result<bool, AuthorizationClientError> {
+                if auth.into_maybe_string().is_some() {
+                    Ok(true)
+                } else {
+                    Err(AuthorizationClientError::NoBearerToken)
+                }
+            }
+        }
+        let app_state = AppStateDouble::dummy().with_authorization_api(AuthorizationMock);
 
         // When
         let http = http(PRODUCTION_FEATURE_SET, app_state);

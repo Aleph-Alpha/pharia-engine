@@ -103,7 +103,7 @@ where
 {
     let tracing_context = TracingContext::current();
     let skill_path = SkillPath::new(namespace, name);
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let response = skill_runtime_api
         .run_function(skill_path, input, auth, tracing_context)
         .await?;
@@ -219,7 +219,7 @@ where
 {
     let path = SkillPath::new(namespace, name);
     let tracing_context = TracingContext::current();
-    let auth = Authentication::new(bearer.token());
+    let auth = Authentication::with_token(bearer.token());
     let mut stream_events = skill_runtime_api
         .run_message_stream(path, input, auth, tracing_context)
         .await;
@@ -584,7 +584,7 @@ mod tests {
             ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send {
                 assert_eq!(path, SkillPath::local("greet_skill"));
                 assert_eq!(input, json!("Homer"));
-                assert_eq!(auth, Authentication::new("dummy auth token"));
+                assert_eq!(auth, Authentication::with_token("dummy auth token"));
                 async move { Ok(json!({})) }
             }
         }
