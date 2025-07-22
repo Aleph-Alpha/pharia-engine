@@ -757,7 +757,7 @@ pub mod tests {
         pub fn new() -> Self {
             Self {
                 inner: Arc::new(Mutex::new(SkillRuntimeSpyInner {
-                    auth: Authentication::dummy(),
+                    auth: Authentication::none(),
                     input: Value::default(),
                     skill_path: SkillPath::local("SKILL HAS NOT BEEN SEND"),
                     tracing_context: Vec::new(),

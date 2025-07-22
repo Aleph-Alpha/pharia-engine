@@ -120,7 +120,7 @@ mod tests {
         let chunks = chunking(
             request,
             &FakeTokenizers,
-            Authentication::dummy(),
+            Authentication::none(),
             TracingContext::dummy(),
         )
         .await
@@ -153,7 +153,7 @@ mod tests {
         let chunks = chunking(
             request,
             &FakeTokenizers,
-            Authentication::dummy(),
+            Authentication::none(),
             TracingContext::dummy(),
         )
         .await
@@ -202,7 +202,7 @@ mod tests {
         let chunks = chunking(
             request,
             &FakeTokenizers,
-            Authentication::dummy(),
+            Authentication::none(),
             TracingContext::dummy(),
         )
         .await
