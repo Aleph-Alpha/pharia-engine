@@ -123,7 +123,7 @@ impl Kernel {
         // Wait for the first pass of the configuration so that the configured skills are loaded
         namespace_watcher.wait_for_ready().await;
 
-        let authorization = Authorization::new(app_config.authorization_url().to_owned());
+        let authorization = Authorization::new(app_config.authorization_url());
 
         let app_state = ShellState::new(
             skill_runtime.api(),

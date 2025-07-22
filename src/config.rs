@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use bytesize::ByteSize;
 use config::{Case, Config, Environment, File, FileFormat, FileSourceFile};
 use engine_room::{EngineConfig, WasmtimeCache};
@@ -25,10 +24,6 @@ mod defaults {
 
     pub fn metrics_address() -> SocketAddr {
         "0.0.0.0:9000".parse().unwrap()
-    }
-
-    pub fn authorization_url() -> String {
-        "https://pharia-iam.product.pharia.com".to_owned()
     }
 
     pub fn namespace_update_interval() -> Duration {
@@ -107,8 +102,8 @@ pub struct AppConfig {
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     document_index_url: Option<String>,
     /// This base URL is used to authorize an `PHARIA_AI_TOKEN` for use by the kernel
-    #[serde(default = "defaults::authorization_url")]
-    authorization_url: String,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    authorization_url: Option<String>,
     #[serde(default)]
     namespaces: NamespaceConfigs,
     #[serde(
@@ -199,12 +194,6 @@ impl AppConfig {
             .inspect_err(|e| {
                 eprintln!("Error deserializing app config: {e:#}");
             })?;
-
-        if config.authorization_url.is_empty() {
-            let message = "The authorization address must not be empty.";
-            eprintln!("{message}");
-            return Err(anyhow!(message));
-        }
 
         if ["debug", "trace"].contains(&config.log_level.as_str()) {
             // Don't allow third-party crates to go below info unless they user passed in a
@@ -298,13 +287,13 @@ impl AppConfig {
     }
 
     #[must_use]
-    pub fn authorization_url(&self) -> &str {
-        &self.authorization_url
+    pub fn authorization_url(&self) -> Option<&str> {
+        self.authorization_url.as_deref()
     }
 
     #[must_use]
-    pub fn with_authorization_url(mut self, url: String) -> Self {
-        self.authorization_url = url;
+    pub fn with_authorization_url(mut self, url: impl Into<String>) -> Self {
+        self.authorization_url = Some(url.into());
         self
     }
 
@@ -533,7 +522,7 @@ impl Default for AppConfig {
             inference_url: None,
             openai_inference: None,
             document_index_url: None,
-            authorization_url: defaults::authorization_url(),
+            authorization_url: None,
             namespaces: NamespaceConfigs::default(),
             namespace_update_interval: defaults::namespace_update_interval(),
             log_level: defaults::log_level(),
@@ -696,6 +685,10 @@ mod tests {
             config.inference_url(),
             Some("https://inference-api.product.pharia.com")
         );
+        assert_eq!(
+            config.authorization_url(),
+            Some("https://pharia-iam.product.pharia.com")
+        );
         assert_eq!(config.namespaces().len(), 1);
         assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
         Ok(())
@@ -715,10 +708,7 @@ mod tests {
         assert_eq!(config.metrics_address(), "0.0.0.0:9000".parse().unwrap());
         assert!(config.inference_url().is_none());
         assert!(config.document_index_url().is_none());
-        assert_eq!(
-            config.authorization_url(),
-            "https://pharia-iam.product.pharia.com"
-        );
+        assert!(config.authorization_url().is_none());
         assert_eq!(config.namespace_update_interval(), Duration::from_secs(10));
         assert_eq!(config.log_level(), "info");
         assert!(config.otel_endpoint().is_none());

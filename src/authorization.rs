@@ -16,9 +16,12 @@ pub struct Authorization {
 }
 
 impl Authorization {
-    pub fn new(authorization_url: String) -> Self {
-        let client = HttpAuthorizationClient::new(authorization_url);
-        Self::with_client(client)
+    pub fn new(authorization_url: Option<&str>) -> Self {
+        if let Some(url) = authorization_url {
+            Self::with_client(HttpAuthorizationClient::new(url))
+        } else {
+            Self::with_client(AlwaysValidClient)
+        }
     }
 
     pub fn with_client(client: impl AuthorizationClient) -> Self {
@@ -132,15 +135,27 @@ pub trait AuthorizationClient: Send + Sync + 'static {
     ) -> impl Future<Output = Result<bool, AuthorizationClientError>> + Send;
 }
 
+struct AlwaysValidClient;
+
+impl AuthorizationClient for AlwaysValidClient {
+    async fn token_valid(
+        &self,
+        _api_token: String,
+        _context: TracingContext,
+    ) -> Result<bool, AuthorizationClientError> {
+        Ok(true)
+    }
+}
+
 struct HttpAuthorizationClient {
     url: String,
     client: HttpClient,
 }
 
 impl HttpAuthorizationClient {
-    pub fn new(url: String) -> Self {
+    pub fn new(url: impl Into<String>) -> Self {
         Self {
-            url,
+            url: url.into(),
             client: HttpClient::default(),
         }
     }
