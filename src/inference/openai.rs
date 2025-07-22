@@ -27,25 +27,6 @@ impl OpenAiClient {
 }
 
 impl InferenceClient for OpenAiClient {
-    async fn complete(
-        &self,
-        _request: &CompletionRequest,
-        _api_token: String,
-        _tracing_context: &TracingContext,
-    ) -> Result<Completion, InferenceError> {
-        Err(InferenceError::Other(anyhow::anyhow!(Self::NOT_SUPPORTED)))
-    }
-
-    async fn stream_completion(
-        &self,
-        _request: &CompletionRequest,
-        _api_token: String,
-        _tracing_context: &TracingContext,
-        _send: mpsc::Sender<CompletionEvent>,
-    ) -> Result<(), InferenceError> {
-        Err(InferenceError::Other(anyhow::anyhow!(Self::NOT_SUPPORTED)))
-    }
-
     async fn chat(
         &self,
         request: &ChatRequest,
@@ -74,6 +55,25 @@ impl InferenceClient for OpenAiClient {
             drop(send.send(ChatEvent::try_from(event?)?).await);
         }
         Ok(())
+    }
+
+    async fn complete(
+        &self,
+        _request: &CompletionRequest,
+        _api_token: String,
+        _tracing_context: &TracingContext,
+    ) -> Result<Completion, InferenceError> {
+        Err(InferenceError::Other(anyhow::anyhow!(Self::NOT_SUPPORTED)))
+    }
+
+    async fn stream_completion(
+        &self,
+        _request: &CompletionRequest,
+        _api_token: String,
+        _tracing_context: &TracingContext,
+        _send: mpsc::Sender<CompletionEvent>,
+    ) -> Result<(), InferenceError> {
+        Err(InferenceError::Other(anyhow::anyhow!(Self::NOT_SUPPORTED)))
     }
 
     async fn explain(
