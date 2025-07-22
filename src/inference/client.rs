@@ -517,6 +517,8 @@ pub enum InferenceError {
         the Kernel configuration."
     )]
     NotConfigured,
+    #[error("Tool calls are not supported yet: {0}")]
+    ToolCallNotSupported(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error), // default is an anyhow error
 }
