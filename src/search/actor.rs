@@ -276,8 +276,7 @@ impl SearchMsg {
                 auth,
                 tracing_context,
             } => {
-                let results =
-                    Self::search(client, request, &auth.into_string(), tracing_context).await;
+                let results = Self::search(client, request, auth, tracing_context).await;
                 drop(send.send(results));
             }
             Self::Metadata {
@@ -286,13 +285,8 @@ impl SearchMsg {
                 auth,
                 tracing_context,
             } => {
-                let results = Self::document_metadata(
-                    client,
-                    document_path,
-                    &auth.into_string(),
-                    tracing_context,
-                )
-                .await;
+                let results =
+                    Self::document_metadata(client, document_path, auth, tracing_context).await;
                 drop(send.send(results));
             }
             Self::Document {
@@ -301,9 +295,7 @@ impl SearchMsg {
                 auth,
                 tracing_context,
             } => {
-                let results =
-                    Self::document(client, document_path, &auth.into_string(), tracing_context)
-                        .await;
+                let results = Self::document(client, document_path, auth, tracing_context).await;
                 drop(send.send(results));
             }
         }
@@ -312,7 +304,7 @@ impl SearchMsg {
     async fn search(
         client: &impl SearchClient,
         request: SearchRequest,
-        auth: &str,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let SearchRequest {
@@ -392,7 +384,7 @@ impl SearchMsg {
     async fn document_metadata(
         client: &impl SearchClient,
         document_path: DocumentPath,
-        auth: &str,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         client
@@ -403,7 +395,7 @@ impl SearchMsg {
     async fn document(
         client: &impl SearchClient,
         document_path: DocumentPath,
-        auth: &str,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Document> {
         client.document(document_path, auth, &tracing_context).await
@@ -653,7 +645,7 @@ pub mod tests {
             &self,
             _index: IndexPath,
             _request: ClientSearchRequest,
-            _authentication: &str,
+            _authentication: Authentication,
             _tracing_context: &TracingContext,
         ) -> anyhow::Result<Vec<ClientSearchResult>> {
             self.expected_concurrent_requests

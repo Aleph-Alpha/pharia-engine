@@ -3,7 +3,7 @@ use std::future::Future;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{http::HttpClient, logging::TracingContext};
+use crate::{authorization::Authentication, http::HttpClient, logging::TracingContext};
 
 #[cfg(test)]
 use double_trait::double;
@@ -14,21 +14,21 @@ pub trait SearchClient: Send + Sync + 'static {
         &self,
         index: IndexPath,
         request: SearchRequest,
-        authentication: &str,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
 
     fn document_metadata(
         &self,
         document_path: DocumentPath,
-        authentication: &str,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
 
     fn document(
         &self,
         document_path: DocumentPath,
-        authentication: &str,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
@@ -54,7 +54,7 @@ impl SearchClient for SearchNotConfigured {
         &self,
         _index: IndexPath,
         _request: SearchRequest,
-        _authentication: &str,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
@@ -63,7 +63,7 @@ impl SearchClient for SearchNotConfigured {
     async fn document_metadata(
         &self,
         _document_path: DocumentPath,
-        _authentication: &str,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
@@ -72,7 +72,7 @@ impl SearchClient for SearchNotConfigured {
     async fn document(
         &self,
         _document_path: DocumentPath,
-        _authentication: &str,
+        _authentication: Authentication,
         _tracing_context: &TracingContext,
     ) -> anyhow::Result<Document> {
         Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
@@ -246,9 +246,15 @@ impl SearchClient for Client {
         &self,
         index: IndexPath,
         request: SearchRequest,
-        authentication: &str,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
+        let api_token = authentication.into_string().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Searching in the Document Index requires a PhariaAI token. \
+                Please provide a valid token in the Authorization header."
+            )
+        })?;
         let IndexPath {
             namespace,
             collection,
@@ -285,7 +291,7 @@ impl SearchClient for Client {
         Ok(self
             .http
             .post(url)
-            .bearer_auth(authentication)
+            .bearer_auth(api_token)
             .headers(tracing_context.w3c_headers())
             .json(&body)
             .send()
@@ -298,13 +304,20 @@ impl SearchClient for Client {
     async fn document_metadata(
         &self,
         document_path: DocumentPath,
-        authentication: &str,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         #[derive(Deserialize)]
         struct Document {
             metadata: Option<Value>,
         }
+
+        let api_token = authentication.into_string().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Fetching metadata from the Document Index requires a PhariaAI token. \
+                Please provide a valid token in the Authorization header."
+            )
+        })?;
 
         let DocumentPath {
             namespace,
@@ -324,7 +337,7 @@ impl SearchClient for Client {
         let document = self
             .http
             .get(url)
-            .bearer_auth(authentication)
+            .bearer_auth(api_token)
             .headers(tracing_context.w3c_headers())
             .send()
             .await?
@@ -338,7 +351,7 @@ impl SearchClient for Client {
     async fn document(
         &self,
         document_path: DocumentPath,
-        authentication: &str,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> anyhow::Result<Document> {
         #[derive(Deserialize)]
@@ -346,6 +359,13 @@ impl SearchClient for Client {
             contents: Vec<Modality>,
             metadata: Option<Value>,
         }
+
+        let api_token = authentication.into_string().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Fetching a document from the Document Index requires a PhariaAI token. \
+                Please provide a valid token in the Authorization header."
+            )
+        })?;
 
         let DocumentPath {
             namespace,
@@ -365,7 +385,7 @@ impl SearchClient for Client {
         let document = self
             .http
             .get(url)
-            .bearer_auth(authentication)
+            .bearer_auth(api_token)
             .headers(tracing_context.w3c_headers())
             .send()
             .await?
@@ -406,7 +426,7 @@ pub mod tests {
             &self,
             _index: IndexPath,
             _request: SearchRequest,
-            _authentication: &str,
+            _authentication: Authentication,
             _tracing_context: &TracingContext,
         ) -> anyhow::Result<Vec<SearchResult>> {
             Ok(vec![])
@@ -415,7 +435,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             _document_path: DocumentPath,
-            _authentication: &str,
+            _authentication: Authentication,
             _tracing_context: &TracingContext,
         ) -> anyhow::Result<Option<Value>> {
             Ok(None)
@@ -424,7 +444,7 @@ pub mod tests {
         async fn document(
             &self,
             _document_path: DocumentPath,
-            _authentication: &str,
+            _authentication: Authentication,
             _tracing_context: &TracingContext,
         ) -> anyhow::Result<Document> {
             Ok(Document::dummy())
@@ -463,13 +483,13 @@ pub mod tests {
     async fn document_exists() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let api_token = api_token();
+        let auth = Authentication::new(api_token());
         let client = Client::new(host);
 
         // When requesting a document
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
         let document = client
-            .document(document_path, api_token, &TracingContext::dummy())
+            .document(document_path, auth, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -481,13 +501,13 @@ pub mod tests {
     async fn document_not_found_is_err() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let api_token = api_token();
+        let auth = Authentication::new(api_token());
         let client = Client::new(host);
 
         // When requesting a document that does not exist
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs-not-found");
         let maybe_document = client
-            .document(document_path, api_token, &TracingContext::dummy())
+            .document(document_path, auth, &TracingContext::dummy())
             .await;
 
         // Then we get no document
@@ -498,7 +518,7 @@ pub mod tests {
     async fn search_request() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let api_token = api_token();
+        let auth = Authentication::new(api_token());
         let client = Client::new(host);
 
         // When making a query on an existing collection
@@ -513,7 +533,7 @@ pub mod tests {
             Vec::new(),
         );
         let results = client
-            .search(index, request, api_token, &TracingContext::dummy())
+            .search(index, request, auth, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -536,13 +556,13 @@ pub mod tests {
     async fn request_metadata() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let api_token = api_token();
+        let auth = Authentication::new(api_token());
         let client = Client::new(host);
 
         // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel/docs");
         let metadata = client
-            .document_metadata(document_path, api_token, &TracingContext::dummy())
+            .document_metadata(document_path, auth, &TracingContext::dummy())
             .await
             .unwrap()
             .unwrap();
@@ -558,7 +578,7 @@ pub mod tests {
     async fn min_score() {
         // Given a search client pointed at the document index
         let host = document_index_url().to_owned();
-        let api_token = api_token();
+        let auth = Authentication::new(api_token());
         let client = Client::new(host);
         let max_results = 5;
         let min_score = 0.99;
@@ -575,7 +595,7 @@ pub mod tests {
             Vec::new(),
         );
         let results = client
-            .search(index, request, api_token, &TracingContext::dummy())
+            .search(index, request, auth, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -588,7 +608,7 @@ pub mod tests {
         // Given a search request with a metadata filter for a created field
         let index = IndexPath::new("Kernel", "test", "asym-64");
         let host = document_index_url().to_owned();
-        let api_token = api_token();
+        let auth = Authentication::new(api_token());
         let client = Client::new(host);
 
         // When filtering for documents with metadata field created after 2100-01-01
@@ -607,7 +627,7 @@ pub mod tests {
             vec![filter],
         );
         let results = client
-            .search(index, request, api_token, &TracingContext::dummy())
+            .search(index, request, auth, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -620,7 +640,7 @@ pub mod tests {
         // Given a search request with a metadata filter for a created field
         let index = IndexPath::new("Kernel", "test", "asym-64");
         let host = document_index_url().to_owned();
-        let api_token = api_token();
+        let auth = Authentication::new(api_token());
         let client = Client::new(host);
 
         // When filtering for documents with metadata field created after 1970-07-01
@@ -639,7 +659,7 @@ pub mod tests {
             vec![filter],
         );
         let results = client
-            .search(index, request, api_token, &TracingContext::dummy())
+            .search(index, request, auth, &TracingContext::dummy())
             .await
             .unwrap();
 
@@ -654,10 +674,10 @@ pub mod tests {
 
         // When making a query
         let index = IndexPath::new("Kernel", "test", "asym-64");
-        let api_token = "";
+        let auth = Authentication::none();
         let request = SearchRequest::new(vec![], 1, None, true, vec![]);
         let results = client
-            .search(index, request, api_token, &TracingContext::dummy())
+            .search(index, request, auth, &TracingContext::dummy())
             .await;
 
         // Then we get an error
