@@ -12,7 +12,7 @@ use bytesize::ByteSize;
 use dotenvy::dotenv;
 use futures::StreamExt;
 use opentelemetry::{SpanId, TraceId};
-use pharia_kernel::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
+use pharia_kernel::{AppConfig, FeatureSet, InferenceConfig, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
@@ -77,7 +77,23 @@ struct TestKernel {
 }
 
 impl TestKernel {
-    async fn new(namespaces: NamespaceConfigs) -> Self {
+    async fn with_namespaces(namespaces: NamespaceConfigs) -> Self {
+        let inference_config = InferenceConfig::AlephAlpha {
+            url: "https://inference-api.product.pharia.com",
+        };
+        Self::new(namespaces, inference_config).await
+    }
+
+    async fn with_openai_inference(token: &str) -> Self {
+        let inference_config = InferenceConfig::OpenAi {
+            url: "https://api.openai.com/v1",
+            token,
+        };
+        let namespaces = NamespaceConfigs::default();
+        Self::new(namespaces, inference_config).await
+    }
+
+    async fn new(namespaces: NamespaceConfigs, inference_config: InferenceConfig<'_>) -> Self {
         let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
@@ -88,7 +104,7 @@ impl TestKernel {
             .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
             .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
             .with_document_index_url("https://document-index.product.pharia.com")
-            .with_inference_url("https://inference-api.product.pharia.com")
+            .with_inference_config(inference_config)
             .with_authorization_url("https://pharia-iam.product.pharia.com")
             .with_namespaces(namespaces)
             .with_pharia_ai_feature_set(FeatureSet::Beta)
@@ -106,36 +122,8 @@ impl TestKernel {
         }
     }
 
-    async fn with_openai_inference(token: &str) -> Self {
-        let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
-        let shutdown_signal = async {
-            shutdown_capture.await.unwrap();
-        };
-        let port = free_test_port();
-        let metrics_port = free_test_port();
-        let app_config = AppConfig::default()
-            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
-            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
-            .with_document_index_url("https://document-index.product.pharia.com")
-            .with_openai_inference("https://api.openai.com/v1", token)
-            .with_authorization_url("https://pharia-iam.product.pharia.com")
-            .with_pharia_ai_feature_set(FeatureSet::Beta)
-            .with_wasmtime_cache_size_request(Some(ByteSize::mib(512)))
-            .with_wasmtime_cache_dir(Some(std::path::absolute("./.wasmtime-cache").unwrap()))
-            .with_pooling_allocator(true);
-        let port = app_config.kernel_address().port();
-        // Wait for socket listener to be bound
-        let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
-
-        Self {
-            shutdown_trigger,
-            kernel,
-            port,
-        }
-    }
-
     async fn with_skills(skills: &[&str]) -> Self {
-        Self::new(namespace_config(
+        Self::with_namespaces(namespace_config(
             &PathBuf::from_str("./skills").unwrap(),
             skills,
         ))
@@ -173,7 +161,7 @@ async fn run_skill() {
     let greet_skill_wasm = given_rust_skill_greet_v0_2().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("greet", greet_skill_wasm);
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let resp = req_client
@@ -206,7 +194,7 @@ async fn run_search_skill() {
     let wasm_bytes = given_rust_skill_search().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("search", wasm_bytes);
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let resp = req_client
@@ -237,7 +225,7 @@ async fn tools_can_be_listed() {
     let mcp = given_sse_mcp_server().await;
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_mcp_server(mcp.address());
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let resp = req_client
@@ -297,7 +285,7 @@ async fn run_skill_with_tool_call() {
     local_skill_dir.with_skill("tool-invocation-rs", wasm_bytes);
     local_skill_dir.with_mcp_server(mcp.address());
 
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let resp = req_client
@@ -328,7 +316,7 @@ async fn run_doc_metadata_skill() {
     let wasm_bytes = given_rust_skill_doc_metadata().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("doc_metadata", wasm_bytes);
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let resp = req_client
@@ -360,7 +348,7 @@ async fn run_complete_stream_skill() {
     let wasm_bytes = given_complete_stream_skill().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("complete_stream", wasm_bytes);
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let resp = req_client
@@ -398,7 +386,7 @@ async fn run_chat_stream_skill() {
     let wasm_bytes = given_chat_stream_skill().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("chat_stream", wasm_bytes);
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let resp = req_client
@@ -832,7 +820,7 @@ async fn span_sampled_when_requested() {
     let (_guard, log_recorder) = given_log_recorder().await;
 
     let local_skill_dir = TestFileRegistry::new();
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     // When we do a request with a parent span that is sampled
     let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
@@ -862,7 +850,7 @@ async fn span_not_sampled_when_not_requested() {
     let (_guard, log_recorder) = given_log_recorder().await;
 
     let local_skill_dir = TestFileRegistry::new();
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     // When we do a request with a parent span that is not sampled
     let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
@@ -894,7 +882,7 @@ async fn traceparent_is_respected() {
     let streaming_output_skill_wasm = given_streaming_output_skill().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("streaming-output", streaming_output_skill_wasm);
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     // When we execute a skill with a traceheader
     let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
@@ -962,7 +950,7 @@ async fn invoke_function_as_stream() {
     let greet_skill_wasm = given_rust_skill_greet_v0_3().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("greet", greet_skill_wasm);
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let resp = req_client
@@ -998,7 +986,7 @@ async fn test_message_stream_canceled_during_the_skill_execution() {
     let greet_skill_wasm = given_skill_infinite_streaming().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("infinite", greet_skill_wasm);
-    let kernel = TestKernel::new(local_skill_dir.to_namespace_config()).await;
+    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
 
     let req_client = reqwest::Client::new();
     let mut stream = req_client

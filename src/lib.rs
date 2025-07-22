@@ -43,6 +43,7 @@ use self::{inference::Inference, skill_runtime::SkillRuntime};
 
 pub use config::{AppConfig, OtelConfig};
 pub use feature_set::FeatureSet;
+pub use inference::InferenceConfig;
 pub use logging::{initialize_tracing, tracer_provider};
 pub use metrics::initialize_metrics;
 pub use namespace_watcher::NamespaceConfigs;
