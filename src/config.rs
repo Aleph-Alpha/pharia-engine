@@ -13,6 +13,7 @@ use std::{
 
 use crate::{
     feature_set::FeatureSet, inference::InferenceConfig, namespace_watcher::NamespaceConfigs,
+    tokenizers::TokenizersConfig,
 };
 
 mod defaults {
@@ -372,6 +373,15 @@ impl AppConfig {
             }
         } else {
             InferenceConfig::None
+        }
+    }
+
+    #[must_use]
+    pub fn as_tokenizers_config(&self) -> TokenizersConfig<'_> {
+        if let Some(url) = self.inference_url() {
+            TokenizersConfig::AlephAlpha { inference_url: url }
+        } else {
+            TokenizersConfig::None
         }
     }
 

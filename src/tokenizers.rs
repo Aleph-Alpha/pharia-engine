@@ -9,10 +9,7 @@ use tokio::{
 };
 use tracing::warn;
 
-use crate::{
-    inference::{InferenceConfig, InferenceNotConfigured},
-    logging::TracingContext,
-};
+use crate::{inference::InferenceNotConfigured, logging::TracingContext};
 
 pub trait TokenizerApi {
     fn tokenizer_by_model(
@@ -53,10 +50,18 @@ pub struct Tokenizers {
     handle: JoinHandle<()>,
 }
 
+/// Where to get the tokenizers from.
+pub enum TokenizersConfig<'a> {
+    /// Configured with an Aleph Alpha inference URL, which serves the tokenizers.
+    AlephAlpha { inference_url: &'a str },
+    /// No Aleph Alpha inference URL configured, unable to fetch tokenizers.
+    None,
+}
+
 impl Tokenizers {
-    pub fn new(config: InferenceConfig<'_>) -> Self {
-        if let InferenceConfig::AlephAlpha { url } = config {
-            let client = Client::new(url, None).unwrap();
+    pub fn new(config: TokenizersConfig<'_>) -> Self {
+        if let TokenizersConfig::AlephAlpha { inference_url } = config {
+            let client = Client::new(inference_url, None).unwrap();
             Self::with_client(client)
         } else {
             warn!(
@@ -208,10 +213,9 @@ pub mod tests {
     use super::{Tokenizer, TokenizerApi};
 
     use crate::{
-        inference::InferenceConfig,
         logging::TracingContext,
         tests::{api_token, inference_url},
-        tokenizers::Tokenizers,
+        tokenizers::{Tokenizers, TokenizersConfig},
     };
 
     /// A real world hugging face tokenizer for testing
@@ -246,11 +250,11 @@ pub mod tests {
     async fn fetch_pharia_1_llm_7b_control_tokenizer() {
         // Given a model name and the actual inference API
         let model_name = "pharia-1-llm-7b-control";
-        let base_url = inference_url();
+        let inference_url = inference_url();
         let api_token = api_token().to_owned();
 
         // When we can request a tokenizer from the AA API
-        let actor = Tokenizers::new(InferenceConfig::AlephAlpha { url: base_url });
+        let actor = Tokenizers::new(TokenizersConfig::AlephAlpha { inference_url });
         let api = actor.api();
         let tokenizer = api
             .tokenizer_by_model(api_token, TracingContext::dummy(), model_name.to_owned())
