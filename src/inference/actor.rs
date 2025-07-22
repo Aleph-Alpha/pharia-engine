@@ -810,7 +810,7 @@ pub mod tests {
 
         // when
         let result = inference_api
-            .complete(request, Authentication::dummy(), TracingContext::dummy())
+            .complete(request, Authentication::none(), TracingContext::dummy())
             .await;
 
         // then
@@ -871,12 +871,12 @@ pub mod tests {
         let resp = try_join!(
             api.complete(
                 complete_text_params_dummy(),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy()
             ),
             api.complete(
                 complete_text_params_dummy(),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy()
             )
         );

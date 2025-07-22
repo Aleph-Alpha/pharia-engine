@@ -11,7 +11,13 @@ use tracing::error;
 use crate::{http::HttpClient, logging::TracingContext};
 
 /// The authentication provided by incoming requests.
-/// When operating inside `PhariaAI`, this will be a `PHARIA_AI_TOKEN`.
+/// When operating inside `PhariaAI`, users are required to provide a valid `PhariaAI` token. This
+/// token is then used to authenticate all outgoing request, e.g. against the Aleph Alpha inference
+/// or the DocumentIndex.
+/// If the Kernel is being operated outside of `PhariaAI`, authentication for incoming requests is
+/// optional. Skills can still execute inference requests against OpenAI-compatible inference
+/// backends, if an api-token has been configured in the Kernel configuration. This e.g. allows
+/// developers to run the Kernel locally.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Authentication(Option<String>);
 
@@ -20,7 +26,7 @@ impl Authentication {
         Self(Some(token.into()))
     }
 
-    pub fn into_string(self) -> Option<String> {
+    pub fn into_maybe_string(self) -> Option<String> {
         self.0
     }
 }
@@ -280,10 +286,6 @@ pub mod tests {
     use crate::tests::{api_token, authorization_url};
 
     impl Authentication {
-        pub fn dummy() -> Self {
-            Self(Some("dummy".to_owned()))
-        }
-
         pub fn none() -> Self {
             Self(None)
         }
@@ -333,7 +335,7 @@ pub mod tests {
 
         // When the client is used to check an invalid api token
         let result = client
-            .token_valid(Authentication::dummy(), TracingContext::dummy())
+            .token_valid(Authentication::none(), TracingContext::dummy())
             .await;
 
         // Then the result is false
@@ -362,7 +364,7 @@ pub mod tests {
         let result = timeout(
             Duration::from_millis(10),
             auth.api()
-                .check_permission(Authentication::dummy(), TracingContext::dummy()),
+                .check_permission(Authentication::none(), TracingContext::dummy()),
         )
         .await;
 
@@ -378,7 +380,7 @@ pub mod tests {
         // When checking permissions for a token
         let result = auth
             .api()
-            .check_permission(Authentication::dummy(), TracingContext::dummy())
+            .check_permission(Authentication::none(), TracingContext::dummy())
             .await;
 
         // Then the result is true

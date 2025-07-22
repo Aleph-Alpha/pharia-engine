@@ -535,7 +535,7 @@ pub mod tests {
             .run_function(
                 SkillPath::dummy(),
                 json!(""),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             )
             .await;
@@ -564,7 +564,7 @@ pub mod tests {
             .run_function(
                 SkillPath::local("my_skill"),
                 json!("Any input"),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             )
             .await;
@@ -594,7 +594,7 @@ pub mod tests {
             .run_function(
                 SkillPath::local("greet"),
                 json!(""),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             )
             .await;
@@ -643,7 +643,7 @@ pub mod tests {
                 .run_function(
                     SkillPath::local("any_path"),
                     json!({}),
-                    Authentication::dummy(),
+                    Authentication::none(),
                     TracingContext::dummy(),
                 )
                 .await
@@ -654,7 +654,7 @@ pub mod tests {
                 .run_function(
                     SkillPath::local("any_path"),
                     json!({}),
-                    Authentication::dummy(),
+                    Authentication::none(),
                     TracingContext::dummy(),
                 )
                 .await
@@ -693,7 +693,7 @@ pub mod tests {
             .run_message_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "tool_caller"),
                 json!(""),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             )
             .await;
@@ -743,7 +743,7 @@ pub mod tests {
             .run_message_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "hello"),
                 json!(""),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             )
             .await;
@@ -807,7 +807,7 @@ pub mod tests {
             .run_message_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "saboteur"),
                 json!(""),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             )
             .await;
@@ -834,7 +834,7 @@ pub mod tests {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
             send,
-            auth: Authentication::dummy(),
+            auth: Authentication::none(),
             tracing_context: TracingContext::dummy(),
         };
 
@@ -894,7 +894,7 @@ pub mod tests {
             .run_message_stream(
                 skill_path,
                 json!({}),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             )
             .await;
@@ -996,7 +996,7 @@ pub mod tests {
             .run_function(
                 SkillPath::local("any_path"),
                 json!({}),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             )
             .await

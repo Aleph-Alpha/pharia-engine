@@ -182,7 +182,7 @@ impl TokenizerClient for Client {
         auth: Authentication,
         tracing_context: TracingContext,
     ) -> anyhow::Result<Tokenizer> {
-        let api_token = auth.into_string().ok_or_else(|| {
+        let api_token = auth.into_maybe_string().ok_or_else(|| {
             anyhow::anyhow!(
                 "Fetching tokenizers from the Aleph Alpha inference API requires a PhariaAI token. \
                 Please provide a valid token in the Authorization header."

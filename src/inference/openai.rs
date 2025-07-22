@@ -363,7 +363,7 @@ mod tests {
                 messages: vec![Message::new("user", "An apple a day")],
                 params: ChatParams::default(),
             },
-            Authentication::dummy(),
+            Authentication::none(),
             &TracingContext::dummy(),
         )
         .await
@@ -393,7 +393,7 @@ mod tests {
                 messages: vec![Message::new("user", "An apple a day")],
                 params,
             },
-            Authentication::dummy(),
+            Authentication::none(),
             &TracingContext::dummy(),
         )
         .await
@@ -422,7 +422,7 @@ mod tests {
                 messages: vec![Message::new("user", "An apple a day")],
                 params: ChatParams::default(),
             },
-            Authentication::dummy(),
+            Authentication::none(),
             &TracingContext::dummy(),
         )
         .await;
@@ -446,7 +446,7 @@ mod tests {
                 messages: vec![Message::new("user", "An apple a day")],
                 params: ChatParams::default(),
             },
-            Authentication::dummy(),
+            Authentication::none(),
             &TracingContext::dummy(),
         )
         .await;
@@ -477,7 +477,7 @@ mod tests {
                     messages: vec![Message::new("user", "An apple a day")],
                     params,
                 },
-                Authentication::dummy(),
+                Authentication::none(),
                 &TracingContext::dummy(),
                 send,
             )

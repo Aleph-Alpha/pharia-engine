@@ -68,7 +68,7 @@ pub trait InferenceClient: Send + Sync + 'static {
 
 /// Create a new [`aleph_alpha_client::How`] based on the given api token and tracing context.
 fn how(auth: Authentication, tracing_context: &TracingContext) -> anyhow::Result<How> {
-    let api_token = auth.into_string().ok_or_else(|| {
+    let api_token = auth.into_maybe_string().ok_or_else(|| {
         anyhow::anyhow!(
             "Doing an inference request against the Aleph Alpha inference API requires a PhariaAI \
             token. Please provide a valid token in the Authorization header."

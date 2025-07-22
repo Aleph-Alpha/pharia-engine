@@ -249,7 +249,7 @@ impl SearchClient for Client {
         authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
-        let api_token = authentication.into_string().ok_or_else(|| {
+        let api_token = authentication.into_maybe_string().ok_or_else(|| {
             anyhow::anyhow!(
                 "Searching in the Document Index requires a PhariaAI token. \
                 Please provide a valid token in the Authorization header."
@@ -312,7 +312,7 @@ impl SearchClient for Client {
             metadata: Option<Value>,
         }
 
-        let api_token = authentication.into_string().ok_or_else(|| {
+        let api_token = authentication.into_maybe_string().ok_or_else(|| {
             anyhow::anyhow!(
                 "Fetching metadata from the Document Index requires a PhariaAI token. \
                 Please provide a valid token in the Authorization header."
@@ -360,7 +360,7 @@ impl SearchClient for Client {
             metadata: Option<Value>,
         }
 
-        let api_token = authentication.into_string().ok_or_else(|| {
+        let api_token = authentication.into_maybe_string().ok_or_else(|| {
             anyhow::anyhow!(
                 "Fetching a document from the Document Index requires a PhariaAI token. \
                 Please provide a valid token in the Authorization header."

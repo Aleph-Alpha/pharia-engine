@@ -601,7 +601,7 @@ mod tests {
         };
         let chunks = csi_apis
             .chunk(
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
                 vec![request],
             )
@@ -628,7 +628,7 @@ mod tests {
             name: "docs".to_owned(),
         }];
         let documents = csi_apis
-            .documents(Authentication::dummy(), TracingContext::dummy(), request)
+            .documents(Authentication::none(), TracingContext::dummy(), request)
             .await
             .unwrap();
 
@@ -684,7 +684,7 @@ mod tests {
 
         let mut completion = csi_apis
             .completion_stream(
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
                 completion_req,
             )
@@ -759,7 +759,7 @@ mod tests {
         };
 
         let mut chat = csi_apis
-            .chat_stream(Authentication::dummy(), TracingContext::dummy(), chat_req)
+            .chat_stream(Authentication::none(), TracingContext::dummy(), chat_req)
             .await;
 
         let mut events = vec![];
@@ -800,7 +800,7 @@ mod tests {
 
         let completions = csi_apis
             .complete(
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
                 vec![completion_req_1, completion_req_2],
             )
@@ -839,7 +839,7 @@ mod tests {
 
         let responses = csi_apis
             .document_metadata(
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
                 vec![request_1, request_2],
             )

@@ -676,12 +676,12 @@ pub mod tests {
         let resp = try_join!(
             api.search(
                 SearchRequest::new(index_path.clone(), "query"),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             ),
             api.search(
                 SearchRequest::new(index_path, "query"),
-                Authentication::dummy(),
+                Authentication::none(),
                 TracingContext::dummy(),
             ),
         );
