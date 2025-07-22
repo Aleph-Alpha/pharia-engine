@@ -11,7 +11,9 @@ use std::{
     time::Duration,
 };
 
-use crate::{feature_set::FeatureSet, namespace_watcher::NamespaceConfigs};
+use crate::{
+    feature_set::FeatureSet, inference::InferenceConfig, namespace_watcher::NamespaceConfigs,
+};
 
 mod defaults {
     use std::{net::SocketAddr, time::Duration};
@@ -153,18 +155,6 @@ pub struct OtelConfig<'a> {
     pub sampling_ratio: f64,
     /// Minimum log level for traces.
     pub log_level: &'a str,
-}
-
-/// Configuration for the inference backend that is used
-pub enum InferenceConfig<'a> {
-    /// Use the Aleph Alpha inference API.
-    AlephAlpha { url: &'a str },
-    /// Use any OpenAI-compatible inference. Only chat requests are supported, completion,
-    /// explanation and chunking requests are not.
-    OpenAi { url: &'a str, token: &'a str },
-    /// Kernel is running without any inference backend. Inference requests will lead to a runtime
-    /// error.
-    None,
 }
 
 /// `jiff::SignedDuration` can parse human readable strings like `1h30m` into `SignedDuration`.

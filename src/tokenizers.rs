@@ -9,7 +9,10 @@ use tokio::{
 };
 use tracing::warn;
 
-use crate::{config::InferenceConfig, inference::InferenceNotConfigured, logging::TracingContext};
+use crate::{
+    inference::{InferenceConfig, InferenceNotConfigured},
+    logging::TracingContext,
+};
 
 pub trait TokenizerApi {
     fn tokenizer_by_model(
@@ -205,7 +208,7 @@ pub mod tests {
     use super::{Tokenizer, TokenizerApi};
 
     use crate::{
-        config::InferenceConfig,
+        inference::InferenceConfig,
         logging::TracingContext,
         tests::{api_token, inference_url},
         tokenizers::Tokenizers,
