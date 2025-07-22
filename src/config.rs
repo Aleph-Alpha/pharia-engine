@@ -258,6 +258,26 @@ impl AppConfig {
     }
 
     #[must_use]
+    pub fn with_inference_config(mut self, inference_config: InferenceConfig<'_>) -> Self {
+        match inference_config {
+            InferenceConfig::AlephAlpha { url } => {
+                self.inference_url = Some(url.to_owned());
+            }
+            InferenceConfig::OpenAi { url, token } => {
+                self.openai_inference = Some(OpenAiInference {
+                    url: url.to_owned(),
+                    token: token.to_owned(),
+                });
+            }
+            InferenceConfig::None => {
+                self.inference_url = None;
+                self.openai_inference = None;
+            }
+        }
+        self
+    }
+
+    #[must_use]
     pub fn openai_inference(&self) -> Option<&OpenAiInference> {
         self.openai_inference.as_ref()
     }
