@@ -14,21 +14,21 @@ pub trait SearchClient: Send + Sync + 'static {
         &self,
         index: IndexPath,
         request: SearchRequest,
-        api_token: &str,
+        authentication: &str,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Vec<SearchResult>>> + Send;
 
     fn document_metadata(
         &self,
         document_path: DocumentPath,
-        api_token: &str,
+        authentication: &str,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Option<Value>>> + Send;
 
     fn document(
         &self,
         document_path: DocumentPath,
-        api_token: &str,
+        authentication: &str,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = anyhow::Result<Document>> + Send;
 }
@@ -54,7 +54,7 @@ impl SearchClient for SearchNotConfigured {
         &self,
         _index: IndexPath,
         _request: SearchRequest,
-        _api_token: &str,
+        _authentication: &str,
         _tracing_context: &TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
@@ -63,7 +63,7 @@ impl SearchClient for SearchNotConfigured {
     async fn document_metadata(
         &self,
         _document_path: DocumentPath,
-        _api_token: &str,
+        _authentication: &str,
         _tracing_context: &TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
@@ -72,7 +72,7 @@ impl SearchClient for SearchNotConfigured {
     async fn document(
         &self,
         _document_path: DocumentPath,
-        _api_token: &str,
+        _authentication: &str,
         _tracing_context: &TracingContext,
     ) -> anyhow::Result<Document> {
         Err(anyhow::anyhow!(Self::ERROR_MESSAGE))
@@ -246,7 +246,7 @@ impl SearchClient for Client {
         &self,
         index: IndexPath,
         request: SearchRequest,
-        api_token: &str,
+        authentication: &str,
         tracing_context: &TracingContext,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let IndexPath {
@@ -285,7 +285,7 @@ impl SearchClient for Client {
         Ok(self
             .http
             .post(url)
-            .bearer_auth(api_token)
+            .bearer_auth(authentication)
             .headers(tracing_context.w3c_headers())
             .json(&body)
             .send()
@@ -298,7 +298,7 @@ impl SearchClient for Client {
     async fn document_metadata(
         &self,
         document_path: DocumentPath,
-        api_token: &str,
+        authentication: &str,
         tracing_context: &TracingContext,
     ) -> anyhow::Result<Option<Value>> {
         #[derive(Deserialize)]
@@ -324,7 +324,7 @@ impl SearchClient for Client {
         let document = self
             .http
             .get(url)
-            .bearer_auth(api_token)
+            .bearer_auth(authentication)
             .headers(tracing_context.w3c_headers())
             .send()
             .await?
@@ -338,7 +338,7 @@ impl SearchClient for Client {
     async fn document(
         &self,
         document_path: DocumentPath,
-        api_token: &str,
+        authentication: &str,
         tracing_context: &TracingContext,
     ) -> anyhow::Result<Document> {
         #[derive(Deserialize)]
@@ -365,7 +365,7 @@ impl SearchClient for Client {
         let document = self
             .http
             .get(url)
-            .bearer_auth(api_token)
+            .bearer_auth(authentication)
             .headers(tracing_context.w3c_headers())
             .send()
             .await?
@@ -406,7 +406,7 @@ pub mod tests {
             &self,
             _index: IndexPath,
             _request: SearchRequest,
-            _api_token: &str,
+            _authentication: &str,
             _tracing_context: &TracingContext,
         ) -> anyhow::Result<Vec<SearchResult>> {
             Ok(vec![])
@@ -415,7 +415,7 @@ pub mod tests {
         async fn document_metadata(
             &self,
             _document_path: DocumentPath,
-            _api_token: &str,
+            _authentication: &str,
             _tracing_context: &TracingContext,
         ) -> anyhow::Result<Option<Value>> {
             Ok(None)
@@ -424,7 +424,7 @@ pub mod tests {
         async fn document(
             &self,
             _document_path: DocumentPath,
-            _api_token: &str,
+            _authentication: &str,
             _tracing_context: &TracingContext,
         ) -> anyhow::Result<Document> {
             Ok(Document::dummy())

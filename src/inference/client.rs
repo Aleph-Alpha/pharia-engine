@@ -14,7 +14,7 @@ use tracing::{error, warn};
 
 use thiserror::Error;
 
-use crate::logging::TracingContext;
+use crate::{authorization::Authentication, logging::TracingContext};
 
 use super::{
     ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
@@ -35,41 +35,41 @@ pub trait InferenceClient: Send + Sync + 'static {
     fn complete(
         &self,
         request: &CompletionRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<Completion, InferenceError>> + Send;
     fn stream_completion(
         &self,
         request: &CompletionRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn chat(
         &self,
         request: &ChatRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
     fn stream_chat(
         &self,
         request: &ChatRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn explain(
         &self,
         request: &ExplanationRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<Explanation, InferenceError>> + Send;
 }
 
 /// Create a new [`aleph_alpha_client::How`] based on the given api token and tracing context.
-fn how(api_token: String, tracing_context: &TracingContext) -> How {
+fn how(authentication: Authentication, tracing_context: &TracingContext) -> How {
     How {
-        api_token: Some(api_token),
+        api_token: Some(authentication),
         trace_context: tracing_context.as_inference_client_context(),
         ..Default::default()
     }
@@ -79,7 +79,7 @@ impl InferenceClient for Client {
     async fn explain(
         &self,
         request: &ExplanationRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<Explanation, InferenceError> {
         let ExplanationRequest {
@@ -93,7 +93,7 @@ impl InferenceClient for Client {
             target,
             granularity: granularity.into(),
         };
-        let how = how(api_token, tracing_context);
+        let how = how(authentication, tracing_context);
         retry(|| self.explanation(&task, model, &how), tracing_context)
             .await?
             .try_into()
@@ -102,12 +102,12 @@ impl InferenceClient for Client {
     async fn chat(
         &self,
         request: &ChatRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let task = request.to_task_chat();
 
-        let how = how(api_token, tracing_context);
+        let how = how(authentication, tracing_context);
         retry(|| self.chat(&task, &request.model, &how), tracing_context)
             .await?
             .try_into()
@@ -117,12 +117,12 @@ impl InferenceClient for Client {
     async fn stream_chat(
         &self,
         request: &ChatRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let task = request.to_task_chat();
-        let how = how(api_token, tracing_context);
+        let how = how(authentication, tracing_context);
         let mut stream = retry(
             || self.stream_chat(&task, &request.model, &how),
             tracing_context,
@@ -138,7 +138,7 @@ impl InferenceClient for Client {
     async fn complete(
         &self,
         request: &CompletionRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<Completion, InferenceError> {
         let CompletionRequest {
@@ -176,7 +176,7 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
             echo: *echo,
         };
-        let how = how(api_token, tracing_context);
+        let how = how(authentication, tracing_context);
         retry(|| self.completion(&task, model, &how), tracing_context)
             .await?
             .try_into()
@@ -186,7 +186,7 @@ impl InferenceClient for Client {
     async fn stream_completion(
         &self,
         request: &CompletionRequest,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: &TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> Result<(), InferenceError> {
@@ -225,7 +225,7 @@ impl InferenceClient for Client {
             logprobs: (*logprobs).into(),
             echo: *echo,
         };
-        let how = how(api_token, tracing_context);
+        let how = how(authentication, tracing_context);
         let mut stream = retry(
             || self.stream_completion(&task, model, &how),
             tracing_context,

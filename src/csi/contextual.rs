@@ -2,6 +2,7 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use crate::{
+    authorization::Authentication,
     chunking::{Chunk, ChunkRequest},
     csi::{CsiError, RawCsi},
     inference::{
@@ -91,7 +92,7 @@ pub struct InvocationContext<R> {
     // list of mcp servers a Skill may access.
     namespace: Namespace,
     // The authentication provided as part of the Skill invocation.
-    api_token: String,
+    authentication: Authentication,
     // Context that is used to situate certain actions in the overall context.
     tracing_context: TracingContext,
 }
@@ -100,13 +101,13 @@ impl<R> InvocationContext<R> {
     pub fn new(
         raw_csi: R,
         namespace: Namespace,
-        api_token: String,
+        authentication: Authentication,
         tracing_context: TracingContext,
     ) -> Self {
         Self {
             raw_csi,
             namespace,
-            api_token,
+            authentication,
             tracing_context,
         }
     }
@@ -121,7 +122,7 @@ where
         requests: Vec<ExplanationRequest>,
     ) -> impl Future<Output = Result<Vec<Explanation>, CsiError>> + Send {
         self.raw_csi.explain(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             requests,
         )
@@ -132,7 +133,7 @@ where
         requests: Vec<CompletionRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Completion>>> + Send {
         self.raw_csi.complete(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             requests,
         )
@@ -143,7 +144,7 @@ where
         request: CompletionRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<CompletionEvent, InferenceError>>> + Send {
         self.raw_csi.completion_stream(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             request,
         )
@@ -154,7 +155,7 @@ where
         requests: Vec<ChatRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send {
         self.raw_csi.chat(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             requests,
         )
@@ -165,7 +166,7 @@ where
         request: ChatRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send {
         self.raw_csi.chat_stream(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             request,
         )
@@ -176,7 +177,7 @@ where
         requests: Vec<ChunkRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Chunk>>>> + Send {
         self.raw_csi.chunk(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             requests,
         )
@@ -195,7 +196,7 @@ where
         requests: Vec<SearchRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<SearchResult>>>> + Send {
         self.raw_csi.search(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             requests,
         )
@@ -206,7 +207,7 @@ where
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Document>>> + Send {
         self.raw_csi.documents(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             requests,
         )
@@ -217,7 +218,7 @@ where
         requests: Vec<DocumentPath>,
     ) -> impl Future<Output = anyhow::Result<Vec<Option<Value>>>> + Send {
         self.raw_csi.document_metadata(
-            self.api_token.clone(),
+            self.authentication.clone(),
             self.tracing_context.clone(),
             requests,
         )

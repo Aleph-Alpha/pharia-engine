@@ -564,6 +564,7 @@ mod tests {
     use double_trait::Dummy;
 
     use crate::{
+        authorization::Authentication,
         chunking::ChunkParams,
         inference::{
             ChatEvent, ChatParams, CompletionEvent, CompletionParams, FinishReason, Message,
@@ -644,7 +645,7 @@ mod tests {
             async fn completion_stream(
                 &self,
                 _request: CompletionRequest,
-                _api_token: String,
+                _authentication: Authentication,
                 _tracing_context: TracingContext,
             ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
                 let (send, recv) = mpsc::channel(3);
@@ -711,7 +712,7 @@ mod tests {
             async fn chat_stream(
                 &self,
                 _request: ChatRequest,
-                _api_token: String,
+                _authentication: Authentication,
                 _tracing_context: TracingContext,
             ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
                 let (send, recv) = mpsc::channel(4);

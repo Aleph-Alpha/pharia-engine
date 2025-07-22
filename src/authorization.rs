@@ -10,6 +10,10 @@ use tracing::error;
 
 use crate::{http::HttpClient, logging::TracingContext};
 
+/// The authentication provided by incoming requests.
+/// When operating inside `PhariaAI`, this will be a `PHARIA_AI_TOKEN`.
+pub type Authentication = String;
+
 pub struct Authorization {
     send: mpsc::Sender<AuthorizationMsg>,
     handle: JoinHandle<()>,
@@ -79,7 +83,7 @@ impl<C: AuthorizationClient> AuthorizationActor<C> {
 pub trait AuthorizationApi {
     fn check_permission(
         &self,
-        api_token: String,
+        authentication: Authentication,
         context: TracingContext,
     ) -> impl Future<Output = Result<bool, AuthorizationClientError>> + Send;
 }
@@ -87,12 +91,12 @@ pub trait AuthorizationApi {
 impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
     async fn check_permission(
         &self,
-        api_token: String,
+        authentication: Authentication,
         context: TracingContext,
     ) -> Result<bool, AuthorizationClientError> {
         let (send, recv) = oneshot::channel();
         let msg = AuthorizationMsg::Auth {
-            api_token,
+            authentication,
             context,
             send,
         };
@@ -106,7 +110,7 @@ impl AuthorizationApi for mpsc::Sender<AuthorizationMsg> {
 
 pub enum AuthorizationMsg {
     Auth {
-        api_token: String,
+        authentication: Authentication,
         context: TracingContext,
         send: oneshot::Sender<Result<bool, AuthorizationClientError>>,
     },
@@ -116,11 +120,11 @@ impl AuthorizationMsg {
     async fn act(self, client: &impl AuthorizationClient) {
         match self {
             AuthorizationMsg::Auth {
-                api_token,
+                authentication,
                 context,
                 send,
             } => {
-                let result = client.token_valid(api_token, context).await;
+                let result = client.token_valid(authentication, context).await;
                 drop(send.send(result));
             }
         }
@@ -130,7 +134,7 @@ impl AuthorizationMsg {
 pub trait AuthorizationClient: Send + Sync + 'static {
     fn token_valid(
         &self,
-        api_token: String,
+        authentication: Authentication,
         context: TracingContext,
     ) -> impl Future<Output = Result<bool, AuthorizationClientError>> + Send;
 }
@@ -140,7 +144,7 @@ struct AlwaysValidClient;
 impl AuthorizationClient for AlwaysValidClient {
     async fn token_valid(
         &self,
-        _api_token: String,
+        _authentication: Authentication,
         _context: TracingContext,
     ) -> Result<bool, AuthorizationClientError> {
         Ok(true)
@@ -174,7 +178,7 @@ pub enum AuthorizationClientError {
 impl AuthorizationClient for HttpAuthorizationClient {
     async fn token_valid(
         &self,
-        api_token: String,
+        authentication: Authentication,
         context: TracingContext,
     ) -> Result<bool, AuthorizationClientError> {
         #[derive(Deserialize)]
@@ -275,7 +279,7 @@ pub mod tests {
     impl AuthorizationApi for StubAuthorization {
         async fn check_permission(
             &self,
-            _api_token: String,
+            _authentication: Authentication,
             _context: TracingContext,
         ) -> Result<bool, AuthorizationClientError> {
             Ok(self.response)
@@ -317,7 +321,7 @@ pub mod tests {
     impl AuthorizationClient for StubAuthorizationClient {
         async fn token_valid(
             &self,
-            _api_token: String,
+            _authentication: Authentication,
             _context: TracingContext,
         ) -> Result<bool, AuthorizationClientError> {
             Ok(true)
