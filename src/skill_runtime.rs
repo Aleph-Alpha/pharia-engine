@@ -75,7 +75,7 @@ pub trait SkillRuntimeApi {
         &self,
         skill_path: SkillPath,
         input: Value,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send;
 
@@ -83,7 +83,7 @@ pub trait SkillRuntimeApi {
         &self,
         skill_path: SkillPath,
         input: Value,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> impl Future<Output = mpsc::Receiver<SkillExecutionEvent>> + Send;
 
@@ -99,7 +99,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         &self,
         skill_path: SkillPath,
         input: Value,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> Result<Value, SkillExecutionError> {
         let (send, recv) = oneshot::channel();
@@ -107,7 +107,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             skill_path,
             input,
             send,
-            authentication,
+            auth,
             tracing_context,
         });
         self.send(msg)
@@ -120,7 +120,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
         &self,
         skill_path: SkillPath,
         input: Value,
-        authentication: Authentication,
+        auth: Authentication,
         tracing_context: TracingContext,
     ) -> mpsc::Receiver<SkillExecutionEvent> {
         let (send, recv) = mpsc::channel::<SkillExecutionEvent>(1);
@@ -129,7 +129,7 @@ impl SkillRuntimeApi for mpsc::Sender<SkillRuntimeMsg> {
             skill_path,
             input,
             send,
-            authentication,
+            auth,
             tracing_context,
         };
 
@@ -272,7 +272,7 @@ pub struct RunMessageStreamMsg {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: mpsc::Sender<SkillExecutionEvent>,
-    pub authentication: Authentication,
+    pub auth: Authentication,
     pub tracing_context: TracingContext,
 }
 
@@ -282,7 +282,7 @@ impl RunMessageStreamMsg {
             skill_path,
             input,
             send,
-            authentication,
+            auth,
             tracing_context,
         } = self;
 
@@ -308,7 +308,7 @@ impl RunMessageStreamMsg {
             let contextual_csi = InvocationContext::new(
                 csi_apis,
                 skill_path.namespace.clone(),
-                authentication,
+                auth,
                 context.clone(),
             );
             let result = SkillDriver
@@ -445,7 +445,7 @@ pub struct RunFunctionMsg {
     pub skill_path: SkillPath,
     pub input: Value,
     pub send: oneshot::Sender<Result<Value, SkillExecutionError>>,
-    pub authentication: Authentication,
+    pub auth: Authentication,
     pub tracing_context: TracingContext,
 }
 
@@ -455,7 +455,7 @@ impl RunFunctionMsg {
             skill_path,
             input,
             send,
-            authentication,
+            auth,
             tracing_context,
         } = self;
 
@@ -481,7 +481,7 @@ impl RunFunctionMsg {
             let contextual_csi = InvocationContext::new(
                 csi_apis,
                 skill_path.namespace.clone(),
-                authentication,
+                auth,
                 context.clone(),
             );
             let result = SkillDriver
@@ -535,7 +535,7 @@ pub mod tests {
             .run_function(
                 SkillPath::dummy(),
                 json!(""),
-                "dummy_token".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
             )
             .await;
@@ -564,7 +564,7 @@ pub mod tests {
             .run_function(
                 SkillPath::local("my_skill"),
                 json!("Any input"),
-                "Dummy api token".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
             )
             .await;
@@ -594,7 +594,7 @@ pub mod tests {
             .run_function(
                 SkillPath::local("greet"),
                 json!(""),
-                "TOKEN_NOT_REQUIRED".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
             )
             .await;
@@ -637,15 +637,13 @@ pub mod tests {
         let runtime = SkillRuntime::new(Dummy, store);
 
         // When invoking two skills in parallel
-        let token = "TOKEN_NOT_REQUIRED";
-
         let api_first = runtime.api();
         let first = tokio::spawn(async move {
             api_first
                 .run_function(
                     SkillPath::local("any_path"),
                     json!({}),
-                    token.to_owned(),
+                    Authentication::dummy(),
                     TracingContext::dummy(),
                 )
                 .await
@@ -656,7 +654,7 @@ pub mod tests {
                 .run_function(
                     SkillPath::local("any_path"),
                     json!({}),
-                    token.to_owned(),
+                    Authentication::dummy(),
                     TracingContext::dummy(),
                 )
                 .await
@@ -695,7 +693,7 @@ pub mod tests {
             .run_message_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "tool_caller"),
                 json!(""),
-                "TOKEN_NOT_REQUIRED".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
             )
             .await;
@@ -745,7 +743,7 @@ pub mod tests {
             .run_message_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "hello"),
                 json!(""),
-                "TOKEN_NOT_REQUIRED".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
             )
             .await;
@@ -809,7 +807,7 @@ pub mod tests {
             .run_message_stream(
                 SkillPath::new(Namespace::new("test-beta").unwrap(), "saboteur"),
                 json!(""),
-                "TOKEN_NOT_REQUIRED".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
             )
             .await;
@@ -836,7 +834,7 @@ pub mod tests {
             skill_path: skill_path.clone(),
             input: json!("Hello"),
             send,
-            authentication: "dummy".to_owned(),
+            auth: Authentication::dummy(),
             tracing_context: TracingContext::dummy(),
         };
 
@@ -873,7 +871,7 @@ pub mod tests {
         impl RawCsiDouble for RawCsiSaboteur {
             async fn chat_stream(
                 &self,
-                _auth: String,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
                 _request: ChatRequest,
             ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
@@ -896,7 +894,7 @@ pub mod tests {
             .run_message_stream(
                 skill_path,
                 json!({}),
-                "dumm_token".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
             )
             .await;
@@ -998,7 +996,7 @@ pub mod tests {
             .run_function(
                 SkillPath::local("any_path"),
                 json!({}),
-                "dummy_token".to_owned(),
+                Authentication::dummy(),
                 TracingContext::dummy(),
             )
             .await

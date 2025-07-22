@@ -1,7 +1,7 @@
 use text_splitter::{ChunkCharIndex, ChunkConfig, TextSplitter};
 use tokio::sync::oneshot;
 
-use crate::{logging::TracingContext, tokenizers::TokenizerApi};
+use crate::{authorization::Authentication, logging::TracingContext, tokenizers::TokenizerApi};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ChunkRequest {
@@ -27,7 +27,7 @@ pub struct ChunkParams {
 pub async fn chunking(
     request: ChunkRequest,
     tokenizers: &impl TokenizerApi,
-    auth: String,
+    auth: Authentication,
     tracing_context: TracingContext,
 ) -> anyhow::Result<Vec<Chunk>> {
     let ChunkRequest {
@@ -120,7 +120,7 @@ mod tests {
         let chunks = chunking(
             request,
             &FakeTokenizers,
-            "dummy".to_owned(),
+            Authentication::dummy(),
             TracingContext::dummy(),
         )
         .await
@@ -153,7 +153,7 @@ mod tests {
         let chunks = chunking(
             request,
             &FakeTokenizers,
-            "dummy".to_owned(),
+            Authentication::dummy(),
             TracingContext::dummy(),
         )
         .await
@@ -202,7 +202,7 @@ mod tests {
         let chunks = chunking(
             request,
             &FakeTokenizers,
-            "dummy".to_owned(),
+            Authentication::dummy(),
             TracingContext::dummy(),
         )
         .await

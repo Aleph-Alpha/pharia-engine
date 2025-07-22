@@ -21,6 +21,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
+    authorization::Authentication,
     csi::{CsiError, RawCsi},
     logging::TracingContext,
     wasm::SupportedVersion,
@@ -66,16 +67,13 @@ where
 {
     let drivers = csi;
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let result = match args {
         VersionedCsiRequest::V0_2(request) => {
-            request
-                .respond(&drivers, bearer.token().to_owned(), tracing_context)
-                .await
+            request.respond(&drivers, auth, tracing_context).await
         }
         VersionedCsiRequest::V0_3(request) => {
-            request
-                .respond(&drivers, bearer.token().to_owned(), tracing_context)
-                .await
+            request.respond(&drivers, auth, tracing_context).await
         }
         VersionedCsiRequest::Unknown(request) => Err(request.into()),
     };
@@ -184,6 +182,7 @@ mod tests {
     use tower::ServiceExt as _;
 
     use crate::{
+        authorization::Authentication,
         chunking::{Chunk, ChunkRequest},
         csi::tests::RawCsiDouble,
         inference::{
@@ -467,7 +466,7 @@ mod tests {
         impl RawCsiDouble for CsiStub {
             async fn complete(
                 &self,
-                _: String,
+                _: Authentication,
                 _: TracingContext,
                 request: Vec<CompletionRequest>,
             ) -> anyhow::Result<Vec<Completion>> {
@@ -519,7 +518,7 @@ mod tests {
         impl RawCsiDouble for CsiMock {
             async fn complete(
                 &self,
-                _: String,
+                _: Authentication,
                 _: TracingContext,
                 request: Vec<CompletionRequest>,
             ) -> anyhow::Result<Vec<Completion>> {
@@ -568,7 +567,7 @@ mod tests {
         impl RawCsiDouble for RawCsiStub {
             async fn completion_stream(
                 &self,
-                _auth: String,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
                 _request: CompletionRequest,
             ) -> mpsc::Receiver<Result<CompletionEvent, InferenceError>> {
@@ -649,7 +648,7 @@ mod tests {
         impl RawCsiDouble for CsiMock {
             async fn complete(
                 &self,
-                _: String,
+                _: Authentication,
                 _: TracingContext,
                 mut request: Vec<CompletionRequest>,
             ) -> anyhow::Result<Vec<Completion>> {
@@ -698,7 +697,7 @@ mod tests {
         impl RawCsiDouble for RawCsiStub {
             async fn chat_stream(
                 &self,
-                _auth: String,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
                 _request: ChatRequest,
             ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
@@ -787,7 +786,7 @@ mod tests {
         impl RawCsiDouble for RawCsiStub {
             async fn explain(
                 &self,
-                _auth: String,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
                 _requests: Vec<ExplanationRequest>,
             ) -> Result<Vec<Explanation>, CsiError> {
@@ -835,7 +834,7 @@ mod tests {
         impl RawCsiDouble for RawCsiStub {
             async fn chat(
                 &self,
-                _auth: String,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
                 _requests: Vec<ChatRequest>,
             ) -> anyhow::Result<Vec<ChatResponse>> {
@@ -898,7 +897,7 @@ mod tests {
         impl RawCsiDouble for RawCsiStub {
             async fn chunk(
                 &self,
-                _auth: String,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
                 _requests: Vec<ChunkRequest>,
             ) -> anyhow::Result<Vec<Vec<Chunk>>> {
@@ -948,7 +947,7 @@ mod tests {
         impl RawCsiDouble for RawCsiStub {
             async fn chunk(
                 &self,
-                _auth: String,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
                 _requests: Vec<ChunkRequest>,
             ) -> anyhow::Result<Vec<Vec<Chunk>>> {

@@ -19,6 +19,7 @@ use utoipa::{OpenApi, ToSchema};
 
 use crate::{
     FeatureSet,
+    authorization::Authentication,
     logging::TracingContext,
     namespace_watcher::Namespace,
     shell::HttpError,
@@ -102,13 +103,9 @@ where
 {
     let tracing_context = TracingContext::current();
     let skill_path = SkillPath::new(namespace, name);
+    let auth = Authentication::new(bearer.token());
     let response = skill_runtime_api
-        .run_function(
-            skill_path,
-            input,
-            bearer.token().to_owned(),
-            tracing_context,
-        )
+        .run_function(skill_path, input, auth, tracing_context)
         .await?;
     Ok(Json(response))
 }
@@ -222,8 +219,9 @@ where
 {
     let path = SkillPath::new(namespace, name);
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let mut stream_events = skill_runtime_api
-        .run_message_stream(path, input, bearer.token().to_owned(), tracing_context)
+        .run_message_stream(path, input, auth, tracing_context)
         .await;
 
     // We need to use `try_stream!` instead of `stream!`, because `stream!` does not implement the
@@ -541,7 +539,7 @@ mod tests {
                 &self,
                 _skill_path: SkillPath,
                 _input: Value,
-                _authentication: Authentication,
+                _auth: Authentication,
                 _tracing_context: TracingContext,
             ) -> Result<Value, SkillExecutionError> {
                 Ok(json!("Result from Skill"))
@@ -581,12 +579,12 @@ mod tests {
                 &self,
                 path: SkillPath,
                 input: Value,
-                auth: String,
+                auth: Authentication,
                 _: TracingContext,
             ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send {
                 assert_eq!(path, SkillPath::local("greet_skill"));
                 assert_eq!(input, json!("Homer"));
-                assert_eq!(auth, "dummy auth token".to_owned());
+                assert_eq!(auth, Authentication::new("dummy auth token"));
                 async move { Ok(json!({})) }
             }
         }
@@ -618,7 +616,7 @@ mod tests {
                 &self,
                 _: SkillPath,
                 _: Value,
-                _: String,
+                _: Authentication,
                 _: TracingContext,
             ) -> Result<Value, SkillExecutionError> {
                 Err(SkillExecutionError::SkillNotConfigured)
@@ -760,7 +758,7 @@ mod tests {
             &self,
             _skill_path: SkillPath,
             _input: Value,
-            _authentication: Authentication,
+            _auth: Authentication,
             _tracing_context: TracingContext,
         ) -> mpsc::Receiver<SkillExecutionEvent> {
             let (send, recv) = mpsc::channel(self.events.len());

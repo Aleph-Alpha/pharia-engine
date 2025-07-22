@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
+    authorization::Authentication,
     chunking,
     csi::RawCsi,
     csi_shell::{CsiProvider, CsiState},
@@ -231,9 +232,10 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let results = csi
         .search(
-            bearer.token().to_owned(),
+            auth,
             tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
@@ -255,9 +257,10 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let results = csi
         .documents(
-            bearer.token().to_owned(),
+            auth,
             tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
@@ -275,9 +278,10 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let results = csi
         .document_metadata(
-            bearer.token().to_owned(),
+            auth,
             tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
@@ -294,9 +298,10 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let results = csi
         .chat(
-            bearer.token().to_owned(),
+            auth,
             tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
@@ -314,9 +319,10 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let results = csi
         .chunk(
-            bearer.token().to_owned(),
+            auth,
             tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
@@ -338,9 +344,10 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let results = csi
         .chunk(
-            bearer.token().to_owned(),
+            auth,
             tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
@@ -362,9 +369,10 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let results = csi
         .explain(
-            bearer.token().to_owned(),
+            auth,
             tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
@@ -386,9 +394,10 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let results = csi
         .complete(
-            bearer.token().to_owned(),
+            auth,
             tracing_context,
             requests.into_iter().map(Into::into).collect(),
         )
@@ -406,8 +415,9 @@ where
     C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
+    let auth = Authentication::new(bearer.token());
     let mut recv = csi
-        .completion_stream(bearer.token().to_owned(), tracing_context, request.into())
+        .completion_stream(auth, tracing_context, request.into())
         .await;
 
     let stream = try_stream! {
@@ -481,9 +491,8 @@ where
     C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
-    let mut recv = csi
-        .chat_stream(bearer.token().to_owned(), tracing_context, request.into())
-        .await;
+    let auth = Authentication::new(bearer.token());
+    let mut recv = csi.chat_stream(auth, tracing_context, request.into()).await;
 
     let stream = try_stream! {
         while let Some(result) = recv.recv().await {
