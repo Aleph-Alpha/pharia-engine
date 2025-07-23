@@ -57,10 +57,10 @@ jobs:
       - run: cargo nextest run --workspace --all-features
       - run: cargo test --doc
     env:
-      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY: ghcr.io
-      NAMESPACES__PHARIA_KERNEL_TEAM__BASE_REPOSITORY: aleph-alpha/pharia-kernel
-      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER: ${{ github.actor }}
-      NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      TEST_REGISTRY: ghcr.io
+      TEST_BASE_REPOSITORY: aleph-alpha/pharia-kernel
+      TEST_REGISTRY_USER: ${{ github.actor }}
+      TEST_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       PHARIA_AI_TOKEN: ${{ secrets.PHARIA_AI_TOKEN }}
       INFERENCE_URL: https://inference-api.product.pharia.com
       DOCUMENT_INDEX_URL: https://document-index.product.pharia.com
