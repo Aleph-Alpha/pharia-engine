@@ -1,7 +1,6 @@
 use std::{convert::Infallible, str::FromStr};
 use tracing::warn;
 
-#[allow(dead_code)] // currently only referenced in shell test
 pub const PRODUCTION_FEATURE_SET: FeatureSet = FeatureSet::Stable(1);
 
 /// Pharia AI feature set as derived from the environment. It is used to hide features under
