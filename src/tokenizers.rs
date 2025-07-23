@@ -260,7 +260,7 @@ pub mod tests {
         // Given a model name and the actual inference API
         let model_name = "pharia-1-llm-7b-control";
         let inference_url = inference_url();
-        let api_token = Authentication::with_token(api_token());
+        let api_token = Authentication::from_token(api_token());
 
         // When we can request a tokenizer from the AA API
         let actor = Tokenizers::new(TokenizersConfig::AlephAlpha { inference_url });

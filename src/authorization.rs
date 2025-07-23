@@ -1,6 +1,14 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use axum::{extract::FromRef, http::StatusCode};
+use axum::{
+    RequestPartsExt,
+    extract::{FromRef, FromRequestParts},
+    http::{StatusCode, request::Parts},
+};
+use axum_extra::{
+    TypedHeader,
+    headers::{Authorization as AuthorizationHeader, authorization::Bearer},
+};
 use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -11,6 +19,7 @@ use tracing::error;
 use crate::{http::HttpClient, logging::TracingContext};
 
 /// The authentication provided by incoming requests.
+///
 /// When operating inside `PhariaAI`, users are required to provide a valid `PhariaAI` token. This
 /// token is then used to authenticate all outgoing request, e.g. against the Aleph Alpha inference
 /// or the `DocumentIndex`.
@@ -26,12 +35,29 @@ impl Authentication {
         Self(maybe_token)
     }
 
-    pub fn with_token(token: impl Into<String>) -> Self {
+    pub fn from_token(token: impl Into<String>) -> Self {
         Self(Some(token.into()))
     }
 
     pub fn into_maybe_string(self) -> Option<String> {
         self.0
+    }
+}
+
+impl<S> FromRequestParts<S> for Authentication
+where
+    S: Send + Sync,
+{
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        match parts
+            .extract::<TypedHeader<AuthorizationHeader<Bearer>>>()
+            .await
+        {
+            Ok(TypedHeader(bearer)) => Ok(Authentication::from_token(bearer.token())),
+            Err(_) => Ok(Authentication::new(None)),
+        }
     }
 }
 
@@ -324,7 +350,7 @@ pub mod tests {
         // Given a client that is configured against the inference api
         let url = authorization_url();
         let client = HttpAuthorizationClient::new(url.to_owned());
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
 
         // When the client is used to check a valid api token
         let result = client.token_valid(auth, TracingContext::dummy()).await;
@@ -342,7 +368,7 @@ pub mod tests {
         // When the client is used to check an invalid api token
         let result = client
             .token_valid(
-                Authentication::with_token("invalid"),
+                Authentication::from_token("invalid"),
                 TracingContext::dummy(),
             )
             .await;

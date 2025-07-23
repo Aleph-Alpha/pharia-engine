@@ -12,10 +12,6 @@ use axum::{
     http::StatusCode,
     routing::post,
 };
-use axum_extra::{
-    TypedHeader,
-    headers::{Authorization, authorization::Bearer},
-};
 use semver::VersionReq;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -59,7 +55,7 @@ where
 
 async fn http_csi_handle<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(args): Json<VersionedCsiRequest>,
 ) -> (StatusCode, Json<Value>)
 where
@@ -67,7 +63,6 @@ where
 {
     let drivers = csi;
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let result = match args {
         VersionedCsiRequest::V0_2(request) => {
             request.respond(&drivers, auth, tracing_context).await
