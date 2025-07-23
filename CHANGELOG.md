@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.19](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.18...pharia-kernel-v0.13.19)
+
+### Features
+
+- Migrate to check_user iam endpoint - ([33697f3](https://github.com/Aleph-Alpha/pharia-kernel/commit/33697f389c9a82b9931e6c3ae51f70284d90b19d))
+- Implement openai client - ([40cf128](https://github.com/Aleph-Alpha/pharia-kernel/commit/40cf1288cbac985a7c93fcef375d6fd263e2d7c8))
+- OpenAI inference backend can be configured - ([e99d410](https://github.com/Aleph-Alpha/pharia-kernel/commit/e99d4108236bd92b985c24d77e791aacd26f9fd5))
+- Add warning if running without inference capabilities - ([d9061cc](https://github.com/Aleph-Alpha/pharia-kernel/commit/d9061cc85d0d58218c5b802fd89e348e97d32586))
+- Inference url is optional in app config - ([a62f135](https://github.com/Aleph-Alpha/pharia-kernel/commit/a62f135dee63b5b48c6f0f1c1f3b9b6c19ed7574))
+- Map empty document index url to none in app config - ([858df5c](https://github.com/Aleph-Alpha/pharia-kernel/commit/858df5cb450795874523d129770d6bb68829ae74))
+- Document index is an optional dependency - ([8a7ea86](https://github.com/Aleph-Alpha/pharia-kernel/commit/8a7ea8629b76047a0bc0878e084ee58009e6a725))
+- Custom logs without span context and attributes - ([268cd96](https://github.com/Aleph-Alpha/pharia-kernel/commit/268cd962a3148b16d84a359a5c315f3444ec07c7))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 16 updates - ([cbf89af](https://github.com/Aleph-Alpha/pharia-kernel/commit/cbf89afc0ff68f9eec3e54ce9f3b6257c29ca304))
+- *(deps)* Bump inference client for sse bug fix - ([57d8368](https://github.com/Aleph-Alpha/pharia-kernel/commit/57d8368c4770b47aa70e635a6fb1969e01f6e6c0))
+
+
 ## [0.13.18](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.17...pharia-kernel-v0.13.18)
 
 ### Features
