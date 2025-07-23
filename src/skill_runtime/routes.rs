@@ -7,10 +7,7 @@ use axum::{
     response::{Sse, sse::Event},
     routing::{get, post},
 };
-use axum_extra::{
-    TypedHeader,
-    headers::{Authorization, authorization::Bearer},
-};
+
 use futures::Stream;
 use reqwest::StatusCode;
 use serde::Serialize;
@@ -94,7 +91,7 @@ where
 )]
 async fn run_skill<R>(
     State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
 ) -> Result<Json<Value>, HttpError>
@@ -103,7 +100,6 @@ where
 {
     let tracing_context = TracingContext::current();
     let skill_path = SkillPath::new(namespace, name);
-    let auth = Authentication::with_token(bearer.token());
     let response = skill_runtime_api
         .run_function(skill_path, input, auth, tracing_context)
         .await?;
@@ -210,7 +206,7 @@ where
 )]
 async fn message_stream_skill<R>(
     State(SkillRuntimeState(skill_runtime_api)): State<SkillRuntimeState<R>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Path((namespace, name)): Path<(Namespace, String)>,
     Json(input): Json<Value>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
@@ -219,7 +215,6 @@ where
 {
     let path = SkillPath::new(namespace, name);
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let mut stream_events = skill_runtime_api
         .run_message_stream(path, input, auth, tracing_context)
         .await;
@@ -409,7 +404,10 @@ impl From<AnySkillManifest> for SkillMetadataV1Representation {
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::Body, http::Request};
+    use axum::{
+        body::Body,
+        http::{Request, header},
+    };
     use double_trait::Dummy;
     use http_body_util::BodyExt as _;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
@@ -584,7 +582,7 @@ mod tests {
             ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send {
                 assert_eq!(path, SkillPath::local("greet_skill"));
                 assert_eq!(input, json!("Homer"));
-                assert_eq!(auth, Authentication::with_token("dummy auth token"));
+                assert_eq!(auth, Authentication::from_token("dummy auth token"));
                 async move { Ok(json!({})) }
             }
         }
@@ -817,5 +815,89 @@ mod tests {
             event: tool\n\
             data: {\"type\":\"error\",\"name\":\"add\",\"message\":\"Out of cheese\"}\n\n";
         assert_eq!(body_text, expected_body);
+    }
+
+    #[tokio::test]
+    async fn skill_can_invoked_without_bearer_token() {
+        // Given
+        #[derive(Clone)]
+        struct SkillRuntimeMock;
+        impl SkillRuntimeDouble for SkillRuntimeMock {
+            async fn run_function(
+                &self,
+                _skill_path: SkillPath,
+                _input: Value,
+                auth: Authentication,
+                _tracing_context: TracingContext,
+            ) -> Result<Value, SkillExecutionError> {
+                assert_eq!(auth, Authentication::none());
+                Ok(json!("Result from Skill"))
+            }
+        }
+        let app_state = ProviderStub::new(SkillRuntimeMock);
+        let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+
+        // When
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .uri("/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = serde_json::from_slice::<String>(&body).unwrap();
+        assert_eq!(answer, "Result from Skill");
+    }
+
+    #[tokio::test]
+    async fn authentication_is_provided_to_skill_runtime() {
+        // Given
+        #[derive(Clone)]
+        struct SkillRuntimeMock;
+        impl SkillRuntimeDouble for SkillRuntimeMock {
+            async fn run_function(
+                &self,
+                _skill_path: SkillPath,
+                _input: Value,
+                auth: Authentication,
+                _tracing_context: TracingContext,
+            ) -> Result<Value, SkillExecutionError> {
+                assert_eq!(auth, Authentication::from_token("dummy auth token"));
+                Ok(json!("Result from Skill"))
+            }
+        }
+        let app_state = ProviderStub::new(SkillRuntimeMock);
+        let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+
+        // When
+        let api_token = "dummy auth token";
+        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
+        auth_value.set_sensitive(true);
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, auth_value)
+                    .uri("/skills/local/greet_skill/run")
+                    .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let answer = serde_json::from_slice::<String>(&body).unwrap();
+        assert_eq!(answer, "Result from Skill");
     }
 }

@@ -12,7 +12,7 @@ use bytesize::ByteSize;
 use dotenvy::dotenv;
 use futures::StreamExt;
 use opentelemetry::{SpanId, TraceId};
-use pharia_kernel::{AppConfig, FeatureSet, InferenceConfig, Kernel, NamespaceConfigs};
+use pharia_kernel::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
@@ -77,40 +77,51 @@ struct TestKernel {
 }
 
 impl TestKernel {
+    async fn default() -> Self {
+        let app_config = Self::default_app_config();
+        Self::new(app_config).await
+    }
+
+    async fn without_authorization() -> Self {
+        let app_config = Self::default_app_config().with_authorization_url(None);
+        Self::new(app_config).await
+    }
+
     async fn with_namespaces(namespaces: NamespaceConfigs) -> Self {
-        let inference_config = InferenceConfig::AlephAlpha {
-            url: "https://inference-api.product.pharia.com",
-        };
-        Self::new(namespaces, inference_config).await
+        let app_config = Self::default_app_config().with_namespaces(namespaces);
+        Self::new(app_config).await
     }
 
     async fn with_openai_inference(token: &str) -> Self {
-        let inference_config = InferenceConfig::OpenAi {
-            url: "https://api.openai.com/v1",
-            token,
-        };
-        let namespaces = NamespaceConfigs::default();
-        Self::new(namespaces, inference_config).await
+        let url = "https://api.openai.com/v1";
+        let app_config = Self::default_app_config()
+            .with_openai_inference(url, token)
+            .with_inference_url(None)
+            .with_authorization_url(None);
+        Self::new(app_config).await
     }
 
-    async fn new(namespaces: NamespaceConfigs, inference_config: InferenceConfig<'_>) -> Self {
+    fn default_app_config() -> AppConfig {
+        let port = free_test_port();
+        let metrics_port = free_test_port();
+        AppConfig::default()
+            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
+            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
+            .with_document_index_url("https://document-index.product.pharia.com")
+            .with_inference_url(Some("https://inference-api.product.pharia.com"))
+            .with_authorization_url(Some("https://pharia-iam.product.pharia.com"))
+            .with_namespaces(NamespaceConfigs::default())
+            .with_pharia_ai_feature_set(FeatureSet::Beta)
+            .with_wasmtime_cache_size_request(Some(ByteSize::mib(512)))
+            .with_wasmtime_cache_dir(Some(std::path::absolute("./.wasmtime-cache").unwrap()))
+            .with_pooling_allocator(true)
+    }
+
+    async fn new(app_config: AppConfig) -> Self {
         let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
         };
-        let port = free_test_port();
-        let metrics_port = free_test_port();
-        let app_config = AppConfig::default()
-            .with_kernel_address(format!("127.0.0.1:{port}").parse().unwrap())
-            .with_metrics_address(format!("127.0.0.1:{metrics_port}").parse().unwrap())
-            .with_document_index_url("https://document-index.product.pharia.com")
-            .with_inference_config(inference_config)
-            .with_authorization_url("https://pharia-iam.product.pharia.com")
-            .with_namespaces(namespaces)
-            .with_pharia_ai_feature_set(FeatureSet::Beta)
-            .with_wasmtime_cache_size_request(Some(ByteSize::mib(512)))
-            .with_wasmtime_cache_dir(Some(std::path::absolute("./.wasmtime-cache").unwrap()))
-            .with_pooling_allocator(true);
         let port = app_config.kernel_address().port();
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
@@ -469,7 +480,7 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
 
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
-async fn openai_inference_backend() {
+async fn openai_inference_backend_is_supported() {
     let token = openai_inference_token();
     let kernel = TestKernel::with_openai_inference(token).await;
 
@@ -477,7 +488,6 @@ async fn openai_inference_backend() {
     let resp = req_client
         .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value())
         .body(Body::from(
             json!({
                 "version": "0.2",
@@ -1006,6 +1016,69 @@ async fn test_message_stream_canceled_during_the_skill_execution() {
     drop(stream.next().await.unwrap());
     drop(stream);
     drop(req_client);
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn token_is_required_if_auth_url_is_set() {
+    // Given a Kernel with authorization enabled
+    let kernel = TestKernel::default().await;
+    let req_client = reqwest::Client::new();
+
+    // When doing a request without a token
+    let resp = req_client
+        .get(format!("http://127.0.0.1:{}/v1/skills", kernel.port()))
+        .send()
+        .await
+        .unwrap();
+
+    // Then we get a 400
+    assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+    let body = resp.text().await.unwrap();
+    assert_eq!(body, "Bearer token expected");
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn token_is_checked_if_auth_url_is_set() {
+    // Given a Kernel with authorization enabled
+    let kernel = TestKernel::default().await;
+    let req_client = reqwest::Client::new();
+
+    // When doing a request with a bad token
+    let bad_token = "bad-token";
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {bad_token}")).unwrap();
+    auth_value.set_sensitive(true);
+    let resp = req_client
+        .get(format!("http://127.0.0.1:{}/v1/skills", kernel.port()))
+        .header(header::AUTHORIZATION, auth_value)
+        .send()
+        .await
+        .unwrap();
+
+    // Then we get a 401
+    assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+    let body = resp.text().await.unwrap();
+    assert_eq!(body, "Bearer token invalid");
+
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn no_token_required_if_auth_url_is_not_set() {
+    // Given a Kernel with authorization disabled
+    let kernel = TestKernel::without_authorization().await;
+    let req_client = reqwest::Client::new();
+
+    // When doing a request without a token
+    let resp = req_client
+        .get(format!("http://127.0.0.1:{}/v1/skills", kernel.port()))
+        .send()
+        .await
+        .unwrap();
+
+    // Then we get a 200
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
     kernel.shutdown().await;
 }
 

@@ -8,10 +8,6 @@ use axum::{
     response::{IntoResponse, Response, Sse, sse::Event},
     routing::post,
 };
-use axum_extra::{
-    TypedHeader,
-    headers::{Authorization, authorization::Bearer},
-};
 use derive_more::{From, Into};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -130,7 +126,6 @@ impl From<tool::Modality> for ToolModality {
 
 async fn invoke_tool<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    _bearer: TypedHeader<Authorization<Bearer>>,
     Json(requests): Json<InvokeRequests>,
 ) -> Json<Vec<Value>>
 where
@@ -190,7 +185,6 @@ struct ListToolsRequest {
 
 async fn list_tools<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    _bearer: TypedHeader<Authorization<Bearer>>,
     Json(request): Json<ListToolsRequest>,
 ) -> Result<Json<Vec<ToolDescription>>, CsiShellError>
 where
@@ -206,7 +200,6 @@ where
 
 async fn select_language<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    _bearer: TypedHeader<Authorization<Bearer>>,
     Json(requests): Json<Vec<SelectLanguageRequest>>,
 ) -> Result<Json<Vec<Option<Language>>>, CsiShellError>
 where
@@ -225,14 +218,13 @@ where
 
 async fn search<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(requests): Json<Vec<SearchRequest>>,
 ) -> Result<Json<Vec<Vec<SearchResult>>>, CsiShellError>
 where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .search(
             auth,
@@ -250,14 +242,13 @@ where
 
 async fn documents<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(requests): Json<Vec<DocumentPath>>,
 ) -> Result<Json<Vec<Document>>, CsiShellError>
 where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .documents(
             auth,
@@ -271,14 +262,13 @@ where
 
 async fn document_metadata<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(requests): Json<Vec<DocumentPath>>,
 ) -> Result<Json<Vec<Option<Value>>>, CsiShellError>
 where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .document_metadata(
             auth,
@@ -291,14 +281,13 @@ where
 
 async fn chat<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(requests): Json<Vec<ChatRequest>>,
 ) -> Result<Json<Vec<ChatResponse>>, CsiShellError>
 where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .chat(
             auth,
@@ -312,14 +301,13 @@ where
 
 async fn chunk<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(requests): Json<Vec<ChunkRequest>>,
 ) -> Result<Json<Vec<Vec<String>>>, CsiShellError>
 where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .chunk(
             auth,
@@ -337,14 +325,13 @@ where
 
 async fn chunk_with_offsets<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(requests): Json<Vec<ChunkWithOffsetRequest>>,
 ) -> Result<Json<Vec<Vec<ChunkWithOffset>>>, CsiShellError>
 where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .chunk(
             auth,
@@ -362,14 +349,13 @@ where
 
 async fn explain<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(requests): Json<Vec<ExplainRequest>>,
 ) -> Result<Json<Vec<Vec<TextScore>>>, CsiShellError>
 where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .explain(
             auth,
@@ -387,14 +373,13 @@ where
 
 async fn complete<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(requests): Json<Vec<CompletionRequest>>,
 ) -> Result<Json<Vec<Completion>>, CsiShellError>
 where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let results = csi
         .complete(
             auth,
@@ -408,14 +393,13 @@ where
 
 async fn completion_stream<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(request): Json<CompletionRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
 where
     C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let mut recv = csi
         .completion_stream(auth, tracing_context, request.into())
         .await;
@@ -484,14 +468,13 @@ struct CompletionUsageEvent {
 
 async fn chat_stream<C>(
     State(CsiState(csi)): State<CsiState<C>>,
-    bearer: TypedHeader<Authorization<Bearer>>,
+    auth: Authentication,
     Json(request): Json<ChatRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
 where
     C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
-    let auth = Authentication::with_token(bearer.token());
     let mut recv = csi.chat_stream(auth, tracing_context, request.into()).await;
 
     let stream = try_stream! {

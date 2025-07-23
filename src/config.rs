@@ -254,34 +254,9 @@ impl AppConfig {
     }
 
     #[must_use]
-    pub fn with_inference_url(mut self, url: impl Into<String>) -> Self {
-        self.inference_url = Some(url.into());
+    pub fn with_inference_url(mut self, url: Option<&str>) -> Self {
+        self.inference_url = url.map(ToOwned::to_owned);
         self
-    }
-
-    #[must_use]
-    pub fn with_inference_config(mut self, inference_config: InferenceConfig<'_>) -> Self {
-        match inference_config {
-            InferenceConfig::AlephAlpha { url } => {
-                self.inference_url = Some(url.to_owned());
-            }
-            InferenceConfig::OpenAi { url, token } => {
-                self.openai_inference = Some(OpenAiInference {
-                    url: url.to_owned(),
-                    token: token.to_owned(),
-                });
-            }
-            InferenceConfig::None => {
-                self.inference_url = None;
-                self.openai_inference = None;
-            }
-        }
-        self
-    }
-
-    #[must_use]
-    pub fn openai_inference(&self) -> Option<&OpenAiInference> {
-        self.openai_inference.as_ref()
     }
 
     #[must_use]
@@ -295,6 +270,11 @@ impl AppConfig {
             token: token.into(),
         });
         self
+    }
+
+    #[must_use]
+    pub fn openai_inference(&self) -> Option<&OpenAiInference> {
+        self.openai_inference.as_ref()
     }
 
     #[must_use]
@@ -314,8 +294,8 @@ impl AppConfig {
     }
 
     #[must_use]
-    pub fn with_authorization_url(mut self, url: impl Into<String>) -> Self {
-        self.authorization_url = Some(url.into());
+    pub fn with_authorization_url(mut self, url: Option<&str>) -> Self {
+        self.authorization_url = url.map(ToOwned::to_owned);
         self
     }
 
@@ -629,7 +609,7 @@ mod tests {
     fn aleph_alpha_inference_is_default() {
         // Given an app config with both, an aleph alpha inference and an openai inference configured
         let app_config = AppConfig::default()
-            .with_inference_url("https://inference-api.product.pharia.com")
+            .with_inference_url(Some("https://inference-api.product.pharia.com"))
             .with_openai_inference("https://openai.com", "sk-1234567890");
 
         // When we convert it into an inference config

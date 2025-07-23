@@ -555,7 +555,7 @@ mod tests {
     #[tokio::test]
     async fn explain() {
         // Given an inference client
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -647,7 +647,7 @@ mod tests {
     #[tokio::test]
     async fn test_chat_message_conversion() {
         // Given an inference client
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -675,7 +675,7 @@ mod tests {
     #[tokio::test]
     async fn test_bad_token_gives_inference_client_error() {
         // Given an inference client and a bad token
-        let bad_auth = Authentication::with_token("bad_api_token");
+        let bad_auth = Authentication::from_token("bad_api_token");
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -706,7 +706,7 @@ mod tests {
     #[tokio::test]
     async fn complete_response_with_special_tokens() {
         // Given an inference client
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -738,7 +738,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn frequency_penalty_for_chat() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -778,7 +778,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn sampling_parameters_for_completion() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -822,7 +822,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn top_logprobs_for_chat() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -856,7 +856,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn top_logprobs_for_completion() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -889,7 +889,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn usage_for_completion() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -919,7 +919,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn echo_parameter_leads_to_echo_in_completion() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -949,7 +949,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn usage_for_chat() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -979,7 +979,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn completion_stream() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
@@ -1026,7 +1026,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     #[tokio::test]
     async fn chat_stream() {
         // Given
-        let auth = Authentication::with_token(api_token());
+        let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
         let client = Client::new(host, None).unwrap();
 
