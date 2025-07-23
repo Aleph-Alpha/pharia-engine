@@ -424,7 +424,6 @@ mod tests {
         authorization::Authentication,
         feature_set::PRODUCTION_FEATURE_SET,
         logging::TracingContext,
-        shell::tests::dummy_auth_value,
         skill::{AnySkillManifest, JsonSchema, Signature, SkillMetadataV0_3, SkillPath},
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
         skill_runtime::{SkillRuntimeDouble, http_skill_runtime_v1, routes::SkillRuntimeProvider},
@@ -462,7 +461,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri(format!("/skills/{bad_namespace}/greet_skill/run"))
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -495,7 +493,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/skills/local/hello/message-stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
@@ -552,7 +549,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/skills/local/greet_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -582,12 +578,15 @@ mod tests {
             ) -> impl Future<Output = Result<Value, SkillExecutionError>> + Send {
                 assert_eq!(path, SkillPath::local("greet_skill"));
                 assert_eq!(input, json!("Homer"));
-                assert_eq!(auth, Authentication::from_token("dummy auth token"));
+                assert_eq!(auth, Authentication::from_token("42 Northern Pikes"));
                 async move { Ok(json!({})) }
             }
         }
         let app_state = ProviderStub::new(SkillRuntimeMock);
         let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+
+        let mut auth_value = header::HeaderValue::from_str("Bearer 42 Northern Pikes").unwrap();
+        auth_value.set_sensitive(true);
 
         // When
         let _resp = http
@@ -595,7 +594,7 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
+                    .header(AUTHORIZATION, auth_value)
                     .uri("/skills/local/greet_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -629,7 +628,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/skills/any-namespace/any_skill/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
                     .unwrap(),
@@ -679,7 +677,6 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method(Method::GET)
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/skills/local/greet_skill/metadata")
                     .body(Body::empty())
                     .unwrap(),
@@ -717,7 +714,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/skills/local/saboteur/message-stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
@@ -793,7 +789,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/skills/local/saboteur/message-stream")
                     .body(Body::from("\"\""))
                     .unwrap(),
