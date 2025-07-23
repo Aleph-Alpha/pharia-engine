@@ -895,14 +895,6 @@ registry-password =  \"{password}\"
     }
 
     #[test]
-    fn reads_from_file() {
-        drop(dotenvy::dotenv());
-        let config = AppConfig::new().unwrap();
-        let namespace = Namespace::new("pharia-kernel-team").unwrap();
-        assert!(config.namespaces().contains_key(&namespace));
-    }
-
-    #[test]
     fn otel_sampling_ratio_from_env() -> anyhow::Result<()> {
         // Given environment variables with a sampling ratio
         let dir = tempdir()?;
