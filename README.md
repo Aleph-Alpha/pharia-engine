@@ -1,6 +1,12 @@
 # PhariaKernel
 
-PhariaKernel allows you to execute Cognitive Business Units called skills. These Skill can be written in any language which compiles to WebAssembly (Wasm). We provide a SDK and dedicated support for Python. PhariaKernel handles the interaction between these skills and drivers for functionality like inference and retrieval via the Cognitive System Interface (CSI). This enables users to deploy RAG usecases serverless. Writing skills for PhariaKernel is more constrained then shipping an end to end use case in a custom Docker container. Yet these constraints allow us to make opinionated decisions for the skill developer. We strive to take away only the decisions and responsibilities a skill developer may find "boring" (such as authentication, parallelization of inference calls). In more technical terms, we aim to reduce the accidental complexity the skill developer has to engage with.
+PhariaKernel allows you to execute Cognitive Business Units called Skills. These Skills can be written in any language which compiles to WebAssembly (Wasm).
+We provide a SDK and dedicated support for Python.
+PhariaKernel handles the interaction between these Skills and drivers for functionality like inference and retrieval via the Cognitive System Interface (CSI).
+This enables users to deploy RAG usecases serverless. Writing skills for PhariaKernel is more constrained then shipping an end to end use case in a custom Docker container.
+Yet these constraints allow us to make opinionated decisions for the Skill developer.
+We strive to take away only the decisions and responsibilities a Skill developer may find "boring" (such as authentication, parallelization of inference calls).
+In more technical terms, we aim to reduce the accidental complexity the Skill developer has to engage with.
 
 ## Contributing
 
@@ -31,7 +37,7 @@ rustup target add wasm32-wasip2
 cargo install wasm-tools
 ```
 
-Every time we update the `wit` worlds, we we need to clear the Skill build cache in `./skill_build_cache` which is used by the tests.
+Every time we update the `wit` worlds, we need to clear the Skill build cache in `./skill_build_cache` which is used by the tests.
 
 ### Building and running the kernel container using Podman
 
@@ -52,7 +58,8 @@ If not configured it defaults to "0.0.0.0:8081", which is necessary in the conta
 
 #### MacOS
 
-Podman on MacOS requires a separate virtual machine run by the user. To compile PhariaKernel, at least 4 GiB of RAM are needed and 8 GiB are recommended. You set this up with
+Podman on MacOS requires a separate virtual machine run by the user.
+To compile PhariaKernel, at least 4 GiB of RAM are needed and 8 GiB are recommended. You set this up with
 
 ```shell
 podman machine init
@@ -74,19 +81,17 @@ health check:
 curl -v GET 127.0.0.1:8081/health
 ```
 
-list skills:
+list available Skills:
 
 ```shell
-curl -v GET 127.0.0.1:8081/skills
-curl -v GET 127.0.0.1:8081/cached_skills
-j
+curl -v GET 127.0.0.1:8081/v1/skills
 ```
 
-run a skill:
+run a Skill:
 
 ```shell
 set -a; source .env
-curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill \
+curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill/run \
 -H "Authorization: Bearer $PHARIA_AI_TOKEN" \
 -H 'Content-Type: application/json' \
 -d '"Homer"'
@@ -94,13 +99,14 @@ curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill \
 
 ## Deploying PhariaKernel on Customer side
 
-**PhariaKernel** is intended to be installed as part of **PhariaAI** on premise by the customer it. It is deployed, as are all other modules of the **PhariaAI**, to the JFrog Artifactory.
+**PhariaKernel** is intended to be installed as part of **PhariaAI** on premise by the customer it.
+It is deployed, as are all other modules of the **PhariaAI**, to the JFrog Artifactory.
 
 ![Block Diagram Pharia OS deploy][deployment]
 
 ## Helpful links for internal deployment
 
-The current prototype is deployed at <https://pk.stage.product.pharia.com/>
+The current helm-chart is deployed to <https://pharia-kernel.stage.product.pharia.com/>
 
 The status page for uptime robot is found at: <https://stats.uptimerobot.com/gjXpoIPMnv>
 
