@@ -3,6 +3,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use axum::{extract::FromRef, http::StatusCode};
 use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use thiserror::Error;
 use tokio::{select, sync::mpsc, task::JoinHandle};
 use tracing::error;
@@ -161,28 +162,33 @@ impl AuthorizationClient for HttpAuthorizationClient {
         api_token: String,
         context: TracingContext,
     ) -> Result<bool, AuthorizationClientError> {
-        #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+        #[derive(Deserialize)]
+        struct Response {
+            permissions: Vec<Permission>,
+        }
+
+        #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
         #[serde(tag = "permission")]
         enum Permission {
             KernelAccess,
         }
 
+        let required_permissions = [Permission::KernelAccess];
+
         let mut builder = self
             .client
-            .post(format!("{}/check_privileges", self.url))
+            .post(format!("{}/check_user", self.url))
             .bearer_auth(api_token);
 
         builder = builder.headers(context.w3c_headers());
 
-        let required_permissions = [Permission::KernelAccess];
-        let response = builder
-            .json(&required_permissions)
-            .send()
-            .await
-            .map_err(|e| {
-                error!(parent: context.span(), error = %e, "Failed to send authorization request.");
-                AuthorizationClientError::Recoverable
-            })?;
+        let payload = json!({
+            "permissions": required_permissions
+        });
+        let response = builder.json(&payload).send().await.map_err(|e| {
+            error!(parent: context.span(), error = %e, "Failed to send authorization request.");
+            AuthorizationClientError::Recoverable
+        })?;
 
         // Response succeeded, but not allowed
         if [StatusCode::FORBIDDEN, StatusCode::UNAUTHORIZED].contains(&response.status()) {
@@ -196,7 +202,7 @@ impl AuthorizationClient for HttpAuthorizationClient {
                 error!(parent: context.span(), error = %e, "Unexpected status code from authorization service.");
                 AuthorizationClientError::Recoverable
             })?
-            .json::<Vec<Permission>>()
+            .json::<Response>()
             .await
             .map_err(|e| {
                 error!(parent: context.span(), error = %e, "Failed to deserialize the response from the authorization service.");
@@ -204,7 +210,7 @@ impl AuthorizationClient for HttpAuthorizationClient {
             })?;
 
         // Check that we got the same list back
-        Ok(allowed_permissions == required_permissions)
+        Ok(allowed_permissions.permissions == required_permissions)
     }
 }
 
