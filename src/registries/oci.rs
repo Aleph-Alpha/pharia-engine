@@ -155,10 +155,10 @@ mod tests {
 
     impl OciRegistry {
         fn from_env() -> Option<Self> {
-            let maybe_registry = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY");
-            let maybe_repository = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__BASE_REPOSITORY");
-            let maybe_username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER");
-            let maybe_password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD");
+            let maybe_registry = env::var("TEST_REGISTRY");
+            let maybe_repository = env::var("TEST_BASE_REPOSITORY");
+            let maybe_username = env::var("TEST_REGISTRY_USER");
+            let maybe_password = env::var("TEST_REGISTRY_PASSWORD");
             match (
                 maybe_registry,
                 maybe_repository,
@@ -178,10 +178,10 @@ mod tests {
             let (config, component_layer) =
                 WasmConfig::from_raw_component(wasm_bytes, None).expect("component must be valid");
 
-            let username = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER")
-                .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER variable not set");
-            let password = env::var("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD")
-                .expect("NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD variable not set");
+            let username =
+                env::var("TEST_REGISTRY_USER").expect("TEST_REGISTRY_USER variable not set");
+            let password = env::var("TEST_REGISTRY_PASSWORD")
+                .expect("TEST_REGISTRY_PASSWORD variable not set");
             let auth = RegistryAuth::Basic(username, password);
 
             self.client
