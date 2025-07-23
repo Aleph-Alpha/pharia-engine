@@ -8,40 +8,37 @@ Yet these constraints allow us to make opinionated decisions for the Skill devel
 We strive to take away only the decisions and responsibilities a Skill developer may find "boring" (such as authentication, parallelization of inference calls).
 In more technical terms, we aim to reduce the accidental complexity the Skill developer has to engage with.
 
-## Contributing
+## PhariaAI
 
-In this repository we stick to Conventional Commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
+The Kernel is part of the [PhariaAI product suite](https://docs.aleph-alpha.com/products/pharia-ai/overview/).
+However, it can also be configured to run standalone with any OpenAI-compatible inference backend.
+If operated outside of PhariaAI, some features are not available.
+These include RAG capabilities offered by the [DocumentIndex](https://docs.aleph-alpha.com/products/apis/pharia-search/aleph-alpha-document-index-api/), features like explainability that are special to the [Aleph Alpha inference](https://docs.aleph-alpha.com/products/apis/pharia-inference/) and the connection to the [Pharia IAM service](https://docs.aleph-alpha.com/products/pharia-ai/pharia-os/user-management/).
 
-### Release
+## Setup
 
-Releasing in this repository is automated with [release-plz](https://release-plz.ieni.dev/).
+### Local Development
 
-1. For every commit to the `main` branch, release-plz creates a release Pull Request.
-2. Review the release Pull Request and add new changes, if necessary, by amending the commit directly.
-   - Helm chart version:
-
-     By default, only the patch version is incremented.
-   - Helm chart changelog date:
-
-     The date is set when the changelog is generated. Update it to the release date if differs.
-3. Merge the release Pull Request and release-plz will release the updated packages.
-
-### Local Development setup
-
-There are some prerequisites you need to install once
+Next to the [Rust toolchain](https://www.rust-lang.org/tools/install), there are some prerequisites you will need to install once:
 
 ```shell
 # We need the Wasm target to be able to compile the skills
 rustup target add wasm32-wasip2
 # We need wasm-tools to strip skill binaries
 cargo install wasm-tools
+# Create an .env file and set the missing values
+cp .env.example .env
 ```
 
-Every time we update the `wit` worlds, we need to clear the Skill build cache in `./skill_build_cache` which is used by the tests.
+Now, you can run the Kernel with
 
-### Building and running the kernel container using Podman
+```sh
+cargo run
+```
 
-Now, you can build the image with
+### Running inside Container
+
+Build the image with
 
 ```shell
 podman build . --tag pharia-kernel
@@ -55,6 +52,8 @@ podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia
 
 We configure the bind address and port via the environment variable `KERNEL_ADDRESS`.
 If not configured it defaults to "0.0.0.0:8081", which is necessary in the container, but locally may cause the firewall to complain.
+Note that the Kernel can be configured both from environment variables and from a `config.toml` file.
+Mounting the config file is optional.
 
 #### MacOS
 
@@ -67,35 +66,25 @@ podman machine set --memory 8192
 podman machine start
 ```
 
-When building the image, you need to specify the target platform.
+## Contributing
 
-```shell
-podman build . --tag pharia-kernel --platform linux/arm64
-```
+In this repository we stick to Conventional Commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
 
-### curl commands
+## Release
 
-health check:
+Releasing in this repository is automated with [release-plz](https://release-plz.ieni.dev/).
 
-```shell
-curl -v GET 127.0.0.1:8081/health
-```
+1. For every commit to the `main` branch, release-plz creates a release Pull Request.
+2. Review the release Pull Request and add new changes, if necessary, by amending the commit directly.
+   - Helm chart version:
 
-list available Skills:
+     By default, only the patch version is incremented.
+   - Helm chart changelog date:
 
-```shell
-curl -v GET 127.0.0.1:8081/v1/skills
-```
+     The date is set when the changelog is generated. Update it to the release date if differs.
+3. Merge the release Pull Request and release-plz will release the updated packages.
 
-run a Skill:
-
-```shell
-set -a; source .env
-curl -v -X POST 127.0.0.1:8081/v1/skills/pharia-kernel-team/greet_skill/run \
--H "Authorization: Bearer $PHARIA_AI_TOKEN" \
--H 'Content-Type: application/json' \
--d '"Homer"'
-```
+Every time we update the `wit` worlds, we need to clear the Skill build cache in `./skill_build_cache` which is used by the tests.
 
 ## Deploying PhariaKernel on Customer side
 
@@ -104,7 +93,19 @@ It is deployed, as are all other modules of the **PhariaAI**, to the JFrog Artif
 
 ![Block Diagram Pharia OS deploy][deployment]
 
-## Helpful links for internal deployment
+## Usage Examples
+
+The Kernel organizes Skills in [namespaces](https://docs.aleph-alpha.com/products/pharia-ai/configuration/how-to-enable-custom-skill-development/#for-operators).
+Each namespace can be configured to pull Skills from either a remote OCI registry or a local directory. Configuration examples can be found in the `.env.example` file.
+The Kernel comes configured with a `test-beta` namespace that hosts some hard-coded skills. You can invoke the `hello` skill with
+
+```shell
+curl -v 127.0.0.1:8081/v1/skills/test-beta/hello/message-stream \
+-H 'Content-Type: application/json' \
+-d '"Homer"'
+```
+
+## Helpful links for Development
 
 The current helm-chart is deployed to <https://pharia-kernel.stage.product.pharia.com/>
 
