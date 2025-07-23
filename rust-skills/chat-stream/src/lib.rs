@@ -3,21 +3,29 @@ use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::inference::{
     ChatEvent, ChatParams, ChatRequest, ChatStream, Logprobs, Message, MessageAppend,
 };
+use serde::Deserialize;
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill", features: ["streaming"] });
 
 struct Skill;
 
+#[derive(Deserialize)]
+struct ChatInput {
+    /// The model to use for the chat.
+    model: String,
+    /// The query to send to the chat.
+    query: String,
+}
+
 impl Guest for Skill {
     fn run(input: Vec<u8>) -> Result<Vec<u8>, Error> {
-        let query = serde_json::from_slice::<String>(&input)
+        let input = serde_json::from_slice::<ChatInput>(&input)
             .map_err(|e| Error::InvalidInput(anyhow!(e).to_string()))?;
 
-        let model = "pharia-1-llm-7b-control".to_owned();
         let messages = vec![Message {
             role: "user".to_owned(),
-            content: query,
+            content: input.query,
         }];
         let params = ChatParams {
             max_tokens: None,
@@ -28,18 +36,22 @@ impl Guest for Skill {
             logprobs: Logprobs::No,
         };
         let request = ChatRequest {
-            model,
+            model: input.model,
             messages,
             params,
         };
 
         let stream = ChatStream::new(&request);
 
+        let mut completion = String::new();
         let mut events = vec![];
         while let Some(event) = stream.next() {
             events.push(match event {
                 ChatEvent::MessageBegin(role) => role,
-                ChatEvent::MessageAppend(MessageAppend { content, .. }) => content,
+                ChatEvent::MessageAppend(MessageAppend { content, .. }) => {
+                    completion.push_str(&content);
+                    content
+                }
                 ChatEvent::MessageEnd(finish_reason) => format!("{finish_reason:?}"),
                 ChatEvent::Usage(token_usage) => format!(
                     "prompt: {}, completion: {}",
@@ -48,8 +60,11 @@ impl Guest for Skill {
             });
         }
 
-        let output = serde_json::to_vec(&json!(events))
-            .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
+        let output = serde_json::to_vec(&json!({
+            "completion": completion,
+            "events": events
+        }))
+        .map_err(|e| Error::Internal(anyhow!(e).to_string()))?;
         Ok(output)
     }
 

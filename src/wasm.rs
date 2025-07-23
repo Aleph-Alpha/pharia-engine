@@ -717,13 +717,17 @@ pub mod tests {
 
         // When invoked with a json string
         let result = skill
-            .run_as_function(ctx, json!("Homer"), &TracingContext::dummy())
+            .run_as_function(
+                ctx,
+                json!({"model": "pharia-1-llm-7b-control", "query": "Homer"}),
+                &TracingContext::dummy(),
+            )
             .await
             .unwrap();
 
         // Then it returns a json string
         assert_eq!(
-            result,
+            result["events"],
             json!([
                 "assistant",
                 "Homer",

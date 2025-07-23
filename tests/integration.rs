@@ -78,30 +78,31 @@ struct TestKernel {
 
 impl TestKernel {
     async fn default() -> Self {
-        let app_config = Self::default_app_config();
+        let app_config = Self::test_app_config();
         Self::new(app_config).await
     }
 
     async fn without_authorization() -> Self {
-        let app_config = Self::default_app_config().with_authorization_url(None);
+        let app_config = Self::test_app_config().with_authorization_url(None);
         Self::new(app_config).await
     }
 
     async fn with_namespaces(namespaces: NamespaceConfigs) -> Self {
-        let app_config = Self::default_app_config().with_namespaces(namespaces);
+        let app_config = Self::test_app_config().with_namespaces(namespaces);
         Self::new(app_config).await
     }
 
-    async fn with_openai_inference(token: &str) -> Self {
+    async fn with_openai_inference(namespaces: NamespaceConfigs, token: &str) -> Self {
         let url = "https://api.openai.com/v1";
-        let app_config = Self::default_app_config()
+        let app_config = Self::test_app_config()
+            .with_namespaces(namespaces)
             .with_openai_inference(url, token)
             .with_inference_url(None)
             .with_authorization_url(None);
         Self::new(app_config).await
     }
 
-    fn default_app_config() -> AppConfig {
+    pub fn test_app_config() -> AppConfig {
         let port = free_test_port();
         let metrics_port = free_test_port();
         AppConfig::default()
@@ -407,7 +408,9 @@ async fn run_chat_stream_skill() {
         ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .header(header::AUTHORIZATION, auth_value())
-        .body(Body::from(json!("ignore for now").to_string()))
+        .body(Body::from(
+            json!({"model": "pharia-1-llm-7b-control", "query": "Homer"}).to_string(),
+        ))
         .timeout(Duration::from_secs(30))
         .send()
         .await
@@ -415,18 +418,18 @@ async fn run_chat_stream_skill() {
     let status = resp.status();
     assert_eq!(status, axum::http::StatusCode::OK);
     let value: Value = resp.json().await.unwrap();
-    let values = value.as_array().unwrap();
+    let values = value["events"].as_array().unwrap();
     assert_eq!(values[0], "assistant");
     let completion = values[1..values.len() - 2]
         .iter()
         .fold(String::new(), |acc, v| acc + v.as_str().unwrap());
     assert_eq!(
         completion,
-        "I'm here to help you with any questions or assistance you need. Please feel free to ask \
-        anything, and I'll do my best to provide helpful information or guidance."
+        "Hello! How can I help you today? If you have any questions or need assistance, feel free \
+        to ask."
     );
     assert_eq!(values[values.len() - 2], "FinishReason::Stop");
-    assert_eq!(values[values.len() - 1], "prompt: 17, completion: 37");
+    assert_eq!(values[values.len() - 1], "prompt: 16, completion: 24");
 
     kernel.shutdown().await;
 }
@@ -481,19 +484,26 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn openai_inference_backend_is_supported() {
+    // Given
+    let chat_skill_wasm = given_chat_stream_skill().bytes();
+    let mut local_skill_dir = TestFileRegistry::new();
+    local_skill_dir.with_skill("chat-stream", chat_skill_wasm);
     let token = openai_inference_token();
-    let kernel = TestKernel::with_openai_inference(token).await;
+    let kernel =
+        TestKernel::with_openai_inference(local_skill_dir.to_namespace_config(), token).await;
 
+    // When
     let req_client = reqwest::Client::new();
     let resp = req_client
-        .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/chat-stream/run",
+            kernel.port()
+        ))
         .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .body(Body::from(
             json!({
-                "version": "0.2",
-                "function": "chat",
-                "messages": [{"role": "user", "content": "Say hello to Homer"}],
                 "model": "gpt-4o-mini",
+                "query": "Who trained you?",
                 "params": {
                     "max_tokens": 64,
                     "temperature": null,
@@ -507,19 +517,10 @@ async fn openai_inference_backend_is_supported() {
         .await
         .unwrap();
 
+    // Then
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
-    let body = resp.bytes().await.unwrap();
-    let completion = serde_json::from_slice::<Value>(&body).unwrap();
-    assert!(
-        completion["message"]["role"]
-            .as_str()
-            .unwrap()
-            .contains("assistant")
-    );
-    assert!(matches!(
-        completion["finish_reason"].as_str().unwrap(),
-        "stop"
-    ));
+    let value: Value = resp.json().await.unwrap();
+    assert!(value["completion"].as_str().unwrap().contains("OpenAI"));
 
     kernel.shutdown().await;
 }
