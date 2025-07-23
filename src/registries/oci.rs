@@ -196,8 +196,7 @@ mod tests {
         // given skill in local directory is pushed to registry
         drop(dotenvy::dotenv());
         let test_skill = given_rust_skill_greet_v0_2();
-        let registry =
-            OciRegistry::from_env().expect("Please configure registry, see .env.example");
+        let registry = OciRegistry::from_env().expect("Please configure registry, see .env.test");
         let tag = "latest";
         registry
             .store_skill(test_skill.bytes(), "greet_skill", tag)
