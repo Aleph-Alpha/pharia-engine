@@ -169,10 +169,7 @@ mod tests {
     use axum::{body::Body, http::Request};
     use http_body_util::BodyExt as _;
     use mime::{APPLICATION_JSON, TEXT_EVENT_STREAM};
-    use reqwest::{
-        Method,
-        header::{AUTHORIZATION, CONTENT_TYPE},
-    };
+    use reqwest::{Method, header::CONTENT_TYPE};
     use tokio::sync::mpsc;
     use tower::ServiceExt as _;
 
@@ -185,7 +182,6 @@ mod tests {
             Explanation, ExplanationRequest, FinishReason, InferenceError, Message, TextScore,
             TokenUsage,
         },
-        shell::tests::dummy_auth_value,
     };
 
     use super::*;
@@ -493,7 +489,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -544,7 +539,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/complete")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -608,7 +602,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/completion_stream")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -674,7 +667,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/complete")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -743,7 +735,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/chat_stream")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -808,7 +799,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/explain")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -870,7 +860,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/chat")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -920,7 +909,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/chunk")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),
@@ -972,7 +960,6 @@ mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .uri("/csi/v1/chunk_with_offsets")
                     .body(Body::from(serde_json::to_string(&body).unwrap()))
                     .unwrap(),

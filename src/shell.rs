@@ -532,13 +532,6 @@ pub mod tests {
         }
     }
 
-    pub fn dummy_auth_value() -> header::HeaderValue {
-        let api_token = "dummy auth token";
-        let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {api_token}")).unwrap();
-        auth_value.set_sensitive(true);
-        auth_value
-    }
-
     #[tokio::test]
     async fn api_token_missing_permission() {
         // Given
@@ -585,11 +578,8 @@ pub mod tests {
                 auth: Authentication,
                 _context: TracingContext,
             ) -> Result<bool, AuthorizationClientError> {
-                if auth.into_maybe_string().is_some() {
-                    Ok(true)
-                } else {
-                    Err(AuthorizationClientError::NoBearerToken)
-                }
+                assert!(auth.into_maybe_string().is_none());
+                Err(AuthorizationClientError::NoBearerToken)
             }
         }
         let app_state = AppStateDouble::dummy().with_authorization_api(AuthorizationMock);
@@ -872,7 +862,6 @@ pub mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .header("traceparent", traceparent)
                     .uri("/v1/skills/acme/summarize/run")
                     .body(Body::from(serde_json::to_string(&json!("Homer")).unwrap()))
@@ -908,7 +897,6 @@ pub mod tests {
                 Request::builder()
                     .method(Method::POST)
                     .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                    .header(AUTHORIZATION, dummy_auth_value())
                     .header("traceparent", traceparent)
                     .header("tracestate", tracestate)
                     .uri("/v1/skills/acme/summarize/run")
