@@ -363,11 +363,9 @@ impl TryFrom<&Version> for SupportedVersion {
 impl SupportedVersion {
     /// Extracts the package version from a given WIT file.
     /// Path is used for debugging, contents should be the text contents of the WIT file.
-    fn extract_wit_package_version(path: impl AsRef<Path>, contents: &str) -> Version {
+    fn extract_wit_package_version(path: impl AsRef<Path>) -> Version {
         let mut resolve = wit_parser::Resolve::new();
-        let package_id = resolve
-            .push_str(path, contents)
-            .expect("Invalid WIT world file");
+        let (package_id, _) = resolve.push_path(path).expect("Invalid WIT world file");
 
         resolve
             .packages
@@ -385,19 +383,13 @@ impl SupportedVersion {
         match self {
             Self::V0_2 => {
                 static VERSION: LazyLock<Version> = LazyLock::new(|| {
-                    SupportedVersion::extract_wit_package_version(
-                        "./wit/skill@0.2/skill.wit",
-                        include_str!("../wit/skill@0.2/skill.wit"),
-                    )
+                    SupportedVersion::extract_wit_package_version("./wit/skill@0.2")
                 });
                 &VERSION
             }
             Self::V0_3 => {
                 static VERSION: LazyLock<Version> = LazyLock::new(|| {
-                    SupportedVersion::extract_wit_package_version(
-                        "./wit/skill@0.3/skill.wit",
-                        include_str!("../wit/skill@0.3/skill.wit"),
-                    )
+                    SupportedVersion::extract_wit_package_version("./wit/skill@0.3")
                 });
                 &VERSION
             }

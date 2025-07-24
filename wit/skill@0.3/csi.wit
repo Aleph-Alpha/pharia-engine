@@ -1,0 +1,9 @@
+// A WIT world dedicated to interacting with Large Language Models and other AI-related tasks.
+@since(version = 0.3.0)
+world csi {
+    import chunking;
+    import document-index;
+    import inference;
+    import language;
+    import tool;
+} 
