@@ -1,3 +1,6 @@
+inferenceAddress: "https://inference-api.product.pharia.com"
+documentIndexAddress: "https://document-index.product.pharia.com"
+authorizationAddress: "https://pharia-iam.product.pharia.com"
 # -- Active namespaces for PhariaKernel.
 # The credentials can be provided via the values:
 #   configAccessToken

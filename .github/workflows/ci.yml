@@ -261,7 +261,6 @@ jobs:
 
           helm install pharia-kernel helm-charts/pharia-kernel \
               -f helm-charts/pharia-kernel/values-kind.yaml \
-              --set "inferenceAddress=https://inference-api.product.pharia.com" \
               --set "image.registry=$LOCAL_REGISTRY" \
               --set "image.repository=pharia-kernel" \
               --set "image.tag=$IMAGE_ID" \
@@ -343,7 +342,6 @@ jobs:
 
           helm install pharia-kernel helm-charts/pharia-kernel \
               -f helm-charts/pharia-kernel/values-kind.yaml \
-              --set "inferenceAddress=https://inference-api.product.pharia.com" \
               --set "image.registry=$LOCAL_REGISTRY" \
               --set "image.repository=pharia-kernel" \
               --set "image.tag=$IMAGE_ID" \
