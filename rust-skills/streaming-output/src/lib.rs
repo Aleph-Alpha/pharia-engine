@@ -6,7 +6,7 @@ use pharia::skill::{
 };
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "message-stream-skill", features: ["streaming"] });
+wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "message-stream-skill" });
 
 struct Skill;
 
