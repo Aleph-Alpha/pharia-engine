@@ -54,6 +54,13 @@ pub fn given_skill_infinite_streaming() -> TestSkill {
 }
 
 #[must_use]
+pub fn given_rust_skill_chat_v0_4() -> TestSkill {
+    static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("chat-v0_4"));
+    let target_path = WASM_BUILD.clone();
+    TestSkill::new(target_path)
+}
+
+#[must_use]
 pub fn given_rust_skill_greet_v0_3() -> TestSkill {
     static WASM_BUILD: LazyLock<PathBuf> = LazyLock::new(|| given_rust_skill("greet-v0_3"));
     let target_path = WASM_BUILD.clone();
