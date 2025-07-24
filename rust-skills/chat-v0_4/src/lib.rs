@@ -3,7 +3,7 @@ use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::inference::{ChatParams, ChatRequest, Logprobs, Message, chat};
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.4", world: "skill" });
+wit_bindgen::generate!({ path: "../../wit/skill@0.4", world: "skill", features: ["next-release"] });
 
 struct Skill;
 
