@@ -973,9 +973,9 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.120.1"
+version = "0.120.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe6ad4b4488859c4811aa9142170d3b065bdafea7075cd4143056c046f7c72ae"
+checksum = "4d6d883b4942ef3a7104096b8bc6f2d1a41393f159ac8de12aed27b25d67f895"
 dependencies = [
  "cranelift-entity",
 ]
