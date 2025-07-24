@@ -166,17 +166,10 @@ jobs:
           exit-code: "1"
           output: "report.json"
 
-      - uses: taiki-e/install-action@v2
+      - name: Run CycloneDX Cargo
+        uses: Aleph-Alpha/actions/cyclonedx/cargo@962815bafa2a1b058f65efdf733872ec62951c0a
         with:
-          tool: cargo-cyclonedx,cyclonedx
-
-      - name: Generate SBOM with CycloneDX
-        run: cargo cyclonedx --format json --manifest-path Cargo.toml
-
-      - name: Merge SBOMs
-        run: |
-          CDX_FILES=$(find . -name "*.cdx.json" -type f | tr '\n' ' ')
-          cyclonedx merge --input-files sbom.json $CDX_FILES --output-format json --output-file sbom.json
+          sbom-file: sbom.json
 
       - name: Upload scanning artifacts
         uses: actions/upload-artifact@v4
