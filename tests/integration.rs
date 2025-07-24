@@ -234,6 +234,8 @@ async fn run_search_skill() {
 
 #[tokio::test]
 async fn tools_can_be_listed() {
+    let _guard = given_tracing_subscriber().await;
+
     let mcp = given_sse_mcp_server().await;
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_mcp_server(mcp.address());
@@ -485,9 +487,12 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
 #[tokio::test]
 async fn openai_inference_backend_is_supported() {
     // Given
+    let _guard = given_tracing_subscriber().await;
+
     let chat_skill_wasm = given_chat_stream_skill().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("chat-stream", chat_skill_wasm);
+
     let token = openai_inference_token();
     let kernel =
         TestKernel::with_openai_inference(local_skill_dir.to_namespace_config(), token).await;
@@ -576,6 +581,8 @@ async fn chat_v0_2_via_remote_csi() {
 
 #[tokio::test]
 async fn unsupported_csi_function() {
+    let _guard = given_tracing_subscriber().await;
+
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -601,6 +608,8 @@ async fn unsupported_csi_function() {
 
 #[tokio::test]
 async fn unsupported_old_csi_version() {
+    let _guard = given_tracing_subscriber().await;
+
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -624,6 +633,8 @@ async fn unsupported_old_csi_version() {
 
 #[tokio::test]
 async fn error_for_lack_of_version() {
+    let _guard = given_tracing_subscriber().await;
+
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -647,6 +658,7 @@ async fn error_for_lack_of_version() {
 
 #[tokio::test]
 async fn list_mcp_servers_for_empty_namespace_returns_empty_list() {
+    let _guard = given_tracing_subscriber().await;
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -672,6 +684,8 @@ async fn list_mcp_servers_for_empty_namespace_returns_empty_list() {
 
 #[tokio::test]
 async fn list_tools_for_empty_namespace_returns_empty_list() {
+    let _guard = given_tracing_subscriber().await;
+
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -694,6 +708,7 @@ async fn list_tools_for_empty_namespace_returns_empty_list() {
 
 #[tokio::test]
 async fn unsupported_newer_csi_version() {
+    let _guard = given_tracing_subscriber().await;
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -719,6 +734,7 @@ async fn unsupported_newer_csi_version() {
 
 #[tokio::test]
 async fn unsupported_newer_minor_csi_version() {
+    let _guard = given_tracing_subscriber().await;
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -848,6 +864,7 @@ async fn span_sampled_when_requested() {
             .await
             .unwrap(),
     );
+    kernel.shutdown().await;
 
     // Then a span is sampled
     let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
@@ -878,6 +895,7 @@ async fn span_not_sampled_when_not_requested() {
             .await
             .unwrap(),
     );
+    kernel.shutdown().await;
 
     // Then no span is recorded
     let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
