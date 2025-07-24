@@ -1,5 +1,6 @@
 mod v0_2;
 mod v0_3;
+mod v0_4;
 
 use std::{
     path::Path,
@@ -215,6 +216,18 @@ pub fn load_skill_from_wasm_bytes(
             let skill = WasmSkill::new(engine, skill_pre);
             Ok(Box::new(skill))
         }
+        SupportedSkillWorld::V0_4Function => {
+            let skill_pre = v0_4::skill::SkillPre::new(pre)
+                .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
+            let skill = WasmSkill::new(engine, skill_pre);
+            Ok(Box::new(skill))
+        }
+        SupportedSkillWorld::V0_4MessageStream => {
+            let skill_pre = v0_4::message_stream_skill::MessageStreamSkillPre::new(pre)
+                .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
+            let skill = WasmSkill::new(engine, skill_pre);
+            Ok(Box::new(skill))
+        }
     }
 }
 
@@ -227,6 +240,10 @@ pub enum SupportedSkillWorld {
     V0_3Function,
     /// Versions 0.3.x of the streaming-skill world
     V0_3MessageStream,
+    /// Versions 0.4.x of the skill world
+    V0_4Function,
+    /// Versions 0.4.x of the streaming-skill world
+    V0_4MessageStream,
 }
 
 impl SupportedSkillWorld {
@@ -242,6 +259,15 @@ impl SupportedSkillWorld {
                 }
                 Self::V0_3MessageStream => {
                     v0_3::message_stream_skill::MessageStreamSkill::add_to_linker(
+                        linker,
+                        |state: &mut LinkedCtx| state,
+                    )?;
+                }
+                Self::V0_4Function => {
+                    v0_4::skill::Skill::add_to_linker(linker, |state: &mut LinkedCtx| state)?;
+                }
+                Self::V0_4MessageStream => {
+                    v0_4::message_stream_skill::MessageStreamSkill::add_to_linker(
                         linker,
                         |state: &mut LinkedCtx| state,
                     )?;
@@ -308,6 +334,12 @@ impl SupportedSkillWorld {
                 (SupportedVersion::V0_3, "message-stream") => {
                     return Ok(SupportedSkillWorld::V0_3MessageStream);
                 }
+                (SupportedVersion::V0_4, "skill-handler") => {
+                    return Ok(SupportedSkillWorld::V0_4Function);
+                }
+                (SupportedVersion::V0_4, "message-stream") => {
+                    return Ok(SupportedSkillWorld::V0_4MessageStream);
+                }
                 _ => {}
             }
         }
@@ -324,6 +356,8 @@ pub enum SupportedVersion {
     V0_2,
     /// Versions 0.3.x of the skill world
     V0_3,
+    /// Versions 0.4.x of the skill world
+    V0_4,
 }
 
 impl TryFrom<&Version> for SupportedVersion {
@@ -345,6 +379,15 @@ impl TryFrom<&Version> for SupportedVersion {
             } => {
                 if version <= Self::V0_3.current_supported_version() {
                     Ok(Self::V0_3)
+                } else {
+                    Err(SkillLoadError::NotSupportedYet(version.to_string()))
+                }
+            }
+            Version {
+                major: 0, minor: 4, ..
+            } => {
+                if version <= Self::V0_4.current_supported_version() {
+                    Ok(Self::V0_4)
                 } else {
                     Err(SkillLoadError::NotSupportedYet(version.to_string()))
                 }
@@ -401,6 +444,32 @@ impl SupportedVersion {
                 });
                 &VERSION
             }
+            Self::V0_4 => {
+                static VERSION: LazyLock<Version> = LazyLock::new(|| {
+                    // It may seem a bit verbose to specify all files manually. Importantly, the
+                    // wit resolver would raise an error if we were to forget to include a file
+                    // that is part of a package.
+
+                    // https://docs.rs/include_wit/latest/include_wit/ might also be an option in
+                    // case iterating all the files becomes too tedious.
+                    let files = [
+                        include_str!("../wit/skill@0.4/skill.wit"),
+                        include_str!("../wit/skill@0.4/message-stream.wit"),
+                        include_str!("../wit/skill@0.4/csi.wit"),
+                        include_str!("../wit/skill@0.4/chunking.wit"),
+                        include_str!("../wit/skill@0.4/inference.wit"),
+                        include_str!("../wit/skill@0.4/language.wit"),
+                        include_str!("../wit/skill@0.4/tool.wit"),
+                        include_str!("../wit/skill@0.4/document-index.wit"),
+                    ];
+                    let contents = files.join("\n");
+                    SupportedVersion::extract_wit_package_version(
+                        "./wit/skill@0.4/skill.wit",
+                        &contents,
+                    )
+                });
+                &VERSION
+            }
         }
     }
 
@@ -421,9 +490,9 @@ pub mod tests {
     use test_skills::{
         given_chat_stream_skill, given_complete_stream_skill, given_invalid_output_skill,
         given_python_skill_greet_v0_2, given_python_skill_greet_v0_3, given_rust_skill_chat,
-        given_rust_skill_complete_with_echo, given_rust_skill_explain, given_rust_skill_greet_v0_2,
-        given_rust_skill_greet_v0_3, given_rust_skill_search, given_skill_tool_invocation,
-        given_streaming_output_skill,
+        given_rust_skill_chat_v0_4, given_rust_skill_complete_with_echo, given_rust_skill_explain,
+        given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
+        given_skill_tool_invocation, given_streaming_output_skill,
     };
 
     use crate::{
@@ -588,6 +657,26 @@ pub mod tests {
 
         // Then it returns a json string
         assert_eq!(result, json!("Hello Homer"));
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_v0_4_module() {
+        // Given a skill loaded by our engine
+        let test_skill = given_rust_skill_chat_v0_4();
+        let wasm = test_skill.bytes();
+        let engine = Arc::new(Engine::default());
+        let skill = load_skill_from_wasm_bytes(engine, wasm, TracingContext::dummy()).unwrap();
+        let ctx = Box::new(CsiChatStub);
+
+        // When invoked with a json string
+        let input = json!("Capital of France?");
+        let result = skill
+            .run_as_function(ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
+
+        // Then it returns a json string
+        assert_eq!(result["content"].as_str().unwrap(), "dummy-content");
     }
 
     #[tokio::test]
@@ -858,9 +947,17 @@ pub mod tests {
     }
 
     #[test]
-    fn latest_supported_version() {
+    fn can_parse_latest_v0_3_wit_world() {
         assert_eq!(
             SupportedVersion::V0_3.current_supported_version(),
+            &Version::new(0, 3, 11)
+        );
+    }
+
+    #[test]
+    fn latest_supported_version() {
+        assert_eq!(
+            SupportedVersion::V0_4.current_supported_version(),
             SupportedVersion::latest_supported_version(),
         );
     }

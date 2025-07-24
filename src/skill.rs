@@ -114,6 +114,7 @@ pub enum AnySkillManifest {
     /// Earliest skill versions do not contain metadata
     V0,
     V0_3(SkillMetadataV0_3),
+    V0_4(SkillMetadataV0_4),
 }
 
 impl AnySkillManifest {
@@ -121,6 +122,7 @@ impl AnySkillManifest {
         match self {
             Self::V0 => None,
             Self::V0_3(metadata) => metadata.description.as_deref(),
+            Self::V0_4(metadata) => metadata.description.as_deref(),
         }
     }
 
@@ -128,6 +130,7 @@ impl AnySkillManifest {
         match self {
             Self::V0 => None,
             Self::V0_3(metadata) => Some(&metadata.signature),
+            Self::V0_4(metadata) => Some(&metadata.signature),
         }
     }
 
@@ -135,6 +138,7 @@ impl AnySkillManifest {
         match self {
             Self::V0 => None,
             Self::V0_3(_) => Some("0.3"),
+            Self::V0_4(_) => Some("0.4"),
         }
     }
 
@@ -142,6 +146,7 @@ impl AnySkillManifest {
         match self {
             Self::V0 => "function",
             Self::V0_3(metadata) => metadata.signature.skill_type_name(),
+            Self::V0_4(metadata) => metadata.signature.skill_type_name(),
         }
     }
 }
@@ -149,6 +154,13 @@ impl AnySkillManifest {
 /// Metadata for a skill at wit version 0.3
 #[derive(Debug, Clone)]
 pub struct SkillMetadataV0_3 {
+    pub description: Option<String>,
+    pub signature: Signature,
+}
+
+/// Metadata for a skill at wit version 0.4
+#[derive(Debug, Clone)]
+pub struct SkillMetadataV0_4 {
     pub description: Option<String>,
     pub signature: Signature,
 }
