@@ -204,15 +204,21 @@ impl Kernel {
 mod tests {
     use std::{env, future::ready, sync::LazyLock, time::Duration};
 
-    use dotenvy::dotenv;
+    use dotenvy::from_filename;
     use tokio_test::assert_ok;
 
     use super::*;
 
+    pub fn load_env() {
+        // As the tests require differnet env vars then running the Kernel, we load from .env.test
+        // instead of .env
+        drop(from_filename(".env.test"));
+    }
+
     /// API Token used by tests to authenticate requests.
     pub fn api_token() -> &'static str {
         static API_TOKEN: LazyLock<String> = LazyLock::new(|| {
-            drop(dotenv());
+            load_env();
             env::var("PHARIA_AI_TOKEN").expect("PHARIA_AI_TOKEN variable not set")
         });
         &API_TOKEN
@@ -221,7 +227,7 @@ mod tests {
     /// Inference address used by tests.
     pub fn inference_url() -> &'static str {
         static INFERENCE_URL: LazyLock<String> = LazyLock::new(|| {
-            drop(dotenv());
+            load_env();
             env::var("INFERENCE_URL")
                 .unwrap_or_else(|_| "https://inference-api.product.pharia.com".to_owned())
         });
@@ -231,7 +237,7 @@ mod tests {
     /// `OpenAI` API Key used by tests to authenticate requests.
     pub fn openai_token() -> &'static str {
         static OPENAI_API_KEY: LazyLock<String> = LazyLock::new(|| {
-            drop(dotenv());
+            load_env();
             env::var("OPENAI_INFERENCE__TOKEN").expect("OPENAI_INFERENCE__TOKEN variable not set")
         });
         &OPENAI_API_KEY
@@ -240,7 +246,7 @@ mod tests {
     /// URL of an `OpenAI` compatible inference server used by tests.
     pub fn openai_inference_url() -> &'static str {
         static OPENAI_INFERENCE_URL: LazyLock<String> = LazyLock::new(|| {
-            drop(dotenv());
+            load_env();
             env::var("OPENAI_INFERENCE__URL").expect("OPENAI_INFERENCE__URL variable not set")
         });
         &OPENAI_INFERENCE_URL
@@ -249,7 +255,7 @@ mod tests {
     /// Authorization address used by tests.
     pub fn authorization_url() -> &'static str {
         static AUTHORIZATION_URL: LazyLock<String> = LazyLock::new(|| {
-            drop(dotenv());
+            load_env();
             env::var("AUTHORIZATION_URL")
                 .unwrap_or_else(|_| "https://pharia-iam.product.pharia.com".to_owned())
         });
@@ -259,7 +265,7 @@ mod tests {
     /// Inference address used by tests.
     pub fn document_index_url() -> &'static str {
         static DOCUMENT_INDEX_URL: LazyLock<String> = LazyLock::new(|| {
-            drop(dotenv());
+            load_env();
             env::var("DOCUMENT_INDEX_URL")
                 .unwrap_or_else(|_| "https://document-index.product.pharia.com".to_owned())
         });

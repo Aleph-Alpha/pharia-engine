@@ -70,6 +70,18 @@ podman machine start
 
 In this repository we stick to Conventional Commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
 
+### Tests
+
+```sh
+# Create an .env.test file and set the missing values
+cp .env.test.example .env.test
+# We recommend cargo nextest, but cargo test also works
+cargo install cargo-nextest --locked
+cargo nextest run
+```
+
+Note that the tests currently require access to a PhariaAI instance.
+
 ## Release
 
 Releasing in this repository is automated with [release-plz](https://release-plz.ieni.dev/).

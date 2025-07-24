@@ -143,18 +143,19 @@ fn is_skill_not_found(error: &OciDistributionError) -> bool {
 mod tests {
     use std::env;
 
-    use dotenvy::dotenv;
     use oci_client::{Reference, secrets::RegistryAuth};
     use oci_wasm::WasmConfig;
     use test_skills::given_rust_skill_greet_v0_2;
     use wasmtime::{Config, Engine, component::Component};
 
     use super::OciRegistry;
+    use crate::tests::load_env;
 
     use crate::{logging::TracingContext, registries::SkillRegistry};
 
     impl OciRegistry {
         fn from_env() -> Option<Self> {
+            load_env();
             let maybe_registry = env::var("TEST_REGISTRY");
             let maybe_repository = env::var("TEST_BASE_REPOSITORY");
             let maybe_username = env::var("TEST_REGISTRY_USER");
@@ -194,7 +195,6 @@ mod tests {
     #[tokio::test]
     async fn oci_push_and_pull_skill() {
         // given skill in local directory is pushed to registry
-        drop(dotenvy::dotenv());
         let test_skill = given_rust_skill_greet_v0_2();
         let registry = OciRegistry::from_env().expect("Please configure registry, see .env.test");
         let tag = "latest";
@@ -226,7 +226,6 @@ mod tests {
     #[tokio::test]
     async fn skill_not_found() {
         // given a OCI registry is available
-        drop(dotenv());
         let registry = OciRegistry::from_env().unwrap();
 
         // when loading a skill that does not exist
@@ -246,7 +245,6 @@ mod tests {
     #[tokio::test]
     async fn digest_not_found() {
         // given a OCI registry is available
-        drop(dotenv());
         let registry = OciRegistry::from_env().unwrap();
 
         // when loading a skill that does not exist
