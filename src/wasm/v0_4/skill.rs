@@ -19,7 +19,7 @@ bindgen!({
         "pharia:skill/document-index": super::csi::pharia::skill::document_index,
         "pharia:skill/inference": super::csi::pharia::skill::inference,
         "pharia:skill/language": super::csi::pharia::skill::language,
-    }
+    },
 });
 
 impl TryFrom<SkillMetadata> for SkillMetadataV0_4 {
