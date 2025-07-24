@@ -87,15 +87,16 @@ static INITIALIZE_TRACING_SUBSCRIBER: LazyLock<LogRecorder> = LazyLock::new(trac
 ///
 /// This might be used for tests where we want logging/tracing to be enabled to simulate
 /// the production environment, but are not interested in inspecting the logs.
-pub async fn given_tracing_subscriber() -> SequentialTestGuard {
-    let _ = &INITIALIZE_TRACING_SUBSCRIBER;
-    SequentialTestGuard::parallel().await
+pub async fn log_recorder() -> (SequentialTestGuard, &'static LogRecorder) {
+    let log_recorder = &INITIALIZE_TRACING_SUBSCRIBER;
+    let guard = SequentialTestGuard::parallel().await;
+    (guard, log_recorder)
 }
 
 /// Exclusive guard that ensures a tracing subscriber is initialized and returns a fresh log recorder.
 ///
 /// May be used for tests that want to inspect the logs.
-pub async fn given_log_recorder() -> (SequentialTestGuard, &'static LogRecorder) {
+pub async fn exclusive_log_recorder() -> (SequentialTestGuard, &'static LogRecorder) {
     let log_recorder = &INITIALIZE_TRACING_SUBSCRIBER;
 
     // Aquire an exclusive guard and clear the log recorder
