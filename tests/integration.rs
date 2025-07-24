@@ -25,7 +25,7 @@ use test_skills::{
 use tokio::sync::oneshot;
 
 mod tracing;
-use tracing::{given_log_recorder, given_tracing_subscriber};
+use tracing::{SequentialTestGuard, exclusive_log_recorder, log_recorder};
 
 struct TestFileRegistry {
     skills: Vec<String>,
@@ -74,35 +74,42 @@ struct TestKernel {
     shutdown_trigger: oneshot::Sender<()>,
     kernel: Kernel,
     port: u16,
+    log_recorder: &'static tracing::LogRecorder,
+    _guard: SequentialTestGuard,
 }
 
 impl TestKernel {
     async fn default() -> Self {
-        let app_config = Self::test_app_config();
-        Self::new(app_config).await
+        let app_config = Self::default_config();
+        Self::new(app_config, false).await
+    }
+
+    /// Create a `TestKernel` instance that is guaranteed to be the only `TestKernel` running.
+    async fn exclusive(app_config: AppConfig) -> Self {
+        Self::new(app_config, true).await
     }
 
     async fn without_authorization() -> Self {
-        let app_config = Self::test_app_config().with_authorization_url(None);
-        Self::new(app_config).await
+        let app_config = Self::default_config().with_authorization_url(None);
+        Self::new(app_config, false).await
     }
 
     async fn with_namespaces(namespaces: NamespaceConfigs) -> Self {
-        let app_config = Self::test_app_config().with_namespaces(namespaces);
-        Self::new(app_config).await
+        let app_config = Self::default_config().with_namespaces(namespaces);
+        Self::new(app_config, false).await
     }
 
     async fn with_openai_inference(namespaces: NamespaceConfigs, token: &str) -> Self {
         let url = "https://api.openai.com/v1";
-        let app_config = Self::test_app_config()
+        let app_config = Self::default_config()
             .with_namespaces(namespaces)
             .with_openai_inference(url, token)
             .with_inference_url(None)
             .with_authorization_url(None);
-        Self::new(app_config).await
+        Self::new(app_config, false).await
     }
 
-    pub fn test_app_config() -> AppConfig {
+    pub fn default_config() -> AppConfig {
         let port = free_test_port();
         let metrics_port = free_test_port();
         AppConfig::default()
@@ -118,7 +125,7 @@ impl TestKernel {
             .with_pooling_allocator(true)
     }
 
-    async fn new(app_config: AppConfig) -> Self {
+    async fn new(app_config: AppConfig, exclusive: bool) -> Self {
         let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
         let shutdown_signal = async {
             shutdown_capture.await.unwrap();
@@ -126,11 +133,18 @@ impl TestKernel {
         let port = app_config.kernel_address().port();
         // Wait for socket listener to be bound
         let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
+        let (guard, log_recorder) = if exclusive {
+            exclusive_log_recorder().await
+        } else {
+            log_recorder().await
+        };
 
         Self {
             shutdown_trigger,
             kernel,
             port,
+            log_recorder,
+            _guard: guard,
         }
     }
 
@@ -140,6 +154,10 @@ impl TestKernel {
             skills,
         ))
         .await
+    }
+
+    fn log_recorder(&self) -> &'static tracing::LogRecorder {
+        self.log_recorder
     }
 
     fn port(&self) -> u16 {
@@ -167,9 +185,6 @@ fn namespace_config(dir_path: &Path, skills: &[&str]) -> NamespaceConfigs {
 #[cfg_attr(not(feature = "test_inference"), ignore)]
 #[tokio::test]
 async fn run_skill() {
-    // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let greet_skill_wasm = given_rust_skill_greet_v0_2().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("greet", greet_skill_wasm);
@@ -200,9 +215,6 @@ async fn run_skill() {
 #[cfg_attr(not(feature = "test_document_index"), ignore)]
 #[tokio::test]
 async fn run_search_skill() {
-    // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let wasm_bytes = given_rust_skill_search().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("search", wasm_bytes);
@@ -234,8 +246,6 @@ async fn run_search_skill() {
 
 #[tokio::test]
 async fn tools_can_be_listed() {
-    let _guard = given_tracing_subscriber().await;
-
     let mcp = given_sse_mcp_server().await;
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_mcp_server(mcp.address());
@@ -291,9 +301,6 @@ async fn tools_can_be_listed() {
 async fn run_skill_with_tool_call() {
     let mcp = given_sse_mcp_server().await;
 
-    // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let wasm_bytes = given_skill_tool_invocation().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("tool-invocation-rs", wasm_bytes);
@@ -324,9 +331,6 @@ async fn run_skill_with_tool_call() {
 
 #[tokio::test]
 async fn run_doc_metadata_skill() {
-    // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let wasm_bytes = given_rust_skill_doc_metadata().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("doc_metadata", wasm_bytes);
@@ -357,8 +361,6 @@ async fn run_doc_metadata_skill() {
 #[tokio::test]
 async fn run_complete_stream_skill() {
     // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let wasm_bytes = given_complete_stream_skill().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("complete_stream", wasm_bytes);
@@ -395,8 +397,6 @@ async fn run_complete_stream_skill() {
 #[tokio::test]
 async fn run_chat_stream_skill() {
     // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let wasm_bytes = given_chat_stream_skill().bytes();
     let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
     local_skill_dir.with_skill("chat_stream", wasm_bytes);
@@ -440,8 +440,6 @@ async fn run_chat_stream_skill() {
 #[tokio::test]
 async fn completion_via_remote_csi() {
     // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -487,8 +485,6 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
 #[tokio::test]
 async fn openai_inference_backend_is_supported() {
     // Given
-    let _guard = given_tracing_subscriber().await;
-
     let chat_skill_wasm = given_chat_stream_skill().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("chat-stream", chat_skill_wasm);
@@ -534,8 +530,6 @@ async fn openai_inference_backend_is_supported() {
 #[tokio::test]
 async fn chat_v0_2_via_remote_csi() {
     // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -581,8 +575,6 @@ async fn chat_v0_2_via_remote_csi() {
 
 #[tokio::test]
 async fn unsupported_csi_function() {
-    let _guard = given_tracing_subscriber().await;
-
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -608,8 +600,6 @@ async fn unsupported_csi_function() {
 
 #[tokio::test]
 async fn unsupported_old_csi_version() {
-    let _guard = given_tracing_subscriber().await;
-
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -633,8 +623,6 @@ async fn unsupported_old_csi_version() {
 
 #[tokio::test]
 async fn error_for_lack_of_version() {
-    let _guard = given_tracing_subscriber().await;
-
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -658,7 +646,6 @@ async fn error_for_lack_of_version() {
 
 #[tokio::test]
 async fn list_mcp_servers_for_empty_namespace_returns_empty_list() {
-    let _guard = given_tracing_subscriber().await;
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -684,8 +671,6 @@ async fn list_mcp_servers_for_empty_namespace_returns_empty_list() {
 
 #[tokio::test]
 async fn list_tools_for_empty_namespace_returns_empty_list() {
-    let _guard = given_tracing_subscriber().await;
-
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -708,7 +693,6 @@ async fn list_tools_for_empty_namespace_returns_empty_list() {
 
 #[tokio::test]
 async fn unsupported_newer_csi_version() {
-    let _guard = given_tracing_subscriber().await;
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -734,7 +718,6 @@ async fn unsupported_newer_csi_version() {
 
 #[tokio::test]
 async fn unsupported_newer_minor_csi_version() {
-    let _guard = given_tracing_subscriber().await;
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -762,8 +745,6 @@ async fn unsupported_newer_minor_csi_version() {
 #[tokio::test]
 async fn search_via_remote_csi() {
     // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -802,8 +783,6 @@ async fn search_via_remote_csi() {
 #[tokio::test]
 async fn metadata_via_remote_csi() {
     // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let kernel = TestKernel::with_skills(&[]).await;
 
     let req_client = reqwest::Client::new();
@@ -843,11 +822,9 @@ async fn metadata_via_remote_csi() {
 #[tokio::test]
 #[allow(clippy::unreadable_literal)]
 async fn span_sampled_when_requested() {
-    // Given a log recorder with a parent based sampler
-    let (_guard, log_recorder) = given_log_recorder().await;
-
-    let local_skill_dir = TestFileRegistry::new();
-    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
+    let app_config = TestKernel::default_config();
+    let kernel = TestKernel::exclusive(app_config).await;
+    let log_recorder = kernel.log_recorder();
 
     // When we do a request with a parent span that is sampled
     let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
@@ -874,11 +851,9 @@ async fn span_sampled_when_requested() {
 #[tokio::test]
 #[allow(clippy::unreadable_literal)]
 async fn span_not_sampled_when_not_requested() {
-    // Given a log recorder with a parent based sampler
-    let (_guard, log_recorder) = given_log_recorder().await;
-
-    let local_skill_dir = TestFileRegistry::new();
-    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
+    let app_config = TestKernel::default_config();
+    let kernel = TestKernel::exclusive(app_config).await;
+    let log_recorder = kernel.log_recorder();
 
     // When we do a request with a parent span that is not sampled
     let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
@@ -905,13 +880,14 @@ async fn span_not_sampled_when_not_requested() {
 #[tokio::test]
 #[allow(clippy::unreadable_literal)]
 async fn traceparent_is_respected() {
-    // Given a log recorder
-    let (_guard, log_recorder) = given_log_recorder().await;
-
+    // Given a Kernel that is the only one running
     let streaming_output_skill_wasm = given_streaming_output_skill().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("streaming-output", streaming_output_skill_wasm);
-    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
+    let app_config =
+        TestKernel::default_config().with_namespaces(local_skill_dir.to_namespace_config());
+    let kernel = TestKernel::exclusive(app_config).await;
+    let log_recorder = kernel.log_recorder();
 
     // When we execute a skill with a traceheader
     let trace_id: u128 = 0x0af7651916cd43dd8448eb211c80319c;
@@ -974,8 +950,6 @@ async fn traceparent_is_respected() {
 #[tokio::test]
 async fn invoke_function_as_stream() {
     // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let greet_skill_wasm = given_rust_skill_greet_v0_3().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("greet", greet_skill_wasm);
@@ -1010,8 +984,6 @@ async fn invoke_function_as_stream() {
 #[tokio::test]
 async fn test_message_stream_canceled_during_the_skill_execution() {
     // Simulate the production environment with tracing enabled
-    let _guard = given_tracing_subscriber().await;
-
     let greet_skill_wasm = given_skill_infinite_streaming().bytes();
     let mut local_skill_dir = TestFileRegistry::new();
     local_skill_dir.with_skill("infinite", greet_skill_wasm);
