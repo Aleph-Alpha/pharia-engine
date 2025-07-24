@@ -89,7 +89,7 @@ jobs:
     runs-on: cpu-runner-16c-64gb-01
     permissions:
       contents: read
-      packages: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - name: Generate image ID
@@ -128,6 +128,20 @@ jobs:
           name: pharia-kernel-image
           path: /tmp/pharia-kernel.tar
           retention-days: 1
+
+      - name: Log in to GitHub
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GitHub
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: pharia-kernel
+          tags: ${{ env.IMAGE_ID }}
+          registry: ghcr.io/aleph-alpha/pharia-kernel
     outputs:
       image_id: ${{ env.IMAGE_ID }}
 
@@ -137,48 +151,44 @@ jobs:
     needs: [build-image]
     permissions:
       contents: read
+      packages: read
     env:
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
+      - name: Log in to GitHub
+        uses: redhat-actions/podman-login@v1
         with:
-          name: pharia-kernel-image
-          path: /tmp
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract SBOM from tarball
-        uses: aquasecurity/trivy-action@0.32.0
+      - name: Run Trivy Scan
+        id: trivy-scan
+        uses: Aleph-Alpha/actions/trivy/scan@962815bafa2a1b058f65efdf733872ec62951c0a
         with:
-          format: "cyclonedx"
-          input: "/tmp/pharia-kernel.tar"
-          output: "sbom.json"
-          scan-type: "fs"
-          scanners: "license,vuln,secret"
-
-      - name: Vulnerability scanning with Trivy
-        uses: aquasecurity/trivy-action@0.32.0
-        with:
-          input: /tmp/pharia-kernel.tar
-          trivyignores: ".trivyignore"
-          severity: "MEDIUM,HIGH,CRITICAL"
-          exit-code: "1"
-          output: "report.json"
+          toml-file: triage.toml
+          image-uri: ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:${{ env.IMAGE_ID }}
 
       - name: Run CycloneDX Cargo
         uses: Aleph-Alpha/actions/cyclonedx/cargo@962815bafa2a1b058f65efdf733872ec62951c0a
         with:
-          sbom-file: sbom.json
+          sbom-file: ${{ steps.trivy-scan.outputs.license }}
 
       - name: Upload scanning artifacts
         uses: actions/upload-artifact@v4
         with:
           name: security-scanning-results
           path: |
-            sbom.json
-            report.json
+            ${{ steps.trivy-scan.outputs.report }}
+            ${{ steps.trivy-scan.outputs.license }}
+            ${{ steps.trivy-scan.outputs.sbom }}
           retention-days: 1
+    outputs:
+      report: ${{ steps.trivy-scan.outputs.report }}
+      license: ${{ steps.trivy-scan.outputs.license }}
+      sbom: ${{ steps.trivy-scan.outputs.sbom }}
 
   test-image:
     # We are not time bound by this job, so ubuntu-latest is fine.
@@ -440,14 +450,14 @@ jobs:
           tags: latest ${{ env.IMAGE_ID }}
           registry: ${{ env.ARTIFACTORY_REPOSITORY }}
 
-      - uses: oras-project/setup-oras@v1
-
-      - name: Attach Trivy report to Image
-        run: |
-          oras login ${{ env.ARTIFACTORY_HOST }} -u ${{ steps.jfrog.outputs.oidc-user }} -p ${{ steps.jfrog.outputs.oidc-token }}
-          oras attach --artifact-type "application/aa.trivy.report" --annotation "created-by=Github-CI" --annotation "content=report.json" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID report.json
-          oras attach --artifact-type "application/aa.trivy.sbom"   --annotation "created-by=Github-CI" --annotation "content=sbom.json" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID sbom.json
-          oras attach --artifact-type "application/aa.trivy.triage" --annotation "created-by=Github-CI" --annotation "content=triage.toml" ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID triage.toml
+      - name: Attach Security Artifacts
+        uses: Aleph-Alpha/actions/oras/attach@962815bafa2a1b058f65efdf733872ec62951c0a
+        with:
+          image-uri: ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID
+          license-path: ${{ needs.security-scan.outputs.license }}
+          report-path: ${{ needs.security-scan.outputs.report }}
+          sbom-path: ${{ needs.security-scan.outputs.sbom }}
+          toml-path: triage.toml
 
       - name: Print image URL
         run: echo "Image pushed to ${{ steps.push.outputs.registry-paths }}"
