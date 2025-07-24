@@ -199,12 +199,7 @@ jobs:
 
       - name: Integration test
         run: |
-          (podman run -p 8081:8081 -v ./config.toml:/app/config.toml \
-            -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_USER=dummy \
-            -e NAMESPACES__PHARIA_KERNEL_TEAM__REGISTRY_PASSWORD=dummy \
-            -e NAMESPACES__PHARIA_KERNEL_TEAM__CONFIG_ACCESS_TOKEN=dummy \
-            -e PHARIA_AI_TOKEN=dummy \
-            pharia-kernel:$IMAGE_ID | cat) &
+          (podman run -p 8081:8081 pharia-kernel:$IMAGE_ID | cat) &
           bash -x ./tests/test-image.sh 8081 127.0.0.1
 
   test-helm-chart:
