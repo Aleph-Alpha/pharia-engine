@@ -6,7 +6,7 @@ use pharia::skill::inference::{
 };
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill", features: ["streaming"] });
+wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
 
 struct Skill;
 

@@ -1,7 +1,7 @@
 use exports::pharia::skill::message_stream::{Error, Guest};
 use pharia::skill::streaming_output::{BeginAttributes, MessageItem, StreamOutput};
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "message-stream-skill", features: ["streaming"] });
+wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "message-stream-skill" });
 
 struct Skill;
 
