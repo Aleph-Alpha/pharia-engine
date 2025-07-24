@@ -105,7 +105,7 @@ pub fn given_rust_skill_chat() -> TestSkill {
 #[must_use]
 pub fn given_python_skill_greet_v0_2() -> TestSkill {
     static WASM_BUILD: LazyLock<PathBuf> =
-        LazyLock::new(|| given_python_skill("greet-v0_2", "0.2", "skill"));
+        LazyLock::new(|| given_python_skill("greet-v0_2", WitVersion::V0_2, "skill"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
@@ -113,7 +113,7 @@ pub fn given_python_skill_greet_v0_2() -> TestSkill {
 #[must_use]
 pub fn given_python_skill_greet_v0_3() -> TestSkill {
     static WASM_BUILD: LazyLock<PathBuf> =
-        LazyLock::new(|| given_python_skill("greet-v0_3", "0.3", "skill"));
+        LazyLock::new(|| given_python_skill("greet-v0_3", WitVersion::V0_3, "skill"));
     let target_path = WASM_BUILD.clone();
     TestSkill::new(target_path)
 }
@@ -146,8 +146,22 @@ pub fn given_streaming_output_skill() -> TestSkill {
     TestSkill::new(target_path)
 }
 
+enum WitVersion {
+    V0_2,
+    V0_3,
+}
+
+impl WitVersion {
+    fn path(&self) -> &str {
+        match self {
+            WitVersion::V0_2 => "wit/skill@0.2",
+            WitVersion::V0_3 => "wit/skill@0.3",
+        }
+    }
+}
+
 /// Creates `{package-name}-py.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `python-skills/{package-name}`
-fn given_python_skill(package_name: &str, wit_version: &str, world: &str) -> PathBuf {
+fn given_python_skill(package_name: &str, wit_version: WitVersion, world: &str) -> PathBuf {
     let target_path = SKILL_BUILD_CACHE_DIR.join(format!("{package_name}-py.wasm"));
     if !target_path.exists() {
         build_python_skill(package_name, &target_path, wit_version, world);
@@ -201,7 +215,12 @@ fn build_rust_skill(package_name: &str) {
     .unwrap();
 }
 
-fn build_python_skill(package_name: &str, target_path: &Path, wit_version: &str, world: &str) {
+fn build_python_skill(
+    package_name: &str,
+    target_path: &Path,
+    wit_version: WitVersion,
+    world: &str,
+) {
     let venv = static_venv();
 
     fs::create_dir_all(SKILL_BUILD_CACHE_DIR.as_path()).unwrap();
@@ -209,10 +228,7 @@ fn build_python_skill(package_name: &str, target_path: &Path, wit_version: &str,
     venv.run(&[
         "componentize-py",
         "-d",
-        REPO_DIR
-            .join(format!("wit/skill@{wit_version}/skill.wit"))
-            .to_str()
-            .unwrap(),
+        REPO_DIR.join(wit_version.path()).to_str().unwrap(),
         "-w",
         world,
         "componentize",
