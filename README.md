@@ -13,7 +13,7 @@ In more technical terms, we aim to reduce the accidental complexity the Skill de
 The Kernel is part of the [PhariaAI product suite](https://docs.aleph-alpha.com/products/pharia-ai/overview/).
 However, it can also be configured to run standalone with any OpenAI-compatible inference backend.
 If operated outside of PhariaAI, some features are not available.
-These include RAG capabilities offered by the [DocumentIndex](https://docs.aleph-alpha.com/products/apis/pharia-search/aleph-alpha-document-index-api/), features like explainability that are special to the [Aleph Alpha inference](https://docs.aleph-alpha.com/products/apis/pharia-inference/) and the connection to the [Pharia IAM service](https://docs.aleph-alpha.com/products/pharia-ai/pharia-os/user-management/).
+These include RAG capabilities offered by the [DocumentIndex](https://docs.aleph-alpha.com/products/apis/pharia-search/aleph-alpha-document-index-api/), features like explainability that are offered by the [Aleph Alpha inference](https://docs.aleph-alpha.com/products/apis/pharia-inference/) and the integration with the [Pharia IAM service](https://docs.aleph-alpha.com/products/pharia-ai/pharia-os/user-management/).
 
 ## Setup
 
