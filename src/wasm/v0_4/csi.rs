@@ -10,7 +10,7 @@ use pharia::skill::{
     },
     inference::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionAppend,
-        CompletionEvent, CompletionParamsV2, CompletionRequest, CompletionRequestV2,
+        CompletionEvent, CompletionParams, CompletionRequest, CompletionRequestV2,
         CompletionStream, Distribution, ExplanationRequest, FinishReason, Granularity,
         Host as InferenceHost, HostChatStream, HostCompletionStream, Logprob, Logprobs, Message,
         MessageAppend, TextScore, TokenUsage,
@@ -667,9 +667,9 @@ impl From<Logprobs> for inference::Logprobs {
     }
 }
 
-impl From<CompletionParamsV2> for inference::CompletionParams {
-    fn from(params: CompletionParamsV2) -> Self {
-        let CompletionParamsV2 {
+impl From<CompletionParams> for inference::CompletionParams {
+    fn from(params: CompletionParams) -> Self {
+        let CompletionParams {
             return_special_tokens,
             max_tokens,
             temperature,
@@ -801,7 +801,7 @@ mod tests {
         let source = CompletionRequestV2 {
             prompt: "Hello, world!".to_string(),
             model: "model".to_string(),
-            params: CompletionParamsV2 {
+            params: CompletionParams {
                 echo: true,
                 return_special_tokens: true,
                 max_tokens: Some(10),
