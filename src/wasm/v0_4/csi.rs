@@ -10,10 +10,9 @@ use pharia::skill::{
     },
     inference::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionAppend,
-        CompletionEvent, CompletionParams, CompletionRequest, CompletionRequestV2,
-        CompletionStream, Distribution, ExplanationRequest, FinishReason, Granularity,
-        Host as InferenceHost, HostChatStream, HostCompletionStream, Logprob, Logprobs, Message,
-        MessageAppend, TextScore, TokenUsage,
+        CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
+        ExplanationRequest, FinishReason, Granularity, Host as InferenceHost, HostChatStream,
+        HostCompletionStream, Logprob, Logprobs, Message, MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -425,15 +424,6 @@ impl InferenceHost for LinkedCtx {
             .map(Into::into)
             .collect()
     }
-
-    async fn complete_v2(&mut self, requests: Vec<CompletionRequestV2>) -> Vec<Completion> {
-        self.ctx
-            .complete(requests.into_iter().map(Into::into).collect())
-            .await
-            .into_iter()
-            .map(Into::into)
-            .collect()
-    }
 }
 
 /// This manages our completion stream within the resource table, allowing us to link to the Resource in the WIT World.
@@ -712,21 +702,6 @@ impl From<CompletionRequest> for inference::CompletionRequest {
     }
 }
 
-impl From<CompletionRequestV2> for inference::CompletionRequest {
-    fn from(request: CompletionRequestV2) -> Self {
-        let CompletionRequestV2 {
-            prompt,
-            model,
-            params,
-        } = request;
-
-        Self {
-            prompt,
-            model,
-            params: params.into(),
-        }
-    }
-}
 impl From<inference::Message> for Message {
     fn from(message: inference::Message) -> Self {
         let inference::Message { role, content } = message;
@@ -798,7 +773,7 @@ mod tests {
 
     #[test]
     fn echo_parameter_gets_forwarded() {
-        let source = CompletionRequestV2 {
+        let source = CompletionRequest {
             prompt: "Hello, world!".to_string(),
             model: "model".to_string(),
             params: CompletionParams {
