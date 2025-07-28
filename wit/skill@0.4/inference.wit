@@ -134,17 +134,6 @@ interface inference {
         echo: bool,
     }
 
-    /// Completion request parameters
-    /// Introduces support for `echo` without requiring a version bump.
-    record completion-request-v2 {
-        model: string,
-        prompt: string,
-        params: completion-params
-    }
-
-    /// Introduces support for `echo` without requiring a version bump.
-    complete-v2: func(requests: list<completion-request-v2>) -> list<completion>;
-
     /// A chunk of a completion returned by a completion stream.
     record completion-append {
         /// A chunk of the completion text.
