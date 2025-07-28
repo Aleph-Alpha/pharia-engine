@@ -95,15 +95,13 @@ interface inference {
     record completion-request {
         model: string,
         prompt: string,
-        params: completion-params-v2
+        params: completion-params
     }
 
-    /// Outdated, consumers should use `complete-v2` instead.
-    /// Still supported for backwards compatibility.
     complete: func(requests: list<completion-request>) -> list<completion>;
 
     /// Completion request parameters
-    record completion-params-v2 {
+    record completion-params {
         /// The maximum tokens that should be inferred.
         ///
         /// Note: the backing implementation may return less tokens due to
@@ -141,7 +139,7 @@ interface inference {
     record completion-request-v2 {
         model: string,
         prompt: string,
-        params: completion-params-v2
+        params: completion-params
     }
 
     /// Introduces support for `echo` without requiring a version bump.
