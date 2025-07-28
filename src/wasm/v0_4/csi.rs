@@ -10,10 +10,10 @@ use pharia::skill::{
     },
     inference::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionAppend,
-        CompletionEvent, CompletionParams, CompletionParamsV2, CompletionRequest,
-        CompletionRequestV2, CompletionStream, Distribution, ExplanationRequest, FinishReason,
-        Granularity, Host as InferenceHost, HostChatStream, HostCompletionStream, Logprob,
-        Logprobs, Message, MessageAppend, TextScore, TokenUsage,
+        CompletionEvent, CompletionParamsV2, CompletionRequest, CompletionRequestV2,
+        CompletionStream, Distribution, ExplanationRequest, FinishReason, Granularity,
+        Host as InferenceHost, HostChatStream, HostCompletionStream, Logprob, Logprobs, Message,
+        MessageAppend, TextScore, TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -667,35 +667,6 @@ impl From<Logprobs> for inference::Logprobs {
     }
 }
 
-impl From<CompletionParams> for inference::CompletionParams {
-    fn from(params: CompletionParams) -> Self {
-        let CompletionParams {
-            return_special_tokens,
-            max_tokens,
-            temperature,
-            top_k,
-            top_p,
-            stop,
-            frequency_penalty,
-            presence_penalty,
-            logprobs,
-        } = params;
-
-        Self {
-            return_special_tokens,
-            max_tokens,
-            temperature,
-            top_k,
-            top_p,
-            stop,
-            frequency_penalty,
-            presence_penalty,
-            logprobs: logprobs.into(),
-            echo: false,
-        }
-    }
-}
-
 impl From<CompletionParamsV2> for inference::CompletionParams {
     fn from(params: CompletionParamsV2) -> Self {
         let CompletionParamsV2 {
@@ -846,29 +817,6 @@ mod tests {
 
         let result: inference::CompletionRequest = source.into();
         assert!(result.params.echo);
-    }
-
-    #[test]
-    fn echo_parameter_set_to_false_for_old_completion() {
-        let source = CompletionRequest {
-            prompt: "Hello, world!".to_string(),
-            model: "model".to_string(),
-            params: CompletionParams {
-                return_special_tokens: true,
-                max_tokens: Some(10),
-                temperature: Some(0.5),
-                top_k: Some(10),
-                top_p: Some(0.9),
-                stop: vec![],
-                frequency_penalty: Some(0.8),
-                presence_penalty: Some(0.7),
-                logprobs: Logprobs::No,
-            },
-        };
-
-        let result: inference::CompletionRequest = source.into();
-
-        assert!(!result.params.echo);
     }
 
     #[test]
