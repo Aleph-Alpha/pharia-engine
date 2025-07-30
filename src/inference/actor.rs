@@ -366,6 +366,17 @@ pub struct CompletionRequest {
     pub params: CompletionParams,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Function {
+    pub name: String,
+    pub description: Option<String>,
+    // While it would be nice to specify here already in the type system that this must be a JSON
+    // value, this would require the possibility for a non-happy path when converting from the
+    // bindings in the `wasm` module, which we do not have.
+    pub parameters: Option<Vec<u8>>,
+    pub strict: Option<bool>,
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct ChatParams {
     pub max_tokens: Option<u32>,
@@ -374,6 +385,7 @@ pub struct ChatParams {
     pub frequency_penalty: Option<f64>,
     pub presence_penalty: Option<f64>,
     pub logprobs: Logprobs,
+    pub tools: Option<Vec<Function>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

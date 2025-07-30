@@ -224,6 +224,7 @@ impl Skill for SkillTellMeAJoke {
                 frequency_penalty: None,
                 presence_penalty: None,
                 logprobs: crate::inference::Logprobs::No,
+                tools: None,
             },
         };
         let stream_id = ctx.chat_stream_new(request).await;
@@ -333,6 +334,7 @@ impl Skill for SkillChat {
                 frequency_penalty: None,
                 presence_penalty: None,
                 logprobs: crate::inference::Logprobs::No,
+                tools: None,
             },
         };
 

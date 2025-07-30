@@ -111,7 +111,7 @@ impl InferenceClient for Client {
         auth: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
-        let task = request.to_task_chat();
+        let task = request.to_task_chat()?;
 
         let how = how(auth, tracing_context)?;
         retry(|| self.chat(&task, &request.model, &how), tracing_context)
@@ -127,7 +127,7 @@ impl InferenceClient for Client {
         tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
-        let task = request.to_task_chat();
+        let task = request.to_task_chat()?;
         let how = how(auth, tracing_context)?;
         let mut stream = retry(
             || self.stream_chat(&task, &request.model, &how),
@@ -413,7 +413,7 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
 }
 
 impl ChatRequest {
-    pub fn to_task_chat(&self) -> TaskChat<'_> {
+    pub fn to_task_chat(&self) -> Result<TaskChat<'_>, InferenceError> {
         let ChatRequest {
             model: _,
             messages,
@@ -425,9 +425,13 @@ impl ChatRequest {
                     frequency_penalty,
                     presence_penalty,
                     logprobs,
+                    tools,
                 },
         } = self;
-        TaskChat {
+        if tools.is_some() {
+            return Err(InferenceError::AlephAlphaInferenceToolCallNotSupported);
+        }
+        let task = TaskChat {
             messages: messages.iter().map(Into::into).collect(),
             stopping: Stopping {
                 maximum_tokens: *max_tokens,
@@ -440,7 +444,8 @@ impl ChatRequest {
                 presence_penalty: *presence_penalty,
             },
             logprobs: (*logprobs).into(),
-        }
+        };
+        Ok(task)
     }
 }
 
@@ -525,6 +530,8 @@ pub enum InferenceError {
     NotConfigured,
     #[error("Tool calls are not supported yet: {0}")]
     ToolCallNotSupported(String),
+    #[error("The tool parameter is not supported yet for the Aleph Alpha inference backend.")]
+    AlephAlphaInferenceToolCallNotSupported,
     #[error(transparent)]
     Other(#[from] anyhow::Error), // default is an anyhow error
 }
@@ -546,7 +553,7 @@ mod tests {
     use tokio::{sync::mpsc, time::Instant};
 
     use crate::{
-        inference::{ChatParams, ExplanationRequest, FinishReason, Granularity},
+        inference::{ChatParams, ExplanationRequest, FinishReason, Function, Granularity},
         tests::{api_token, inference_url},
     };
 
@@ -752,6 +759,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 frequency_penalty: Some(-10.0),
                 presence_penalty: None,
                 logprobs: Logprobs::No,
+                tools: None,
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };
@@ -1077,5 +1085,44 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             }
         );
         assert!(matches!(events[3], ChatEvent::Usage { .. }));
+    }
+
+    #[tokio::test]
+    async fn specifying_tools_for_aa_inference_is_error() {
+        // Given a chat request with tools
+        let auth = Authentication::from_token(api_token());
+        let host = inference_url().to_owned();
+        let client = Client::new(host, None).unwrap();
+
+        // When
+        let chat_request = ChatRequest {
+            model: "pharia-1-llm-7b-control".to_owned(),
+            messages: vec![Message::new("user", "An apple a day")],
+            params: ChatParams {
+                tools: Some(vec![Function {
+                    name: "get_delivery_date".to_owned(),
+                    description: Some("Get the delivery date for a given order".to_owned()),
+                    parameters: None,
+                    strict: None,
+                }]),
+                ..Default::default()
+            },
+        };
+
+        // When
+        let chat_response = <Client as InferenceClient>::chat(
+            &client,
+            &chat_request,
+            auth,
+            &TracingContext::dummy(),
+        )
+        .await
+        .unwrap_err();
+
+        // Then we get a not supported yet error
+        assert!(matches!(
+            chat_response,
+            InferenceError::AlephAlphaInferenceToolCallNotSupported
+        ));
     }
 }
