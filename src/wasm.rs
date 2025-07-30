@@ -266,14 +266,14 @@ impl SupportedSkillWorld {
                 Self::V0_4Function => {
                     v0_4::skill::Skill::add_to_linker(
                         linker,
-                        v0_4::skill::LinkOptions::default().next_release(true),
+                        v0_4::skill::LinkOptions::default().alpha(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
                 Self::V0_4MessageStream => {
                     v0_4::message_stream_skill::MessageStreamSkill::add_to_linker(
                         linker,
-                        v0_4::message_stream_skill::LinkOptions::default().next_release(true),
+                        v0_4::message_stream_skill::LinkOptions::default().alpha(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
