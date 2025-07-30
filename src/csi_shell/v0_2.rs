@@ -517,9 +517,9 @@ impl From<Message> for inference::Message {
     }
 }
 
-impl From<inference::Message> for Message {
-    fn from(value: inference::Message) -> Self {
-        let inference::Message { role, content } = value;
+impl From<inference::ResponseMessage> for Message {
+    fn from(value: inference::ResponseMessage) -> Self {
+        let inference::ResponseMessage { role, content } = value;
         Self { role, content }
     }
 }
@@ -598,10 +598,7 @@ pub mod tests {
     fn chat_response() {
         let response = CsiResponse::Chat(
             inference::ChatResponse {
-                message: inference::Message {
-                    role: "user".to_string(),
-                    content: "Hello".to_string(),
-                },
+                message: inference::ResponseMessage::new("user", "Hello"),
                 finish_reason: inference::FinishReason::Stop,
                 logprobs: vec![],
                 usage: inference::TokenUsage {

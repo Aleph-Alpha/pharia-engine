@@ -757,9 +757,9 @@ impl From<CompletionRequestV2> for inference::CompletionRequest {
         }
     }
 }
-impl From<inference::Message> for Message {
-    fn from(message: inference::Message) -> Self {
-        let inference::Message { role, content } = message;
+impl From<inference::ResponseMessage> for Message {
+    fn from(message: inference::ResponseMessage) -> Self {
+        let inference::ResponseMessage { role, content } = message;
         Self { role, content }
     }
 }
@@ -972,10 +972,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::Message {
-                role: "user".to_string(),
-                content: "Hello, world!".to_string(),
-            },
+            message: inference::ResponseMessage::new("user", "Hello, world!"),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![inference::Distribution {
                 sampled: inference::Logprob {
@@ -1008,10 +1005,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::Message {
-                role: "user".to_string(),
-                content: "Hello, world!".to_string(),
-            },
+            message: inference::ResponseMessage::new("user", "Hello, world!"),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![],
         };

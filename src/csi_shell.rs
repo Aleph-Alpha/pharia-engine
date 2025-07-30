@@ -179,8 +179,8 @@ mod tests {
         csi::tests::RawCsiDouble,
         inference::{
             ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-            Explanation, ExplanationRequest, FinishReason, InferenceError, Message, TextScore,
-            TokenUsage,
+            Explanation, ExplanationRequest, FinishReason, InferenceError, ResponseMessage,
+            TextScore, TokenUsage,
         },
     };
 
@@ -824,10 +824,7 @@ mod tests {
                 _requests: Vec<ChatRequest>,
             ) -> anyhow::Result<Vec<ChatResponse>> {
                 Ok(vec![ChatResponse {
-                    message: Message {
-                        role: "assistant".to_owned(),
-                        content: "dummy-content".to_owned(),
-                    },
+                    message: ResponseMessage::new("assistant", "dummy-content"),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],
                     usage: TokenUsage {

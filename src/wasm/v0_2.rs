@@ -442,9 +442,9 @@ impl From<String> for Role {
     }
 }
 
-impl From<inference::Message> for Message {
-    fn from(message: inference::Message) -> Self {
-        let inference::Message { role, content } = message;
+impl From<inference::ResponseMessage> for Message {
+    fn from(message: inference::ResponseMessage) -> Self {
+        let inference::ResponseMessage { role, content } = message;
         Self {
             role: role.into(),
             content,
