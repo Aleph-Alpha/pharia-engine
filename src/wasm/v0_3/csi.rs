@@ -653,6 +653,7 @@ impl From<ChatParams> for inference::ChatParams {
             frequency_penalty,
             presence_penalty,
             logprobs: logprobs.into(),
+            tools: None,
         }
     }
 }
@@ -951,6 +952,7 @@ mod tests {
                 frequency_penalty: Some(0.8),
                 presence_penalty: Some(0.7),
                 logprobs: inference::Logprobs::Top(2),
+                tools: None,
             }
         );
     }

@@ -654,6 +654,7 @@ impl From<ChatParams> for inference::ChatParams {
             frequency_penalty,
             presence_penalty,
             logprobs: logprobs.into(),
+            tools: None,
         }
     }
 }

@@ -11,8 +11,9 @@ use pharia::skill::{
     inference::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionAppend,
         CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
-        ExplanationRequest, FinishReason, Granularity, Host as InferenceHost, HostChatStream,
-        HostCompletionStream, Logprob, Logprobs, Message, MessageAppend, TextScore, TokenUsage,
+        ExplanationRequest, FinishReason, Function, Granularity, Host as InferenceHost,
+        HostChatStream, HostCompletionStream, Logprob, Logprobs, Message, MessageAppend, TextScore,
+        TokenUsage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -635,6 +636,7 @@ impl From<ChatParams> for inference::ChatParams {
             frequency_penalty,
             presence_penalty,
             logprobs,
+            tools,
         } = params;
         Self {
             max_tokens,
@@ -643,6 +645,24 @@ impl From<ChatParams> for inference::ChatParams {
             frequency_penalty,
             presence_penalty,
             logprobs: logprobs.into(),
+            tools: tools.map(|t| t.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+impl From<Function> for inference::Function {
+    fn from(function: Function) -> Self {
+        let Function {
+            name,
+            description,
+            parameters,
+            strict,
+        } = function;
+        Self {
+            name,
+            description,
+            parameters,
+            strict,
         }
     }
 }
@@ -769,6 +789,8 @@ impl LanguageHost for LinkedCtx {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -852,6 +874,19 @@ mod tests {
     #[test]
     fn forward_chat_params() {
         // Given
+        let parameters = serde_json::to_vec(&json!({
+            "type": "object",
+            "properties": {
+                "order_id": { "type": "string" }
+            }
+        }))
+        .unwrap();
+        let function = Function {
+            name: "get_delivery_date".to_owned(),
+            description: Some("Get the delivery date for a given order".to_owned()),
+            parameters: Some(parameters.clone()),
+            strict: None,
+        };
         let source = ChatParams {
             max_tokens: Some(10),
             temperature: Some(0.5),
@@ -859,6 +894,7 @@ mod tests {
             frequency_penalty: Some(0.8),
             presence_penalty: Some(0.7),
             logprobs: Logprobs::Top(2),
+            tools: Some(vec![function]),
         };
 
         // When
@@ -874,6 +910,12 @@ mod tests {
                 frequency_penalty: Some(0.8),
                 presence_penalty: Some(0.7),
                 logprobs: inference::Logprobs::Top(2),
+                tools: Some(vec![inference::Function {
+                    name: "get_delivery_date".to_owned(),
+                    description: Some("Get the delivery date for a given order".to_owned()),
+                    parameters: Some(parameters),
+                    strict: None,
+                }]),
             }
         );
     }

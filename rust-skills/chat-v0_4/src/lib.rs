@@ -24,6 +24,7 @@ impl Guest for Skill {
             frequency_penalty: None,
             presence_penalty: None,
             logprobs: Logprobs::No,
+            tools: None,
         };
 
         let request = ChatRequest {
