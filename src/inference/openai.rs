@@ -205,18 +205,14 @@ impl TryFrom<&inference::Function> for ChatCompletionTool {
     }
 }
 
-impl TryFrom<FinishReason> for inference::FinishReason {
-    type Error = InferenceError;
-
-    fn try_from(finish_reason: FinishReason) -> Result<Self, Self::Error> {
+impl From<FinishReason> for inference::FinishReason {
+    fn from(finish_reason: FinishReason) -> Self {
         match finish_reason {
-            FinishReason::Stop => Ok(inference::FinishReason::Stop),
-            FinishReason::Length => Ok(inference::FinishReason::Length),
-            FinishReason::ContentFilter => Ok(inference::FinishReason::ContentFilter),
+            FinishReason::Stop => inference::FinishReason::Stop,
+            FinishReason::Length => inference::FinishReason::Length,
+            FinishReason::ContentFilter => inference::FinishReason::ContentFilter,
             FinishReason::FunctionCall | FinishReason::ToolCalls => {
-                Err(InferenceError::ToolCallNotSupported(format!(
-                    "Unsupported finish reason: {finish_reason:?}",
-                )))
+                inference::FinishReason::ToolCalls
             }
         }
     }
@@ -240,7 +236,7 @@ impl TryFrom<CreateChatCompletionResponse> for inference::ChatResponse {
             .ok_or_else(|| {
                 anyhow::anyhow!("Expected chat completion response to have a finish reason.")
             })?
-            .try_into()?;
+            .into();
 
         // It is not quite clear why usage is represented as an Option. The OpenAI API docs specify
         // it to always exist:
@@ -291,7 +287,7 @@ impl TryFrom<CreateChatCompletionStreamResponse> for inference::ChatEvent {
             anyhow::anyhow!("Expected at least one choice in the chat completion stream response.")
         })?;
         if let Some(finish_reason) = first_choice.finish_reason {
-            let finish_reason = finish_reason.try_into()?;
+            let finish_reason = finish_reason.into();
             return Ok(inference::ChatEvent::MessageEnd { finish_reason });
         }
         if let Some(role) = first_choice.delta.role {

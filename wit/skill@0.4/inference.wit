@@ -46,6 +46,8 @@ interface inference {
         length,
         /// Content was omitted due to a flag from content filters
         content-filter,
+        /// The model called a tool.
+        tool-calls,
     }
 
     record logprob {
