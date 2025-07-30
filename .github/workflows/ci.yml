@@ -404,6 +404,7 @@ jobs:
       ARTIFACTORY_HOST: alephalpha.jfrog.io
       ARTIFACTORY_REPOSITORY: alephalpha.jfrog.io/pharia-kernel-images
       ARTIFACTORY_HELM_REPOSITORY: pharia-kernel-helm
+      HARBOR_REPOSITORY: ${{ vars.HARBOR_REGISTRY }}/pharia-kernel-images
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v4
@@ -490,6 +491,20 @@ jobs:
           id: "931"
           ref: "main"
           variables: '{"TRIGGER_USER_EMAIL":"${{ env.TRIGGER_USER_EMAIL }}","TRIGGER_USER_NAME":"${{ env.TRIGGER_USER_NAME }}","TRIGGER_IMAGE_TAG":"${{ env.IMAGE_ID }}","TRIGGER_IMAGE_TAG_TARGET":".image.tag","UPDATE_DIRECTORY":"applications","UPDATE_PROJECT":"pharia-kernel"}'
+
+      - name: Log in to Harbor
+        uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603
+        with:
+          registry: ${{ env.HARBOR_REPOSITORY }}
+          username: ${{ vars.HARBOR_USER }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Push to Harbor
+        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c
+        with:
+          image: pharia-kernel
+          tags: latest ${{ env.IMAGE_ID }}
+          registry: ${{ env.HARBOR_REPOSITORY }}
 
       - if: github.ref_type == 'tag'
         name: Extract Helm chart version
