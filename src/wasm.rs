@@ -18,7 +18,7 @@ use wasmtime::{
     component::{InstancePre, Linker},
 };
 use wit_parser::{
-    WorldKey,
+    SourceMap, WorldKey,
     decoding::{DecodedWasm, decode},
 };
 
@@ -410,12 +410,18 @@ impl TryFrom<&Version> for SupportedVersion {
 
 impl SupportedVersion {
     /// Extracts the package version from a given WIT file.
-    /// Path is used for debugging, contents should be the text contents of the WIT file.
-    fn extract_wit_package_version(path: impl AsRef<Path>, contents: &str) -> Version {
+    ///
+    /// Files is expected to be the path and content of different files, all belonging to the same
+    /// package. The path is only used for a better error message when debugging.
+    fn extract_wit_package_version(files: &[(impl AsRef<Path>, &str)]) -> Version {
+        let mut source_map = SourceMap::new();
+        for (path, contents) in files {
+            source_map.push(path.as_ref(), *contents);
+        }
+        let package = source_map.parse().expect("Failed to parse WIT package");
+
         let mut resolve = wit_parser::Resolve::new();
-        let package_id = resolve
-            .push_str(path, contents)
-            .expect("Invalid WIT world file");
+        let package_id = resolve.push_group(package).expect("Failed to push package");
 
         resolve
             .packages
@@ -433,19 +439,21 @@ impl SupportedVersion {
         match self {
             Self::V0_2 => {
                 static VERSION: LazyLock<Version> = LazyLock::new(|| {
-                    SupportedVersion::extract_wit_package_version(
+                    let files = [(
                         "./wit/skill@0.2/skill.wit",
                         include_str!("../wit/skill@0.2/skill.wit"),
-                    )
+                    )];
+                    SupportedVersion::extract_wit_package_version(&files)
                 });
                 &VERSION
             }
             Self::V0_3 => {
                 static VERSION: LazyLock<Version> = LazyLock::new(|| {
-                    SupportedVersion::extract_wit_package_version(
+                    let files = [(
                         "./wit/skill@0.3/skill.wit",
                         include_str!("../wit/skill@0.3/skill.wit"),
-                    )
+                    )];
+                    SupportedVersion::extract_wit_package_version(&files)
                 });
                 &VERSION
             }
@@ -458,20 +466,40 @@ impl SupportedVersion {
                     // https://docs.rs/include_wit/latest/include_wit/ might also be an option in
                     // case iterating all the files becomes too tedious.
                     let files = [
-                        include_str!("../wit/skill@0.4/skill.wit"),
-                        include_str!("../wit/skill@0.4/message-stream.wit"),
-                        include_str!("../wit/skill@0.4/csi.wit"),
-                        include_str!("../wit/skill@0.4/chunking.wit"),
-                        include_str!("../wit/skill@0.4/inference.wit"),
-                        include_str!("../wit/skill@0.4/language.wit"),
-                        include_str!("../wit/skill@0.4/tool.wit"),
-                        include_str!("../wit/skill@0.4/document-index.wit"),
+                        (
+                            "./wit/skill@0.4/chunking.wit",
+                            include_str!("../wit/skill@0.4/chunking.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.4/inference.wit",
+                            include_str!("../wit/skill@0.4/inference.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.4/language.wit",
+                            include_str!("../wit/skill@0.4/language.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.4/tool.wit",
+                            include_str!("../wit/skill@0.4/tool.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.4/document-index.wit",
+                            include_str!("../wit/skill@0.4/document-index.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.4/skill.wit",
+                            include_str!("../wit/skill@0.4/skill.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.4/message-stream.wit",
+                            include_str!("../wit/skill@0.4/message-stream.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.4/csi.wit",
+                            include_str!("../wit/skill@0.4/csi.wit"),
+                        ),
                     ];
-                    let contents = files.join("\n");
-                    SupportedVersion::extract_wit_package_version(
-                        "./wit/skill@0.4/skill.wit",
-                        &contents,
-                    )
+                    SupportedVersion::extract_wit_package_version(&files)
                 });
                 &VERSION
             }
@@ -956,6 +984,14 @@ pub mod tests {
         assert_eq!(
             SupportedVersion::V0_3.current_supported_version(),
             &Version::new(0, 3, 11)
+        );
+    }
+
+    #[test]
+    fn can_parse_latest_v0_4_wit_world() {
+        assert_eq!(
+            SupportedVersion::V0_4.current_supported_version(),
+            &Version::new(0, 4, 0)
         );
     }
 
