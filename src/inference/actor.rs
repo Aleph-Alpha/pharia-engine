@@ -429,6 +429,7 @@ pub enum FinishReason {
     Stop,
     Length,
     ContentFilter,
+    ToolCalls,
 }
 
 impl FromStr for FinishReason {

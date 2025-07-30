@@ -470,7 +470,13 @@ impl From<inference::ChatResponse> for ChatResponse {
 impl From<inference::FinishReason> for FinishReason {
     fn from(finish_reason: inference::FinishReason) -> Self {
         match finish_reason {
-            inference::FinishReason::Stop => Self::Stop,
+            // For backwards compatibility, we need to map newly introduced variants.
+            // Mapping `ToolCalls` to `Stop` might not be the "correct" choice for all situations.
+            // In practice, however, this code path should not be reached as there is also no way
+            // to specify available tools as part of the request. It is not impossible to reach,
+            // as the user could also specify tools in the system prompt themselves, so we must
+            // not unwrap here. Mapping to `Stop` is the simplest solution for now.
+            inference::FinishReason::Stop | inference::FinishReason::ToolCalls => Self::Stop,
             inference::FinishReason::Length => Self::Length,
             inference::FinishReason::ContentFilter => Self::ContentFilter,
         }

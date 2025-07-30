@@ -752,6 +752,7 @@ impl From<inference::FinishReason> for FinishReason {
             inference::FinishReason::Stop => Self::Stop,
             inference::FinishReason::Length => Self::Length,
             inference::FinishReason::ContentFilter => Self::ContentFilter,
+            inference::FinishReason::ToolCalls => Self::ToolCalls,
         }
     }
 }
