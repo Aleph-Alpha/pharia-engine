@@ -14,7 +14,7 @@ use tracing::{error, warn};
 
 use thiserror::Error;
 
-use crate::{authorization::Authentication, logging::TracingContext};
+use crate::{authorization::Authentication, inference::ResponseMessage, logging::TracingContext};
 
 use super::{
     ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
@@ -361,9 +361,13 @@ impl From<aleph_alpha_client::Usage> for TokenUsage {
     }
 }
 
-impl From<aleph_alpha_client::Message<'_>> for Message {
+impl From<aleph_alpha_client::Message<'_>> for ResponseMessage {
     fn from(message: aleph_alpha_client::Message<'_>) -> Self {
-        Message::new(message.role, message.content)
+        let aleph_alpha_client::Message { role, content } = message;
+        ResponseMessage {
+            role: role.to_string(),
+            content: content.to_string(),
+        }
     }
 }
 

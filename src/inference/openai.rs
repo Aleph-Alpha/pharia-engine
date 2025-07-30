@@ -56,13 +56,13 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
 }
 
 /// Not supporting tool calls yet.
-impl TryFrom<ChatCompletionResponseMessage> for inference::Message {
+impl TryFrom<ChatCompletionResponseMessage> for inference::ResponseMessage {
     type Error = InferenceError;
 
     fn try_from(message: ChatCompletionResponseMessage) -> Result<Self, Self::Error> {
         message
             .content
-            .map(|content| inference::Message {
+            .map(|content| inference::ResponseMessage {
                 role: message.role.to_string(),
                 content,
             })
@@ -246,7 +246,7 @@ impl TryFrom<CreateChatCompletionResponse> for inference::ChatResponse {
             .ok_or_else(|| anyhow::anyhow!("Expected chat completion response to have a usage."))?
             .into();
 
-        let message = inference::Message::try_from(first_choice.message.clone())?;
+        let message = inference::ResponseMessage::try_from(first_choice.message.clone())?;
         let response = inference::ChatResponse {
             message,
             finish_reason,
@@ -370,17 +370,51 @@ impl InferenceClient for OpenAiClient {
 #[cfg(test)]
 mod tests {
     use super::OpenAiClient;
+    use async_openai::types::{
+        ChatCompletionMessageToolCall, ChatCompletionResponseMessage, ChatCompletionToolType,
+        FunctionCall, Role,
+    };
     use tokio::sync::mpsc;
 
     use crate::{
         authorization::Authentication,
         inference::{
-            ChatEvent, ChatParams, ChatRequest, Function, InferenceError, Logprobs, Message,
+            self, ChatEvent, ChatParams, ChatRequest, Function, InferenceError, Logprobs, Message,
             client::InferenceClient,
         },
         logging::TracingContext,
         tests::{openai_inference_url, openai_token},
     };
+
+    #[test]
+    fn tool_call_is_mapped() {
+        // Given an OpenAI message with a tool call
+        let function_call = FunctionCall {
+            name: "get_delivery_date".to_owned(),
+            arguments: "{\"order_id\": \"123456\"}".to_owned(),
+        };
+        let tool_call = ChatCompletionMessageToolCall {
+            id: "123456".to_owned(),
+            function: function_call,
+            r#type: ChatCompletionToolType::Function,
+        };
+
+        #[allow(deprecated)]
+        let message = ChatCompletionResponseMessage {
+            tool_calls: Some(vec![tool_call]),
+            role: Role::Assistant,
+            content: None,
+            refusal: None,
+            audio: None,
+            function_call: None,
+        };
+
+        // When converting to an inference message
+        let _message = inference::ResponseMessage::try_from(message).unwrap();
+
+        // Then the tool call is available
+        // assert_eq!(message.tool_calls.len(), 1);
+    }
 
     #[tokio::test]
     async fn chat_with_function_calling() {

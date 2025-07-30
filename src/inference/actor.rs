@@ -403,6 +403,22 @@ impl Message {
     }
 }
 
+/// While we kept them the same before, the ingoing and outgoing message types are different.
+#[derive(Debug, Clone)]
+pub struct ResponseMessage {
+    pub role: String,
+    pub content: String,
+}
+
+impl ResponseMessage {
+    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            role: role.into(),
+            content: content.into(),
+        }
+    }
+}
+
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<Message>,
@@ -477,7 +493,7 @@ pub enum CompletionEvent {
 
 #[derive(Debug, Clone)]
 pub struct ChatResponse {
-    pub message: Message,
+    pub message: ResponseMessage,
     pub finish_reason: FinishReason,
     /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
     /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].

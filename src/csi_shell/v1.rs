@@ -762,9 +762,9 @@ impl From<Message> for inference::Message {
     }
 }
 
-impl From<inference::Message> for Message {
-    fn from(value: inference::Message) -> Self {
-        let inference::Message { role, content } = value;
+impl From<inference::ResponseMessage> for Message {
+    fn from(value: inference::ResponseMessage) -> Self {
+        let inference::ResponseMessage { role, content } = value;
         Message { role, content }
     }
 }
