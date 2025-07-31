@@ -3,10 +3,11 @@ use async_openai::{
     config::OpenAIConfig,
     error::{ApiError, OpenAIError},
     types::{
-        ChatChoiceLogprobs, ChatCompletionRequestMessage, ChatCompletionResponseMessage,
-        ChatCompletionStreamOptions, ChatCompletionTokenLogprob, ChatCompletionTool,
-        CompletionUsage, CreateChatCompletionRequest, CreateChatCompletionResponse,
-        CreateChatCompletionStreamResponse, FinishReason, FunctionObject, TopLogprobs,
+        ChatChoiceLogprobs, ChatCompletionMessageToolCall, ChatCompletionRequestMessage,
+        ChatCompletionResponseMessage, ChatCompletionStreamOptions, ChatCompletionTokenLogprob,
+        ChatCompletionTool, CompletionUsage, CreateChatCompletionRequest,
+        CreateChatCompletionResponse, CreateChatCompletionStreamResponse, FinishReason,
+        FunctionCall, FunctionObject, TopLogprobs,
     },
 };
 use futures::StreamExt;
@@ -55,13 +56,30 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
     }
 }
 
+impl From<ChatCompletionMessageToolCall> for inference::ToolCall {
+    fn from(tool_call: ChatCompletionMessageToolCall) -> Self {
+        let ChatCompletionMessageToolCall {
+            id: _,
+            r#type: _,
+            function: FunctionCall { name, arguments },
+        } = tool_call;
+        inference::ToolCall { name, arguments }
+    }
+}
+
 /// Not supporting tool calls yet.
 impl From<ChatCompletionResponseMessage> for inference::ResponseMessage {
     fn from(message: ChatCompletionResponseMessage) -> Self {
-        let ChatCompletionResponseMessage { role, content, .. } = message;
+        let ChatCompletionResponseMessage {
+            role,
+            content,
+            tool_calls,
+            ..
+        } = message;
         inference::ResponseMessage {
             role: role.to_string(),
             content: content.map(|c| c.to_string()),
+            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -448,7 +466,8 @@ mod tests {
         .unwrap();
 
         // Then
-        assert!(result.message.content.is_none())
+        assert!(result.message.content.is_none());
+        assert!(result.message.tool_calls.is_some());
     }
 
     #[tokio::test]
