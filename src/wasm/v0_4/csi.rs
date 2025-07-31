@@ -13,7 +13,7 @@ use pharia::skill::{
         CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
         ExplanationRequest, FinishReason, Function, Granularity, Host as InferenceHost,
         HostChatStream, HostCompletionStream, Logprob, Logprobs, Message, MessageAppend,
-        ResponseMessage, TextScore, TokenUsage,
+        ResponseMessage, TextScore, TokenUsage, ToolCall,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -722,10 +722,25 @@ impl From<CompletionRequest> for inference::CompletionRequest {
     }
 }
 
+impl From<inference::ToolCall> for ToolCall {
+    fn from(call: inference::ToolCall) -> Self {
+        let inference::ToolCall { name, arguments } = call;
+        Self { name, arguments }
+    }
+}
+
 impl From<inference::ResponseMessage> for ResponseMessage {
     fn from(message: inference::ResponseMessage) -> Self {
-        let inference::ResponseMessage { role, content } = message;
-        Self { role, content }
+        let inference::ResponseMessage {
+            role,
+            content,
+            tool_calls,
+        } = message;
+        Self {
+            role,
+            content,
+            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+        }
     }
 }
 

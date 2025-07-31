@@ -367,6 +367,8 @@ impl From<aleph_alpha_client::Message<'_>> for ResponseMessage {
         ResponseMessage {
             role: role.to_string(),
             content: Some(content.to_string()),
+            // We do not support tool calling for the Aleph Alpha inference backend.
+            tool_calls: None,
         }
     }
 }

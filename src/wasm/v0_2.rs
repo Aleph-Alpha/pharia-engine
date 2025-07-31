@@ -444,7 +444,11 @@ impl From<String> for Role {
 
 impl From<inference::ResponseMessage> for Message {
     fn from(message: inference::ResponseMessage) -> Self {
-        let inference::ResponseMessage { role, content } = message;
+        let inference::ResponseMessage {
+            role,
+            content,
+            tool_calls: _,
+        } = message;
         // We know that the messages we receive will always have a content, because we do not
         // support the tool parametersas input for this version of the WIT world. Nevertheless,
         // we are relying on the inference backend, so we avoid unwrapping here.
