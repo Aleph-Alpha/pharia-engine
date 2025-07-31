@@ -172,7 +172,7 @@ interface inference {
     /// A message that is returned by the model.
     record response-message {
         role: string,
-        content: string,
+        content: option<string>,
     }
 
     record function {

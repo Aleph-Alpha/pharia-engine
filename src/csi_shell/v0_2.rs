@@ -520,7 +520,13 @@ impl From<Message> for inference::Message {
 impl From<inference::ResponseMessage> for Message {
     fn from(value: inference::ResponseMessage) -> Self {
         let inference::ResponseMessage { role, content } = value;
-        Self { role, content }
+        // We know that the messages we receive will always have a content, because we do not
+        // support the tool parametersas input for this version of the WIT world. Nevertheless,
+        // we are relying on the inference backend, so we avoid unwrapping here.
+        Self {
+            role,
+            content: content.unwrap_or_default(),
+        }
     }
 }
 
@@ -594,11 +600,27 @@ pub mod tests {
             }])
         );
     }
+
+    #[test]
+    fn none_message_is_mapped_to_empty_string() {
+        let response = ChatResponse::from(inference::ChatResponse {
+            message: inference::ResponseMessage::new("assistant", None::<String>),
+            finish_reason: inference::FinishReason::Stop,
+            logprobs: vec![],
+            usage: inference::TokenUsage {
+                prompt: 0,
+                completion: 0,
+            },
+        });
+
+        assert_eq!(response.message.content, "");
+    }
+
     #[test]
     fn chat_response() {
         let response = CsiResponse::Chat(
             inference::ChatResponse {
-                message: inference::ResponseMessage::new("user", "Hello"),
+                message: inference::ResponseMessage::assistant("Hello"),
                 finish_reason: inference::FinishReason::Stop,
                 logprobs: vec![],
                 usage: inference::TokenUsage {
@@ -615,7 +637,7 @@ pub mod tests {
             serialized,
             json!({
                 "message": {
-                    "role": "user",
+                    "role": "assistant",
                     "content": "Hello"
                 },
                 "finish_reason": "stop",

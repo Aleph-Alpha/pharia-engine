@@ -824,7 +824,7 @@ mod tests {
                 _requests: Vec<ChatRequest>,
             ) -> anyhow::Result<Vec<ChatResponse>> {
                 Ok(vec![ChatResponse {
-                    message: ResponseMessage::new("assistant", "dummy-content"),
+                    message: ResponseMessage::assistant("dummy-content"),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],
                     usage: TokenUsage {

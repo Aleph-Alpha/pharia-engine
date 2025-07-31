@@ -407,14 +407,14 @@ impl Message {
 #[derive(Debug, Clone)]
 pub struct ResponseMessage {
     pub role: String,
-    pub content: String,
+    pub content: Option<String>,
 }
 
 impl ResponseMessage {
-    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(role: impl Into<String>, content: Option<impl Into<String>>) -> Self {
         Self {
             role: role.into(),
-            content: content.into(),
+            content: content.map(Into::into),
         }
     }
 }
@@ -740,6 +740,15 @@ pub mod tests {
     use crate::inference::client::{InferenceClientDouble, InferenceError};
 
     use super::*;
+
+    impl ResponseMessage {
+        pub fn assistant(content: impl Into<String>) -> Self {
+            Self {
+                content: Some(content.into()),
+                role: "assistant".to_string(),
+            }
+        }
+    }
 
     impl Completion {
         pub fn from_text(completion: impl Into<String>) -> Self {

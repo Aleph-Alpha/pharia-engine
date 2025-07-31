@@ -366,7 +366,7 @@ impl From<aleph_alpha_client::Message<'_>> for ResponseMessage {
         let aleph_alpha_client::Message { role, content } = message;
         ResponseMessage {
             role: role.to_string(),
-            content: content.to_string(),
+            content: Some(content.to_string()),
         }
     }
 }
@@ -680,7 +680,7 @@ mod tests {
         .unwrap();
 
         // Then a chat response is returned
-        assert!(!chat_response.message.content.is_empty());
+        assert!(!chat_response.message.content.unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -780,6 +780,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let number_oat_mentioned = chat_response
             .message
             .content
+            .unwrap()
             .to_lowercase()
             .split_whitespace()
             .filter(|word| *word == "oat")
