@@ -56,20 +56,13 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
 }
 
 /// Not supporting tool calls yet.
-impl TryFrom<ChatCompletionResponseMessage> for inference::ResponseMessage {
-    type Error = InferenceError;
-
-    fn try_from(message: ChatCompletionResponseMessage) -> Result<Self, Self::Error> {
-        message
-            .content
-            .map(|content| inference::ResponseMessage {
-                role: message.role.to_string(),
-                content,
-            })
-            .ok_or_else(|| {
-                // The content will be None if there is a tool call field.
-                InferenceError::ToolCallNotSupported("Invalid message without content".to_string())
-            })
+impl From<ChatCompletionResponseMessage> for inference::ResponseMessage {
+    fn from(message: ChatCompletionResponseMessage) -> Self {
+        let ChatCompletionResponseMessage { role, content, .. } = message;
+        inference::ResponseMessage {
+            role: role.to_string(),
+            content: content.map(|c| c.to_string()),
+        }
     }
 }
 
@@ -246,7 +239,7 @@ impl TryFrom<CreateChatCompletionResponse> for inference::ChatResponse {
             .ok_or_else(|| anyhow::anyhow!("Expected chat completion response to have a usage."))?
             .into();
 
-        let message = inference::ResponseMessage::try_from(first_choice.message.clone())?;
+        let message = inference::ResponseMessage::from(first_choice.message.clone());
         let response = inference::ChatResponse {
             message,
             finish_reason,
@@ -410,7 +403,7 @@ mod tests {
         };
 
         // When converting to an inference message
-        let _message = inference::ResponseMessage::try_from(message).unwrap();
+        let _message = inference::ResponseMessage::from(message);
 
         // Then the tool call is available
         // assert_eq!(message.tool_calls.len(), 1);
@@ -452,10 +445,10 @@ mod tests {
             &TracingContext::dummy(),
         )
         .await
-        .unwrap_err();
+        .unwrap();
 
         // Then
-        assert!(matches!(result, InferenceError::ToolCallNotSupported(_)));
+        assert!(result.message.content.is_none())
     }
 
     #[tokio::test]
@@ -479,7 +472,7 @@ mod tests {
         .unwrap();
 
         // Then a chat response is returned
-        assert!(!result.message.content.is_empty());
+        assert!(!result.message.content.unwrap().is_empty());
     }
 
     #[tokio::test]

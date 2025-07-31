@@ -930,7 +930,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::ResponseMessage::new("user", "Hello, world!"),
+            message: inference::ResponseMessage::assistant("Hello, world!"),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![inference::Distribution {
                 sampled: inference::Logprob {
@@ -963,7 +963,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::ResponseMessage::new("user", "Hello, world!"),
+            message: inference::ResponseMessage::assistant("Hello, world!"),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![],
         };

@@ -765,7 +765,13 @@ impl From<Message> for inference::Message {
 impl From<inference::ResponseMessage> for Message {
     fn from(value: inference::ResponseMessage) -> Self {
         let inference::ResponseMessage { role, content } = value;
-        Message { role, content }
+        // We know that the messages we receive will always have a content, because we do not
+        // support the tool parametersas input for this version of the WIT world. Nevertheless,
+        // we are relying on the inference backend, so we avoid unwrapping here.
+        Message {
+            role,
+            content: content.unwrap_or_default(),
+        }
     }
 }
 

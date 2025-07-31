@@ -760,7 +760,13 @@ impl From<CompletionRequestV2> for inference::CompletionRequest {
 impl From<inference::ResponseMessage> for Message {
     fn from(message: inference::ResponseMessage) -> Self {
         let inference::ResponseMessage { role, content } = message;
-        Self { role, content }
+        // We know that the messages we receive will always have a content, because we do not
+        // support the tool parametersas input for this version of the WIT world. Nevertheless,
+        // we are relying on the inference backend, so we avoid unwrapping here.
+        Self {
+            role,
+            content: content.unwrap_or_default(),
+        }
     }
 }
 
@@ -972,7 +978,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::ResponseMessage::new("user", "Hello, world!"),
+            message: inference::ResponseMessage::assistant("Hello, world!"),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![inference::Distribution {
                 sampled: inference::Logprob {
@@ -1005,7 +1011,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::ResponseMessage::new("user", "Hello, world!"),
+            message: inference::ResponseMessage::assistant("Hello, world!"),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![],
         };
