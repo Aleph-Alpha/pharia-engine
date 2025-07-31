@@ -1,4 +1,5 @@
 use anyhow::{Context as _, Error, anyhow, bail};
+use sha2::Digest;
 use std::{
     env, fs,
     path::{Path, PathBuf},
@@ -8,21 +9,6 @@ use std::{
 use tempfile::{TempDir, tempdir};
 
 use crate::assert_uv_installed;
-
-const WASI_TARGET: &str = "wasm32-wasip2";
-static REPO_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    let output = std::process::Command::new(env!("CARGO"))
-        .arg("locate-project")
-        .arg("--workspace")
-        .arg("--message-format=plain")
-        .output()
-        .unwrap()
-        .stdout;
-    let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
-    cargo_path.parent().unwrap().to_path_buf()
-});
-static SKILL_BUILD_CACHE_DIR: LazyLock<PathBuf> =
-    LazyLock::new(|| REPO_DIR.join("skill_build_cache"));
 
 pub struct TestSkill {
     path: PathBuf,
@@ -167,9 +153,96 @@ impl WitVersion {
     }
 }
 
+/// A cache directory that clears itself if the WIT world has changed.
+///
+/// For testing, we use multiple WASM skills that are built from Python and Rust. Especially for the
+/// Python skills, building can take a while. Therefore, we cache the components in a local
+/// directory. However, for certain changes, this directory needs to be cleared. While we need to
+/// ensure to support all components that were built against a stable WIT world we released at any
+/// point, we gate features we are iterating on behind unstable feature gates in the WIT world. If
+/// we now update an unstable WIT world, we are not able to load components built against the old
+/// version anymore. This leads to the requirement to clear the cache in case an unstable WIT world
+/// is updated.
+static MANAGED_CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    update_if_expired();
+    SKILL_BUILD_CACHE_DIR.clone()
+});
+
+static SKILL_BUILD_CACHE_DIR: LazyLock<PathBuf> =
+    LazyLock::new(|| REPO_DIR.join("skill_build_cache"));
+
+static REPO_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    let output = std::process::Command::new(env!("CARGO"))
+        .arg("locate-project")
+        .arg("--workspace")
+        .arg("--message-format=plain")
+        .output()
+        .unwrap()
+        .stdout;
+    let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
+    cargo_path.parent().unwrap().to_path_buf()
+});
+
+/// Are the skills inside the cache built against an outdated WIT world?
+fn update_if_expired() {
+    let wit_world_used_for_build = wit_world_used_for_build();
+    if let Some(wit_world_used_for_build) = wit_world_used_for_build {
+        if wit_world_used_for_build != wit_hash() {
+            fs::remove_dir_all(SKILL_BUILD_CACHE_DIR.as_path())
+                .expect("Directory must exist if it is flagged as expired.");
+            write_wit_hash();
+        }
+    } else {
+        // If there is no hash file, write it
+        write_wit_hash();
+    }
+}
+
+const WIT_HASH_FILE: &str = ".wit-world-hash";
+
+/// Every time skills are built, the WIT world is hashed and stored in the `.wit-world-hash`
+/// file. This function loads the hash from the file and returns it.
+fn wit_world_used_for_build() -> Option<String> {
+    let wit_world_file = SKILL_BUILD_CACHE_DIR.join(WIT_HASH_FILE);
+    fs::read_to_string(wit_world_file).ok()
+}
+
+/// Hash the current WIT directory and write it to the skill cache folder
+fn write_wit_hash() {
+    fs::create_dir_all(SKILL_BUILD_CACHE_DIR.as_path()).unwrap();
+    let hash = wit_hash();
+    fs::write(SKILL_BUILD_CACHE_DIR.join(WIT_HASH_FILE), hash).unwrap();
+}
+
+fn wit_hash() -> String {
+    let wit_dir = REPO_DIR.join("wit");
+    let mut content = Vec::new();
+
+    // Read all files in the wit directory recursively
+    read_dir_recursively(&wit_dir, &mut content);
+
+    let digest = &sha2::Sha256::digest(content)[..];
+    hex::encode(digest)
+}
+
+fn read_dir_recursively(dir: &Path, content: &mut Vec<u8>) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        let mut paths: Vec<_> = entries.filter_map(Result::ok).map(|e| e.path()).collect();
+        paths.sort(); // Sort for deterministic order
+
+        for path in paths {
+            if path.is_dir() {
+                read_dir_recursively(&path, content);
+            } else if let Ok(mut file_content) = fs::read(&path) {
+                content.append(&mut file_content);
+            }
+        }
+    }
+}
+
 /// Creates `{package-name}-py.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `python-skills/{package-name}`
 fn given_python_skill(package_name: &str, wit_version: WitVersion, world: &str) -> PathBuf {
-    let target_path = SKILL_BUILD_CACHE_DIR.join(format!("{package_name}-py.wasm"));
+    let target_path = MANAGED_CACHE_DIR.join(format!("{package_name}-py.wasm"));
     if !target_path.exists() {
         build_python_skill(package_name, &target_path, wit_version, world);
     }
@@ -178,7 +251,7 @@ fn given_python_skill(package_name: &str, wit_version: WitVersion, world: &str) 
 
 /// Creates `{package-name}-rs.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `crates/{package-name}`
 fn given_rust_skill(package_name: &str) -> PathBuf {
-    let target_path = SKILL_BUILD_CACHE_DIR.join(format!("{package_name}-rs.wasm"));
+    let target_path = MANAGED_CACHE_DIR.join(format!("{package_name}-rs.wasm"));
     if !target_path.exists() {
         build_rust_skill(package_name);
     }
@@ -192,6 +265,8 @@ fn given_rust_skill(package_name: &str) -> PathBuf {
 /// wasm-tools strip ./skill_build_cache/greet-v0_2-rs.wasm -o ./skill_build_cache/greet-v0_2-rs.wasm
 /// ```
 fn build_rust_skill(package_name: &str) {
+    const WASI_TARGET: &str = "wasm32-wasip2";
+
     // Build the release artefact for web assembly target
     //
     // cargo build -p greet-v0_2 --target wasm32-wasip2 --release
@@ -207,8 +282,6 @@ fn build_rust_skill(package_name: &str) {
         .output()
         .unwrap();
     error_on_status("Building web assembly failed.", output).unwrap();
-
-    fs::create_dir_all(SKILL_BUILD_CACHE_DIR.as_path()).unwrap();
 
     let snake_case = change_case::snake_case(package_name);
     std::fs::copy(
@@ -229,8 +302,6 @@ fn build_python_skill(
     world: &str,
 ) {
     let venv = static_venv();
-
-    fs::create_dir_all(SKILL_BUILD_CACHE_DIR.as_path()).unwrap();
 
     venv.run(&[
         "componentize-py",
