@@ -65,8 +65,8 @@ reqwest = { version = "0.12.22", features = [
 ] }
 semver = "1.0.26"
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.141"
-toml = "0.9.3"
+serde_json = "1.0.142"
+toml = "0.9.4"
 strum = { version = "0.27.2", features = ["derive"] }
 tokio = { version = "1.47.0", features = [
     "macros",
