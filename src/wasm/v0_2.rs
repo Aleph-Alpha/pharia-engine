@@ -413,6 +413,7 @@ impl From<ChatParams> for inference::ChatParams {
             presence_penalty: None,
             logprobs: inference::Logprobs::No,
             tools: None,
+            tool_choice: None,
         }
     }
 }
@@ -592,6 +593,7 @@ mod tests {
                 presence_penalty: None,
                 logprobs: inference::Logprobs::No,
                 tools: None,
+                tool_choice: None,
             }
         );
     }

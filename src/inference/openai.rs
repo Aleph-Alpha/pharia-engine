@@ -3,11 +3,12 @@ use async_openai::{
     config::OpenAIConfig,
     error::{ApiError, OpenAIError},
     types::{
-        ChatChoiceLogprobs, ChatCompletionMessageToolCall, ChatCompletionRequestMessage,
-        ChatCompletionResponseMessage, ChatCompletionStreamOptions, ChatCompletionTokenLogprob,
-        ChatCompletionTool, CompletionUsage, CreateChatCompletionRequest,
+        ChatChoiceLogprobs, ChatCompletionMessageToolCall, ChatCompletionNamedToolChoice,
+        ChatCompletionRequestMessage, ChatCompletionResponseMessage, ChatCompletionStreamOptions,
+        ChatCompletionTokenLogprob, ChatCompletionTool, ChatCompletionToolChoiceOption,
+        ChatCompletionToolType, CompletionUsage, CreateChatCompletionRequest,
         CreateChatCompletionResponse, CreateChatCompletionStreamResponse, FinishReason,
-        FunctionCall, FunctionObject, TopLogprobs,
+        FunctionCall, FunctionName, FunctionObject, TopLogprobs,
     },
 };
 use futures::StreamExt;
@@ -149,6 +150,7 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
             presence_penalty,
             logprobs,
             tools,
+            tool_choice,
         } = params;
         let messages = messages
             .iter()
@@ -183,9 +185,28 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
             // An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens.
             max_completion_tokens: *max_tokens,
             tools,
+            tool_choice: tool_choice.as_ref().map(Into::into),
             ..Default::default()
         };
         Ok(request)
+    }
+}
+
+impl From<&inference::ToolChoice> for ChatCompletionToolChoiceOption {
+    fn from(tool_choice: &inference::ToolChoice) -> Self {
+        match tool_choice {
+            inference::ToolChoice::None => ChatCompletionToolChoiceOption::None,
+            inference::ToolChoice::Auto => ChatCompletionToolChoiceOption::Auto,
+            inference::ToolChoice::Required => ChatCompletionToolChoiceOption::Required,
+            inference::ToolChoice::Named(name) => {
+                ChatCompletionToolChoiceOption::Named(ChatCompletionNamedToolChoice {
+                    function: FunctionName {
+                        name: name.to_owned(),
+                    },
+                    r#type: ChatCompletionToolType::Function,
+                })
+            }
+        }
     }
 }
 
@@ -402,7 +423,7 @@ mod tests {
         authorization::Authentication,
         inference::{
             self, ChatEvent, ChatParams, ChatRequest, Function, InferenceError, Logprobs, Message,
-            client::InferenceClient,
+            ToolChoice, client::InferenceClient,
         },
         logging::TracingContext,
         tests::{openai_inference_url, openai_token},
@@ -628,5 +649,44 @@ mod tests {
         assert!(matches!(events[1], ChatEvent::MessageAppend { .. }));
         assert!(matches!(events[2], ChatEvent::MessageEnd { .. }));
         assert!(matches!(events[3], ChatEvent::Usage { .. }));
+    }
+
+    #[tokio::test]
+    async fn forced_tool_call() {
+        // Given a message history that would not require a tool call
+        let api_token = openai_token().to_owned();
+        let host = openai_inference_url().to_owned();
+        let client = OpenAiClient::new(host, api_token);
+        let message = Message::new("user", "What is the weather in Berlin?");
+
+        // When forcing a tool call
+        let function = Function {
+            name: "catch_fish".to_owned(),
+            description: Some("Catch a fish (most likely a northern pike)".to_owned()),
+            parameters: None,
+            strict: None,
+        };
+        let params = ChatParams {
+            tools: Some(vec![function]),
+            tool_choice: Some(ToolChoice::Named("catch_fish".to_owned())),
+            ..Default::default()
+        };
+        let result = <OpenAiClient as InferenceClient>::chat(
+            &client,
+            &ChatRequest {
+                model: "gpt-4o-mini".to_owned(),
+                messages: vec![message],
+                params,
+            },
+            Authentication::none(),
+            &TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
+
+        // Then the model catches a fish
+        let tool_calls = result.message.tool_calls.unwrap();
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].name, "catch_fish");
     }
 }

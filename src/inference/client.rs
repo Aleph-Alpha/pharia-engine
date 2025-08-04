@@ -432,9 +432,10 @@ impl ChatRequest {
                     presence_penalty,
                     logprobs,
                     tools,
+                    tool_choice,
                 },
         } = self;
-        if tools.is_some() {
+        if tools.is_some() || tool_choice.is_some() {
             return Err(InferenceError::AlephAlphaInferenceToolCallNotSupported);
         }
         let task = TaskChat {
@@ -772,6 +773,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 presence_penalty: None,
                 logprobs: Logprobs::No,
                 tools: None,
+                tool_choice: None,
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };

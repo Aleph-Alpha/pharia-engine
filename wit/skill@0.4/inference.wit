@@ -204,6 +204,17 @@ interface inference {
         strict: option<bool>,
     }
 
+    variant tool-choice {
+        /// None means the model will not call any tool and instead generates a message.
+        none,
+        /// Auto means the model can pick between generating a message or calling one or more tools.
+        auto,
+        /// Required means the model must call one or more tools.
+        required,
+        /// Specifying a particular tool forces the model to call that tool.
+        named(string),
+    }
+
     record chat-params {
         /// The maximum tokens that should be inferred.
         ///
@@ -230,6 +241,14 @@ interface inference {
         /// Use this to provide a list of functions the model may generate JSON inputs for.
         /// A max of 128 functions are supported.
         tools: option<list<function>>,
+        // Controls which (if any) tool is called by the model. none means the model will not call any tool
+        // and instead generates a message. auto means the model can pick between generating a message or 
+        // calling one or more tools. required means the model must call one or more tools.
+        // Specifying a particular tool via {"type": "function", "function": {"name": "my_function"}} forces the model to call that tool.
+        // none is the default when no tools are present. auto is the default if tools are present.
+        tool-choice: option<tool-choice>,
+
+
         
     }
 
