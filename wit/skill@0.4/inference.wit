@@ -247,9 +247,8 @@ interface inference {
         // Specifying a particular tool via {"type": "function", "function": {"name": "my_function"}} forces the model to call that tool.
         // none is the default when no tools are present. auto is the default if tools are present.
         tool-choice: option<tool-choice>,
-
-
-        
+        /// Whether to allow the model to call multiple tools in parallel. Defaults to true if not specified.
+        parallel-tool-calls: option<bool>,
     }
 
     /// The result of a chat response, including the message generated as well as

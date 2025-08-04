@@ -655,6 +655,7 @@ impl From<ChatParams> for inference::ChatParams {
             logprobs: logprobs.into(),
             tools: None,
             tool_choice: None,
+            parallel_tool_calls: None,
         }
     }
 }
@@ -972,6 +973,7 @@ mod tests {
                 logprobs: inference::Logprobs::Top(2),
                 tools: None,
                 tool_choice: None,
+                parallel_tool_calls: None,
             }
         );
     }
