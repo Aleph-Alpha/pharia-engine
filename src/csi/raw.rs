@@ -754,6 +754,7 @@ mod tests {
             messages: vec![Message {
                 role: "user".to_owned(),
                 content: "request".to_owned(),
+                tool_call_id: None,
             }],
             params: ChatParams::default(),
         };

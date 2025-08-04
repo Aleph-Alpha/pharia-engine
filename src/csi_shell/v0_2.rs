@@ -515,6 +515,7 @@ impl From<Message> for inference::Message {
         Self {
             role: role.to_lowercase(),
             content,
+            tool_call_id: None,
         }
     }
 }

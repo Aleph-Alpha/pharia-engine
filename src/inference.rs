@@ -8,7 +8,7 @@ pub use self::{
         CompletionParams, CompletionRequest, Distribution, Explanation, ExplanationRequest,
         FinishReason, Function, Granularity, Inference, InferenceApi, InferenceConfig,
         InferenceNotConfigured, InferenceSender, Logprob, Logprobs, Message, ResponseMessage,
-        TextScore, TokenUsage, ToolCall, ToolChoice,
+        TextScore, TokenUsage, ToolCall, ToolCallChunk, ToolChoice,
     },
     client::InferenceError,
 };

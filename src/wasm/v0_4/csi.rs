@@ -13,7 +13,7 @@ use pharia::skill::{
         CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
         ExplanationRequest, FinishReason, Function, Granularity, Host as InferenceHost,
         HostChatStream, HostCompletionStream, Logprob, Logprobs, Message, MessageAppend,
-        ResponseMessage, TextScore, TokenUsage, ToolCall, ToolChoice,
+        ResponseMessage, TextScore, TokenUsage, ToolCall, ToolCallChunk, ToolChoice,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -524,6 +524,26 @@ impl From<inference::ChatEvent> for ChatEvent {
                 ChatEvent::MessageEnd(finish_reason.into())
             }
             inference::ChatEvent::Usage { usage } => ChatEvent::Usage(usage.into()),
+            inference::ChatEvent::ToolCall(chunks) => {
+                ChatEvent::ToolCall(chunks.into_iter().map(Into::into).collect())
+            }
+        }
+    }
+}
+
+impl From<inference::ToolCallChunk> for ToolCallChunk {
+    fn from(chunk: inference::ToolCallChunk) -> Self {
+        let inference::ToolCallChunk {
+            index,
+            id,
+            name,
+            arguments,
+        } = chunk;
+        Self {
+            index,
+            id,
+            name,
+            arguments,
         }
     }
 }
@@ -623,7 +643,11 @@ impl From<inference::TokenUsage> for TokenUsage {
 impl From<Message> for inference::Message {
     fn from(message: Message) -> Self {
         let Message { role, content } = message;
-        Self { role, content }
+        Self {
+            role,
+            content,
+            tool_call_id: None,
+        }
     }
 }
 

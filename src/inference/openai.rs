@@ -3,12 +3,14 @@ use async_openai::{
     config::OpenAIConfig,
     error::{ApiError, OpenAIError},
     types::{
-        ChatChoiceLogprobs, ChatCompletionMessageToolCall, ChatCompletionNamedToolChoice,
-        ChatCompletionRequestMessage, ChatCompletionResponseMessage, ChatCompletionStreamOptions,
-        ChatCompletionTokenLogprob, ChatCompletionTool, ChatCompletionToolChoiceOption,
-        ChatCompletionToolType, CompletionUsage, CreateChatCompletionRequest,
-        CreateChatCompletionResponse, CreateChatCompletionStreamResponse, FinishReason,
-        FunctionCall, FunctionName, FunctionObject, TopLogprobs,
+        ChatChoiceLogprobs, ChatCompletionMessageToolCall, ChatCompletionMessageToolCallChunk,
+        ChatCompletionNamedToolChoice, ChatCompletionRequestMessage,
+        ChatCompletionRequestToolMessage, ChatCompletionResponseMessage,
+        ChatCompletionStreamOptions, ChatCompletionTokenLogprob, ChatCompletionTool,
+        ChatCompletionToolChoiceOption, ChatCompletionToolType, CompletionUsage,
+        CreateChatCompletionRequest, CreateChatCompletionResponse,
+        CreateChatCompletionStreamResponse, FinishReason, FunctionCall, FunctionCallStream,
+        FunctionName, FunctionObject, TopLogprobs,
     },
 };
 use futures::StreamExt;
@@ -43,16 +45,23 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
     type Error = InferenceError;
 
     fn try_from(message: inference::Message) -> Result<Self, Self::Error> {
-        let inference::Message { role, content } = message;
+        let inference::Message {
+            role,
+            content,
+            tool_call_id,
+        } = message;
         match role.as_str() {
             "user" => Ok(ChatCompletionRequestMessage::User(content.into())),
             "assistant" => Ok(ChatCompletionRequestMessage::Assistant(content.into())),
             "system" => Ok(ChatCompletionRequestMessage::System(content.into())),
-            // we currently do not support tool messages, as we have no concept of the tool id yet,
-            // which we would need to provide here
-            _ => Err(InferenceError::ToolCallNotSupported(format!(
-                "Invalid role: {role}"
-            ))),
+            "tool" => Ok(ChatCompletionRequestMessage::Tool(
+                ChatCompletionRequestToolMessage {
+                    content: content.into(),
+                    tool_call_id: tool_call_id
+                        .ok_or_else(|| InferenceError::NoToolCallIdProvided)?,
+                },
+            )),
+            _ => Err(InferenceError::RoleNotSupported(role)),
         }
     }
 }
@@ -333,9 +342,38 @@ impl TryFrom<CreateChatCompletionStreamResponse> for inference::ChatEvent {
             let logprobs = map_logprobs(first_choice.logprobs);
             return Ok(inference::ChatEvent::MessageAppend { content, logprobs });
         }
-        Err(InferenceError::ToolCallNotSupported(
-            "Invalid message without content".to_string(),
-        ))
+        if let Some(tool_call) = first_choice.delta.tool_calls {
+            return Ok(inference::ChatEvent::ToolCall(
+                tool_call.into_iter().map(Into::into).collect(),
+            ));
+        }
+        Err(InferenceError::NeitherContentNorToolCall)
+    }
+}
+
+impl From<ChatCompletionMessageToolCallChunk> for inference::ToolCallChunk {
+    fn from(chunk: ChatCompletionMessageToolCallChunk) -> Self {
+        let ChatCompletionMessageToolCallChunk {
+            index,
+            id,
+            function,
+            r#type: _,
+        } = chunk;
+        if let Some(FunctionCallStream { name, arguments }) = function {
+            inference::ToolCallChunk {
+                index,
+                id,
+                name,
+                arguments,
+            }
+        } else {
+            inference::ToolCallChunk {
+                index,
+                id,
+                name: None,
+                arguments: None,
+            }
+        }
     }
 }
 
@@ -370,14 +408,23 @@ impl InferenceClient for OpenAiClient {
         _tracing_context: &TracingContext,
         send: mpsc::Sender<inference::ChatEvent>,
     ) -> Result<(), InferenceError> {
-        let mut request: CreateChatCompletionRequest = request.try_into()?;
-        request.stream_options = Some(ChatCompletionStreamOptions {
+        let mut openai_request: CreateChatCompletionRequest = request.try_into()?;
+        openai_request.stream_options = Some(ChatCompletionStreamOptions {
             include_usage: true,
         });
-        let mut stream = self.client.chat().create_stream(request).await?;
+        let mut stream = self.client.chat().create_stream(openai_request).await?;
 
         while let Some(event) = stream.next().await {
             let event = inference::ChatEvent::try_from(event?)?;
+
+            // If tools are not specified, we do not expect to get a tool call chunk from inference.
+            // See the comment on `chat` for more details.
+            if request.params.tools.is_none()
+                && matches!(event, inference::ChatEvent::ToolCall { .. })
+            {
+                return Err(InferenceError::EmptyContent);
+            }
+
             drop(send.send(event).await);
         }
         Ok(())
@@ -690,5 +737,65 @@ mod tests {
         let tool_calls = result.message.tool_calls.unwrap();
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].name, "catch_fish");
+    }
+
+    #[tokio::test]
+    async fn streaming_tool_call() {
+        // Given a message history that would lead to a tool call
+        let api_token = openai_token().to_owned();
+        let host = openai_inference_url().to_owned();
+        let client = OpenAiClient::new(host, api_token);
+        let message = Message::new("user", "When will order 123456 be delivered?");
+
+        // When streaming a tool call
+        let function = Function {
+            name: "get_delivery_date".to_owned(),
+            description: Some("Get the delivery date for a given order".to_owned()),
+            parameters: Some(
+                serde_json::to_vec(&serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "order_id": { "type": "string" }
+                    }
+                }))
+                .unwrap(),
+            ),
+            strict: None,
+        };
+        let params = ChatParams {
+            tools: Some(vec![function]),
+            ..Default::default()
+        };
+
+        let (send, mut recv) = mpsc::channel(1);
+        tokio::spawn(async move {
+            <OpenAiClient as InferenceClient>::stream_chat(
+                &client,
+                &ChatRequest {
+                    model: "gpt-4o-mini".to_owned(),
+                    messages: vec![message],
+                    params,
+                },
+                Authentication::none(),
+                &TracingContext::dummy(),
+                send,
+            )
+            .await
+            .unwrap();
+        });
+
+        let mut events = vec![];
+        while let Some(event) = recv.recv().await {
+            events.push(event);
+        }
+
+        // Then the model calls the tool
+        assert!(matches!(events[0], ChatEvent::MessageBegin { .. }));
+        assert!(matches!(events[1], ChatEvent::ToolCall { .. }));
+        assert!(matches!(
+            events[events.len() - 2],
+            ChatEvent::MessageEnd { .. }
+        ));
+        assert!(matches!(events[events.len() - 1], ChatEvent::Usage { .. }));
     }
 }

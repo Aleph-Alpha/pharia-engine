@@ -335,7 +335,11 @@ pub struct Message {
 impl From<Message> for inference::Message {
     fn from(value: Message) -> Self {
         let Message { role, content } = value;
-        inference::Message { role, content }
+        inference::Message {
+            role,
+            content,
+            tool_call_id: None,
+        }
     }
 }
 

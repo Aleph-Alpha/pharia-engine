@@ -518,6 +518,9 @@ impl From<inference::ChatEvent> for Event {
                     usage: usage.into(),
                 })
                 .expect("`json_data` must only be called once."),
+            inference::ChatEvent::ToolCall { .. } => {
+                panic!("Inference client does not yield tool calls if no tools are specified.")
+            }
         }
     }
 }
@@ -760,7 +763,11 @@ struct Message {
 impl From<Message> for inference::Message {
     fn from(value: Message) -> Self {
         let Message { role, content } = value;
-        inference::Message { role, content }
+        inference::Message {
+            role,
+            content,
+            tool_call_id: None,
+        }
     }
 }
 
