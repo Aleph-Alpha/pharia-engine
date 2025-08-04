@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.20](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.19...pharia-kernel-v0.13.20)
+
+### Features
+
+- Use completion-params-v2 for completion-request - ([baea817](https://github.com/Aleph-Alpha/pharia-kernel/commit/baea817c146763ce47a79ac204ab2bc568105f82))
+- Mark 0.4 wit world as unstable - ([553e139](https://github.com/Aleph-Alpha/pharia-kernel/commit/553e139a253e0480f7ae1da844fa2cbc0e4ffaf6))
+- Introduce 0.4 wit world - ([8aec913](https://github.com/Aleph-Alpha/pharia-kernel/commit/8aec913d22a318d5139dd7dc13223c539cc7792f))
+- Do not specify a namespace in default config.toml - ([b6105c8](https://github.com/Aleph-Alpha/pharia-kernel/commit/b6105c8ee42c74b480082fa676c2bbb7274dd34d))
+- Allow running without requiring bearer token - ([5ab0e9b](https://github.com/Aleph-Alpha/pharia-kernel/commit/5ab0e9b45b36bc6e789a3465ba8b3c761a432b26))
+- Authorization client decides if no token is okay - ([75c900a](https://github.com/Aleph-Alpha/pharia-kernel/commit/75c900a909f8a1293c573aef92ddceee7b6aca7f))
+- Make authorization check optional - ([bbf7f08](https://github.com/Aleph-Alpha/pharia-kernel/commit/bbf7f08cf5cf85361284c14bbb2da9bd13daa678))
+
+### Fixes
+
+- Remove unused allow dead code - ([a3495d2](https://github.com/Aleph-Alpha/pharia-kernel/commit/a3495d2be76f14d958c2af5d0a5e22f6014f1974))
+
+### Documentation
+
+- Streamline formulations - ([a3b4414](https://github.com/Aleph-Alpha/pharia-kernel/commit/a3b4414d89d35fca053282d54df97c54a41b89e4))
+- Split .env example and test example - ([0ebbe36](https://github.com/Aleph-Alpha/pharia-kernel/commit/0ebbe3682650ce798d8b38c593a13f35b8083fa8))
+- Reorder README sections - ([3dde600](https://github.com/Aleph-Alpha/pharia-kernel/commit/3dde60049c633e5f70ca9b484bcf03bb88bd806e))
+- Fix some typos & small lints - ([59b7965](https://github.com/Aleph-Alpha/pharia-kernel/commit/59b796552b5379dcfe38024dabe152cbaaf610e5))
+- Specify what happens if auth url is none - ([70b3a43](https://github.com/Aleph-Alpha/pharia-kernel/commit/70b3a43d6f8dd80e9ebc845074557b04e4fa1095))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 13 updates - ([df13a42](https://github.com/Aleph-Alpha/pharia-kernel/commit/df13a429e63f020cea064131528afebc384a71a6))
+- *(deps)* Bump the minor group across 1 directory with 8 updates - ([16b4938](https://github.com/Aleph-Alpha/pharia-kernel/commit/16b49384423dad85b36a25fa04cbcc431dd30097))
+- *(deps)* Bump the minor group across 1 directory with 9 updates - ([d3ff1d7](https://github.com/Aleph-Alpha/pharia-kernel/commit/d3ff1d73983524949023861d858cbdfa8fdbe651))
+
+### Chore
+
+- Load test envs from .env.test - ([a2748f2](https://github.com/Aleph-Alpha/pharia-kernel/commit/a2748f2dc6c15a0d82437ec79891107c07f96208))
+
+### Ci
+
+- Push to Harbor - ([4791fbf](https://github.com/Aleph-Alpha/pharia-kernel/commit/4791fbfdcc043051eec7ca1e501bc55731347e8d))
+- Pin Red Hat GitHub actions - ([41ab6d9](https://github.com/Aleph-Alpha/pharia-kernel/commit/41ab6d9d7ce0b8f73a55e27631abee3d691654e3))
+- Use internal actions - ([4b37eff](https://github.com/Aleph-Alpha/pharia-kernel/commit/4b37effcfb83f95f2232c0a9e45e9fd3ec68267a))
+- Use CycloneDX Cargo action - ([ac21d3c](https://github.com/Aleph-Alpha/pharia-kernel/commit/ac21d3ce2fcb441b38800a7dbd1edbe5759818c0))
+- Merge all CycloneDX files - ([e0965e5](https://github.com/Aleph-Alpha/pharia-kernel/commit/e0965e5f9cca7f18820bddb67f6a4d5bad4d28d7))
+- Merge SBOM with licenses - ([079d285](https://github.com/Aleph-Alpha/pharia-kernel/commit/079d2857ec82f1cba980fbd69be4c5733d2cf56d))
+- Add license scanner - ([13c3d61](https://github.com/Aleph-Alpha/pharia-kernel/commit/13c3d61c2ff6542bebacf94a267c0faaeda561af))
+- Set PhariaAI services for helm-test in values-kind.yaml - ([f449c4e](https://github.com/Aleph-Alpha/pharia-kernel/commit/f449c4e8584d85f00008ea32bc45c109c798c00a))
+- Do not provide unneeded envs and config to image integration test - ([ad3805f](https://github.com/Aleph-Alpha/pharia-kernel/commit/ad3805f8868de18db7e00338b8ea23f10b906323))
+
+### Refactor
+
+- Use wit-parser source map to assemble package - ([fc31b33](https://github.com/Aleph-Alpha/pharia-kernel/commit/fc31b33b1aa138fa7f894921a4d3ddc5fea62516))
+- Rename next-release feature gate to alpha - ([e615410](https://github.com/Aleph-Alpha/pharia-kernel/commit/e615410ec8ee16dd880a66054eab17b1d0545d38))
+- Remove completion-request-v2 - ([847fa37](https://github.com/Aleph-Alpha/pharia-kernel/commit/847fa37cb9f188c138ea5f1119b8b413b648fea0))
+- Remove v2 suffix from completion-params - ([aa70880](https://github.com/Aleph-Alpha/pharia-kernel/commit/aa708808f874eceb85034c7cfd42a0b0def4594a))
+- Authentication wraps an option - ([52e2ec5](https://github.com/Aleph-Alpha/pharia-kernel/commit/52e2ec5e1c7f65a58dd848bfcfae8933e5478a49))
+- Introduce authentication new type - ([df8abb0](https://github.com/Aleph-Alpha/pharia-kernel/commit/df8abb0945cd1212b8d2c2e90ef1a47a13dafe55))
+- Introduce new type authentication - ([952c735](https://github.com/Aleph-Alpha/pharia-kernel/commit/952c735f09303101592cbe83b9cc85832985e8f8))
+
+### Test
+
+- TestKernel owns tracing subscriber guard - ([6355bca](https://github.com/Aleph-Alpha/pharia-kernel/commit/6355bca11e56a88b642577e151ab30513641252f))
+- Fix flaky tracing tests - ([711504f](https://github.com/Aleph-Alpha/pharia-kernel/commit/711504f85e5cd9f7edbcee54d878c44ad2c5c4f7))
+- Update registry names to not overlap with namespace configuration - ([be48b4f](https://github.com/Aleph-Alpha/pharia-kernel/commit/be48b4f6756e8d4c440fb655c7c4d5320bd8cbff))
+- Remove test as reading from config file is already covered - ([8a0f4c0](https://github.com/Aleph-Alpha/pharia-kernel/commit/8a0f4c071e14c181d741e5eff709daba52d17d82))
+- Remove unneeded auth token - ([388f2b9](https://github.com/Aleph-Alpha/pharia-kernel/commit/388f2b9baaa77fe30f5a95235a4528e7064bc4a3))
+- Skill execution against openai - ([5ddc2c8](https://github.com/Aleph-Alpha/pharia-kernel/commit/5ddc2c8742039673a4374248d818cc5ef25a79e5))
+- Replace dummy function with none - ([94b56d5](https://github.com/Aleph-Alpha/pharia-kernel/commit/94b56d5aecc9b19e8c8fc94306294f5161e71fcb))
+- Auth actor without url always returns true - ([25c4e0c](https://github.com/Aleph-Alpha/pharia-kernel/commit/25c4e0ca33e9fe60053906463f5b4785e3f75aea))
+- Restructure utilities for test kernel - ([31c6830](https://github.com/Aleph-Alpha/pharia-kernel/commit/31c68306ac218e84d7eeec99a99084d486032c02))
+
+
 ## [0.13.19](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.18...pharia-kernel-v0.13.19)
 
 ### Features
