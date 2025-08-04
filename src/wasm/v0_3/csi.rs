@@ -764,12 +764,13 @@ impl From<inference::ResponseMessage> for Message {
             content,
             tool_calls: _,
         } = message;
-        // We know that the messages we receive will always have a content, because we do not
-        // support the tool parametersas input for this version of the WIT world. Nevertheless,
-        // we are relying on the inference backend, so we avoid unwrapping here.
+        // The inference client has the guarantee that the content is not empty if no tools are
+        // specified in the request. Therefore, it is fine to unwrap here.
         Self {
             role,
-            content: content.unwrap_or_default(),
+            content: content.expect(
+                "Inference client guarantees content is not empty for requests without tools.",
+            ),
         }
     }
 }

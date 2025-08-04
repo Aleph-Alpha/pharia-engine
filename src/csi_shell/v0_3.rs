@@ -346,12 +346,13 @@ impl From<inference::ResponseMessage> for Message {
             content,
             tool_calls: _,
         } = value;
-        // We know that the messages we receive will always have a content, because we do not
-        // support the tool parametersas input for this version of the WIT world. Nevertheless,
-        // we are relying on the inference backend, so we avoid unwrapping here.
+        // The inference client has the guarantee that the content is not empty if no tools are
+        // specified in the request. Therefore, it is fine to unwrap here.
         Message {
             role,
-            content: content.unwrap_or_default(),
+            content: content.expect(
+                "Inference client guarantees content is not empty for requests without tools.",
+            ),
         }
     }
 }
@@ -1130,8 +1131,11 @@ mod tests {
     }
 
     #[test]
-    fn none_message_is_mapped_to_empty_string() {
-        let response = ChatResponse::from(inference::ChatResponse {
+    #[should_panic(
+        expected = "Inference client guarantees content is not empty for requests without tools."
+    )]
+    fn none_message_is_unwrapped() {
+        drop(ChatResponse::from(inference::ChatResponse {
             message: inference::ResponseMessage {
                 role: "assistant".to_string(),
                 content: None,
@@ -1143,9 +1147,7 @@ mod tests {
                 prompt: 0,
                 completion: 0,
             },
-        });
-
-        assert_eq!(response.message.content, "");
+        }));
     }
 
     #[test]
