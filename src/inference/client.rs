@@ -534,6 +534,12 @@ pub enum InferenceError {
         the Kernel configuration."
     )]
     NotConfigured,
+    #[error(
+        "The inference backend returned a message with an empty content while no tools were \
+        specified in the request. For such responses, we expect a content and no tool calls. This \
+        seems to be a bug with the configured inference backend."
+    )]
+    EmptyContent,
     #[error("Tool calls are not supported yet: {0}")]
     ToolCallNotSupported(String),
     #[error("The tool parameter is not supported yet for the Aleph Alpha inference backend.")]

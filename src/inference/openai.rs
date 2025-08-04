@@ -323,9 +323,20 @@ impl InferenceClient for OpenAiClient {
         _auth: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::ChatResponse, InferenceError> {
-        let request = request.try_into()?;
-        let response = self.client.chat().create(request).await?;
+        let openai_request = request.try_into()?;
+        let response = self.client.chat().create(openai_request).await?;
         let response = inference::ChatResponse::try_from(response)?;
+
+        // We have an implicit assumption: If no tools are specified in the request, we expect a
+        // content in the response. We also have consumers of this functions (old WIT worlds) that
+        // never provide tools and always expect a content in the response. One option in Rust would
+        // be to specify this in the type system. This could mean having two chat functions, one for
+        // requests with tools and one for requests without tools. However, this would mean
+        // introducing multiple chat functions in the CSI traits. For now, we believe the best way
+        // forward is to check the condition here, and unwrap the content at the consumer side.
+        if request.params.tools.is_none() && response.message.content.is_none() {
+            return Err(InferenceError::EmptyContent);
+        }
         Ok(response)
     }
 
