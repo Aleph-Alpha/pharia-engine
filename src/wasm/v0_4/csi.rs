@@ -638,6 +638,7 @@ impl From<ChatParams> for inference::ChatParams {
             logprobs,
             tools,
             tool_choice,
+            parallel_tool_calls,
         } = params;
         Self {
             max_tokens,
@@ -648,6 +649,7 @@ impl From<ChatParams> for inference::ChatParams {
             logprobs: logprobs.into(),
             tools: tools.map(|t| t.into_iter().map(Into::into).collect()),
             tool_choice: tool_choice.map(Into::into),
+            parallel_tool_calls,
         }
     }
 }
@@ -925,6 +927,7 @@ mod tests {
             logprobs: Logprobs::Top(2),
             tools: Some(vec![function]),
             tool_choice: Some(ToolChoice::Auto),
+            parallel_tool_calls: Some(false),
         };
 
         // When
@@ -947,6 +950,7 @@ mod tests {
                     strict: None,
                 }]),
                 tool_choice: Some(inference::ToolChoice::Auto),
+                parallel_tool_calls: Some(false),
             }
         );
     }

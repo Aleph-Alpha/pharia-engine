@@ -656,6 +656,7 @@ impl From<ChatParams> for inference::ChatParams {
             logprobs: logprobs.into(),
             tools: None,
             tool_choice: None,
+            parallel_tool_calls: None,
         }
     }
 }

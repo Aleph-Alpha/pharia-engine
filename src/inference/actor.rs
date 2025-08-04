@@ -387,6 +387,7 @@ pub struct ChatParams {
     pub logprobs: Logprobs,
     pub tools: Option<Vec<Function>>,
     pub tool_choice: Option<ToolChoice>,
+    pub parallel_tool_calls: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

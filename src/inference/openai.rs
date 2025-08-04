@@ -151,6 +151,7 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
             logprobs,
             tools,
             tool_choice,
+            parallel_tool_calls,
         } = params;
         let messages = messages
             .iter()
@@ -186,6 +187,7 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
             max_completion_tokens: *max_tokens,
             tools,
             tool_choice: tool_choice.as_ref().map(Into::into),
+            parallel_tool_calls: *parallel_tool_calls,
             ..Default::default()
         };
         Ok(request)

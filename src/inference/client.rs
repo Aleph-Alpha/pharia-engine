@@ -433,9 +433,10 @@ impl ChatRequest {
                     logprobs,
                     tools,
                     tool_choice,
+                    parallel_tool_calls,
                 },
         } = self;
-        if tools.is_some() || tool_choice.is_some() {
+        if tools.is_some() || tool_choice.is_some() || parallel_tool_calls.is_some() {
             return Err(InferenceError::AlephAlphaInferenceToolCallNotSupported);
         }
         let task = TaskChat {
@@ -774,6 +775,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 logprobs: Logprobs::No,
                 tools: None,
                 tool_choice: None,
+                parallel_tool_calls: None,
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };

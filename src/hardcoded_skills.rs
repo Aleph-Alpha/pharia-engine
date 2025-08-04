@@ -226,6 +226,7 @@ impl Skill for SkillTellMeAJoke {
                 logprobs: crate::inference::Logprobs::No,
                 tools: None,
                 tool_choice: None,
+                parallel_tool_calls: None,
             },
         };
         let stream_id = ctx.chat_stream_new(request).await;
@@ -337,6 +338,7 @@ impl Skill for SkillChat {
                 logprobs: crate::inference::Logprobs::No,
                 tools: None,
                 tool_choice: None,
+                parallel_tool_calls: None,
             },
         };
 
