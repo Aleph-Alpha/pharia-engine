@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
-use pharia::skill::inference::{ChatParams, ChatRequest, Logprobs, Message, chat};
+use pharia::skill::inference::{ChatParams, ChatRequest, Logprobs, Message, ToolChoice, chat};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.4", world: "skill", features: ["alpha"] });
@@ -25,6 +25,7 @@ impl Guest for Skill {
             presence_penalty: None,
             logprobs: Logprobs::No,
             tools: None,
+            tool_choice: Some(ToolChoice::None),
         };
 
         let request = ChatRequest {

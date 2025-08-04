@@ -386,6 +386,7 @@ pub struct ChatParams {
     pub presence_penalty: Option<f64>,
     pub logprobs: Logprobs,
     pub tools: Option<Vec<Function>>,
+    pub tool_choice: Option<ToolChoice>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -413,6 +414,14 @@ pub struct ToolCall {
     /// defined by your function schema.
     /// Validate the arguments in your code before calling your function.
     pub arguments: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ToolChoice {
+    None,
+    Auto,
+    Required,
+    Named(String),
 }
 
 /// While we kept them the same before, the ingoing and outgoing message types are different.

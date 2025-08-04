@@ -478,6 +478,7 @@ impl From<ChatParams> for inference::ChatParams {
             presence_penalty,
             logprobs: logprobs.into(),
             tools: None,
+            tool_choice: None,
         }
     }
 }

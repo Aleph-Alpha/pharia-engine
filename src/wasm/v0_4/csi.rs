@@ -13,7 +13,7 @@ use pharia::skill::{
         CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
         ExplanationRequest, FinishReason, Function, Granularity, Host as InferenceHost,
         HostChatStream, HostCompletionStream, Logprob, Logprobs, Message, MessageAppend,
-        ResponseMessage, TextScore, TokenUsage, ToolCall,
+        ResponseMessage, TextScore, TokenUsage, ToolCall, ToolChoice,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -637,6 +637,7 @@ impl From<ChatParams> for inference::ChatParams {
             presence_penalty,
             logprobs,
             tools,
+            tool_choice,
         } = params;
         Self {
             max_tokens,
@@ -646,6 +647,18 @@ impl From<ChatParams> for inference::ChatParams {
             presence_penalty,
             logprobs: logprobs.into(),
             tools: tools.map(|t| t.into_iter().map(Into::into).collect()),
+            tool_choice: tool_choice.map(Into::into),
+        }
+    }
+}
+
+impl From<ToolChoice> for inference::ToolChoice {
+    fn from(tool_choice: ToolChoice) -> Self {
+        match tool_choice {
+            ToolChoice::None => inference::ToolChoice::None,
+            ToolChoice::Auto => inference::ToolChoice::Auto,
+            ToolChoice::Required => inference::ToolChoice::Required,
+            ToolChoice::Named(name) => inference::ToolChoice::Named(name),
         }
     }
 }
@@ -911,6 +924,7 @@ mod tests {
             presence_penalty: Some(0.7),
             logprobs: Logprobs::Top(2),
             tools: Some(vec![function]),
+            tool_choice: Some(ToolChoice::Auto),
         };
 
         // When
@@ -932,6 +946,7 @@ mod tests {
                     parameters: Some(parameters),
                     strict: None,
                 }]),
+                tool_choice: Some(inference::ToolChoice::Auto),
             }
         );
     }
