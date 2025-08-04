@@ -216,6 +216,7 @@ impl Skill for SkillTellMeAJoke {
             messages: vec![Message {
                 role: "user".to_owned(),
                 content: "Tell me a joke!".to_owned(),
+                tool_call_id: None,
             }],
             params: ChatParams {
                 max_tokens: Some(300),
@@ -239,7 +240,7 @@ impl Skill for SkillTellMeAJoke {
                 ChatEvent::MessageEnd { finish_reason } => Some(SkillEvent::MessageEnd {
                     payload: json!(format!("{finish_reason:?}")),
                 }),
-                ChatEvent::Usage { .. } => None,
+                ChatEvent::Usage { .. } | ChatEvent::ToolCall { .. } => None,
             };
             if let Some(event) = event {
                 drop(sender.send(event).await);
@@ -323,6 +324,7 @@ impl Skill for SkillChat {
         let mut all_messages = vec![Message {
             role: "system".to_owned(),
             content: self.system_prompt.clone(),
+            tool_call_id: None,
         }];
         all_messages.extend(messages);
 
@@ -352,7 +354,7 @@ impl Skill for SkillChat {
                 ChatEvent::MessageEnd { finish_reason } => Some(SkillEvent::MessageEnd {
                     payload: json!(format!("{finish_reason:?}")),
                 }),
-                ChatEvent::Usage { .. } => None,
+                ChatEvent::Usage { .. } | ChatEvent::ToolCall { .. } => None,
             };
             if let Some(event) = event {
                 drop(sender.send(event).await);

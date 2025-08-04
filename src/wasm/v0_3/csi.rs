@@ -533,6 +533,9 @@ impl From<inference::ChatEvent> for ChatEvent {
                 ChatEvent::MessageEnd(finish_reason.into())
             }
             inference::ChatEvent::Usage { usage } => ChatEvent::Usage(usage.into()),
+            inference::ChatEvent::ToolCall { .. } => {
+                panic!("Inference client does not yield tool calls if no tools are specified.")
+            }
         }
     }
 }
@@ -632,7 +635,11 @@ impl From<inference::TokenUsage> for TokenUsage {
 impl From<Message> for inference::Message {
     fn from(message: Message) -> Self {
         let Message { role, content } = message;
-        Self { role, content }
+        Self {
+            role,
+            content,
+            tool_call_id: None,
+        }
     }
 }
 

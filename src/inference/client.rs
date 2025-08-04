@@ -542,8 +542,18 @@ pub enum InferenceError {
         seems to be a bug with the configured inference backend."
     )]
     EmptyContent,
-    #[error("Tool calls are not supported yet: {0}")]
-    ToolCallNotSupported(String),
+    #[error("For tool messages, we expect a tool call id to be provided, but none was provided.")]
+    NoToolCallIdProvided,
+    #[error(
+        "The role {0} is not supported by the inference backend. Currently, supported roles are \
+        `user`, `assistant`, `system` and `tool`."
+    )]
+    RoleNotSupported(String),
+    #[error(
+        "The inference backend returned a message neither containing content nor a tool call. \
+        This indicates a bug with the inference backend."
+    )]
+    NeitherContentNorToolCall,
     #[error("The tool parameter is not supported yet for the Aleph Alpha inference backend.")]
     AlephAlphaInferenceToolCallNotSupported,
     #[error(transparent)]
@@ -1061,6 +1071,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             messages: vec![Message {
                 role: "user".to_owned(),
                 content: "An apple a day".to_owned(),
+                tool_call_id: None,
             }],
             params: ChatParams {
                 max_tokens: Some(1),

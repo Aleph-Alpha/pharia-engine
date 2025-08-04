@@ -394,6 +394,7 @@ impl From<Message> for inference::Message {
         Self {
             role: role.into(),
             content,
+            tool_call_id: None,
         }
     }
 }
