@@ -663,6 +663,7 @@ impl From<ChatParams> for inference::ChatParams {
             tools: None,
             tool_choice: None,
             parallel_tool_calls: None,
+            response_format: None,
         }
     }
 }
@@ -981,6 +982,7 @@ mod tests {
                 tools: None,
                 tool_choice: None,
                 parallel_tool_calls: None,
+                response_format: None,
             }
         );
     }

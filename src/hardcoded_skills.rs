@@ -228,6 +228,7 @@ impl Skill for SkillTellMeAJoke {
                 tools: None,
                 tool_choice: None,
                 parallel_tool_calls: None,
+                response_format: None,
             },
         };
         let stream_id = ctx.chat_stream_new(request).await;
@@ -341,6 +342,7 @@ impl Skill for SkillChat {
                 tools: None,
                 tool_choice: None,
                 parallel_tool_calls: None,
+                response_format: None,
             },
         };
 

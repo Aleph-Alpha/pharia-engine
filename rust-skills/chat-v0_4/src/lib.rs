@@ -27,6 +27,7 @@ impl Guest for Skill {
             tools: None,
             tool_choice: None,
             parallel_tool_calls: None,
+            response_format: None,
         };
 
         let request = ChatRequest {

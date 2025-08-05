@@ -10,7 +10,7 @@ use async_openai::{
         ChatCompletionToolChoiceOption, ChatCompletionToolType, CompletionUsage,
         CreateChatCompletionRequest, CreateChatCompletionResponse,
         CreateChatCompletionStreamResponse, FinishReason, FunctionCall, FunctionCallStream,
-        FunctionName, FunctionObject, TopLogprobs,
+        FunctionName, FunctionObject, ResponseFormat, ResponseFormatJsonSchema, TopLogprobs,
     },
 };
 use futures::StreamExt;
@@ -161,6 +161,7 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
             tools,
             tool_choice,
             parallel_tool_calls,
+            response_format,
         } = params;
         let messages = messages
             .iter()
@@ -200,12 +201,53 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
             tools,
             tool_choice: tool_choice.as_ref().map(Into::into),
             parallel_tool_calls: *parallel_tool_calls,
+            response_format: response_format
+                .as_ref()
+                .map(TryInto::try_into)
+                .transpose()?,
             ..Default::default()
         };
         Ok(request)
     }
 }
 
+impl TryFrom<&inference::ResponseFormat> for ResponseFormat {
+    type Error = InferenceError;
+
+    fn try_from(response_format: &inference::ResponseFormat) -> Result<Self, Self::Error> {
+        match response_format {
+            inference::ResponseFormat::Text => Ok(ResponseFormat::Text),
+            inference::ResponseFormat::JsonObject => Ok(ResponseFormat::JsonObject),
+            inference::ResponseFormat::JsonSchema(json_schema) => Ok(ResponseFormat::JsonSchema {
+                json_schema: json_schema.try_into()?,
+            }),
+        }
+    }
+}
+
+impl TryFrom<&inference::JsonSchema> for ResponseFormatJsonSchema {
+    type Error = InferenceError;
+
+    fn try_from(json_schema: &inference::JsonSchema) -> Result<Self, Self::Error> {
+        let inference::JsonSchema {
+            name,
+            description,
+            schema,
+            strict,
+        } = json_schema;
+        let schema = schema
+            .as_ref()
+            .map(|s| serde_json::from_slice(s))
+            .transpose()
+            .map_err(|e| anyhow::anyhow!(e))?;
+        Ok(ResponseFormatJsonSchema {
+            name: name.clone(),
+            description: description.clone(),
+            schema,
+            strict: *strict,
+        })
+    }
+}
 impl From<&inference::ToolChoice> for ChatCompletionToolChoiceOption {
     fn from(tool_choice: &inference::ToolChoice) -> Self {
         match tool_choice {
@@ -474,8 +516,8 @@ mod tests {
     use crate::{
         authorization::Authentication,
         inference::{
-            self, ChatEvent, ChatParams, ChatRequest, Function, InferenceError, Logprobs, Message,
-            ToolChoice, client::InferenceClient,
+            self, ChatEvent, ChatParams, ChatRequest, Function, InferenceError, JsonSchema,
+            Logprobs, Message, ResponseFormat, ToolChoice, client::InferenceClient,
         },
         logging::TracingContext,
         tests::{openai_inference_url, openai_token},
@@ -800,5 +842,53 @@ mod tests {
             ChatEvent::MessageEnd { .. }
         ));
         assert!(matches!(events[events.len() - 1], ChatEvent::Usage { .. }));
+    }
+
+    #[tokio::test]
+    async fn json_schema_response_format() {
+        // Given a message history that would lead to a text response
+        let api_token = openai_token().to_owned();
+        let host = openai_inference_url().to_owned();
+        let client = OpenAiClient::new(host, api_token);
+        let message = Message::new("user", "Hi, how are you?");
+
+        // When forcing a json schema response format
+        let response_format = ResponseFormat::JsonSchema(JsonSchema {
+            name: "delivery_date".to_owned(),
+            description: Some("Get the delivery date for a given order".to_owned()),
+            schema: Some(
+                serde_json::to_vec(&serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "order_id": { "type": "string" }
+                    }
+                }))
+                .unwrap(),
+            ),
+            strict: None,
+        });
+
+        let params = ChatParams {
+            response_format: Some(response_format),
+            ..Default::default()
+        };
+
+        let result = <OpenAiClient as InferenceClient>::chat(
+            &client,
+            &ChatRequest {
+                model: "gpt-4o-mini".to_owned(),
+                messages: vec![message],
+                params,
+            },
+            Authentication::none(),
+            &TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
+
+        // Then the model returns a json object
+        let content = result.message.content.unwrap();
+        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(json["order_id"].is_string());
     }
 }

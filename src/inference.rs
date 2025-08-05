@@ -7,8 +7,9 @@ pub use self::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
         CompletionParams, CompletionRequest, Distribution, Explanation, ExplanationRequest,
         FinishReason, Function, Granularity, Inference, InferenceApi, InferenceConfig,
-        InferenceNotConfigured, InferenceSender, Logprob, Logprobs, Message, ResponseMessage,
-        TextScore, TokenUsage, ToolCall, ToolCallChunk, ToolChoice,
+        InferenceNotConfigured, InferenceSender, JsonSchema, Logprob, Logprobs, Message,
+        ResponseFormat, ResponseMessage, TextScore, TokenUsage, ToolCall, ToolCallChunk,
+        ToolChoice,
     },
     client::InferenceError,
 };

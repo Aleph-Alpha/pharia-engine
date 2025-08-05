@@ -389,6 +389,22 @@ pub struct ChatParams {
     pub tools: Option<Vec<Function>>,
     pub tool_choice: Option<ToolChoice>,
     pub parallel_tool_calls: Option<bool>,
+    pub response_format: Option<ResponseFormat>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ResponseFormat {
+    Text,
+    JsonObject,
+    JsonSchema(JsonSchema),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct JsonSchema {
+    pub name: String,
+    pub description: Option<String>,
+    pub schema: Option<Vec<u8>>,
+    pub strict: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

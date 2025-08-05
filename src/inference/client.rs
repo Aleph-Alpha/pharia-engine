@@ -7,8 +7,7 @@ use std::{
 };
 
 use aleph_alpha_client::{
-    ChatSampling, Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskChat,
-    TaskCompletion, TaskExplanation,
+    Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskCompletion, TaskExplanation,
 };
 use futures::StreamExt;
 use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
@@ -20,9 +19,9 @@ use thiserror::Error;
 use crate::{authorization::Authentication, inference::ResponseMessage, logging::TracingContext};
 
 use super::{
-    ChatEvent, ChatParams, ChatRequest, ChatResponse, Completion, CompletionEvent,
-    CompletionParams, CompletionRequest, Distribution, Explanation, ExplanationRequest,
-    Granularity, Logprob, Logprobs, Message, TextScore, TokenUsage,
+    ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
+    CompletionRequest, Distribution, Explanation, ExplanationRequest, Granularity, Logprob,
+    Logprobs, Message, TextScore, TokenUsage,
 };
 use async_openai::{
     Client as OpenAiClient,
@@ -534,45 +533,6 @@ impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
     }
 }
 
-impl ChatRequest {
-    pub fn to_task_chat(&self) -> Result<TaskChat<'_>, InferenceError> {
-        let ChatRequest {
-            model: _,
-            messages,
-            params:
-                ChatParams {
-                    max_tokens,
-                    temperature,
-                    top_p,
-                    frequency_penalty,
-                    presence_penalty,
-                    logprobs,
-                    tools,
-                    tool_choice,
-                    parallel_tool_calls,
-                },
-        } = self;
-        if tools.is_some() || tool_choice.is_some() || parallel_tool_calls.is_some() {
-            return Err(InferenceError::AlephAlphaInferenceToolCallNotSupported);
-        }
-        let task = TaskChat {
-            messages: messages.iter().map(Into::into).collect(),
-            stopping: Stopping {
-                maximum_tokens: *max_tokens,
-                stop_sequences: &[],
-            },
-            sampling: ChatSampling {
-                temperature: *temperature,
-                top_p: *top_p,
-                frequency_penalty: *frequency_penalty,
-                presence_penalty: *presence_penalty,
-            },
-            logprobs: (*logprobs).into(),
-        };
-        Ok(task)
-    }
-}
-
 impl From<Logprobs> for aleph_alpha_client::Logprobs {
     fn from(logprobs: Logprobs) -> Self {
         match logprobs {
@@ -909,6 +869,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 tools: None,
                 tool_choice: None,
                 parallel_tool_calls: None,
+                response_format: None,
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };
