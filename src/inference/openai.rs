@@ -174,6 +174,7 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
                     .collect::<Result<Vec<_>, _>>()
             })
             .transpose()?;
+
         let request = CreateChatCompletionRequest {
             model: model.clone(),
             messages,
@@ -191,9 +192,11 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
             top_p: top_p.map(|p| p as f32),
             frequency_penalty: frequency_penalty.map(|p| p as f32),
             presence_penalty: presence_penalty.map(|p| p as f32),
-            // `max_tokens` is deprecated in favor of `max_completion_tokens`
-            // An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens.
-            max_completion_tokens: *max_tokens,
+            // The correct argument is `max_completion_tokens`, but our inference backend only
+            // supports the deprecated `max_tokens`. Since OpenAI gives an error if setting
+            // settings both values, we only set the deprecated one.
+            #[allow(deprecated)]
+            max_tokens: *max_tokens,
             tools,
             tool_choice: tool_choice.as_ref().map(Into::into),
             parallel_tool_calls: *parallel_tool_calls,
