@@ -81,7 +81,17 @@ fn how(auth: Authentication, tracing_context: &TracingContext) -> anyhow::Result
     })
 }
 
-impl InferenceClient for Client {
+/// The client we use to make http requests to the Aleph Alpha inference API.
+pub struct AlephAlphaClient(Client);
+
+impl AlephAlphaClient {
+    pub fn new(host: impl Into<String>) -> Self {
+        let client = Client::new(host, None).unwrap();
+        Self(client)
+    }
+}
+
+impl InferenceClient for AlephAlphaClient {
     async fn explain(
         &self,
         request: &ExplanationRequest,
@@ -100,7 +110,7 @@ impl InferenceClient for Client {
             granularity: granularity.into(),
         };
         let how = how(auth, tracing_context)?;
-        retry(|| self.explanation(&task, model, &how), tracing_context)
+        retry(|| self.0.explanation(&task, model, &how), tracing_context)
             .await?
             .try_into()
             .map_err(InferenceError::Other)
@@ -114,7 +124,7 @@ impl InferenceClient for Client {
         let task = request.to_task_chat()?;
 
         let how = how(auth, tracing_context)?;
-        retry(|| self.chat(&task, &request.model, &how), tracing_context)
+        retry(|| self.0.chat(&task, &request.model, &how), tracing_context)
             .await?
             .try_into()
             .map_err(InferenceError::Other)
@@ -130,7 +140,7 @@ impl InferenceClient for Client {
         let task = request.to_task_chat()?;
         let how = how(auth, tracing_context)?;
         let mut stream = retry(
-            || self.stream_chat(&task, &request.model, &how),
+            || self.0.stream_chat(&task, &request.model, &how),
             tracing_context,
         )
         .await?;
@@ -183,7 +193,7 @@ impl InferenceClient for Client {
             echo: *echo,
         };
         let how = how(auth, tracing_context)?;
-        retry(|| self.completion(&task, model, &how), tracing_context)
+        retry(|| self.0.completion(&task, model, &how), tracing_context)
             .await?
             .try_into()
             .map_err(InferenceError::Other)
@@ -233,7 +243,7 @@ impl InferenceClient for Client {
         };
         let how = how(auth, tracing_context)?;
         let mut stream = retry(
-            || self.stream_completion(&task, model, &how),
+            || self.0.stream_completion(&task, model, &how),
             tracing_context,
         )
         .await?;
@@ -588,7 +598,7 @@ mod tests {
         // Given an inference client
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When explaining complete
         let request = ExplanationRequest {
@@ -597,10 +607,14 @@ mod tests {
             model: "pharia-1-llm-7b-control".to_string(),
             granularity: Granularity::Auto,
         };
-        let explanation =
-            <Client as InferenceClient>::explain(&client, &request, auth, &TracingContext::dummy())
-                .await
-                .unwrap();
+        let explanation = <AlephAlphaClient as InferenceClient>::explain(
+            &client,
+            &request,
+            auth,
+            &TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
 
         // Then we explanation of five items
         assert_eq!(explanation.len(), 5);
@@ -680,7 +694,7 @@ mod tests {
         // Given an inference client
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // and a chat request
         let chat_request = ChatRequest {
@@ -690,7 +704,7 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_response = <Client as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
@@ -708,7 +722,7 @@ mod tests {
         // Given an inference client and a bad token
         let bad_auth = Authentication::from_token("bad_api_token");
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // and a chat request return an error
         let chat_request = ChatRequest {
@@ -718,7 +732,7 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_result = <Client as InferenceClient>::chat(
+        let chat_result = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             bad_auth,
@@ -739,7 +753,7 @@ mod tests {
         // Given an inference client
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // and a completion request
         let completion_request = CompletionRequest {
@@ -753,7 +767,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         };
 
         // When completing text with inference client
-        let completion_response = <Client as InferenceClient>::complete(
+        let completion_response = <AlephAlphaClient as InferenceClient>::complete(
             &client,
             &completion_request,
             auth,
@@ -771,7 +785,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let chat_request = ChatRequest {
@@ -789,7 +803,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };
-        let chat_response = <Client as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
@@ -815,7 +829,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let completion_request = CompletionRequest {
@@ -834,7 +848,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 echo: false,
             },
         };
-        let completion_response = <Client as InferenceClient>::complete(
+        let completion_response = <AlephAlphaClient as InferenceClient>::complete(
             &client,
             &completion_request,
             auth,
@@ -859,7 +873,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let chat_request = ChatRequest {
@@ -871,7 +885,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <Client as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
@@ -893,7 +907,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let completion_request = CompletionRequest {
@@ -905,7 +919,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let completion_response = <Client as InferenceClient>::complete(
+        let completion_response = <AlephAlphaClient as InferenceClient>::complete(
             &client,
             &completion_request,
             auth,
@@ -926,7 +940,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let completion_request = CompletionRequest {
@@ -937,7 +951,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let completion_response = <Client as InferenceClient>::complete(
+        let completion_response = <AlephAlphaClient as InferenceClient>::complete(
             &client,
             &completion_request,
             auth,
@@ -956,7 +970,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let completion_request = CompletionRequest {
@@ -968,7 +982,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let completion_response = <Client as InferenceClient>::complete(
+        let completion_response = <AlephAlphaClient as InferenceClient>::complete(
             &client,
             &completion_request,
             auth,
@@ -986,7 +1000,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let chat_request = ChatRequest {
@@ -997,7 +1011,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <Client as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
@@ -1016,7 +1030,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let completion_request = CompletionRequest {
@@ -1030,7 +1044,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <Client as InferenceClient>::stream_completion(
+            <AlephAlphaClient as InferenceClient>::stream_completion(
                 &client,
                 &completion_request,
                 auth,
@@ -1063,7 +1077,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let chat_request = ChatRequest {
@@ -1081,7 +1095,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <Client as InferenceClient>::stream_chat(
+            <AlephAlphaClient as InferenceClient>::stream_chat(
                 &client,
                 &chat_request,
                 auth,
@@ -1120,7 +1134,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // Given a chat request with tools
         let auth = Authentication::from_token(api_token());
         let host = inference_url().to_owned();
-        let client = Client::new(host, None).unwrap();
+        let client = AlephAlphaClient::new(host);
 
         // When
         let chat_request = ChatRequest {
@@ -1138,7 +1152,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         };
 
         // When
-        let chat_response = <Client as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
