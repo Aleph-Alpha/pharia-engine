@@ -249,6 +249,32 @@ interface inference {
         tool-choice: option<tool-choice>,
         /// Whether to allow the model to call multiple tools in parallel. Defaults to true if not specified.
         parallel-tool-calls: option<bool>,
+        /// An object specifying the format that the model must output.
+        /// Setting to { "type": "json_schema", "json_schema": {...} } enables Structured Outputs which ensures the model
+        /// will match your supplied JSON schema. Learn more in the Structured Outputs guide.
+        /// Setting to { "type": "json_object" } enables the older JSON mode, which ensures the message the model generates
+        /// is valid JSON. Using json_schema is preferred for models that support it.
+        response-format: option<response-format>,
+    }
+
+    variant response-format {
+        /// The type of response format being defined: `text`
+        text,
+        /// The type of response format being defined: `json_object`
+        json-object,
+        /// The type of response format being defined: `json_schema`
+        json-schema(json-schema),
+    }
+
+    record json-schema {
+        /// A description of what the response format is for, used by the model to determine how to respond in the format.
+        description: option<string>,
+        /// The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
+        name: string,
+        /// The schema for the response format, described as a JSON Schema object.
+        schema: option<list<u8>>,
+        /// Whether to enable strict schema adherence when generating the output. If set to true, the model will always follow the exact schema defined in the `schema` field. Only a subset of JSON Schema is supported when `strict` is `true`. To learn more, read the [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+        strict: option<bool>,
     }
 
     /// The result of a chat response, including the message generated as well as

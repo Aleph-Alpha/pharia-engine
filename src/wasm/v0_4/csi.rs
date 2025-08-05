@@ -12,8 +12,9 @@ use pharia::skill::{
         ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionAppend,
         CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
         ExplanationRequest, FinishReason, Function, Granularity, Host as InferenceHost,
-        HostChatStream, HostCompletionStream, Logprob, Logprobs, Message, MessageAppend,
-        ResponseMessage, TextScore, TokenUsage, ToolCall, ToolCallChunk, ToolChoice,
+        HostChatStream, HostCompletionStream, JsonSchema, Logprob, Logprobs, Message,
+        MessageAppend, ResponseFormat, ResponseMessage, TextScore, TokenUsage, ToolCall,
+        ToolCallChunk, ToolChoice,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -663,6 +664,7 @@ impl From<ChatParams> for inference::ChatParams {
             tools,
             tool_choice,
             parallel_tool_calls,
+            response_format,
         } = params;
         Self {
             max_tokens,
@@ -674,6 +676,36 @@ impl From<ChatParams> for inference::ChatParams {
             tools: tools.map(|t| t.into_iter().map(Into::into).collect()),
             tool_choice: tool_choice.map(Into::into),
             parallel_tool_calls,
+            response_format: response_format.map(Into::into),
+        }
+    }
+}
+
+impl From<ResponseFormat> for inference::ResponseFormat {
+    fn from(response_format: ResponseFormat) -> Self {
+        match response_format {
+            ResponseFormat::Text => inference::ResponseFormat::Text,
+            ResponseFormat::JsonObject => inference::ResponseFormat::JsonObject,
+            ResponseFormat::JsonSchema(json_schema) => {
+                inference::ResponseFormat::JsonSchema(json_schema.into())
+            }
+        }
+    }
+}
+
+impl From<JsonSchema> for inference::JsonSchema {
+    fn from(json_schema: JsonSchema) -> Self {
+        let JsonSchema {
+            name,
+            description,
+            schema,
+            strict,
+        } = json_schema;
+        Self {
+            name,
+            description,
+            schema,
+            strict,
         }
     }
 }
@@ -942,6 +974,7 @@ mod tests {
             parameters: Some(parameters.clone()),
             strict: None,
         };
+        let response_format = ResponseFormat::Text;
         let source = ChatParams {
             max_tokens: Some(10),
             temperature: Some(0.5),
@@ -952,6 +985,7 @@ mod tests {
             tools: Some(vec![function]),
             tool_choice: Some(ToolChoice::Auto),
             parallel_tool_calls: Some(false),
+            response_format: Some(response_format.clone()),
         };
 
         // When
@@ -975,6 +1009,7 @@ mod tests {
                 }]),
                 tool_choice: Some(inference::ToolChoice::Auto),
                 parallel_tool_calls: Some(false),
+                response_format: Some(inference::ResponseFormat::Text),
             }
         );
     }
