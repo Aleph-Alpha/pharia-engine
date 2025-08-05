@@ -81,13 +81,19 @@ fn how(auth: Authentication, tracing_context: &TracingContext) -> anyhow::Result
     })
 }
 
-/// The client we use to make http requests to the Aleph Alpha inference API.
-pub struct AlephAlphaClient(Client);
+/// The `AlephAlphaClient` is responsible for resolving inference requests in case the Aleph Alpha
+/// inference API is configured.
+pub struct AlephAlphaClient {
+    /// The rust client developed by us. Supports our custom features like the explanation endpoint.
+    aleph_alpha: Client,
+}
 
 impl AlephAlphaClient {
     pub fn new(host: impl Into<String>) -> Self {
         let client = Client::new(host, None).unwrap();
-        Self(client)
+        Self {
+            aleph_alpha: client,
+        }
     }
 }
 
@@ -110,10 +116,13 @@ impl InferenceClient for AlephAlphaClient {
             granularity: granularity.into(),
         };
         let how = how(auth, tracing_context)?;
-        retry(|| self.0.explanation(&task, model, &how), tracing_context)
-            .await?
-            .try_into()
-            .map_err(InferenceError::Other)
+        retry(
+            || self.aleph_alpha.explanation(&task, model, &how),
+            tracing_context,
+        )
+        .await?
+        .try_into()
+        .map_err(InferenceError::Other)
     }
     async fn chat(
         &self,
@@ -124,10 +133,13 @@ impl InferenceClient for AlephAlphaClient {
         let task = request.to_task_chat()?;
 
         let how = how(auth, tracing_context)?;
-        retry(|| self.0.chat(&task, &request.model, &how), tracing_context)
-            .await?
-            .try_into()
-            .map_err(InferenceError::Other)
+        retry(
+            || self.aleph_alpha.chat(&task, &request.model, &how),
+            tracing_context,
+        )
+        .await?
+        .try_into()
+        .map_err(InferenceError::Other)
     }
 
     async fn stream_chat(
@@ -140,7 +152,7 @@ impl InferenceClient for AlephAlphaClient {
         let task = request.to_task_chat()?;
         let how = how(auth, tracing_context)?;
         let mut stream = retry(
-            || self.0.stream_chat(&task, &request.model, &how),
+            || self.aleph_alpha.stream_chat(&task, &request.model, &how),
             tracing_context,
         )
         .await?;
@@ -193,10 +205,13 @@ impl InferenceClient for AlephAlphaClient {
             echo: *echo,
         };
         let how = how(auth, tracing_context)?;
-        retry(|| self.0.completion(&task, model, &how), tracing_context)
-            .await?
-            .try_into()
-            .map_err(InferenceError::Other)
+        retry(
+            || self.aleph_alpha.completion(&task, model, &how),
+            tracing_context,
+        )
+        .await?
+        .try_into()
+        .map_err(InferenceError::Other)
     }
 
     async fn stream_completion(
@@ -243,7 +258,7 @@ impl InferenceClient for AlephAlphaClient {
         };
         let how = how(auth, tracing_context)?;
         let mut stream = retry(
-            || self.0.stream_completion(&task, model, &how),
+            || self.aleph_alpha.stream_completion(&task, model, &how),
             tracing_context,
         )
         .await?;
