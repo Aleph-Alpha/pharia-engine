@@ -1,4 +1,3 @@
-use aleph_alpha_client::Client;
 use derive_more::{Constructor, Deref, Display, IntoIterator};
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde::Deserialize;
@@ -9,7 +8,9 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::{authorization::Authentication, logging::TracingContext};
+use crate::{
+    authorization::Authentication, inference::client::AlephAlphaClient, logging::TracingContext,
+};
 use tracing::{info, warn};
 
 use super::{
@@ -48,7 +49,7 @@ impl Inference {
                     target: "pharia-kernel::inference",
                     "Using Aleph Alpha Inference at {}", url
                 );
-                let client = Client::new(url, None).unwrap();
+                let client = AlephAlphaClient::new(url);
                 Self::with_client(client)
             }
             InferenceConfig::OpenAi { url, token } => {
