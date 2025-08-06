@@ -795,8 +795,16 @@ impl From<CompletionRequest> for inference::CompletionRequest {
 
 impl From<inference::ToolCall> for ToolCall {
     fn from(call: inference::ToolCall) -> Self {
-        let inference::ToolCall { name, arguments } = call;
-        Self { name, arguments }
+        let inference::ToolCall {
+            id,
+            name,
+            arguments,
+        } = call;
+        Self {
+            id,
+            name,
+            arguments,
+        }
     }
 }
 
