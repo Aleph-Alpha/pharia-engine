@@ -212,7 +212,7 @@ impl InferenceClient for AlephAlphaClient {
         tracing_context: &TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let client = self.openai_client(auth, tracing_context)?;
-        let openai_request = request.into_openai_request(true)?;
+        let openai_request = request.as_openai_request(true)?;
         let response = client.chat().create(openai_request).await?;
         let response = ChatResponse::try_from(response)?;
 
@@ -237,7 +237,7 @@ impl InferenceClient for AlephAlphaClient {
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let client = self.openai_client(auth, tracing_context)?;
-        let mut openai_request = request.into_openai_request(true)?;
+        let mut openai_request = request.as_openai_request(true)?;
         openai_request.stream_options = Some(ChatCompletionStreamOptions {
             include_usage: true,
         });
@@ -866,6 +866,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 tool_choice: None,
                 parallel_tool_calls: None,
                 response_format: None,
+                reasoning_effort: None,
             },
             messages: vec![Message::new("user", "Haiku about oat milk!")],
         };

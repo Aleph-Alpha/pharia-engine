@@ -257,6 +257,17 @@ interface inference {
         /// Setting to { "type": "json_object" } enables the older JSON mode, which ensures the message the model generates
         /// is valid JSON. Using json_schema is preferred for models that support it.
         response-format: option<response-format>,
+        /// Only available for reasoning models (o-series for OpenAI).
+        /// Constrains effort on reasoning for reasoning models.
+        /// Currently supported values are low, medium, and high.
+        /// Reducing reasoning effort can result in faster responses and fewer tokens used on reasoning in a response.
+        reasoning-effort: option<reasoning-effort>,
+    }
+
+    enum reasoning-effort {
+        low,
+        medium,
+        high,
     }
 
     variant response-format {

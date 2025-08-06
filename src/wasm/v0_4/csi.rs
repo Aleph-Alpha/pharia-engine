@@ -13,8 +13,8 @@ use pharia::skill::{
         CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
         ExplanationRequest, FinishReason, Function, Granularity, Host as InferenceHost,
         HostChatStream, HostCompletionStream, JsonSchema, Logprob, Logprobs, Message,
-        MessageAppend, ResponseFormat, ResponseMessage, TextScore, TokenUsage, ToolCall,
-        ToolCallChunk, ToolChoice,
+        MessageAppend, ReasoningEffort, ResponseFormat, ResponseMessage, TextScore, TokenUsage,
+        ToolCall, ToolCallChunk, ToolChoice,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -652,6 +652,16 @@ impl From<Message> for inference::Message {
     }
 }
 
+impl From<ReasoningEffort> for inference::ReasoningEffort {
+    fn from(reasoning_effort: ReasoningEffort) -> Self {
+        match reasoning_effort {
+            ReasoningEffort::Low => inference::ReasoningEffort::Low,
+            ReasoningEffort::Medium => inference::ReasoningEffort::Medium,
+            ReasoningEffort::High => inference::ReasoningEffort::High,
+        }
+    }
+}
+
 impl From<ChatParams> for inference::ChatParams {
     fn from(params: ChatParams) -> Self {
         let ChatParams {
@@ -665,6 +675,7 @@ impl From<ChatParams> for inference::ChatParams {
             tool_choice,
             parallel_tool_calls,
             response_format,
+            reasoning_effort,
         } = params;
         Self {
             max_tokens,
@@ -677,6 +688,7 @@ impl From<ChatParams> for inference::ChatParams {
             tool_choice: tool_choice.map(Into::into),
             parallel_tool_calls,
             response_format: response_format.map(Into::into),
+            reasoning_effort: reasoning_effort.map(Into::into),
         }
     }
 }
@@ -994,6 +1006,7 @@ mod tests {
             tool_choice: Some(ToolChoice::Auto),
             parallel_tool_calls: Some(false),
             response_format: Some(response_format.clone()),
+            reasoning_effort: Some(ReasoningEffort::Low),
         };
 
         // When
@@ -1018,6 +1031,7 @@ mod tests {
                 tool_choice: Some(inference::ToolChoice::Auto),
                 parallel_tool_calls: Some(false),
                 response_format: Some(inference::ResponseFormat::Text),
+                reasoning_effort: Some(inference::ReasoningEffort::Low),
             }
         );
     }

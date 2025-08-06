@@ -10,7 +10,8 @@ use async_openai::{
         ChatCompletionToolChoiceOption, ChatCompletionToolType, CompletionUsage,
         CreateChatCompletionRequest, CreateChatCompletionResponse,
         CreateChatCompletionStreamResponse, FinishReason, FunctionCall, FunctionCallStream,
-        FunctionName, FunctionObject, ResponseFormat, ResponseFormatJsonSchema, TopLogprobs,
+        FunctionName, FunctionObject, ReasoningEffort, ResponseFormat, ResponseFormatJsonSchema,
+        TopLogprobs,
     },
 };
 use futures::StreamExt;
@@ -148,11 +149,12 @@ fn map_logprobs(logprobs: Option<ChatChoiceLogprobs>) -> Vec<inference::Distribu
 impl inference::ChatRequest {
     /// Convert a [`inference::ChatRequest`] into an [`async_openai::types::CreateChatCompletionRequest`].
     ///
-    /// OpenAI deprecated the `max_tokens` parameter in favor of `max_completion_tokens`. Our
+    /// `OpenAI` deprecated the `max_tokens` parameter in favor of `max_completion_tokens`. Our
     /// inference backend does not support the `max_completion_tokens` yet. While initially we
     /// thought we could simply use the deprecated `max_tokens` parameter, it turns out that using
     /// it for reasoning models leads to an error. Therefore, we branch on the inference backend.
-    pub fn into_openai_request(
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn as_openai_request(
         &self,
         aleph_alpha_inference: bool,
     ) -> Result<CreateChatCompletionRequest, InferenceError> {
@@ -172,6 +174,7 @@ impl inference::ChatRequest {
             tool_choice,
             parallel_tool_calls,
             response_format,
+            reasoning_effort,
         } = params;
         let messages = messages
             .iter()
@@ -209,10 +212,10 @@ impl inference::ChatRequest {
             } else {
                 None
             },
-            max_completion_tokens: if !aleph_alpha_inference {
-                *max_tokens
-            } else {
+            max_completion_tokens: if aleph_alpha_inference {
                 None
+            } else {
+                *max_tokens
             },
             tools,
             tool_choice: tool_choice.as_ref().map(Into::into),
@@ -221,9 +224,20 @@ impl inference::ChatRequest {
                 .as_ref()
                 .map(TryInto::try_into)
                 .transpose()?,
+            reasoning_effort: reasoning_effort.as_ref().map(Into::into),
             ..Default::default()
         };
         Ok(request)
+    }
+}
+
+impl From<&inference::ReasoningEffort> for ReasoningEffort {
+    fn from(reasoning_effort: &inference::ReasoningEffort) -> Self {
+        match reasoning_effort {
+            inference::ReasoningEffort::Low => ReasoningEffort::Low,
+            inference::ReasoningEffort::Medium => ReasoningEffort::Medium,
+            inference::ReasoningEffort::High => ReasoningEffort::High,
+        }
     }
 }
 
@@ -445,7 +459,7 @@ impl InferenceClient for OpenAiClient {
         _auth: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::ChatResponse, InferenceError> {
-        let openai_request = request.into_openai_request(false)?;
+        let openai_request = request.as_openai_request(false)?;
         let response = self.client.chat().create(openai_request).await?;
         let response = inference::ChatResponse::try_from(response)?;
 
@@ -469,7 +483,7 @@ impl InferenceClient for OpenAiClient {
         _tracing_context: &TracingContext,
         send: mpsc::Sender<inference::ChatEvent>,
     ) -> Result<(), InferenceError> {
-        let mut openai_request = request.into_openai_request(false)?;
+        let mut openai_request = request.as_openai_request(false)?;
         openai_request.stream_options = Some(ChatCompletionStreamOptions {
             include_usage: true,
         });
@@ -533,7 +547,8 @@ mod tests {
         authorization::Authentication,
         inference::{
             self, ChatEvent, ChatParams, ChatRequest, Function, InferenceError, JsonSchema,
-            Logprobs, Message, ResponseFormat, ToolChoice, client::InferenceClient,
+            Logprobs, Message, ReasoningEffort, ResponseFormat, ToolChoice,
+            client::InferenceClient,
         },
         logging::TracingContext,
         tests::{openai_inference_url, openai_token},
@@ -919,6 +934,7 @@ mod tests {
 
         let params = ChatParams {
             max_tokens: Some(10),
+            reasoning_effort: Some(ReasoningEffort::Low),
             ..Default::default()
         };
 
@@ -935,6 +951,6 @@ mod tests {
         .await;
 
         // Then the model returns a text response
-        assert!(dbg!(result).is_ok());
+        assert!(result.is_ok());
     }
 }

@@ -378,6 +378,13 @@ pub struct Function {
     pub strict: Option<bool>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ReasoningEffort {
+    Low,
+    Medium,
+    High,
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct ChatParams {
     pub max_tokens: Option<u32>,
@@ -390,6 +397,7 @@ pub struct ChatParams {
     pub tool_choice: Option<ToolChoice>,
     pub parallel_tool_calls: Option<bool>,
     pub response_format: Option<ResponseFormat>,
+    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

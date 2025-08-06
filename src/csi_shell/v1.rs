@@ -754,6 +754,24 @@ impl From<ResponseFormat> for inference::ResponseFormat {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ReasoningEffort {
+    Low,
+    Medium,
+    High,
+}
+
+impl From<ReasoningEffort> for inference::ReasoningEffort {
+    fn from(value: ReasoningEffort) -> Self {
+        match value {
+            ReasoningEffort::Low => inference::ReasoningEffort::Low,
+            ReasoningEffort::Medium => inference::ReasoningEffort::Medium,
+            ReasoningEffort::High => inference::ReasoningEffort::High,
+        }
+    }
+}
+
+#[derive(Deserialize)]
 struct ChatParams {
     max_tokens: Option<u32>,
     temperature: Option<f64>,
@@ -765,6 +783,7 @@ struct ChatParams {
     tool_choice: Option<ToolChoice>,
     parallel_tool_calls: Option<bool>,
     response_format: Option<ResponseFormat>,
+    reasoning_effort: Option<ReasoningEffort>,
 }
 
 impl From<ChatParams> for inference::ChatParams {
@@ -780,6 +799,7 @@ impl From<ChatParams> for inference::ChatParams {
             tool_choice,
             parallel_tool_calls,
             response_format,
+            reasoning_effort,
         } = value;
         inference::ChatParams {
             max_tokens,
@@ -792,6 +812,7 @@ impl From<ChatParams> for inference::ChatParams {
             tool_choice: tool_choice.map(Into::into),
             parallel_tool_calls,
             response_format: response_format.map(Into::into),
+            reasoning_effort: reasoning_effort.map(Into::into),
         }
     }
 }
