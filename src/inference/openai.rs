@@ -145,16 +145,22 @@ fn map_logprobs(logprobs: Option<ChatChoiceLogprobs>) -> Vec<inference::Distribu
     }
 }
 
-impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
-    type Error = InferenceError;
-
-    #[allow(clippy::cast_possible_truncation)]
-    fn try_from(request: &inference::ChatRequest) -> Result<Self, Self::Error> {
+impl inference::ChatRequest {
+    /// Convert a [`inference::ChatRequest`] into an [`async_openai::types::CreateChatCompletionRequest`].
+    ///
+    /// OpenAI deprecated the `max_tokens` parameter in favor of `max_completion_tokens`. Our
+    /// inference backend does not support the `max_completion_tokens` yet. While initially we
+    /// thought we could simply use the deprecated `max_tokens` parameter, it turns out that using
+    /// it for reasoning models leads to an error. Therefore, we branch on the inference backend.
+    pub fn into_openai_request(
+        &self,
+        aleph_alpha_inference: bool,
+    ) -> Result<CreateChatCompletionRequest, InferenceError> {
         let inference::ChatRequest {
             model,
             messages,
             params,
-        } = request;
+        } = self;
         let inference::ChatParams {
             max_tokens,
             temperature,
@@ -197,11 +203,17 @@ impl TryFrom<&inference::ChatRequest> for CreateChatCompletionRequest {
             top_p: top_p.map(|p| p as f32),
             frequency_penalty: frequency_penalty.map(|p| p as f32),
             presence_penalty: presence_penalty.map(|p| p as f32),
-            // The correct argument is `max_completion_tokens`, but our inference backend only
-            // supports the deprecated `max_tokens`. Since OpenAI gives an error if setting
-            // settings both values, we only set the deprecated one.
             #[allow(deprecated)]
-            max_tokens: *max_tokens,
+            max_tokens: if aleph_alpha_inference {
+                *max_tokens
+            } else {
+                None
+            },
+            max_completion_tokens: if !aleph_alpha_inference {
+                *max_tokens
+            } else {
+                None
+            },
             tools,
             tool_choice: tool_choice.as_ref().map(Into::into),
             parallel_tool_calls: *parallel_tool_calls,
@@ -433,7 +445,7 @@ impl InferenceClient for OpenAiClient {
         _auth: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::ChatResponse, InferenceError> {
-        let openai_request = request.try_into()?;
+        let openai_request = request.into_openai_request(false)?;
         let response = self.client.chat().create(openai_request).await?;
         let response = inference::ChatResponse::try_from(response)?;
 
@@ -457,7 +469,7 @@ impl InferenceClient for OpenAiClient {
         _tracing_context: &TracingContext,
         send: mpsc::Sender<inference::ChatEvent>,
     ) -> Result<(), InferenceError> {
-        let mut openai_request: CreateChatCompletionRequest = request.try_into()?;
+        let mut openai_request = request.into_openai_request(false)?;
         openai_request.stream_options = Some(ChatCompletionStreamOptions {
             include_usage: true,
         });
@@ -874,6 +886,7 @@ mod tests {
 
         let params = ChatParams {
             response_format: Some(response_format),
+            temperature: Some(0.0),
             ..Default::default()
         };
 
@@ -894,5 +907,34 @@ mod tests {
         let content = result.message.content.unwrap();
         let json: serde_json::Value = serde_json::from_str(&content).unwrap();
         assert!(json["order_id"].is_string());
+    }
+
+    #[tokio::test]
+    async fn reasoning_model_is_supported_with_max_tokens() {
+        // Given a message history that would lead to a text response
+        let api_token = openai_token().to_owned();
+        let host = openai_inference_url().to_owned();
+        let client = OpenAiClient::new(host, api_token);
+        let message = Message::new("user", "Hi, how are you?");
+
+        let params = ChatParams {
+            max_tokens: Some(10),
+            ..Default::default()
+        };
+
+        let result = <OpenAiClient as InferenceClient>::chat(
+            &client,
+            &ChatRequest {
+                model: "o4-mini".to_owned(),
+                messages: vec![message],
+                params,
+            },
+            Authentication::none(),
+            &TracingContext::dummy(),
+        )
+        .await;
+
+        // Then the model returns a text response
+        assert!(dbg!(result).is_ok());
     }
 }
