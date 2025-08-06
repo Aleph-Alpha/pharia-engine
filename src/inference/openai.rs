@@ -69,11 +69,15 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
 impl From<ChatCompletionMessageToolCall> for inference::ToolCall {
     fn from(tool_call: ChatCompletionMessageToolCall) -> Self {
         let ChatCompletionMessageToolCall {
-            id: _,
+            id,
             r#type: _,
             function: FunctionCall { name, arguments },
         } = tool_call;
-        inference::ToolCall { name, arguments }
+        inference::ToolCall {
+            id,
+            name,
+            arguments,
+        }
     }
 }
 

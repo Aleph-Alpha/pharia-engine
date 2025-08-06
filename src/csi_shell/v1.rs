@@ -518,9 +518,12 @@ impl From<inference::ChatEvent> for Event {
                     usage: usage.into(),
                 })
                 .expect("`json_data` must only be called once."),
-            inference::ChatEvent::ToolCall { .. } => {
-                panic!("Inference client does not yield tool calls if no tools are specified.")
-            }
+            inference::ChatEvent::ToolCall(tool_calls) => Event::default()
+                .event("tool_call")
+                .json_data(ToolCallEvent {
+                    tool_calls: tool_calls.into_iter().map(Into::into).collect(),
+                })
+                .expect("`json_data` must only be called once."),
         }
     }
 }
@@ -544,6 +547,36 @@ struct ChatMessageEndEvent {
 #[derive(Serialize)]
 struct ChatUsageEvent {
     usage: TokenUsage,
+}
+
+#[derive(Serialize)]
+struct ToolCallChunk {
+    index: u32,
+    id: Option<String>,
+    name: Option<String>,
+    arguments: Option<String>,
+}
+
+impl From<inference::ToolCallChunk> for ToolCallChunk {
+    fn from(value: inference::ToolCallChunk) -> Self {
+        let inference::ToolCallChunk {
+            index,
+            id,
+            name,
+            arguments,
+        } = value;
+        ToolCallChunk {
+            index,
+            id,
+            name,
+            arguments,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ToolCallEvent {
+    tool_calls: Vec<ToolCallChunk>,
 }
 
 #[derive(Deserialize)]
@@ -631,6 +664,96 @@ impl From<Logprobs> for inference::Logprobs {
 }
 
 #[derive(Deserialize)]
+struct Function {
+    name: String,
+    description: Option<String>,
+    parameters: Option<Value>,
+    strict: Option<bool>,
+}
+
+impl From<Function> for inference::Function {
+    fn from(value: Function) -> Self {
+        let Function {
+            name,
+            description,
+            parameters,
+            strict,
+        } = value;
+        inference::Function {
+            name,
+            description,
+            parameters: parameters.map(|p| serde_json::to_vec(&p).unwrap()),
+            strict,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ToolChoice {
+    Auto,
+    Required,
+    None,
+    Named(String),
+}
+
+impl From<ToolChoice> for inference::ToolChoice {
+    fn from(value: ToolChoice) -> Self {
+        match value {
+            ToolChoice::Auto => inference::ToolChoice::Auto,
+            ToolChoice::Required => inference::ToolChoice::Required,
+            ToolChoice::None => inference::ToolChoice::None,
+            ToolChoice::Named(name) => inference::ToolChoice::Named(name),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct JsonSchema {
+    name: String,
+    description: Option<String>,
+    schema: Option<Value>,
+    strict: Option<bool>,
+}
+
+impl From<JsonSchema> for inference::JsonSchema {
+    fn from(value: JsonSchema) -> Self {
+        let JsonSchema {
+            name,
+            description,
+            schema,
+            strict,
+        } = value;
+        inference::JsonSchema {
+            name,
+            description,
+            schema: schema.map(|s| serde_json::to_vec(&s).unwrap()),
+            strict,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ResponseFormat {
+    Text,
+    JsonObject,
+    JsonSchema(JsonSchema),
+}
+
+impl From<ResponseFormat> for inference::ResponseFormat {
+    fn from(value: ResponseFormat) -> Self {
+        match value {
+            ResponseFormat::Text => inference::ResponseFormat::Text,
+            ResponseFormat::JsonObject => inference::ResponseFormat::JsonObject,
+            ResponseFormat::JsonSchema(json_schema) => {
+                inference::ResponseFormat::JsonSchema(json_schema.into())
+            }
+        }
+    }
+}
+
+#[derive(Deserialize)]
 struct ChatParams {
     max_tokens: Option<u32>,
     temperature: Option<f64>,
@@ -638,6 +761,10 @@ struct ChatParams {
     frequency_penalty: Option<f64>,
     presence_penalty: Option<f64>,
     logprobs: Logprobs,
+    tools: Option<Vec<Function>>,
+    tool_choice: Option<ToolChoice>,
+    parallel_tool_calls: Option<bool>,
+    response_format: Option<ResponseFormat>,
 }
 
 impl From<ChatParams> for inference::ChatParams {
@@ -649,6 +776,10 @@ impl From<ChatParams> for inference::ChatParams {
             frequency_penalty,
             presence_penalty,
             logprobs,
+            tools,
+            tool_choice,
+            parallel_tool_calls,
+            response_format,
         } = value;
         inference::ChatParams {
             max_tokens,
@@ -657,10 +788,10 @@ impl From<ChatParams> for inference::ChatParams {
             frequency_penalty,
             presence_penalty,
             logprobs: logprobs.into(),
-            tools: None,
-            tool_choice: None,
-            parallel_tool_calls: None,
-            response_format: None,
+            tools: tools.map(|t| t.into_iter().map(Into::into).collect()),
+            tool_choice: tool_choice.map(Into::into),
+            parallel_tool_calls,
+            response_format: response_format.map(Into::into),
         }
     }
 }
@@ -693,22 +824,16 @@ enum FinishReason {
     Stop,
     Length,
     ContentFilter,
+    ToolCalls,
 }
 
 impl From<inference::FinishReason> for FinishReason {
     fn from(value: inference::FinishReason) -> Self {
         match value {
-            // For backwards compatibility, we need to map newly introduced variants.
-            // Mapping `ToolCalls` to `Stop` might not be the "correct" choice for all situations.
-            // In practice, however, this code path should not be reached as there is also no way
-            // to specify available tools as part of the request. It is not impossible to reach,
-            // as the user could also specify tools in the system prompt themselves, so we must
-            // not unwrap here. Mapping to `Stop` is the simplest solution for now.
-            inference::FinishReason::Stop | inference::FinishReason::ToolCalls => {
-                FinishReason::Stop
-            }
+            inference::FinishReason::Stop => FinishReason::Stop,
             inference::FinishReason::Length => FinishReason::Length,
             inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
+            inference::FinishReason::ToolCalls => FinishReason::ToolCalls,
         }
     }
 }
@@ -755,37 +880,68 @@ impl From<inference::Distribution> for Distribution {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct Message {
-    role: String,
-    content: String,
+#[derive(Serialize)]
+struct ToolCall {
+    id: String,
+    name: String,
+    arguments: String,
 }
 
-impl From<Message> for inference::Message {
-    fn from(value: Message) -> Self {
-        let Message { role, content } = value;
-        inference::Message {
-            role,
-            content,
-            tool_call_id: None,
+impl From<inference::ToolCall> for ToolCall {
+    fn from(value: inference::ToolCall) -> Self {
+        let inference::ToolCall {
+            id,
+            name,
+            arguments,
+        } = value;
+        ToolCall {
+            id,
+            name,
+            arguments,
         }
     }
 }
 
-impl From<inference::ResponseMessage> for Message {
+#[derive(Serialize)]
+struct ResponseMessage {
+    role: String,
+    content: Option<String>,
+    tool_calls: Option<Vec<ToolCall>>,
+}
+
+#[derive(Deserialize)]
+struct Message {
+    role: String,
+    content: String,
+    tool_call_id: Option<String>,
+}
+
+impl From<Message> for inference::Message {
+    fn from(value: Message) -> Self {
+        let Message {
+            role,
+            content,
+            tool_call_id,
+        } = value;
+        inference::Message {
+            role,
+            content,
+            tool_call_id,
+        }
+    }
+}
+
+impl From<inference::ResponseMessage> for ResponseMessage {
     fn from(value: inference::ResponseMessage) -> Self {
         let inference::ResponseMessage {
             role,
             content,
-            tool_calls: _,
+            tool_calls,
         } = value;
-        // The inference client has the guarantee that the content is not empty if no tools are
-        // specified in the request. Therefore, it is fine to unwrap here.
-        Message {
+        ResponseMessage {
             role,
-            content: content.expect(
-                "Inference client guarantees content is not empty for requests without tools.",
-            ),
+            content,
+            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -933,7 +1089,7 @@ impl From<search::Document> for Document {
 
 #[derive(Serialize)]
 struct ChatResponse {
-    message: Message,
+    message: ResponseMessage,
     finish_reason: FinishReason,
     logprobs: Vec<Distribution>,
     usage: TokenUsage,
@@ -1319,9 +1475,11 @@ mod tests {
         header::{AUTHORIZATION, CONTENT_TYPE},
     };
     use serde_json::json;
+    use tokio::sync::mpsc;
 
     use crate::{
         csi::tests::RawCsiDouble,
+        inference::{ChatEvent, ChatRequest, InferenceError, ToolCallChunk},
         namespace_watcher::Namespace,
         tool::{Argument, InvokeRequest, ToolError, ToolOutput},
     };
@@ -1336,6 +1494,206 @@ mod tests {
                 value: value.into(),
             }
         }
+    }
+
+    #[tokio::test]
+    async fn message_content_can_be_none() {
+        // Given a csi mock that:
+        // 1. asserts that incoming messages can be developer, user and tool messages
+        // 2. returns a message with a tool call and no content
+        #[derive(Clone)]
+        struct RawCsiMock;
+        impl RawCsiDouble for RawCsiMock {
+            async fn chat(
+                &self,
+                _auth: Authentication,
+                _tracing_context: TracingContext,
+                requests: Vec<inference::ChatRequest>,
+            ) -> anyhow::Result<Vec<inference::ChatResponse>> {
+                let messages = requests[0].messages.clone();
+                assert_eq!(messages.len(), 3);
+                assert_eq!(messages[0].role, "developer");
+                assert_eq!(messages[1].role, "user");
+                assert_eq!(messages[2].role, "tool");
+                assert_eq!(messages[2].tool_call_id.as_ref().unwrap(), "1");
+
+                Ok(vec![inference::ChatResponse {
+                    message: inference::ResponseMessage {
+                        role: "tool".to_string(),
+                        content: None,
+                        tool_calls: None,
+                    },
+                    finish_reason: inference::FinishReason::Stop,
+                    logprobs: vec![],
+                    usage: inference::TokenUsage {
+                        prompt: 0,
+                        completion: 0,
+                    },
+                }])
+            }
+        }
+
+        #[derive(Clone)]
+        struct CsiProviderStub;
+        impl CsiProvider for CsiProviderStub {
+            type Csi = RawCsiMock;
+            fn csi(&self) -> &Self::Csi {
+                &RawCsiMock
+            }
+        }
+
+        // When doing a chat request
+        let body = json!([{
+            "model": "dummy",
+            "messages": [
+                {"role": "developer", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Hello, world!"},
+                {"role": "tool", "content": "Result of the tool call", "tool_call_id": "1"}
+            ],
+            "params": {
+                "logprobs": "no",
+            }
+        }]);
+        let response = http()
+            .with_state(CsiProviderStub)
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, "Bearer test")
+                    .uri("/chat")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the response is successful, and we get the two events from the mock
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        let expected_body = json!([{
+            "message": {
+                "role": "tool",
+                "content": null,
+                "tool_calls": null
+            },
+            "finish_reason": "stop",
+            "logprobs": [],
+            "usage": {
+                "prompt": 0,
+                "completion": 0
+            }
+        }]);
+        assert_eq!(body, expected_body);
+    }
+
+    #[tokio::test]
+    async fn stream_tool_calling_via_csi() {
+        // Given a csi mock that asserts that
+        // 1. asserts that the tool related parameters are provided
+        // 2. returns tool call events
+        #[derive(Clone)]
+        struct RawCsiMock;
+        impl RawCsiDouble for RawCsiMock {
+            async fn chat_stream(
+                &self,
+                _auth: Authentication,
+                _tracing_context: TracingContext,
+                request: ChatRequest,
+            ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
+                assert_eq!(request.params.tools.as_ref().unwrap().len(), 1);
+                assert_eq!(
+                    request.params.tool_choice.as_ref().unwrap(),
+                    &inference::ToolChoice::Named("add".to_string())
+                );
+                assert!(request.params.parallel_tool_calls.unwrap());
+                assert_eq!(
+                    request.params.response_format.as_ref().unwrap(),
+                    &inference::ResponseFormat::JsonSchema(inference::JsonSchema {
+                        name: "add".to_string(),
+                        description: None,
+                        schema: None,
+                        strict: None,
+                    })
+                );
+
+                let (tx, rx) = mpsc::channel(1);
+                let events = vec![
+                    ChatEvent::MessageBegin {
+                        role: "tool".to_string(),
+                    },
+                    ChatEvent::ToolCall(vec![ToolCallChunk {
+                        index: 0,
+                        id: Some("1".to_string()),
+                        name: Some("add".to_string()),
+                        arguments: None,
+                    }]),
+                ];
+                tokio::spawn(async move {
+                    for event in events {
+                        tx.send(Ok(event)).await.unwrap();
+                    }
+                });
+                rx
+            }
+        }
+
+        #[derive(Clone)]
+        struct CsiProviderStub;
+        impl CsiProvider for CsiProviderStub {
+            type Csi = RawCsiMock;
+            fn csi(&self) -> &Self::Csi {
+                &RawCsiMock
+            }
+        }
+
+        // When doing a chat request with all the tool related parameters
+        let body = json!({
+            "model": "dummy",
+            "messages": [{"role": "user", "content": "Hello, world!"}],
+            "params": {
+                "logprobs": "no",
+                "tools": [{"name": "add", "description": "Add two numbers", "parameters": {"type": "object", "properties": {"a": {"type": "number"}, "b": {"type": "number"}}, "required": ["a", "b"]}}],
+                "tool_choice": {
+                    "named": "add"
+                },
+                "parallel_tool_calls": true,
+                "response_format": {
+                    "json_schema": {
+                        "name": "add",
+                    }
+                }
+            }
+        });
+        let response = http()
+            .with_state(CsiProviderStub)
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, "Bearer test")
+                    .uri("/chat_stream")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the response is successful, and we get the two events from the mock
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        let expected_body = "\
+            event: message_begin\n\
+            data: {\"role\":\"tool\"}\n\n\
+            event: tool_call\n\
+            data: {\"tool_calls\":[{\"index\":0,\"id\":\"1\",\"name\":\"add\",\"arguments\":null}]}\n\n\
+            ";
+
+        assert_eq!(body, expected_body);
     }
 
     #[tokio::test]
