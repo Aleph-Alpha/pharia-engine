@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::{
-    inference::{ChatEvent, ChatParams, ChatRequest, Message},
+    inference::{AssistantMessage, ChatEvent, ChatParams, ChatRequest, Message},
     logging::TracingContext,
     namespace_watcher::Namespace,
     skill::{
@@ -213,10 +213,9 @@ impl Skill for SkillTellMeAJoke {
     ) -> Result<(), SkillError> {
         let request = ChatRequest {
             model: "llama-3.1-8b-instruct".to_owned(),
-            messages: vec![Message {
+            messages: vec![Message::Other {
                 role: "user".to_owned(),
                 content: "Tell me a joke!".to_owned(),
-                tool_call_id: None,
             }],
             params: ChatParams {
                 max_tokens: Some(300),
@@ -253,9 +252,32 @@ impl Skill for SkillTellMeAJoke {
     }
 }
 
+/// Since the chat skill is part of our public API, we decouple it from the inference types by
+/// introducing our own message type. This means even if the inference types change, the skill still
+/// exposes the same interface.
+#[derive(Deserialize)]
+struct SkillChatMessage {
+    role: String,
+    content: String,
+}
+
+impl SkillChatMessage {
+    fn into_message(self) -> anyhow::Result<Message> {
+        match self.role.as_str() {
+            "system" => Ok(Message::system(self.content)),
+            "user" => Ok(Message::user(self.content)),
+            "assistant" => Ok(Message::Assistant(AssistantMessage {
+                content: Some(self.content),
+                tool_calls: None,
+            })),
+            _ => Err(anyhow::anyhow!("Invalid role: {}", self.role)),
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct SkillChatInput {
-    messages: Vec<Message>,
+    messages: Vec<SkillChatMessage>,
 }
 
 pub struct SkillChat {
@@ -322,11 +344,17 @@ impl Skill for SkillChat {
             return Err(SkillError::InvalidInput(e.to_string()));
         }
 
-        let messages = result.unwrap().messages;
-        let mut all_messages = vec![Message {
+        let messages = result
+            .unwrap()
+            .messages
+            .into_iter()
+            .map(SkillChatMessage::into_message)
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map_err(|e| SkillError::InvalidInput(e.to_string()))?;
+
+        let mut all_messages = vec![Message::Other {
             role: "system".to_owned(),
             content: self.system_prompt.clone(),
-            tool_call_id: None,
         }];
         all_messages.extend(messages);
 

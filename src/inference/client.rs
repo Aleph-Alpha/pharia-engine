@@ -16,12 +16,12 @@ use tracing::{error, warn};
 
 use thiserror::Error;
 
-use crate::{authorization::Authentication, inference::ResponseMessage, logging::TracingContext};
+use crate::{authorization::Authentication, logging::TracingContext};
 
 use super::{
     ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
     CompletionRequest, Distribution, Explanation, ExplanationRequest, Granularity, Logprob,
-    Logprobs, Message, TextScore, TokenUsage,
+    Logprobs, TextScore, TokenUsage,
 };
 use async_openai::{Client as OpenAiClient, config::Config, types::ChatCompletionStreamOptions};
 
@@ -164,12 +164,15 @@ impl Config for AlephAlphaConfig<'_> {
     }
 
     fn api_base(&self) -> &str {
-        &self.api_base
+        unreachable!(
+            "We do not make use of this method. It is unclear why it is part of the trait."
+        )
     }
 
     fn api_key(&self) -> &SecretString {
-        // This method is not used in the library at all.
-        unreachable!()
+        unreachable!(
+            "We do not make use of this method. It is unclear why it is part of the trait."
+        )
     }
 
     fn query(&self) -> Vec<(&str, &str)> {
@@ -378,30 +381,6 @@ impl TryFrom<aleph_alpha_client::CompletionEvent> for CompletionEvent {
     }
 }
 
-impl TryFrom<aleph_alpha_client::ChatEvent> for ChatEvent {
-    type Error = anyhow::Error;
-
-    fn try_from(value: aleph_alpha_client::ChatEvent) -> Result<Self, Self::Error> {
-        Ok(match value {
-            aleph_alpha_client::ChatEvent::MessageStart { role } => {
-                ChatEvent::MessageBegin { role }
-            }
-            aleph_alpha_client::ChatEvent::MessageDelta { content, logprobs } => {
-                ChatEvent::MessageAppend {
-                    content,
-                    logprobs: logprobs.into_iter().map(Into::into).collect(),
-                }
-            }
-            aleph_alpha_client::ChatEvent::MessageEnd { stop_reason } => ChatEvent::MessageEnd {
-                finish_reason: stop_reason.parse()?,
-            },
-            aleph_alpha_client::ChatEvent::Summary { usage } => ChatEvent::Usage {
-                usage: usage.into(),
-            },
-        })
-    }
-}
-
 impl TryFrom<aleph_alpha_client::ExplanationOutput> for Explanation {
     type Error = anyhow::Error;
 
@@ -472,27 +451,6 @@ impl From<aleph_alpha_client::Usage> for TokenUsage {
     }
 }
 
-impl From<aleph_alpha_client::Message<'_>> for ResponseMessage {
-    fn from(message: aleph_alpha_client::Message<'_>) -> Self {
-        let aleph_alpha_client::Message { role, content } = message;
-        ResponseMessage {
-            role: role.to_string(),
-            content: Some(content.to_string()),
-            // We do not support tool calling for the Aleph Alpha inference backend.
-            tool_calls: None,
-        }
-    }
-}
-
-impl<'a> From<&'a Message> for aleph_alpha_client::Message<'a> {
-    fn from(message: &'a Message) -> Self {
-        aleph_alpha_client::Message {
-            role: message.role.to_string().into(),
-            content: (&message.content).into(),
-        }
-    }
-}
-
 impl From<aleph_alpha_client::Distribution> for Distribution {
     fn from(logprob: aleph_alpha_client::Distribution) -> Self {
         let aleph_alpha_client::Distribution { sampled, top } = logprob;
@@ -507,25 +465,6 @@ impl From<aleph_alpha_client::Logprob> for Logprob {
     fn from(logprob: aleph_alpha_client::Logprob) -> Self {
         let aleph_alpha_client::Logprob { token, logprob } = logprob;
         Logprob { token, logprob }
-    }
-}
-
-impl TryFrom<aleph_alpha_client::ChatOutput> for ChatResponse {
-    type Error = anyhow::Error;
-
-    fn try_from(chat_output: aleph_alpha_client::ChatOutput) -> anyhow::Result<Self> {
-        let aleph_alpha_client::ChatOutput {
-            message,
-            finish_reason,
-            logprobs,
-            usage,
-        } = chat_output;
-        Ok(ChatResponse {
-            message: message.into(),
-            finish_reason: finish_reason.parse()?,
-            logprobs: logprobs.into_iter().map(Distribution::from).collect(),
-            usage: usage.into(),
-        })
     }
 }
 
@@ -619,8 +558,6 @@ pub enum InferenceError {
         seems to be a bug with the configured inference backend."
     )]
     EmptyContent,
-    #[error("For tool messages, we expect a tool call id to be provided, but none was provided.")]
-    NoToolCallIdProvided,
     #[error(
         "The role {0} is not supported by the inference backend. Currently, supported roles are \
         `user`, `assistant`, `system` and `tool`."
@@ -631,8 +568,6 @@ pub enum InferenceError {
         This indicates a bug with the inference backend."
     )]
     NeitherContentNorToolCall,
-    #[error("The tool parameter is not supported yet for the Aleph Alpha inference backend.")]
-    AlephAlphaInferenceToolCallNotSupported,
     #[error(transparent)]
     Other(#[from] anyhow::Error), // default is an anyhow error
 }
@@ -654,7 +589,7 @@ mod tests {
     use tokio::{sync::mpsc, time::Instant};
 
     use crate::{
-        inference::{ChatParams, ExplanationRequest, FinishReason, Granularity},
+        inference::{ChatParams, ExplanationRequest, FinishReason, Granularity, Message},
         tests::{api_token, inference_url},
     };
 
@@ -767,7 +702,7 @@ mod tests {
         let chat_request = ChatRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
             params: ChatParams::default(),
-            messages: vec![Message::new("user", "Hello, world!")],
+            messages: vec![Message::user("Hello, world!")],
         };
 
         // When chatting with inference client
@@ -796,7 +731,7 @@ mod tests {
         let chat_request = ChatRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
             params: ChatParams::default(),
-            messages: vec![Message::new("user", "Hello, world!")],
+            messages: vec![Message::user("Hello, world!")],
         };
 
         // When chatting with inference client
@@ -868,7 +803,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 response_format: None,
                 reasoning_effort: None,
             },
-            messages: vec![Message::new("user", "Haiku about oat milk!")],
+            messages: vec![Message::user("Haiku about oat milk!")],
         };
         let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
@@ -945,7 +880,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // When
         let chat_request = ChatRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
-            messages: vec![Message::new("user", "An apple a day, ")],
+            messages: vec![Message::user("An apple a day, ")],
             params: ChatParams {
                 max_tokens: Some(1),
                 logprobs: Logprobs::Top(2),
@@ -1072,7 +1007,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // When
         let chat_request = ChatRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
-            messages: vec![Message::new("user", "An apple a day, ")],
+            messages: vec![Message::user("An apple a day, ")],
             params: ChatParams {
                 max_tokens: Some(1),
                 ..Default::default()
@@ -1149,11 +1084,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         // When
         let chat_request = ChatRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
-            messages: vec![Message {
-                role: "user".to_owned(),
-                content: "An apple a day".to_owned(),
-                tool_call_id: None,
-            }],
+            messages: vec![Message::user("An apple a day")],
             params: ChatParams {
                 max_tokens: Some(1),
                 ..Default::default()

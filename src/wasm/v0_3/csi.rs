@@ -635,11 +635,7 @@ impl From<inference::TokenUsage> for TokenUsage {
 impl From<Message> for inference::Message {
     fn from(message: Message) -> Self {
         let Message { role, content } = message;
-        Self {
-            role,
-            content,
-            tool_call_id: None,
-        }
+        Self::Other { role, content }
     }
 }
 
@@ -768,17 +764,16 @@ impl From<CompletionRequestV2> for inference::CompletionRequest {
         }
     }
 }
-impl From<inference::ResponseMessage> for Message {
-    fn from(message: inference::ResponseMessage) -> Self {
-        let inference::ResponseMessage {
-            role,
+impl From<inference::AssistantMessage> for Message {
+    fn from(message: inference::AssistantMessage) -> Self {
+        let inference::AssistantMessage {
             content,
             tool_calls: _,
         } = message;
-        // The inference client has the guarantee that the content is not empty if no tools are
-        // specified in the request. Therefore, it is fine to unwrap here.
         Self {
-            role,
+            role: inference::AssistantMessage::role().to_owned(),
+            // The inference client has the guarantee that the content is not empty if no tools are
+            // specified in the request. Therefore, it is fine to unwrap here.
             content: content.expect(
                 "Inference client guarantees content is not empty for requests without tools.",
             ),
@@ -998,7 +993,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::ResponseMessage::assistant("Hello, world!"),
+            message: inference::AssistantMessage::dummy(),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![inference::Distribution {
                 sampled: inference::Logprob {
@@ -1031,7 +1026,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::ResponseMessage::assistant("Hello, world!"),
+            message: inference::AssistantMessage::dummy(),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![],
         };

@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
-use pharia::skill::inference::{ChatParams, ChatRequest, Logprobs, Message, chat};
+use pharia::skill::inference::{ChatParams, ChatRequest, Logprobs, Message, OtherMessage, chat};
 use serde_json::json;
 
 wit_bindgen::generate!({ path: "../../wit/skill@0.4", world: "skill", features: ["alpha"] });
@@ -13,10 +13,10 @@ impl Guest for Skill {
             .map_err(|e| Error::InvalidInput(anyhow!(e).to_string()))?;
 
         let model = "pharia-1-llm-7b-control".to_owned();
-        let messages = vec![Message {
+        let messages = vec![Message::Other(OtherMessage {
             role: "user".to_owned(),
             content: query,
-        }];
+        })];
         let params = ChatParams {
             max_tokens: None,
             temperature: None,
@@ -38,9 +38,10 @@ impl Guest for Skill {
         };
 
         let response = chat(&[request]).remove(0);
+        let message = response.message;
         let json = json!({
-            "content": response.message.content,
-            "role": response.message.role,
+            "content": message.content,
+            "role": "assistant"
         });
 
         let output =

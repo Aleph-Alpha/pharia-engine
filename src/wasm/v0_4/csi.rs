@@ -1,4 +1,7 @@
-use crate::{chunking, csi, inference, language_selection, search, tool};
+use crate::{
+    chunking, csi, inference, language_selection, search, tool,
+    wasm::v0_4::skill::__with_name2::OtherMessage,
+};
 use pharia::skill::{
     chunking::{
         ChunkParams, ChunkRequest, ChunkWithOffset, ChunkWithOffsetRequest, Host as ChunkingHost,
@@ -9,12 +12,12 @@ use pharia::skill::{
         SearchResult, TextCursor,
     },
     inference::{
-        ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion, CompletionAppend,
-        CompletionEvent, CompletionParams, CompletionRequest, CompletionStream, Distribution,
-        ExplanationRequest, FinishReason, Function, Granularity, Host as InferenceHost,
-        HostChatStream, HostCompletionStream, JsonSchema, Logprob, Logprobs, Message,
-        MessageAppend, ReasoningEffort, ResponseFormat, ResponseMessage, TextScore, TokenUsage,
-        ToolCall, ToolCallChunk, ToolChoice,
+        AssistantMessage, ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion,
+        CompletionAppend, CompletionEvent, CompletionParams, CompletionRequest, CompletionStream,
+        Distribution, ExplanationRequest, FinishReason, Function, Granularity,
+        Host as InferenceHost, HostChatStream, HostCompletionStream, JsonSchema, Logprob, Logprobs,
+        Message, MessageAppend, ReasoningEffort, ResponseFormat, TextScore, TokenUsage, ToolCall,
+        ToolCallChunk, ToolChoice, ToolMessage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -643,11 +646,24 @@ impl From<inference::TokenUsage> for TokenUsage {
 
 impl From<Message> for inference::Message {
     fn from(message: Message) -> Self {
-        let Message { role, content } = message;
-        Self {
-            role,
-            content,
-            tool_call_id: None,
+        match message {
+            Message::Assistant(AssistantMessage {
+                content,
+                tool_calls,
+            }) => inference::Message::Assistant(inference::AssistantMessage {
+                content,
+                tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+            }),
+            Message::Tool(ToolMessage {
+                content,
+                tool_call_id,
+            }) => inference::Message::Tool(inference::ToolMessage {
+                content,
+                tool_call_id,
+            }),
+            Message::Other(OtherMessage { role, content }) => {
+                inference::Message::Other { role, content }
+            }
         }
     }
 }
@@ -805,6 +821,21 @@ impl From<CompletionRequest> for inference::CompletionRequest {
     }
 }
 
+impl From<ToolCall> for inference::ToolCall {
+    fn from(call: ToolCall) -> Self {
+        let ToolCall {
+            id,
+            name,
+            arguments,
+        } = call;
+        Self {
+            id,
+            name,
+            arguments,
+        }
+    }
+}
+
 impl From<inference::ToolCall> for ToolCall {
     fn from(call: inference::ToolCall) -> Self {
         let inference::ToolCall {
@@ -820,15 +851,13 @@ impl From<inference::ToolCall> for ToolCall {
     }
 }
 
-impl From<inference::ResponseMessage> for ResponseMessage {
-    fn from(message: inference::ResponseMessage) -> Self {
-        let inference::ResponseMessage {
-            role,
+impl From<inference::AssistantMessage> for AssistantMessage {
+    fn from(message: inference::AssistantMessage) -> Self {
+        let inference::AssistantMessage {
             content,
             tool_calls,
         } = message;
         Self {
-            role,
             content,
             tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
@@ -1045,7 +1074,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::ResponseMessage::assistant("Hello, world!"),
+            message: inference::AssistantMessage::dummy(),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![inference::Distribution {
                 sampled: inference::Logprob {
@@ -1078,7 +1107,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::ResponseMessage::assistant("Hello, world!"),
+            message: inference::AssistantMessage::dummy(),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![],
         };
