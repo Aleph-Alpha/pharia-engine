@@ -1,6 +1,5 @@
 use derive_more::{Constructor, Deref, Display, IntoIterator};
 use futures::{StreamExt, stream::FuturesUnordered};
-use serde::Deserialize;
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
@@ -415,19 +414,47 @@ pub struct JsonSchema {
     pub strict: Option<bool>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct Message {
-    pub role: String,
+#[derive(Debug, Clone)]
+pub struct AssistantMessage {
+    pub content: Option<String>,
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl AssistantMessage {
+    pub fn role() -> &'static str {
+        "assistant"
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ToolMessage {
     pub content: String,
-    pub tool_call_id: Option<String>,
+    pub tool_call_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    Assistant(AssistantMessage),
+    Tool(ToolMessage),
+    // Would be either system, developer or user, others are not supported by OpenAI and the
+    // client library. We do not have stronger typing for the role, as we do not have a good way
+    // to send errors (and stop skill execution) where the Message is constructed from the WIT
+    // bindings.
+    Other { role: String, content: String },
 }
 
 impl Message {
-    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            role: role.into(),
+    pub fn system(content: impl Into<String>) -> Self {
+        Self::Other {
+            role: "system".to_owned(),
             content: content.into(),
-            tool_call_id: None,
+        }
+    }
+
+    pub fn user(content: impl Into<String>) -> Self {
+        Self::Other {
+            role: "user".to_owned(),
+            content: content.into(),
         }
     }
 }
@@ -451,14 +478,6 @@ pub enum ToolChoice {
     Auto,
     Required,
     Named(String),
-}
-
-/// While we kept them the same before, the ingoing and outgoing message types are different.
-#[derive(Debug, Clone)]
-pub struct ResponseMessage {
-    pub role: String,
-    pub content: Option<String>,
-    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 pub struct ChatRequest {
@@ -535,7 +554,7 @@ pub enum CompletionEvent {
 
 #[derive(Debug, Clone)]
 pub struct ChatResponse {
-    pub message: ResponseMessage,
+    pub message: AssistantMessage,
     pub finish_reason: FinishReason,
     /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
     /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
@@ -796,11 +815,10 @@ pub mod tests {
 
     use super::*;
 
-    impl ResponseMessage {
-        pub fn assistant(content: impl Into<String>) -> Self {
+    impl AssistantMessage {
+        pub fn dummy() -> Self {
             Self {
-                content: Some(content.into()),
-                role: "assistant".to_string(),
+                content: Some("dummy-content".to_string()),
                 tool_calls: None,
             }
         }

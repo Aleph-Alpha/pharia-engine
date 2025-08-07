@@ -335,25 +335,20 @@ pub struct Message {
 impl From<Message> for inference::Message {
     fn from(value: Message) -> Self {
         let Message { role, content } = value;
-        inference::Message {
-            role,
-            content,
-            tool_call_id: None,
-        }
+        inference::Message::Other { role, content }
     }
 }
 
-impl From<inference::ResponseMessage> for Message {
-    fn from(value: inference::ResponseMessage) -> Self {
-        let inference::ResponseMessage {
-            role,
+impl From<inference::AssistantMessage> for Message {
+    fn from(value: inference::AssistantMessage) -> Self {
+        let inference::AssistantMessage {
             content,
             tool_calls: _,
         } = value;
-        // The inference client has the guarantee that the content is not empty if no tools are
-        // specified in the request. Therefore, it is fine to unwrap here.
         Message {
-            role,
+            role: inference::AssistantMessage::role().to_owned(),
+            // The inference client has the guarantee that the content is not empty if no tools are
+            // specified in the request. Therefore, it is fine to unwrap here.
             content: content.expect(
                 "Inference client guarantees content is not empty for requests without tools.",
             ),
@@ -1144,8 +1139,7 @@ mod tests {
     )]
     fn none_message_is_unwrapped() {
         drop(ChatResponse::from(inference::ChatResponse {
-            message: inference::ResponseMessage {
-                role: "assistant".to_string(),
+            message: inference::AssistantMessage {
                 content: None,
                 tool_calls: None,
             },
@@ -1162,7 +1156,10 @@ mod tests {
     fn chat_response() {
         let response = CsiResponse::Chat(vec![
             inference::ChatResponse {
-                message: inference::ResponseMessage::assistant("Hello"),
+                message: inference::AssistantMessage {
+                    content: Some("Hello".to_string()),
+                    tool_calls: None,
+                },
                 finish_reason: inference::FinishReason::Stop,
                 logprobs: vec![inference::Distribution {
                     sampled: inference::Logprob {

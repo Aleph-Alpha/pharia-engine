@@ -288,12 +288,12 @@ where
     C: RawCsi,
 {
     let tracing_context = TracingContext::current();
+    let requests = requests
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()?;
     let results = csi
-        .chat(
-            auth,
-            tracing_context,
-            requests.into_iter().map(Into::into).collect(),
-        )
+        .chat(auth, tracing_context, requests)
         .await
         .map(|v| v.into_iter().map(Into::into).collect())?;
     Ok(Json(results))
@@ -470,12 +470,13 @@ async fn chat_stream<C>(
     State(CsiState(csi)): State<CsiState<C>>,
     auth: Authentication,
     Json(request): Json<ChatRequest>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>>
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, CsiShellError>
 where
     C: RawCsi + Clone + Sync,
 {
     let tracing_context = TracingContext::current();
-    let mut recv = csi.chat_stream(auth, tracing_context, request.into()).await;
+    let request = request.try_into()?;
+    let mut recv = csi.chat_stream(auth, tracing_context, request).await;
 
     let stream = try_stream! {
         while let Some(result) = recv.recv().await {
@@ -489,7 +490,7 @@ where
         }
     };
 
-    Sse::new(stream)
+    Ok(Sse::new(stream))
 }
 
 impl From<inference::ChatEvent> for Event {
@@ -824,18 +825,24 @@ struct ChatRequest {
     params: ChatParams,
 }
 
-impl From<ChatRequest> for inference::ChatRequest {
-    fn from(value: ChatRequest) -> Self {
+impl TryFrom<ChatRequest> for inference::ChatRequest {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ChatRequest) -> Result<Self, Self::Error> {
         let ChatRequest {
             model,
             messages,
             params,
         } = value;
-        inference::ChatRequest {
+        let messages = messages
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(inference::ChatRequest {
             model,
-            messages: messages.into_iter().map(Into::into).collect(),
+            messages,
             params: params.into(),
-        }
+        })
     }
 }
 
@@ -901,7 +908,7 @@ impl From<inference::Distribution> for Distribution {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct ToolCall {
     id: String,
     name: String,
@@ -923,46 +930,75 @@ impl From<inference::ToolCall> for ToolCall {
     }
 }
 
-#[derive(Serialize)]
-struct ResponseMessage {
-    role: String,
-    content: Option<String>,
-    tool_calls: Option<Vec<ToolCall>>,
-}
-
-#[derive(Deserialize)]
-struct Message {
-    role: String,
-    content: String,
-    tool_call_id: Option<String>,
-}
-
-impl From<Message> for inference::Message {
-    fn from(value: Message) -> Self {
-        let Message {
-            role,
-            content,
-            tool_call_id,
+impl From<ToolCall> for inference::ToolCall {
+    fn from(value: ToolCall) -> Self {
+        let ToolCall {
+            id,
+            name,
+            arguments,
         } = value;
-        inference::Message {
-            role,
-            content,
-            tool_call_id,
+        inference::ToolCall {
+            id,
+            name,
+            arguments,
         }
     }
 }
 
-impl From<inference::ResponseMessage> for ResponseMessage {
-    fn from(value: inference::ResponseMessage) -> Self {
-        let inference::ResponseMessage {
-            role,
+/// Representation of a Message for serialization/deserialization via the CSI shell.
+///
+/// While we could also go for an enum approach here to mirror the domain representation in
+/// [`crate::inference::Message`], we currently do not see any benefit in doing so, and stick to
+/// the one struct approach here.
+#[derive(Serialize, Deserialize)]
+struct Message {
+    role: String,
+    content: Option<String>,
+    tool_call_id: Option<String>,
+    tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl From<inference::AssistantMessage> for Message {
+    fn from(value: inference::AssistantMessage) -> Self {
+        let inference::AssistantMessage {
             content,
             tool_calls,
         } = value;
-        ResponseMessage {
+        Message {
+            role: inference::AssistantMessage::role().to_owned(),
+            content,
+            tool_call_id: None,
+            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+impl TryFrom<Message> for inference::Message {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Message) -> Result<Self, Self::Error> {
+        let Message {
             role,
             content,
-            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+            tool_call_id,
+            tool_calls,
+        } = value;
+        match role.as_str() {
+            "assistant" => Ok(inference::Message::Assistant(inference::AssistantMessage {
+                content,
+                tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+            })),
+            "tool" => Ok(inference::Message::Tool(inference::ToolMessage {
+                // We did previously accept tool call messages without a tool call id, as the
+                // AlephAlpha inference backend does not require it. Therefore, we still accept it.
+                content: content.ok_or(anyhow::anyhow!("Tool message must have content"))?,
+                tool_call_id: tool_call_id.unwrap_or_default(),
+            })),
+            _ => Ok(inference::Message::Other {
+                role,
+                content: content
+                    .ok_or(anyhow::anyhow!("Non-assistant message must have content"))?,
+            }),
         }
     }
 }
@@ -1110,7 +1146,7 @@ impl From<search::Document> for Document {
 
 #[derive(Serialize)]
 struct ChatResponse {
-    message: ResponseMessage,
+    message: Message,
     finish_reason: FinishReason,
     logprobs: Vec<Distribution>,
     usage: TokenUsage,
@@ -1532,15 +1568,29 @@ mod tests {
                 requests: Vec<inference::ChatRequest>,
             ) -> anyhow::Result<Vec<inference::ChatResponse>> {
                 let messages = requests[0].messages.clone();
-                assert_eq!(messages.len(), 3);
-                assert_eq!(messages[0].role, "developer");
-                assert_eq!(messages[1].role, "user");
-                assert_eq!(messages[2].role, "tool");
-                assert_eq!(messages[2].tool_call_id.as_ref().unwrap(), "1");
+                assert_eq!(messages.len(), 4);
+                assert!(matches!(
+                    &messages[0],
+                    inference::Message::Other {
+                        role,
+                        ..
+                    }
+                if role == "developer"));
+                assert!(matches!(
+                    &messages[1],
+                    inference::Message::Other { role, .. } if role == "user"
+                ));
+                assert!(matches!(messages[2], inference::Message::Assistant { .. }));
+                assert!(matches!(
+                    &messages[3],
+                    inference::Message::Tool(inference::ToolMessage {
+                        tool_call_id,
+                        ..
+                    }) if tool_call_id == "1"
+                ));
 
                 Ok(vec![inference::ChatResponse {
-                    message: inference::ResponseMessage {
-                        role: "tool".to_string(),
+                    message: inference::AssistantMessage {
                         content: None,
                         tool_calls: None,
                     },
@@ -1568,8 +1618,9 @@ mod tests {
             "model": "dummy",
             "messages": [
                 {"role": "developer", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Hello, world!"},
-                {"role": "tool", "content": "Result of the tool call", "tool_call_id": "1"}
+                {"role": "user", "content": "What is the result of 1 + 2?"},
+                {"role": "assistant", "tool_calls": [{"id": "1", "name": "add", "arguments": "{\"a\": 1, \"b\": 2}"}]},
+                {"role": "tool", "content": "Result of the tool call is 3", "tool_call_id": "1"}
             ],
             "params": {
                 "logprobs": "no",
@@ -1596,9 +1647,10 @@ mod tests {
         let body: Value = serde_json::from_slice(&body).unwrap();
         let expected_body = json!([{
             "message": {
-                "role": "tool",
+                "role": "assistant",
                 "content": null,
-                "tool_calls": null
+                "tool_calls": null,
+                "tool_call_id": null,
             },
             "finish_reason": "stop",
             "logprobs": [],

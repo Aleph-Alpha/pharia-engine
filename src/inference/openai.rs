@@ -4,11 +4,11 @@ use async_openai::{
     error::{ApiError, OpenAIError},
     types::{
         ChatChoiceLogprobs, ChatCompletionMessageToolCall, ChatCompletionMessageToolCallChunk,
-        ChatCompletionNamedToolChoice, ChatCompletionRequestMessage,
-        ChatCompletionRequestToolMessage, ChatCompletionResponseMessage,
-        ChatCompletionStreamOptions, ChatCompletionTokenLogprob, ChatCompletionTool,
-        ChatCompletionToolChoiceOption, ChatCompletionToolType, CompletionUsage,
-        CreateChatCompletionRequest, CreateChatCompletionResponse,
+        ChatCompletionNamedToolChoice, ChatCompletionRequestAssistantMessage,
+        ChatCompletionRequestMessage, ChatCompletionRequestToolMessage,
+        ChatCompletionResponseMessage, ChatCompletionStreamOptions, ChatCompletionTokenLogprob,
+        ChatCompletionTool, ChatCompletionToolChoiceOption, ChatCompletionToolType,
+        CompletionUsage, CreateChatCompletionRequest, CreateChatCompletionResponse,
         CreateChatCompletionStreamResponse, FinishReason, FunctionCall, FunctionCallStream,
         FunctionName, FunctionObject, ReasoningEffort, ResponseFormat, ResponseFormatJsonSchema,
         TopLogprobs,
@@ -46,23 +46,55 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
     type Error = InferenceError;
 
     fn try_from(message: inference::Message) -> Result<Self, Self::Error> {
-        let inference::Message {
-            role,
-            content,
-            tool_call_id,
-        } = message;
-        match role.as_str() {
-            "user" => Ok(ChatCompletionRequestMessage::User(content.into())),
-            "assistant" => Ok(ChatCompletionRequestMessage::Assistant(content.into())),
-            "system" => Ok(ChatCompletionRequestMessage::System(content.into())),
-            "tool" => Ok(ChatCompletionRequestMessage::Tool(
-                ChatCompletionRequestToolMessage {
-                    content: content.into(),
-                    tool_call_id: tool_call_id
-                        .ok_or_else(|| InferenceError::NoToolCallIdProvided)?,
+        match message {
+            inference::Message::Assistant(inference::AssistantMessage {
+                content,
+                tool_calls,
+            }) => Ok(ChatCompletionRequestMessage::Assistant(
+                ChatCompletionRequestAssistantMessage {
+                    content: content.map(Into::into),
+                    tool_calls: tool_calls
+                        .map(|tool_calls| tool_calls.into_iter().map(Into::into).collect()),
+                    refusal: None,
+                    name: None,
+                    audio: None,
+                    #[allow(deprecated)]
+                    function_call: None,
                 },
             )),
-            _ => Err(InferenceError::RoleNotSupported(role)),
+            inference::Message::Tool(inference::ToolMessage {
+                content,
+                tool_call_id,
+            }) => Ok(ChatCompletionRequestMessage::Tool(
+                ChatCompletionRequestToolMessage {
+                    content: content.into(),
+                    tool_call_id,
+                },
+            )),
+            // We did support upper case role names in the past (at least the AlephAlpha inference
+            // accepted it), so we need to continue to support them by matching on the lowercase
+            // version of the role name.
+            inference::Message::Other { role, content } => match role.to_lowercase().as_str() {
+                "system" => Ok(ChatCompletionRequestMessage::System(content.into())),
+                "developer" => Ok(ChatCompletionRequestMessage::Developer(content.into())),
+                "user" => Ok(ChatCompletionRequestMessage::User(content.into())),
+                _ => Err(InferenceError::RoleNotSupported(role)),
+            },
+        }
+    }
+}
+
+impl From<inference::ToolCall> for ChatCompletionMessageToolCall {
+    fn from(tool_call: inference::ToolCall) -> Self {
+        let inference::ToolCall {
+            id,
+            name,
+            arguments,
+        } = tool_call;
+        ChatCompletionMessageToolCall {
+            id,
+            function: FunctionCall { name, arguments },
+            r#type: ChatCompletionToolType::Function,
         }
     }
 }
@@ -82,17 +114,15 @@ impl From<ChatCompletionMessageToolCall> for inference::ToolCall {
     }
 }
 
-/// Not supporting tool calls yet.
-impl From<ChatCompletionResponseMessage> for inference::ResponseMessage {
+impl From<ChatCompletionResponseMessage> for inference::AssistantMessage {
     fn from(message: ChatCompletionResponseMessage) -> Self {
         let ChatCompletionResponseMessage {
-            role,
+            role: _,
             content,
             tool_calls,
             ..
         } = message;
-        inference::ResponseMessage {
-            role: role.to_string(),
+        inference::AssistantMessage {
             content: content.map(|c| c.to_string()),
             tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
@@ -364,7 +394,7 @@ impl TryFrom<CreateChatCompletionResponse> for inference::ChatResponse {
             .ok_or_else(|| anyhow::anyhow!("Expected chat completion response to have a usage."))?
             .into();
 
-        let message = inference::ResponseMessage::from(first_choice.message.clone());
+        let message = inference::AssistantMessage::from(first_choice.message.clone());
         let response = inference::ChatResponse {
             message,
             finish_reason,
@@ -577,11 +607,11 @@ mod tests {
             function_call: None,
         };
 
-        // When converting to an inference message
-        let _message = inference::ResponseMessage::from(message);
+        // When converting to an inference assistant message
+        let message = inference::AssistantMessage::from(message);
 
         // Then the tool call is available
-        // assert_eq!(message.tool_calls.len(), 1);
+        assert_eq!(message.tool_calls.unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -610,7 +640,7 @@ mod tests {
             &client,
             &ChatRequest {
                 model: "gpt-4o-mini".to_owned(),
-                messages: vec![Message::new("user", "When is order 123456 delivered?")],
+                messages: vec![Message::user("When is order 123456 delivered?")],
                 params: ChatParams {
                     tools: Some(vec![function]),
                     ..Default::default()
@@ -638,7 +668,7 @@ mod tests {
             &client,
             &ChatRequest {
                 model: "gpt-4o-mini".to_owned(),
-                messages: vec![Message::new("user", "An apple a day")],
+                messages: vec![Message::user("An apple a day")],
                 params: ChatParams::default(),
             },
             Authentication::none(),
@@ -668,7 +698,7 @@ mod tests {
             &client,
             &ChatRequest {
                 model: "gpt-4o-mini".to_owned(),
-                messages: vec![Message::new("user", "An apple a day")],
+                messages: vec![Message::user("An apple a day")],
                 params,
             },
             Authentication::none(),
@@ -697,7 +727,7 @@ mod tests {
             &client,
             &ChatRequest {
                 model: "gpt-4o-mini-non-existent".to_owned(),
-                messages: vec![Message::new("user", "An apple a day")],
+                messages: vec![Message::user("An apple a day")],
                 params: ChatParams::default(),
             },
             Authentication::none(),
@@ -721,7 +751,7 @@ mod tests {
             &client,
             &ChatRequest {
                 model: "gpt-4o-mini".to_owned(),
-                messages: vec![Message::new("user", "An apple a day")],
+                messages: vec![Message::user("An apple a day")],
                 params: ChatParams::default(),
             },
             Authentication::none(),
@@ -752,7 +782,7 @@ mod tests {
                 &client,
                 &ChatRequest {
                     model: "gpt-4o-mini".to_owned(),
-                    messages: vec![Message::new("user", "An apple a day")],
+                    messages: vec![Message::user("An apple a day")],
                     params,
                 },
                 Authentication::none(),
@@ -782,7 +812,7 @@ mod tests {
         let api_token = openai_token().to_owned();
         let host = openai_inference_url().to_owned();
         let client = OpenAiClient::new(host, api_token);
-        let message = Message::new("user", "What is the weather in Berlin?");
+        let message = Message::user("What is the weather in Berlin?");
 
         // When forcing a tool call
         let function = Function {
@@ -821,7 +851,7 @@ mod tests {
         let api_token = openai_token().to_owned();
         let host = openai_inference_url().to_owned();
         let client = OpenAiClient::new(host, api_token);
-        let message = Message::new("user", "When will order 123456 be delivered?");
+        let message = Message::user("When will order 123456 be delivered?");
 
         // When streaming a tool call
         let function = Function {
@@ -881,7 +911,7 @@ mod tests {
         let api_token = openai_token().to_owned();
         let host = openai_inference_url().to_owned();
         let client = OpenAiClient::new(host, api_token);
-        let message = Message::new("user", "Hi, how are you?");
+        let message = Message::user("Hi, how are you?");
 
         // When forcing a json schema response format
         let response_format = ResponseFormat::JsonSchema(JsonSchema {
@@ -930,7 +960,7 @@ mod tests {
         let api_token = openai_token().to_owned();
         let host = openai_inference_url().to_owned();
         let client = OpenAiClient::new(host, api_token);
-        let message = Message::new("user", "Hi, how are you?");
+        let message = Message::user("Hi, how are you?");
 
         let params = ChatParams {
             max_tokens: Some(10),

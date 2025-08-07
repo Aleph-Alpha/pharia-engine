@@ -76,7 +76,7 @@ pub mod tests {
     };
 
     use crate::{
-        inference::{ChatEvent, CompletionEvent, FinishReason, ResponseMessage, TokenUsage},
+        inference::{AssistantMessage, ChatEvent, CompletionEvent, FinishReason, TokenUsage},
         search::TextCursor,
     };
 
@@ -222,7 +222,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             requests
                 .iter()
                 .map(|_| ChatResponse {
-                    message: ResponseMessage::assistant("dummy-content"),
+                    message: AssistantMessage::dummy(),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],
                     usage: TokenUsage {

@@ -178,8 +178,8 @@ mod tests {
         chunking::{Chunk, ChunkRequest},
         csi::tests::RawCsiDouble,
         inference::{
-            ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-            Explanation, ExplanationRequest, FinishReason, InferenceError, ResponseMessage,
+            AssistantMessage, ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent,
+            CompletionRequest, Explanation, ExplanationRequest, FinishReason, InferenceError,
             TextScore, TokenUsage,
         },
     };
@@ -824,7 +824,7 @@ mod tests {
                 _requests: Vec<ChatRequest>,
             ) -> anyhow::Result<Vec<ChatResponse>> {
                 Ok(vec![ChatResponse {
-                    message: ResponseMessage::assistant("dummy-content"),
+                    message: AssistantMessage::dummy(),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],
                     usage: TokenUsage {

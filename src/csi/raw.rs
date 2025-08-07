@@ -751,11 +751,7 @@ mod tests {
         // When requesting a streamed completion
         let chat_req = ChatRequest {
             model: "dummy_model".to_owned(),
-            messages: vec![Message {
-                role: "user".to_owned(),
-                content: "request".to_owned(),
-                tool_call_id: None,
-            }],
+            messages: vec![Message::user("request".to_owned())],
             params: ChatParams::default(),
         };
 
