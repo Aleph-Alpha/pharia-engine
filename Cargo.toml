@@ -42,7 +42,7 @@ exclude = ["helm-charts", "resource_eval"]
 [dependencies]
 engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.8" }
 aleph-alpha-client = "0.29.0"
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 async-trait = "0.1.88"
 axum = { version = "0.8.4", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
@@ -89,7 +89,7 @@ utoipa-scalar = { version = "0.3.0" }
 wasmtime = "33.0.1"
 wit-parser = "0.236.0"
 url = "2.5.4"
-thiserror = "2.0.12"
+thiserror = "2.0.14"
 tokenizers = { version = "0.21.4", default-features = false, features = [
     "onig",
     "esaxx_fast",
