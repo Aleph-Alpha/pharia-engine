@@ -4,7 +4,7 @@ version = "0.2.8"
 edition.workspace = true
 
 [dependencies]
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 bytesize = "2.0.1"
 moka = { version = "0.12.10", features = ["sync"] }
 tempfile = "3.20.0"
