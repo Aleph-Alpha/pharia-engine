@@ -19,7 +19,10 @@ use tokio::sync::mpsc;
 
 use crate::{
     authorization::Authentication,
-    inference::{self, InferenceError, client::InferenceClient},
+    inference::{
+        self, InferenceError,
+        client::{InferenceClient, validate_chat_event, validate_chat_response},
+    },
     logging::TracingContext,
 };
 
@@ -492,17 +495,7 @@ impl InferenceClient for OpenAiClient {
         let openai_request = request.as_openai_request(false)?;
         let response = self.client.chat().create(openai_request).await?;
         let response = inference::ChatResponse::try_from(response)?;
-
-        // We have an implicit assumption: If no tools are specified in the request, we expect a
-        // content in the response. We also have consumers of this functions (old WIT worlds) that
-        // never provide tools and always expect a content in the response. One option in Rust would
-        // be to specify this in the type system. This could mean having two chat functions, one for
-        // requests with tools and one for requests without tools. However, this would mean
-        // introducing multiple chat functions in the CSI traits. For now, we believe the best way
-        // forward is to check the condition here, and unwrap the content at the consumer side.
-        if request.params.tools.is_none() && response.message.content.is_none() {
-            return Err(InferenceError::EmptyContent);
-        }
+        validate_chat_response(request, &response)?;
         Ok(response)
     }
 
@@ -521,15 +514,7 @@ impl InferenceClient for OpenAiClient {
 
         while let Some(event) = stream.next().await {
             let event = inference::ChatEvent::try_from(event?)?;
-
-            // If tools are not specified, we do not expect to get a tool call chunk from inference.
-            // See the comment on `chat` for more details.
-            if request.params.tools.is_none()
-                && matches!(event, inference::ChatEvent::ToolCall { .. })
-            {
-                return Err(InferenceError::EmptyContent);
-            }
-
+            validate_chat_event(request, &event)?;
             drop(send.send(event).await);
         }
         Ok(())

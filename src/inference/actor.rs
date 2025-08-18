@@ -509,6 +509,12 @@ pub enum FinishReason {
     ToolCalls,
 }
 
+/// Parse a finish reason from a string.
+///
+/// This implementation is only used for completion responses. In case the Aleph Alpha API adds the
+/// [`FinishReason::ToolCalls`] variant for completion responses, we must NOT simply add it here,
+/// because when mapping this type to the variants of the different WIT worlds, we map the
+/// [`FinishReason::ToolCalls`] variant to an unreachable code path.
 impl FromStr for FinishReason {
     type Err = anyhow::Error;
 

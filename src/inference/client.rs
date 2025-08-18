@@ -16,7 +16,7 @@ use tracing::{error, warn};
 
 use thiserror::Error;
 
-use crate::{authorization::Authentication, logging::TracingContext};
+use crate::{authorization::Authentication, inference::FinishReason, logging::TracingContext};
 
 use super::{
     ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
@@ -180,6 +180,56 @@ impl Config for AlephAlphaConfig<'_> {
     }
 }
 
+/// Validate our assumptions about the chat response.
+///
+/// We have an implicit assumption: If no tools are specified in the request, we do not
+/// expect a tool call in the response. This means two things: The finish reason cannot be
+/// `ToolCalls` and the content must be present. We also have consumers of this functions
+/// (old WIT worlds) that never provide tools and always expect a content in the response.
+/// One option in Rust would be to specify this in the type system. This could mean having
+/// two chat functions, one for requests with tools and one for requests without tools.
+/// However, this would mean introducing multiple chat functions in the CSI traits. For now,
+/// we believe the best way forward is to check the condition here, and unwrap the content
+/// at the consumer side.
+pub fn validate_chat_response(
+    request: &ChatRequest,
+    response: &ChatResponse,
+) -> Result<(), InferenceError> {
+    if request.params.tools.is_none() {
+        if response.message.content.is_none() {
+            return Err(InferenceError::EmptyContent);
+        }
+        if matches!(response.finish_reason, FinishReason::ToolCalls) {
+            return Err(InferenceError::UnexpectedToolCall);
+        }
+    }
+    Ok(())
+}
+
+/// Validate our assumptions about chat events.
+///
+/// See [`validate_chat_response`] for more details.
+pub fn validate_chat_event(
+    request: &ChatRequest,
+    response: &ChatEvent,
+) -> Result<(), InferenceError> {
+    if request.params.tools.is_none() {
+        if matches!(response, ChatEvent::ToolCall(_)) {
+            return Err(InferenceError::UnexpectedToolCall);
+        }
+        if matches!(
+            response,
+            ChatEvent::MessageEnd {
+                finish_reason: FinishReason::ToolCalls
+            }
+        ) {
+            return Err(InferenceError::UnexpectedToolCall);
+        }
+    }
+
+    Ok(())
+}
+
 impl InferenceClient for AlephAlphaClient {
     async fn explain(
         &self,
@@ -218,17 +268,7 @@ impl InferenceClient for AlephAlphaClient {
         let openai_request = request.as_openai_request(true)?;
         let response = client.chat().create(openai_request).await?;
         let response = ChatResponse::try_from(response)?;
-
-        // We have an implicit assumption: If no tools are specified in the request, we expect a
-        // content in the response. We also have consumers of this functions (old WIT worlds) that
-        // never provide tools and always expect a content in the response. One option in Rust would
-        // be to specify this in the type system. This could mean having two chat functions, one for
-        // requests with tools and one for requests without tools. However, this would mean
-        // introducing multiple chat functions in the CSI traits. For now, we believe the best way
-        // forward is to check the condition here, and unwrap the content at the consumer side.
-        if request.params.tools.is_none() && response.message.content.is_none() {
-            return Err(InferenceError::EmptyContent);
-        }
+        validate_chat_response(request, &response)?;
         Ok(response)
     }
 
@@ -246,7 +286,9 @@ impl InferenceClient for AlephAlphaClient {
         });
         let mut stream = client.chat().create_stream(openai_request).await?;
         while let Some(event) = stream.next().await {
-            drop(send.send(ChatEvent::try_from(event?)?).await);
+            let event = ChatEvent::try_from(event?)?;
+            validate_chat_event(request, &event)?;
+            drop(send.send(event).await);
         }
 
         Ok(())
@@ -568,6 +610,12 @@ pub enum InferenceError {
         This indicates a bug with the inference backend."
     )]
     NeitherContentNorToolCall,
+    #[error(
+        "The inference backend returned a tool call, even though no tools were specified in the \
+        chat request. This is likely a bug with the inference backend. Please report this issue to \
+        the operator of your PhariaAI instance."
+    )]
+    UnexpectedToolCall,
     #[error(transparent)]
     Other(#[from] anyhow::Error), // default is an anyhow error
 }

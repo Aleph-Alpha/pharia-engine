@@ -367,17 +367,14 @@ enum FinishReason {
 impl From<inference::FinishReason> for FinishReason {
     fn from(value: inference::FinishReason) -> Self {
         match value {
-            // For backwards compatibility, we need to map newly introduced variants.
-            // Mapping `ToolCalls` to `Stop` might not be the "correct" choice for all situations.
-            // In practice, however, this code path should not be reached as there is also no way
-            // to specify available tools as part of the request. It is not impossible to reach,
-            // as the user could also specify tools in the system prompt themselves, so we must
-            // not unwrap here. Mapping to `Stop` is the simplest solution for now.
-            inference::FinishReason::Stop | inference::FinishReason::ToolCalls => {
-                FinishReason::Stop
-            }
+            inference::FinishReason::Stop => FinishReason::Stop,
             inference::FinishReason::Length => FinishReason::Length,
             inference::FinishReason::ContentFilter => FinishReason::ContentFilter,
+            inference::FinishReason::ToolCalls => unreachable!(
+                "As the tool call parameter is not supported for 0.3 chat requests, we will not \
+                receive a tool call as finish reason. The inference client validates this \
+                assumption. For completion requests, the client also does not support tool calls."
+            ),
         }
     }
 }
