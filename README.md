@@ -82,6 +82,8 @@ cargo nextest run
 
 Note that the tests currently require access to a PhariaAI instance.
 
+To deselect tests against OpenAI, run `cargo nextest run --features test_no_openai`.
+
 ## Release
 
 Releasing in this repository is automated with [release-plz](https://release-plz.ieni.dev/).

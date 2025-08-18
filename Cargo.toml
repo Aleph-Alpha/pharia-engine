@@ -176,6 +176,7 @@ tikv-jemallocator = "0.6"
 [features]
 test_inference = []
 test_document_index = []
+test_no_openai = []
 default = ["test_inference", "test_document_index"]
 
 [lints]
