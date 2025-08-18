@@ -13,10 +13,8 @@ interface message-stream {
 }
 
 /// Provided host types for supporting running streaming skills.
-@since(version = 0.3.6)
 interface streaming-output {
     /// Payload for the beginning of a message.
-    @since(version = 0.3.6)
     record begin-attributes {
         /// Optional role of the message. Currently unused. Setting it will have no effect. In case
         /// we would need it soon, it allows us to introduce it though without breaking changes to
@@ -24,7 +22,6 @@ interface streaming-output {
         role: option<string>
     }
 
-    @since(version = 0.3.6)
     variant message-item {
         /// Begin a new message. Cannot be sent before a previous message has ended.
         message-begin(begin-attributes),
@@ -36,10 +33,8 @@ interface streaming-output {
         message-end(option<list<u8>>),
     }
 
-    @since(version = 0.3.6)
     resource stream-output {
         /// Puts part of a message into the output stream.
-        @since(version = 0.3.6)
         write: func(item: message-item);
     }
-} 
+}
