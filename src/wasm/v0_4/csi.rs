@@ -671,6 +671,7 @@ impl From<Message> for inference::Message {
 impl From<ReasoningEffort> for inference::ReasoningEffort {
     fn from(reasoning_effort: ReasoningEffort) -> Self {
         match reasoning_effort {
+            ReasoningEffort::Minimal => inference::ReasoningEffort::Minimal,
             ReasoningEffort::Low => inference::ReasoningEffort::Low,
             ReasoningEffort::Medium => inference::ReasoningEffort::Medium,
             ReasoningEffort::High => inference::ReasoningEffort::High,

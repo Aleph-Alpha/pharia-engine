@@ -277,6 +277,7 @@ interface inference {
     }
 
     enum reasoning-effort {
+        minimal,
         low,
         medium,
         high,

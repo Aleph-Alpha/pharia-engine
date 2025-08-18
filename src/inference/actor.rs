@@ -379,6 +379,7 @@ pub struct Function {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReasoningEffort {
+    Minimal,
     Low,
     Medium,
     High,
