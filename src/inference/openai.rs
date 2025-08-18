@@ -569,6 +569,9 @@ mod tests {
         tests::{openai_inference_url, openai_token},
     };
 
+    const NON_REASONING_MODEL: &str = "gpt-4o-mini";
+    const REASONING_MODEL: &str = "o4-mini";
+
     #[test]
     fn tool_call_is_mapped() {
         // Given an OpenAI message with a tool call
@@ -625,7 +628,7 @@ mod tests {
         let result = <OpenAiClient as InferenceClient>::chat(
             &client,
             &ChatRequest {
-                model: "gpt-4o-mini".to_owned(),
+                model: NON_REASONING_MODEL.to_owned(),
                 messages: vec![Message::user("When is order 123456 delivered?")],
                 params: ChatParams {
                     tools: Some(vec![function]),
@@ -654,7 +657,7 @@ mod tests {
         let result = <OpenAiClient as InferenceClient>::chat(
             &client,
             &ChatRequest {
-                model: "gpt-4o-mini".to_owned(),
+                model: NON_REASONING_MODEL.to_owned(),
                 messages: vec![Message::user("An apple a day")],
                 params: ChatParams::default(),
             },
@@ -685,7 +688,7 @@ mod tests {
         let result = <OpenAiClient as InferenceClient>::chat(
             &client,
             &ChatRequest {
-                model: "gpt-4o-mini".to_owned(),
+                model: NON_REASONING_MODEL.to_owned(),
                 messages: vec![Message::user("An apple a day")],
                 params,
             },
@@ -740,7 +743,7 @@ mod tests {
         let result = <OpenAiClient as InferenceClient>::chat(
             &client,
             &ChatRequest {
-                model: "gpt-4o-mini".to_owned(),
+                model: NON_REASONING_MODEL.to_owned(),
                 messages: vec![Message::user("An apple a day")],
                 params: ChatParams::default(),
             },
@@ -772,7 +775,7 @@ mod tests {
             <OpenAiClient as InferenceClient>::stream_chat(
                 &client,
                 &ChatRequest {
-                    model: "gpt-4o-mini".to_owned(),
+                    model: NON_REASONING_MODEL.to_owned(),
                     messages: vec![Message::user("An apple a day")],
                     params,
                 },
@@ -821,7 +824,7 @@ mod tests {
         let result = <OpenAiClient as InferenceClient>::chat(
             &client,
             &ChatRequest {
-                model: "gpt-4o-mini".to_owned(),
+                model: NON_REASONING_MODEL.to_owned(),
                 messages: vec![message],
                 params,
             },
@@ -871,7 +874,7 @@ mod tests {
             <OpenAiClient as InferenceClient>::stream_chat(
                 &client,
                 &ChatRequest {
-                    model: "gpt-4o-mini".to_owned(),
+                    model: NON_REASONING_MODEL.to_owned(),
                     messages: vec![message],
                     params,
                 },
@@ -932,7 +935,7 @@ mod tests {
         let result = <OpenAiClient as InferenceClient>::chat(
             &client,
             &ChatRequest {
-                model: "gpt-4o-mini".to_owned(),
+                model: NON_REASONING_MODEL.to_owned(),
                 messages: vec![message],
                 params,
             },
@@ -966,7 +969,7 @@ mod tests {
         let result = <OpenAiClient as InferenceClient>::chat(
             &client,
             &ChatRequest {
-                model: "o4-mini".to_owned(),
+                model: REASONING_MODEL.to_owned(),
                 messages: vec![message],
                 params,
             },
