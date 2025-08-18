@@ -1,6 +1,8 @@
 mod actor;
 mod client;
 mod mcp_tool;
+// This is coming from the OpenAPI macro from utoipa.
+#[allow(clippy::needless_for_each)]
 mod routes;
 mod store;
 mod subscribers;

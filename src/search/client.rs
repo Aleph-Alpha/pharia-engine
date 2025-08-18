@@ -407,8 +407,6 @@ pub mod tests {
 
     use crate::tests::{api_token, document_index_url};
 
-    pub struct StubClient;
-
     impl Document {
         pub fn dummy() -> Self {
             Self {
@@ -418,36 +416,6 @@ pub mod tests {
                 }],
                 metadata: Some(json!({ "url": "http://example.de" })),
             }
-        }
-    }
-
-    impl SearchClientDouble for StubClient {
-        async fn search(
-            &self,
-            _index: IndexPath,
-            _request: SearchRequest,
-            _authentication: Authentication,
-            _tracing_context: &TracingContext,
-        ) -> anyhow::Result<Vec<SearchResult>> {
-            Ok(vec![])
-        }
-
-        async fn document_metadata(
-            &self,
-            _document_path: DocumentPath,
-            _authentication: Authentication,
-            _tracing_context: &TracingContext,
-        ) -> anyhow::Result<Option<Value>> {
-            Ok(None)
-        }
-
-        async fn document(
-            &self,
-            _document_path: DocumentPath,
-            _authentication: Authentication,
-            _tracing_context: &TracingContext,
-        ) -> anyhow::Result<Document> {
-            Ok(Document::dummy())
         }
     }
 

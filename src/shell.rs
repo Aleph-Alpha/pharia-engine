@@ -347,7 +347,7 @@ async fn index() -> Html<&'static str> {
 
 /// openapi.json
 ///
-/// Return JSON version of an OpenAPI schema
+/// Return JSON version of an `OpenAPI` schema
 #[utoipa::path(
     get,
     path = "/openapi.json",

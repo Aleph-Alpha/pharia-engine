@@ -141,7 +141,7 @@ impl From<SkillDescriptionSchemaType> for SkillDescriptionFilterType {
     }
 }
 
-/// cached_skills
+/// Cached Skills
 ///
 /// List of all cached Skills. These are Skills that are already compiled
 /// and are faster because they do not have to be transpiled to machine code.
@@ -167,7 +167,7 @@ where
     Json(response)
 }
 
-/// drop_cached_skill
+/// Drop Cached Skill
 ///
 /// Remove a loaded Skill from the runtime. With a first invocation, Skills are loaded to
 /// the runtime. This leads to faster execution on the second invocation. If a Skill is
