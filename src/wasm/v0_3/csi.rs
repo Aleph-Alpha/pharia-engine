@@ -651,6 +651,7 @@ impl From<ChatParams> for inference::ChatParams {
         } = params;
         Self {
             max_tokens,
+            max_completion_tokens: None,
             temperature,
             top_p,
             frequency_penalty,
@@ -969,6 +970,7 @@ mod tests {
             result,
             inference::ChatParams {
                 max_tokens: Some(10),
+                max_completion_tokens: None,
                 temperature: Some(0.5),
                 top_p: Some(0.9),
                 frequency_penalty: Some(0.8),

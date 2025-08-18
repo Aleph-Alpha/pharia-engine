@@ -219,6 +219,7 @@ impl Skill for SkillTellMeAJoke {
             }],
             params: ChatParams {
                 max_tokens: Some(300),
+                max_completion_tokens: None,
                 temperature: Some(0.3),
                 top_p: None,
                 frequency_penalty: None,
@@ -363,6 +364,7 @@ impl Skill for SkillChat {
             messages: all_messages,
             params: ChatParams {
                 max_tokens: None,
+                max_completion_tokens: None,
                 temperature: None,
                 top_p: None,
                 frequency_penalty: None,

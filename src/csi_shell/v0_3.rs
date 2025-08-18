@@ -468,6 +468,7 @@ impl From<ChatParams> for inference::ChatParams {
         } = value;
         inference::ChatParams {
             max_tokens,
+            max_completion_tokens: None,
             temperature,
             top_p,
             frequency_penalty,

@@ -226,11 +226,15 @@ interface inference {
     }
 
     record chat-params {
-        /// The maximum tokens that should be inferred.
-        ///
-        /// Note: the backing implementation may return less tokens due to
-        /// other stop reasons.
+        /// The maximum number of tokens that can be generated in the chat completion. This value can be used to control costs for text generated via API.
+        /// This value is now deprecated by OpenAI in favor of max_completion_tokens, and is not compatible with OpenAI o-series models.
+        /// Whether to set `max-tokens` or `max-completion-tokens` is an inference provider specific decision.
+        /// While some inference providers like GitHub models and the Aleph Alpha inference expect the user to set `max-tokens`,
+        /// OpenAI deprecated it in favor of `max-completion-tokens`. For OpenAI reasoning models, settings `max-tokens` raises an error.
         max-tokens: option<u32>,
+        /// An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens.
+        /// Only supported by distinct inference providers (e.g. OpenAI).
+        max-completion-tokens: option<u32>,
         /// The randomness with which the next token is selected.
         temperature: option<f64>,
         /// The probability total of next tokens the model will choose from.

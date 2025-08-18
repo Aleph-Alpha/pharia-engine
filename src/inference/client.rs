@@ -265,7 +265,7 @@ impl InferenceClient for AlephAlphaClient {
         tracing_context: &TracingContext,
     ) -> Result<ChatResponse, InferenceError> {
         let client = self.openai_client(auth, tracing_context)?;
-        let openai_request = request.as_openai_request(true)?;
+        let openai_request = request.as_openai_request()?;
         let response = client.chat().create(openai_request).await?;
         let response = ChatResponse::try_from(response)?;
         validate_chat_response(request, &response)?;
@@ -280,7 +280,7 @@ impl InferenceClient for AlephAlphaClient {
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let client = self.openai_client(auth, tracing_context)?;
-        let mut openai_request = request.as_openai_request(true)?;
+        let mut openai_request = request.as_openai_request()?;
         openai_request.stream_options = Some(ChatCompletionStreamOptions {
             include_usage: true,
         });
@@ -840,6 +840,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             model: "pharia-1-llm-7b-control".to_owned(),
             params: ChatParams {
                 max_tokens: Some(20),
+                max_completion_tokens: None,
                 temperature: None,
                 top_p: None,
                 frequency_penalty: Some(-10.0),

@@ -775,6 +775,7 @@ impl From<ReasoningEffort> for inference::ReasoningEffort {
 #[derive(Deserialize)]
 struct ChatParams {
     max_tokens: Option<u32>,
+    max_completion_tokens: Option<u32>,
     temperature: Option<f64>,
     top_p: Option<f64>,
     frequency_penalty: Option<f64>,
@@ -791,6 +792,7 @@ impl From<ChatParams> for inference::ChatParams {
     fn from(value: ChatParams) -> Self {
         let ChatParams {
             max_tokens,
+            max_completion_tokens,
             temperature,
             top_p,
             frequency_penalty,
@@ -804,6 +806,7 @@ impl From<ChatParams> for inference::ChatParams {
         } = value;
         inference::ChatParams {
             max_tokens,
+            max_completion_tokens,
             temperature,
             top_p,
             frequency_penalty,
