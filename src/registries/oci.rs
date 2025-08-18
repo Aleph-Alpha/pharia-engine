@@ -13,7 +13,7 @@ use crate::{logging::TracingContext, registries::SkillRegistry};
 pub struct OciRegistry {
     client: WasmClient,
     registry: String,
-    base_repository: String,
+    base_repository: Option<String>,
     username: String,
     password: String,
 }
@@ -21,7 +21,7 @@ pub struct OciRegistry {
 impl OciRegistry {
     pub fn new(
         registry: String,
-        base_repository: String,
+        base_repository: Option<String>,
         username: String,
         password: String,
     ) -> Self {
@@ -31,7 +31,7 @@ impl OciRegistry {
         Self {
             client,
             registry,
-            base_repository: base_repository.trim_matches('/').to_owned(),
+            base_repository: base_repository.map(|s| s.trim_matches('/').to_owned()),
             username,
             password,
         }
@@ -42,10 +42,12 @@ impl OciRegistry {
     }
 
     fn reference(&self, name: &str, tag: impl Into<String>) -> Reference {
-        let repository = if self.base_repository.is_empty() {
-            name.to_owned()
+        let repository = if let Some(base_repository) = &self.base_repository
+            && !base_repository.is_empty()
+        {
+            format!("{base_repository}/{name}")
         } else {
-            format!("{}/{name}", self.base_repository)
+            name.to_owned()
         };
         Reference::with_tag(self.registry.clone(), repository, tag.into())
     }
@@ -166,15 +168,21 @@ mod tests {
                 maybe_username,
                 maybe_password,
             ) {
-                (Ok(registry), Ok(repository), Ok(username), Ok(password)) => {
-                    Some(OciRegistry::new(registry, repository, username, password))
-                }
+                (Ok(registry), Ok(repository), Ok(username), Ok(password)) => Some(
+                    OciRegistry::new(registry, Some(repository), username, password),
+                ),
                 _ => None,
             }
         }
 
         async fn store_skill(&self, wasm_bytes: Vec<u8>, skill_name: &str, tag: &str) {
-            let repository = format!("{}/{skill_name}", self.base_repository);
+            let repository = if let Some(base_repository) = &self.base_repository
+                && !base_repository.is_empty()
+            {
+                format!("{base_repository}/{skill_name}")
+            } else {
+                skill_name.to_owned()
+            };
             let image = Reference::with_tag(self.registry.clone(), repository, tag.to_owned());
             let (config, component_layer) =
                 WasmConfig::from_raw_component(wasm_bytes, None).expect("component must be valid");
@@ -262,7 +270,7 @@ mod tests {
         // given a OCI registry is not available at localhost:6000
         let registry = OciRegistry::new(
             "127.0.0.1:6000".to_owned(),
-            "skills".to_owned(),
+            Some("skills".to_owned()),
             "dummy-user".to_owned(),
             "dummy-password".to_owned(),
         );
@@ -284,12 +292,12 @@ mod tests {
     fn oci_registry_sanitizes_base_repository_input() {
         let registry = OciRegistry::new(
             "127.0.0.1:6000".to_owned(),
-            "/skills/".to_owned(),
+            Some("/skills/".to_owned()),
             "dummy-user".to_owned(),
             "dummy-password".to_owned(),
         );
 
-        assert_eq!(registry.base_repository, "skills");
+        assert_eq!(registry.base_repository.unwrap(), "skills");
     }
 
     #[test]
@@ -297,7 +305,22 @@ mod tests {
         let skill_name = "skill";
         let registry = OciRegistry::new(
             "127.0.0.1:6000".to_owned(),
-            String::new(),
+            Some(String::new()),
+            "dummy-user".to_owned(),
+            "dummy-password".to_owned(),
+        );
+
+        let reference = registry.reference(skill_name, "tag");
+
+        assert_eq!(reference.repository(), skill_name);
+    }
+
+    #[test]
+    fn oci_registry_without_base_repository() {
+        let skill_name = "skill";
+        let registry = OciRegistry::new(
+            "127.0.0.1:6000".to_owned(),
+            None,
             "dummy-user".to_owned(),
             "dummy-password".to_owned(),
         );

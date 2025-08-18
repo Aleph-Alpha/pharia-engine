@@ -129,7 +129,7 @@ pub enum Registry {
     #[serde(rename_all = "kebab-case")]
     Oci {
         registry: String,
-        base_repository: String,
+        base_repository: Option<String>,
         #[serde(rename = "registry-user")]
         user: String,
         #[serde(rename = "registry-password")]
@@ -369,7 +369,32 @@ mod tests {
             pharia_kernel_team.registry(),
             Registry::Oci {
                 registry: "registry.gitlab.aleph-alpha.de".to_owned(),
-                base_repository: "engineering/pharia-skills/skills".to_owned(),
+                base_repository: Some("engineering/pharia-skills/skills".to_owned()),
+                user: "DUMMY_USER".to_owned(),
+                password: "DUMMY_PASSWORD".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn deserialize_config_with_oci_registry_without_base_repository() {
+        let config = NamespaceConfigs::from_toml(
+            r#"
+            [pharia-kernel-team]
+            config-url = "https://dummy_url"
+            registry = "registry.gitlab.aleph-alpha.de"
+            registry-user = "DUMMY_USER"
+            registry-password = "DUMMY_PASSWORD"
+            "#,
+        )
+        .unwrap();
+        let namespace = Namespace::new("pharia-kernel-team").unwrap();
+        let pharia_kernel_team = config.get(&namespace).unwrap();
+        assert_eq!(
+            pharia_kernel_team.registry(),
+            Registry::Oci {
+                registry: "registry.gitlab.aleph-alpha.de".to_owned(),
+                base_repository: None,
                 user: "DUMMY_USER".to_owned(),
                 password: "DUMMY_PASSWORD".to_owned(),
             }
@@ -453,7 +478,7 @@ mod tests {
                         config_access_token: Some("GITLAB_CONFIG_ACCESS_TOKEN".to_owned()),
                         registry: Registry::Oci {
                             registry: "registry.gitlab.aleph-alpha.de".to_owned(),
-                            base_repository: "engineering/pharia-skills/skills".to_owned(),
+                            base_repository: Some("engineering/pharia-skills/skills".to_owned()),
                             user: "PHARIA_KERNEL_TEAM_REGISTRY_USER".to_owned(),
                             password: "PHARIA_KERNEL_TEAM_REGISTRY_PASSWORD".to_owned(),
                         },
