@@ -187,10 +187,7 @@ impl inference::ChatRequest {
     /// thought we could simply use the deprecated `max_tokens` parameter, it turns out that using
     /// it for reasoning models leads to an error. Therefore, we branch on the inference backend.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn as_openai_request(
-        &self,
-        aleph_alpha_inference: bool,
-    ) -> Result<CreateChatCompletionRequest, InferenceError> {
+    pub fn as_openai_request(&self) -> Result<CreateChatCompletionRequest, InferenceError> {
         let inference::ChatRequest {
             model,
             messages,
@@ -198,6 +195,7 @@ impl inference::ChatRequest {
         } = self;
         let inference::ChatParams {
             max_tokens,
+            max_completion_tokens,
             temperature,
             top_p,
             frequency_penalty,
@@ -240,16 +238,8 @@ impl inference::ChatRequest {
             frequency_penalty: frequency_penalty.map(|p| p as f32),
             presence_penalty: presence_penalty.map(|p| p as f32),
             #[allow(deprecated)]
-            max_tokens: if aleph_alpha_inference {
-                *max_tokens
-            } else {
-                None
-            },
-            max_completion_tokens: if aleph_alpha_inference {
-                None
-            } else {
-                *max_tokens
-            },
+            max_tokens: *max_tokens,
+            max_completion_tokens: *max_completion_tokens,
             tools,
             tool_choice: tool_choice.as_ref().map(Into::into),
             parallel_tool_calls: *parallel_tool_calls,
@@ -492,7 +482,7 @@ impl InferenceClient for OpenAiClient {
         _auth: Authentication,
         _tracing_context: &TracingContext,
     ) -> Result<inference::ChatResponse, InferenceError> {
-        let openai_request = request.as_openai_request(false)?;
+        let openai_request = request.as_openai_request()?;
         let response = self.client.chat().create(openai_request).await?;
         let response = inference::ChatResponse::try_from(response)?;
         validate_chat_response(request, &response)?;
@@ -506,7 +496,7 @@ impl InferenceClient for OpenAiClient {
         _tracing_context: &TracingContext,
         send: mpsc::Sender<inference::ChatEvent>,
     ) -> Result<(), InferenceError> {
-        let mut openai_request = request.as_openai_request(false)?;
+        let mut openai_request = request.as_openai_request()?;
         openai_request.stream_options = Some(ChatCompletionStreamOptions {
             include_usage: true,
         });
@@ -953,7 +943,7 @@ mod tests {
 
     #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
-    async fn reasoning_model_is_supported_with_max_tokens() {
+    async fn reasoning_model_expects_max_completion_tokens() {
         // Given a message history that would lead to a text response
         let api_token = openai_token().to_owned();
         let host = openai_inference_url().to_owned();
@@ -961,7 +951,7 @@ mod tests {
         let message = Message::user("Hi, how are you?");
 
         let params = ChatParams {
-            max_tokens: Some(10),
+            max_completion_tokens: Some(10),
             reasoning_effort: Some(ReasoningEffort::Low),
             ..Default::default()
         };

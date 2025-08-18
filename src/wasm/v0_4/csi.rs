@@ -682,6 +682,7 @@ impl From<ChatParams> for inference::ChatParams {
     fn from(params: ChatParams) -> Self {
         let ChatParams {
             max_tokens,
+            max_completion_tokens,
             temperature,
             top_p,
             frequency_penalty,
@@ -695,6 +696,7 @@ impl From<ChatParams> for inference::ChatParams {
         } = params;
         Self {
             max_tokens,
+            max_completion_tokens,
             temperature,
             top_p,
             frequency_penalty,
@@ -1026,6 +1028,7 @@ mod tests {
         let response_format = ResponseFormat::Text;
         let source = ChatParams {
             max_tokens: Some(10),
+            max_completion_tokens: None,
             temperature: Some(0.5),
             top_p: Some(0.9),
             frequency_penalty: Some(0.8),
@@ -1046,6 +1049,7 @@ mod tests {
             result,
             inference::ChatParams {
                 max_tokens: Some(10),
+                max_completion_tokens: None,
                 temperature: Some(0.5),
                 top_p: Some(0.9),
                 frequency_penalty: Some(0.8),

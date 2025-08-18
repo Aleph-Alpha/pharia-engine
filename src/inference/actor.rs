@@ -387,6 +387,7 @@ pub enum ReasoningEffort {
 #[derive(Debug, Default, PartialEq)]
 pub struct ChatParams {
     pub max_tokens: Option<u32>,
+    pub max_completion_tokens: Option<u32>,
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
     pub frequency_penalty: Option<f64>,

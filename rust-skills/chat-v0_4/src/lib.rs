@@ -19,6 +19,7 @@ impl Guest for Skill {
         })];
         let params = ChatParams {
             max_tokens: None,
+            max_completion_tokens: None,
             temperature: None,
             top_p: None,
             frequency_penalty: None,
