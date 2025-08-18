@@ -481,7 +481,7 @@ Say hello to Homer<|eot_id|><|start_header_id|>assistant<|end_header_id|>",
     kernel.shutdown().await;
 }
 
-#[cfg_attr(not(feature = "test_inference"), ignore)]
+#[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
 #[tokio::test]
 async fn openai_inference_backend_is_supported() {
     // Given

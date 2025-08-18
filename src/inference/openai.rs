@@ -599,6 +599,7 @@ mod tests {
         assert_eq!(message.tool_calls.unwrap().len(), 1);
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn chat_with_function_calling() {
         // Given an inference client
@@ -642,6 +643,7 @@ mod tests {
         assert!(result.message.tool_calls.is_some());
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn chat_message_conversion() {
         // Given an inference client
@@ -666,6 +668,7 @@ mod tests {
         assert!(!result.message.content.unwrap().is_empty());
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn top_logprobs_for_chat() {
         // Given an inference client
@@ -700,6 +703,7 @@ mod tests {
         assert_eq!(str::from_utf8(&top_logprobs[1].token).unwrap(), "The");
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn model_not_found() {
         // Given
@@ -724,6 +728,7 @@ mod tests {
         assert!(matches!(result, Err(InferenceError::ModelNotFound)));
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn bad_token_gives_unauthorized() {
         // Given a client with a bad token
@@ -748,6 +753,7 @@ mod tests {
         assert!(matches!(result, Err(InferenceError::Unauthorized)));
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn chat_stream() {
         // Given
@@ -791,6 +797,7 @@ mod tests {
         assert!(matches!(events[3], ChatEvent::Usage { .. }));
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn forced_tool_call() {
         // Given a message history that would not require a tool call
@@ -830,6 +837,7 @@ mod tests {
         assert_eq!(tool_calls[0].name, "catch_fish");
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn streaming_tool_call() {
         // Given a message history that would lead to a tool call
@@ -890,6 +898,7 @@ mod tests {
         assert!(matches!(events[events.len() - 1], ChatEvent::Usage { .. }));
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn json_schema_response_format() {
         // Given a message history that would lead to a text response
@@ -939,6 +948,7 @@ mod tests {
         assert!(json["order_id"].is_string());
     }
 
+    #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
     #[tokio::test]
     async fn reasoning_model_is_supported_with_max_tokens() {
         // Given a message history that would lead to a text response
