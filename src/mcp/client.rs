@@ -287,10 +287,10 @@ impl McpClientImpl {
         while let Some(event) = event_stream.next().await {
             // We ignore any errors, as we still have a chance to find the JSON-RPC response we are
             // interested in.
-            if let Ok(event) = event {
-                if let Ok(value) = serde_json::from_str::<T>(&event.data) {
-                    return Ok(value);
-                }
+            if let Ok(event) = event
+                && let Ok(value) = serde_json::from_str::<T>(&event.data)
+            {
+                return Ok(value);
             }
         }
 

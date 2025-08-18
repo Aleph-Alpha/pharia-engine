@@ -14,6 +14,8 @@ mod metrics;
 mod namespace_watcher;
 mod registries;
 mod search;
+// This is coming from the OpenAPI macro from utoipa.
+#[allow(clippy::needless_for_each)]
 mod shell;
 mod skill;
 mod skill_cache;

@@ -1,3 +1,5 @@
+// This is coming from the OpenAPI macro from utoipa.
+#[allow(clippy::needless_for_each)]
 mod routes;
 
 pub use routes::{

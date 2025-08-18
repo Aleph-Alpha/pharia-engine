@@ -566,8 +566,8 @@ pub mod tests {
 
         // When the observer checks for new skills
         let diff = NamespaceWatcherActor::<Dummy, ToolStoreDummy, Dummy>::compute_skill_diff(
-            &[existing.clone()],
-            &[incoming.clone()],
+            std::slice::from_ref(&existing),
+            std::slice::from_ref(&incoming),
         );
 
         // Then the new version is added and the old version is not removed as only the tag changed

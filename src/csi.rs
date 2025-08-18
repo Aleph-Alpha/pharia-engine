@@ -70,10 +70,7 @@ pub type ToolResult = Result<ToolOutput, String>;
 pub mod tests {
     pub use contextual::ContextualCsiDouble;
     pub use raw::RawCsiDouble;
-    use std::{
-        collections::HashMap,
-        sync::{Arc, Mutex},
-    };
+    use std::collections::HashMap;
 
     use crate::{
         inference::{AssistantMessage, ChatEvent, CompletionEvent, FinishReason, TokenUsage},
@@ -267,25 +264,6 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
         async fn documents(&mut self, _requests: Vec<DocumentPath>) -> Vec<Document> {
             vec![Document::dummy()]
-        }
-    }
-
-    #[derive(Default, Clone)]
-    pub struct CsiCounter {
-        counter: Arc<Mutex<u32>>,
-    }
-
-    #[async_trait]
-    impl CsiDouble for CsiCounter {
-        async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
-            requests
-                .iter()
-                .map(|_| {
-                    let mut counter = self.counter.lock().unwrap();
-                    *counter += 1;
-                    Completion::from_text(counter.to_string())
-                })
-                .collect()
         }
     }
 }
