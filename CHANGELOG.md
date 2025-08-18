@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.21](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.20...pharia-kernel-v0.13.21)
+
+### Features
+
+- Make base_repository optional - ([aa943a4](https://github.com/Aleph-Alpha/pharia-kernel/commit/aa943a4b871edd56d4daf732e7c98894d16e4fa0))
+- Support Minimal variant of ReasoningEffort - ([67a16fc](https://github.com/Aleph-Alpha/pharia-kernel/commit/67a16fc49d9c9fe9128587f024a7dbacc5b0dbe5))
+- User decides between max-tokens and max-completion-tokens - ([7fa92ff](https://github.com/Aleph-Alpha/pharia-kernel/commit/7fa92ffa8eec3f11cafcc9b1070c642723165f0e))
+- Include reasoning-effort in chat-params - ([e7a806e](https://github.com/Aleph-Alpha/pharia-kernel/commit/e7a806e613ae3d038af70a71420150aa65559ea9))
+- Expose 0.4 tool call params via csi shell - ([0d6f471](https://github.com/Aleph-Alpha/pharia-kernel/commit/0d6f471055a04ebcdb2fbd81c270248cb44d4fd8))
+- Add support for structured output - ([837a0e0](https://github.com/Aleph-Alpha/pharia-kernel/commit/837a0e0f9033f2b18bad5f40fe26d2ceae660ace))
+- Support tool call stream events in 0.4 wit world - ([bbe7118](https://github.com/Aleph-Alpha/pharia-kernel/commit/bbe71186150f3501d4e5b33089e7e328bfe43bbe))
+- Support parallel-tool-call parameter in 0.4 wit world - ([8784cc7](https://github.com/Aleph-Alpha/pharia-kernel/commit/8784cc71c967d07539763efa7294d523de295141))
+- Support tool-choice parameter in 0.4 wit world - ([50d0505](https://github.com/Aleph-Alpha/pharia-kernel/commit/50d050577479e09381a4209f20ce40f776dd77c3))
+- Propagate tool call to 0.4 wit world - ([ea36ac0](https://github.com/Aleph-Alpha/pharia-kernel/commit/ea36ac0f3928a8068d782fb4615fc58409db0d55))
+
+### Fixes
+
+- Set max_completion_tokens for reasoning models instead of max_tokens - ([b638a54](https://github.com/Aleph-Alpha/pharia-kernel/commit/b638a540f3b665cf1fecfccf21b52dc356bc80a7))
+
+### Builds
+
+- *(deps)* Bump actions/checkout from 4 to 5 - ([e75cd13](https://github.com/Aleph-Alpha/pharia-kernel/commit/e75cd13cd67b6827b10be19416140ad1793bedda))
+- *(deps)* Bump actions/download-artifact from 4 to 5 - ([32ece28](https://github.com/Aleph-Alpha/pharia-kernel/commit/32ece28854fa71b9429dcb2279b54ccda0d530ef))
+- *(deps)* Bump the minor group across 1 directory with 7 updates - ([af90a29](https://github.com/Aleph-Alpha/pharia-kernel/commit/af90a29cb399b94fcc4d27116d7c6c3b10640d37))
+
+### Chore
+
+- Add skill build cache to .gitignore - ([d6c99d1](https://github.com/Aleph-Alpha/pharia-kernel/commit/d6c99d11839452dc6f8031839990f5569cea9e68))
+
+### Ci
+
+- Update pinned version of trivy action - ([269155b](https://github.com/Aleph-Alpha/pharia-kernel/commit/269155b6b850f29e02aee5cbad35c1827eec1617))
+
+### Refactor
+
+- Panic in csi if receiving tool call for early wit worlds - ([054e5cb](https://github.com/Aleph-Alpha/pharia-kernel/commit/054e5cb9f3e95029330cafa0b1f17098ddc35e8e))
+- Represent message as enum internally - ([9c19d26](https://github.com/Aleph-Alpha/pharia-kernel/commit/9c19d26be72fc804cb7637993537650a8cc8a778))
+- Use async_openai for chat requests against AA inference - ([1595e9b](https://github.com/Aleph-Alpha/pharia-kernel/commit/1595e9bf75895feb62636f79b0cdea71aea0bfcc))
+- Rename internal client to aleph_alpha - ([6185ee8](https://github.com/Aleph-Alpha/pharia-kernel/commit/6185ee87c2ca74ae766134930a445036b20e1dfa))
+- Introduce aleph alpha client struct - ([2da7ab3](https://github.com/Aleph-Alpha/pharia-kernel/commit/2da7ab3214438caa49af59fee51acb1c37a288b1))
+- Check precondition on inference responses in client - ([4b47f97](https://github.com/Aleph-Alpha/pharia-kernel/commit/4b47f979f36f00874d8f83d299bbbc528abeab86))
+- Make response message content optional - ([6876287](https://github.com/Aleph-Alpha/pharia-kernel/commit/68762875b1826340d38de2b8873c7d678969e565))
+- Split Message from ResponseMessage - ([1926b4a](https://github.com/Aleph-Alpha/pharia-kernel/commit/1926b4a06a9a71eab9c8cf04170ed6df14d770d7))
+- Introduce tool call variant on finish reason - ([d9540a6](https://github.com/Aleph-Alpha/pharia-kernel/commit/d9540a6e518b8dd0fdf0f4279ebf10852081fc1a))
+- Introduce tools parameter 0.4 wit world - ([7c4c369](https://github.com/Aleph-Alpha/pharia-kernel/commit/7c4c369bc36582d321870a0e3f59706ba137eba1))
+
+### Style
+
+- Apply 1.89 lints - ([c5afdd6](https://github.com/Aleph-Alpha/pharia-kernel/commit/c5afdd6f770c02317f4bee84d7e1f76cef5a2a77))
+
+### Test
+
+- Pull out model names into consts - ([0fc2153](https://github.com/Aleph-Alpha/pharia-kernel/commit/0fc2153459e94aba859c4a45e3f5a4192547996f))
+- Add test_no_openai feature - ([e342952](https://github.com/Aleph-Alpha/pharia-kernel/commit/e342952fb313a2ba29a3e044d494146720d54b03))
+- Clear skill build cache on wit changes - ([e60bfd1](https://github.com/Aleph-Alpha/pharia-kernel/commit/e60bfd1b18f17788dcbea76218ad2a906694bbe9))
+
+
 ## [0.13.20](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.19...pharia-kernel-v0.13.20)
 
 ### Features
