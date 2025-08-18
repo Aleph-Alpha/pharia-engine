@@ -24,7 +24,9 @@ target/
 !wasi_snapshot*.wasm
 .wasmtime-cache
 .vscode
-.wit-world-hash
+
+# Compiled .wasm skills for testing
+skill_build_cache/
 
 # Python-generated files
 __pycache__/
