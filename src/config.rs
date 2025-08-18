@@ -881,7 +881,7 @@ registry-password =  \"{password}\"
             config_access_token: Some(config_access_token.to_owned()),
             registry: Registry::Oci {
                 registry: registry.to_owned(),
-                base_repository: base_repository.to_owned(),
+                base_repository: Some(base_repository.to_owned()),
                 user: user.to_owned(),
                 password: password.to_owned(),
             },
