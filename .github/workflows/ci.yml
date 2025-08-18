@@ -25,7 +25,7 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasip2
@@ -39,7 +39,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasip2
@@ -71,7 +71,7 @@ jobs:
   lints:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -91,7 +91,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Generate image ID
         id: generate-image-id
         run: |
@@ -155,7 +155,7 @@ jobs:
     env:
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Log in to GitHub
         uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603
@@ -199,7 +199,7 @@ jobs:
     env:
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download image artifact
         uses: actions/download-artifact@v5
@@ -228,7 +228,7 @@ jobs:
       ARTIFACTORY_HOST: alephalpha.jfrog.io
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download image artifact
         uses: actions/download-artifact@v5
@@ -309,7 +309,7 @@ jobs:
       ARTIFACTORY_HOST: alephalpha.jfrog.io
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download image artifact
         uses: actions/download-artifact@v5
@@ -407,7 +407,7 @@ jobs:
       HARBOR_REPOSITORY: ${{ vars.HARBOR_REGISTRY }}/pharia-kernel-images
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download image artifact
         uses: actions/download-artifact@v5
