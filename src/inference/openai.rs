@@ -257,6 +257,7 @@ impl inference::ChatRequest {
 impl From<&inference::ReasoningEffort> for ReasoningEffort {
     fn from(reasoning_effort: &inference::ReasoningEffort) -> Self {
         match reasoning_effort {
+            inference::ReasoningEffort::Minimal => ReasoningEffort::Minimal,
             inference::ReasoningEffort::Low => ReasoningEffort::Low,
             inference::ReasoningEffort::Medium => ReasoningEffort::Medium,
             inference::ReasoningEffort::High => ReasoningEffort::High,
