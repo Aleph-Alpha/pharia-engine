@@ -1138,6 +1138,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             messages: vec![Message::user("An apple a day")],
             params: ChatParams {
                 max_tokens: Some(1),
+                temperature: Some(0.0),
                 ..Default::default()
             },
         };
@@ -1161,14 +1162,20 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         }
 
         // Then
-        // assert_eq!(events.len(), 4);
+        assert_eq!(events.len(), 4);
         assert_eq!(
             events[0],
             ChatEvent::MessageBegin {
                 role: "assistant".to_owned()
             }
         );
-        assert!(matches!(events[1], ChatEvent::MessageAppend { .. }));
+        assert!(matches!(
+            &events[1],
+            ChatEvent::MessageAppend {
+                content,
+                ..
+            } if content == "Keep"
+        ));
         assert_eq!(
             events[2],
             ChatEvent::MessageEnd {
