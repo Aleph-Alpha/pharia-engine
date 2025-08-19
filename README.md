@@ -17,8 +17,6 @@ These include RAG capabilities offered by the [DocumentIndex](https://docs.aleph
 
 ## Setup
 
-### Local Development
-
 Next to the [Rust toolchain](https://www.rust-lang.org/tools/install), there are some prerequisites you will need to install once:
 
 ```shell
@@ -34,6 +32,27 @@ Now, you can run the Kernel with
 
 ```sh
 cargo run
+```
+
+### Testing
+
+```sh
+# Create an .env.test file and set the missing values
+cp .env.test.example .env.test
+# We recommend cargo nextest, but cargo test also works
+cargo install cargo-nextest --locked
+cargo nextest run --workspace --all-features
+```
+
+Note that some tests require access to a PhariaAI instance.
+
+To deselect tests against OpenAI, run `cargo nextest run --features test_no_openai`.
+
+### Formatting & Linting
+
+```sh
+cargo fmt -- --check
+cargo clippy --workspace --all-features --all-targets -- -D warnings
 ```
 
 ### Running inside Container
@@ -65,24 +84,6 @@ podman machine init
 podman machine set --memory 8192
 podman machine start
 ```
-
-## Contributing
-
-In this repository we stick to Conventional Commits. See: <https://www.conventionalcommits.org/en/v1.0.0/>.
-
-### Tests
-
-```sh
-# Create an .env.test file and set the missing values
-cp .env.test.example .env.test
-# We recommend cargo nextest, but cargo test also works
-cargo install cargo-nextest --locked
-cargo nextest run
-```
-
-Note that the tests currently require access to a PhariaAI instance.
-
-To deselect tests against OpenAI, run `cargo nextest run --features test_no_openai`.
 
 ## Release
 
