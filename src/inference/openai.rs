@@ -417,10 +417,12 @@ impl From<OpenAIError> for InferenceError {
 }
 
 impl inference::ChatEvent {
-    pub fn from_stream(event: CreateChatCompletionStreamResponse) -> Result<Self, InferenceError> {
+    pub fn from_stream(
+        event: CreateChatCompletionStreamResponse,
+    ) -> Result<Vec<Self>, InferenceError> {
         if let Some(usage) = event.usage {
             let usage = usage.into();
-            return Ok(inference::ChatEvent::Usage { usage });
+            return Ok(vec![inference::ChatEvent::Usage { usage }]);
         }
 
         let first_choice = event.choices.into_iter().next().ok_or_else(|| {
@@ -428,21 +430,21 @@ impl inference::ChatEvent {
         })?;
         if let Some(finish_reason) = first_choice.finish_reason {
             let finish_reason = finish_reason.into();
-            return Ok(inference::ChatEvent::MessageEnd { finish_reason });
+            return Ok(vec![inference::ChatEvent::MessageEnd { finish_reason }]);
         }
         if let Some(role) = first_choice.delta.role {
-            return Ok(inference::ChatEvent::MessageBegin {
+            return Ok(vec![inference::ChatEvent::MessageBegin {
                 role: role.to_string(),
-            });
+            }]);
         }
         if let Some(content) = first_choice.delta.content {
             let logprobs = map_logprobs(first_choice.logprobs);
-            return Ok(inference::ChatEvent::MessageAppend { content, logprobs });
+            return Ok(vec![inference::ChatEvent::MessageAppend { content, logprobs }]);
         }
         if let Some(tool_call) = first_choice.delta.tool_calls {
-            return Ok(inference::ChatEvent::ToolCall(
+            return Ok(vec![inference::ChatEvent::ToolCall(
                 tool_call.into_iter().map(Into::into).collect(),
-            ));
+            )]);
         }
         Err(InferenceError::NeitherContentNorToolCall)
     }
@@ -502,9 +504,11 @@ impl InferenceClient for OpenAiClient {
         let mut stream = self.client.chat().create_stream(openai_request).await?;
 
         while let Some(event) = stream.next().await {
-            let event = inference::ChatEvent::from_stream(event?)?;
-            validate_chat_event(request, &event)?;
-            drop(send.send(event).await);
+            let events = inference::ChatEvent::from_stream(event?)?;
+            for event in events {
+                validate_chat_event(request, &event)?;
+                drop(send.send(event).await);
+            }
         }
         Ok(())
     }
