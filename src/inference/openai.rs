@@ -417,9 +417,19 @@ impl From<OpenAIError> for InferenceError {
 }
 
 impl inference::ChatEvent {
+    /// Convert a [`CreateChatCompletionStreamResponse`] into a vector of [`inference::ChatEvent`].
+    ///
+    /// While it might seem natural to have a 1-1 mapping between events from the inference backend
+    /// and events in our domain, we have chosen a domain model in which `MessageBegin` (containing
+    /// the role) and `MessageAppend`/`ToolCall` (containing the content) are separate events.
+    /// However, at least for tool calls coming from `OpenAI`, there is no guarantee for the event
+    /// containing the role to be distinct from the event containing the tool call.
+    /// Therefore, a single inference backend event can turn itself into multiple events in our
+    /// domain model.
     pub fn from_stream(
         event: CreateChatCompletionStreamResponse,
     ) -> Result<Vec<Self>, InferenceError> {
+        // In case we receive a usage, there is no choices, and no other events.
         if let Some(usage) = event.usage {
             let usage = usage.into();
             return Ok(vec![inference::ChatEvent::Usage { usage }]);
@@ -428,28 +438,32 @@ impl inference::ChatEvent {
         let first_choice = event.choices.into_iter().next().ok_or_else(|| {
             anyhow::anyhow!("Expected at least one choice in the chat completion stream response.")
         })?;
+        let mut events = if let Some(role) = first_choice.delta.role {
+            vec![inference::ChatEvent::MessageBegin {
+                role: role.to_string(),
+            }]
+        } else {
+            vec![]
+        };
+
+        // If the message has a main part, it is either a content chunk or a tool call.
+        // We filter for empty content, as message containing the role often has an empty content.
+        if let Some(content) = first_choice.delta.content
+            && !content.is_empty()
+        {
+            let logprobs = map_logprobs(first_choice.logprobs);
+            events.push(inference::ChatEvent::MessageAppend { content, logprobs });
+        } else if let Some(tool_call) = first_choice.delta.tool_calls {
+            events.push(inference::ChatEvent::ToolCall(
+                tool_call.into_iter().map(Into::into).collect(),
+            ));
+        }
+
         if let Some(finish_reason) = first_choice.finish_reason {
             let finish_reason = finish_reason.into();
-            return Ok(vec![inference::ChatEvent::MessageEnd { finish_reason }]);
+            events.push(inference::ChatEvent::MessageEnd { finish_reason });
         }
-        if let Some(role) = first_choice.delta.role {
-            return Ok(vec![inference::ChatEvent::MessageBegin {
-                role: role.to_string(),
-            }]);
-        }
-        if let Some(content) = first_choice.delta.content {
-            let logprobs = map_logprobs(first_choice.logprobs);
-            return Ok(vec![inference::ChatEvent::MessageAppend {
-                content,
-                logprobs,
-            }]);
-        }
-        if let Some(tool_call) = first_choice.delta.tool_calls {
-            return Ok(vec![inference::ChatEvent::ToolCall(
-                tool_call.into_iter().map(Into::into).collect(),
-            )]);
-        }
-        Ok(vec![])
+        Ok(events)
     }
 }
 
@@ -789,7 +803,7 @@ mod tests {
         }
 
         // Then
-        // assert_eq!(events.len(), 4);
+        assert_eq!(events.len(), 4);
         assert!(matches!(events[0], ChatEvent::MessageBegin { .. }));
         assert!(matches!(events[1], ChatEvent::MessageAppend { .. }));
         assert!(matches!(events[2], ChatEvent::MessageEnd { .. }));
@@ -889,14 +903,26 @@ mod tests {
 
         // Then the model calls the tool
         assert!(matches!(events[0], ChatEvent::MessageBegin { .. }));
+
+        // And the first event contains the index, name and id
         if let ChatEvent::ToolCall(tool_calls) = &events[1] {
             assert_eq!(tool_calls.len(), 1);
-            assert_eq!(tool_calls[0].name.as_ref().unwrap(), "get_delivery_date");
             assert_eq!(tool_calls[0].index, 0);
+            assert_eq!(tool_calls[0].name.as_ref().unwrap(), "get_delivery_date");
             assert!(!tool_calls[0].id.as_ref().unwrap().is_empty());
         } else {
             panic!("Expected a tool call event");
         }
+
+        // And the second event contains the index and parts of the arguments
+        if let ChatEvent::ToolCall(tool_calls) = &events[2] {
+            assert_eq!(tool_calls.len(), 1);
+            assert_eq!(tool_calls[0].index, 0);
+            assert!(!tool_calls[0].arguments.as_ref().unwrap().is_empty());
+        } else {
+            panic!("Expected a tool call event");
+        }
+
         assert!(matches!(
             events[events.len() - 2],
             ChatEvent::MessageEnd { .. }
