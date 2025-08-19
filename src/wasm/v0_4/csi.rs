@@ -14,10 +14,10 @@ use pharia::skill::{
     inference::{
         AssistantMessage, ChatEvent, ChatParams, ChatRequest, ChatResponse, ChatStream, Completion,
         CompletionAppend, CompletionEvent, CompletionParams, CompletionRequest, CompletionStream,
-        Distribution, ExplanationRequest, FinishReason, Function, Granularity,
-        Host as InferenceHost, HostChatStream, HostCompletionStream, JsonSchema, Logprob, Logprobs,
-        Message, MessageAppend, ReasoningEffort, ResponseFormat, TextScore, TokenUsage, ToolCall,
-        ToolCallChunk, ToolChoice, ToolMessage,
+        Distribution, FinishReason, Function, Host as InferenceHost, HostChatStream,
+        HostCompletionStream, JsonSchema, Logprob, Logprobs, Message, MessageAppend,
+        ReasoningEffort, ResponseFormat, TokenUsage, ToolCall, ToolCallChunk, ToolChoice,
+        ToolMessage,
     },
     language::{Host as LanguageHost, SelectLanguageRequest},
     tool::{Argument, Host as ToolHost, InvokeRequest, Modality as ToolModality, Tool, ToolResult},
@@ -404,14 +404,6 @@ impl From<MetadataFieldValue> for search::MetadataFieldValue {
 }
 
 impl InferenceHost for LinkedCtx {
-    async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Vec<TextScore>> {
-        self.ctx
-            .explain(requests.into_iter().map(Into::into).collect())
-            .await
-            .into_iter()
-            .map(|scores| scores.into_iter().map(Into::into).collect())
-            .collect()
-    }
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
         self.ctx
             .chat(requests.into_iter().map(Into::into).collect())
@@ -548,49 +540,6 @@ impl From<inference::ToolCallChunk> for ToolCallChunk {
             id,
             name,
             arguments,
-        }
-    }
-}
-
-impl From<inference::TextScore> for TextScore {
-    fn from(score: inference::TextScore) -> Self {
-        let inference::TextScore {
-            start,
-            length,
-            score,
-        } = score;
-        Self {
-            start,
-            length,
-            score,
-        }
-    }
-}
-
-impl From<Granularity> for inference::Granularity {
-    fn from(granularity: Granularity) -> Self {
-        match granularity {
-            Granularity::Auto => inference::Granularity::Auto,
-            Granularity::Word => inference::Granularity::Word,
-            Granularity::Sentence => inference::Granularity::Sentence,
-            Granularity::Paragraph => inference::Granularity::Paragraph,
-        }
-    }
-}
-
-impl From<ExplanationRequest> for inference::ExplanationRequest {
-    fn from(request: ExplanationRequest) -> Self {
-        let ExplanationRequest {
-            prompt,
-            target,
-            model,
-            granularity,
-        } = request;
-        Self {
-            prompt,
-            target,
-            model,
-            granularity: granularity.into(),
         }
     }
 }
@@ -988,26 +937,6 @@ mod tests {
                 character_offsets: false,
             }
         );
-    }
-
-    #[test]
-    fn forward_explain_request() {
-        // Given
-        let source = ExplanationRequest {
-            prompt: "Hello, world!".to_string(),
-            target: "world".to_string(),
-            model: "model".to_string(),
-            granularity: Granularity::Auto,
-        };
-
-        // When
-        let result: inference::ExplanationRequest = source.into();
-
-        // Then
-        assert_eq!(result.prompt, "Hello, world!".to_string());
-        assert_eq!(result.target, "world".to_string());
-        assert_eq!(result.model, "model".to_string());
-        assert_eq!(result.granularity, inference::Granularity::Auto);
     }
 
     #[test]
