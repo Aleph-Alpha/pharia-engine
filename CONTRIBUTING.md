@@ -2,6 +2,8 @@
 
 Thanks for your interest in the PhariaKernel, the serverless AI platform. Check out the [README](README.md) for more information on how to get started.
 
+Note: We are currently setting up a Contributor License Agreement (CLA) before accepting external contributions.
+
 ## New Features
 
 We welcome external contributions. Before putting in major refactorings or features, we recommend opening an issue to discuss the design and get early feedback.
