@@ -1023,8 +1023,8 @@ async fn token_is_required_if_auth_url_is_set() {
         .await
         .unwrap();
 
-    // Then we get a 400
-    assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+    // Then we get a 401
+    assert_eq!(resp.status(), axum::http::StatusCode::UNAUTHORIZED);
     let body = resp.text().await.unwrap();
     assert_eq!(body, "Bearer token expected");
     kernel.shutdown().await;

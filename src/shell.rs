@@ -231,7 +231,7 @@ where
         }
         Err(AuthorizationClientError::NoBearerToken) => {
             return Err(ErrorResponse::from((
-                StatusCode::BAD_REQUEST,
+                StatusCode::UNAUTHORIZED,
                 AuthorizationClientError::NoBearerToken.to_string(),
             )));
         }
@@ -599,7 +599,7 @@ pub mod tests {
             .unwrap();
 
         // Then
-        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(resp.status(), axum::http::StatusCode::UNAUTHORIZED);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(
             String::from_utf8(body.to_vec()).unwrap(),
