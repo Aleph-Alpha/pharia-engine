@@ -409,7 +409,7 @@ impl From<OpenAIError> for InferenceError {
                 code: Some(code), ..
             }) if code == "model_not_found" => InferenceError::ModelNotFound,
             _ => InferenceError::Other(anyhow::anyhow!(
-                "Error while calling OpenAI chat completion API: {:?}",
+                "Error while calling OpenAI chat completion API: {:#}",
                 error
             )),
         }
@@ -426,18 +426,19 @@ impl inference::ChatEvent {
     /// containing the role to be distinct from the event containing the tool call.
     /// Therefore, a single inference backend event can turn itself into multiple events in our
     /// domain model.
-    pub fn from_stream(
-        event: CreateChatCompletionStreamResponse,
-    ) -> Result<Vec<Self>, InferenceError> {
+    pub fn from_stream(event: CreateChatCompletionStreamResponse) -> Vec<Self> {
         // In case we receive a usage, there is no choices, and no other events.
         if let Some(usage) = event.usage {
             let usage = usage.into();
-            return Ok(vec![inference::ChatEvent::Usage { usage }]);
+            return vec![inference::ChatEvent::Usage { usage }];
         }
 
-        let first_choice = event.choices.into_iter().next().ok_or_else(|| {
-            anyhow::anyhow!("Expected at least one choice in the chat completion stream response.")
-        })?;
+        let Some(first_choice) = event.choices.into_iter().next() else {
+            // GitHub models returns an empty choices array on the first event. To be compatible,
+            // we do not raise an error but simply wait for the next event.
+            return vec![];
+        };
+
         let mut events = if let Some(role) = first_choice.delta.role {
             vec![inference::ChatEvent::MessageBegin {
                 role: role.to_string(),
@@ -463,7 +464,7 @@ impl inference::ChatEvent {
             let finish_reason = finish_reason.into();
             events.push(inference::ChatEvent::MessageEnd { finish_reason });
         }
-        Ok(events)
+        events
     }
 }
 
@@ -521,7 +522,7 @@ impl InferenceClient for OpenAiClient {
         let mut stream = self.client.chat().create_stream(openai_request).await?;
 
         while let Some(event) = stream.next().await {
-            let events = inference::ChatEvent::from_stream(event?)?;
+            let events = inference::ChatEvent::from_stream(event?);
             for event in events {
                 validate_chat_event(request, &event)?;
                 drop(send.send(event).await);

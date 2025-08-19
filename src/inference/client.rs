@@ -286,7 +286,7 @@ impl InferenceClient for AlephAlphaClient {
         });
         let mut stream = client.chat().create_stream(openai_request).await?;
         while let Some(event) = stream.next().await {
-            let events = ChatEvent::from_stream(event?)?;
+            let events = ChatEvent::from_stream(event?);
             for event in events {
                 validate_chat_event(request, &event)?;
                 drop(send.send(event).await);
@@ -607,11 +607,6 @@ pub enum InferenceError {
         `user`, `assistant`, `system` and `tool`."
     )]
     RoleNotSupported(String),
-    #[error(
-        "The inference backend returned a message neither containing content nor a tool call. \
-        This indicates a bug with the inference backend."
-    )]
-    NeitherContentNorToolCall,
     #[error(
         "The inference backend returned a tool call, even though no tools were specified in the \
         chat request. This is likely a bug with the inference backend. Please report this issue to \
