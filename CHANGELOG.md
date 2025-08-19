@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.22](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.21...pharia-kernel-v0.13.22)
+
+### Features
+
+- No need to fail on events without content or tool call - ([bc9c1c9](https://github.com/Aleph-Alpha/pharia-kernel/commit/bc9c1c9bfa72b4b7f73a6c3b9b3ccb81ceb7cecf))
+- Return 401 instead of 400 when no token is provided - ([1615a76](https://github.com/Aleph-Alpha/pharia-kernel/commit/1615a76853aad85ab65c8b045531ec97bd9f17aa))
+
+### Fixes
+
+- Allow empty choice stream chunk to be compatible with GitHub models - ([4ea4769](https://github.com/Aleph-Alpha/pharia-kernel/commit/4ea47698bb4182c08520f9456954acc3b146cb39))
+- Tool call events can contain role and content - ([4cdc293](https://github.com/Aleph-Alpha/pharia-kernel/commit/4cdc29331736b6519921460a288d1003583901fb))
+- Remove unneeded since gates on 0.4 wit world - ([fbaa64c](https://github.com/Aleph-Alpha/pharia-kernel/commit/fbaa64c5496d580c7ae9ffc2cdd4c563e4083186))
+
+### Documentation
+
+- Specify cla is not yet in place - ([d50a50d](https://github.com/Aleph-Alpha/pharia-kernel/commit/d50a50d88cb7a9c62eb5d51be4eb3524bc1f9168))
+- Add contributing.md - ([f20b91c](https://github.com/Aleph-Alpha/pharia-kernel/commit/f20b91c6a938202304f5549adf054ace67546023))
+- Add LICENSE.md - ([8f9d229](https://github.com/Aleph-Alpha/pharia-kernel/commit/8f9d229ff288064a075d43beb9433d13ff3244d1))
+
+### Refactor
+
+- From stream returns vec of events - ([c449e94](https://github.com/Aleph-Alpha/pharia-kernel/commit/c449e94f2e86a60a6375019d7c1aa9e70ce529ad))
+- Use normal impl block for event conversion - ([bd36049](https://github.com/Aleph-Alpha/pharia-kernel/commit/bd36049702e27f430d201212e51eaaf4a0838672))
+
+
 ## [0.13.21](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.20...pharia-kernel-v0.13.21)
 
 ### Features
