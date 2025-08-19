@@ -416,10 +416,8 @@ impl From<OpenAIError> for InferenceError {
     }
 }
 
-impl TryFrom<CreateChatCompletionStreamResponse> for inference::ChatEvent {
-    type Error = InferenceError;
-
-    fn try_from(event: CreateChatCompletionStreamResponse) -> Result<Self, Self::Error> {
+impl inference::ChatEvent {
+    pub fn from_stream(event: CreateChatCompletionStreamResponse) -> Result<Self, InferenceError> {
         if let Some(usage) = event.usage {
             let usage = usage.into();
             return Ok(inference::ChatEvent::Usage { usage });
@@ -504,7 +502,7 @@ impl InferenceClient for OpenAiClient {
         let mut stream = self.client.chat().create_stream(openai_request).await?;
 
         while let Some(event) = stream.next().await {
-            let event = inference::ChatEvent::try_from(event?)?;
+            let event = inference::ChatEvent::from_stream(event?)?;
             validate_chat_event(request, &event)?;
             drop(send.send(event).await);
         }
@@ -884,7 +882,14 @@ mod tests {
 
         // Then the model calls the tool
         assert!(matches!(events[0], ChatEvent::MessageBegin { .. }));
-        assert!(matches!(events[1], ChatEvent::ToolCall { .. }));
+        if let ChatEvent::ToolCall(tool_calls) = &events[1] {
+            assert_eq!(tool_calls.len(), 1);
+            assert_eq!(tool_calls[0].name.as_ref().unwrap(), "get_delivery_date");
+            assert_eq!(tool_calls[0].index, 0);
+            assert!(!tool_calls[0].id.as_ref().unwrap().is_empty());
+        } else {
+            panic!("Expected a tool call event");
+        }
         assert!(matches!(
             events[events.len() - 2],
             ChatEvent::MessageEnd { .. }

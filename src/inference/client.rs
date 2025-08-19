@@ -286,7 +286,7 @@ impl InferenceClient for AlephAlphaClient {
         });
         let mut stream = client.chat().create_stream(openai_request).await?;
         while let Some(event) = stream.next().await {
-            let event = ChatEvent::try_from(event?)?;
+            let event = ChatEvent::from_stream(event?)?;
             validate_chat_event(request, &event)?;
             drop(send.send(event).await);
         }
