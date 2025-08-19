@@ -439,14 +439,17 @@ impl inference::ChatEvent {
         }
         if let Some(content) = first_choice.delta.content {
             let logprobs = map_logprobs(first_choice.logprobs);
-            return Ok(vec![inference::ChatEvent::MessageAppend { content, logprobs }]);
+            return Ok(vec![inference::ChatEvent::MessageAppend {
+                content,
+                logprobs,
+            }]);
         }
         if let Some(tool_call) = first_choice.delta.tool_calls {
             return Ok(vec![inference::ChatEvent::ToolCall(
                 tool_call.into_iter().map(Into::into).collect(),
             )]);
         }
-        Err(InferenceError::NeitherContentNorToolCall)
+        Ok(vec![])
     }
 }
 
