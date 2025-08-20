@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.23](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.22...pharia-kernel-v0.13.23)
+
+### Features
+
+- Remove explain functionality in 0.4 wit world - ([57c3ec0](https://github.com/Aleph-Alpha/pharia-kernel/commit/57c3ec068dca1e9aa52ac81c231f14295825e53f))
+
+### Builds
+
+- *(deps)* Bump the minor group with 37 updates - ([3e64d2a](https://github.com/Aleph-Alpha/pharia-kernel/commit/3e64d2af40a2f4bacc57fef1b512788aeae77574))
+
+
 ## [0.13.22](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.21...pharia-kernel-v0.13.22)
 
 ### Features
