@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.24](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.23...pharia-kernel-v0.13.24)
+
+### Fixes
+
+- Map wasm assistant message to correct inference message variant - ([761b34c](https://github.com/Aleph-Alpha/pharia-kernel/commit/761b34c67389131bde8207478e8125098e93b4ed))
+
+
 ## [0.13.23](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.22...pharia-kernel-v0.13.23)
 
 ### Features
