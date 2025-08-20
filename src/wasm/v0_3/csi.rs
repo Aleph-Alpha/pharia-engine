@@ -635,7 +635,13 @@ impl From<inference::TokenUsage> for TokenUsage {
 impl From<Message> for inference::Message {
     fn from(message: Message) -> Self {
         let Message { role, content } = message;
-        Self::Other { role, content }
+        match role.to_lowercase().as_str() {
+            "assistant" => inference::Message::Assistant(inference::AssistantMessage {
+                content: Some(content),
+                tool_calls: None,
+            }),
+            _ => inference::Message::Other { role, content },
+        }
     }
 }
 
@@ -848,6 +854,21 @@ impl LanguageHost for LinkedCtx {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn assistant_message_is_mapped_correctly() {
+        // Given an assistant message in the 0.3 wit world
+        let message = Message {
+            role: "assistant".to_string(),
+            content: "Hello, world!".to_string(),
+        };
+
+        // When mapping to the inference message
+        let result: inference::Message = message.into();
+
+        // Then we receive the assistant variant of the inference message
+        assert!(matches!(result, inference::Message::Assistant(_)));
+    }
 
     #[test]
     fn echo_parameter_gets_forwarded() {
