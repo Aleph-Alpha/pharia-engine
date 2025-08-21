@@ -89,7 +89,7 @@ utoipa-scalar = { version = "0.3.0" }
 wasmtime = "33.0.1"
 wit-parser = "0.236.1"
 url = "2.5.4"
-thiserror = "2.0.15"
+thiserror = "2.0.16"
 tokenizers = { version = "0.21.4", default-features = false, features = [
     "onig",
     "esaxx_fast",
