@@ -36,6 +36,7 @@ use utoipa::{
 use utoipa_scalar::Scalar;
 
 use crate::{
+    agent_results::http_agent_results_v1,
     authorization::{
         Authentication, AuthorizationApi, AuthorizationClientError, AuthorizationProvider,
         AuthorizationState,
@@ -128,6 +129,7 @@ where
         .merge(http_mcp_servers_v1(feature_set))
         .merge(http_skill_store_v1(feature_set))
         .merge(http_skill_runtime_v1(feature_set))
+        .merge(http_agent_results_v1(feature_set))
 }
 
 fn open_api_docs(feature_set: FeatureSet) -> utoipa::openapi::OpenApi {
