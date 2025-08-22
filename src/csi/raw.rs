@@ -552,11 +552,16 @@ where
             namespace = namespace.to_string()
         );
         self.tool
-            .list_tools(namespace)
+            .list_tools(namespace.clone())
             .await
             // As long as namespaces can not be registered/unregistered dynamically, this error
-            // path should never be taken.
-            .map_err(|_| anyhow::anyhow!("Namespace disappeared while executing the Skill. This is a logical bug in the Kernel. Please contact the developers."))
+            // path should never be taken for skill execution. For the HTTP CSI however, it can
+            // happen, as we do not validate if a namespace exists or not.
+            .map_err(|_| {
+                anyhow::anyhow!(
+                    "You tried to list the tools for a namespace that does not exist: {namespace:?}"
+                )
+            })
     }
 }
 
