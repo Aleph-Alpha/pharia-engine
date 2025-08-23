@@ -19,7 +19,7 @@ These include RAG capabilities offered by the [DocumentIndex](https://docs.aleph
 
 Next to the [Rust toolchain](https://www.rust-lang.org/tools/install), there are some prerequisites you will need to install once:
 
-```shell
+```sh
 # We need the Wasm target to be able to compile the skills
 rustup target add wasm32-wasip2
 # We need wasm-tools to strip skill binaries
@@ -59,13 +59,13 @@ cargo clippy --workspace --all-features --all-targets -- -D warnings
 
 Build the image with
 
-```shell
+```sh
 podman build . --tag pharia-kernel
 ```
 
 Then, run the image with
 
-```shell
+```sh
 podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
 
@@ -79,7 +79,7 @@ Mounting the config file is optional.
 Podman on MacOS requires a separate virtual machine run by the user.
 To compile PhariaKernel, at least 4 GiB of RAM are needed and 8 GiB are recommended. You set this up with
 
-```shell
+```sh
 podman machine init
 podman machine set --memory 8192
 podman machine start
@@ -114,7 +114,7 @@ The Kernel organizes Skills in [namespaces](https://docs.aleph-alpha.com/product
 Each namespace can be configured to pull Skills from either a remote OCI registry or a local directory. Configuration examples can be found in the `.env.example` file.
 The Kernel comes configured with a `test-beta` namespace that hosts some hard-coded skills. You can invoke the `hello` skill with
 
-```shell
+```sh
 curl -v 127.0.0.1:8081/v1/skills/test-beta/hello/message-stream \
 -H 'Content-Type: application/json' \
 -d '"Homer"'
