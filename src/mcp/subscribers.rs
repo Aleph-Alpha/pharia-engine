@@ -5,9 +5,6 @@ use crate::{
     tool::{Tool, ToolRuntimeSender, ToolStoreApi},
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 /// Having the namespace as top-level key also allows to report namespaces without tools.
 pub type ToolMap = HashMap<Namespace, HashMap<String, Arc<dyn Tool + Send + Sync>>>;
 
@@ -19,7 +16,7 @@ pub type ToolMap = HashMap<Namespace, HashMap<String, Arc<dyn Tool + Send + Sync
 /// For the actor, it represents the outgoing interface, while its sibling trait
 /// [`crate::mcp::McpApi`] represents the incoming interface by which the actor is notified about
 /// new MCP servers.
-#[cfg_attr(test, double(McpSubscriberDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait McpSubscriber {
     /// Let the subscriber know that the list of tools has been changed and report the new list
     fn report_updated_tools(&mut self, tools: ToolMap) -> impl Future<Output = ()> + Send;

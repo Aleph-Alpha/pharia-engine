@@ -264,15 +264,12 @@ pub mod tests {
     use tokio::time::Instant as TokioInstant;
 
     use crate::{
-        mcp::{
-            McpClientDouble,
-            subscribers::{McpSubscriberDouble, ToolMap},
-        },
+        mcp::{McpClientDouble, subscribers::ToolMap},
         tool::ToolDescription,
     };
 
     struct DummySubscriber;
-    impl McpSubscriberDouble for DummySubscriber {
+    impl McpSubscriber for DummySubscriber {
         async fn report_updated_tools(&mut self, _tools: ToolMap) {
             // Do nothing
         }
@@ -452,7 +449,7 @@ pub mod tests {
     async fn report_tools_after_upserting_server() {
         // Given a MCP API that knows about no mcp servers
         struct SubscriberMock;
-        impl McpSubscriberDouble for SubscriberMock {
+        impl McpSubscriber for SubscriberMock {
             async fn report_updated_tools(&mut self, tools: ToolMap) {
                 // Then the tool reported by the server is reported to the subscriber
                 let namespace = Namespace::new("test-namespace").unwrap();
@@ -676,7 +673,7 @@ pub mod tests {
         }
     }
 
-    impl McpSubscriberDouble for RecordingSubscriber {
+    impl McpSubscriber for RecordingSubscriber {
         async fn report_updated_tools(&mut self, tools: ToolMap) {
             self.calls.lock().unwrap().push(tools);
         }
