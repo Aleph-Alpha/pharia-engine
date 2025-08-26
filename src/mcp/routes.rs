@@ -95,7 +95,7 @@ mod tests {
     use super::{McpServerStoreProvider, McpServerUrl, http_mcp_servers_v1};
     use crate::{
         feature_set::PRODUCTION_FEATURE_SET,
-        mcp::{McpDouble, store::NamespaceNotFound},
+        mcp::{McpApi, store::NamespaceNotFound},
         namespace_watcher::Namespace,
     };
 
@@ -122,7 +122,7 @@ mod tests {
     async fn list_mcp_servers_by_namespace() {
         #[derive(Clone)]
         struct McpServerMock;
-        impl McpDouble for McpServerMock {
+        impl McpApi for McpServerMock {
             async fn mcp_list(
                 &self,
                 namespace: Namespace,
@@ -158,7 +158,7 @@ mod tests {
         // Given a an mcp server store that does not know about a namespace
         #[derive(Clone)]
         struct McpServerMock;
-        impl McpDouble for McpServerMock {
+        impl McpApi for McpServerMock {
             async fn mcp_list(
                 &self,
                 _namespace: Namespace,
