@@ -161,8 +161,6 @@ pub mod tests {
 
     use crate::tool::{ToolDescription, ToolOutput};
 
-    pub use super::actor::ToolStoreDouble;
-
     impl ToolOutput {
         pub fn empty() -> Self {
             Self(vec![])

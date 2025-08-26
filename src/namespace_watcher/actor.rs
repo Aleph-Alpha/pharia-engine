@@ -408,7 +408,6 @@ pub mod tests {
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill::SkillPath,
         skill_store::tests::SkillStoreMsg,
-        tool::tests::ToolStoreDouble,
     };
 
     use super::*;
@@ -510,10 +509,6 @@ pub mod tests {
         assert_eq!(diff.removed, vec![NativeToolName::Subtract]);
     }
 
-    pub struct ToolStoreDummy;
-
-    impl ToolStoreDouble for ToolStoreDummy {}
-
     #[test]
     fn diff_is_computed() {
         let incoming = vec![
@@ -537,9 +532,8 @@ pub mod tests {
             },
         ];
 
-        let diff = NamespaceWatcherActor::<Dummy, ToolStoreDummy, Dummy>::compute_skill_diff(
-            &existing, &incoming,
-        );
+        let diff =
+            NamespaceWatcherActor::<Dummy, Dummy, Dummy>::compute_skill_diff(&existing, &incoming);
 
         // when the observer checks for new skills
         assert_eq!(
@@ -565,7 +559,7 @@ pub mod tests {
         };
 
         // When the observer checks for new skills
-        let diff = NamespaceWatcherActor::<Dummy, ToolStoreDummy, Dummy>::compute_skill_diff(
+        let diff = NamespaceWatcherActor::<Dummy, Dummy, Dummy>::compute_skill_diff(
             std::slice::from_ref(&existing),
             std::slice::from_ref(&incoming),
         );
@@ -588,7 +582,7 @@ pub mod tests {
         let config = Box::new(PendingConfig);
         let update_interval = Duration::from_millis(1);
         let mut observer =
-            NamespaceWatcher::with_config(Dummy, ToolStoreDummy, McpStub, config, update_interval);
+            NamespaceWatcher::with_config(Dummy, Dummy, McpStub, config, update_interval);
 
         // When waiting for the first pass
         let result = tokio::time::timeout(Duration::from_secs(1), observer.wait_for_ready()).await;
@@ -691,7 +685,7 @@ pub mod tests {
         let mcp_store = McpStoreSpy::new();
         let mut observer = NamespaceWatcher::with_config(
             Dummy,
-            ToolStoreDummy,
+            Dummy,
             mcp_store.clone(),
             config,
             Duration::from_millis(1),
@@ -721,13 +715,8 @@ pub mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(1);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let mut observer = NamespaceWatcher::with_config(
-            sender,
-            ToolStoreDummy,
-            McpStub,
-            stub_config,
-            update_interval,
-        );
+        let mut observer =
+            NamespaceWatcher::with_config(sender, Dummy, McpStub, stub_config, update_interval);
         observer.wait_for_ready().await;
 
         // Then one new skill message is send for each skill configured
@@ -747,7 +736,7 @@ pub mod tests {
         observer.wait_for_shutdown().await;
     }
 
-    impl<S> NamespaceWatcherActor<S, ToolStoreDummy, Dummy>
+    impl<S> NamespaceWatcherActor<S, Dummy, Dummy>
     where
         S: SkillStoreApi + Send + Sync,
     {
@@ -762,7 +751,7 @@ pub mod tests {
                 ready,
                 shutdown,
                 skill_store_api,
-                tool_store_api: ToolStoreDummy,
+                tool_store_api: Dummy,
                 mcp_store_api: Dummy,
                 config,
                 update_interval: Duration::from_millis(1),
@@ -944,7 +933,7 @@ pub mod tests {
         }
     }
 
-    impl ToolStoreDouble for NativeToolStoreSpy {
+    impl ToolStoreApi for NativeToolStoreSpy {
         async fn native_tool_upsert(&self, tool: ConfiguredNativeTool) {
             self.upserted.lock().await.push(tool);
         }
@@ -1102,13 +1091,8 @@ pub mod tests {
         // When we boot up the configuration observer
         let (sender, mut receiver) = mpsc::channel::<SkillStoreMsg>(1);
         let update_interval = Duration::from_millis(update_interval_ms);
-        let observer = NamespaceWatcher::with_config(
-            sender,
-            ToolStoreDummy,
-            McpStub,
-            stub_config,
-            update_interval,
-        );
+        let observer =
+            NamespaceWatcher::with_config(sender, Dummy, McpStub, stub_config, update_interval);
 
         // Then only one new skill message is send for each skill configured
         receiver.recv().await.unwrap();
@@ -1138,7 +1122,7 @@ pub mod tests {
         let config_arc_clone = Arc::clone(&config_arc);
         let config = Box::new(UpdatableConfig::new(config_arc));
         let mut observer =
-            NamespaceWatcher::with_config(sender, ToolStoreDummy, McpStub, config, update_interval);
+            NamespaceWatcher::with_config(sender, Dummy, McpStub, config, update_interval);
         observer.wait_for_ready().await;
         receiver.recv().await.unwrap();
 

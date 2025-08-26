@@ -33,7 +33,7 @@ use double_trait::double;
 /// Whereas the [`ToolRuntimeApi`] allows to interact with tools (and does not care that they are
 /// implemented with different MCP servers), the [`ToolStoreApi`] allows someone else (e.g.
 /// the `McpActor`) to notify about new or removed tools.
-#[cfg_attr(test, double(ToolStoreDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait ToolStoreApi {
     /// Update the list of tools known to the `ToolRuntime`.
     ///
