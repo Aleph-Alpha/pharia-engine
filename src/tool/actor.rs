@@ -25,9 +25,6 @@ use crate::{
     },
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 /// Interact with tool storage.
 ///
 /// Whereas the [`ToolRuntimeApi`] allows to interact with tools (and does not care that they are
@@ -48,7 +45,7 @@ pub trait ToolStoreApi {
 }
 
 /// CSI facing interface, allows to invoke and list tools
-#[cfg_attr(test, double(ToolRuntimeDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait ToolRuntimeApi {
     fn invoke_tool(
         &self,
