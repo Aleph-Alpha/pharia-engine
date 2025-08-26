@@ -404,7 +404,6 @@ pub mod tests {
     };
 
     use crate::{
-        mcp::McpDouble,
         namespace_watcher::{config::Namespace, tests::NamespaceConfig},
         skill::SkillPath,
         skill_store::tests::SkillStoreMsg,
@@ -571,7 +570,7 @@ pub mod tests {
     #[derive(Clone)]
     struct McpStub;
 
-    impl McpDouble for McpStub {
+    impl McpApi for McpStub {
         /// The namespace watcher requires some implementation of `register_namespace` to boot up.
         async fn register_namespace(&self, _namespace: Namespace) {}
     }
@@ -669,7 +668,7 @@ pub mod tests {
             }
         }
 
-        impl McpDouble for McpStoreSpy {
+        impl McpApi for McpStoreSpy {
             async fn register_namespace(&self, namespace: Namespace) {
                 self.registered.lock().await.push(namespace);
             }
@@ -829,7 +828,7 @@ pub mod tests {
         }
     }
 
-    impl McpDouble for McpServerStoreSpy {
+    impl McpApi for McpServerStoreSpy {
         async fn upsert(&self, server: ConfiguredMcpServer) {
             self.upserted.lock().await.push(server);
         }

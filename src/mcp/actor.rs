@@ -21,14 +21,12 @@ use crate::{
     namespace_watcher::Namespace,
     tool::{Tool, ToolDescription},
 };
-#[cfg(test)]
-use double_trait::double;
 use futures::{Future, StreamExt, stream::FuturesUnordered};
 
 /// Interface offered by the MCP actor.
 ///
 /// Allows the MCP actor to be notified about changes in the list of configured MCP servers.
-#[cfg_attr(test, double(McpDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait McpApi {
     fn upsert(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
     fn remove(&self, server: ConfiguredMcpServer) -> impl Future<Output = ()> + Send;
