@@ -1401,9 +1401,9 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "double-derive"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e29f5c7cb4409aa1191acfcfe5d8b50c943e1e62c583564e8aab4b1063db0974"
+checksum = "b38d80fa5f214969438922d0bccac923e788bce7455776f89f6b84db3254e886"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1412,9 +1412,9 @@ dependencies = [
 
 [[package]]
 name = "double-trait"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6426ec3552e51b92751c667afca2b7118d1b25e6e2192ab7ee17f313b0881ed1"
+checksum = "0fb78c1c39a2dbc70701c8c849f86a071f59649a271d11a7c9c3d69d3bf14a10"
 dependencies = [
  "double-derive",
 ]
