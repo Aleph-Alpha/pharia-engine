@@ -31,9 +31,6 @@ use tokio::{
 };
 use tracing::{error, info};
 
-#[cfg(test)]
-use double_trait::double;
-
 struct SkillStoreState<L> {
     known_skills: HashMap<SkillPath, ConfiguredSkill>,
     cached_skills: SkillCache,
@@ -231,7 +228,7 @@ impl SkillStore {
     }
 }
 
-#[cfg_attr(test, double(SkillStoreApiDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait SkillStoreApi {
     fn remove(&self, skill_path: SkillPath) -> impl Future<Output = ()> + Send;
 
@@ -610,7 +607,7 @@ pub mod tests {
         }
     }
 
-    impl SkillStoreApiDouble for SkillStoreStub {
+    impl SkillStoreApi for SkillStoreStub {
         async fn fetch(
             &self,
             _skill_path: SkillPath,

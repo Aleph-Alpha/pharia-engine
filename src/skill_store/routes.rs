@@ -214,7 +214,7 @@ mod tests {
         skill::SkillPath,
         skill_loader::SkillDescriptionFilterType,
         skill_store::{
-            SkillStoreApiDouble, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
+            SkillStoreApi, SkillStoreProvider, http_skill_store_v0, http_skill_store_v1,
         },
     };
 
@@ -242,7 +242,7 @@ mod tests {
         // Given a skill store which can provide two skills "ns-one/one" and "ns-two/two"
         #[derive(Clone)]
         struct SkillStoreStub;
-        impl SkillStoreApiDouble for SkillStoreStub {
+        impl SkillStoreApi for SkillStoreStub {
             async fn list(
                 &self,
                 _skill_type: Option<SkillDescriptionFilterType>,
@@ -280,7 +280,7 @@ mod tests {
         #[derive(Clone)]
         struct SkillStoreStub;
 
-        impl SkillStoreApiDouble for SkillStoreStub {
+        impl SkillStoreApi for SkillStoreStub {
             async fn list_cached(&self) -> Vec<SkillPath> {
                 vec![
                     SkillPath::new(Namespace::new("ns").unwrap(), "first"),
@@ -316,7 +316,7 @@ mod tests {
         #[derive(Clone)]
         struct SkillStoreMock;
 
-        impl SkillStoreApiDouble for SkillStoreMock {
+        impl SkillStoreApi for SkillStoreMock {
             async fn invalidate_cache(&self, path: SkillPath) -> bool {
                 assert_eq!(
                     SkillPath::new(Namespace::new("my-test-namespace").unwrap(), "test-skill"),
@@ -354,7 +354,7 @@ mod tests {
         #[derive(Clone)]
         struct SkillStoreMock;
 
-        impl SkillStoreApiDouble for SkillStoreMock {
+        impl SkillStoreApi for SkillStoreMock {
             async fn invalidate_cache(&self, path: SkillPath) -> bool {
                 assert_eq!(
                     SkillPath::new(Namespace::new("my-test-namespace").unwrap(), "test-skill"),
