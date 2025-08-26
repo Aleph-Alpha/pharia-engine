@@ -132,7 +132,7 @@ mod tests {
     use crate::{
         feature_set::PRODUCTION_FEATURE_SET,
         namespace_watcher::Namespace,
-        tool::{ToolDescription, actor::ToolRuntimeDouble, toolbox::NamespaceNotFound},
+        tool::{ToolDescription, ToolRuntimeApi, toolbox::NamespaceNotFound},
     };
 
     #[derive(Clone)]
@@ -159,7 +159,7 @@ mod tests {
         // Given a tool mock that returns an unordered list of tools
         #[derive(Clone)]
         struct ToolMock;
-        impl ToolRuntimeDouble for ToolMock {
+        impl ToolRuntimeApi for ToolMock {
             async fn list_tools(
                 &self,
                 namespace: Namespace,
@@ -201,7 +201,7 @@ mod tests {
         // Given a tool that does not know about any namespace
         #[derive(Clone)]
         struct ToolMock;
-        impl ToolRuntimeDouble for ToolMock {
+        impl ToolRuntimeApi for ToolMock {
             async fn list_tools(
                 &self,
                 _namespace: Namespace,
