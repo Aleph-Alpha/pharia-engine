@@ -15,8 +15,8 @@ use axum_extra::{
     headers::{self, authorization::Bearer},
 };
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
-use std::{future::Future, iter::once, net::SocketAddr, time::Instant};
-use tokio::{net::TcpListener, task::JoinHandle};
+use std::{iter::once, net::SocketAddr, time::Instant};
+use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -59,7 +59,10 @@ use crate::{
 
 pub use self::state::ShellState;
 
+/// The shell handles our requests with the outside world. It translates from the requests to the
+/// domain objects and back.
 pub struct Shell {
+    shutdown: oneshot::Sender<()>,
     handle: JoinHandle<()>,
 }
 
@@ -70,7 +73,6 @@ impl Shell {
         feature_set: FeatureSet,
         addr: impl Into<SocketAddr>,
         app_state: T,
-        shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> anyhow::Result<Self>
     where
         T: AppState + Clone + Send + Sync + 'static,
@@ -89,18 +91,24 @@ impl Shell {
             .context(format!("Could not bind a tcp listener to '{addr}'"))?;
         info!(target: "pharia-kernel::http", "Listening on: {addr}");
 
+        let (send_shutdown, recv_shutdown) = oneshot::channel();
         let handle = tokio::spawn(async move {
             let res = axum::serve(listener, http(feature_set, app_state))
-                .with_graceful_shutdown(shutdown_signal)
+                .with_graceful_shutdown(async move { recv_shutdown.await.unwrap() })
                 .await;
             if let Err(e) = res {
                 error!(target: "pharia-kernel::http", "Error terminating shell: {e:#}");
             }
         });
-        Ok(Self { handle })
+        Ok(Self {
+            handle,
+            shutdown: send_shutdown,
+        })
     }
 
+    /// Shut down the shell. Will wait for requests to terminate gracefully.
     pub async fn wait_for_shutdown(self) {
+        self.shutdown.send(()).unwrap();
         self.handle.await.unwrap();
     }
 }
