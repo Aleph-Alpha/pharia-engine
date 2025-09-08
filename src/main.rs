@@ -18,7 +18,10 @@ async fn main() -> Result<(), Error> {
         app_config.wasmtime_cache_size().unwrap_or_default()
     );
 
-    let kernel = Kernel::new(app_config, shutdown_signal()).await?;
+    let kernel = Kernel::new(app_config).await?;
+
+    shutdown_signal().await;
+
     kernel.wait_for_shutdown().await;
 
     Ok(())

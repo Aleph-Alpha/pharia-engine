@@ -22,7 +22,6 @@ use test_skills::{
     given_skill_infinite_streaming, given_skill_tool_invocation, given_sse_mcp_server,
     given_streaming_output_skill,
 };
-use tokio::sync::oneshot;
 
 mod tracing;
 use tracing::{SequentialTestGuard, exclusive_log_recorder, log_recorder};
@@ -71,7 +70,6 @@ impl TestFileRegistry {
 }
 
 struct TestKernel {
-    shutdown_trigger: oneshot::Sender<()>,
     kernel: Kernel,
     port: u16,
     log_recorder: &'static tracing::LogRecorder,
@@ -126,13 +124,9 @@ impl TestKernel {
     }
 
     async fn new(app_config: AppConfig, exclusive: bool) -> Self {
-        let (shutdown_trigger, shutdown_capture) = oneshot::channel::<()>();
-        let shutdown_signal = async {
-            shutdown_capture.await.unwrap();
-        };
         let port = app_config.kernel_address().port();
         // Wait for socket listener to be bound
-        let kernel = Kernel::new(app_config, shutdown_signal).await.unwrap();
+        let kernel = Kernel::new(app_config).await.unwrap();
         let (guard, log_recorder) = if exclusive {
             exclusive_log_recorder().await
         } else {
@@ -140,7 +134,6 @@ impl TestKernel {
         };
 
         Self {
-            shutdown_trigger,
             kernel,
             port,
             log_recorder,
@@ -165,7 +158,6 @@ impl TestKernel {
     }
 
     async fn shutdown(self) {
-        self.shutdown_trigger.send(()).unwrap();
         self.kernel.wait_for_shutdown().await;
     }
 }

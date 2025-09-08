@@ -29,7 +29,6 @@ mod wasm;
 
 use anyhow::{Context, Error};
 use authorization::Authorization;
-use futures::Future;
 use namespace_watcher::{NamespaceDescriptionLoaders, NamespaceWatcher};
 use search::Search;
 use shell::Shell;
@@ -82,10 +81,7 @@ impl Kernel {
     ///
     /// Fails if application can not read the namespace configuration. Errors in booting up the
     /// shell are only exposed once waiting for the shutdown
-    pub async fn new(
-        app_config: AppConfig,
-        shutdown_signal: impl Future<Output = ()> + Send + 'static,
-    ) -> Result<Self, Error> {
+    pub async fn new(app_config: AppConfig) -> Result<Self, Error> {
         let loaders = Box::new(
             NamespaceDescriptionLoaders::new(app_config.namespaces().clone())
                 .context("Unable to read the configuration for namespaces")
@@ -140,7 +136,6 @@ impl Kernel {
             app_config.pharia_ai_feature_set(),
             app_config.kernel_address(),
             app_state,
-            shutdown_signal,
         )
         .await
         {
@@ -204,7 +199,7 @@ impl Kernel {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, future::ready, sync::LazyLock, time::Duration};
+    use std::{env, sync::LazyLock, time::Duration};
 
     use dotenvy::from_filename;
     use tokio_test::assert_ok;
@@ -280,7 +275,7 @@ mod tests {
         let config = AppConfig::default()
             .with_kernel_address("127.0.0.1:8888".parse().unwrap())
             .with_metrics_address("127.0.0.1:0".parse().unwrap());
-        let kernel = Kernel::new(config, ready(())).await.unwrap();
+        let kernel = Kernel::new(config).await.unwrap();
 
         let shutdown_completed = kernel.wait_for_shutdown();
 
