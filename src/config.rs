@@ -116,6 +116,8 @@ pub struct AppConfig {
     #[serde(default = "defaults::log_level")]
     log_level: String,
     otel_endpoint: Option<String>,
+    otel_genai_endpoint_api_key: Option<String>,
+    otel_genai_endpoint: Option<String>,
     /// OTEL sampling ratio between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all traces
     #[serde(
         default = "defaults::otel_sampling_ratio",
@@ -149,6 +151,10 @@ pub struct OpenAiInference {
 pub struct OtelConfig<'a> {
     /// Endpoint that traces are sent to. If set to None, no traces are emitted
     pub endpoint: Option<&'a str>,
+    /// API key for the OpenTelemetry endpoint. If set to None, no API key is used
+    pub genai_endpoint_api_key: Option<&'a str>,
+    /// GenAI endpoint that traces are sent to. If set to None, no traces are sent to GenAI endpoint
+    pub genai_endpoint: Option<&'a str>,
     /// ratio between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all traces
     pub sampling_ratio: f64,
     /// Minimum log level for traces.
@@ -347,6 +353,8 @@ impl AppConfig {
     pub fn as_otel_config(&self) -> OtelConfig<'_> {
         OtelConfig {
             endpoint: self.otel_endpoint.as_deref(),
+            genai_endpoint_api_key: self.otel_genai_endpoint_api_key.as_deref(),
+            genai_endpoint: self.otel_genai_endpoint.as_deref(),
             sampling_ratio: self.otel_sampling_ratio,
             log_level: self.log_level.as_str(),
         }
@@ -529,6 +537,8 @@ impl Default for AppConfig {
             namespace_update_interval: defaults::namespace_update_interval(),
             log_level: defaults::log_level(),
             otel_endpoint: None,
+            otel_genai_endpoint_api_key: None,
+            otel_genai_endpoint: None,
             otel_sampling_ratio: defaults::otel_sampling_ratio(),
             use_pooling_allocator: false,
             memory_request: None,
