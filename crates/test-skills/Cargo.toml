@@ -9,7 +9,7 @@ change-case = "0.2.0"
 futures-util = "0.3.31"
 reqwest = { version = "0.12.23", features = ["json", "stream"] }
 serde_json = "1.0.143"
-tempfile = "3.21.0"
+tempfile = "3.22.0"
 tokio = "1.47.1"
 sha2 = "0.10.9"
 hex = "0.4.3"
