@@ -68,8 +68,8 @@ impl Tokenizers {
         } else {
             warn!(
                 target: "pharia-kernel::tokenizers",
-                "Chunking is only supported for models hosted by Aleph Alpha inference, \
-                running without tokenizer capabilities."
+                "Chunking with tokenizers is only supported for models hosted by Aleph Alpha \
+                inference, falling back to character based chunking."
             );
             Self::with_client(InferenceNotConfigured)
         }

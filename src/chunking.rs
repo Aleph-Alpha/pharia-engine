@@ -1,4 +1,4 @@
-use text_splitter::{ChunkCharIndex, ChunkConfig, TextSplitter};
+use text_splitter::{Characters, ChunkCharIndex, ChunkConfig, ChunkSizer, TextSplitter};
 use tokio::sync::oneshot;
 
 use crate::{authorization::Authentication, logging::TracingContext, tokenizers::TokenizerApi};
@@ -43,27 +43,32 @@ pub async fn chunking(
 
     let tokenizer = tokenizers
         .tokenizer_by_model(auth, tracing_context, model)
-        .await?;
+        .await
+        .ok();
 
     // Push into the blocking thread pool because this can be expensive for long documents
     let (send, recv) = oneshot::channel();
     rayon::spawn(move || {
-        let result = generate_chunks(&text, max_tokens, overlap, character_offsets, &tokenizer);
+        let result = if let Some(tokenizer) = &tokenizer {
+            generate_chunks(&text, max_tokens, overlap, character_offsets, tokenizer)
+        } else {
+            generate_chunks(&text, max_tokens, overlap, character_offsets, Characters)
+        };
         drop(send.send(result));
     });
 
     Ok(recv.await??)
 }
 
-fn generate_chunks(
+fn generate_chunks<S: ChunkSizer>(
     text: &str,
     max_tokens: u32,
     overlap: u32,
     character_offsets: bool,
-    tokenizer: &tokenizers::Tokenizer,
+    sizer: S,
 ) -> Result<Vec<Chunk>, text_splitter::ChunkConfigError> {
     let config = ChunkConfig::new(max_tokens as usize)
-        .with_sizer(tokenizer)
+        .with_sizer(sizer)
         .with_overlap(overlap as usize)?;
 
     let splitter = TextSplitter::new(config);
@@ -97,9 +102,59 @@ fn generate_chunks(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+
     use crate::tokenizers::tests::FakeTokenizers;
 
     use super::*;
+
+    /// A skill executer double, loaded up with predefined answers.
+    #[derive(Clone)]
+    pub struct SabotageTokenizers;
+
+    impl TokenizerApi for SabotageTokenizers {
+        async fn tokenizer_by_model(
+            &self,
+            _auth: Authentication,
+            _tracing_context: TracingContext,
+            model_name: String,
+        ) -> anyhow::Result<Arc<tokenizers::Tokenizer>> {
+            Err(anyhow!(
+                "model '{}' not supported by FakeTokenizers",
+                model_name
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn chunking_without_tokenizer() {
+        // Given a tokenizer api that always errors out
+        let tokenizers = SabotageTokenizers;
+        let request = ChunkRequest {
+            text: "123456".to_owned(),
+            params: ChunkParams {
+                model: "pharia-1-llm-7B-control".to_owned(),
+                max_tokens: 3,
+                overlap: 2,
+            },
+            character_offsets: false,
+        };
+
+        // When we chunk the text
+        let chunks = chunking(
+            request,
+            &tokenizers,
+            Authentication::none(),
+            TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
+
+        // Then the text is still chunked
+        assert_eq!(chunks.len(), 4);
+    }
 
     #[tokio::test]
     async fn chunking_splits_text() {
