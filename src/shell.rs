@@ -4,7 +4,7 @@ use anyhow::Context;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{MatchedPath, Request, State},
+    extract::{DefaultBodyLimit, MatchedPath, Request, State},
     http::{StatusCode, header::AUTHORIZATION},
     middleware::{self, Next},
     response::{ErrorResponse, Html, IntoResponse, Response},
@@ -205,7 +205,10 @@ where
                 // Compress responses
                 .layer(CompressionLayer::new())
                 .layer(DecompressionLayer::new())
-                .layer(CorsLayer::very_permissive()),
+                .layer(CorsLayer::very_permissive())
+                // The default setting is 2MB. For long contracts, this posed and issue for some
+                // Creance Skills. The api-scheduler also has a limit of 50MB.
+                .layer(DefaultBodyLimit::max(50 * 1024 * 1024)),
         )
 }
 
