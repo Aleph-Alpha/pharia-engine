@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.24...pharia-kernel-v0.14.0)
+
+### Features
+
+- Increase http body limit to 50mb - ([b93bbab](https://github.com/Aleph-Alpha/pharia-kernel/commit/b93bbab1d098e91384d405cd8633c5ecdebacf38))
+- Chunk text based on characters if tokenizer not available - ([8b23e44](https://github.com/Aleph-Alpha/pharia-kernel/commit/8b23e4400efaedbdb37c9bf8d11d0f7bc2731195))
+
+### Fixes
+
+- Error message when listing tools in non-existing namespace - ([56666a2](https://github.com/Aleph-Alpha/pharia-kernel/commit/56666a28312d12b8def186bdd0ef8d5cc5828f8c))
+
+### Documentation
+
+- Use sh code blocks consistently - ([177e0a4](https://github.com/Aleph-Alpha/pharia-kernel/commit/177e0a48629f1701550ec29ec35263c43512d5c6))
+
+### Builds
+
+- *(deps)* Bump actions/setup-python from 5 to 6 - ([6112314](https://github.com/Aleph-Alpha/pharia-kernel/commit/611231442c68869bd5916c34d5454f9253fa7e1e))
+- *(deps)* Bump the minor group across 1 directory with 8 updates - ([31d13fd](https://github.com/Aleph-Alpha/pharia-kernel/commit/31d13fd345a134dae533305d14775c7b983c9674))
+
+### Refactor
+
+- Make lifecycle managed by `main`. - ([409178b](https://github.com/Aleph-Alpha/pharia-kernel/commit/409178b15d502262633df0dc361c8f4cf31a67d3))
+
+### Test
+
+- Use dummies macro for SkillStoreApi - ([155ea21](https://github.com/Aleph-Alpha/pharia-kernel/commit/155ea21a1f6b475761ed7724435c265449abdf06))
+- Use dummies for McpSubscriber - ([33bc511](https://github.com/Aleph-Alpha/pharia-kernel/commit/33bc5115d48647aa0419bd3c241de2a259680ee6))
+- Use dummies macro for McpApi - ([395c552](https://github.com/Aleph-Alpha/pharia-kernel/commit/395c5523c931512940b81793399fadb503685d3c))
+- Use dummies macro for ToolRuntimeApi - ([50614b0](https://github.com/Aleph-Alpha/pharia-kernel/commit/50614b056c787da35aa70b25b94dc8841f0d19d7))
+- ToolStoreApi is now doubled using dummies macro - ([592764d](https://github.com/Aleph-Alpha/pharia-kernel/commit/592764ddc12766bf04efd4e5438aa3171b3e6fe2))
+
+
 ## [0.13.24](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.23...pharia-kernel-v0.13.24)
 
 ### Fixes
