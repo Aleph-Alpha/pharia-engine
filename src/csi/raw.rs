@@ -145,6 +145,8 @@ pub struct CsiDrivers<I, S, Tz, Tl> {
     pub search: S,
     pub tokenizers: Tz,
     pub tool: Tl,
+    /// Whether to capture `GenAI` content (prompts/completions) in traces
+    pub gen_ai_content_capture: bool,
 }
 
 impl<I, S, Tz, Tl> RawCsi for CsiDrivers<I, S, Tz, Tl>
@@ -705,6 +707,7 @@ mod tests {
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
             tool: Dummy,
+            gen_ai_content_capture: false,
         };
 
         // When requesting a streamed completion
@@ -778,6 +781,7 @@ mod tests {
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
             tool: Dummy,
+            gen_ai_content_capture: false,
         };
 
         // When requesting a streamed completion
@@ -894,6 +898,7 @@ mod tests {
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
             tool: Dummy,
+            gen_ai_content_capture: false,
         }
     }
 }
