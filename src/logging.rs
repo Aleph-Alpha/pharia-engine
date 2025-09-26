@@ -289,13 +289,33 @@ pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGua
         .with(env_filter)
         .with(fmt_layer);
     let tracer_provider = if let Some(endpoint) = otel_config.endpoint {
-        let exporter = SpanExporter::builder()
-            .with_tonic()
-            .with_endpoint(endpoint)
-            .build()
-            .inspect_err(|e| {
-                eprintln!("Error building span exporter: {e:#}");
-            })?;
+        // Detect protocol based on endpoint URL
+        let (exporter, protocol) =
+            if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                // Use HTTP protocol for Langfuse and other HTTP endpoints
+                (
+                    SpanExporter::builder()
+                        .with_http()
+                        .with_endpoint(endpoint)
+                        .build()
+                        .inspect_err(|e| {
+                            eprintln!("Error building HTTP span exporter: {e:#}");
+                        })?,
+                    "HTTP",
+                )
+            } else {
+                // Use gRPC protocol for Grafana and other gRPC endpoints
+                (
+                    SpanExporter::builder()
+                        .with_tonic()
+                        .with_endpoint(endpoint)
+                        .build()
+                        .inspect_err(|e| {
+                            eprintln!("Error building gRPC span exporter: {e:#}");
+                        })?,
+                    "gRPC",
+                )
+            };
         let tracer_provider = tracer_provider(exporter, otel_config.sampling_ratio)?;
         init_propagator();
 
@@ -305,7 +325,8 @@ pub fn initialize_tracing(otel_config: OtelConfig<'_>) -> anyhow::Result<OtelGua
         registry.with(layer).init();
         info!(
             target: "pharia-kernel::logging",
-            "Initialized OpenTelemetry tracer provider with endpoint: {}",
+            "Initialized OpenTelemetry tracer provider with {} endpoint: {}",
+            protocol,
             endpoint
         );
         Some(tracer_provider)

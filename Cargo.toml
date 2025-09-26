@@ -102,6 +102,8 @@ tracing-opentelemetry = "0.31.0"
 opentelemetry-otlp = { version = "0.30.0", features = [
     "grpc-tonic",
     "gzip-tonic",
+    "http-proto",
+    "reqwest",
     "tls-webpki-roots",
     "zstd-tonic",
 ] }
