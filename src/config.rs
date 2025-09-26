@@ -122,6 +122,9 @@ pub struct AppConfig {
         deserialize_with = "deserialize_sampling_ratio"
     )]
     otel_sampling_ratio: f64,
+    /// Whether to capture `GenAI` content (prompts/completions) in traces.
+    #[serde(default)]
+    otel_gen_ai_content_capture: bool,
     #[serde(default)]
     use_pooling_allocator: bool,
     /// Optionally set amount of memory requested from Kubernetes
@@ -153,6 +156,9 @@ pub struct OtelConfig<'a> {
     pub sampling_ratio: f64,
     /// Minimum log level for traces.
     pub log_level: &'a str,
+    /// Whether to capture `GenAI` content (prompts/completions) in traces per OpenTelemetry `GenAI`
+    /// semantic conventions. Default is false for privacy/compliance reasons.
+    pub gen_ai_content_capture: bool,
 }
 
 /// `jiff::SignedDuration` can parse human readable strings like `1h30m` into `SignedDuration`.
@@ -349,6 +355,7 @@ impl AppConfig {
             endpoint: self.otel_endpoint.as_deref(),
             sampling_ratio: self.otel_sampling_ratio,
             log_level: self.log_level.as_str(),
+            gen_ai_content_capture: self.otel_gen_ai_content_capture,
         }
     }
 
@@ -530,6 +537,7 @@ impl Default for AppConfig {
             log_level: defaults::log_level(),
             otel_endpoint: None,
             otel_sampling_ratio: defaults::otel_sampling_ratio(),
+            otel_gen_ai_content_capture: false,
             use_pooling_allocator: false,
             memory_request: None,
             memory_limit: None,
