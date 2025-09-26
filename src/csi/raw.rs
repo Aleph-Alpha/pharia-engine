@@ -215,7 +215,14 @@ where
                         tracing_context,
                         "pharia-kernel::csi",
                         "complete",
-                        model = r.model
+                        model = r.model,
+                        "gen_ai.request.model" = r.model.clone(),
+                        "gen_ai.system" = "pharia-kernel",
+                        "gen_ai.request.max_tokens" = r.params.max_tokens,
+                        "gen_ai.request.temperature" = r.params.temperature,
+                        "gen_ai.request.top_p" = r.params.top_p,
+                        "gen_ai.request.frequency_penalty" = r.params.frequency_penalty,
+                        "gen_ai.request.presence_penalty" = r.params.presence_penalty
                     );
                     self.inference.complete(r, auth.clone(), child_context)
                 })
@@ -241,7 +248,14 @@ where
             tracing_context,
             "pharia-kernel::csi",
             "completion_stream",
-            model = request.model
+            model = request.model,
+            "gen_ai.request.model" = request.model.clone(),
+            "gen_ai.system" = "pharia-kernel",
+            "gen_ai.request.max_tokens" = request.params.max_tokens,
+            "gen_ai.request.temperature" = request.params.temperature,
+            "gen_ai.request.top_p" = request.params.top_p,
+            "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
+            "gen_ai.request.presence_penalty" = request.params.presence_penalty
         );
         self.inference
             .completion_stream(request, auth, context)
@@ -272,11 +286,18 @@ where
             requests
                 .into_iter()
                 .map(|r| {
+                    // Create context with GenAI semantic convention attributes
                     let context = context!(
                         tracing_context,
                         "pharia-kernel::csi",
                         "chat",
-                        model = r.model
+                        "gen_ai.request.model" = r.model,
+                        "gen_ai.system" = "pharia-kernel",
+                        "gen_ai.request.max_tokens" = r.params.max_tokens,
+                        "gen_ai.request.temperature" = r.params.temperature,
+                        "gen_ai.request.top_p" = r.params.top_p,
+                        "gen_ai.request.frequency_penalty" = r.params.frequency_penalty,
+                        "gen_ai.request.presence_penalty" = r.params.presence_penalty
                     );
                     self.inference.chat(r, auth.clone(), context)
                 })
@@ -299,7 +320,13 @@ where
             tracing_context,
             "pharia-kernel::csi",
             "chat_stream",
-            model = request.model
+            "gen_ai.request.model" = request.model,
+            "gen_ai.system" = "pharia-kernel",
+            "gen_ai.request.max_tokens" = request.params.max_tokens,
+            "gen_ai.request.temperature" = request.params.temperature,
+            "gen_ai.request.top_p" = request.params.top_p,
+            "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
+            "gen_ai.request.presence_penalty" = request.params.presence_penalty
         );
         self.inference.chat_stream(request, auth, context).await
     }
