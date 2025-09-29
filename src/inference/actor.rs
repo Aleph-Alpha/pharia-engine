@@ -1,5 +1,6 @@
 use derive_more::{Constructor, Deref, Display, IntoIterator};
 use futures::{StreamExt, stream::FuturesUnordered};
+use serde::Serialize;
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
@@ -423,6 +424,15 @@ pub struct AssistantMessage {
 }
 
 impl AssistantMessage {
+    pub fn as_otel_message(&self) -> OTelMessage {
+        OTelMessage {
+            role: "assistant".to_owned(),
+            content: self.content.clone().unwrap_or_default(),
+        }
+    }
+}
+
+impl AssistantMessage {
     pub fn role() -> &'static str {
         "assistant"
     }
@@ -459,6 +469,31 @@ impl Message {
             content: content.into(),
         }
     }
+
+    pub fn as_otel_message(&self) -> OTelMessage {
+        match self {
+            Self::Assistant(message) => OTelMessage {
+                role: "assistant".to_owned(),
+                content: message.content.clone().unwrap_or_default(),
+            },
+            Self::Tool(message) => OTelMessage {
+                role: "tool".to_owned(),
+                content: message.content.clone(),
+            },
+            Self::Other { role, content } => OTelMessage {
+                role: role.clone(),
+                content: content.clone(),
+            },
+        }
+    }
+}
+
+/// Message format expected by the OTel GenAI semantic convention.
+/// See: <https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/>
+#[derive(Serialize)]
+pub struct OTelMessage {
+    role: String,
+    content: String,
 }
 
 /// A tool call as requested by the model.

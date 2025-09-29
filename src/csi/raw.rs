@@ -2,6 +2,7 @@ use futures::future::{join_all, try_join_all};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::mpsc;
+use tracing::field;
 
 use crate::{
     authorization::Authentication,
@@ -288,20 +289,46 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    // Create context with GenAI semantic convention attributes
-                    let context = context!(
-                        tracing_context,
-                        "pharia-kernel::csi",
-                        "chat",
-                        "gen_ai.request.model" = r.model,
-                        "gen_ai.system" = "pharia-kernel",
-                        "gen_ai.request.max_tokens" = r.params.max_tokens,
-                        "gen_ai.request.temperature" = r.params.temperature,
-                        "gen_ai.request.top_p" = r.params.top_p,
-                        "gen_ai.request.frequency_penalty" = r.params.frequency_penalty,
-                        "gen_ai.request.presence_penalty" = r.params.presence_penalty
-                    );
-                    self.inference.chat(r, auth.clone(), context)
+                    async {
+                        // Create context with GenAI semantic convention attributes
+                        let context = context!(
+                            tracing_context,
+                            "pharia-kernel::csi",
+                            "chat",
+                            "gen_ai.request.model" = r.model,
+                            "gen_ai.system" = "pharia-kernel",
+                            "gen_ai.request.max_tokens" = r.params.max_tokens,
+                            "gen_ai.request.temperature" = r.params.temperature,
+                            "gen_ai.request.top_p" = r.params.top_p,
+                            "gen_ai.request.frequency_penalty" = r.params.frequency_penalty,
+                            "gen_ai.request.presence_penalty" = r.params.presence_penalty,
+                            "gen_ai.input.messages" = field::Empty,
+                            "gen_ai.output.messages" = field::Empty,
+                        );
+                        if self.gen_ai_content_capture {
+                            context.span().record(
+                                "gen_ai.input.messages",
+                                serde_json::to_string(
+                                    &r.messages
+                                        .iter()
+                                        .map(|m| m.as_otel_message())
+                                        .collect::<Vec<_>>(),
+                                )
+                                .unwrap(),
+                            );
+                        }
+                        let result = self.inference.chat(r, auth.clone(), context.clone()).await;
+                        if let Ok(response) = &result {
+                            if self.gen_ai_content_capture {
+                                context.span().record(
+                                    "gen_ai.output.messages",
+                                    serde_json::to_string(&response.message.as_otel_message())
+                                        .unwrap(),
+                                );
+                            }
+                        }
+                        result
+                    }
                 })
                 .collect::<Vec<_>>(),
         )
