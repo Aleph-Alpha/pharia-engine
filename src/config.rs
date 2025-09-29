@@ -11,7 +11,9 @@ use std::{
 };
 
 use crate::{
-    feature_set::FeatureSet, inference::InferenceConfig, namespace_watcher::NamespaceConfigs,
+    feature_set::FeatureSet,
+    inference::{InferenceConfig, InferenceProvider},
+    namespace_watcher::NamespaceConfigs,
     tokenizers::TokenizersConfig,
 };
 
@@ -361,16 +363,20 @@ impl AppConfig {
 
     #[must_use]
     pub fn as_inference_config(&self) -> InferenceConfig<'_> {
-        if let Some(url) = self.inference_url() {
+        let provider = if let Some(url) = self.inference_url() {
             // Default to the Aleph Alpha one
-            InferenceConfig::AlephAlpha { url }
+            InferenceProvider::AlephAlpha { url }
         } else if let Some(openai) = self.openai_inference() {
-            InferenceConfig::OpenAi {
+            InferenceProvider::OpenAi {
                 url: openai.url.as_str(),
                 token: openai.token.as_str(),
             }
         } else {
-            InferenceConfig::None
+            InferenceProvider::None
+        };
+        InferenceConfig {
+            provider,
+            gen_ai_content_capture: self.otel_gen_ai_content_capture,
         }
     }
 
@@ -603,9 +609,10 @@ mod tests {
         let config = AppConfig::from_sources(file_source, env_source)?;
 
         // Then the openai inference is configured
+        let inference_config = config.as_inference_config();
         assert!(matches!(
-            config.as_inference_config(),
-            InferenceConfig::OpenAi {
+            inference_config.provider,
+            InferenceProvider::OpenAi {
                 url: "https://openai.com",
                 token: "sk-1234567890"
             }
@@ -625,8 +632,8 @@ mod tests {
 
         // Then the aleph alpha inference is used
         assert!(matches!(
-            config,
-            InferenceConfig::AlephAlpha {
+            config.provider,
+            InferenceProvider::AlephAlpha {
                 url: "https://inference-api.product.pharia.com"
             }
         ));

@@ -2,7 +2,6 @@ use futures::future::{join_all, try_join_all};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::mpsc;
-use tracing::field;
 
 use crate::{
     authorization::Authentication,
@@ -146,8 +145,6 @@ pub struct CsiDrivers<I, S, Tz, Tl> {
     pub search: S,
     pub tokenizers: Tz,
     pub tool: Tl,
-    /// Whether to capture `GenAI` content (prompts/completions) in traces
-    pub gen_ai_content_capture: bool,
 }
 
 impl<I, S, Tz, Tl> RawCsi for CsiDrivers<I, S, Tz, Tl>
@@ -214,20 +211,8 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    let child_context = context!(
-                        tracing_context,
-                        "pharia-kernel::csi",
-                        "complete",
-                        model = r.model,
-                        "gen_ai.request.model" = r.model.clone(),
-                        "gen_ai.system" = "pharia-kernel",
-                        "gen_ai.request.max_tokens" = r.params.max_tokens,
-                        "gen_ai.request.temperature" = r.params.temperature,
-                        "gen_ai.request.top_p" = r.params.top_p,
-                        "gen_ai.request.frequency_penalty" = r.params.frequency_penalty,
-                        "gen_ai.request.presence_penalty" = r.params.presence_penalty
-                    );
-                    self.inference.complete(r, auth.clone(), child_context)
+                    self.inference
+                        .complete(r, auth.clone(), tracing_context.clone())
                 })
                 .collect::<Vec<_>>(),
         )
@@ -247,21 +232,8 @@ where
         )
         .increment(1);
 
-        let context = context!(
-            tracing_context,
-            "pharia-kernel::csi",
-            "completion_stream",
-            model = request.model,
-            "gen_ai.request.model" = request.model.clone(),
-            "gen_ai.system" = "pharia-kernel",
-            "gen_ai.request.max_tokens" = request.params.max_tokens,
-            "gen_ai.request.temperature" = request.params.temperature,
-            "gen_ai.request.top_p" = request.params.top_p,
-            "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
-            "gen_ai.request.presence_penalty" = request.params.presence_penalty
-        );
         self.inference
-            .completion_stream(request, auth, context)
+            .completion_stream(request, auth, tracing_context)
             .await
     }
 
@@ -289,46 +261,8 @@ where
             requests
                 .into_iter()
                 .map(|r| {
-                    async {
-                        // Create context with GenAI semantic convention attributes
-                        let context = context!(
-                            tracing_context,
-                            "pharia-kernel::csi",
-                            "chat",
-                            "gen_ai.request.model" = r.model,
-                            "gen_ai.system" = "pharia-kernel",
-                            "gen_ai.request.max_tokens" = r.params.max_tokens,
-                            "gen_ai.request.temperature" = r.params.temperature,
-                            "gen_ai.request.top_p" = r.params.top_p,
-                            "gen_ai.request.frequency_penalty" = r.params.frequency_penalty,
-                            "gen_ai.request.presence_penalty" = r.params.presence_penalty,
-                            "gen_ai.input.messages" = field::Empty,
-                            "gen_ai.output.messages" = field::Empty,
-                        );
-                        if self.gen_ai_content_capture {
-                            context.span().record(
-                                "gen_ai.input.messages",
-                                serde_json::to_string(
-                                    &r.messages
-                                        .iter()
-                                        .map(|m| m.as_otel_message())
-                                        .collect::<Vec<_>>(),
-                                )
-                                .unwrap(),
-                            );
-                        }
-                        let result = self.inference.chat(r, auth.clone(), context.clone()).await;
-                        if let Ok(response) = &result {
-                            if self.gen_ai_content_capture {
-                                context.span().record(
-                                    "gen_ai.output.messages",
-                                    serde_json::to_string(&response.message.as_otel_message())
-                                        .unwrap(),
-                                );
-                            }
-                        }
-                        result
-                    }
+                    self.inference
+                        .chat(r, auth.clone(), tracing_context.clone())
                 })
                 .collect::<Vec<_>>(),
         )
@@ -345,19 +279,9 @@ where
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
             .increment(1);
 
-        let context = context!(
-            tracing_context,
-            "pharia-kernel::csi",
-            "chat_stream",
-            "gen_ai.request.model" = request.model,
-            "gen_ai.system" = "pharia-kernel",
-            "gen_ai.request.max_tokens" = request.params.max_tokens,
-            "gen_ai.request.temperature" = request.params.temperature,
-            "gen_ai.request.top_p" = request.params.top_p,
-            "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
-            "gen_ai.request.presence_penalty" = request.params.presence_penalty
-        );
-        self.inference.chat_stream(request, auth, context).await
+        self.inference
+            .chat_stream(request, auth, tracing_context)
+            .await
     }
 
     async fn chunk(
@@ -734,7 +658,6 @@ mod tests {
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
             tool: Dummy,
-            gen_ai_content_capture: false,
         };
 
         // When requesting a streamed completion
@@ -808,7 +731,6 @@ mod tests {
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
             tool: Dummy,
-            gen_ai_content_capture: false,
         };
 
         // When requesting a streamed completion
@@ -925,7 +847,6 @@ mod tests {
             search: SearchStub::new(),
             tokenizers: FakeTokenizers,
             tool: Dummy,
-            gen_ai_content_capture: false,
         }
     }
 }
