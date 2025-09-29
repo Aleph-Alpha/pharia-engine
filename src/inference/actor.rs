@@ -9,9 +9,10 @@ use tokio::{
 };
 
 use crate::{
-    authorization::Authentication, inference::client::AlephAlphaClient, logging::TracingContext,
+    authorization::Authentication, context, inference::client::AlephAlphaClient,
+    logging::TracingContext,
 };
-use tracing::{info, warn};
+use tracing::{field, info, warn};
 
 use super::{
     client::{InferenceClient, InferenceError},
@@ -21,8 +22,8 @@ use super::{
 #[cfg(test)]
 use double_trait::double;
 
-/// Configuration for the inference backend that is used
-pub enum InferenceConfig<'a> {
+/// Provider configuration for the inference backend
+pub enum InferenceProvider<'a> {
     /// Use the Aleph Alpha inference API.
     AlephAlpha { url: &'a str },
     /// Use any OpenAI-compatible inference. Only chat requests are supported, completion,
@@ -31,6 +32,14 @@ pub enum InferenceConfig<'a> {
     /// Kernel is running without any inference backend. Inference requests will lead to a runtime
     /// error.
     None,
+}
+
+/// Configuration for the inference backend that is used
+pub struct InferenceConfig<'a> {
+    /// The inference provider to use
+    pub provider: InferenceProvider<'a>,
+    /// Whether to capture `GenAI` content (prompts/completions) in traces
+    pub gen_ai_content_capture: bool,
 }
 
 /// Handle to the inference actor. Spin this up in order to use the inference API.
@@ -43,36 +52,36 @@ impl Inference {
     /// Starts a new inference Actor. Calls to this method be balanced by calls to
     /// [`Self::shutdown`].
     pub fn new(config: InferenceConfig<'_>) -> Self {
-        match config {
-            InferenceConfig::AlephAlpha { url } => {
+        match config.provider {
+            InferenceProvider::AlephAlpha { url } => {
                 info!(
                     target: "pharia-kernel::inference",
                     "Using Aleph Alpha Inference at {}", url
                 );
                 let client = AlephAlphaClient::new(url);
-                Self::with_client(client)
+                Self::with_client(client, config.gen_ai_content_capture)
             }
-            InferenceConfig::OpenAi { url, token } => {
+            InferenceProvider::OpenAi { url, token } => {
                 info!(
                     target: "pharia-kernel::inference",
                     "Using OpenAI Inference API at {}", url
                 );
                 let client = OpenAiClient::new(url, token);
-                Self::with_client(client)
+                Self::with_client(client, config.gen_ai_content_capture)
             }
-            InferenceConfig::None => {
+            InferenceProvider::None => {
                 warn!(
                     target: "pharia-kernel::inference",
                     "No inference configured, running without inference capabilities."
                 );
-                Self::with_client(InferenceNotConfigured)
+                Self::with_client(InferenceNotConfigured, config.gen_ai_content_capture)
             }
         }
     }
 
-    pub fn with_client(client: impl InferenceClient) -> Self {
+    pub fn with_client(client: impl InferenceClient, gen_ai_content_capture: bool) -> Self {
         let (send, recv) = tokio::sync::mpsc::channel::<InferenceMsg>(1);
-        let mut actor = InferenceActor::new(client, recv);
+        let mut actor = InferenceActor::new(client, recv, gen_ai_content_capture);
         let handle = tokio::spawn(async move { actor.run().await });
         Inference { send, handle }
     }
@@ -488,7 +497,7 @@ impl Message {
     }
 }
 
-/// Message format expected by the OTel GenAI semantic convention.
+/// Message format expected by the `OTel GenAI` semantic convention.
 /// See: <https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/>
 #[derive(Serialize)]
 pub struct OTelMessage {
@@ -660,14 +669,17 @@ struct InferenceActor<C: InferenceClient> {
     client: Arc<C>,
     recv: mpsc::Receiver<InferenceMsg>,
     running_requests: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    /// Whether to capture `GenAI` content (prompts/completions) in traces
+    gen_ai_content_capture: bool,
 }
 
 impl<C: InferenceClient> InferenceActor<C> {
-    fn new(client: C, recv: mpsc::Receiver<InferenceMsg>) -> Self {
+    fn new(client: C, recv: mpsc::Receiver<InferenceMsg>, gen_ai_content_capture: bool) -> Self {
         InferenceActor {
             client: Arc::new(client),
             recv,
             running_requests: FuturesUnordered::new(),
+            gen_ai_content_capture,
         }
     }
 
@@ -691,8 +703,9 @@ impl<C: InferenceClient> InferenceActor<C> {
 
     fn act(&mut self, msg: InferenceMsg) {
         let client = self.client.clone();
+        let gen_ai_content_capture = self.gen_ai_content_capture;
         self.running_requests.push(Box::pin(async move {
-            msg.act(client.as_ref()).await;
+            msg.act(client.as_ref(), gen_ai_content_capture).await;
         }));
     }
 }
@@ -737,7 +750,7 @@ enum InferenceMsg {
 
 impl InferenceMsg {
     #[allow(clippy::too_many_lines)]
-    async fn act(self, client: &impl InferenceClient) {
+    async fn act(self, client: &impl InferenceClient, gen_ai_content_capture: bool) {
         match self {
             Self::Complete {
                 request,
@@ -745,7 +758,19 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
-                let result = client.complete(&request, auth, &tracing_context).await;
+                let context = context!(
+                    tracing_context,
+                    "pharia-kernel::inference",
+                    "complete",
+                    "gen_ai.request.model" = request.model.clone(),
+                    "gen_ai.system" = "pharia-kernel",
+                    "gen_ai.request.max_tokens" = request.params.max_tokens,
+                    "gen_ai.request.temperature" = request.params.temperature,
+                    "gen_ai.request.top_p" = request.params.top_p,
+                    "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
+                    "gen_ai.request.presence_penalty" = request.params.presence_penalty
+                );
+                let result = client.complete(&request, auth, &context).await;
                 drop(send.send(result));
             }
             Self::CompletionStream {
@@ -754,13 +779,21 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
+                let context = context!(
+                    tracing_context,
+                    "pharia-kernel::inference",
+                    "completion_stream",
+                    "gen_ai.request.model" = request.model.clone(),
+                    "gen_ai.system" = "pharia-kernel",
+                    "gen_ai.request.max_tokens" = request.params.max_tokens,
+                    "gen_ai.request.temperature" = request.params.temperature,
+                    "gen_ai.request.top_p" = request.params.top_p,
+                    "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
+                    "gen_ai.request.presence_penalty" = request.params.presence_penalty
+                );
                 let (event_send, mut event_recv) = mpsc::channel(1);
-                let mut stream = Box::pin(client.stream_completion(
-                    &request,
-                    auth,
-                    &tracing_context,
-                    event_send,
-                ));
+                let mut stream =
+                    Box::pin(client.stream_completion(&request, auth, &context, event_send));
 
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
@@ -793,7 +826,42 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
-                let result = client.chat(&request, auth, &tracing_context).await;
+                let context = context!(
+                    tracing_context,
+                    "pharia-kernel::inference",
+                    "chat",
+                    "gen_ai.request.model" = request.model,
+                    "gen_ai.system" = "pharia-kernel",
+                    "gen_ai.request.max_tokens" = request.params.max_tokens,
+                    "gen_ai.request.temperature" = request.params.temperature,
+                    "gen_ai.request.top_p" = request.params.top_p,
+                    "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
+                    "gen_ai.request.presence_penalty" = request.params.presence_penalty,
+                    "gen_ai.input.messages" = field::Empty,
+                    "gen_ai.output.messages" = field::Empty,
+                );
+                if gen_ai_content_capture {
+                    context.span().record(
+                        "gen_ai.input.messages",
+                        serde_json::to_string(
+                            &request
+                                .messages
+                                .iter()
+                                .map(Message::as_otel_message)
+                                .collect::<Vec<_>>(),
+                        )
+                        .unwrap(),
+                    );
+                }
+                let result = client.chat(&request, auth, &context).await;
+                if let Ok(response) = &result
+                    && gen_ai_content_capture
+                {
+                    context.span().record(
+                        "gen_ai.output.messages",
+                        serde_json::to_string(&response.message.as_otel_message()).unwrap(),
+                    );
+                }
                 drop(send.send(result));
             }
             Self::ChatStream {
@@ -802,9 +870,35 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
+                let context = context!(
+                    tracing_context,
+                    "pharia-kernel::inference",
+                    "chat_stream",
+                    "gen_ai.request.model" = request.model,
+                    "gen_ai.system" = "pharia-kernel",
+                    "gen_ai.request.max_tokens" = request.params.max_tokens,
+                    "gen_ai.request.temperature" = request.params.temperature,
+                    "gen_ai.request.top_p" = request.params.top_p,
+                    "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
+                    "gen_ai.request.presence_penalty" = request.params.presence_penalty,
+                    "gen_ai.input.messages" = field::Empty,
+                    "gen_ai.output.messages" = field::Empty,
+                );
+                if gen_ai_content_capture {
+                    context.span().record(
+                        "gen_ai.input.messages",
+                        serde_json::to_string(
+                            &request
+                                .messages
+                                .iter()
+                                .map(Message::as_otel_message)
+                                .collect::<Vec<_>>(),
+                        )
+                        .unwrap(),
+                    );
+                }
                 let (event_send, mut event_recv) = mpsc::channel(1);
-                let mut stream =
-                    Box::pin(client.stream_chat(&request, auth, &tracing_context, event_send));
+                let mut stream = Box::pin(client.stream_chat(&request, auth, &context, event_send));
 
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
@@ -837,7 +931,8 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
-                let result = client.explain(&request, auth, &tracing_context).await;
+                let context = context!(tracing_context, "pharia-kernel::inference", "explain");
+                let result = client.explain(&request, auth, &context).await;
                 drop(send.send(result));
             }
         }
@@ -955,7 +1050,7 @@ pub mod tests {
     async fn recover_from_connection_loss() {
         // given
         let client = SaboteurClient::new(2);
-        let inference = Inference::with_client(client);
+        let inference = Inference::with_client(client, false);
         let inference_api = inference.api();
         let request = CompletionRequest {
             prompt: "dummy_prompt".to_owned(),
@@ -1018,7 +1113,7 @@ pub mod tests {
     async fn concurrent_invocation_of_client() {
         // Given
         let client = AssertConcurrentClient::new(2);
-        let inference = Inference::with_client(client);
+        let inference = Inference::with_client(client, false);
         let api = inference.api();
 
         // When

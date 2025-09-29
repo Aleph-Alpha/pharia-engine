@@ -929,6 +929,20 @@ async fn traceparent_is_respected() {
     );
     assert_eq!(skill_execution.name, "skill_execution");
     assert_eq!(chat_stream.name, "chat_stream");
+
+    // Input and output are not set as the default config is not to capture the content
+    let input_messages = chat_stream
+        .attributes
+        .iter()
+        .find(|a| a.key == "gen_ai.input.messages".into());
+    assert!(input_messages.is_none());
+
+    let output_messages = chat_stream
+        .attributes
+        .iter()
+        .find(|a| a.key == "gen_ai.output.messages".into());
+    assert!(output_messages.is_none());
+
     assert_eq!(compile.name, "compile");
     assert_eq!(load_skill.name, "load_skill");
     assert_eq!(download.name, "download");

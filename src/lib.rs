@@ -98,7 +98,6 @@ impl Kernel {
             search: search.api(),
             tokenizers: tokenizers.api(),
             tool: tool.api(),
-            gen_ai_content_capture: app_config.as_otel_config().gen_ai_content_capture,
         };
 
         let registry_config = app_config.namespaces().registry_config();
