@@ -3,10 +3,17 @@
 PhariaKernel allows you to execute Cognitive Business Units called Skills. These Skills can be written in any language which compiles to WebAssembly (Wasm).
 We provide a SDK and dedicated support for Python.
 PhariaKernel handles the interaction between these Skills and drivers for functionality like inference and retrieval via the Cognitive System Interface (CSI).
-This enables users to deploy RAG usecases serverless. Writing skills for PhariaKernel is more constrained then shipping an end to end use case in a custom Docker container.
+Writing Skills for PhariaKernel is more constrained then shipping an end to end use case in a custom Docker container.
 Yet these constraints allow us to make opinionated decisions for the Skill developer.
 We strive to take away only the decisions and responsibilities a Skill developer may find "boring" (such as authentication, parallelization of inference calls).
 In more technical terms, we aim to reduce the accidental complexity the Skill developer has to engage with.
+
+## Features
+
+- **WebAssembly Skills**: Hosts AI methodology written in Python and makes it available via HTTP endpoints
+- **Flexible Inference Backends**: Works with Aleph Alpha inference or any OpenAI-compatible backend
+- **OpenTelemetry Tracing**: Integrated observability with support for OpenTelemetry backends like Langfuse and Langsmith, following GenAI semantic conventions
+- **Model Context Protocol (MCP)**: Dynamic tool discovery and invocation through MCP servers with per-namespace configuration
 
 ## PhariaAI
 
