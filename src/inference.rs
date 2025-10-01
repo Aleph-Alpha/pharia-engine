@@ -1,6 +1,7 @@
 mod actor;
 mod client;
 mod openai;
+mod tracing;
 
 pub use self::{
     actor::{
