@@ -13,7 +13,7 @@ use crate::{
     authorization::Authentication, context, inference::client::AlephAlphaClient,
     logging::TracingContext,
 };
-use tracing::{field, info, warn};
+use tracing::{info, warn};
 
 use super::{
     client::{InferenceClient, InferenceError},
@@ -827,41 +827,15 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
-                let context = context!(
-                    tracing_context,
-                    "pharia-kernel::inference",
-                    "chat",
-                    "gen_ai.request.model" = request.model,
-                    "gen_ai.system" = "pharia-kernel",
-                    "gen_ai.request.max_tokens" = request.params.max_tokens,
-                    "gen_ai.request.temperature" = request.params.temperature,
-                    "gen_ai.request.top_p" = request.params.top_p,
-                    "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
-                    "gen_ai.request.presence_penalty" = request.params.presence_penalty,
-                    "gen_ai.input.messages" = field::Empty,
-                    "gen_ai.output.messages" = field::Empty,
-                );
+                let context = tracing_context.child_from_chat_request(&request);
                 if gen_ai_content_capture {
-                    context.span().record(
-                        "gen_ai.input.messages",
-                        serde_json::to_string(
-                            &request
-                                .messages
-                                .iter()
-                                .map(Message::as_otel_message)
-                                .collect::<Vec<_>>(),
-                        )
-                        .unwrap(),
-                    );
+                    context.capture_input_messages(&request.messages);
                 }
                 let result = client.chat(&request, auth, &context).await;
                 if let Ok(response) = &result
                     && gen_ai_content_capture
                 {
-                    context.span().record(
-                        "gen_ai.output.messages",
-                        serde_json::to_string(&response.message.as_otel_message()).unwrap(),
-                    );
+                    context.capture_output_message(&response.message);
                 }
                 drop(send.send(result));
             }
@@ -871,32 +845,9 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
-                let context = context!(
-                    tracing_context,
-                    "pharia-kernel::inference",
-                    "chat_stream",
-                    "gen_ai.request.model" = request.model,
-                    "gen_ai.system" = "pharia-kernel",
-                    "gen_ai.request.max_tokens" = request.params.max_tokens,
-                    "gen_ai.request.temperature" = request.params.temperature,
-                    "gen_ai.request.top_p" = request.params.top_p,
-                    "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
-                    "gen_ai.request.presence_penalty" = request.params.presence_penalty,
-                    "gen_ai.input.messages" = field::Empty,
-                    "gen_ai.output.messages" = field::Empty,
-                );
+                let context = tracing_context.child_from_chat_request(&request);
                 if gen_ai_content_capture {
-                    context.span().record(
-                        "gen_ai.input.messages",
-                        serde_json::to_string(
-                            &request
-                                .messages
-                                .iter()
-                                .map(Message::as_otel_message)
-                                .collect::<Vec<_>>(),
-                        )
-                        .unwrap(),
-                    );
+                    context.capture_input_messages(&request.messages);
                 }
                 let (event_send, mut event_recv) = mpsc::channel(1);
                 let mut stream = Box::pin(client.stream_chat(&request, auth, &context, event_send));
