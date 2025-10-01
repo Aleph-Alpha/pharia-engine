@@ -9,7 +9,7 @@ use std::{
 
 use axum::http;
 use bytesize::ByteSize;
-use dotenvy::dotenv;
+use dotenvy::from_filename;
 use futures::StreamExt;
 use opentelemetry::{SpanId, TraceId};
 use pharia_kernel::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
@@ -870,6 +870,67 @@ async fn span_not_sampled_when_not_requested() {
 }
 
 #[tokio::test]
+async fn chat_content_can_be_configured_to_be_captured() {
+    // Given a Kernel that is configured to capture the chat content
+    let streaming_output_skill_wasm = given_streaming_output_skill().bytes();
+    let mut local_skill_dir = TestFileRegistry::new();
+    local_skill_dir.with_skill("streaming-output", streaming_output_skill_wasm);
+    let app_config = TestKernel::default_config()
+        .with_namespaces(local_skill_dir.to_namespace_config())
+        .with_gen_ai_content_capture(true)
+        .with_otel_sampling_ratio(1.0)
+        .unwrap();
+    let kernel = TestKernel::exclusive(app_config).await;
+    let log_recorder = kernel.log_recorder();
+
+    // When we execute a skill
+    let req_client = reqwest::Client::new();
+    let response = req_client
+        .post(format!(
+            "http://127.0.0.1:{}/v1/skills/local/streaming-output/message-stream",
+            kernel.port()
+        ))
+        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .header(header::AUTHORIZATION, auth_value())
+        .body(Body::from(json!("Say one word: Homer").to_string()))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .unwrap();
+
+    assert!(response.status().is_success());
+
+    let mut stream = response.bytes_stream();
+    while stream.next().await.is_some() {}
+
+    kernel.shutdown().await;
+
+    // Then the input and output messages are recorded
+    let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
+    assert_eq!(spans.len(), 7);
+
+    let chat_stream = spans.iter().find(|s| s.name == "chat_stream").unwrap();
+    let input_messages = chat_stream
+        .attributes
+        .iter()
+        .find(|a| a.key == "gen_ai.input.messages".into())
+        .unwrap();
+    let output_messages = chat_stream
+        .attributes
+        .iter()
+        .find(|a| a.key == "gen_ai.output.messages".into())
+        .unwrap();
+    assert_eq!(
+        input_messages.value.as_str(),
+        "[{\"role\":\"user\",\"content\":\"Say one word: Homer\"}]",
+    );
+    assert_eq!(
+        output_messages.value.as_str(),
+        "[{\"content\":\"Homer\",\"role\":\"assistant\"}]",
+    );
+}
+
+#[tokio::test]
 #[allow(clippy::unreadable_literal)]
 async fn traceparent_is_respected() {
     // Given a Kernel that is the only one running
@@ -1091,7 +1152,7 @@ fn auth_value() -> header::HeaderValue {
 fn api_token() -> &'static str {
     static API_TOKEN: OnceLock<String> = OnceLock::new();
     API_TOKEN.get_or_init(|| {
-        drop(dotenv());
+        drop(from_filename(".env.test"));
         env::var("PHARIA_AI_TOKEN").expect("PHARIA_AI_TOKEN variable not set")
     })
 }
@@ -1100,7 +1161,7 @@ fn api_token() -> &'static str {
 fn openai_inference_token() -> &'static str {
     static OPENAI_INFERENCE_TOKEN: OnceLock<String> = OnceLock::new();
     OPENAI_INFERENCE_TOKEN.get_or_init(|| {
-        drop(dotenv());
+        drop(from_filename(".env.test"));
         env::var("OPENAI_INFERENCE__TOKEN").expect("OPENAI_INFERENCE__TOKEN variable not set")
     })
 }
