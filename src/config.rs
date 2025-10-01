@@ -394,6 +394,12 @@ impl AppConfig {
         self.otel_sampling_ratio
     }
 
+    #[must_use]
+    pub fn with_gen_ai_content_capture(mut self, capture: bool) -> Self {
+        self.otel_gen_ai_content_capture = capture;
+        self
+    }
+
     /// # Errors
     ///
     /// Returns an error if the sampling ratio is not between 0.0 and 1.0 inclusive.
