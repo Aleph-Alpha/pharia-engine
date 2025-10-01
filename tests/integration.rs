@@ -909,7 +909,7 @@ async fn chat_content_can_be_configured_to_be_captured() {
     let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
     assert_eq!(spans.len(), 7);
 
-    let chat_stream = spans.iter().find(|s| s.name == "chat_stream").unwrap();
+    let chat_stream = spans.iter().find(|s| s.name == "chat").unwrap();
     let input_messages = chat_stream
         .attributes
         .iter()
@@ -920,13 +920,16 @@ async fn chat_content_can_be_configured_to_be_captured() {
         .iter()
         .find(|a| a.key == "gen_ai.output.messages".into())
         .unwrap();
+
+    let input_messages = serde_json::from_str::<Value>(&input_messages.value.as_str()).unwrap();
     assert_eq!(
-        input_messages.value.as_str(),
-        "[{\"role\":\"user\",\"content\":\"Say one word: Homer\"}]",
+        input_messages,
+        json!([{"role":"user","content":"Say one word: Homer"}]),
     );
+    let output_messages = serde_json::from_str::<Value>(&output_messages.value.as_str()).unwrap();
     assert_eq!(
-        output_messages.value.as_str(),
-        "[{\"content\":\"Homer\",\"role\":\"assistant\"}]",
+        output_messages,
+        json!([{"content":"Homer","role":"assistant"}]),
     );
 }
 
@@ -989,7 +992,7 @@ async fn traceparent_is_respected() {
         "POST /v1/skills/{namespace}/{name}/message-stream"
     );
     assert_eq!(skill_execution.name, "skill_execution");
-    assert_eq!(chat_stream.name, "chat_stream");
+    assert_eq!(chat_stream.name, "chat");
 
     // Input and output are not set as the default config is not to capture the content
     let input_messages = chat_stream

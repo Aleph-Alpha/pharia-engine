@@ -1,7 +1,6 @@
 use derive_more::{Constructor, Deref, Display, IntoIterator};
 use futures::{StreamExt, stream::FuturesUnordered};
 use serde::Serialize;
-use serde_json::json;
 use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 use tokio::{
     select,
@@ -759,18 +758,7 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
-                let context = context!(
-                    tracing_context,
-                    "pharia-kernel::inference",
-                    "complete",
-                    "gen_ai.request.model" = request.model.clone(),
-                    "gen_ai.system" = "pharia-kernel",
-                    "gen_ai.request.max_tokens" = request.params.max_tokens,
-                    "gen_ai.request.temperature" = request.params.temperature,
-                    "gen_ai.request.top_p" = request.params.top_p,
-                    "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
-                    "gen_ai.request.presence_penalty" = request.params.presence_penalty
-                );
+                let context = tracing_context.child_from_completion_request(&request);
                 let result = client.complete(&request, auth, &context).await;
                 drop(send.send(result));
             }
@@ -780,18 +768,7 @@ impl InferenceMsg {
                 auth,
                 tracing_context,
             } => {
-                let context = context!(
-                    tracing_context,
-                    "pharia-kernel::inference",
-                    "completion_stream",
-                    "gen_ai.request.model" = request.model.clone(),
-                    "gen_ai.system" = "pharia-kernel",
-                    "gen_ai.request.max_tokens" = request.params.max_tokens,
-                    "gen_ai.request.temperature" = request.params.temperature,
-                    "gen_ai.request.top_p" = request.params.top_p,
-                    "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
-                    "gen_ai.request.presence_penalty" = request.params.presence_penalty
-                );
+                let context = tracing_context.child_from_completion_request(&request);
                 let (event_send, mut event_recv) = mpsc::channel(1);
                 let mut stream =
                     Box::pin(client.stream_completion(&request, auth, &context, event_send));
@@ -852,24 +829,16 @@ impl InferenceMsg {
                 let (event_send, mut event_recv) = mpsc::channel(1);
                 let mut stream = Box::pin(client.stream_chat(&request, auth, &context, event_send));
 
+                // Reconstruct the entire assistant message from the stream.
                 let mut span_content = String::new();
-                let mut span_role: Option<String> = None;
 
                 loop {
                     // Pass along messages that we get from the stream while also checking if we get an error
                     select! {
                         // Pull from receiver as long as there are still senders
                         Some(msg) = event_recv.recv(), if !event_recv.is_closed() =>  {
-                            if gen_ai_content_capture {
-                                match &msg {
-                                    ChatEvent::MessageAppend { content, .. } => {
-                                        span_content.push_str(content);
-                                    }
-                                    ChatEvent::MessageBegin { role } => {
-                                        span_role = Some(role.to_owned());
-                                    }
-                                    _ => {}
-                                }
+                            if gen_ai_content_capture &&let ChatEvent::MessageAppend { content, .. } = &msg {
+                                span_content.push_str(content);
                             }
                             let Ok(()) = send.send(Ok(msg)).await else {
                                 // The receiver is dropped so we can stop polling the stream.
@@ -891,13 +860,12 @@ impl InferenceMsg {
                     drop(send.send(Ok(msg)).await);
                 }
 
-                if gen_ai_content_capture && let Some(role) = span_role {
-                    let messages = json!([{
-                        "role": role,
-                        "content": span_content,
-                    }]);
-                    let serialized = serde_json::to_string(&messages).unwrap();
-                    context.span().record("gen_ai.output.messages", serialized);
+                if gen_ai_content_capture {
+                    let message = AssistantMessage {
+                        content: Some(span_content),
+                        tool_calls: None,
+                    };
+                    context.capture_output_message(&message);
                 }
             }
             Self::Explain {
