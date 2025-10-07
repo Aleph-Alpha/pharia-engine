@@ -166,13 +166,13 @@ jobs:
 
       - name: Run Trivy Scan
         id: trivy-scan
-        uses: Aleph-Alpha/actions/trivy/scan@c07a5bda5c99d704e1b8e6d75380edcd76f855f2
+        uses: Aleph-Alpha/actions/trivy/scan@0d8ac2b89966f69ac2151b268821edb44fa9c06f
         with:
           toml-file: triage.toml
           image-uri: ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:${{ env.IMAGE_ID }}
 
       - name: Run CycloneDX Cargo
-        uses: Aleph-Alpha/actions/cyclonedx/cargo@c07a5bda5c99d704e1b8e6d75380edcd76f855f2
+        uses: Aleph-Alpha/actions/cyclonedx/cargo@0d8ac2b89966f69ac2151b268821edb44fa9c06f
         with:
           sbom-file: ${{ steps.trivy-scan.outputs.license }}
 
@@ -452,7 +452,7 @@ jobs:
           registry: ${{ env.ARTIFACTORY_REPOSITORY }}
 
       - name: Attach Security Artifacts
-        uses: Aleph-Alpha/actions/oras/attach@c07a5bda5c99d704e1b8e6d75380edcd76f855f2
+        uses: Aleph-Alpha/actions/oras/attach@0d8ac2b89966f69ac2151b268821edb44fa9c06f
         with:
           image-uri: ${{ env.ARTIFACTORY_REPOSITORY }}/pharia-kernel:$IMAGE_ID
           license-path: ${{ needs.security-scan.outputs.license }}
