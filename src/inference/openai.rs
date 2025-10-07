@@ -180,6 +180,15 @@ fn map_logprobs(logprobs: Option<ChatChoiceLogprobs>) -> Vec<inference::Distribu
 }
 
 impl inference::ChatRequest {
+    pub fn as_openai_stream_request(&self) -> Result<CreateChatCompletionRequest, InferenceError> {
+        let mut request = self.as_openai_request()?;
+        request.stream = Some(true);
+        request.stream_options = Some(ChatCompletionStreamOptions {
+            include_usage: true,
+        });
+        Ok(request)
+    }
+
     /// Convert a [`inference::ChatRequest`] into an [`async_openai::types::CreateChatCompletionRequest`].
     ///
     /// `OpenAI` deprecated the `max_tokens` parameter in favor of `max_completion_tokens`. Our
@@ -515,10 +524,7 @@ impl InferenceClient for OpenAiClient {
         _tracing_context: &TracingContext,
         send: mpsc::Sender<inference::ChatEvent>,
     ) -> Result<(), InferenceError> {
-        let mut openai_request = request.as_openai_request()?;
-        openai_request.stream_options = Some(ChatCompletionStreamOptions {
-            include_usage: true,
-        });
+        let openai_request = request.as_openai_stream_request()?;
         let mut stream = self.client.chat().create_stream(openai_request).await?;
 
         while let Some(event) = stream.next().await {

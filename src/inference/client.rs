@@ -23,7 +23,7 @@ use super::{
     CompletionRequest, Distribution, Explanation, ExplanationRequest, Granularity, Logprob,
     Logprobs, TextScore, TokenUsage,
 };
-use async_openai::{Client as OpenAiClient, config::Config, types::ChatCompletionStreamOptions};
+use async_openai::{Client as OpenAiClient, config::Config};
 
 #[cfg(test)]
 use double_trait::double;
@@ -280,10 +280,7 @@ impl InferenceClient for AlephAlphaClient {
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
         let client = self.openai_client(auth, tracing_context)?;
-        let mut openai_request = request.as_openai_request()?;
-        openai_request.stream_options = Some(ChatCompletionStreamOptions {
-            include_usage: true,
-        });
+        let openai_request = request.as_openai_stream_request()?;
         let mut stream = client.chat().create_stream(openai_request).await?;
         while let Some(event) = stream.next().await {
             let events = ChatEvent::from_stream(event?);
