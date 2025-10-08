@@ -1,7 +1,6 @@
 use http::HeaderMap;
 use reqwest::header::AUTHORIZATION;
 use secrecy::SecretString;
-use serde::Deserialize;
 use std::{
     future::Future,
     time::{Duration, SystemTime},
@@ -17,14 +16,18 @@ use tracing::{error, warn};
 
 use thiserror::Error;
 
-use crate::{authorization::Authentication, inference::FinishReason, logging::TracingContext};
+use crate::{
+    authorization::Authentication,
+    inference::{FinishReason, openai::ChatResponseReasoningContent},
+    logging::TracingContext,
+};
 
 use super::{
     ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionParams,
     CompletionRequest, Distribution, Explanation, ExplanationRequest, Granularity, Logprob,
     Logprobs, TextScore, TokenUsage,
 };
-use async_openai::{Client as OpenAiClient, config::Config, types::CreateChatCompletionResponse};
+use async_openai::{Client as OpenAiClient, config::Config};
 
 #[cfg(test)]
 use double_trait::double;
@@ -231,13 +234,6 @@ pub fn validate_chat_event(
     Ok(())
 }
 
-#[derive(Deserialize)]
-struct ChatResponseReasoningContent {
-    #[serde(flatten)]
-    inner: CreateChatCompletionResponse,
-    reasoning_content: Option<String>,
-}
-
 impl InferenceClient for AlephAlphaClient {
     async fn explain(
         &self,
@@ -276,7 +272,7 @@ impl InferenceClient for AlephAlphaClient {
         let openai_request = request.as_openai_request()?;
         let response: ChatResponseReasoningContent =
             client.chat().create_byot(openai_request).await?;
-        let response = ChatResponse::try_from(response.inner)?;
+        let response = ChatResponse::try_from(response)?;
         validate_chat_response(request, &response)?;
         Ok(response)
     }

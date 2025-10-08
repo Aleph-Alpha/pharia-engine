@@ -8,13 +8,13 @@ use async_openai::{
         ChatCompletionRequestMessage, ChatCompletionRequestToolMessage,
         ChatCompletionResponseMessage, ChatCompletionStreamOptions, ChatCompletionTokenLogprob,
         ChatCompletionTool, ChatCompletionToolChoiceOption, ChatCompletionToolType,
-        CompletionUsage, CreateChatCompletionRequest, CreateChatCompletionResponse,
-        CreateChatCompletionStreamResponse, FinishReason, FunctionCall, FunctionCallStream,
-        FunctionName, FunctionObject, ReasoningEffort, ResponseFormat, ResponseFormatJsonSchema,
-        TopLogprobs,
+        CompletionUsage, CreateChatCompletionRequest, CreateChatCompletionStreamResponse,
+        FinishReason, FunctionCall, FunctionCallStream, FunctionName, FunctionObject,
+        ReasoningEffort, ResponseFormat, ResponseFormatJsonSchema, TopLogprobs,
     },
 };
 use futures::StreamExt;
+use serde::Deserialize;
 use tokio::sync::mpsc;
 
 use crate::{
@@ -374,10 +374,17 @@ impl From<FinishReason> for inference::FinishReason {
     }
 }
 
-impl TryFrom<CreateChatCompletionResponse> for inference::ChatResponse {
+#[derive(Deserialize)]
+pub struct ChatResponseReasoningContent {
+    /// A list of chat completion choices. Can be more than one if `n` is greater than 1.
+    choices: Vec<async_openai::types::ChatChoice>,
+    usage: Option<async_openai::types::CompletionUsage>,
+}
+
+impl TryFrom<ChatResponseReasoningContent> for inference::ChatResponse {
     type Error = InferenceError;
 
-    fn try_from(response: CreateChatCompletionResponse) -> Result<Self, Self::Error> {
+    fn try_from(response: ChatResponseReasoningContent) -> Result<Self, Self::Error> {
         let first_choice = response.choices.into_iter().next().ok_or_else(|| {
             InferenceError::Other(anyhow::anyhow!(
                 "Expected at least one choice in the chat completion response."
@@ -516,7 +523,8 @@ impl InferenceClient for OpenAiClient {
         _tracing_context: &TracingContext,
     ) -> Result<inference::ChatResponse, InferenceError> {
         let openai_request = request.as_openai_request()?;
-        let response = self.client.chat().create(openai_request).await?;
+        let response: ChatResponseReasoningContent =
+            self.client.chat().create_byot(openai_request).await?;
         let response = inference::ChatResponse::try_from(response)?;
         validate_chat_response(request, &response)?;
         Ok(response)
