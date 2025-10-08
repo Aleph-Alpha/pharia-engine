@@ -638,6 +638,7 @@ impl From<Message> for inference::Message {
         match role.to_lowercase().as_str() {
             "assistant" => inference::Message::Assistant(inference::AssistantMessage {
                 content: Some(content),
+                reasoning_content: None,
                 tool_calls: None,
             }),
             _ => inference::Message::Other { role, content },
@@ -775,15 +776,17 @@ impl From<inference::AssistantMessage> for Message {
     fn from(message: inference::AssistantMessage) -> Self {
         let inference::AssistantMessage {
             content,
+            reasoning_content,
             tool_calls: _,
         } = message;
+        // The inference client has the guarantee that the content is not empty if no tools are
+        // specified in the request. Therefore, it is fine to unwrap here.
+        let content = content
+            .expect("Inference client guarantees content is not empty for requests without tools.");
+        let content = inference::prepend_reasoning_content(content, reasoning_content);
         Self {
             role: inference::AssistantMessage::role().to_owned(),
-            // The inference client has the guarantee that the content is not empty if no tools are
-            // specified in the request. Therefore, it is fine to unwrap here.
-            content: content.expect(
-                "Inference client guarantees content is not empty for requests without tools.",
-            ),
+            content,
         }
     }
 }

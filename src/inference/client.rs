@@ -1,6 +1,7 @@
 use http::HeaderMap;
 use reqwest::header::AUTHORIZATION;
 use secrecy::SecretString;
+use serde::Deserialize;
 use std::{
     future::Future,
     time::{Duration, SystemTime},
@@ -23,7 +24,7 @@ use super::{
     CompletionRequest, Distribution, Explanation, ExplanationRequest, Granularity, Logprob,
     Logprobs, TextScore, TokenUsage,
 };
-use async_openai::{Client as OpenAiClient, config::Config};
+use async_openai::{Client as OpenAiClient, config::Config, types::CreateChatCompletionResponse};
 
 #[cfg(test)]
 use double_trait::double;
@@ -230,6 +231,13 @@ pub fn validate_chat_event(
     Ok(())
 }
 
+#[derive(Deserialize)]
+struct ChatResponseReasoningContent {
+    #[serde(flatten)]
+    inner: CreateChatCompletionResponse,
+    reasoning_content: Option<String>,
+}
+
 impl InferenceClient for AlephAlphaClient {
     async fn explain(
         &self,
@@ -266,8 +274,9 @@ impl InferenceClient for AlephAlphaClient {
     ) -> Result<ChatResponse, InferenceError> {
         let client = self.openai_client(auth, tracing_context)?;
         let openai_request = request.as_openai_request()?;
-        let response = client.chat().create(openai_request).await?;
-        let response = ChatResponse::try_from(response)?;
+        let response: ChatResponseReasoningContent =
+            client.chat().create_byot(openai_request).await?;
+        let response = ChatResponse::try_from(response.inner)?;
         validate_chat_response(request, &response)?;
         Ok(response)
     }
@@ -636,6 +645,34 @@ mod tests {
     };
 
     use super::*;
+
+    #[tokio::test]
+    async fn chat_with_reasoning_content() {
+        // Given an inference client
+        let auth = Authentication::from_token(api_token());
+        let host = inference_url().to_owned();
+        let client = AlephAlphaClient::new(host);
+
+        // When chatting with a reasoning model
+        let chat_request = ChatRequest {
+            model: "qwen3-32b".to_owned(),
+            params: ChatParams::default(),
+            messages: vec![Message::user("Hello, world!")],
+        };
+
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
+            &client,
+            &chat_request,
+            auth,
+            &TracingContext::dummy(),
+        )
+        .await
+        .unwrap();
+
+        // Then the chat response contains content and reasoning content
+        assert!(chat_response.message.content.is_some());
+        assert!(chat_response.message.reasoning_content.is_some());
+    }
 
     #[tokio::test]
     async fn explain() {
