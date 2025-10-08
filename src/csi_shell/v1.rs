@@ -956,6 +956,7 @@ impl From<ToolCall> for inference::ToolCall {
 #[derive(Serialize, Deserialize)]
 struct Message {
     role: String,
+    reasoning_content: Option<String>,
     content: Option<String>,
     tool_call_id: Option<String>,
     tool_calls: Option<Vec<ToolCall>>,
@@ -965,10 +966,12 @@ impl From<inference::AssistantMessage> for Message {
     fn from(value: inference::AssistantMessage) -> Self {
         let inference::AssistantMessage {
             content,
+            reasoning_content,
             tool_calls,
         } = value;
         Message {
             role: inference::AssistantMessage::role().to_owned(),
+            reasoning_content,
             content,
             tool_call_id: None,
             tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
@@ -982,6 +985,7 @@ impl TryFrom<Message> for inference::Message {
     fn try_from(value: Message) -> Result<Self, Self::Error> {
         let Message {
             role,
+            reasoning_content,
             content,
             tool_call_id,
             tool_calls,
@@ -989,6 +993,7 @@ impl TryFrom<Message> for inference::Message {
         match role.as_str() {
             "assistant" => Ok(inference::Message::Assistant(inference::AssistantMessage {
                 content,
+                reasoning_content,
                 tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
             })),
             "tool" => Ok(inference::Message::Tool(inference::ToolMessage {
@@ -1595,6 +1600,7 @@ mod tests {
                 Ok(vec![inference::ChatResponse {
                     message: inference::AssistantMessage {
                         content: None,
+                        reasoning_content: None,
                         tool_calls: None,
                     },
                     finish_reason: inference::FinishReason::Stop,
@@ -1651,6 +1657,7 @@ mod tests {
         let expected_body = json!([{
             "message": {
                 "role": "assistant",
+                "reasoning_content": null,
                 "content": null,
                 "tool_calls": null,
                 "tool_call_id": null,

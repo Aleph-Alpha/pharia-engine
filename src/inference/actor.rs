@@ -429,6 +429,7 @@ pub struct JsonSchema {
 #[derive(Debug, Clone)]
 pub struct AssistantMessage {
     pub content: Option<String>,
+    pub reasoning_content: Option<String>,
     pub tool_calls: Option<Vec<ToolCall>>,
 }
 
@@ -444,6 +445,23 @@ impl AssistantMessage {
 impl AssistantMessage {
     pub fn role() -> &'static str {
         "assistant"
+    }
+}
+
+/// Merge reasoning content with the assistant message content.
+///
+/// When switching to v2/completions, we will get a stronger typed response from inference that
+/// distinguishes between content and reasoning content. However, older wit world do not know
+/// about reasoning, so we need to merge the content and reasoning content into a single string.
+///
+/// A known limitation is that we take assumptions about the thinking tokens of the model (qwen syntax).
+/// However, since reasoning models have not been available in the Aleph Alpha API for a long time, it
+/// is reasonable to assume that the only reasoning model used inside skills is qwen (if even).
+pub fn prepend_reasoning_content(content: String, reasoning_content: Option<String>) -> String {
+    if let Some(reasoning_content) = reasoning_content {
+        format!("<think>{reasoning_content}</think>{content}")
+    } else {
+        content
     }
 }
 
@@ -863,6 +881,7 @@ impl InferenceMsg {
                 if gen_ai_content_capture {
                     let message = AssistantMessage {
                         content: Some(span_content),
+                        reasoning_content: None,
                         tool_calls: None,
                     };
                     context.capture_output_message(&message);
@@ -900,6 +919,7 @@ pub mod tests {
         pub fn dummy() -> Self {
             Self {
                 content: Some("dummy-content".to_string()),
+                reasoning_content: None,
                 tool_calls: None,
             }
         }

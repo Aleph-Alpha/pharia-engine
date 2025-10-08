@@ -52,6 +52,10 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
         match message {
             inference::Message::Assistant(inference::AssistantMessage {
                 content,
+                // Whether or not the reasoning of passed messages is rendered into consecutive prompts is
+                // a decision by the prompt template per model. For now, we'll ignore it for all
+                // models here.
+                reasoning_content: _reasoning_content,
                 tool_calls,
             }) => Ok(ChatCompletionRequestMessage::Assistant(
                 ChatCompletionRequestAssistantMessage {
@@ -127,6 +131,7 @@ impl From<ChatCompletionResponseMessage> for inference::AssistantMessage {
         } = message;
         inference::AssistantMessage {
             content: content.map(|c| c.to_string()),
+            reasoning_content: None,
             tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
     }

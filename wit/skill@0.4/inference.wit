@@ -126,6 +126,7 @@ interface inference {
 
     record assistant-message {
         content: option<string>,
+        reasoning-content: option<string>,
         tool-calls: option<list<tool-call>>,
     }
 
