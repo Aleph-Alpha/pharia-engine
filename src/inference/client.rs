@@ -643,6 +643,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "Ignore due to dependency on inference v2 api"]
     async fn chat_with_reasoning_content() {
         // Given an inference client
         let auth = Authentication::from_token(api_token());
