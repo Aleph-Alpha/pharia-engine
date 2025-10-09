@@ -8,9 +8,8 @@ use async_openai::{
         ChatCompletionRequestMessage, ChatCompletionRequestToolMessage,
         ChatCompletionStreamOptions, ChatCompletionTokenLogprob, ChatCompletionTool,
         ChatCompletionToolChoiceOption, ChatCompletionToolType, CompletionUsage,
-        CreateChatCompletionRequest, CreateChatCompletionStreamResponse, FinishReason,
-        FunctionCall, FunctionCallStream, FunctionName, FunctionObject, ReasoningEffort,
-        ResponseFormat, ResponseFormatJsonSchema, TopLogprobs,
+        CreateChatCompletionRequest, FinishReason, FunctionCall, FunctionCallStream, FunctionName,
+        FunctionObject, ReasoningEffort, ResponseFormat, ResponseFormatJsonSchema, TopLogprobs,
     },
 };
 use futures::StreamExt;
@@ -464,8 +463,19 @@ impl From<OpenAIError> for InferenceError {
     }
 }
 
+#[derive(Debug, Deserialize, Clone, PartialEq, Serialize)]
+/// Represents a streamed chunk of a chat completion response returned by model, based on the provided input.
+pub struct ChatStreamWithReasoning {
+    /// A list of chat completion choices. Can contain more than one elements if `n` is greater than 1. Can also be empty for the last chunk if you set `stream_options: {"include_usage": true}`.
+    choices: Vec<async_openai::types::ChatChoiceStream>,
+
+    /// An optional field that will only be present when you set `stream_options: {"include_usage": true}` in your request.
+    /// When present, it contains a null value except for the last chunk which contains the token usage statistics for the entire request.
+    usage: Option<async_openai::types::CompletionUsage>,
+}
+
 impl inference::ChatEvent {
-    /// Convert a [`CreateChatCompletionStreamResponse`] into a vector of [`inference::ChatEvent`].
+    /// Convert a [`ChatStreamWithReasoning`] into a vector of [`inference::ChatEvent`].
     ///
     /// While it might seem natural to have a 1-1 mapping between events from the inference backend
     /// and events in our domain, we have chosen a domain model in which `MessageBegin` (containing
@@ -474,7 +484,7 @@ impl inference::ChatEvent {
     /// containing the role to be distinct from the event containing the tool call.
     /// Therefore, a single inference backend event can turn itself into multiple events in our
     /// domain model.
-    pub fn from_stream(event: CreateChatCompletionStreamResponse) -> Vec<Self> {
+    pub fn from_stream(event: ChatStreamWithReasoning) -> Vec<Self> {
         // In case we receive a usage, there is no choices, and no other events.
         if let Some(usage) = event.usage {
             let usage = usage.into();
@@ -565,7 +575,11 @@ impl InferenceClient for OpenAiClient {
         send: mpsc::Sender<inference::ChatEvent>,
     ) -> Result<(), InferenceError> {
         let openai_request = request.as_openai_stream_request()?;
-        let mut stream = self.client.chat().create_stream(openai_request).await?;
+        let mut stream = self
+            .client
+            .chat()
+            .create_stream_byot(openai_request)
+            .await?;
 
         while let Some(event) = stream.next().await {
             let events = inference::ChatEvent::from_stream(event?);
