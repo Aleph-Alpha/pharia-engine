@@ -3,13 +3,14 @@ use reqwest::header::AUTHORIZATION;
 use secrecy::SecretString;
 use std::{
     future::Future,
+    pin::Pin,
     time::{Duration, SystemTime},
 };
 
 use aleph_alpha_client::{
     Client, CompletionOutput, How, Prompt, Sampling, Stopping, TaskCompletion, TaskExplanation,
 };
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 use tokio::sync::mpsc;
 use tracing::{error, warn};
@@ -18,7 +19,10 @@ use thiserror::Error;
 
 use crate::{
     authorization::Authentication,
-    inference::{FinishReason, openai::ChatResponseReasoningContent},
+    inference::{
+        FinishReason,
+        openai::{ChatResponseReasoningContent, ChatStreamWithReasoning},
+    },
     logging::TracingContext,
 };
 
@@ -27,7 +31,7 @@ use super::{
     CompletionRequest, Distribution, Explanation, ExplanationRequest, Granularity, Logprob,
     Logprobs, TextScore, TokenUsage,
 };
-use async_openai::{Client as OpenAiClient, config::Config};
+use async_openai::{Client as OpenAiClient, config::Config, error::OpenAIError};
 
 #[cfg(test)]
 use double_trait::double;
@@ -284,9 +288,11 @@ impl InferenceClient for AlephAlphaClient {
         tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> Result<(), InferenceError> {
+        type OurStream =
+            Pin<Box<dyn Stream<Item = Result<ChatStreamWithReasoning, OpenAIError>> + Send>>;
         let client = self.openai_client(auth, tracing_context)?;
         let openai_request = request.as_openai_stream_request()?;
-        let mut stream = client.chat().create_stream(openai_request).await?;
+        let mut stream: OurStream = client.chat().create_stream_byot(openai_request).await?;
         while let Some(event) = stream.next().await {
             let events = ChatEvent::from_stream(event?);
             for event in events {
