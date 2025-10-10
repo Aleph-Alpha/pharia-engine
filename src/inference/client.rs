@@ -1158,6 +1158,67 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     }
 
     #[tokio::test]
+    #[ignore = "Reasoning for streaming not implemented yet."]
+    async fn chat_stream_with_reasoning() {
+        // Given
+        let auth = Authentication::from_token(api_token());
+        let host = inference_url().to_owned();
+        let client = AlephAlphaClient::new(host);
+
+        // When
+        let chat_request = ChatRequest {
+            model: "qwen3-32b".to_owned(),
+            messages: vec![Message::user("An apple a day")],
+            params: ChatParams {
+                max_tokens: Some(1),
+                temperature: Some(0.0),
+                ..Default::default()
+            },
+        };
+        let (send, mut recv) = mpsc::channel(1);
+
+        tokio::spawn(async move {
+            <AlephAlphaClient as InferenceClient>::stream_chat(
+                &client,
+                &chat_request,
+                auth,
+                &TracingContext::dummy(),
+                send,
+            )
+            .await
+            .unwrap();
+        });
+
+        let mut events = vec![];
+        while let Some(event) = recv.recv().await {
+            events.push(event);
+        }
+
+        // Then
+        assert_eq!(events.len(), 4);
+        assert_eq!(
+            events[0],
+            ChatEvent::MessageBegin {
+                role: "assistant".to_owned()
+            }
+        );
+        assert!(matches!(
+            &events[1],
+            ChatEvent::MessageAppend {
+                content,
+                ..
+            } if content == "Keep"
+        ));
+        assert_eq!(
+            events[2],
+            ChatEvent::MessageEnd {
+                finish_reason: FinishReason::Length
+            }
+        );
+        assert!(matches!(events[3], ChatEvent::Usage { .. }));
+    }
+
+    #[tokio::test]
     async fn chat_stream() {
         // Given
         let auth = Authentication::from_token(api_token());
