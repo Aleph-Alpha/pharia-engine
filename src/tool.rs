@@ -159,7 +159,16 @@ pub enum ToolError {
 pub mod tests {
     use serde_json::Value;
 
-    use crate::tool::{ToolDescription, ToolOutput};
+    use crate::tool::{Argument, ToolDescription, ToolOutput};
+
+    impl Argument {
+        pub fn new(name: impl Into<String>, value: impl Into<Vec<u8>>) -> Self {
+            Self {
+                name: name.into(),
+                value: value.into(),
+            }
+        }
+    }
 
     impl ToolOutput {
         pub fn empty() -> Self {

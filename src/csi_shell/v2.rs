@@ -19,7 +19,7 @@ use crate::{
     csi::RawCsi,
     csi_shell::{
         CsiProvider, CsiState,
-        common::{Distribution, FinishReason, SseErrorEvent, TokenUsage},
+        common::{Argument, Distribution, FinishReason, SseErrorEvent, TokenUsage},
     },
     inference::{self},
     language_selection,
@@ -76,21 +76,6 @@ where
         .route("/list_tools", post(list_tools))
         .route("/search", post(search))
         .route("/select_language", post(select_language))
-}
-
-#[derive(Deserialize)]
-struct Argument {
-    name: String,
-    value: Value,
-}
-
-impl From<Argument> for tool::Argument {
-    fn from(value: Argument) -> Self {
-        Self {
-            name: value.name,
-            value: value.value.to_string().into_bytes(),
-        }
-    }
 }
 
 #[derive(Deserialize)]
@@ -297,7 +282,7 @@ where
         .map(TryInto::try_into)
         .collect::<Result<Vec<_>, _>>()?;
     let results = csi
-        .chat(auth, tracing_context, requests)
+        .chat_v2(auth, tracing_context, requests)
         .await
         .map(|v| v.into_iter().map(Into::into).collect())?;
     Ok(Json(results))
@@ -433,7 +418,7 @@ where
 {
     let tracing_context = TracingContext::current();
     let request = request.try_into()?;
-    let mut recv = csi.chat_stream(auth, tracing_context, request).await;
+    let mut recv = csi.chat_stream_v2(auth, tracing_context, request).await;
 
     let stream = try_stream! {
         while let Some(result) = recv.recv().await {
@@ -448,57 +433,6 @@ where
     };
 
     Ok(Sse::new(stream))
-}
-
-#[derive(Serialize)]
-struct ChatMessageStartEvent {
-    role: String,
-}
-
-#[derive(Serialize)]
-struct ChatMessageAppendEvent {
-    content: String,
-    logprobs: Vec<Distribution>,
-}
-
-#[derive(Serialize)]
-struct ChatMessageEndEvent {
-    finish_reason: FinishReason,
-}
-
-#[derive(Serialize)]
-struct ChatUsageEvent {
-    usage: TokenUsage,
-}
-
-#[derive(Serialize)]
-struct ToolCallChunk {
-    index: u32,
-    id: Option<String>,
-    name: Option<String>,
-    arguments: Option<String>,
-}
-
-impl From<inference::ToolCallChunk> for ToolCallChunk {
-    fn from(value: inference::ToolCallChunk) -> Self {
-        let inference::ToolCallChunk {
-            index,
-            id,
-            name,
-            arguments,
-        } = value;
-        ToolCallChunk {
-            index,
-            id,
-            name,
-            arguments,
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct ToolCallEvent {
-    tool_calls: Vec<ToolCallChunk>,
 }
 
 #[derive(Deserialize)]
@@ -1411,15 +1345,6 @@ mod tests {
     use super::*;
     use tower::util::ServiceExt;
 
-    impl Argument {
-        pub fn new(name: impl Into<String>, value: impl Into<Vec<u8>>) -> Self {
-            Self {
-                name: name.into(),
-                value: value.into(),
-            }
-        }
-    }
-
     #[tokio::test]
     async fn message_content_can_be_none() {
         // Given a csi mock that:
@@ -1428,7 +1353,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiMock;
         impl RawCsiDouble for RawCsiMock {
-            async fn chat(
+            async fn chat_v2(
                 &self,
                 _auth: Authentication,
                 _tracing_context: TracingContext,
@@ -1539,7 +1464,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiMock;
         impl RawCsiDouble for RawCsiMock {
-            async fn chat_stream(
+            async fn chat_stream_v2(
                 &self,
                 _auth: Authentication,
                 _tracing_context: TracingContext,
