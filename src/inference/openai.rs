@@ -379,6 +379,21 @@ pub struct ChatCompletionResponseMessage {
     tool_calls: Option<Vec<async_openai::types::ChatCompletionMessageToolCall>>,
 }
 
+impl From<ChatCompletionResponseMessage> for inference::AssistantMessageV2 {
+    fn from(message: ChatCompletionResponseMessage) -> Self {
+        let ChatCompletionResponseMessage {
+            content,
+            reasoning_content,
+            tool_calls,
+        } = message;
+        inference::AssistantMessageV2 {
+            content,
+            reasoning_content,
+            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
 #[derive(Deserialize)]
 pub struct ChatChoice {
     message: ChatCompletionResponseMessage,
@@ -466,7 +481,7 @@ impl TryFrom<ChatResponseReasoningContent> for inference::ChatResponseV2 {
             .ok_or_else(|| anyhow::anyhow!("Expected chat completion response to have a usage."))?
             .into();
 
-        let message = inference::AssistantMessage::from(first_choice.message.clone());
+        let message = inference::AssistantMessageV2::from(first_choice.message.clone());
         let response = inference::ChatResponseV2 {
             message,
             finish_reason,

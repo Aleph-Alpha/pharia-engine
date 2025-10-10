@@ -3,7 +3,7 @@
 //! See: <https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/>
 
 use crate::{
-    inference::{AssistantMessage, CompletionRequest, Message},
+    inference::{CompletionRequest, Message, actor::OTelMessage},
     logging::TracingContext,
 };
 use tracing::{Level, field};
@@ -55,10 +55,10 @@ impl TracingContext {
     ///
     /// Ensure that the span has been created by calling [`Self::child_from_chat_request`] so that
     /// the attributes can be captured.
-    pub fn capture_output_message(&self, message: &AssistantMessage) {
+    pub fn capture_output_message(&self, message: &OTelMessage) {
         self.span().record(
             "gen_ai.output.messages",
-            serde_json::to_string(&[message.as_otel_message()]).unwrap(),
+            serde_json::to_string(&[message]).unwrap(),
         );
     }
 
