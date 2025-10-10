@@ -56,13 +56,13 @@ pub trait InferenceClient: Send + Sync + 'static {
         tracing_context: &TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
-    fn chat(
+    fn chat_with_reasoning(
         &self,
         request: &ChatRequest,
         auth: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
-    fn stream_chat(
+    fn stream_chat_with_reasoning(
         &self,
         request: &ChatRequest,
         auth: Authentication,
@@ -266,7 +266,7 @@ impl InferenceClient for AlephAlphaClient {
         .map_err(InferenceError::Other)
     }
 
-    async fn chat(
+    async fn chat_with_reasoning(
         &self,
         request: &ChatRequest,
         auth: Authentication,
@@ -281,7 +281,7 @@ impl InferenceClient for AlephAlphaClient {
         Ok(response)
     }
 
-    async fn stream_chat(
+    async fn stream_chat_with_reasoning(
         &self,
         request: &ChatRequest,
         auth: Authentication,
@@ -663,7 +663,7 @@ mod tests {
             messages: vec![Message::user("Hello, world!")],
         };
 
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
             &client,
             &chat_request,
             auth,
@@ -788,7 +788,7 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
             &client,
             &chat_request,
             auth,
@@ -817,7 +817,7 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_result = <AlephAlphaClient as InferenceClient>::chat(
+        let chat_result = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
             &client,
             &chat_request,
             bad_auth,
@@ -888,7 +888,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             },
             messages: vec![Message::user("Haiku about oat milk!")],
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
             &client,
             &chat_request,
             auth,
@@ -970,7 +970,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
             &client,
             &chat_request,
             auth,
@@ -1096,7 +1096,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
             &client,
             &chat_request,
             auth,
@@ -1178,7 +1178,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <AlephAlphaClient as InferenceClient>::stream_chat(
+            <AlephAlphaClient as InferenceClient>::stream_chat_with_reasoning(
                 &client,
                 &chat_request,
                 auth,
@@ -1238,7 +1238,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <AlephAlphaClient as InferenceClient>::stream_chat(
+            <AlephAlphaClient as InferenceClient>::stream_chat_with_reasoning(
                 &client,
                 &chat_request,
                 auth,

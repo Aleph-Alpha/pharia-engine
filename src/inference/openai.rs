@@ -578,7 +578,7 @@ impl From<ChatCompletionMessageToolCallChunk> for inference::ToolCallChunk {
 }
 
 impl InferenceClient for OpenAiClient {
-    async fn chat(
+    async fn chat_with_reasoning(
         &self,
         request: &inference::ChatRequest,
         _auth: Authentication,
@@ -592,7 +592,7 @@ impl InferenceClient for OpenAiClient {
         Ok(response)
     }
 
-    async fn stream_chat(
+    async fn stream_chat_with_reasoning(
         &self,
         request: &inference::ChatRequest,
         _auth: Authentication,
@@ -716,7 +716,7 @@ mod tests {
             strict: None,
         };
 
-        let result = <OpenAiClient as InferenceClient>::chat(
+        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -745,7 +745,7 @@ mod tests {
         let host = openai_inference_url().to_owned();
         let client = OpenAiClient::new(host, api_token);
 
-        let result = <OpenAiClient as InferenceClient>::chat(
+        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -776,7 +776,7 @@ mod tests {
             temperature: Some(0.0),
             ..Default::default()
         };
-        let result = <OpenAiClient as InferenceClient>::chat(
+        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -806,7 +806,7 @@ mod tests {
         let client = OpenAiClient::new(host, api_token);
 
         // When doing a chat request against a model that does not exist
-        let result = <OpenAiClient as InferenceClient>::chat(
+        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
             &client,
             &ChatRequest {
                 model: "gpt-4o-mini-non-existent".to_owned(),
@@ -831,7 +831,7 @@ mod tests {
         let client = OpenAiClient::new(host, api_token);
 
         // When doing a chat request
-        let result = <OpenAiClient as InferenceClient>::chat(
+        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -863,7 +863,7 @@ mod tests {
         };
         let (send, mut recv) = mpsc::channel(1);
         tokio::spawn(async move {
-            <OpenAiClient as InferenceClient>::stream_chat(
+            <OpenAiClient as InferenceClient>::stream_chat_with_reasoning(
                 &client,
                 &ChatRequest {
                     model: NON_REASONING_MODEL.to_owned(),
@@ -912,7 +912,7 @@ mod tests {
             tool_choice: Some(ToolChoice::Named("catch_fish".to_owned())),
             ..Default::default()
         };
-        let result = <OpenAiClient as InferenceClient>::chat(
+        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -962,7 +962,7 @@ mod tests {
 
         let (send, mut recv) = mpsc::channel(1);
         tokio::spawn(async move {
-            <OpenAiClient as InferenceClient>::stream_chat(
+            <OpenAiClient as InferenceClient>::stream_chat_with_reasoning(
                 &client,
                 &ChatRequest {
                     model: NON_REASONING_MODEL.to_owned(),
@@ -1042,7 +1042,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = <OpenAiClient as InferenceClient>::chat(
+        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -1076,7 +1076,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = <OpenAiClient as InferenceClient>::chat(
+        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
             &client,
             &ChatRequest {
                 model: REASONING_MODEL.to_owned(),

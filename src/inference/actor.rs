@@ -273,7 +273,7 @@ impl InferenceClient for InferenceNotConfigured {
         Err(InferenceError::NotConfigured)
     }
 
-    async fn chat(
+    async fn chat_with_reasoning(
         &self,
         _request: &ChatRequest,
         _auth: Authentication,
@@ -282,7 +282,7 @@ impl InferenceClient for InferenceNotConfigured {
         Err(InferenceError::NotConfigured)
     }
 
-    async fn stream_chat(
+    async fn stream_chat_with_reasoning(
         &self,
         _request: &ChatRequest,
         _auth: Authentication,
@@ -826,7 +826,7 @@ impl InferenceMsg {
                 if gen_ai_content_capture {
                     context.capture_input_messages(&request.messages);
                 }
-                let result = client.chat(&request, auth, &context).await;
+                let result = client.chat_with_reasoning(&request, auth, &context).await;
                 if let Ok(response) = &result
                     && gen_ai_content_capture
                 {
@@ -845,7 +845,7 @@ impl InferenceMsg {
                     context.capture_input_messages(&request.messages);
                 }
                 let (event_send, mut event_recv) = mpsc::channel(1);
-                let mut stream = Box::pin(client.stream_chat(&request, auth, &context, event_send));
+                let mut stream = Box::pin(client.stream_chat_with_reasoning(&request, auth, &context, event_send));
 
                 // Reconstruct the entire assistant message from the stream.
                 let mut span_content = String::new();
