@@ -443,10 +443,11 @@ impl From<String> for Role {
         match role.as_str() {
             "user" => Self::User,
             "system" => Self::System,
-            // An unsupported role can happen if the api scheduler introduces more roles in the future.
-            // It is unclear what to pass to the skill in this case, as it only knows three roles.
-            // We could terminate skill execution, but as we know that this will be a reply from the model,
-            // returning assistant seems like a sensible fallback.
+            // An unsupported role can happen if the api scheduler introduces more roles in the
+            // future. It is unclear what to pass to the skill in this case, as it only
+            // knows three roles. We could terminate skill execution, but as we know
+            // that this will be a reply from the model, returning assistant seems like
+            // a sensible fallback.
             _ => Self::Assistant,
         }
     }

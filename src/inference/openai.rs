@@ -51,9 +51,9 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
         match message {
             inference::Message::Assistant(inference::AssistantMessage {
                 content,
-                // Whether or not the reasoning of passed messages is rendered into consecutive prompts is
-                // a decision by the prompt template per model. For now, we'll ignore it for all
-                // models here.
+                // Whether or not the reasoning of passed messages is rendered into consecutive
+                // prompts is a decision by the prompt template per model. For now,
+                // we'll ignore it for all models here.
                 reasoning_content: _reasoning_content,
                 tool_calls,
             }) => Ok(ChatCompletionRequestMessage::Assistant(
@@ -192,7 +192,8 @@ impl inference::ChatRequest {
         Ok(request)
     }
 
-    /// Convert a [`inference::ChatRequest`] into an [`async_openai::types::CreateChatCompletionRequest`].
+    /// Convert a [`inference::ChatRequest`] into an
+    /// [`async_openai::types::CreateChatCompletionRequest`].
     ///
     /// `OpenAI` deprecated the `max_tokens` parameter in favor of `max_completion_tokens`. Our
     /// inference backend does not support the `max_completion_tokens` yet. While initially we
@@ -386,10 +387,11 @@ pub struct ChatCompletionResponseMessage {
 #[derive(Deserialize)]
 pub struct ChatChoice {
     message: ChatCompletionResponseMessage,
-    /// The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence,
-    /// `length` if the maximum number of tokens specified in the request was reached,
-    /// `content_filter` if content was omitted due to a flag from our content filters,
-    /// `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function.
+    /// The reason the model stopped generating tokens. This will be `stop` if the model hit a
+    /// natural stop point or a provided stop sequence, `length` if the maximum number of
+    /// tokens specified in the request was reached, `content_filter` if content was omitted
+    /// due to a flag from our content filters, `tool_calls` if the model called a tool, or
+    /// `function_call` (deprecated) if the model called a function.
     finish_reason: Option<async_openai::types::FinishReason>,
     /// Log probability information for the choice.
     logprobs: Option<async_openai::types::ChatChoiceLogprobs>,
@@ -489,13 +491,17 @@ pub struct ChatChoiceStream {
 }
 
 #[derive(Deserialize)]
-/// Represents a streamed chunk of a chat completion response returned by model, based on the provided input.
+/// Represents a streamed chunk of a chat completion response returned by model, based on the
+/// provided input.
 pub struct ChatStreamWithReasoning {
-    /// A list of chat completion choices. Can contain more than one elements if `n` is greater than 1. Can also be empty for the last chunk if you set `stream_options: {"include_usage": true}`.
+    /// A list of chat completion choices. Can contain more than one elements if `n` is greater
+    /// than 1. Can also be empty for the last chunk if you set `stream_options: {"include_usage":
+    /// true}`.
     choices: Vec<ChatChoiceStream>,
 
-    /// An optional field that will only be present when you set `stream_options: {"include_usage": true}` in your request.
-    /// When present, it contains a null value except for the last chunk which contains the token usage statistics for the entire request.
+    /// An optional field that will only be present when you set `stream_options: {"include_usage":
+    /// true}` in your request. When present, it contains a null value except for the last
+    /// chunk which contains the token usage statistics for the entire request.
     usage: Option<async_openai::types::CompletionUsage>,
 }
 

@@ -1,10 +1,12 @@
 //! CSI Shell version 0.3
 //!
-//! This module introduces serializable/user-facing structs which are very similar to our "internal" representations.
-//! While this module may appear to contain a lot of boilerplate code, there is a good reason to not serialize our "internal" representations:
-//! It allows us to keep our external interface stable while updating our "internal" representations.
-//! Imagine we introduce a new version (0.4) with breaking changes in the api (e.g. a new field in `CompletionParams`).
-//! If we simply serialized the internal representation, we would break clients going against the 0.3 version of the CSI shell.
+//! This module introduces serializable/user-facing structs which are very similar to our "internal"
+//! representations. While this module may appear to contain a lot of boilerplate code, there is a
+//! good reason to not serialize our "internal" representations: It allows us to keep our external
+//! interface stable while updating our "internal" representations. Imagine we introduce a new
+//! version (0.4) with breaking changes in the api (e.g. a new field in `CompletionParams`).
+//! If we simply serialized the internal representation, we would break clients going against the
+//! 0.3 version of the CSI shell.
 use derive_more::{From, Into};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};

@@ -165,13 +165,14 @@ impl Engine {
     }
 
     /// Creates a new linker for the engine.
-    /// This linker can be used to register functions and globals that can be called from WebAssembly code.
-    /// It will already be linked with wasmtime-wasi for wasi implementations.
+    /// This linker can be used to register functions and globals that can be called from
+    /// WebAssembly code. It will already be linked with wasmtime-wasi for wasi implementations.
     ///
-    /// `allow_shadowing` - Whether to allow shadowing of existing functions and globals. This is helpful
-    /// if you are linking multiple worlds that might share some common interfaces and therefore would be
-    /// defined twice and would error by default. You should only enable this if you are sure the two
-    /// implementations are in fact identical, and therefore this is safe to do.
+    /// `allow_shadowing` - Whether to allow shadowing of existing functions and globals. This is
+    /// helpful if you are linking multiple worlds that might share some common interfaces and
+    /// therefore would be defined twice and would error by default. You should only enable this
+    /// if you are sure the two implementations are in fact identical, and therefore this is
+    /// safe to do.
     ///
     /// # Errors
     ///
@@ -193,7 +194,8 @@ impl Engine {
     }
 
     /// Generates a store for a specific invocation.
-    /// This will yield after every tick, as well as halt execution after `Self::MAX_EXECUTION_TIME`.
+    /// This will yield after every tick, as well as halt execution after
+    /// `Self::MAX_EXECUTION_TIME`.
     pub fn store<Ctx>(&self, ctx: Ctx) -> Store<LinkerImpl<Ctx>>
     where
         Ctx: Send,
@@ -266,30 +268,30 @@ where
 /// things like the same Python interpreter or SDK dependencies, which means we can reuse all
 /// of this compilation across instances.
 ///
-/// Based on benchmarks and tests, this can lead to a slight overhead (~5%) on the first compilation,
-/// but then save 50-80% of the time for subsequent compilations.
+/// Based on benchmarks and tests, this can lead to a slight overhead (~5%) on the first
+/// compilation, but then save 50-80% of the time for subsequent compilations.
 ///
-/// This also only requires ~30MB of memory to store the cache, which seems like a small price to pay
-/// for the benefits we gain in compile time.
+/// This also only requires ~30MB of memory to store the cache, which seems like a small price to
+/// pay for the benefits we gain in compile time.
 ///
-/// We use a moka cache so that we can have an upper bound on the cache size, while also allowing for
-/// automatic eviction of least recently used entries when the cache reaches its maximum capacity.
-/// This hopefully optimizes for the most commonly used entries, as our skills are somewhat dynamic
-/// in content.
+/// We use a moka cache so that we can have an upper bound on the cache size, while also allowing
+/// for automatic eviction of least recently used entries when the cache reaches its maximum
+/// capacity. This hopefully optimizes for the most commonly used entries, as our skills are
+/// somewhat dynamic in content.
 ///
 /// Possible future improvements:
 ///
 /// **Minimum cache entry size:**
-/// Rustc and other compilers have a minimum size for cache entries, which it may be cheaper to regenerate
-/// than to store in the cache. However, in benchmarking different minimum sizes, there wasn't a noticeable
-/// difference in time saved, so for now we opt to just store everything.
+/// Rustc and other compilers have a minimum size for cache entries, which it may be cheaper to
+/// regenerate than to store in the cache. However, in benchmarking different minimum sizes, there
+/// wasn't a noticeable difference in time saved, so for now we opt to just store everything.
 ///
 /// **Cache crate**
-/// Just using `DashMap` was faster, but it didn't provide a way to bound the cache size. There are other crates
-/// that offer lighterweight versions than moka, but we use moka elsewhere and it is also one of the more
-/// popular options and has a nicer API if you want to decide your upper bound without knowing the estimated
-/// number of entries. The performance penalty seems reasonable for what we gain in terms of predictable
-/// performance.
+/// Just using `DashMap` was faster, but it didn't provide a way to bound the cache size. There are
+/// other crates that offer lighterweight versions than moka, but we use moka elsewhere and it is
+/// also one of the more popular options and has a nicer API if you want to decide your upper bound
+/// without knowing the estimated number of entries. The performance penalty seems reasonable for
+/// what we gain in terms of predictable performance.
 #[derive(Debug)]
 struct IncrementalCompilationCache {
     /// Key: the precompiled bytes

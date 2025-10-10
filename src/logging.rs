@@ -51,12 +51,16 @@ use tracing_subscriber::{
 ///
 /// Before, our logs were getting cluttered with http attributes coming from the axum middleware:
 ///
-/// `2025-07-15T14:52:44.928603Z INFO HTTP request:skill_execution: pharia-kernel::skill-execution: skill=test-beta/hello Skill executed successfully http.request.method=POST network.protocol.version=1.1 server.address="127.0.0.1:8081" user_agent.original="PostmanRuntime/7.44.1"`
+/// `2025-07-15T14:52:44.928603Z INFO HTTP request:skill_execution: pharia-kernel::skill-execution:
+/// skill=test-beta/hello Skill executed successfully http.request.method=POST
+/// network.protocol.version=1.1 server.address="127.0.0.1:8081"
+/// user_agent.original="PostmanRuntime/7.44.1"`
 ///
 /// However, for our logs, we are mostly interested in the message itself. This formatter leads to
 /// logs like:
 ///
-/// `2025-07-15T14:52:44.928603Z pharia-kernel::skill-execution: skill=test-beta/hello Skill executed successfully`
+/// `2025-07-15T14:52:44.928603Z pharia-kernel::skill-execution: skill=test-beta/hello Skill
+/// executed successfully`
 struct NoSpan;
 
 impl<S, N> FormatEvent<S, N> for NoSpan
@@ -394,11 +398,14 @@ pub fn resource() -> Resource {
             [KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION"))],
             SCHEMA_URL,
         )
-        // When calling [Resource::builder], the resource name get's read from the env variable `OTEL_SERVICE_NAME`.
-        // We don't set this, and per default the service name of the resource inside Resource::builder is then set to `unknown_service`.
-        // When providing a `SERVICE_NAME` as part of the attributes to `with_schema_url`, these attributes get merged with the existing
-        // resource inside the builder. As the service name is already set to `unknown_service`, the newly provided service name will be ignored.
-        // We therefore need to explicitly set the service name by using `with_service_name`.
+        // When calling [Resource::builder], the resource name get's read from the env variable
+        // `OTEL_SERVICE_NAME`. We don't set this, and per default the service name of the
+        // resource inside Resource::builder is then set to `unknown_service`.
+        // When providing a `SERVICE_NAME` as part of the attributes to `with_schema_url`, these
+        // attributes get merged with the existing resource inside the builder. As the
+        // service name is already set to `unknown_service`, the newly provided service name will be
+        // ignored. We therefore need to explicitly set the service name by using
+        // `with_service_name`.
         .with_service_name("pharia-kernel")
         .build()
 }

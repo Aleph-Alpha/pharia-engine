@@ -125,7 +125,8 @@ pub enum Registry {
     // Serde will try to match the data against each variant in order and the first one that
     // deserializes successfully is the one returned.
     //
-    // Therefore, we put `Oci` first as this is most likely the variant someone will use in production.
+    // Therefore, we put `Oci` first as this is most likely the variant someone will use in
+    // production.
     #[serde(rename_all = "kebab-case")]
     Oci {
         registry: String,

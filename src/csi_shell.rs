@@ -127,8 +127,8 @@ impl CsiShellError {
         match self {
             CsiShellError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             // We use `BAD_REQUEST` (400) for validation error as it is more commonly used.
-            // `UNPROCESSABLE_ENTITY` (422) is an alternative, but it may surprise users as it is less commonly
-            // known
+            // `UNPROCESSABLE_ENTITY` (422) is an alternative, but it may surprise users as it is
+            // less commonly known
             _ => StatusCode::BAD_REQUEST,
         }
     }
@@ -151,7 +151,8 @@ impl From<UnknownCsiRequest> for CsiShellError {
             Some(Ok(req)) if req.comparators.len() == 1 => {
                 let max_supported_version = SupportedVersion::latest_supported_version();
                 let comp = req.comparators.first().unwrap();
-                // Only applies to unknown versions. If we parse `1.x.x` as `1` then we are only doing a major version check and minor version only applies `0.x`
+                // Only applies to unknown versions. If we parse `1.x.x` as `1` then we are only
+                // doing a major version check and minor version only applies `0.x`
                 if comp.major > max_supported_version.major
                     || (comp.major == max_supported_version.major
                         && comp.minor.is_some_and(|m| m > max_supported_version.minor))
@@ -161,7 +162,8 @@ impl From<UnknownCsiRequest> for CsiShellError {
                     CsiShellError::NoLongerSupported
                 }
             }
-            // If the user passes in a random string, the parse will fail and we will end up down here
+            // If the user passes in a random string, the parse will fail and we will end up down
+            // here
             Some(Ok(_) | Err(_)) | None => CsiShellError::InvalidVersion,
         }
     }

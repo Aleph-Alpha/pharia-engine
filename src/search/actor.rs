@@ -190,7 +190,8 @@ pub struct SearchResult {
     /// The position within the document where the section begins. The cursor is always inclusive.
     pub start: TextCursor,
     /// The position within the document where the section ends.
-    /// The cursor is always inclusive, so the section includes the position represented by this cursor.
+    /// The cursor is always inclusive, so the section includes the position represented by this
+    /// cursor.
     pub end: TextCursor,
 }
 

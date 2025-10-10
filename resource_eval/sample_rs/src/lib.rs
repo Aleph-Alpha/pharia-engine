@@ -17,7 +17,8 @@ struct SampleRequest {
     wait_time: u32,
 }
 
-// consumes small memory chunks if memory is larger than 300 KB, chunk size is between 100 and 300 KB
+// consumes small memory chunks if memory is larger than 300 KB, chunk size is between 100 and 300
+// KB
 fn consume_memory(mut mem_size: usize) -> Result<Vec<Layout>, LayoutError> {
     let mut chunks = vec![];
     if mem_size < 300 {
@@ -63,7 +64,8 @@ fn consume(input: SampleRequest) -> String {
     format!("Hello {}  {} {}", input.topic, mem_msg, wait_msg)
 }
 
-// We cannot use the SDK in Pharia Kernel repo, there is no way to exclude subfolders from Cargo magic?
+// We cannot use the SDK in Pharia Kernel repo, there is no way to exclude subfolders from Cargo
+// magic?
 wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill" });
 
 struct Skill;

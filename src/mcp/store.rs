@@ -83,10 +83,10 @@ impl McpServerStore {
 
     /// List all mcp servers for a given namespace.
     ///
-    /// Returns an error if the namespace is not known to the store. A developer can ask the mcp routes
-    /// to list all mcp servers for a namespace. We want to cater this route from this actor alone,
-    /// but also want to give an error in case the namespace does not exist. This implies that the
-    /// store needs to know about all namespaces.
+    /// Returns an error if the namespace is not known to the store. A developer can ask the mcp
+    /// routes to list all mcp servers for a namespace. We want to cater this route from this
+    /// actor alone, but also want to give an error in case the namespace does not exist. This
+    /// implies that the store needs to know about all namespaces.
     pub fn list_in_namespace(
         &self,
         namespace: &Namespace,

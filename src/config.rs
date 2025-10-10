@@ -84,10 +84,10 @@ pub struct AppConfig {
     metrics_address: SocketAddr,
     /// Aleph Alpha inference base URL. It is used to do chat/completion requests against models
     /// hosted by the Aleph Alpha inference stack, as well as used to fetch Tokenizers for said
-    /// models. Takes precedence over the `openai_inference_url` if both are set. If neither is set,
-    /// the Kernel will run without inference capabilities. In case skills try to use inference
-    /// functionality without a configured inference URL, an error is returned and skill execution
-    /// is suspended.
+    /// models. Takes precedence over the `openai_inference_url` if both are set. If neither is
+    /// set, the Kernel will run without inference capabilities. In case skills try to use
+    /// inference functionality without a configured inference URL, an error is returned and
+    /// skill execution is suspended.
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     inference_url: Option<String>,
     /// OpenAI-compatible inference. Set these variables and do not set the `inference_url`
@@ -118,7 +118,8 @@ pub struct AppConfig {
     #[serde(default = "defaults::log_level")]
     log_level: String,
     otel_endpoint: Option<String>,
-    /// OTEL sampling ratio between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all traces
+    /// OTEL sampling ratio between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all
+    /// traces
     #[serde(
         default = "defaults::otel_sampling_ratio",
         deserialize_with = "deserialize_sampling_ratio"
@@ -158,8 +159,8 @@ pub struct OtelConfig<'a> {
     pub sampling_ratio: f64,
     /// Minimum log level for traces.
     pub log_level: &'a str,
-    /// Whether to capture `GenAI` content (prompts/completions) in traces per OpenTelemetry `GenAI`
-    /// semantic conventions. Default is false for privacy/compliance reasons.
+    /// Whether to capture `GenAI` content (prompts/completions) in traces per OpenTelemetry
+    /// `GenAI` semantic conventions. Default is false for privacy/compliance reasons.
     pub gen_ai_content_capture: bool,
 }
 
@@ -177,7 +178,8 @@ where
 impl AppConfig {
     /// # Panics
     ///
-    /// Will panic if the environment variables `inference_url` or `authorization_url` are provided but empty.
+    /// Will panic if the environment variables `inference_url` or `authorization_url` are provided
+    /// but empty.
     ///
     /// # Errors
     ///
@@ -485,13 +487,14 @@ impl AppConfig {
         self
     }
 
-    /// We predominantly load Python skills, which are quite heavy. Python skills are roughly 60MB in size from the registry.
-    /// The first skill is roughly 850MB in memory, and subsequent ones are between 100-150MB.
-    /// We aim to use about 1/2 of the available memory.
+    /// We predominantly load Python skills, which are quite heavy. Python skills are roughly 60MB
+    /// in size from the registry. The first skill is roughly 850MB in memory, and subsequent
+    /// ones are between 100-150MB. We aim to use about 1/2 of the available memory.
     #[must_use]
     pub fn desired_skill_cache_memory_usage(&self) -> ByteSize {
         let memory_limit = self
-            // Default to requested memory limit if available. Since this is what we are guaranteed by k8s, we are conservative and use it.
+            // Default to requested memory limit if available. Since this is what we are guaranteed
+            // by k8s, we are conservative and use it.
             .memory_request
             // Fallback to memory limit if available.
             .or(self.memory_limit)
@@ -513,7 +516,8 @@ impl AppConfig {
     #[must_use]
     pub fn wasmtime_cache_size(&self) -> Option<ByteSize> {
         self
-            // Default to requested limit if available. Since this is what we are guaranteed by k8s, we are conservative and use it.
+            // Default to requested limit if available. Since this is what we are guaranteed by k8s,
+            // we are conservative and use it.
             .wasmtime_cache_size_request
             // Fallback to limit if available.
             .or(self.wasmtime_cache_size_limit)
@@ -628,7 +632,8 @@ mod tests {
 
     #[test]
     fn aleph_alpha_inference_is_default() {
-        // Given an app config with both, an aleph alpha inference and an openai inference configured
+        // Given an app config with both, an aleph alpha inference and an openai inference
+        // configured
         let app_config = AppConfig::default()
             .with_inference_url(Some("https://inference-api.product.pharia.com"))
             .with_openai_inference("https://openai.com", "sk-1234567890");
@@ -808,7 +813,8 @@ mod tests {
         // When loading from the sources
         let config = AppConfig::from_sources(file_source, env_source)?;
 
-        // Then both sources are applied, with the values from environment variables having precedence
+        // Then both sources are applied, with the values from environment variables having
+        // precedence
         assert_eq!(config.namespaces().len(), 0);
         Ok(())
     }
@@ -895,7 +901,8 @@ registry-password =  \"{password}\"
         // When loading from the sources
         let config = AppConfig::from_sources(file_source, env_source)?;
 
-        // Then both sources are applied, with the values from environment variables having higher precedence
+        // Then both sources are applied, with the values from environment variables having higher
+        // precedence
         assert_eq!(config.namespaces().len(), 1);
         let namespace_config = NamespaceConfig::TeamOwned {
             config_url: config_url.to_owned(),

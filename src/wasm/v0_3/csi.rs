@@ -436,7 +436,8 @@ impl InferenceHost for LinkedCtx {
     }
 }
 
-/// This manages our completion stream within the resource table, allowing us to link to the Resource in the WIT World.
+/// This manages our completion stream within the resource table, allowing us to link to the
+/// Resource in the WIT World.
 impl HostCompletionStream for LinkedCtx {
     async fn new(&mut self, init: CompletionRequest) -> Resource<CompletionStream> {
         let stream_id = self.ctx.completion_stream_new(init.into()).await;

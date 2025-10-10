@@ -47,7 +47,8 @@ impl Engine {
     pub fn new(engine_config: engine_room::EngineConfig) -> anyhow::Result<Self> {
         let engine = engine_room::Engine::new(engine_config)?;
         // We currently use the same linker for multiple worlds that use CSI.
-        // Shadowing allows them to be hooked up twice, but might also be a clue we might want two linkers to avoid the issue.
+        // Shadowing allows them to be hooked up twice, but might also be a clue we might want two
+        // linkers to avoid the issue.
         let mut linker = engine.new_linker(true)?;
         // Skill world from bindgen
         SupportedSkillWorld::add_all_to_linker(&mut linker)?;
@@ -73,7 +74,8 @@ impl Engine {
     }
 
     /// Generates a store for a specific invocation.
-    /// This will yield after every tick, as well as halt execution after `Self::MAX_EXECUTION_TIME`.
+    /// This will yield after every tick, as well as halt execution after
+    /// `Self::MAX_EXECUTION_TIME`.
     fn store(&self, skill_ctx: Box<dyn Csi + Send>) -> Store<LinkedCtx> {
         self.engine.store(skill_ctx)
     }
@@ -1030,7 +1032,8 @@ pub mod tests {
         assert!(matches!(error, SkillLoadError::NotSupportedYet(..)));
     }
 
-    /// Learning test to verify nothing strange happens if a instantiated skill is invoked multiple times.
+    /// Learning test to verify nothing strange happens if a instantiated skill is invoked multiple
+    /// times.
     #[tokio::test]
     async fn can_call_pre_instantiated_multiple_times() {
         let test_skill = given_rust_skill_greet_v0_2();

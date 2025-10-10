@@ -199,10 +199,11 @@ impl McpClientImpl {
 
         let result = Self::json_rpc_result_from_http::<InitializeResult>(response).await?;
 
-        // If the server supports the requested protocol version, it MUST respond with the same version.
-        // Otherwise, the server MUST respond with another protocol version it supports.
-        // This SHOULD be the latest version supported by the server.
-        // If the client does not support the version in the server's response, it SHOULD disconnect.
+        // If the server supports the requested protocol version, it MUST respond with the same
+        // version. Otherwise, the server MUST respond with another protocol version it
+        // supports. This SHOULD be the latest version supported by the server.
+        // If the client does not support the version in the server's response, it SHOULD
+        // disconnect.
         if !SUPPORTED_PROTOCOL_VERSIONS.contains(&result.protocol_version.as_str()) {
             return Err(anyhow!(
                 "The proposed protocol version {} from the MCP server is not supported.",
