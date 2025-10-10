@@ -750,6 +750,7 @@ impl From<ToolCall> for inference::ToolCall {
 struct Message {
     role: String,
     content: Option<String>,
+    reasoning_content: Option<String>,
     tool_call_id: Option<String>,
     tool_calls: Option<Vec<ToolCall>>,
 }
@@ -763,6 +764,24 @@ impl From<inference::AssistantMessage> for Message {
         Message {
             role: inference::AssistantMessage::role().to_owned(),
             content,
+            reasoning_content: None,
+            tool_call_id: None,
+            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+impl From<inference::AssistantMessageV2> for Message {
+    fn from(value: inference::AssistantMessageV2) -> Self {
+        let inference::AssistantMessageV2 {
+            content,
+            reasoning_content,
+            tool_calls,
+        } = value;
+        Message {
+            role: inference::AssistantMessageV2::role().to_owned(),
+            content,
+            reasoning_content,
             tool_call_id: None,
             tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
@@ -776,6 +795,7 @@ impl TryFrom<Message> for inference::Message {
         let Message {
             role,
             content,
+            reasoning_content,
             tool_call_id,
             tool_calls,
         } = value;
@@ -1377,8 +1397,9 @@ mod tests {
                 ));
 
                 Ok(vec![inference::ChatResponseV2 {
-                    message: inference::AssistantMessage {
+                    message: inference::AssistantMessageV2 {
                         content: None,
+                        reasoning_content: None,
                         tool_calls: None,
                     },
                     finish_reason: inference::FinishReason::Stop,
@@ -1436,6 +1457,7 @@ mod tests {
             "message": {
                 "role": "assistant",
                 "content": null,
+                "reasoning_content": null,
                 "tool_calls": null,
                 "tool_call_id": null,
             },

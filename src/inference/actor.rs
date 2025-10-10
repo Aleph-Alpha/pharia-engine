@@ -520,6 +520,29 @@ impl AssistantMessage {
 }
 
 #[derive(Debug, Clone)]
+pub struct AssistantMessageV2 {
+    pub content: Option<String>,
+    pub reasoning_content: Option<String>,
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl AssistantMessageV2 {
+    /// We deliberately omit the reasoning content from the OpenTelemetry message as it is not standardized yet.
+    pub fn as_otel_message(&self) -> OTelMessage {
+        OTelMessage {
+            role: "assistant".to_owned(),
+            content: self.content.clone().unwrap_or_default(),
+        }
+    }
+}
+
+impl AssistantMessageV2 {
+    pub fn role() -> &'static str {
+        "assistant"
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ToolMessage {
     pub content: String,
     pub tool_call_id: String,
@@ -688,7 +711,7 @@ pub struct ChatResponse {
 
 #[derive(Debug, Clone)]
 pub struct ChatResponseV2 {
-    pub message: AssistantMessage,
+    pub message: AssistantMessageV2,
     pub finish_reason: FinishReason,
     /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
     /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
@@ -909,7 +932,7 @@ impl InferenceMsg {
                 if let Ok(response) = &result
                     && gen_ai_content_capture
                 {
-                    context.capture_output_message(&response.message);
+                    context.capture_output_message(&response.message.as_otel_message());
                 }
                 drop(send.send(result));
             }
@@ -927,7 +950,7 @@ impl InferenceMsg {
                 if let Ok(response) = &result
                     && gen_ai_content_capture
                 {
-                    context.capture_output_message(&response.message);
+                    context.capture_output_message(&response.message.as_otel_message());
                 }
                 drop(send.send(result));
             }
@@ -981,7 +1004,7 @@ impl InferenceMsg {
                         content: Some(span_content),
                         tool_calls: None,
                     };
-                    context.capture_output_message(&message);
+                    context.capture_output_message(&message.as_otel_message());
                 }
             }
             Self::ChatStreamV2 {
@@ -1035,7 +1058,7 @@ impl InferenceMsg {
                         content: Some(span_content),
                         tool_calls: None,
                     };
-                    context.capture_output_message(&message);
+                    context.capture_output_message(&message.as_otel_message());
                 }
             }
             Self::Explain {
@@ -1070,6 +1093,16 @@ pub mod tests {
         pub fn dummy() -> Self {
             Self {
                 content: Some("dummy-content".to_string()),
+                tool_calls: None,
+            }
+        }
+    }
+
+    impl AssistantMessageV2 {
+        pub fn dummy() -> Self {
+            Self {
+                content: Some("dummy-content".to_string()),
+                reasoning_content: Some("dummy-reasoning-content".to_string()),
                 tool_calls: None,
             }
         }

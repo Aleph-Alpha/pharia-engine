@@ -76,7 +76,10 @@ pub mod tests {
     use std::collections::HashMap;
 
     use crate::{
-        inference::{AssistantMessage, ChatEvent, CompletionEvent, FinishReason, TokenUsage},
+        inference::{
+            AssistantMessage, AssistantMessageV2, ChatEvent, CompletionEvent, FinishReason,
+            TokenUsage,
+        },
         search::TextCursor,
     };
 
@@ -242,7 +245,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
             requests
                 .iter()
                 .map(|_| ChatResponseV2 {
-                    message: AssistantMessage::dummy(),
+                    message: AssistantMessageV2::dummy(),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],
                     usage: TokenUsage {

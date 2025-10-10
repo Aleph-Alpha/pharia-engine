@@ -808,15 +808,16 @@ impl From<inference::ToolCall> for ToolCall {
     }
 }
 
-impl From<inference::AssistantMessage> for AssistantMessage {
-    fn from(message: inference::AssistantMessage) -> Self {
-        let inference::AssistantMessage {
+impl From<inference::AssistantMessageV2> for AssistantMessage {
+    fn from(message: inference::AssistantMessageV2) -> Self {
+        let inference::AssistantMessageV2 {
             content,
+            reasoning_content,
             tool_calls,
         } = message;
         Self {
             content,
-            reasoning_content: None,
+            reasoning_content,
             tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
     }
@@ -1014,7 +1015,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::AssistantMessage::dummy(),
+            message: inference::AssistantMessageV2::dummy(),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![inference::Distribution {
                 sampled: inference::Logprob {
@@ -1047,7 +1048,7 @@ mod tests {
                 prompt: 4,
                 completion: 1,
             },
-            message: inference::AssistantMessage::dummy(),
+            message: inference::AssistantMessageV2::dummy(),
             finish_reason: inference::FinishReason::Stop,
             logprobs: vec![],
         };
