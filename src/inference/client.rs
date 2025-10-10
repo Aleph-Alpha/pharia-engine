@@ -62,9 +62,10 @@ pub trait InferenceClient: Send + Sync + 'static {
         auth: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
-    /// BREAKING CHANGE: Introducing `reasoning_content` to the [`crate::inference::AssistantMessage`] is a breaking
-    /// change as it removes the reasoning content from the `content` field. We therefore require a
-    /// new function to reliably support both the old and new behavior.
+    /// BREAKING CHANGE: Introducing `reasoning_content` to the
+    /// [`crate::inference::AssistantMessage`] is a breaking change as it removes the reasoning
+    /// content from the `content` field. We therefore require a new function to reliably
+    /// support both the old and new behavior.
     fn chat_v2(
         &self,
         request: &ChatRequest,
@@ -78,9 +79,10 @@ pub trait InferenceClient: Send + Sync + 'static {
         tracing_context: &TracingContext,
         send: mpsc::Sender<ChatEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
-    /// BREAKING CHANGE: Introducing `reasoning_content` to the [`crate::inference::AssistantMessage`] is a breaking
-    /// change as it removes the reasoning content from the `content` field. We therefore require a
-    /// new function to reliably support both the old and new behavior.
+    /// BREAKING CHANGE: Introducing `reasoning_content` to the
+    /// [`crate::inference::AssistantMessage`] is a breaking change as it removes the reasoning
+    /// content from the `content` field. We therefore require a new function to reliably
+    /// support both the old and new behavior.
     fn stream_chat_v2(
         &self,
         request: &ChatRequest,

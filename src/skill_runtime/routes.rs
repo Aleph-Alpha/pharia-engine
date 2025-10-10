@@ -282,7 +282,8 @@ enum MessageEvent {
     End {
         payload: Value,
     },
-    // While the enum variants do not differ in the body, they are distinguished by the event field.
+    // While the enum variants do not differ in the body, they are distinguished by the event
+    // field.
     #[serde(rename = "begin")]
     ToolBegin {
         name: String,

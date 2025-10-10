@@ -240,7 +240,8 @@ fn read_dir_recursively(dir: &Path, content: &mut Vec<u8>) {
     }
 }
 
-/// Creates `{package-name}-py.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `python-skills/{package-name}`
+/// Creates `{package-name}-py.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on
+/// `python-skills/{package-name}`
 fn given_python_skill(package_name: &str, wit_version: WitVersion, world: &str) -> PathBuf {
     let target_path = MANAGED_CACHE_DIR.join(format!("{package_name}-py.wasm"));
     if !target_path.exists() {
@@ -249,7 +250,8 @@ fn given_python_skill(package_name: &str, wit_version: WitVersion, world: &str) 
     target_path
 }
 
-/// Creates `{package-name}-rs.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on `crates/{package-name}`
+/// Creates `{package-name}-rs.wasm` in `SKILL_BUILD_CACHE_DIR` directory, based on
+/// `crates/{package-name}`
 fn given_rust_skill(package_name: &str) -> PathBuf {
     let target_path = MANAGED_CACHE_DIR.join(format!("{package_name}-rs.wasm"));
     if !target_path.exists() {

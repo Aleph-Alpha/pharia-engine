@@ -61,7 +61,8 @@ impl SkillCache {
     /// Create a new `SkillCache` that can hold approximately up to `desired_memory_usage`.
     /// It is really hard to predict the exact memory usage of the cache, so we use a heuristic
     /// to estimate the capacity based on the desired memory usage.
-    /// We define weight of a skill as the size of the wasm module loaded from the registry in bytes.
+    /// We define weight of a skill as the size of the wasm module loaded from the registry in
+    /// bytes.
     pub fn new(desired_memory_usage: ByteSize) -> Self {
         let capacity = Self::estimated_capacity(desired_memory_usage);
         Self {
@@ -83,18 +84,20 @@ impl SkillCache {
     }
 
     /// Generates a capacity that should end up around the desired target memory usage.
-    /// We use bytes of wasm modules as a proxy for the memory usage of the cache, since we can't see exactly
-    /// how much memory a skill is using.
+    /// We use bytes of wasm modules as a proxy for the memory usage of the cache, since we can't
+    /// see exactly how much memory a skill is using.
     ///
-    /// It isn't perfect, because compilation artifacts can lead to some heap fragmentation, so we are roughly
-    /// measuring not only how much the skill takes in memory, but what the memory pressure is after compiling it.
-    /// (This is why we switched to jemalloc, to help with this).
+    /// It isn't perfect, because compilation artifacts can lead to some heap fragmentation, so we
+    /// are roughly measuring not only how much the skill takes in memory, but what the memory
+    /// pressure is after compiling it. (This is why we switched to jemalloc, to help with
+    /// this).
     ///
-    /// This is a best effort estimate and may need to be adjusted based on the actual measurements in production.
+    /// This is a best effort estimate and may need to be adjusted based on the actual measurements
+    /// in production.
     ///
-    /// The following measurements are based on loading a number of Python skills from our SDK on my Mac (Ben).
-    /// But it also seems to correlate with what we see in production on Linux. So we'll use it as a guide.
-    /// Incremental compilation and jemalloc were used.
+    /// The following measurements are based on loading a number of Python skills from our SDK on my
+    /// Mac (Ben). But it also seems to correlate with what we see in production on Linux. So
+    /// we'll use it as a guide. Incremental compilation and jemalloc were used.
     ///
     /// 01. 0.73GB
     /// 02. 0.85GB ~ 0.12GB
@@ -110,15 +113,15 @@ impl SkillCache {
     /// 12. 1.60GB - 0.10GB
     /// 13. 1.69GB - 0.09GB
     ///
-    /// Assuming the large initial allocation is from compilation artifacts (validated the theory with Joel Dice and
-    /// Alex Chrichton), it is possible this memory will get reused later. So the actual memory pressure from the
-    /// cache is closer to skill 2+ and beyond.
+    /// Assuming the large initial allocation is from compilation artifacts (validated the theory
+    /// with Joel Dice and Alex Chrichton), it is possible this memory will get reused later. So
+    /// the actual memory pressure from the cache is closer to skill 2+ and beyond.
     ///
-    /// The skill used for my test was 38.5MB on disk, so this would be roughly a factor of ~2x memory vs bytes of
-    /// the component.
+    /// The skill used for my test was 38.5MB on disk, so this would be roughly a factor of ~2x
+    /// memory vs bytes of the component.
     ///
-    /// Given this, for 2GB of desired memory, we can store roughly 17 skills. Which, extrapolating from the data out
-    /// to 17 skills, this lines up.
+    /// Given this, for 2GB of desired memory, we can store roughly 17 skills. Which, extrapolating
+    /// from the data out to 17 skills, this lines up.
     fn estimated_capacity(desired_memory_usage: ByteSize) -> ByteSize {
         ByteSize(desired_memory_usage.as_u64() / 2)
     }
@@ -161,8 +164,8 @@ impl SkillCache {
         removed
     }
 
-    /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the soonest.
-    /// If there are no cached skills, it will return `None`.
+    /// Retrieve the oldest digest validation timestamp. So, the one we would need to refresh the
+    /// soonest. If there are no cached skills, it will return `None`.
     pub fn oldest_digest(&self) -> Option<(Arc<SkillPath>, Instant)> {
         self.update_gauge();
         self.cache
@@ -172,8 +175,8 @@ impl SkillCache {
     }
 
     /// Just mark the digest as validated.
-    /// Useful in cases where we were unable to retrieve the latest digest from the registry, and we want to update
-    /// the timestamp so that we don't try to refresh it again too soon.
+    /// Useful in cases where we were unable to retrieve the latest digest from the registry, and we
+    /// want to update the timestamp so that we don't try to refresh it again too soon.
     pub fn update_digest_validated(&mut self, skill_path: SkillPath) {
         self.cache.entry(skill_path).and_compute_with(|entry| {
             if let Some(entry) = entry {
@@ -187,8 +190,8 @@ impl SkillCache {
         self.update_gauge();
     }
 
-    /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
-    /// If the digest behind the tag has changed, remove the cache entry.
+    /// Compares the digest in the cache with the digest behind the corresponding tag in the
+    /// registry. If the digest behind the tag has changed, remove the cache entry.
     pub fn compare_latest_digest(
         &mut self,
         skill_path: SkillPath,

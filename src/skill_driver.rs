@@ -160,18 +160,22 @@ pub enum SkillCtxEvent {
 /// calls to csi, to the respective drivers and forwarding runtime errors directly to the actor
 /// so the User defined code must not worry about accidental complexity.
 pub struct SkillInvocationCtx<C> {
-    /// This channel is used to notify the caller about events that happened around skill execution.
+    /// This channel is used to notify the caller about events that happened around skill
+    /// execution.
     send_rt_event: mpsc::Sender<SkillCtxEvent>,
-    /// Provides the CSI functionality to Skills while encapsulating knowledge about the invocation.
+    /// Provides the CSI functionality to Skills while encapsulating knowledge about the
+    /// invocation.
     contextual_csi: C,
     /// ID counter for stored streams.
     current_stream_id: usize,
     /// Currently running chat streams. We store them here so that we can easier cancel the running
-    /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
+    /// skill if there is an error in the stream. This is much harder to do if we use the normal
+    /// `ResourceTable`.
     chat_streams: HashMap<ChatStreamId, mpsc::Receiver<Result<ChatEvent, InferenceError>>>,
     chat_streams_v2: HashMap<ChatStreamId, mpsc::Receiver<Result<ChatEvent, InferenceError>>>,
-    /// Currently running completion streams. We store them here so that we can easier cancel the running
-    /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
+    /// Currently running completion streams. We store them here so that we can easier cancel the
+    /// running skill if there is an error in the stream. This is much harder to do if we use
+    /// the normal `ResourceTable`.
     completion_streams:
         HashMap<CompletionStreamId, mpsc::Receiver<Result<CompletionEvent, InferenceError>>>,
 }
@@ -669,8 +673,8 @@ pub enum SkillExecutionError {
     )]
     RuntimeError(String),
     /// This happens if a configuration for an individual namespace is broken. For the user calling
-    /// the route to execute a skill, we treat this as a runtime error, but make sure he gets all the
-    /// context, because it very likely might be the skill developer who misconfigured the
+    /// the route to execute a skill, we treat this as a runtime error, but make sure he gets all
+    /// the context, because it very likely might be the skill developer who misconfigured the
     /// namespace. For the operator team, operating all of Pharia Kernel we treat this as a logic
     /// error, because there is nothing wrong about the Kernel installation or inference, or network
     /// or other stuff, which they would be able to fix.
@@ -999,7 +1003,8 @@ mod test {
 
     #[tokio::test]
     async fn csi_usage_from_metadata_leads_to_suspension() {
-        // Given a skill runtime that always returns a skill that uses the csi from the metadata function
+        // Given a skill runtime that always returns a skill that uses the csi from the metadata
+        // function
         struct CsiFromMetadataSkill;
 
         #[async_trait]

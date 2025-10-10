@@ -182,7 +182,8 @@ pub enum Modality {
     Image { bytes: String },
 }
 
-/// A position within a document. The cursor is always inclusive of the current position, in both start and end positions.
+/// A position within a document. The cursor is always inclusive of the current position, in both
+/// start and end positions.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "modality")]
 pub enum Cursor {

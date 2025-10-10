@@ -93,7 +93,8 @@ pub async fn log_recorder() -> (SequentialTestGuard, &'static LogRecorder) {
     (guard, log_recorder)
 }
 
-/// Exclusive guard that ensures a tracing subscriber is initialized and returns a fresh log recorder.
+/// Exclusive guard that ensures a tracing subscriber is initialized and returns a fresh log
+/// recorder.
 ///
 /// May be used for tests that want to inspect the logs.
 pub async fn exclusive_log_recorder() -> (SequentialTestGuard, &'static LogRecorder) {

@@ -283,9 +283,10 @@ where
             let description = self.config.description(&namespace).await;
             (namespace, description)
         });
-        // While it would be nice to use a stream and update the state after each future has finished,
-        // this would only work if all the members except config go into a member object.
-        // If they are top level, we can not obtain a exclusive reference, as we already have shared references to them in the futures.
+        // While it would be nice to use a stream and update the state after each future has
+        // finished, this would only work if all the members except config go into a member
+        // object. If they are top level, we can not obtain a exclusive reference, as we
+        // already have shared references to them in the futures.
         for (namespace, description) in futures::future::join_all(futures).await {
             self.report_changes_in_namespace(&namespace, description)
                 .await;

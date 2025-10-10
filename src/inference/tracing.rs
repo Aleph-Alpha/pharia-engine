@@ -11,7 +11,8 @@ use tracing::{Level, field};
 use super::actor::ChatRequest;
 
 impl TracingContext {
-    /// Creates a child tracing context for a chat request with `GenAI` semantic convention attributes.
+    /// Creates a child tracing context for a chat request with `GenAI` semantic convention
+    /// attributes.
     ///
     /// For OpenTelemetry spans, all attributes that are to be recorded need to be specified when
     /// creating the span.
@@ -61,7 +62,8 @@ impl TracingContext {
         );
     }
 
-    /// Creates a child tracing context for a completion request with `GenAI` semantic convention attributes.
+    /// Creates a child tracing context for a completion request with `GenAI` semantic convention
+    /// attributes.
     ///
     /// For OpenTelemetry spans, all attributes that are to be recorded need to be specified when
     /// creating the span.

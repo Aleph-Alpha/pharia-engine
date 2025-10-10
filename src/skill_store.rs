@@ -139,8 +139,9 @@ where
         Ok(self.known_skills.get(skill_path).map(|s| &s.description))
     }
 
-    /// Compares the digest in the cache with the digest behind the corresponding tag in the registry.
-    /// If the digest behind the tag has changed, remove the cache entry. Otherwise, update the validation time.
+    /// Compares the digest in the cache with the digest behind the corresponding tag in the
+    /// registry. If the digest behind the tag has changed, remove the cache entry. Otherwise,
+    /// update the validation time.
     async fn validate_digest(&mut self, skill_path: SkillPath) -> anyhow::Result<()> {
         let SkillDescription::Programmable { tag, .. } = self
             .skill_description(&skill_path)
@@ -639,7 +640,8 @@ pub mod tests {
         let second_error =
             SkillFetchError::SkillNotFound(ProgrammableSkill::from_path(&second_skill));
 
-        // When pushing two requests for the same skill to the cache (but their futures return different errors)
+        // When pushing two requests for the same skill to the cache (but their futures return
+        // different errors)
         let first_skill_clone = first_skill.clone();
         let first_skill_clone_2 = first_skill.clone();
         let (first_send, first_recv) = oneshot::channel();

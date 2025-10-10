@@ -5,7 +5,8 @@ use crate::{
 /// CSI Shell version 0.2
 ///
 /// See [v0_3.rs](v0_3.rs) for a more detailed explanation on the reasoning for introducing
-/// serializable/user-facing structs in here and for not serializing our "internal" representations.
+/// serializable/user-facing structs in here and for not serializing our "internal"
+/// representations.
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tracing::error;

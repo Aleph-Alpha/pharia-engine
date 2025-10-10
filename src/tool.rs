@@ -88,9 +88,9 @@ impl PartialOrd for ToolDescription {
 pub struct QualifiedToolName {
     /// The namespace in which the tool is defined.
     pub namespace: Namespace,
-    /// The name of the tool as it is known within the namespace. Currently this is identical to the
-    /// name of the tool as reported by the MCP server, yet it may diverge in the future in order to
-    /// disambiguate tools calls, in the case of name collisions.
+    /// The name of the tool as it is known within the namespace. Currently this is identical to
+    /// the name of the tool as reported by the MCP server, yet it may diverge in the future in
+    /// order to disambiguate tools calls, in the case of name collisions.
     pub name: String,
 }
 
