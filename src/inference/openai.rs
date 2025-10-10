@@ -51,10 +51,6 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
         match message {
             inference::Message::Assistant(inference::AssistantMessage {
                 content,
-                // Whether or not the reasoning of passed messages is rendered into consecutive
-                // prompts is a decision by the prompt template per model. For now,
-                // we'll ignore it for all models here.
-                reasoning_content: _reasoning_content,
                 tool_calls,
             }) => Ok(ChatCompletionRequestMessage::Assistant(
                 ChatCompletionRequestAssistantMessage {
@@ -129,7 +125,6 @@ impl From<ChatCompletionResponseMessage> for inference::AssistantMessage {
         } = message;
         inference::AssistantMessage {
             content,
-            reasoning_content,
             tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
     }
@@ -443,6 +438,60 @@ impl TryFrom<ChatResponseReasoningContent> for inference::ChatResponse {
     }
 }
 
+impl TryFrom<async_openai::types::CreateChatCompletionResponse> for inference::ChatResponse {
+    type Error = InferenceError;
+    fn try_from(
+        response: async_openai::types::CreateChatCompletionResponse,
+    ) -> Result<Self, Self::Error> {
+        let first_choice = response.choices.into_iter().next().ok_or_else(|| {
+            InferenceError::Other(anyhow::anyhow!(
+                "Expected at least one choice in the chat completion response."
+            ))
+        })?;
+
+        // It is not quite clear why finish reason is represented as an Option. The OpenAI API docs
+        // specify it to always exist:
+        // https://platform.openai.com/docs/api-reference/chat/object#chat/object-choices
+        let finish_reason = first_choice
+            .finish_reason
+            .ok_or_else(|| {
+                anyhow::anyhow!("Expected chat completion response to have a finish reason.")
+            })?
+            .into();
+
+        // It is not quite clear why usage is represented as an Option. The OpenAI API docs specify
+        // it to always exist:
+        // https://platform.openai.com/docs/api-reference/chat/object#chat/object-usage
+        let usage = response
+            .usage
+            .ok_or_else(|| anyhow::anyhow!("Expected chat completion response to have a usage."))?
+            .into();
+
+        let message = inference::AssistantMessage::from(first_choice.message.clone());
+        let response = inference::ChatResponse {
+            message,
+            finish_reason,
+            logprobs: map_logprobs(first_choice.logprobs),
+            usage,
+        };
+        Ok(response)
+    }
+}
+
+impl From<async_openai::types::ChatCompletionResponseMessage> for inference::AssistantMessage {
+    fn from(message: async_openai::types::ChatCompletionResponseMessage) -> Self {
+        let async_openai::types::ChatCompletionResponseMessage {
+            content,
+            tool_calls,
+            ..
+        } = message;
+        Self {
+            content,
+            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
 impl From<OpenAIError> for InferenceError {
     fn from(error: OpenAIError) -> Self {
         match error {
@@ -465,8 +514,6 @@ impl From<OpenAIError> for InferenceError {
 pub struct ChatCompletionStreamResponseDelta {
     /// The contents of the chunk message.
     content: Option<String>,
-    reasoning_content: Option<String>,
-
     tool_calls: Option<Vec<async_openai::types::ChatCompletionMessageToolCallChunk>>,
     /// The role of the author of this message.
     role: Option<async_openai::types::Role>,
@@ -591,8 +638,7 @@ impl InferenceClient for OpenAiClient {
         _tracing_context: &TracingContext,
     ) -> Result<inference::ChatResponse, InferenceError> {
         let openai_request = request.as_openai_request()?;
-        let response: ChatResponseReasoningContent =
-            self.client.chat().create_byot(openai_request).await?;
+        let response = self.client.chat().create(openai_request).await?;
         let response = inference::ChatResponse::try_from(response)?;
         validate_chat_response(request, &response)?;
         Ok(response)

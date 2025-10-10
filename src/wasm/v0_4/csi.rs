@@ -606,7 +606,6 @@ impl From<Message> for inference::Message {
                 tool_calls,
             }) => inference::Message::Assistant(inference::AssistantMessage {
                 content,
-                reasoning_content,
                 tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
             }),
             Message::Tool(ToolMessage {
@@ -813,12 +812,11 @@ impl From<inference::AssistantMessage> for AssistantMessage {
     fn from(message: inference::AssistantMessage) -> Self {
         let inference::AssistantMessage {
             content,
-            reasoning_content,
             tool_calls,
         } = message;
         Self {
             content,
-            reasoning_content,
+            reasoning_content: None,
             tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
         }
     }

@@ -10,7 +10,7 @@ pub use self::{
         ExplanationRequest, FinishReason, Function, Granularity, Inference, InferenceApi,
         InferenceConfig, InferenceNotConfigured, InferenceProvider, InferenceSender, JsonSchema,
         Logprob, Logprobs, Message, ReasoningEffort, ResponseFormat, TextScore, TokenUsage,
-        ToolCall, ToolCallChunk, ToolChoice, ToolMessage, prepend_reasoning_content,
+        ToolCall, ToolCallChunk, ToolChoice, ToolMessage,
     },
     client::InferenceError,
 };
