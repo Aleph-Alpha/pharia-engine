@@ -532,8 +532,8 @@ pub mod tests {
         csi::{
             CsiDouble, CsiError, ToolResult,
             tests::{
-                ContextualCsiDouble, CsiChatStreamStub, CsiChatStub, CsiCompleteStreamStub,
-                CsiCompleteWithEchoMock, CsiGreetingMock, CsiSearchMock,
+                ContextualCsiDouble, CsiChatStreamStub, CsiChatStub, CsiChatStubV2,
+                CsiCompleteStreamStub, CsiCompleteWithEchoMock, CsiGreetingMock, CsiSearchMock,
             },
         },
         inference::{
@@ -699,7 +699,7 @@ pub mod tests {
         let wasm = test_skill.bytes();
         let engine = Arc::new(Engine::default());
         let skill = load_skill_from_wasm_bytes(engine, wasm, TracingContext::dummy()).unwrap();
-        let ctx = Box::new(CsiChatStub);
+        let ctx = Box::new(CsiChatStubV2);
 
         // When invoked with a json string
         let input = json!("Capital of France?");

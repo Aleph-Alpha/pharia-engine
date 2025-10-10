@@ -1,7 +1,23 @@
 use axum::response::sse::Event;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
-use crate::inference;
+use crate::{inference, tool};
+
+#[derive(Deserialize)]
+pub struct Argument {
+    name: String,
+    value: Value,
+}
+
+impl From<Argument> for tool::Argument {
+    fn from(value: Argument) -> Self {
+        Self {
+            name: value.name,
+            value: value.value.to_string().into_bytes(),
+        }
+    }
+}
 
 #[derive(Serialize)]
 struct Logprob {

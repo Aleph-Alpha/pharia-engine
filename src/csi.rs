@@ -234,6 +234,26 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
         }
     }
 
+    pub struct CsiChatStubV2;
+
+    #[async_trait]
+    impl CsiDouble for CsiChatStubV2 {
+        async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+            requests
+                .iter()
+                .map(|_| ChatResponse {
+                    message: AssistantMessage::dummy(),
+                    finish_reason: FinishReason::Stop,
+                    logprobs: vec![],
+                    usage: TokenUsage {
+                        prompt: 0,
+                        completion: 0,
+                    },
+                })
+                .collect()
+        }
+    }
+
     /// Return the content of the query as a search result
     pub struct CsiSearchMock;
 

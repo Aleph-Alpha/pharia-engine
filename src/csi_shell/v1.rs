@@ -17,11 +17,12 @@ use crate::{
     authorization::Authentication,
     chunking,
     csi::RawCsi,
-    csi_shell::{CsiProvider, CsiState},
+    csi_shell::{CsiProvider, CsiState, common::Argument},
     inference, language_selection,
     logging::TracingContext,
     namespace_watcher::Namespace,
-    search, tool,
+    search,
+    tool::{self},
 };
 
 // Make our own error that wraps `anyhow::Error`.
@@ -72,21 +73,6 @@ where
         .route("/list_tools", post(list_tools))
         .route("/search", post(search))
         .route("/select_language", post(select_language))
-}
-
-#[derive(Deserialize)]
-struct Argument {
-    name: String,
-    value: Value,
-}
-
-impl From<Argument> for tool::Argument {
-    fn from(value: Argument) -> Self {
-        Self {
-            name: value.name,
-            value: value.value.to_string().into_bytes(),
-        }
-    }
 }
 
 #[derive(Deserialize)]
@@ -422,22 +408,6 @@ where
 #[derive(Serialize)]
 struct SseErrorEvent {
     message: String,
-}
-
-#[derive(Serialize)]
-struct CompletionAppendEvent {
-    text: String,
-    logprobs: Vec<Distribution>,
-}
-
-#[derive(Serialize)]
-struct CompletionEndEvent {
-    finish_reason: FinishReason,
-}
-
-#[derive(Serialize)]
-struct CompletionUsageEvent {
-    usage: TokenUsage,
 }
 
 async fn chat_stream<C>(
@@ -1525,15 +1495,6 @@ mod tests {
 
     use super::*;
     use tower::util::ServiceExt;
-
-    impl Argument {
-        pub fn new(name: impl Into<String>, value: impl Into<Vec<u8>>) -> Self {
-            Self {
-                name: name.into(),
-                value: value.into(),
-            }
-        }
-    }
 
     #[tokio::test]
     async fn message_content_can_be_none() {
