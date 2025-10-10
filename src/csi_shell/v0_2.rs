@@ -523,17 +523,15 @@ impl From<inference::AssistantMessage> for Message {
     fn from(value: inference::AssistantMessage) -> Self {
         let inference::AssistantMessage {
             content,
-            reasoning_content,
             tool_calls: _,
         } = value;
-        // The inference client has the guarantee that the content is not empty if no tools are
-        // specified in the request. Therefore, it is fine to unwrap here.
-        let content = content
-            .expect("Inference client guarantees content is not empty for requests without tools.");
-        let content = inference::prepend_reasoning_content(content, reasoning_content);
         Self {
             role: inference::AssistantMessage::role().to_owned(),
-            content,
+            // The inference client has the guarantee that the content is not empty if no tools are
+            // specified in the request. Therefore, it is fine to unwrap here.
+            content: content.expect(
+                "Inference client guarantees content is not empty for requests without tools.",
+            ),
         }
     }
 }
@@ -617,7 +615,6 @@ pub mod tests {
         drop(ChatResponse::from(inference::ChatResponse {
             message: inference::AssistantMessage {
                 content: None,
-                reasoning_content: None,
                 tool_calls: None,
             },
             finish_reason: inference::FinishReason::Stop,
@@ -635,7 +632,6 @@ pub mod tests {
             inference::ChatResponse {
                 message: inference::AssistantMessage {
                     content: Some("\n\nHello".to_string()),
-                    reasoning_content: Some("I should reply with a greeting".to_string()),
                     tool_calls: None,
                 },
                 finish_reason: inference::FinishReason::Stop,
@@ -655,7 +651,7 @@ pub mod tests {
             json!({
                 "message": {
                     "role": "assistant",
-                    "content": "<think>I should reply with a greeting</think>\n\nHello"
+                    "content": "Hello"
                 },
                 "finish_reason": "stop",
             })

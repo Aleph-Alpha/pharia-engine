@@ -269,7 +269,6 @@ impl SkillChatMessage {
             "user" => Ok(Message::user(self.content)),
             "assistant" => Ok(Message::Assistant(AssistantMessage {
                 content: Some(self.content),
-                reasoning_content: None,
                 tool_calls: None,
             })),
             _ => Err(anyhow::anyhow!("Invalid role: {}", self.role)),
