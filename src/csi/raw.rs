@@ -57,7 +57,19 @@ pub trait RawCsi {
         requests: Vec<ChatRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
 
+    fn chat_v2(
+        &self,
+        auth: Authentication,
+        tracing_context: TracingContext,
+        requests: Vec<ChatRequest>,
+    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
     fn chat_stream(
+        &self,
+        auth: Authentication,
+        tracing_context: TracingContext,
+        request: ChatRequest,
+    ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
+    fn chat_stream_v2(
         &self,
         auth: Authentication,
         tracing_context: TracingContext,
@@ -269,6 +281,38 @@ where
         .await?;
         Ok(responses)
     }
+    async fn chat_v2(
+        &self,
+        auth: Authentication,
+        tracing_context: TracingContext,
+        requests: Vec<ChatRequest>,
+    ) -> anyhow::Result<Vec<ChatResponse>> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")])
+            .increment(requests.len() as u64);
+
+        let tracing_context = if requests.len() > 1 {
+            context!(
+                tracing_context,
+                "pharia-kernel::csi",
+                "chat_concurrent",
+                requests = requests.len()
+            )
+        } else {
+            tracing_context
+        };
+
+        let responses = try_join_all(
+            requests
+                .into_iter()
+                .map(|r| {
+                    self.inference
+                        .chat_v2(r, auth.clone(), tracing_context.clone())
+                })
+                .collect::<Vec<_>>(),
+        )
+        .await?;
+        Ok(responses)
+    }
 
     async fn chat_stream(
         &self,
@@ -281,6 +325,19 @@ where
 
         self.inference
             .chat_stream(request, auth, tracing_context)
+            .await
+    }
+    async fn chat_stream_v2(
+        &self,
+        auth: Authentication,
+        tracing_context: TracingContext,
+        request: ChatRequest,
+    ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
+        metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat_stream")])
+            .increment(1);
+
+        self.inference
+            .chat_stream_v2(request, auth, tracing_context)
             .await
     }
 

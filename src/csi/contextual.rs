@@ -44,7 +44,17 @@ pub trait ContextualCsi {
         requests: Vec<ChatRequest>,
     ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
 
+    fn chat_v2(
+        &self,
+        requests: Vec<ChatRequest>,
+    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
+
     fn chat_stream(
+        &self,
+        request: ChatRequest,
+    ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
+
+    fn chat_stream_v2(
         &self,
         request: ChatRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
@@ -149,12 +159,28 @@ where
             .chat(self.auth.clone(), self.tracing_context.clone(), requests)
     }
 
+    fn chat_v2(
+        &self,
+        requests: Vec<ChatRequest>,
+    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send {
+        self.raw_csi
+            .chat_v2(self.auth.clone(), self.tracing_context.clone(), requests)
+    }
+
     fn chat_stream(
         &self,
         request: ChatRequest,
     ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send {
         self.raw_csi
             .chat_stream(self.auth.clone(), self.tracing_context.clone(), request)
+    }
+
+    fn chat_stream_v2(
+        &self,
+        request: ChatRequest,
+    ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send {
+        self.raw_csi
+            .chat_stream_v2(self.auth.clone(), self.tracing_context.clone(), request)
     }
 
     fn chunk(
