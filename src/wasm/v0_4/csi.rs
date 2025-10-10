@@ -406,7 +406,7 @@ impl From<MetadataFieldValue> for search::MetadataFieldValue {
 impl InferenceHost for LinkedCtx {
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
         self.ctx
-            .chat(requests.into_iter().map(Into::into).collect())
+            .chat_v2(requests.into_iter().map(Into::into).collect())
             .await
             .into_iter()
             .map(Into::into)
@@ -460,7 +460,7 @@ impl HostCompletionStream for LinkedCtx {
 
 impl HostChatStream for LinkedCtx {
     async fn new(&mut self, init: ChatRequest) -> Resource<ChatStream> {
-        let stream_id = self.ctx.chat_stream_new(init.into()).await;
+        let stream_id = self.ctx.chat_stream_new_v2(init.into()).await;
         self.resource_table
             .push(stream_id)
             .inspect_err(|e| error!("Failed to push stream to resource table: {e:#}"))
@@ -474,7 +474,10 @@ impl HostChatStream for LinkedCtx {
             .get(&stream)
             .inspect_err(|e| error!("Failed to get stream from resource table: {e:#}"))
             .expect("Failed to get stream from resource table");
-        self.ctx.chat_stream_next(stream_id).await.map(Into::into)
+        self.ctx
+            .chat_stream_next_v2(stream_id)
+            .await
+            .map(Into::into)
     }
 
     async fn drop(&mut self, stream: Resource<ChatStream>) -> anyhow::Result<()> {

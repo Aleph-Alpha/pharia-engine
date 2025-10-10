@@ -127,7 +127,20 @@ pub trait InferenceApi {
         tracing_context: TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
 
+    fn chat_v2(
+        &self,
+        request: ChatRequest,
+        auth: Authentication,
+        tracing_context: TracingContext,
+    ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
     fn chat_stream(
+        &self,
+        request: ChatRequest,
+        auth: Authentication,
+        tracing_context: TracingContext,
+    ) -> impl Future<Output = mpsc::Receiver<Result<ChatEvent, InferenceError>>> + Send;
+
+    fn chat_stream_v2(
         &self,
         request: ChatRequest,
         auth: Authentication,
@@ -224,6 +237,28 @@ impl InferenceApi for InferenceSender {
             .expect("sender must be alive when awaiting for answers")?;
         Ok(chat_response)
     }
+    async fn chat_v2(
+        &self,
+        request: ChatRequest,
+        auth: Authentication,
+        tracing_context: TracingContext,
+    ) -> Result<ChatResponse, InferenceError> {
+        let (send, recv) = oneshot::channel();
+        let msg = InferenceMsg::ChatV2 {
+            request,
+            send,
+            auth,
+            tracing_context,
+        };
+        self.0
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        let chat_response = recv
+            .await
+            .expect("sender must be alive when awaiting for answers")?;
+        Ok(chat_response)
+    }
 
     async fn chat_stream(
         &self,
@@ -233,6 +268,25 @@ impl InferenceApi for InferenceSender {
     ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
         let (send, recv) = mpsc::channel(1);
         let msg = InferenceMsg::ChatStream {
+            request,
+            send,
+            auth,
+            tracing_context,
+        };
+        self.0
+            .send(msg)
+            .await
+            .expect("all api handlers must be shutdown before actors");
+        recv
+    }
+    async fn chat_stream_v2(
+        &self,
+        request: ChatRequest,
+        auth: Authentication,
+        tracing_context: TracingContext,
+    ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
+        let (send, recv) = mpsc::channel(1);
+        let msg = InferenceMsg::ChatStreamV2 {
             request,
             send,
             auth,
@@ -773,7 +827,19 @@ enum InferenceMsg {
         auth: Authentication,
         tracing_context: TracingContext,
     },
+    ChatV2 {
+        request: ChatRequest,
+        send: oneshot::Sender<Result<ChatResponse, InferenceError>>,
+        auth: Authentication,
+        tracing_context: TracingContext,
+    },
     ChatStream {
+        request: ChatRequest,
+        send: mpsc::Sender<Result<ChatEvent, InferenceError>>,
+        auth: Authentication,
+        tracing_context: TracingContext,
+    },
+    ChatStreamV2 {
         request: ChatRequest,
         send: mpsc::Sender<Result<ChatEvent, InferenceError>>,
         auth: Authentication,
@@ -848,6 +914,24 @@ impl InferenceMsg {
                 if gen_ai_content_capture {
                     context.capture_input_messages(&request.messages);
                 }
+                let result = client.chat(&request, auth, &context).await;
+                if let Ok(response) = &result
+                    && gen_ai_content_capture
+                {
+                    context.capture_output_message(&response.message);
+                }
+                drop(send.send(result));
+            }
+            Self::ChatV2 {
+                request,
+                send,
+                auth,
+                tracing_context,
+            } => {
+                let context = tracing_context.child_from_chat_request(&request);
+                if gen_ai_content_capture {
+                    context.capture_input_messages(&request.messages);
+                }
                 let result = client.chat_v2(&request, auth, &context).await;
                 if let Ok(response) = &result
                     && gen_ai_content_capture
@@ -857,6 +941,60 @@ impl InferenceMsg {
                 drop(send.send(result));
             }
             Self::ChatStream {
+                request,
+                send,
+                auth,
+                tracing_context,
+            } => {
+                let context = tracing_context.child_from_chat_request(&request);
+                if gen_ai_content_capture {
+                    context.capture_input_messages(&request.messages);
+                }
+                let (event_send, mut event_recv) = mpsc::channel(1);
+                let mut stream = Box::pin(client.stream_chat(&request, auth, &context, event_send));
+
+                // Reconstruct the entire assistant message from the stream.
+                let mut span_content = String::new();
+
+                loop {
+                    // Pass along messages that we get from the stream while also checking if we get
+                    // an error
+                    select! {
+                        // Pull from receiver as long as there are still senders
+                        Some(msg) = event_recv.recv(), if !event_recv.is_closed() =>  {
+                            if gen_ai_content_capture &&let ChatEvent::MessageAppend { content, .. } = &msg {
+                                span_content.push_str(content);
+                            }
+                            let Ok(()) = send.send(Ok(msg)).await else {
+                                // The receiver is dropped so we can stop polling the stream.
+                                break;
+                            };
+                        },
+                        result = &mut stream =>  {
+                            if let Err(err) = result {
+                                drop(send.send(Err(err)).await);
+                            }
+                            // Break out of the loop once the stream is done
+                            break;
+                        }
+                    };
+                }
+
+                // Finish sending through any remaining messages
+                while let Some(msg) = event_recv.recv().await {
+                    drop(send.send(Ok(msg)).await);
+                }
+
+                if gen_ai_content_capture {
+                    let message = AssistantMessage {
+                        content: Some(span_content),
+                        reasoning_content: None,
+                        tool_calls: None,
+                    };
+                    context.capture_output_message(&message);
+                }
+            }
+            Self::ChatStreamV2 {
                 request,
                 send,
                 auth,

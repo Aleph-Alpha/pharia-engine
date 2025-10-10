@@ -47,8 +47,11 @@ pub trait Csi {
         requests: Vec<SelectLanguageRequest>,
     ) -> Vec<Option<Language>>;
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse>;
+    async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse>;
     async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId;
+    async fn chat_stream_new_v2(&mut self, request: ChatRequest) -> ChatStreamId;
     async fn chat_stream_next(&mut self, id: &ChatStreamId) -> Option<ChatEvent>;
+    async fn chat_stream_next_v2(&mut self, id: &ChatStreamId) -> Option<ChatEvent>;
     async fn chat_stream_drop(&mut self, id: ChatStreamId);
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>>;
     async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;

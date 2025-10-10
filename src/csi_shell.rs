@@ -1,3 +1,4 @@
+mod common;
 /// Expose the CSI (Cognitive System Interface which is offered to skills) via HTTP.
 ///
 /// This allows users to test and debug Skills on their machine while still having access
@@ -5,6 +6,7 @@
 mod v0_2;
 mod v0_3;
 mod v1;
+mod v2;
 
 use axum::{
     Json, Router,
@@ -30,6 +32,7 @@ where
 {
     Router::new()
         .nest("/csi/v1", v1::http())
+        .nest("/csi/v2", v2::http())
         // Legacy CSI route
         .route("/csi", post(http_csi_handle::<T::Csi>))
 }

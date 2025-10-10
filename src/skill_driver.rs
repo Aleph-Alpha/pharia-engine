@@ -169,6 +169,7 @@ pub struct SkillInvocationCtx<C> {
     /// Currently running chat streams. We store them here so that we can easier cancel the running
     /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
     chat_streams: HashMap<ChatStreamId, mpsc::Receiver<Result<ChatEvent, InferenceError>>>,
+    chat_streams_v2: HashMap<ChatStreamId, mpsc::Receiver<Result<ChatEvent, InferenceError>>>,
     /// Currently running completion streams. We store them here so that we can easier cancel the running
     /// skill if there is an error in the stream. This is much harder to do if we use the normal `ResourceTable`.
     completion_streams:
@@ -182,6 +183,7 @@ impl<C> SkillInvocationCtx<C> {
             contextual_csi,
             current_stream_id: 0,
             chat_streams: HashMap::new(),
+            chat_streams_v2: HashMap::new(),
             completion_streams: HashMap::new(),
         }
     }
@@ -255,10 +257,24 @@ where
         }
     }
 
+    async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+        match self.contextual_csi.chat_v2(requests).await {
+            Ok(value) => value,
+            Err(error) => self.send_error(error).await,
+        }
+    }
+
     async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId {
         let id = self.next_stream_id();
         let recv = self.contextual_csi.chat_stream(request).await;
         self.chat_streams.insert(id, recv);
+        id
+    }
+
+    async fn chat_stream_new_v2(&mut self, request: ChatRequest) -> ChatStreamId {
+        let id = self.next_stream_id();
+        let recv = self.contextual_csi.chat_stream_v2(request).await;
+        self.chat_streams_v2.insert(id, recv);
         id
     }
 
@@ -276,8 +292,23 @@ where
         }
     }
 
+    async fn chat_stream_next_v2(&mut self, id: &ChatStreamId) -> Option<ChatEvent> {
+        let event = self
+            .chat_streams_v2
+            .get_mut(id)
+            .expect("Stream not found")
+            .recv()
+            .await
+            .transpose();
+        match event {
+            Ok(event) => event,
+            Err(error) => self.send_error(error.into()).await,
+        }
+    }
+
     async fn chat_stream_drop(&mut self, id: ChatStreamId) {
         self.chat_streams.remove(&id);
+        self.chat_streams_v2.remove(&id);
     }
 
     async fn chunk(&mut self, requests: Vec<ChunkRequest>) -> Vec<Vec<Chunk>> {
@@ -432,11 +463,23 @@ impl Csi for SkillMetadataCtx {
         self.send_error().await
     }
 
+    async fn chat_v2(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+        self.send_error().await
+    }
+
     async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
         self.send_error().await
     }
 
+    async fn chat_stream_new_v2(&mut self, _request: ChatRequest) -> ChatStreamId {
+        self.send_error().await
+    }
+
     async fn chat_stream_next(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+        self.send_error().await
+    }
+
+    async fn chat_stream_next_v2(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
         self.send_error().await
     }
 
