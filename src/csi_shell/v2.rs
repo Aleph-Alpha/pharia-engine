@@ -948,9 +948,9 @@ struct ChatResponse {
     usage: TokenUsage,
 }
 
-impl From<inference::ChatResponse> for ChatResponse {
-    fn from(value: inference::ChatResponse) -> Self {
-        let inference::ChatResponse {
+impl From<inference::ChatResponseV2> for ChatResponse {
+    fn from(value: inference::ChatResponseV2) -> Self {
+        let inference::ChatResponseV2 {
             message,
             finish_reason,
             logprobs,
@@ -1353,7 +1353,7 @@ mod tests {
                 _auth: Authentication,
                 _tracing_context: TracingContext,
                 requests: Vec<inference::ChatRequest>,
-            ) -> anyhow::Result<Vec<inference::ChatResponse>> {
+            ) -> anyhow::Result<Vec<inference::ChatResponseV2>> {
                 let messages = requests[0].messages.clone();
                 assert_eq!(messages.len(), 4);
                 assert!(matches!(
@@ -1376,7 +1376,7 @@ mod tests {
                     }) if tool_call_id == "1"
                 ));
 
-                Ok(vec![inference::ChatResponse {
+                Ok(vec![inference::ChatResponseV2 {
                     message: inference::AssistantMessage {
                         content: None,
                         tool_calls: None,
@@ -1435,7 +1435,6 @@ mod tests {
         let expected_body = json!([{
             "message": {
                 "role": "assistant",
-                "reasoning_content": null,
                 "content": null,
                 "tool_calls": null,
                 "tool_call_id": null,

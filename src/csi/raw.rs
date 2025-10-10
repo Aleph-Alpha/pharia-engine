@@ -8,8 +8,8 @@ use crate::{
     chunking::{self, Chunk, ChunkRequest},
     context,
     inference::{
-        ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-        Explanation, ExplanationRequest, InferenceApi, InferenceError,
+        ChatEvent, ChatRequest, ChatResponse, ChatResponseV2, Completion, CompletionEvent,
+        CompletionRequest, Explanation, ExplanationRequest, InferenceApi, InferenceError,
     },
     language_selection::{Language, SelectLanguageRequest, select_language},
     logging::TracingContext,
@@ -62,7 +62,7 @@ pub trait RawCsi {
         auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<ChatRequest>,
-    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
+    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponseV2>>> + Send;
     fn chat_stream(
         &self,
         auth: Authentication,
@@ -286,7 +286,7 @@ where
         auth: Authentication,
         tracing_context: TracingContext,
         requests: Vec<ChatRequest>,
-    ) -> anyhow::Result<Vec<ChatResponse>> {
+    ) -> anyhow::Result<Vec<ChatResponseV2>> {
         metrics::counter!(CsiMetrics::CsiRequestsTotal, &[("function", "chat")])
             .increment(requests.len() as u64);
 

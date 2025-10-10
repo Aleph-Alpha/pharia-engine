@@ -6,8 +6,8 @@ use crate::{
     chunking::{Chunk, ChunkRequest},
     csi::{CsiError, RawCsi},
     inference::{
-        ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-        Explanation, ExplanationRequest, InferenceError,
+        ChatEvent, ChatRequest, ChatResponse, ChatResponseV2, Completion, CompletionEvent,
+        CompletionRequest, Explanation, ExplanationRequest, InferenceError,
     },
     language_selection::{Language, SelectLanguageRequest},
     logging::TracingContext,
@@ -47,7 +47,7 @@ pub trait ContextualCsi {
     fn chat_v2(
         &self,
         requests: Vec<ChatRequest>,
-    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send;
+    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponseV2>>> + Send;
 
     fn chat_stream(
         &self,
@@ -162,7 +162,7 @@ where
     fn chat_v2(
         &self,
         requests: Vec<ChatRequest>,
-    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponse>>> + Send {
+    ) -> impl Future<Output = anyhow::Result<Vec<ChatResponseV2>>> + Send {
         self.raw_csi
             .chat_v2(self.auth.clone(), self.tracing_context.clone(), requests)
     }

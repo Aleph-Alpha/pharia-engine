@@ -132,7 +132,7 @@ pub trait InferenceApi {
         request: ChatRequest,
         auth: Authentication,
         tracing_context: TracingContext,
-    ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
+    ) -> impl Future<Output = Result<ChatResponseV2, InferenceError>> + Send;
     fn chat_stream(
         &self,
         request: ChatRequest,
@@ -242,7 +242,7 @@ impl InferenceApi for InferenceSender {
         request: ChatRequest,
         auth: Authentication,
         tracing_context: TracingContext,
-    ) -> Result<ChatResponse, InferenceError> {
+    ) -> Result<ChatResponseV2, InferenceError> {
         let (send, recv) = oneshot::channel();
         let msg = InferenceMsg::ChatV2 {
             request,
@@ -340,7 +340,7 @@ impl InferenceClient for InferenceNotConfigured {
         _request: &ChatRequest,
         _auth: Authentication,
         _tracing_context: &TracingContext,
-    ) -> Result<ChatResponse, InferenceError> {
+    ) -> Result<ChatResponseV2, InferenceError> {
         Err(InferenceError::NotConfigured)
     }
 
@@ -686,6 +686,16 @@ pub struct ChatResponse {
     pub usage: TokenUsage,
 }
 
+#[derive(Debug, Clone)]
+pub struct ChatResponseV2 {
+    pub message: AssistantMessage,
+    pub finish_reason: FinishReason,
+    /// Contains the logprobs for the sampled and top n tokens, given that [`crate::Logprobs`] has
+    /// been set to [`crate::Logprobs::Sampled`] or [`crate::Logprobs::Top`].
+    pub logprobs: Vec<Distribution>,
+    pub usage: TokenUsage,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ChatEvent {
     MessageBegin {
@@ -810,7 +820,7 @@ enum InferenceMsg {
     },
     ChatV2 {
         request: ChatRequest,
-        send: oneshot::Sender<Result<ChatResponse, InferenceError>>,
+        send: oneshot::Sender<Result<ChatResponseV2, InferenceError>>,
         auth: Authentication,
         tracing_context: TracingContext,
     },

@@ -438,6 +438,45 @@ impl TryFrom<ChatResponseReasoningContent> for inference::ChatResponse {
     }
 }
 
+impl TryFrom<ChatResponseReasoningContent> for inference::ChatResponseV2 {
+    type Error = InferenceError;
+
+    fn try_from(response: ChatResponseReasoningContent) -> Result<Self, Self::Error> {
+        let first_choice = response.choices.into_iter().next().ok_or_else(|| {
+            InferenceError::Other(anyhow::anyhow!(
+                "Expected at least one choice in the chat completion response."
+            ))
+        })?;
+
+        // It is not quite clear why finish reason is represented as an Option. The OpenAI API docs
+        // specify it to always exist:
+        // https://platform.openai.com/docs/api-reference/chat/object#chat/object-choices
+        let finish_reason = first_choice
+            .finish_reason
+            .ok_or_else(|| {
+                anyhow::anyhow!("Expected chat completion response to have a finish reason.")
+            })?
+            .into();
+
+        // It is not quite clear why usage is represented as an Option. The OpenAI API docs specify
+        // it to always exist:
+        // https://platform.openai.com/docs/api-reference/chat/object#chat/object-usage
+        let usage = response
+            .usage
+            .ok_or_else(|| anyhow::anyhow!("Expected chat completion response to have a usage."))?
+            .into();
+
+        let message = inference::AssistantMessage::from(first_choice.message.clone());
+        let response = inference::ChatResponseV2 {
+            message,
+            finish_reason,
+            logprobs: map_logprobs(first_choice.logprobs),
+            usage,
+        };
+        Ok(response)
+    }
+}
+
 impl TryFrom<async_openai::types::CreateChatCompletionResponse> for inference::ChatResponse {
     type Error = InferenceError;
     fn try_from(
@@ -648,12 +687,11 @@ impl InferenceClient for OpenAiClient {
         request: &inference::ChatRequest,
         _auth: Authentication,
         _tracing_context: &TracingContext,
-    ) -> Result<inference::ChatResponse, InferenceError> {
+    ) -> Result<inference::ChatResponseV2, InferenceError> {
         let openai_request = request.as_openai_request()?;
         let response: ChatResponseReasoningContent =
             self.client.chat().create_byot(openai_request).await?;
-        let response = inference::ChatResponse::try_from(response)?;
-        validate_chat_response(request, &response)?;
+        let response = inference::ChatResponseV2::try_from(response)?;
         Ok(response)
     }
 

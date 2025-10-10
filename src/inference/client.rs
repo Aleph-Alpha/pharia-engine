@@ -21,6 +21,7 @@ use crate::{
     authorization::Authentication,
     inference::{
         FinishReason,
+        actor::ChatResponseV2,
         openai::{ChatResponseReasoningContent, ChatStreamWithReasoning},
     },
     logging::TracingContext,
@@ -71,7 +72,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         request: &ChatRequest,
         auth: Authentication,
         tracing_context: &TracingContext,
-    ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
+    ) -> impl Future<Output = Result<ChatResponseV2, InferenceError>> + Send;
     fn stream_chat(
         &self,
         request: &ChatRequest,
@@ -306,13 +307,12 @@ impl InferenceClient for AlephAlphaClient {
         request: &ChatRequest,
         auth: Authentication,
         tracing_context: &TracingContext,
-    ) -> Result<ChatResponse, InferenceError> {
+    ) -> Result<ChatResponseV2, InferenceError> {
         let client = self.openai_client(auth, tracing_context)?;
         let openai_request = request.as_openai_request()?;
         let response: ChatResponseReasoningContent =
             client.chat().create_byot(openai_request).await?;
-        let response = ChatResponse::try_from(response)?;
-        validate_chat_response(request, &response)?;
+        let response = ChatResponseV2::try_from(response)?;
         Ok(response)
     }
 

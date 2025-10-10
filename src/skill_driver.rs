@@ -13,8 +13,8 @@ use crate::{
     chunking::{Chunk, ChunkRequest},
     csi::{ChatStreamId, CompletionStreamId, ContextualCsi, Csi, ToolResult},
     inference::{
-        ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-        Explanation, ExplanationRequest, InferenceError,
+        ChatEvent, ChatRequest, ChatResponse, ChatResponseV2, Completion, CompletionEvent,
+        CompletionRequest, Explanation, ExplanationRequest, InferenceError,
     },
     language_selection::{Language, SelectLanguageRequest},
     logging::TracingContext,
@@ -261,7 +261,7 @@ where
         }
     }
 
-    async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+    async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponseV2> {
         match self.contextual_csi.chat_v2(requests).await {
             Ok(value) => value,
             Err(error) => self.send_error(error).await,
@@ -467,7 +467,7 @@ impl Csi for SkillMetadataCtx {
         self.send_error().await
     }
 
-    async fn chat_v2(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+    async fn chat_v2(&mut self, _requests: Vec<ChatRequest>) -> Vec<ChatResponseV2> {
         self.send_error().await
     }
 

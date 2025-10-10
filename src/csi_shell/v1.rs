@@ -1586,7 +1586,6 @@ mod tests {
         let expected_body = json!([{
             "message": {
                 "role": "assistant",
-                "reasoning_content": null,
                 "content": null,
                 "tool_calls": null,
                 "tool_call_id": null,
