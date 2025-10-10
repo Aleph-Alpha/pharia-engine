@@ -11,8 +11,8 @@ pub use raw::{CsiDrivers, CsiError, RawCsi};
 use crate::{
     chunking::{Chunk, ChunkRequest},
     inference::{
-        ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent, CompletionRequest,
-        Explanation, ExplanationRequest,
+        ChatEvent, ChatRequest, ChatResponse, ChatResponseV2, Completion, CompletionEvent,
+        CompletionRequest, Explanation, ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -47,7 +47,7 @@ pub trait Csi {
         requests: Vec<SelectLanguageRequest>,
     ) -> Vec<Option<Language>>;
     async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse>;
-    async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse>;
+    async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponseV2>;
     async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId;
     async fn chat_stream_new_v2(&mut self, request: ChatRequest) -> ChatStreamId;
     async fn chat_stream_next(&mut self, id: &ChatStreamId) -> Option<ChatEvent>;
@@ -238,10 +238,10 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
 
     #[async_trait]
     impl CsiDouble for CsiChatStubV2 {
-        async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
+        async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponseV2> {
             requests
                 .iter()
-                .map(|_| ChatResponse {
+                .map(|_| ChatResponseV2 {
                     message: AssistantMessage::dummy(),
                     finish_reason: FinishReason::Stop,
                     logprobs: vec![],

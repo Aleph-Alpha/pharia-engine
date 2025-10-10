@@ -822,9 +822,9 @@ impl From<inference::AssistantMessage> for AssistantMessage {
     }
 }
 
-impl From<inference::ChatResponse> for ChatResponse {
-    fn from(response: inference::ChatResponse) -> Self {
-        let inference::ChatResponse {
+impl From<inference::ChatResponseV2> for ChatResponse {
+    fn from(response: inference::ChatResponseV2) -> Self {
+        let inference::ChatResponseV2 {
             message,
             finish_reason,
             logprobs,
@@ -1009,7 +1009,7 @@ mod tests {
     fn forward_logprobs() {
         // Given
         let token: Vec<u8> = "Hello".to_string().into();
-        let source = inference::ChatResponse {
+        let source = inference::ChatResponseV2 {
             usage: inference::TokenUsage {
                 prompt: 4,
                 completion: 1,
@@ -1042,7 +1042,7 @@ mod tests {
     #[test]
     fn forward_token_usage_chat() {
         // Given
-        let source = inference::ChatResponse {
+        let source = inference::ChatResponseV2 {
             usage: inference::TokenUsage {
                 prompt: 4,
                 completion: 1,

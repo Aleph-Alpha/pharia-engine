@@ -631,7 +631,7 @@ pub mod tests {
         let response = CsiResponse::Chat(
             inference::ChatResponse {
                 message: inference::AssistantMessage {
-                    content: Some("\n\nHello".to_string()),
+                    content: Some("Hello".to_string()),
                     tool_calls: None,
                 },
                 finish_reason: inference::FinishReason::Stop,
