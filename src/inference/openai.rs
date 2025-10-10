@@ -578,7 +578,20 @@ impl From<ChatCompletionMessageToolCallChunk> for inference::ToolCallChunk {
 }
 
 impl InferenceClient for OpenAiClient {
-    async fn chat_with_reasoning(
+    async fn chat(
+        &self,
+        request: &inference::ChatRequest,
+        _auth: Authentication,
+        _tracing_context: &TracingContext,
+    ) -> Result<inference::ChatResponse, InferenceError> {
+        let openai_request = request.as_openai_request()?;
+        let response: ChatResponseReasoningContent =
+            self.client.chat().create_byot(openai_request).await?;
+        let response = inference::ChatResponse::try_from(response)?;
+        validate_chat_response(request, &response)?;
+        Ok(response)
+    }
+    async fn chat_v2(
         &self,
         request: &inference::ChatRequest,
         _auth: Authentication,
@@ -592,7 +605,7 @@ impl InferenceClient for OpenAiClient {
         Ok(response)
     }
 
-    async fn stream_chat_with_reasoning(
+    async fn stream_chat_v2(
         &self,
         request: &inference::ChatRequest,
         _auth: Authentication,
@@ -616,6 +629,29 @@ impl InferenceClient for OpenAiClient {
         Ok(())
     }
 
+    async fn stream_chat(
+        &self,
+        request: &inference::ChatRequest,
+        _auth: Authentication,
+        _tracing_context: &TracingContext,
+        send: mpsc::Sender<inference::ChatEvent>,
+    ) -> Result<(), InferenceError> {
+        let openai_request = request.as_openai_stream_request()?;
+        let mut stream = self
+            .client
+            .chat()
+            .create_stream_byot(openai_request)
+            .await?;
+
+        while let Some(event) = stream.next().await {
+            let events = inference::ChatEvent::from_stream(event?);
+            for event in events {
+                validate_chat_event(request, &event)?;
+                drop(send.send(event).await);
+            }
+        }
+        Ok(())
+    }
     async fn complete(
         &self,
         _request: &inference::CompletionRequest,
@@ -716,7 +752,7 @@ mod tests {
             strict: None,
         };
 
-        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
+        let result = <OpenAiClient as InferenceClient>::chat_v2(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -745,7 +781,7 @@ mod tests {
         let host = openai_inference_url().to_owned();
         let client = OpenAiClient::new(host, api_token);
 
-        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
+        let result = <OpenAiClient as InferenceClient>::chat_v2(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -776,7 +812,7 @@ mod tests {
             temperature: Some(0.0),
             ..Default::default()
         };
-        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
+        let result = <OpenAiClient as InferenceClient>::chat_v2(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -806,7 +842,7 @@ mod tests {
         let client = OpenAiClient::new(host, api_token);
 
         // When doing a chat request against a model that does not exist
-        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
+        let result = <OpenAiClient as InferenceClient>::chat_v2(
             &client,
             &ChatRequest {
                 model: "gpt-4o-mini-non-existent".to_owned(),
@@ -831,7 +867,7 @@ mod tests {
         let client = OpenAiClient::new(host, api_token);
 
         // When doing a chat request
-        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
+        let result = <OpenAiClient as InferenceClient>::chat_v2(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -863,7 +899,7 @@ mod tests {
         };
         let (send, mut recv) = mpsc::channel(1);
         tokio::spawn(async move {
-            <OpenAiClient as InferenceClient>::stream_chat_with_reasoning(
+            <OpenAiClient as InferenceClient>::stream_chat_v2(
                 &client,
                 &ChatRequest {
                     model: NON_REASONING_MODEL.to_owned(),
@@ -912,7 +948,7 @@ mod tests {
             tool_choice: Some(ToolChoice::Named("catch_fish".to_owned())),
             ..Default::default()
         };
-        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
+        let result = <OpenAiClient as InferenceClient>::chat_v2(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -962,7 +998,7 @@ mod tests {
 
         let (send, mut recv) = mpsc::channel(1);
         tokio::spawn(async move {
-            <OpenAiClient as InferenceClient>::stream_chat_with_reasoning(
+            <OpenAiClient as InferenceClient>::stream_chat_v2(
                 &client,
                 &ChatRequest {
                     model: NON_REASONING_MODEL.to_owned(),
@@ -1042,7 +1078,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
+        let result = <OpenAiClient as InferenceClient>::chat_v2(
             &client,
             &ChatRequest {
                 model: NON_REASONING_MODEL.to_owned(),
@@ -1076,7 +1112,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = <OpenAiClient as InferenceClient>::chat_with_reasoning(
+        let result = <OpenAiClient as InferenceClient>::chat_v2(
             &client,
             &ChatRequest {
                 model: REASONING_MODEL.to_owned(),

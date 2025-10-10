@@ -56,13 +56,32 @@ pub trait InferenceClient: Send + Sync + 'static {
         tracing_context: &TracingContext,
         send: mpsc::Sender<CompletionEvent>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
-    fn chat_with_reasoning(
+    fn chat(
         &self,
         request: &ChatRequest,
         auth: Authentication,
         tracing_context: &TracingContext,
     ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
-    fn stream_chat_with_reasoning(
+    /// BREAKING CHANGE: Introducing `reasoning_content` to the [`crate::inference::AssistantMessage`] is a breaking
+    /// change as it removes the reasoning content from the `content` field. We therefore require a
+    /// new function to reliably support both the old and new behavior.
+    fn chat_v2(
+        &self,
+        request: &ChatRequest,
+        auth: Authentication,
+        tracing_context: &TracingContext,
+    ) -> impl Future<Output = Result<ChatResponse, InferenceError>> + Send;
+    fn stream_chat(
+        &self,
+        request: &ChatRequest,
+        auth: Authentication,
+        tracing_context: &TracingContext,
+        send: mpsc::Sender<ChatEvent>,
+    ) -> impl Future<Output = Result<(), InferenceError>> + Send;
+    /// BREAKING CHANGE: Introducing `reasoning_content` to the [`crate::inference::AssistantMessage`] is a breaking
+    /// change as it removes the reasoning content from the `content` field. We therefore require a
+    /// new function to reliably support both the old and new behavior.
+    fn stream_chat_v2(
         &self,
         request: &ChatRequest,
         auth: Authentication,
@@ -97,7 +116,8 @@ fn how(auth: Authentication, tracing_context: &TracingContext) -> Result<How, In
 /// do want to use the publicly available libraries, since we aim to be compatible with the `OpenAI`
 /// chat API.
 pub struct AlephAlphaClient {
-    /// The rust client developed by us. Supports our custom features like the explanation endpoint.
+    /// The rust client developed by us. Supports our custom features like the explanation
+    /// endpoint.
     aleph_alpha: Client,
     /// The http client used to make requests by the async openai client.
     /// While we need to construct the config per request, we can store the client across requests.
@@ -266,7 +286,21 @@ impl InferenceClient for AlephAlphaClient {
         .map_err(InferenceError::Other)
     }
 
-    async fn chat_with_reasoning(
+    async fn chat(
+        &self,
+        request: &ChatRequest,
+        auth: Authentication,
+        tracing_context: &TracingContext,
+    ) -> Result<ChatResponse, InferenceError> {
+        let client = self.openai_client(auth, tracing_context)?;
+        let openai_request = request.as_openai_request()?;
+        let response: ChatResponseReasoningContent =
+            client.chat().create_byot(openai_request).await?;
+        let response = ChatResponse::try_from(response)?;
+        validate_chat_response(request, &response)?;
+        Ok(response)
+    }
+    async fn chat_v2(
         &self,
         request: &ChatRequest,
         auth: Authentication,
@@ -281,7 +315,29 @@ impl InferenceClient for AlephAlphaClient {
         Ok(response)
     }
 
-    async fn stream_chat_with_reasoning(
+    async fn stream_chat_v2(
+        &self,
+        request: &ChatRequest,
+        auth: Authentication,
+        tracing_context: &TracingContext,
+        send: mpsc::Sender<ChatEvent>,
+    ) -> Result<(), InferenceError> {
+        type OurStream =
+            Pin<Box<dyn Stream<Item = Result<ChatStreamWithReasoning, OpenAIError>> + Send>>;
+        let client = self.openai_client(auth, tracing_context)?;
+        let openai_request = request.as_openai_stream_request()?;
+        let mut stream: OurStream = client.chat().create_stream_byot(openai_request).await?;
+        while let Some(event) = stream.next().await {
+            let events = ChatEvent::from_stream(event?);
+            for event in events {
+                validate_chat_event(request, &event)?;
+                drop(send.send(event).await);
+            }
+        }
+
+        Ok(())
+    }
+    async fn stream_chat(
         &self,
         request: &ChatRequest,
         auth: Authentication,
@@ -663,7 +719,7 @@ mod tests {
             messages: vec![Message::user("Hello, world!")],
         };
 
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
             &client,
             &chat_request,
             auth,
@@ -788,7 +844,7 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
             &client,
             &chat_request,
             auth,
@@ -817,7 +873,7 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_result = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
+        let chat_result = <AlephAlphaClient as InferenceClient>::chat_v2(
             &client,
             &chat_request,
             bad_auth,
@@ -888,7 +944,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             },
             messages: vec![Message::user("Haiku about oat milk!")],
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
             &client,
             &chat_request,
             auth,
@@ -970,7 +1026,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
             &client,
             &chat_request,
             auth,
@@ -1096,7 +1152,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_with_reasoning(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
             &client,
             &chat_request,
             auth,
@@ -1178,7 +1234,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <AlephAlphaClient as InferenceClient>::stream_chat_with_reasoning(
+            <AlephAlphaClient as InferenceClient>::stream_chat_v2(
                 &client,
                 &chat_request,
                 auth,
@@ -1238,7 +1294,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <AlephAlphaClient as InferenceClient>::stream_chat_with_reasoning(
+            <AlephAlphaClient as InferenceClient>::stream_chat_v2(
                 &client,
                 &chat_request,
                 auth,
