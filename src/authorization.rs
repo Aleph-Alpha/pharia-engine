@@ -3,20 +3,19 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use axum::{
     RequestPartsExt,
     extract::{FromRef, FromRequestParts},
-    http::{StatusCode, request::Parts},
+    http::request::Parts,
 };
 use axum_extra::{
     TypedHeader,
     headers::{Authorization as AuthorizationHeader, authorization::Bearer},
 };
 use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+use pharia_common::{AuthorizationError, IamClient, Permission};
 use thiserror::Error;
 use tokio::{select, sync::mpsc, task::JoinHandle};
 use tracing::error;
 
-use crate::{http::HttpClient, logging::TracingContext};
+use crate::logging::TracingContext;
 
 /// The authentication provided by incoming requests.
 ///
@@ -69,7 +68,7 @@ pub struct Authorization {
 impl Authorization {
     pub fn new(authorization_url: Option<&str>) -> Self {
         if let Some(url) = authorization_url {
-            Self::with_client(HttpAuthorizationClient::new(url))
+            Self::with_client(IamClient::new(url.to_owned()))
         } else {
             Self::with_client(AlwaysValidClient)
         }
@@ -198,16 +197,27 @@ impl AuthorizationClient for AlwaysValidClient {
     }
 }
 
-struct HttpAuthorizationClient {
-    url: String,
-    client: HttpClient,
-}
+impl AuthorizationClient for IamClient {
+    async fn token_valid(
+        &self,
+        auth: Authentication,
+        context: TracingContext,
+    ) -> Result<bool, AuthorizationClientError> {
+        let Authentication(Some(token)) = auth else {
+            return Err(AuthorizationClientError::NoBearerToken);
+        };
 
-impl HttpAuthorizationClient {
-    pub fn new(url: impl Into<String>) -> Self {
-        Self {
-            url: url.into(),
-            client: HttpClient::default(),
+        let result = self.authorize(token, &[Permission::KernelAccess]).await;
+
+        match result {
+            Ok(_) => Ok(true),
+            Err(AuthorizationError::Unauthenticated) | Err(AuthorizationError::Unauthorized) => {
+                Ok(false)
+            }
+            Err(AuthorizationError::ConnectionError(e)) => {
+                error!(parent: context.span(), error = %e, "Failed to send authorization request.");
+                Err(AuthorizationClientError::Recoverable)
+            }
         }
     }
 }
@@ -222,68 +232,6 @@ pub enum AuthorizationClientError {
     Recoverable,
     #[error("Bearer token expected")]
     NoBearerToken,
-}
-
-impl AuthorizationClient for HttpAuthorizationClient {
-    async fn token_valid(
-        &self,
-        auth: Authentication,
-        context: TracingContext,
-    ) -> Result<bool, AuthorizationClientError> {
-        #[derive(Deserialize)]
-        struct Response {
-            permissions: Vec<Permission>,
-        }
-
-        #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
-        #[serde(tag = "permission")]
-        enum Permission {
-            KernelAccess,
-        }
-
-        let required_permissions = [Permission::KernelAccess];
-
-        let Some(token) = auth.0 else {
-            return Err(AuthorizationClientError::NoBearerToken);
-        };
-
-        let mut builder = self
-            .client
-            .post(format!("{}/check_user", self.url))
-            .bearer_auth(token);
-
-        builder = builder.headers(context.w3c_headers());
-
-        let payload = json!({
-            "permissions": required_permissions
-        });
-        let response = builder.json(&payload).send().await.map_err(|e| {
-            error!(parent: context.span(), error = %e, "Failed to send authorization request.");
-            AuthorizationClientError::Recoverable
-        })?;
-
-        // Response succeeded, but not allowed
-        if [StatusCode::FORBIDDEN, StatusCode::UNAUTHORIZED].contains(&response.status()) {
-            return Ok(false);
-        }
-
-        let allowed_permissions = response
-            // Error for any other status
-            .error_for_status()
-            .map_err(|e| {
-                error!(parent: context.span(), error = %e, "Unexpected status code from authorization service.");
-                AuthorizationClientError::Recoverable
-            })?
-            .json::<Response>()
-            .await
-            .map_err(|e| {
-                error!(parent: context.span(), error = %e, "Failed to deserialize the response from the authorization service.");
-                AuthorizationClientError::Recoverable
-            })?;
-
-        // Check that we got the same list back
-        Ok(allowed_permissions.permissions == required_permissions)
-    }
 }
 
 /// Authorization Provider allows to fetch the authorization API from an aggregated application
@@ -349,7 +297,7 @@ pub mod tests {
     async fn true_for_valid_permissions() {
         // Given a client that is configured against the inference api
         let url = authorization_url();
-        let client = HttpAuthorizationClient::new(url.to_owned());
+        let client = IamClient::new(url.to_owned());
         let auth = Authentication::from_token(api_token());
 
         // When the client is used to check a valid api token
@@ -363,7 +311,7 @@ pub mod tests {
     async fn false_for_invalid_token() {
         // Given a client that is configured against the inference api
         let url = authorization_url();
-        let client = HttpAuthorizationClient::new(url.to_owned());
+        let client = IamClient::new(url.to_owned());
 
         // When the client is used to check an invalid api token
         let result = client
@@ -426,7 +374,7 @@ pub mod tests {
     async fn no_token_is_an_error() {
         // Given a client that is configured against the inference api
         let url = authorization_url();
-        let client = HttpAuthorizationClient::new(url.to_owned());
+        let client = IamClient::new(url.to_owned());
 
         // When the client is used to check a none token
         let result = client
