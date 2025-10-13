@@ -396,7 +396,7 @@ impl From<Message> for inference::Message {
             Role::User => inference::Message::user(content),
             Role::Assistant => inference::Message::Assistant(inference::AssistantMessage {
                 content: Some(content),
-                tool_calls: None
+                tool_calls: None,
             }),
         }
     }

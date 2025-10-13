@@ -860,7 +860,6 @@ struct InputMessage {
     tool_calls: Option<Vec<ToolCall>>,
 }
 
-
 impl From<inference::AssistantMessageV2> for OutputMessage {
     fn from(value: inference::AssistantMessageV2) -> Self {
         let inference::AssistantMessageV2 {
@@ -889,12 +888,10 @@ impl TryFrom<InputMessage> for inference::Message {
             tool_calls,
         } = value;
         match role.as_str() {
-            "assistant" => Ok(inference::Message::Assistant(
-                inference::AssistantMessage {
-                    content,
-                    tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
-                },
-            )),
+            "assistant" => Ok(inference::Message::Assistant(inference::AssistantMessage {
+                content,
+                tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+            })),
             "tool" => Ok(inference::Message::Tool(inference::ToolMessage {
                 // We did previously accept tool call messages without a tool call id, as the
                 // AlephAlpha inference backend does not require it. Therefore, we still accept it.
