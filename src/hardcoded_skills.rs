@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::{
-    inference::{AssistantMessageV2, ChatEvent, ChatParams, ChatRequest, Message},
+    inference::{AssistantMessage, ChatEvent, ChatParams, ChatRequest, Message},
     logging::TracingContext,
     namespace_watcher::Namespace,
     skill::{
@@ -267,9 +267,8 @@ impl SkillChatMessage {
         match self.role.as_str() {
             "system" => Ok(Message::system(self.content)),
             "user" => Ok(Message::user(self.content)),
-            "assistant" => Ok(Message::Assistant(AssistantMessageV2 {
+            "assistant" => Ok(Message::Assistant(AssistantMessage {
                 content: Some(self.content),
-                reasoning_content: None,
                 tool_calls: None,
             })),
             _ => Err(anyhow::anyhow!("Invalid role: {}", self.role)),
