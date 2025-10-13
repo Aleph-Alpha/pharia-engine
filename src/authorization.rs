@@ -13,7 +13,7 @@ use futures::{StreamExt, channel::oneshot, stream::FuturesUnordered};
 use pharia_common::{AuthorizationError, IamClient, Permission};
 use thiserror::Error;
 use tokio::{select, sync::mpsc, task::JoinHandle};
-use tracing::error;
+use tracing::{Instrument, error};
 
 use crate::logging::TracingContext;
 
@@ -207,7 +207,10 @@ impl AuthorizationClient for IamClient {
             return Err(AuthorizationClientError::NoBearerToken);
         };
 
-        let result = self.authorize(token, &[Permission::KernelAccess]).await;
+        let result = self
+            .authorize(token, &[Permission::KernelAccess])
+            .instrument(context.span().clone())
+            .await;
 
         match result {
             Ok(_) => Ok(true),
