@@ -510,7 +510,7 @@ pub mod tests {
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke, SkillToolCaller},
         inference::{ChatEvent, ChatRequest, InferenceError},
         namespace_watcher::Namespace,
-        skill::{BoxedCsi, SkillDouble, SkillError},
+        skill::{BoxedCsi, SkillDouble, SkillError, SkillEvent},
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
@@ -694,7 +694,7 @@ pub mod tests {
         let mut recv = runtime
             .api()
             .run_message_stream(
-                SkillPath::new(Namespace::new("test-beta").unwrap(), "tool_caller"),
+                SkillPath::dummy(),
                 json!(""),
                 Authentication::none(),
                 TracingContext::dummy(),
@@ -735,6 +735,63 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn stream_with_reasoning() {
+        struct ReasoningSkill;
+
+        #[async_trait]
+        impl SkillDouble for ReasoningSkill {
+            async fn run_as_message_stream(
+                &self,
+                _ctx: BoxedCsi,
+                _input: Value,
+                sender: mpsc::Sender<SkillEvent>,
+                _tracing_context: &TracingContext,
+            ) -> Result<(), SkillError> {
+                sender.send(SkillEvent::MessageBegin).await.unwrap();
+
+                sender
+                    .send(SkillEvent::Reasoning {
+                        text: "To be or not to be".to_owned(),
+                    })
+                    .await
+                    .unwrap();
+                Ok(())
+            }
+        }
+
+        // Given
+        let store = SkillStoreStub::with_fetch_response(Some(Arc::new(ReasoningSkill)));
+        let runtime = SkillRuntime::new(Dummy, store);
+
+        // When
+        let mut recv = runtime
+            .api()
+            .run_message_stream(
+                SkillPath::dummy(),
+                json!(""),
+                Authentication::none(),
+                TracingContext::dummy(),
+            )
+            .await;
+
+        // Then
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            SkillExecutionEvent::MessageBegin
+        );
+        assert_eq!(
+            recv.recv().await.unwrap(),
+            SkillExecutionEvent::Reasoning {
+                text: "To be or not to be".to_string()
+            }
+        );
+        assert!(recv.recv().await.is_none());
+
+        // Cleanup
+        runtime.wait_for_shutdown().await;
+    }
+
+    #[tokio::test]
     async fn stream_hello_test() {
         // Given
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillHello)));
@@ -744,7 +801,7 @@ pub mod tests {
         let mut recv = runtime
             .api()
             .run_message_stream(
-                SkillPath::new(Namespace::new("test-beta").unwrap(), "hello"),
+                SkillPath::dummy(),
                 json!(""),
                 Authentication::none(),
                 TracingContext::dummy(),
@@ -808,7 +865,7 @@ pub mod tests {
         let mut recv = runtime
             .api()
             .run_message_stream(
-                SkillPath::new(Namespace::new("test-beta").unwrap(), "saboteur"),
+                SkillPath::dummy(),
                 json!(""),
                 Authentication::none(),
                 TracingContext::dummy(),
@@ -889,7 +946,7 @@ pub mod tests {
         // Given
         let store = SkillStoreStub::with_fetch_response(Some(Arc::new(SkillTellMeAJoke)));
         let runtime = SkillRuntime::new(RawCsiSaboteur, store);
-        let skill_path = SkillPath::new(Namespace::new("test-beta").unwrap(), "tell_me_a_joke");
+        let skill_path = SkillPath::dummy();
 
         // When
         let mut recv = runtime
