@@ -868,7 +868,7 @@ mod tests {
         };
 
         // When chatting with inference client
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
@@ -968,7 +968,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             },
             messages: vec![Message::user("Haiku about oat milk!")],
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
@@ -1050,7 +1050,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
@@ -1176,7 +1176,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
                 ..Default::default()
             },
         };
-        let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
+        let chat_response = <AlephAlphaClient as InferenceClient>::chat(
             &client,
             &chat_request,
             auth,
@@ -1304,7 +1304,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         let (send, mut recv) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            <AlephAlphaClient as InferenceClient>::stream_chat_v2(
+            <AlephAlphaClient as InferenceClient>::stream_chat(
                 &client,
                 &chat_request,
                 auth,
@@ -1324,23 +1324,23 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         assert_eq!(events.len(), 4);
         assert_eq!(
             events[0],
-            ChatEventV2::MessageBegin {
+            ChatEvent::MessageBegin {
                 role: "assistant".to_owned()
             }
         );
         assert!(matches!(
             &events[1],
-            ChatEventV2::MessageAppend {
+            ChatEvent::MessageAppend {
                 content,
                 ..
             } if content == "Keep"
         ));
         assert_eq!(
             events[2],
-            ChatEventV2::MessageEnd {
+            ChatEvent::MessageEnd {
                 finish_reason: FinishReason::Length
             }
         );
-        assert!(matches!(events[3], ChatEventV2::Usage { .. }));
+        assert!(matches!(events[3], ChatEvent::Usage { .. }));
     }
 }

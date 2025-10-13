@@ -97,6 +97,7 @@ impl HostStreamOutput for LinkedCtx {
             .expect("Failed to push stream to resource table");
         let event = match item {
             MessageItem::MessageBegin(_) => SkillEvent::MessageBegin,
+            MessageItem::Reasoning(text) => SkillEvent::Reasoning { text },
             MessageItem::MessageAppend(text) => SkillEvent::MessageAppend { text },
             MessageItem::MessageEnd(payload) => match payload {
                 Some(payload) => match serde_json::from_slice(&payload) {

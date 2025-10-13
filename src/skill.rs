@@ -84,6 +84,8 @@ pub enum SkillEvent {
     /// reason to be very useful for end applications. We also introduce end messages to keep the
     /// door open for multiple messages in a stream.
     MessageEnd { payload: Value },
+    /// A chunk of reasoning generated while working on the request.
+    Reasoning { text: String },
     /// Append the internal string to the current message
     MessageAppend { text: String },
     /// A bug caused by the skill code, there the object passed in the payload is not valid JSON.
