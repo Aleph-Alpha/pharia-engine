@@ -118,20 +118,6 @@ impl From<ChatCompletionMessageToolCall> for inference::ToolCall {
     }
 }
 
-impl From<ChatCompletionResponseMessage> for inference::AssistantMessage {
-    fn from(message: ChatCompletionResponseMessage) -> Self {
-        let ChatCompletionResponseMessage {
-            content,
-            reasoning_content: _,
-            tool_calls,
-        } = message;
-        inference::AssistantMessage {
-            content,
-            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
-        }
-    }
-}
-
 impl From<CompletionUsage> for inference::TokenUsage {
     fn from(usage: CompletionUsage) -> Self {
         // OpenAI provides more fields like `prompt_tokens_details` and `completion_tokens_details`.
@@ -416,45 +402,6 @@ pub struct ChatResponseReasoningContent {
     usage: Option<async_openai::types::CompletionUsage>,
 }
 
-impl TryFrom<ChatResponseReasoningContent> for inference::ChatResponse {
-    type Error = InferenceError;
-
-    fn try_from(response: ChatResponseReasoningContent) -> Result<Self, Self::Error> {
-        let first_choice = response.choices.into_iter().next().ok_or_else(|| {
-            InferenceError::Other(anyhow::anyhow!(
-                "Expected at least one choice in the chat completion response."
-            ))
-        })?;
-
-        // It is not quite clear why finish reason is represented as an Option. The OpenAI API docs
-        // specify it to always exist:
-        // https://platform.openai.com/docs/api-reference/chat/object#chat/object-choices
-        let finish_reason = first_choice
-            .finish_reason
-            .ok_or_else(|| {
-                anyhow::anyhow!("Expected chat completion response to have a finish reason.")
-            })?
-            .into();
-
-        // It is not quite clear why usage is represented as an Option. The OpenAI API docs specify
-        // it to always exist:
-        // https://platform.openai.com/docs/api-reference/chat/object#chat/object-usage
-        let usage = response
-            .usage
-            .ok_or_else(|| anyhow::anyhow!("Expected chat completion response to have a usage."))?
-            .into();
-
-        let message = inference::AssistantMessage::from(first_choice.message.clone());
-        let response = inference::ChatResponse {
-            message,
-            finish_reason,
-            logprobs: map_logprobs(first_choice.logprobs),
-            usage,
-        };
-        Ok(response)
-    }
-}
-
 impl TryFrom<ChatResponseReasoningContent> for inference::ChatResponseV2 {
     type Error = InferenceError;
 
@@ -699,6 +646,7 @@ impl InferenceClient for OpenAiClient {
         validate_chat_response(request, &response)?;
         Ok(response)
     }
+
     async fn chat_v2(
         &self,
         request: &inference::ChatRequest,
@@ -830,7 +778,7 @@ mod tests {
         };
 
         // When converting to an inference assistant message
-        let message = inference::AssistantMessage::from(message);
+        let message = inference::AssistantMessageV2::from(message);
 
         // Then the tool call is available
         assert_eq!(message.tool_calls.unwrap().len(), 1);
