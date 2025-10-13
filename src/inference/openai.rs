@@ -570,7 +570,7 @@ impl inference::ChatEvent {
         // In case we receive a usage, there is no choices, and no other events.
         if let Some(usage) = event.usage {
             let usage = usage.into();
-            return vec![inference::ChatEvent::Usage { usage }];
+            return vec![Self::Usage { usage }];
         }
 
         let Some(first_choice) = event.choices.into_iter().next() else {
@@ -580,7 +580,7 @@ impl inference::ChatEvent {
         };
 
         let mut events = if let Some(role) = first_choice.delta.role {
-            vec![inference::ChatEvent::MessageBegin {
+            vec![Self::MessageBegin {
                 role: role.to_string(),
             }]
         } else {
@@ -593,16 +593,68 @@ impl inference::ChatEvent {
             && !content.is_empty()
         {
             let logprobs = map_logprobs(first_choice.logprobs);
-            events.push(inference::ChatEvent::MessageAppend { content, logprobs });
+            events.push(Self::MessageAppend { content, logprobs });
         } else if let Some(tool_call) = first_choice.delta.tool_calls {
-            events.push(inference::ChatEvent::ToolCall(
+            events.push(Self::ToolCall(
                 tool_call.into_iter().map(Into::into).collect(),
             ));
         }
 
         if let Some(finish_reason) = first_choice.finish_reason {
             let finish_reason = finish_reason.into();
-            events.push(inference::ChatEvent::MessageEnd { finish_reason });
+            events.push(Self::MessageEnd { finish_reason });
+        }
+        events
+    }
+}
+
+impl inference::ChatEventV2 {
+    /// Convert a [`ChatStreamWithReasoning`] into a vector of [`inference::ChatEventV2`].
+    ///
+    /// While it might seem natural to have a 1-1 mapping between events from the inference backend
+    /// and events in our domain, we have chosen a domain model in which `MessageBegin` (containing
+    /// the role) and `MessageAppend`/`ToolCall` (containing the content) are separate events.
+    /// However, at least for tool calls coming from `OpenAI`, there is no guarantee for the event
+    /// containing the role to be distinct from the event containing the tool call.
+    /// Therefore, a single inference backend event can turn itself into multiple events in our
+    /// domain model.
+    pub fn from_stream(event: ChatStreamWithReasoning) -> Vec<Self> {
+        // In case we receive a usage, there is no choices, and no other events.
+        if let Some(usage) = event.usage {
+            let usage = usage.into();
+            return vec![Self::Usage { usage }];
+        }
+
+        let Some(first_choice) = event.choices.into_iter().next() else {
+            // GitHub models returns an empty choices array on the first event. To be compatible,
+            // we do not raise an error but simply wait for the next event.
+            return vec![];
+        };
+
+        let mut events = if let Some(role) = first_choice.delta.role {
+            vec![Self::MessageBegin {
+                role: role.to_string(),
+            }]
+        } else {
+            vec![]
+        };
+
+        // If the message has a main part, it is either a content chunk or a tool call.
+        // We filter for empty content, as message containing the role often has an empty content.
+        if let Some(content) = first_choice.delta.content
+            && !content.is_empty()
+        {
+            let logprobs = map_logprobs(first_choice.logprobs);
+            events.push(Self::MessageAppend { content, logprobs });
+        } else if let Some(tool_call) = first_choice.delta.tool_calls {
+            events.push(Self::ToolCall(
+                tool_call.into_iter().map(Into::into).collect(),
+            ));
+        }
+
+        if let Some(finish_reason) = first_choice.finish_reason {
+            let finish_reason = finish_reason.into();
+            events.push(Self::MessageEnd { finish_reason });
         }
         events
     }
@@ -667,7 +719,7 @@ impl InferenceClient for OpenAiClient {
         request: &inference::ChatRequest,
         _auth: Authentication,
         _tracing_context: &TracingContext,
-        send: mpsc::Sender<inference::ChatEvent>,
+        send: mpsc::Sender<inference::ChatEventV2>,
     ) -> Result<(), InferenceError> {
         let openai_request = request.as_openai_stream_request()?;
         let mut stream = self
@@ -677,9 +729,8 @@ impl InferenceClient for OpenAiClient {
             .await?;
 
         while let Some(event) = stream.next().await {
-            let events = inference::ChatEvent::from_stream(event?);
+            let events = inference::ChatEventV2::from_stream(event?);
             for event in events {
-                validate_chat_event(request, &event)?;
                 drop(send.send(event).await);
             }
         }
@@ -749,7 +800,7 @@ mod tests {
     use crate::{
         authorization::Authentication,
         inference::{
-            self, ChatEvent, ChatParams, ChatRequest, Function, InferenceError, JsonSchema,
+            self, ChatEventV2, ChatParams, ChatRequest, Function, InferenceError, JsonSchema,
             Logprobs, Message, ReasoningEffort, ResponseFormat, ToolChoice,
             client::InferenceClient,
         },
@@ -1005,10 +1056,10 @@ mod tests {
 
         // Then
         assert_eq!(events.len(), 4);
-        assert!(matches!(events[0], ChatEvent::MessageBegin { .. }));
-        assert!(matches!(events[1], ChatEvent::MessageAppend { .. }));
-        assert!(matches!(events[2], ChatEvent::MessageEnd { .. }));
-        assert!(matches!(events[3], ChatEvent::Usage { .. }));
+        assert!(matches!(events[0], ChatEventV2::MessageBegin { .. }));
+        assert!(matches!(events[1], ChatEventV2::MessageAppend { .. }));
+        assert!(matches!(events[2], ChatEventV2::MessageEnd { .. }));
+        assert!(matches!(events[3], ChatEventV2::Usage { .. }));
     }
 
     #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]
@@ -1103,10 +1154,10 @@ mod tests {
         }
 
         // Then the model calls the tool
-        assert!(matches!(events[0], ChatEvent::MessageBegin { .. }));
+        assert!(matches!(events[0], ChatEventV2::MessageBegin { .. }));
 
         // And the first event contains the index, name and id
-        if let ChatEvent::ToolCall(tool_calls) = &events[1] {
+        if let ChatEventV2::ToolCall(tool_calls) = &events[1] {
             assert_eq!(tool_calls.len(), 1);
             assert_eq!(tool_calls[0].index, 0);
             assert_eq!(tool_calls[0].name.as_ref().unwrap(), "get_delivery_date");
@@ -1116,7 +1167,7 @@ mod tests {
         }
 
         // And the second event contains the index and parts of the arguments
-        if let ChatEvent::ToolCall(tool_calls) = &events[2] {
+        if let ChatEventV2::ToolCall(tool_calls) = &events[2] {
             assert_eq!(tool_calls.len(), 1);
             assert_eq!(tool_calls[0].index, 0);
             assert!(!tool_calls[0].arguments.as_ref().unwrap().is_empty());
@@ -1126,9 +1177,12 @@ mod tests {
 
         assert!(matches!(
             events[events.len() - 2],
-            ChatEvent::MessageEnd { .. }
+            ChatEventV2::MessageEnd { .. }
         ));
-        assert!(matches!(events[events.len() - 1], ChatEvent::Usage { .. }));
+        assert!(matches!(
+            events[events.len() - 1],
+            ChatEventV2::Usage { .. }
+        ));
     }
 
     #[cfg_attr(feature = "test_no_openai", ignore = "OpenAI tests disabled")]

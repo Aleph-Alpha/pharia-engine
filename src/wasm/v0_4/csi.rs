@@ -510,21 +510,21 @@ impl From<inference::CompletionEvent> for CompletionEvent {
     }
 }
 
-impl From<inference::ChatEvent> for ChatEvent {
-    fn from(value: inference::ChatEvent) -> Self {
+impl From<inference::ChatEventV2> for ChatEvent {
+    fn from(value: inference::ChatEventV2) -> Self {
         match value {
-            inference::ChatEvent::MessageBegin { role } => ChatEvent::MessageBegin(role),
-            inference::ChatEvent::MessageAppend { content, logprobs } => {
+            inference::ChatEventV2::MessageBegin { role } => ChatEvent::MessageBegin(role),
+            inference::ChatEventV2::MessageAppend { content, logprobs } => {
                 ChatEvent::MessageAppend(MessageAppend {
                     content,
                     logprobs: logprobs.into_iter().map(Into::into).collect(),
                 })
             }
-            inference::ChatEvent::MessageEnd { finish_reason } => {
+            inference::ChatEventV2::MessageEnd { finish_reason } => {
                 ChatEvent::MessageEnd(finish_reason.into())
             }
-            inference::ChatEvent::Usage { usage } => ChatEvent::Usage(usage.into()),
-            inference::ChatEvent::ToolCall(chunks) => {
+            inference::ChatEventV2::Usage { usage } => ChatEvent::Usage(usage.into()),
+            inference::ChatEventV2::ToolCall(chunks) => {
                 ChatEvent::ToolCall(chunks.into_iter().map(Into::into).collect())
             }
         }

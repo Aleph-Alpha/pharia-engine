@@ -435,6 +435,93 @@ where
     Ok(Sse::new(stream))
 }
 
+impl From<inference::ChatEventV2> for Event {
+    fn from(event: inference::ChatEventV2) -> Self {
+        match event {
+            inference::ChatEventV2::MessageBegin { role } => Event::default()
+                .event("message_begin")
+                .json_data(ChatMessageStartEvent { role })
+                .expect("`json_data` must only be called once."),
+            inference::ChatEventV2::MessageAppend { content, logprobs } => Event::default()
+                .event("message_append")
+                .json_data(ChatMessageAppendEvent {
+                    content,
+                    logprobs: logprobs.into_iter().map(Into::into).collect(),
+                })
+                .expect("`json_data` must only be called once."),
+            inference::ChatEventV2::MessageEnd { finish_reason } => Event::default()
+                .event("message_end")
+                .json_data(ChatMessageEndEvent {
+                    finish_reason: finish_reason.into(),
+                })
+                .expect("`json_data` must only be called once."),
+            inference::ChatEventV2::Usage { usage } => Event::default()
+                .event("usage")
+                .json_data(ChatUsageEvent {
+                    usage: usage.into(),
+                })
+                .expect("`json_data` must only be called once."),
+            inference::ChatEventV2::ToolCall(tool_calls) => Event::default()
+                .event("tool_call")
+                .json_data(ToolCallEvent {
+                    tool_calls: tool_calls.into_iter().map(Into::into).collect(),
+                })
+                .expect("`json_data` must only be called once."),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ChatMessageStartEvent {
+    role: String,
+}
+
+#[derive(Serialize)]
+struct ChatMessageAppendEvent {
+    content: String,
+    logprobs: Vec<Distribution>,
+}
+
+#[derive(Serialize)]
+struct ChatMessageEndEvent {
+    finish_reason: FinishReason,
+}
+
+#[derive(Serialize)]
+struct ChatUsageEvent {
+    usage: TokenUsage,
+}
+
+#[derive(Serialize)]
+struct ToolCallChunk {
+    index: u32,
+    id: Option<String>,
+    name: Option<String>,
+    arguments: Option<String>,
+}
+
+impl From<inference::ToolCallChunk> for ToolCallChunk {
+    fn from(value: inference::ToolCallChunk) -> Self {
+        let inference::ToolCallChunk {
+            index,
+            id,
+            name,
+            arguments,
+        } = value;
+        ToolCallChunk {
+            index,
+            id,
+            name,
+            arguments,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ToolCallEvent {
+    tool_calls: Vec<ToolCallChunk>,
+}
+
 #[derive(Deserialize)]
 struct CompletionRequest {
     prompt: String,
@@ -1355,7 +1442,7 @@ mod tests {
 
     use crate::{
         csi::tests::RawCsiDouble,
-        inference::{ChatEvent, ChatRequest, InferenceError, ToolCallChunk},
+        inference::{ChatEventV2, ChatRequest, InferenceError, ToolCallChunk},
         namespace_watcher::Namespace,
         tool::{Argument, InvokeRequest, ToolError, ToolOutput},
     };
@@ -1487,7 +1574,7 @@ mod tests {
                 _auth: Authentication,
                 _tracing_context: TracingContext,
                 request: ChatRequest,
-            ) -> mpsc::Receiver<Result<ChatEvent, InferenceError>> {
+            ) -> mpsc::Receiver<Result<ChatEventV2, InferenceError>> {
                 assert_eq!(request.params.tools.as_ref().unwrap().len(), 1);
                 assert_eq!(
                     request.params.tool_choice.as_ref().unwrap(),
@@ -1506,10 +1593,10 @@ mod tests {
 
                 let (tx, rx) = mpsc::channel(1);
                 let events = vec![
-                    ChatEvent::MessageBegin {
+                    ChatEventV2::MessageBegin {
                         role: "tool".to_string(),
                     },
-                    ChatEvent::ToolCall(vec![ToolCallChunk {
+                    ChatEventV2::ToolCall(vec![ToolCallChunk {
                         index: 0,
                         id: Some("1".to_string()),
                         name: Some("add".to_string()),
