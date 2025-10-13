@@ -381,6 +381,7 @@ fn record_skill_execution_metrics<T>(
             | SkillExecutionError::MisconfiguredNamespace { .. }
             | SkillExecutionError::IsFunction
             | SkillExecutionError::IsMessageStream
+            | SkillExecutionError::ReasoningWithoutMessageBegin
             | SkillExecutionError::MessageAppendWithoutMessageBegin
             | SkillExecutionError::MessageEndWithoutMessageBegin
             | SkillExecutionError::MessageBeginWhileMessageActive,
@@ -509,7 +510,7 @@ pub mod tests {
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke, SkillToolCaller},
         inference::{ChatEvent, ChatRequest, InferenceError},
         namespace_watcher::Namespace,
-        skill::{BoxedCsi, SkillDouble, SkillError, SkillEvent},
+        skill::{BoxedCsi, SkillDouble, SkillError},
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
@@ -929,16 +930,6 @@ pub mod tests {
             _tracing_context: &TracingContext,
         ) -> Result<Value, SkillError> {
             Ok(json!("Hello"))
-        }
-
-        async fn run_as_message_stream(
-            &self,
-            _ctx: BoxedCsi,
-            _input: Value,
-            _sender: mpsc::Sender<SkillEvent>,
-            _tracing_context: &TracingContext,
-        ) -> Result<(), SkillError> {
-            Err(SkillError::IsFunction)
         }
     }
 

@@ -244,6 +244,10 @@ impl From<SkillExecutionEvent> for Event {
                 .event("message")
                 .json_data(MessageEvent::End { payload })
                 .expect("`json_data` must only be called once."),
+            SkillExecutionEvent::Reasoning { text } => Self::default()
+                .event("reasoning")
+                .json_data(MessageEvent::Reasoning { text })
+                .expect("`json_data` must only be called once."),
             SkillExecutionEvent::MessageAppend { text } => Self::default()
                 .event("message")
                 .json_data(MessageEvent::Append { text })
@@ -276,6 +280,9 @@ impl From<SkillExecutionEvent> for Event {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum MessageEvent {
     Begin,
+    Reasoning {
+        text: String,
+    },
     Append {
         text: String,
     },
@@ -307,19 +314,15 @@ struct SseErrorEvent {
 impl From<SkillExecutionError> for HttpError {
     fn from(value: SkillExecutionError) -> Self {
         let status_code = match &value {
-            // We return 5xx not only for runtime errors, but also for errors we consider Bugs in
-            // the deployed skills.
             SkillExecutionError::MisconfiguredNamespace { .. }
             | SkillExecutionError::CsiUseFromMetadata
             | SkillExecutionError::InvalidOutput(_)
+            | SkillExecutionError::ReasoningWithoutMessageBegin
             | SkillExecutionError::MessageAppendWithoutMessageBegin
             | SkillExecutionError::MessageBeginWhileMessageActive
             | SkillExecutionError::MessageEndWithoutMessageBegin
             | SkillExecutionError::SkillLoadError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            // Service unavailable indicates better that the situation is temporary and retrying it
-            // might be worth it.
             SkillExecutionError::RuntimeError(_) => StatusCode::SERVICE_UNAVAILABLE,
-            // 400 for every error we see an error on the client side of HTTP
             SkillExecutionError::UserCode(_)
             | SkillExecutionError::SkillNotConfigured
             | SkillExecutionError::IsFunction
@@ -473,6 +476,39 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let error = String::from_utf8(body.to_vec()).unwrap();
         assert!(error.to_lowercase().contains("invalid namespace"));
+    }
+
+    #[tokio::test]
+    async fn stream_endpoint_should_send_reasoning_chunks() {
+        // Given
+        let event = SkillExecutionEvent::Reasoning {
+            text: "To be or not to be".to_string(),
+        };
+        let app_state = ProviderStub::new(EventStreamStub::new(vec![event]));
+        let http = http_skill_runtime_v1(PRODUCTION_FEATURE_SET).with_state(app_state);
+
+        // When asking for a message stream
+        let resp = http
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .uri("/skills/local/hello/message-stream")
+                    .body(Body::from("\"\""))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then we get separate events for each letter in "Hello"
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(content_type, TEXT_EVENT_STREAM.as_ref());
+
+        let body_text = resp.into_body().collect().await.unwrap().to_bytes();
+        let expected_body =
+            "event: reasoning\ndata: {\"type\":\"reasoning\",\"text\":\"To be or not to be\"}\n\n";
+        assert_eq!(body_text, expected_body);
     }
 
     #[tokio::test]
