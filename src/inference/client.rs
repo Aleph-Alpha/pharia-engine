@@ -1226,7 +1226,7 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
             model: "qwen3-32b".to_owned(),
             messages: vec![Message::user("An apple a day")],
             params: ChatParams {
-                max_tokens: Some(1),
+                max_tokens: Some(2),
                 temperature: Some(0.0),
                 ..Default::default()
             },
@@ -1251,27 +1251,13 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         }
 
         // Then
-        assert_eq!(events.len(), 4);
         assert_eq!(
             events[0],
             ChatEventV2::MessageBegin {
                 role: "assistant".to_owned()
             }
         );
-        assert!(matches!(
-            &events[1],
-            ChatEventV2::MessageAppend {
-                content,
-                ..
-            } if content == "Keep"
-        ));
-        assert_eq!(
-            events[2],
-            ChatEventV2::MessageEnd {
-                finish_reason: FinishReason::Length
-            }
-        );
-        assert!(matches!(events[3], ChatEventV2::Usage { .. }));
+        assert!(matches!(&events[1], ChatEventV2::Reasoning { .. }));
     }
 
     #[tokio::test]

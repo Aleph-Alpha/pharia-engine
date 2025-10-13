@@ -518,6 +518,9 @@ impl From<OpenAIError> for InferenceError {
 pub struct ChatCompletionStreamResponseDelta {
     /// The contents of the chunk message.
     content: Option<String>,
+    /// OpenRouter serializes reasoning content into field reasoning
+    #[serde(alias = "reasoning")]
+    reasoning_content: Option<String>,
     tool_calls: Option<Vec<async_openai::types::ChatCompletionMessageToolCallChunk>>,
     /// The role of the author of this message.
     role: Option<async_openai::types::Role>,
@@ -639,6 +642,13 @@ impl inference::ChatEventV2 {
             vec![]
         };
 
+        // We assume there are messages with both reasoning content and content.
+        // We filter for empty content, as non thinking messages often contain an empty string in the reasoning content field.
+        if let Some(content) = first_choice.delta.reasoning_content
+            && !content.is_empty()
+        {
+            events.push(Self::Reasoning { content });
+        }
         // If the message has a main part, it is either a content chunk or a tool call.
         // We filter for empty content, as message containing the role often has an empty content.
         if let Some(content) = first_choice.delta.content
