@@ -442,6 +442,10 @@ impl From<inference::ChatEventV2> for Event {
                 .event("message_begin")
                 .json_data(ChatMessageStartEvent { role })
                 .expect("`json_data` must only be called once."),
+            inference::ChatEventV2::Reasoning { content } => Event::default()
+                .event("reasoning")
+                .json_data(ChatReasoningEvent { content })
+                .expect("`json_data` must only be called once."),
             inference::ChatEventV2::MessageAppend { content, logprobs } => Event::default()
                 .event("message_append")
                 .json_data(ChatMessageAppendEvent {
@@ -474,6 +478,11 @@ impl From<inference::ChatEventV2> for Event {
 #[derive(Serialize)]
 struct ChatMessageStartEvent {
     role: String,
+}
+
+#[derive(Serialize)]
+struct ChatReasoningEvent {
+    content: String,
 }
 
 #[derive(Serialize)]
@@ -1558,6 +1567,73 @@ mod tests {
                 "completion": 0
             }
         }]);
+        assert_eq!(body, expected_body);
+    }
+
+    #[tokio::test]
+    async fn stream_with_reasoning_via_csi() {
+        // Given a csi stub that returns reasoning content
+        #[derive(Clone)]
+        struct RawCsiStub;
+
+        impl RawCsiDouble for RawCsiStub {
+            async fn chat_stream_v2(
+                &self,
+                _auth: Authentication,
+                _tracing_context: TracingContext,
+                _request: ChatRequest,
+            ) -> mpsc::Receiver<Result<ChatEventV2, InferenceError>> {
+                let (tx, rx) = mpsc::channel(1);
+                let event = ChatEventV2::Reasoning {
+                    content: "reasoning_content".to_string(),
+                };
+                tokio::spawn(async move {
+                    tx.send(Ok(event)).await.unwrap();
+                });
+                rx
+            }
+        }
+
+        #[derive(Clone)]
+        struct CsiProviderStub;
+        impl CsiProvider for CsiProviderStub {
+            type Csi = RawCsiStub;
+            fn csi(&self) -> &Self::Csi {
+                &RawCsiStub
+            }
+        }
+
+        // When doing a chat request
+        let body = json!({
+            "model": "dummy",
+            "messages": [],
+            "params": {
+                "logprobs": "no",
+            }
+        });
+        let response = http()
+            .with_state(CsiProviderStub)
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+                    .header(AUTHORIZATION, "Bearer test")
+                    .uri("/chat_stream")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Then the response is successful, and we get a reasoning content from the stub.
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        let expected_body = "\
+            event: reasoning\n\
+            data: {\"content\":\"reasoning_content\"}\n\n";
+
         assert_eq!(body, expected_body);
     }
 
