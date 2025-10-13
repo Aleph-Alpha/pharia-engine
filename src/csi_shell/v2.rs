@@ -775,7 +775,7 @@ impl From<ChatParams> for inference::ChatParams {
 #[derive(Deserialize)]
 struct ChatRequest {
     model: String,
-    messages: Vec<Message>,
+    messages: Vec<InputMessage>,
     params: ChatParams,
 }
 
@@ -837,13 +837,13 @@ impl From<ToolCall> for inference::ToolCall {
     }
 }
 
-/// Representation of a Message for serialization/deserialization via the CSI shell.
+/// Representation of a Message for serialization via the CSI shell.
 ///
 /// While we could also go for an enum approach here to mirror the domain representation in
 /// [`crate::inference::Message`], we currently do not see any benefit in doing so, and stick to
 /// the one struct approach here.
-#[derive(Serialize, Deserialize)]
-struct Message {
+#[derive(Serialize)]
+struct OutputMessage {
     role: String,
     content: Option<String>,
     reasoning_content: Option<String>,
@@ -851,30 +851,24 @@ struct Message {
     tool_calls: Option<Vec<ToolCall>>,
 }
 
-impl From<inference::AssistantMessage> for Message {
-    fn from(value: inference::AssistantMessage) -> Self {
-        let inference::AssistantMessage {
-            content,
-            tool_calls,
-        } = value;
-        Message {
-            role: inference::AssistantMessage::role().to_owned(),
-            content,
-            reasoning_content: None,
-            tool_call_id: None,
-            tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
-        }
-    }
+/// Representation of a Message for deserialization via the CSI shell.
+#[derive(Deserialize)]
+struct InputMessage {
+    role: String,
+    content: Option<String>,
+    tool_call_id: Option<String>,
+    tool_calls: Option<Vec<ToolCall>>,
 }
 
-impl From<inference::AssistantMessageV2> for Message {
+
+impl From<inference::AssistantMessageV2> for OutputMessage {
     fn from(value: inference::AssistantMessageV2) -> Self {
         let inference::AssistantMessageV2 {
             content,
             reasoning_content,
             tool_calls,
         } = value;
-        Message {
+        OutputMessage {
             role: inference::AssistantMessageV2::role().to_owned(),
             content,
             reasoning_content,
@@ -884,22 +878,20 @@ impl From<inference::AssistantMessageV2> for Message {
     }
 }
 
-impl TryFrom<Message> for inference::Message {
+impl TryFrom<InputMessage> for inference::Message {
     type Error = anyhow::Error;
 
-    fn try_from(value: Message) -> Result<Self, Self::Error> {
-        let Message {
+    fn try_from(value: InputMessage) -> Result<Self, Self::Error> {
+        let InputMessage {
             role,
             content,
-            reasoning_content,
             tool_call_id,
             tool_calls,
         } = value;
         match role.as_str() {
             "assistant" => Ok(inference::Message::Assistant(
-                inference::AssistantMessageV2 {
+                inference::AssistantMessage {
                     content,
-                    reasoning_content,
                     tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
                 },
             )),
@@ -1061,7 +1053,7 @@ impl From<search::Document> for Document {
 
 #[derive(Serialize)]
 struct ChatResponse {
-    message: Message,
+    message: OutputMessage,
     finish_reason: FinishReason,
     logprobs: Vec<Distribution>,
     usage: TokenUsage,

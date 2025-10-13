@@ -603,11 +603,13 @@ impl From<Message> for inference::Message {
         match message {
             Message::Assistant(AssistantMessage {
                 content,
-                reasoning_content,
+                // While the WIT world does not differentiate between request and response messages,
+                // as of now we do not support the reasoning content in the request message in the
+                // message history since there are no apparent use cases for it right now.
+                reasoning_content: _,
                 tool_calls,
-            }) => inference::Message::Assistant(inference::AssistantMessageV2 {
+            }) => inference::Message::Assistant(inference::AssistantMessage {
                 content,
-                reasoning_content,
                 tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
             }),
             Message::Tool(ToolMessage {

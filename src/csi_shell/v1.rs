@@ -932,9 +932,8 @@ impl TryFrom<Message> for inference::Message {
         } = value;
         match role.as_str() {
             "assistant" => Ok(inference::Message::Assistant(
-                inference::AssistantMessageV2 {
+                inference::AssistantMessage {
                     content,
-                    reasoning_content: None,
                     tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
                 },
             )),

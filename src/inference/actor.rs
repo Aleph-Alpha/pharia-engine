@@ -550,7 +550,7 @@ pub struct ToolMessage {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Assistant(AssistantMessageV2),
+    Assistant(AssistantMessage),
     Tool(ToolMessage),
     // Would be either system, developer or user, others are not supported by OpenAI and the
     // client library. We do not have stronger typing for the role, as we do not have a good way
