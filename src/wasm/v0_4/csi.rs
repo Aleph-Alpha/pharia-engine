@@ -514,6 +514,7 @@ impl From<inference::ChatEventV2> for ChatEvent {
     fn from(value: inference::ChatEventV2) -> Self {
         match value {
             inference::ChatEventV2::MessageBegin { role } => ChatEvent::MessageBegin(role),
+            inference::ChatEventV2::Reasoning { content } => ChatEvent::Reasoning(content),
             inference::ChatEventV2::MessageAppend { content, logprobs } => {
                 ChatEvent::MessageAppend(MessageAppend {
                     content,
