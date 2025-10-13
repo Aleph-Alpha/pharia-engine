@@ -518,7 +518,7 @@ impl From<OpenAIError> for InferenceError {
 pub struct ChatCompletionStreamResponseDelta {
     /// The contents of the chunk message.
     content: Option<String>,
-    /// OpenRouter serializes reasoning content into field reasoning
+    /// `OpenRouter` serializes reasoning content into field reasoning
     #[serde(alias = "reasoning")]
     reasoning_content: Option<String>,
     tool_calls: Option<Vec<async_openai::types::ChatCompletionMessageToolCallChunk>>,
