@@ -604,8 +604,9 @@ impl From<Message> for inference::Message {
                 content,
                 reasoning_content,
                 tool_calls,
-            }) => inference::Message::Assistant(inference::AssistantMessage {
+            }) => inference::Message::Assistant(inference::AssistantMessageV2 {
                 content,
+                reasoning_content,
                 tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
             }),
             Message::Tool(ToolMessage {

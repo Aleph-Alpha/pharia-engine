@@ -637,8 +637,9 @@ impl From<Message> for inference::Message {
     fn from(message: Message) -> Self {
         let Message { role, content } = message;
         match role.to_lowercase().as_str() {
-            "assistant" => inference::Message::Assistant(inference::AssistantMessage {
+            "assistant" => inference::Message::Assistant(inference::AssistantMessageV2 {
                 content: Some(content),
+                reasoning_content: None,
                 tool_calls: None,
             }),
             _ => inference::Message::Other { role, content },

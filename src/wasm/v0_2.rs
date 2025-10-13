@@ -394,8 +394,9 @@ impl From<Message> for inference::Message {
         match role {
             Role::System => inference::Message::system(content),
             Role::User => inference::Message::user(content),
-            Role::Assistant => inference::Message::Assistant(inference::AssistantMessage {
+            Role::Assistant => inference::Message::Assistant(inference::AssistantMessageV2 {
                 content: Some(content),
+                reasoning_content: None,
                 tool_calls: None,
             }),
         }
