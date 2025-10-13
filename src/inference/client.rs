@@ -20,7 +20,7 @@ use thiserror::Error;
 use crate::{
     authorization::Authentication,
     inference::{
-        FinishReason,
+        ChatEventV2, FinishReason,
         actor::ChatResponseV2,
         openai::{ChatResponseReasoningContent, ChatStreamWithReasoning},
     },
@@ -89,7 +89,7 @@ pub trait InferenceClient: Send + Sync + 'static {
         request: &ChatRequest,
         auth: Authentication,
         tracing_context: &TracingContext,
-        send: mpsc::Sender<ChatEvent>,
+        send: mpsc::Sender<ChatEventV2>,
     ) -> impl Future<Output = Result<(), InferenceError>> + Send;
     fn explain(
         &self,
@@ -321,7 +321,7 @@ impl InferenceClient for AlephAlphaClient {
         request: &ChatRequest,
         auth: Authentication,
         tracing_context: &TracingContext,
-        send: mpsc::Sender<ChatEvent>,
+        send: mpsc::Sender<ChatEventV2>,
     ) -> Result<(), InferenceError> {
         type OurStream =
             Pin<Box<dyn Stream<Item = Result<ChatStreamWithReasoning, OpenAIError>> + Send>>;
@@ -329,9 +329,8 @@ impl InferenceClient for AlephAlphaClient {
         let openai_request = request.as_openai_stream_request()?;
         let mut stream: OurStream = client.chat().create_stream_byot(openai_request).await?;
         while let Some(event) = stream.next().await {
-            let events = ChatEvent::from_stream(event?);
+            let events = ChatEventV2::from_stream(event?);
             for event in events {
-                validate_chat_event(request, &event)?;
                 drop(send.send(event).await);
             }
         }
@@ -1255,24 +1254,24 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         assert_eq!(events.len(), 4);
         assert_eq!(
             events[0],
-            ChatEvent::MessageBegin {
+            ChatEventV2::MessageBegin {
                 role: "assistant".to_owned()
             }
         );
         assert!(matches!(
             &events[1],
-            ChatEvent::MessageAppend {
+            ChatEventV2::MessageAppend {
                 content,
                 ..
             } if content == "Keep"
         ));
         assert_eq!(
             events[2],
-            ChatEvent::MessageEnd {
+            ChatEventV2::MessageEnd {
                 finish_reason: FinishReason::Length
             }
         );
-        assert!(matches!(events[3], ChatEvent::Usage { .. }));
+        assert!(matches!(events[3], ChatEventV2::Usage { .. }));
     }
 
     #[tokio::test]
@@ -1315,23 +1314,23 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
         assert_eq!(events.len(), 4);
         assert_eq!(
             events[0],
-            ChatEvent::MessageBegin {
+            ChatEventV2::MessageBegin {
                 role: "assistant".to_owned()
             }
         );
         assert!(matches!(
             &events[1],
-            ChatEvent::MessageAppend {
+            ChatEventV2::MessageAppend {
                 content,
                 ..
             } if content == "Keep"
         ));
         assert_eq!(
             events[2],
-            ChatEvent::MessageEnd {
+            ChatEventV2::MessageEnd {
                 finish_reason: FinishReason::Length
             }
         );
-        assert!(matches!(events[3], ChatEvent::Usage { .. }));
+        assert!(matches!(events[3], ChatEventV2::Usage { .. }));
     }
 }

@@ -11,8 +11,8 @@ pub use raw::{CsiDrivers, CsiError, RawCsi};
 use crate::{
     chunking::{Chunk, ChunkRequest},
     inference::{
-        ChatEvent, ChatRequest, ChatResponse, ChatResponseV2, Completion, CompletionEvent,
-        CompletionRequest, Explanation, ExplanationRequest,
+        ChatEvent, ChatEventV2, ChatRequest, ChatResponse, ChatResponseV2, Completion,
+        CompletionEvent, CompletionRequest, Explanation, ExplanationRequest,
     },
     language_selection::{Language, SelectLanguageRequest},
     search::{Document, DocumentPath, SearchRequest, SearchResult},
@@ -51,7 +51,7 @@ pub trait Csi {
     async fn chat_stream_new(&mut self, request: ChatRequest) -> ChatStreamId;
     async fn chat_stream_new_v2(&mut self, request: ChatRequest) -> ChatStreamId;
     async fn chat_stream_next(&mut self, id: &ChatStreamId) -> Option<ChatEvent>;
-    async fn chat_stream_next_v2(&mut self, id: &ChatStreamId) -> Option<ChatEvent>;
+    async fn chat_stream_next_v2(&mut self, id: &ChatStreamId) -> Option<ChatEventV2>;
     async fn chat_stream_drop(&mut self, id: ChatStreamId);
     async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>>;
     async fn document_metadata(&mut self, document_paths: Vec<DocumentPath>) -> Vec<Option<Value>>;

@@ -13,8 +13,8 @@ use crate::{
     chunking::{Chunk, ChunkRequest},
     csi::{ChatStreamId, CompletionStreamId, ContextualCsi, Csi, ToolResult},
     inference::{
-        ChatEvent, ChatRequest, ChatResponse, ChatResponseV2, Completion, CompletionEvent,
-        CompletionRequest, Explanation, ExplanationRequest, InferenceError,
+        ChatEvent, ChatEventV2, ChatRequest, ChatResponse, ChatResponseV2, Completion,
+        CompletionEvent, CompletionRequest, Explanation, ExplanationRequest, InferenceError,
     },
     language_selection::{Language, SelectLanguageRequest},
     logging::TracingContext,
@@ -172,7 +172,7 @@ pub struct SkillInvocationCtx<C> {
     /// skill if there is an error in the stream. This is much harder to do if we use the normal
     /// `ResourceTable`.
     chat_streams: HashMap<ChatStreamId, mpsc::Receiver<Result<ChatEvent, InferenceError>>>,
-    chat_streams_v2: HashMap<ChatStreamId, mpsc::Receiver<Result<ChatEvent, InferenceError>>>,
+    chat_streams_v2: HashMap<ChatStreamId, mpsc::Receiver<Result<ChatEventV2, InferenceError>>>,
     /// Currently running completion streams. We store them here so that we can easier cancel the
     /// running skill if there is an error in the stream. This is much harder to do if we use
     /// the normal `ResourceTable`.
@@ -296,7 +296,7 @@ where
         }
     }
 
-    async fn chat_stream_next_v2(&mut self, id: &ChatStreamId) -> Option<ChatEvent> {
+    async fn chat_stream_next_v2(&mut self, id: &ChatStreamId) -> Option<ChatEventV2> {
         let event = self
             .chat_streams_v2
             .get_mut(id)
@@ -483,7 +483,7 @@ impl Csi for SkillMetadataCtx {
         self.send_error().await
     }
 
-    async fn chat_stream_next_v2(&mut self, _id: &ChatStreamId) -> Option<ChatEvent> {
+    async fn chat_stream_next_v2(&mut self, _id: &ChatStreamId) -> Option<ChatEventV2> {
         self.send_error().await
     }
 
