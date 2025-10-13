@@ -527,7 +527,8 @@ pub struct AssistantMessageV2 {
 }
 
 impl AssistantMessageV2 {
-    /// We deliberately omit the reasoning content from the OpenTelemetry message as it is not standardized yet.
+    /// We deliberately omit the reasoning content from the OpenTelemetry message as it is not
+    /// standardized yet.
     pub fn as_otel_message(&self) -> OTelMessage {
         OTelMessage {
             role: "assistant".to_owned(),

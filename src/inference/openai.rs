@@ -641,7 +641,8 @@ impl inference::ChatEventV2 {
         };
 
         // We assume there are messages with both reasoning content and content.
-        // We filter for empty content, as non thinking messages often contain an empty string in the reasoning content field.
+        // We filter for empty content, as non thinking messages often contain an empty string in
+        // the reasoning content field.
         if let Some(content) = first_choice.delta.reasoning_content
             && !content.is_empty()
         {
