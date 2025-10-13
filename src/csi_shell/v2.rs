@@ -800,11 +800,13 @@ impl TryFrom<Message> for inference::Message {
             tool_calls,
         } = value;
         match role.as_str() {
-            "assistant" => Ok(inference::Message::Assistant(inference::AssistantMessageV2 {
-                content,
-                reasoning_content,
-                tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
-            })),
+            "assistant" => Ok(inference::Message::Assistant(
+                inference::AssistantMessageV2 {
+                    content,
+                    reasoning_content,
+                    tool_calls: tool_calls.map(|calls| calls.into_iter().map(Into::into).collect()),
+                },
+            )),
             "tool" => Ok(inference::Message::Tool(inference::ToolMessage {
                 // We did previously accept tool call messages without a tool call id, as the
                 // AlephAlpha inference backend does not require it. Therefore, we still accept it.
