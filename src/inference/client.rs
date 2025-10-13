@@ -150,10 +150,34 @@ impl AlephAlphaClient {
         auth: Authentication,
         tracing_context: &'a TracingContext,
     ) -> Result<OpenAiClient<AlephAlphaConfig<'a>>, InferenceError> {
+        let api_base = self.host.clone();
         let token = auth
             .into_maybe_string()
             .ok_or(InferenceError::AlephAlphaTokenRequired)?;
-        let config = AlephAlphaConfig::new(self.host.clone(), token, tracing_context);
+        let config = AlephAlphaConfig::new(api_base, token, tracing_context);
+        Ok(OpenAiClient::build(
+            self.client.clone(),
+            config,
+            backoff::ExponentialBackoff::default(),
+        ))
+    }
+    /// Create a new [`OpenAiClient`].
+    ///
+    /// This client targets the `/v2` endpoint of the inference API, providing support for reasoning
+    /// content.
+    ///
+    /// This client is short-lived, as it has knowledge about the particular authentication and
+    /// tracing context for a single request.
+    pub fn openai_client_v2<'a>(
+        &self,
+        auth: Authentication,
+        tracing_context: &'a TracingContext,
+    ) -> Result<OpenAiClient<AlephAlphaConfig<'a>>, InferenceError> {
+        let api_base = format!("{}/v2", self.host);
+        let token = auth
+            .into_maybe_string()
+            .ok_or(InferenceError::AlephAlphaTokenRequired)?;
+        let config = AlephAlphaConfig::new(api_base, token, tracing_context);
         Ok(OpenAiClient::build(
             self.client.clone(),
             config,
@@ -308,7 +332,7 @@ impl InferenceClient for AlephAlphaClient {
         auth: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<ChatResponseV2, InferenceError> {
-        let client = self.openai_client(auth, tracing_context)?;
+        let client = self.openai_client_v2(auth, tracing_context)?;
         let openai_request = request.as_openai_request()?;
         let response: ChatResponseReasoningContent =
             client.chat().create_byot(openai_request).await?;
@@ -325,7 +349,7 @@ impl InferenceClient for AlephAlphaClient {
     ) -> Result<(), InferenceError> {
         type OurStream =
             Pin<Box<dyn Stream<Item = Result<ChatStreamWithReasoning, OpenAIError>> + Send>>;
-        let client = self.openai_client(auth, tracing_context)?;
+        let client = self.openai_client_v2(auth, tracing_context)?;
         let openai_request = request.as_openai_stream_request()?;
         let mut stream: OurStream = client.chat().create_stream_byot(openai_request).await?;
         while let Some(event) = stream.next().await {
