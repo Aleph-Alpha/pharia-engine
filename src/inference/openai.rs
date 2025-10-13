@@ -49,8 +49,10 @@ impl TryFrom<inference::Message> for ChatCompletionRequestMessage {
 
     fn try_from(message: inference::Message) -> Result<Self, Self::Error> {
         match message {
-            inference::Message::Assistant(inference::AssistantMessage {
+            inference::Message::Assistant(inference::AssistantMessageV2 {
                 content,
+                // Currently, we do not support forwarding the reasoning content as part of the request.
+                reasoning_content: _,
                 tool_calls,
             }) => Ok(ChatCompletionRequestMessage::Assistant(
                 ChatCompletionRequestAssistantMessage {
@@ -120,7 +122,7 @@ impl From<ChatCompletionResponseMessage> for inference::AssistantMessage {
     fn from(message: ChatCompletionResponseMessage) -> Self {
         let ChatCompletionResponseMessage {
             content,
-            reasoning_content,
+            reasoning_content: _,
             tool_calls,
         } = message;
         inference::AssistantMessage {
