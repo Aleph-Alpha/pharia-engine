@@ -908,6 +908,9 @@ impl InferenceMsg {
             } => {
                 let context = tracing_context.child_from_completion_request(&request);
                 let result = client.complete(&request, auth, &context).await;
+                if let Ok(completion) = &result {
+                    context.capture_token_usage(&completion.usage);
+                }
                 drop(send.send(result));
             }
             Self::CompletionStream {
@@ -927,6 +930,9 @@ impl InferenceMsg {
                     select! {
                         // Pull from receiver as long as there are still senders
                         Some(msg) = event_recv.recv(), if !event_recv.is_closed() =>  {
+                            if let CompletionEvent::Usage { usage } = &msg {
+                                context.capture_token_usage(usage);
+                            }
                             let Ok(()) = send.send(Ok(msg)).await else {
                                 // The receiver is dropped so we can stop polling the stream.
                                 break;
@@ -944,6 +950,9 @@ impl InferenceMsg {
 
                 // Finish sending through any remaining messages
                 while let Some(msg) = event_recv.recv().await {
+                    if let CompletionEvent::Usage { usage } = &msg {
+                        context.capture_token_usage(usage);
+                    }
                     drop(send.send(Ok(msg)).await);
                 }
             }
@@ -958,10 +967,11 @@ impl InferenceMsg {
                     context.capture_input_messages(&request.messages);
                 }
                 let result = client.chat(&request, auth, &context).await;
-                if let Ok(response) = &result
-                    && gen_ai_content_capture
-                {
-                    context.capture_output_message(&response.message.as_otel_message());
+                if let Ok(response) = &result {
+                    context.capture_token_usage(&response.usage);
+                    if gen_ai_content_capture {
+                        context.capture_output_message(&response.message.as_otel_message());
+                    }
                 }
                 drop(send.send(result));
             }
@@ -976,10 +986,11 @@ impl InferenceMsg {
                     context.capture_input_messages(&request.messages);
                 }
                 let result = client.chat_v2(&request, auth, &context).await;
-                if let Ok(response) = &result
-                    && gen_ai_content_capture
-                {
-                    context.capture_output_message(&response.message.as_otel_message());
+                if let Ok(response) = &result {
+                    context.capture_token_usage(&response.usage);
+                    if gen_ai_content_capture {
+                        context.capture_output_message(&response.message.as_otel_message());
+                    }
                 }
                 drop(send.send(result));
             }
@@ -1008,6 +1019,9 @@ impl InferenceMsg {
                             if gen_ai_content_capture &&let ChatEvent::MessageAppend { content, .. } = &msg {
                                 span_content.push_str(content);
                             }
+                            if let ChatEvent::Usage { usage } = &msg {
+                                context.capture_token_usage(usage);
+                            }
                             let Ok(()) = send.send(Ok(msg)).await else {
                                 // The receiver is dropped so we can stop polling the stream.
                                 break;
@@ -1025,6 +1039,9 @@ impl InferenceMsg {
 
                 // Finish sending through any remaining messages
                 while let Some(msg) = event_recv.recv().await {
+                    if let ChatEvent::Usage { usage } = &msg {
+                        context.capture_token_usage(usage);
+                    }
                     drop(send.send(Ok(msg)).await);
                 }
 
@@ -1062,6 +1079,9 @@ impl InferenceMsg {
                             if gen_ai_content_capture &&let ChatEventV2::MessageAppend { content, .. } = &msg {
                                 span_content.push_str(content);
                             }
+                            if let ChatEventV2::Usage { usage } = &msg {
+                                context.capture_token_usage(usage);
+                            }
                             let Ok(()) = send.send(Ok(msg)).await else {
                                 // The receiver is dropped so we can stop polling the stream.
                                 break;
@@ -1079,6 +1099,9 @@ impl InferenceMsg {
 
                 // Finish sending through any remaining messages
                 while let Some(msg) = event_recv.recv().await {
+                    if let ChatEventV2::Usage { usage } = &msg {
+                        context.capture_token_usage(usage);
+                    }
                     drop(send.send(Ok(msg)).await);
                 }
 

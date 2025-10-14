@@ -905,11 +905,26 @@ async fn chat_content_can_be_configured_to_be_captured() {
 
     kernel.shutdown().await;
 
-    // Then the input and output messages are recorded
+    // Then we have a `chat` span
     let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
     assert_eq!(spans.len(), 7);
-
     let chat_stream = spans.iter().find(|s| s.name == "chat").unwrap();
+
+    // And the token usage is set on the span
+    let input_tokens = chat_stream
+        .attributes
+        .iter()
+        .find(|a| a.key == "gen_ai.usage.input_tokens".into())
+        .unwrap();
+    assert_eq!(input_tokens.value.as_str(), "19");
+    let output_tokens = chat_stream
+        .attributes
+        .iter()
+        .find(|a| a.key == "gen_ai.usage.output_tokens".into())
+        .unwrap();
+    assert_eq!(output_tokens.value.as_str(), "2");
+
+    // And the input and output messages are recorded
     let input_messages = chat_stream
         .attributes
         .iter()
