@@ -30,6 +30,8 @@ impl TracingContext {
             "gen_ai.request.presence_penalty" = request.params.presence_penalty,
             "gen_ai.input.messages" = field::Empty,
             "gen_ai.output.messages" = field::Empty,
+            "gen_ai.usage.input_tokens" = field::Empty,
+            "gen_ai.usage.output_tokens" = field::Empty,
         );
         Self::new(span)
     }
@@ -62,6 +64,17 @@ impl TracingContext {
         );
     }
 
+    /// Capture the token usage of an inference request on the span.
+    ///
+    /// Ensure that the span has been created by calling [`Self::child_from_chat_request`] or
+    /// [`Self::child_from_completion_request`] so that the attributes can be captured.
+    pub fn capture_token_usage(&self, usage: &super::TokenUsage) {
+        self.span()
+            .record("gen_ai.usage.input_tokens", usage.prompt);
+        self.span()
+            .record("gen_ai.usage.output_tokens", usage.completion);
+    }
+
     /// Creates a child tracing context for a completion request with `GenAI` semantic convention
     /// attributes.
     ///
@@ -79,6 +92,8 @@ impl TracingContext {
             "gen_ai.request.top_p" = request.params.top_p,
             "gen_ai.request.frequency_penalty" = request.params.frequency_penalty,
             "gen_ai.request.presence_penalty" = request.params.presence_penalty,
+            "gen_ai.usage.input_tokens" = field::Empty,
+            "gen_ai.usage.output_tokens" = field::Empty,
         );
         Self::new(span)
     }
