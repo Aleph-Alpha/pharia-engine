@@ -987,7 +987,7 @@ async fn traceparent_is_respected() {
 
     // Then we should have recorded spans that all belong to the same trace id
     let spans = log_recorder.spans().into_iter().rev().collect::<Vec<_>>();
-    assert_eq!(spans.len(), 8);
+    assert_eq!(spans.len(), 7);
     let trace_ids = spans
         .iter()
         .map(|s| s.span_context.trace_id())
