@@ -214,7 +214,7 @@ impl AuthorizationClient for IamClient {
 
         match result {
             Ok(_) => Ok(true),
-            Err(AuthorizationError::Unauthenticated) | Err(AuthorizationError::Unauthorized) => {
+            Err(AuthorizationError::Unauthenticated | AuthorizationError::Unauthorized) => {
                 Ok(false)
             }
             Err(AuthorizationError::ConnectionError(e)) => {
