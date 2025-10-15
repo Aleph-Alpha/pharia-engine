@@ -332,10 +332,11 @@ impl InferenceClient for AlephAlphaClient {
         auth: Authentication,
         tracing_context: &TracingContext,
     ) -> Result<ChatResponseV2, InferenceError> {
-        let client = self.openai_client_v2(auth, tracing_context)?;
+        let client = self.openai_client(auth, tracing_context)?;
         let openai_request = request.as_openai_request()?;
-        let response: ChatResponseReasoningContent =
+        let mut response: ChatResponseReasoningContent =
             client.chat().create_byot(openai_request).await?;
+        response.extract_reasoning_from_content();
         let response = ChatResponseV2::try_from(response)?;
         Ok(response)
     }
@@ -729,7 +730,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[ignore = "Ignore due to dependency on inference v2 api"]
     async fn chat_with_reasoning_content() {
         // Given an inference client
         let auth = Authentication::from_token(api_token());
@@ -738,9 +738,11 @@ mod tests {
 
         // When chatting with a reasoning model
         let chat_request = ChatRequest {
-            model: "qwen3-32b".to_owned(),
+            model: "pharia-1-llm-7b-control".to_owned(),
             params: ChatParams::default(),
-            messages: vec![Message::user("Hello, world!")],
+            // We can not ensure that the inference API has a reasoning model available so we can instruct
+            // a non-reasoning model to return a response with a "faked" reasoning content.
+            messages: vec![Message::user("Hello, world! please start your answer with <think>I am thinking...</think>")],
         };
 
         let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(
@@ -754,7 +756,7 @@ mod tests {
 
         // Then the chat response contains content and reasoning content
         assert!(chat_response.message.content.is_some());
-        // assert!(chat_response.message.reasoning_content.is_some());
+        assert!(chat_response.message.reasoning_content.is_some());
     }
 
     #[tokio::test]

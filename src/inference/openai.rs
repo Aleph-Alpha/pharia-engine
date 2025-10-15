@@ -366,6 +366,33 @@ pub struct ChatCompletionResponseMessage {
     tool_calls: Option<Vec<async_openai::types::ChatCompletionMessageToolCall>>,
 }
 
+impl ChatCompletionResponseMessage {
+    /// Split the content and reasoning of a message.
+    ///
+    /// This scenario takes place when converting a [inference::openai::ChatCompletionResponseMessage] 
+    /// to an [inference::ChatResponseV2] and the completion response API does not support the
+    /// `reasoning_content` field.
+    /// Currently, we only support models that delimit there reasoning content with the 
+    /// `<think>` start tag and the `</think>` end tag like qwen-3-32b.
+    ///
+    /// Example: `"<think>I am thinking...</think> The answer is 42"`
+    pub fn extract_reasoning_from_content(&mut self) {
+        if let (Some(content), None) = (&self.content, &self.reasoning_content) {
+            if let (Some(start_pos), Some(end_pos)) =
+                (content.find("<think>"), content.find("</think>"))
+            {
+                if start_pos < end_pos {
+                    let len_start_tag = "<think>".len();
+                    let len_end_tag = "</think>".len();
+                    self.reasoning_content =
+                        Some(content[start_pos + len_start_tag..end_pos].to_owned());
+                    self.content = Some(content[end_pos + len_end_tag..].to_owned());
+                }
+            }
+        }
+    }
+}
+
 impl From<ChatCompletionResponseMessage> for inference::AssistantMessageV2 {
     fn from(message: ChatCompletionResponseMessage) -> Self {
         let ChatCompletionResponseMessage {
@@ -383,7 +410,7 @@ impl From<ChatCompletionResponseMessage> for inference::AssistantMessageV2 {
 
 #[derive(Deserialize)]
 pub struct ChatChoice {
-    message: ChatCompletionResponseMessage,
+    pub message: ChatCompletionResponseMessage,
     /// The reason the model stopped generating tokens. This will be `stop` if the model hit a
     /// natural stop point or a provided stop sequence, `length` if the maximum number of
     /// tokens specified in the request was reached, `content_filter` if content was omitted
@@ -399,6 +426,14 @@ pub struct ChatResponseReasoningContent {
     /// A list of chat completion choices. Can be more than one if `n` is greater than 1.
     choices: Vec<ChatChoice>,
     usage: Option<async_openai::types::CompletionUsage>,
+}
+
+impl ChatResponseReasoningContent {
+    pub fn extract_reasoning_from_content(&mut self) {
+        for choice in self.choices.iter_mut() {
+            choice.message.extract_reasoning_from_content();
+        }
+    }
 }
 
 impl TryFrom<ChatResponseReasoningContent> for inference::ChatResponseV2 {
@@ -798,7 +833,7 @@ impl InferenceClient for OpenAiClient {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use async_openai::types::{
         ChatCompletionMessageToolCall, ChatCompletionToolType, FunctionCall,
@@ -815,6 +850,29 @@ mod tests {
         logging::TracingContext,
         tests::{openai_inference_url, openai_token},
     };
+
+    impl ChatChoice {
+        pub fn with_message(msg: ChatCompletionResponseMessage) -> Self {
+            Self {
+                message: msg,
+                finish_reason: None,
+                logprobs: None,
+            }
+        }
+    }
+
+    impl ChatResponseReasoningContent {
+        pub fn with_message(msg: ChatCompletionResponseMessage) -> Self {
+            Self {
+                choices: vec![ChatChoice::with_message(msg)],
+                usage: None,
+            }
+        }
+
+        pub fn first_message(&self) -> &ChatCompletionResponseMessage {
+            &self.choices[0].message
+        }
+    }
 
     const NON_REASONING_MODEL: &str = "gpt-4o-mini";
     const REASONING_MODEL: &str = "o4-mini";
@@ -844,6 +902,145 @@ mod tests {
 
         // Then the response contains reasoning content
         assert!(response.message.reasoning_content.is_some());
+    }
+
+    #[test]
+    fn split_content_and_reasoning_content_in_response() {
+        // Given a chat response where content and reasoning content are in the same field
+        let chat_msg = ChatCompletionResponseMessage {
+            content: Some("<think>I am thinking...</think> The answer is 42".to_owned()),
+            reasoning_content: None,
+            tool_calls: None,
+        };
+        let mut chat_response = ChatResponseReasoningContent::with_message(chat_msg);
+        // When processing the content field
+        chat_response.extract_reasoning_from_content();
+
+        // Then the content and reasoning content are in separate fields
+        let first_message = chat_response.first_message();
+        assert_eq!(first_message.content, Some(" The answer is 42".to_owned()));
+        assert_eq!(
+            first_message.reasoning_content,
+            Some("I am thinking...".to_owned())
+        );
+    }
+
+    #[test]
+    fn split_content_and_reasoning_content_on_message() {
+        // Given a message where a content tag has a think tag and an end tag are present in the content
+        let mut chat_msg = ChatCompletionResponseMessage {
+            content: Some("<think>I am thinking...</think> The answer is 42".to_owned()),
+            reasoning_content: None,
+            tool_calls: None,
+        };
+
+        // When proceessing the message
+        chat_msg.extract_reasoning_from_content();
+
+        // Then the reasoning content is set
+        assert_eq!(chat_msg.content, Some(" The answer is 42".to_owned()));
+        assert_eq!(
+            chat_msg.reasoning_content,
+            Some("I am thinking...".to_owned())
+        );
+    }
+
+    #[test]
+    fn split_content_and_reasoning_content_on_message_with_reasoning_content_already_set() {
+        // Given a message where a content tag has a think tag and an end tag are present in the content and reasoning content is already set
+        let mut chat_msg = ChatCompletionResponseMessage {
+            content: Some("<think>I am thinking...</think> The answer is 42".to_owned()),
+            reasoning_content: Some("I was already thinking...".to_owned()),
+            tool_calls: None,
+        };
+
+        // When proceessing the message
+        chat_msg.extract_reasoning_from_content();
+
+        // Then the content and reasoning content are not changed
+        assert_eq!(
+            chat_msg.content,
+            Some("<think>I am thinking...</think> The answer is 42".to_owned())
+        );
+        assert_eq!(
+            chat_msg.reasoning_content,
+            Some("I was already thinking...".to_owned())
+        );
+    }
+    #[test]
+    fn split_content_and_reasoning_content_has_no_effect_without_think_tag() {
+        // Given a message where no think tag is present in the content
+        let mut chat_msg = ChatCompletionResponseMessage {
+            content: Some("The answer is 42".to_owned()),
+            reasoning_content: None,
+            tool_calls: None,
+        };
+
+        // When proceessing the message
+        chat_msg.extract_reasoning_from_content();
+
+        // Then the reasoning content is not set
+        assert_eq!(chat_msg.content, Some("The answer is 42".to_owned()));
+        assert!(chat_msg.reasoning_content.is_none());
+    }
+
+    #[test]
+    fn split_content_and_reasoning_content_has_no_effect_without_closing_think_tag() {
+        // Given a message where no think tag is present in the content
+        let mut chat_msg = ChatCompletionResponseMessage {
+            content: Some("<think>I am thinking... The answer is 42".to_owned()),
+            reasoning_content: None,
+            tool_calls: None,
+        };
+
+        // When proceessing the message
+        chat_msg.extract_reasoning_from_content();
+
+        // Then the reasoning content is not set
+        assert_eq!(
+            chat_msg.content,
+            Some("<think>I am thinking... The answer is 42".to_owned())
+        );
+        assert!(chat_msg.reasoning_content.is_none());
+    }
+
+    #[test]
+    fn split_content_and_reasoning_content_has_no_effect_when_think_tags_are_not_in_order() {
+        // Given a message where no think tag is present in the content
+        let mut chat_msg = ChatCompletionResponseMessage {
+            content: Some("</think>I am thinking...<think> The answer is 42".to_owned()),
+            reasoning_content: None,
+            tool_calls: None,
+        };
+
+        // When proceessing the message
+        chat_msg.extract_reasoning_from_content();
+
+        // Then the reasoning content is not set
+        assert_eq!(
+            chat_msg.content,
+            Some("</think>I am thinking...<think> The answer is 42".to_owned())
+        );
+        assert!(chat_msg.reasoning_content.is_none());
+    }
+    #[test]
+    fn split_content_and_reasoning_content_has_effect_with_think_tag_present() {
+        // Given a message where content and reasoning content are in the same field
+        let mut chat_msg = ChatCompletionResponseMessage {
+            content: Some("<think>I am thinking...</think> The answer is 42".to_owned()),
+            reasoning_content: None,
+            tool_calls: None,
+        };
+
+        // When proceessing the message
+        chat_msg.extract_reasoning_from_content();
+
+        // Then the content and reasoning content are in separate fields
+        assert_eq!(chat_msg.content, Some(" The answer is 42".to_owned()));
+        assert_eq!(
+            chat_msg.reasoning_content,
+            Some("I am thinking...".to_owned())
+        );
     }
 
     #[test]
