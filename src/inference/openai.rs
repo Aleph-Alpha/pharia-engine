@@ -369,10 +369,10 @@ pub struct ChatCompletionResponseMessage {
 impl ChatCompletionResponseMessage {
     /// Split the content and reasoning of a message.
     ///
-    /// This scenario takes place when converting a [inference::openai::ChatCompletionResponseMessage] 
+    /// This scenario takes place when converting a [inference::openai::ChatCompletionResponseMessage]
     /// to an [inference::ChatResponseV2] and the completion response API does not support the
     /// `reasoning_content` field.
-    /// Currently, we only support models that delimit there reasoning content with the 
+    /// Currently, we only support models that delimit there reasoning content with the
     /// `<think>` start tag and the `</think>` end tag like qwen-3-32b.
     ///
     /// Example: `"<think>I am thinking...</think> The answer is 42"`
@@ -967,6 +967,7 @@ pub mod tests {
             Some("I was already thinking...".to_owned())
         );
     }
+
     #[test]
     fn split_content_and_reasoning_content_has_no_effect_without_think_tag() {
         // Given a message where no think tag is present in the content
@@ -982,6 +983,45 @@ pub mod tests {
         // Then the reasoning content is not set
         assert_eq!(chat_msg.content, Some("The answer is 42".to_owned()));
         assert!(chat_msg.reasoning_content.is_none());
+    }
+
+    #[test]
+    #[ignore = "currently not ready to pass"]
+    fn stream_split_content_and_reasoning_content_has_no_effect_without_think_tag() {
+        // Given a message where no think tag is present in the content
+        struct ReasoningExtractor;
+
+        impl ReasoningExtractor {
+            fn extract(&self, event: &ChatEventV2) -> ChatEventV2 {
+                ChatEventV2::MessageEnd {
+                    finish_reason: inference::FinishReason::Stop,
+                }
+            }
+        }
+
+        let stream = vec![
+            ChatEventV2::MessageBegin {
+                role: "assistant".to_owned(),
+            },
+            ChatEventV2::MessageAppend {
+                content: "The answer is 42".to_owned(),
+                logprobs: vec![],
+            },
+            ChatEventV2::MessageEnd {
+                finish_reason: inference::FinishReason::Stop,
+            },
+        ];
+
+        // When proceessing the message
+        let extractor = ReasoningExtractor;
+
+        let mut stream_transformed: Vec<ChatEventV2> = vec![];
+        for event in &stream {
+            stream_transformed.push(extractor.extract(&event));
+        }
+
+        // Then the reasoning content is not set
+        assert_eq!(stream_transformed, stream);
     }
 
     #[test]
