@@ -156,7 +156,7 @@ async-openai = { version = "0.29.1", features = ["byot", "native-tls"] }
 http = "1.3.1"
 secrecy = "0.10.3"
 backoff = "0.4.0"
-pharia-common = "0.4.0"
+pharia-common = { version = "0.4.1", features = ["opentelemetry"] }
 
 [dev-dependencies]
 test-skills = { path = "./crates/test-skills" }
