@@ -68,11 +68,7 @@ pub struct Authorization {
 impl Authorization {
     pub fn new(authorization_url: Option<&str>) -> Self {
         if let Some(url) = authorization_url {
-            Self::with_client(
-                IamClient::builder(url.to_owned())
-                    .with_opentelemetry()
-                    .build(),
-            )
+            Self::with_client(IamClient::builder(url.to_owned()).build())
         } else {
             Self::with_client(AlwaysValidClient)
         }
