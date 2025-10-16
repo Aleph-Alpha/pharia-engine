@@ -1,6 +1,7 @@
 mod actor;
 mod client;
 mod openai;
+mod reasoning_extractor;
 mod tracing;
 
 pub use self::{

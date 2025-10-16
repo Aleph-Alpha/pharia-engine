@@ -22,7 +22,8 @@ use crate::{
     inference::{
         ChatEventV2, FinishReason,
         actor::ChatResponseV2,
-        openai::{ChatResponseReasoningContent, ChatStreamWithReasoning, ReasoningExtractor},
+        openai::{ChatResponseReasoningContent, ChatStreamWithReasoning},
+        reasoning_extractor::ReasoningExtractor,
     },
     logging::TracingContext,
 };
