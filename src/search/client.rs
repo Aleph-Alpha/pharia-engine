@@ -556,7 +556,7 @@ pub mod tests {
         let index = IndexPath::new("Kernel", "test", "asym-64");
         let request = SearchRequest::new(
             vec![Modality::Text {
-                text: "What is the Pharia Kernel?".to_owned(),
+                text: "tomato?".to_owned(),
             }],
             max_results,
             Some(min_score),

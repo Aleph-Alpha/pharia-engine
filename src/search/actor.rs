@@ -414,9 +414,7 @@ pub mod tests {
     use tokio::{time::sleep, try_join};
 
     use crate::{
-        search::client::{
-            Filter, FilterCondition, MetadataFilter, MetadataFilterCondition, SearchClientDouble,
-        },
+        search::client::SearchClientDouble,
         tests::{api_token, document_index_url},
     };
 
@@ -486,21 +484,6 @@ pub mod tests {
                 filters: Vec::new(),
             }
         }
-
-        pub fn with_max_results(mut self, max_results: u32) -> Self {
-            self.max_results = max_results;
-            self
-        }
-
-        pub fn with_min_score(mut self, min_score: f64) -> Self {
-            self.min_score = Some(min_score);
-            self
-        }
-
-        pub fn with_filter(mut self, filter: Filter) -> Self {
-            self.filters.push(filter);
-            self
-        }
     }
 
     #[tokio::test]
@@ -554,57 +537,6 @@ pub mod tests {
             metadata["url"].as_str().unwrap(),
             "https://pharia-kernel.product.pharia.com/"
         );
-    }
-
-    #[tokio::test]
-    async fn min_score() {
-        // Given a search client pointed at the document index
-        let host = document_index_url();
-        let api_token = Authentication::from_token(api_token());
-        let search = Search::new(Some(host));
-        let max_results = 5;
-        let min_score = 0.99;
-
-        // When making a query on an existing collection
-        let index = IndexPath::new("Kernel", "test", "asym-64");
-        let request = SearchRequest::new(index, "What is the Pharia Kernel?")
-            .with_max_results(max_results)
-            .with_min_score(min_score);
-        let results = search
-            .api()
-            .search(request, api_token, TracingContext::dummy())
-            .await
-            .unwrap();
-        search.wait_for_shutdown().await;
-
-        // Then we don't get any results
-        assert!(results.is_empty());
-    }
-
-    #[tokio::test]
-    async fn filter_index() {
-        // Given a search client pointed at the document index
-        let host = document_index_url();
-        let api_token = Authentication::from_token(api_token());
-        let search = Search::new(Some(host));
-
-        // When making a query on an existing collection
-        let index = IndexPath::new("Kernel", "test", "asym-64");
-        let filter_condition = FilterCondition::Metadata(MetadataFilter {
-            field: "created".to_owned(),
-            condition: MetadataFilterCondition::After("1970-07-01T14:10:11Z".to_owned()),
-        });
-        let filter = Filter::Without(vec![filter_condition]);
-        let request = SearchRequest::new(index, "What is the Pharia Kernel?").with_filter(filter);
-        let results = search
-            .api()
-            .search(request, api_token, TracingContext::dummy())
-            .await
-            .unwrap();
-        search.wait_for_shutdown().await;
-
-        // Then we don't get any results
-        assert!(results.is_empty());
     }
 
     #[tokio::test]
