@@ -5890,6 +5890,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-v0_5"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "text-splitter"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

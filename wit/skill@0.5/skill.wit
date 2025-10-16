@@ -1,0 +1,31 @@
+package pharia:skill@0.5.0;
+
+@unstable(feature = alpha)
+world message-stream-skill {
+    include csi;
+    export message-stream;
+}
+
+@unstable(feature = alpha)
+world skill {
+    include csi;
+    export skill-handler;
+}
+
+interface skill-handler {
+    /// The set of errors which may be raised by functions in this interface
+    variant error {
+        internal(string),
+        invalid-input(string)
+    }
+
+    run: func(input: list<u8>) -> result<list<u8>, error>;
+
+    record skill-metadata {
+        description: option<string>,
+        input-schema: list<u8>,
+        output-schema: list<u8>,
+    }
+
+    metadata: func() -> skill-metadata;
+}
