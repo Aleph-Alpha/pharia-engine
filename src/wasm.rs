@@ -1,6 +1,7 @@
 mod v0_2;
 mod v0_3;
 mod v0_4;
+mod v0_5;
 
 use std::{
     path::Path,
@@ -230,6 +231,18 @@ pub fn load_skill_from_wasm_bytes(
             let skill = WasmSkill::new(engine, skill_pre);
             Ok(Box::new(skill))
         }
+        SupportedSkillWorld::V0_5Function => {
+            let skill_pre = v0_5::skill::SkillPre::new(pre)
+                .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
+            let skill = WasmSkill::new(engine, skill_pre);
+            Ok(Box::new(skill))
+        }
+        SupportedSkillWorld::V0_5MessageStream => {
+            let skill_pre = v0_5::message_stream_skill::MessageStreamSkillPre::new(pre)
+                .map_err(|e| SkillLoadError::SkillPreError(e.to_string()))?;
+            let skill = WasmSkill::new(engine, skill_pre);
+            Ok(Box::new(skill))
+        }
     }
 }
 
@@ -246,6 +259,10 @@ pub enum SupportedSkillWorld {
     V0_4Function,
     /// Versions 0.4.x of the streaming-skill world
     V0_4MessageStream,
+    /// Versions 0.5.x of the skill world
+    V0_5Function,
+    /// Versions 0.5.x of the streaming-skill world
+    V0_5MessageStream,
 }
 
 impl SupportedSkillWorld {
@@ -271,6 +288,20 @@ impl SupportedSkillWorld {
                 Self::V0_4MessageStream => {
                     v0_4::message_stream_skill::MessageStreamSkill::add_to_linker(
                         linker,
+                        |state: &mut LinkedCtx| state,
+                    )?;
+                }
+                Self::V0_5Function => {
+                    v0_5::skill::Skill::add_to_linker(
+                        linker,
+                        v0_5::skill::LinkOptions::default().alpha(true),
+                        |state: &mut LinkedCtx| state,
+                    )?;
+                }
+                Self::V0_5MessageStream => {
+                    v0_5::message_stream_skill::MessageStreamSkill::add_to_linker(
+                        linker,
+                        v0_5::message_stream_skill::LinkOptions::default().alpha(true),
                         |state: &mut LinkedCtx| state,
                     )?;
                 }
@@ -342,6 +373,12 @@ impl SupportedSkillWorld {
                 (SupportedVersion::V0_4, "message-stream") => {
                     return Ok(SupportedSkillWorld::V0_4MessageStream);
                 }
+                (SupportedVersion::V0_5, "skill-handler") => {
+                    return Ok(SupportedSkillWorld::V0_5Function);
+                }
+                (SupportedVersion::V0_5, "message-stream") => {
+                    return Ok(SupportedSkillWorld::V0_5MessageStream);
+                }
                 _ => {}
             }
         }
@@ -360,6 +397,8 @@ pub enum SupportedVersion {
     V0_3,
     /// Versions 0.4.x of the skill world
     V0_4,
+    /// Versions 0.5.x of the skill world
+    V0_5,
 }
 
 impl TryFrom<&Version> for SupportedVersion {
@@ -390,6 +429,15 @@ impl TryFrom<&Version> for SupportedVersion {
             } => {
                 if version <= Self::V0_4.current_supported_version() {
                     Ok(Self::V0_4)
+                } else {
+                    Err(SkillLoadError::NotSupportedYet(version.to_string()))
+                }
+            }
+            Version {
+                major: 0, minor: 5, ..
+            } => {
+                if version <= Self::V0_5.current_supported_version() {
+                    Ok(Self::V0_5)
                 } else {
                     Err(SkillLoadError::NotSupportedYet(version.to_string()))
                 }
@@ -432,6 +480,7 @@ impl SupportedVersion {
     }
 
     /// Current latest supported version of a given release line
+    #[allow(clippy::too_many_lines)]
     fn current_supported_version(self) -> &'static Version {
         match self {
             Self::V0_2 => {
@@ -494,6 +543,46 @@ impl SupportedVersion {
                         (
                             "./wit/skill@0.4/csi.wit",
                             include_str!("../wit/skill@0.4/csi.wit"),
+                        ),
+                    ];
+                    SupportedVersion::extract_wit_package_version(&files)
+                });
+                &VERSION
+            }
+            Self::V0_5 => {
+                static VERSION: LazyLock<Version> = LazyLock::new(|| {
+                    let files = [
+                        (
+                            "./wit/skill@0.5/chunking.wit",
+                            include_str!("../wit/skill@0.5/chunking.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.5/inference.wit",
+                            include_str!("../wit/skill@0.5/inference.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.5/language.wit",
+                            include_str!("../wit/skill@0.5/language.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.5/tool.wit",
+                            include_str!("../wit/skill@0.5/tool.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.5/document-index.wit",
+                            include_str!("../wit/skill@0.5/document-index.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.5/skill.wit",
+                            include_str!("../wit/skill@0.5/skill.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.5/message-stream.wit",
+                            include_str!("../wit/skill@0.5/message-stream.wit"),
+                        ),
+                        (
+                            "./wit/skill@0.5/csi.wit",
+                            include_str!("../wit/skill@0.5/csi.wit"),
                         ),
                     ];
                     SupportedVersion::extract_wit_package_version(&files)
@@ -707,6 +796,29 @@ pub mod tests {
 
         // Then it returns a json string
         assert_eq!(result["content"].as_str().unwrap(), "dummy-content");
+    }
+
+    #[tokio::test]
+    async fn can_load_and_run_v0_5_module() {
+        // Given a skill loaded by our engine
+        let test_skill = test_skills::given_rust_skill_test_v0_5();
+        let wasm = test_skill.bytes();
+        let engine = Arc::new(Engine::default());
+        let skill = load_skill_from_wasm_bytes(engine, wasm, TracingContext::dummy()).unwrap();
+        let ctx = Box::new(Dummy);
+
+        // When invoked with a json string
+        let input = json!("test input");
+        let result = skill
+            .run_as_function(ctx, input, &TracingContext::dummy())
+            .await
+            .unwrap();
+
+        // Then it returns a json string with the expected message
+        assert_eq!(
+            result["message"].as_str().unwrap(),
+            "Test skill v0.5 received: \"test input\""
+        );
     }
 
     #[tokio::test]
@@ -993,9 +1105,17 @@ pub mod tests {
     }
 
     #[test]
+    fn can_parse_latest_v0_5_wit_world() {
+        assert_eq!(
+            SupportedVersion::V0_5.current_supported_version(),
+            &Version::new(0, 5, 0)
+        );
+    }
+
+    #[test]
     fn latest_supported_version() {
         assert_eq!(
-            SupportedVersion::V0_4.current_supported_version(),
+            SupportedVersion::V0_5.current_supported_version(),
             SupportedVersion::latest_supported_version(),
         );
     }
