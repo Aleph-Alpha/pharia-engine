@@ -616,14 +616,10 @@ impl ReasoningExtractor {
                     let content_part = content[reasoning_ends + Self::END_TAG.len()..].to_owned();
                     let mut events = vec![];
                     if !reasoning_part.is_empty() {
-                        events.push(ChatEventV2::Reasoning {
-                            content: reasoning_part,
-                        });
+                        events.push(ChatEventV2::reasoning(reasoning_part));
                     }
                     if !content_part.is_empty() {
-                        events.push(ChatEventV2::MessageAppend {
-                            content: content_part,
-                        });
+                        events.push(ChatEventV2::content(content_part));
                     }
                     events
                 } else if contains_reasoning {
@@ -632,9 +628,7 @@ impl ReasoningExtractor {
                     if reasoning_part.is_empty() {
                         vec![]
                     } else {
-                        vec![ChatEventV2::Reasoning {
-                            content: reasoning_part,
-                        }]
+                        vec![ChatEventV2::reasoning(reasoning_part)]
                     }
                 } else {
                     vec![event]
@@ -648,20 +642,14 @@ impl ReasoningExtractor {
                     let mut events = vec![];
 
                     if !reasoning_part.is_empty() {
-                        events.push(ChatEventV2::Reasoning {
-                            content: reasoning_part,
-                        });
+                        events.push(ChatEventV2::reasoning(reasoning_part));
                     }
                     if !content_part.is_empty() {
-                        events.push(ChatEventV2::MessageAppend {
-                            content: content_part,
-                        });
+                        events.push(ChatEventV2::content(content_part));
                     }
                     events
                 } else {
-                    vec![ChatEventV2::Reasoning {
-                        content: content.to_owned(),
-                    }]
+                    vec![ChatEventV2::reasoning(content.to_owned())]
                 }
             }
             _ => vec![event],
@@ -757,14 +745,14 @@ impl inference::ChatEventV2 {
         if let Some(content) = first_choice.delta.reasoning_content
             && !content.is_empty()
         {
-            events.push(Self::Reasoning { content });
+            events.push(Self::reasoning(content));
         }
         // If the message has a main part, it is either a content chunk or a tool call.
         // We filter for empty content, as message containing the role often has an empty content.
         if let Some(content) = first_choice.delta.content
             && !content.is_empty()
         {
-            events.push(Self::MessageAppend { content });
+            events.push(Self::content(content));
         } else if let Some(tool_call) = first_choice.delta.tool_calls {
             events.push(Self::ToolCall(
                 tool_call.into_iter().map(Into::into).collect(),
@@ -1028,16 +1016,7 @@ pub mod tests {
                 role: "assistant".to_owned(),
             }
         }
-        fn content(content: impl Into<String>) -> Self {
-            Self::MessageAppend {
-                content: content.into(),
-            }
-        }
-        fn reasoning(reasoning_content: impl Into<String>) -> Self {
-            Self::Reasoning {
-                content: reasoning_content.into(),
-            }
-        }
+
         fn end() -> Self {
             Self::MessageEnd {
                 finish_reason: inference::FinishReason::Stop,
