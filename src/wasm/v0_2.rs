@@ -506,7 +506,7 @@ mod tests {
     use engine_room::LinkerImpl;
 
     use crate::{
-        csi::{Csi, tests::ContextualCsiDouble},
+        csi::{ContextualCsi, Csi},
         skill_driver::SkillInvocationCtx,
     };
 
@@ -516,7 +516,7 @@ mod tests {
     async fn language_selection_from_csi() {
         // Given a linked context with a mock csi provider
         struct ContextualCsiMock;
-        impl ContextualCsiDouble for ContextualCsiMock {
+        impl ContextualCsi for ContextualCsiMock {
             async fn select_language(
                 &self,
                 requests: Vec<SelectLanguageRequest>,

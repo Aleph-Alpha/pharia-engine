@@ -19,9 +19,6 @@ use super::{
     openai::OpenAiClient,
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 /// Provider configuration for the inference backend
 pub enum InferenceProvider<'a> {
     /// Use the Aleph Alpha inference API.
@@ -97,7 +94,7 @@ impl Inference {
     }
 }
 
-#[cfg_attr(test, double(InferenceApiDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait InferenceApi {
     fn explain(
         &self,
@@ -1148,7 +1145,7 @@ pub mod tests {
     use anyhow::anyhow;
     use tokio::{time::sleep, try_join};
 
-    use crate::inference::client::{InferenceClientDouble, InferenceError};
+    use crate::inference::client::InferenceError;
 
     use super::*;
 
@@ -1209,7 +1206,7 @@ pub mod tests {
         }
     }
 
-    impl InferenceApiDouble for InferenceStub {
+    impl InferenceApi for InferenceStub {
         async fn complete(
             &self,
             request: CompletionRequest,
@@ -1233,7 +1230,7 @@ pub mod tests {
         }
     }
 
-    impl InferenceClientDouble for SaboteurClient {
+    impl InferenceClient for SaboteurClient {
         async fn complete(
             &self,
             _params: &super::CompletionRequest,
@@ -1296,7 +1293,7 @@ pub mod tests {
         }
     }
 
-    impl InferenceClientDouble for AssertConcurrentClient {
+    impl InferenceClient for AssertConcurrentClient {
         async fn complete(
             &self,
             request: &CompletionRequest,

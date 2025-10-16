@@ -22,13 +22,10 @@ use crate::{
     },
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 /// Cognitive System Interface (CSI) - Direct interaction with raw system APIs.
 /// This is the lowest level interface that directly calls the underlying system APIs
 /// without any authentication, namespace resolution, or error handling abstractions.
-#[cfg_attr(test, double(RawCsiDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait RawCsi {
     fn explain(
         &self,
@@ -611,9 +608,8 @@ mod tests {
         authorization::Authentication,
         chunking::ChunkParams,
         inference::{
-            ChatEvent, ChatParams, CompletionEvent, CompletionParams, FinishReason, Message,
-            TokenUsage,
-            tests::{InferenceApiDouble, InferenceStub},
+            ChatEvent, ChatParams, CompletionEvent, CompletionParams, FinishReason, InferenceApi,
+            Message, TokenUsage, tests::InferenceStub,
         },
         search::tests::SearchStub,
         tokenizers::tests::FakeTokenizers,
@@ -684,7 +680,7 @@ mod tests {
         // Given a CSI drivers with stub completion stream
         struct CompletionStreamStub;
 
-        impl InferenceApiDouble for CompletionStreamStub {
+        impl InferenceApi for CompletionStreamStub {
             async fn completion_stream(
                 &self,
                 _request: CompletionRequest,
@@ -751,7 +747,7 @@ mod tests {
     async fn chat_stream_events() {
         struct ChatStreamStub;
 
-        impl InferenceApiDouble for ChatStreamStub {
+        impl InferenceApi for ChatStreamStub {
             async fn chat_stream(
                 &self,
                 _request: ChatRequest,

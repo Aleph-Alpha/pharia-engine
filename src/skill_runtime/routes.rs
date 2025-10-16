@@ -430,7 +430,7 @@ mod tests {
         logging::TracingContext,
         skill::{AnySkillManifest, JsonSchema, Signature, SkillMetadataV0_3, SkillPath},
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
-        skill_runtime::{SkillRuntimeDouble, http_skill_runtime_v1, routes::SkillRuntimeProvider},
+        skill_runtime::{SkillRuntimeApi, http_skill_runtime_v1, routes::SkillRuntimeProvider},
     };
 
     #[derive(Clone)]
@@ -566,7 +566,7 @@ mod tests {
         // Given
         #[derive(Clone)]
         struct SkillRuntimeStub;
-        impl SkillRuntimeDouble for SkillRuntimeStub {
+        impl SkillRuntimeApi for SkillRuntimeStub {
             async fn run_function(
                 &self,
                 _skill_path: SkillPath,
@@ -605,7 +605,7 @@ mod tests {
         // Given
         #[derive(Clone)]
         struct SkillRuntimeMock;
-        impl SkillRuntimeDouble for SkillRuntimeMock {
+        impl SkillRuntimeApi for SkillRuntimeMock {
             fn run_function(
                 &self,
                 path: SkillPath,
@@ -645,7 +645,7 @@ mod tests {
         // Given a skill executer which always replies Skill does not exist
         #[derive(Clone)]
         struct SkillRuntimeStub;
-        impl SkillRuntimeDouble for SkillRuntimeStub {
+        impl SkillRuntimeApi for SkillRuntimeStub {
             async fn run_function(
                 &self,
                 _: SkillPath,
@@ -690,7 +690,7 @@ mod tests {
         // Given
         #[derive(Clone)]
         struct SkillRuntimeStub;
-        impl SkillRuntimeDouble for SkillRuntimeStub {
+        impl SkillRuntimeApi for SkillRuntimeStub {
             async fn skill_metadata(
                 &self,
                 _: SkillPath,
@@ -784,7 +784,7 @@ mod tests {
         }
     }
 
-    impl SkillRuntimeDouble for EventStreamStub {
+    impl SkillRuntimeApi for EventStreamStub {
         async fn run_message_stream(
             &self,
             _skill_path: SkillPath,
@@ -854,7 +854,7 @@ mod tests {
         // Given
         #[derive(Clone)]
         struct SkillRuntimeMock;
-        impl SkillRuntimeDouble for SkillRuntimeMock {
+        impl SkillRuntimeApi for SkillRuntimeMock {
             async fn run_function(
                 &self,
                 _skill_path: SkillPath,
@@ -894,7 +894,7 @@ mod tests {
         // Given
         #[derive(Clone)]
         struct SkillRuntimeMock;
-        impl SkillRuntimeDouble for SkillRuntimeMock {
+        impl SkillRuntimeApi for SkillRuntimeMock {
             async fn run_function(
                 &self,
                 _skill_path: SkillPath,

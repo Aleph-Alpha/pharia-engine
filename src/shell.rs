@@ -398,7 +398,6 @@ pub mod tests {
         logging::tests::given_tracing_subscriber,
         skill::{AnySkillManifest, SkillPath},
         skill_driver::{SkillExecutionError, SkillExecutionEvent},
-        skill_runtime::SkillRuntimeDouble,
         tests::api_token,
     };
 
@@ -740,7 +739,7 @@ pub mod tests {
         }
     }
 
-    impl SkillRuntimeDouble for SkillRuntimeSaboteur {
+    impl SkillRuntimeApi for SkillRuntimeSaboteur {
         async fn run_function(
             &self,
             _skill_path: SkillPath,
@@ -790,7 +789,7 @@ pub mod tests {
         }
     }
 
-    impl SkillRuntimeDouble for SkillRuntimeSpy {
+    impl SkillRuntimeApi for SkillRuntimeSpy {
         async fn run_function(
             &self,
             skill_path: SkillPath,

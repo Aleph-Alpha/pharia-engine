@@ -6,9 +6,6 @@ use std::fmt;
 use tokio::sync::mpsc;
 use utoipa::ToSchema;
 
-#[cfg(test)]
-use double_trait::double;
-
 /// Unique identifier for a Skill.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(test, derive(fake::Dummy))]
@@ -45,7 +42,7 @@ pub type BoxedCsi = Box<dyn Csi + Send + Sync>;
 /// While we support skills that are written in WASM, there are also other implementations
 /// like [`crate::hardcoded_skills::hardcoded_skill`] that are also supported.
 #[async_trait]
-#[cfg_attr(test, double(SkillDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait Skill: Send + Sync {
     async fn manifest(
         &self,

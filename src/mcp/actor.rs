@@ -263,10 +263,7 @@ pub mod tests {
     use std::{collections::HashSet, sync::Mutex};
     use tokio::time::Instant as TokioInstant;
 
-    use crate::{
-        mcp::{McpClientDouble, subscribers::ToolMap},
-        tool::ToolDescription,
-    };
+    use crate::{mcp::subscribers::ToolMap, tool::ToolDescription};
 
     struct DummySubscriber;
     impl McpSubscriber for DummySubscriber {
@@ -300,7 +297,7 @@ pub mod tests {
             }
         }
 
-        impl McpClientDouble for SaboteurClient {
+        impl McpClient for SaboteurClient {
             async fn list_tools(
                 &self,
                 _url: &McpServerUrl,
@@ -339,7 +336,7 @@ pub mod tests {
     async fn upserting_pending_tool_server_does_not_block() {
         // Given a client that hangs forever
         struct McpClientStub;
-        impl McpClientDouble for McpClientStub {
+        impl McpClient for McpClientStub {
             async fn list_tools(
                 &self,
                 _: &McpServerUrl,
@@ -372,7 +369,7 @@ pub mod tests {
         struct McpClientStub {
             start: TokioInstant,
         }
-        impl McpClientDouble for McpClientStub {
+        impl McpClient for McpClientStub {
             async fn list_tools(
                 &self,
                 _: &McpServerUrl,
@@ -459,7 +456,7 @@ pub mod tests {
             }
         }
         struct StubClient;
-        impl McpClientDouble for StubClient {
+        impl McpClient for StubClient {
             async fn list_tools(
                 &self,
                 _: &McpServerUrl,
@@ -571,7 +568,7 @@ pub mod tests {
     async fn one_bad_mcp_server_still_allows_to_list_other_tools() {
         // Given an mcp server that returns an error when listing it's tools
         struct ClientOneGoodOtherBad;
-        impl McpClientDouble for ClientOneGoodOtherBad {
+        impl McpClient for ClientOneGoodOtherBad {
             async fn list_tools(
                 &self,
                 url: &McpServerUrl,
@@ -613,7 +610,7 @@ pub mod tests {
     #[tokio::test]
     async fn configuring_existing_server_for_new_namespace_triggers_update() {
         struct McpClientStub;
-        impl McpClientDouble for McpClientStub {
+        impl McpClient for McpClientStub {
             async fn list_tools(
                 &self,
                 _: &McpServerUrl,

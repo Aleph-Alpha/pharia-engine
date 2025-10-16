@@ -767,13 +767,13 @@ mod test {
     use super::*;
     use crate::{
         chunking::ChunkParams,
-        csi::{CsiError, tests::ContextualCsiDouble},
+        csi::CsiError,
         hardcoded_skills::SkillHello,
         inference::{
             ChatParams, CompletionParams, FinishReason, Granularity, Logprobs, TextScore,
             TokenUsage,
         },
-        skill::{BoxedCsi, SkillDouble, SkillError},
+        skill::{BoxedCsi, Skill, SkillError},
         tool::{ToolError, ToolOutput},
     };
     use anyhow::{anyhow, bail};
@@ -784,7 +784,7 @@ mod test {
     async fn chunk_result_is_forwarded() {
         // Given a skill invocation context with a stub csi provider
         struct ContextualCsiStub;
-        impl ContextualCsiDouble for ContextualCsiStub {
+        impl ContextualCsi for ContextualCsiStub {
             async fn chunk(&self, _requests: Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> {
                 Ok(vec![vec![Chunk {
                     text: "my_chunk".to_owned(),
@@ -826,7 +826,7 @@ mod test {
     async fn receive_error_if_chunk_failed() {
         // Given a skill invocation context with a saboteur tokenizer provider
         struct ContextualCsiSaboteur;
-        impl ContextualCsiDouble for ContextualCsiSaboteur {
+        impl ContextualCsi for ContextualCsiSaboteur {
             async fn chunk(&self, _requests: Vec<ChunkRequest>) -> anyhow::Result<Vec<Vec<Chunk>>> {
                 Err(anyhow!("Failed to load tokenizer"))
             }
@@ -862,7 +862,7 @@ mod test {
     #[tokio::test]
     async fn skill_invocation_ctx_stream_management() {
         struct ContextualCsiStub;
-        impl ContextualCsiDouble for ContextualCsiStub {
+        impl ContextualCsi for ContextualCsiStub {
             async fn completion_stream(
                 &self,
                 _request: CompletionRequest,
@@ -930,7 +930,7 @@ mod test {
     #[tokio::test]
     async fn skill_invocation_ctx_chat_stream_management() {
         struct ContextualCsiStub;
-        impl ContextualCsiDouble for ContextualCsiStub {
+        impl ContextualCsi for ContextualCsiStub {
             async fn chat_stream(
                 &self,
                 _request: ChatRequest,
@@ -1015,7 +1015,7 @@ mod test {
         struct CsiFromMetadataSkill;
 
         #[async_trait]
-        impl SkillDouble for CsiFromMetadataSkill {
+        impl Skill for CsiFromMetadataSkill {
             async fn manifest(
                 &self,
                 mut ctx: BoxedCsi,
@@ -1049,7 +1049,7 @@ mod test {
     async fn forward_explain_response_from_csi() {
         struct SkillDoubleUsingExplain;
         #[async_trait]
-        impl SkillDouble for SkillDoubleUsingExplain {
+        impl Skill for SkillDoubleUsingExplain {
             async fn run_as_function(
                 &self,
                 mut ctx: BoxedCsi,
@@ -1075,7 +1075,7 @@ mod test {
         }
 
         struct ContextualCsiStub;
-        impl ContextualCsiDouble for ContextualCsiStub {
+        impl ContextualCsi for ContextualCsiStub {
             async fn explain(
                 &self,
                 _requests: Vec<ExplanationRequest>,
@@ -1105,7 +1105,7 @@ mod test {
     #[tokio::test]
     async fn should_forward_csi_errors() {
         struct ContextualCsiSaboteur;
-        impl ContextualCsiDouble for ContextualCsiSaboteur {
+        impl ContextualCsi for ContextualCsiSaboteur {
             async fn complete(
                 &self,
                 _requests: Vec<CompletionRequest>,
@@ -1139,7 +1139,7 @@ mod test {
     struct MessageStreamSkillWithCsi;
 
     #[async_trait]
-    impl SkillDouble for MessageStreamSkillWithCsi {
+    impl Skill for MessageStreamSkillWithCsi {
         async fn run_as_message_stream(
             &self,
             mut ctx: BoxedCsi,
@@ -1173,7 +1173,7 @@ mod test {
         // Given a skill that calls a failing function on the CSI
         struct CsiSaboteur;
 
-        impl ContextualCsiDouble for CsiSaboteur {
+        impl ContextualCsi for CsiSaboteur {
             async fn complete(
                 &self,
                 _requests: Vec<CompletionRequest>,
@@ -1279,7 +1279,7 @@ mod test {
         struct BuggyStreamingSkill;
 
         #[async_trait]
-        impl SkillDouble for BuggyStreamingSkill {
+        impl Skill for BuggyStreamingSkill {
             async fn run_as_message_stream(
                 &self,
                 _ctx: BoxedCsi,
@@ -1325,7 +1325,7 @@ mod test {
     struct SkillGreetCompletion;
 
     #[async_trait]
-    impl SkillDouble for SkillGreetCompletion {
+    impl Skill for SkillGreetCompletion {
         async fn run_as_function(
             &self,
             mut ctx: BoxedCsi,
@@ -1369,7 +1369,7 @@ mod test {
     struct SkillSaboteurInvalidMessageOutput;
 
     #[async_trait]
-    impl SkillDouble for SkillSaboteurInvalidMessageOutput {
+    impl Skill for SkillSaboteurInvalidMessageOutput {
         async fn run_as_message_stream(
             &self,
             _ctx: BoxedCsi,
@@ -1393,7 +1393,7 @@ mod test {
         struct SkillWithToolCall;
 
         #[async_trait]
-        impl SkillDouble for SkillWithToolCall {
+        impl Skill for SkillWithToolCall {
             async fn run_as_function(
                 &self,
                 mut ctx: BoxedCsi,
@@ -1411,7 +1411,7 @@ mod test {
 
         // And given a stub csi
         struct ContextualCsiStub;
-        impl ContextualCsiDouble for ContextualCsiStub {
+        impl ContextualCsi for ContextualCsiStub {
             async fn invoke_tool(
                 &self,
                 _requests: Vec<InvokeRequest>,
@@ -1441,7 +1441,7 @@ mod test {
         struct SkillWithToolCall;
 
         #[async_trait]
-        impl SkillDouble for SkillWithToolCall {
+        impl Skill for SkillWithToolCall {
             async fn run_as_message_stream(
                 &self,
                 mut ctx: BoxedCsi,
@@ -1462,7 +1462,7 @@ mod test {
 
         // And given a stub csi
         struct ContextualCsiStub;
-        impl ContextualCsiDouble for ContextualCsiStub {
+        impl ContextualCsi for ContextualCsiStub {
             async fn invoke_tool(
                 &self,
                 _requests: Vec<InvokeRequest>,
@@ -1508,7 +1508,7 @@ mod test {
     async fn tool_end_event_is_produced_for_each_tool_call() {
         // Given a stub csi
         struct StubCsi;
-        impl ContextualCsiDouble for StubCsi {
+        impl ContextualCsi for StubCsi {
             async fn invoke_tool(
                 &self,
                 requests: Vec<InvokeRequest>,

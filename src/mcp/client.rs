@@ -14,9 +14,6 @@ use crate::{
     tool::{Argument, ToolDescription, ToolError, ToolOutput},
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 pub struct McpClientImpl {
     client: Client,
 }
@@ -46,7 +43,7 @@ impl McpClientImpl {
 }
 
 /// A client used by the MCP actor to interact with the MCP servers.
-#[cfg_attr(test, double(McpClientDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait McpClient: Send + Sync + 'static {
     fn invoke_tool(
         &self,

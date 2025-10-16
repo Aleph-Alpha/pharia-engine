@@ -5,10 +5,7 @@ use serde_json::{Value, json};
 
 use crate::{authorization::Authentication, http::HttpClient, logging::TracingContext};
 
-#[cfg(test)]
-use double_trait::double;
-
-#[cfg_attr(test, double(SearchClientDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait SearchClient: Send + Sync + 'static {
     fn search(
         &self,
