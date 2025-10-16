@@ -742,7 +742,9 @@ mod tests {
             params: ChatParams::default(),
             // We can not ensure that the inference API has a reasoning model available so we can instruct
             // a non-reasoning model to return a response with a "faked" reasoning content.
-            messages: vec![Message::user("Hello, world! please start your answer with <think>I am thinking...</think>")],
+            messages: vec![Message::user(
+                "Hello, world! please start your answer with <think>I am thinking...</think>",
+            )],
         };
 
         let chat_response = <AlephAlphaClient as InferenceClient>::chat_v2(

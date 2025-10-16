@@ -369,26 +369,23 @@ pub struct ChatCompletionResponseMessage {
 impl ChatCompletionResponseMessage {
     /// Split the content and reasoning of a message.
     ///
-    /// This scenario takes place when converting a [inference::openai::ChatCompletionResponseMessage]
-    /// to an [inference::ChatResponseV2] and the completion response API does not support the
+    /// This scenario takes place when converting a [`inference::openai::ChatCompletionResponseMessage`]
+    /// to an [`inference::ChatResponseV2`] and the completion response API does not support the
     /// `reasoning_content` field.
     /// Currently, we only support models that delimit there reasoning content with the
     /// `<think>` start tag and the `</think>` end tag like qwen-3-32b.
     ///
     /// Example: `"<think>I am thinking...</think> The answer is 42"`
     pub fn extract_reasoning_from_content(&mut self) {
-        if let (Some(content), None) = (&self.content, &self.reasoning_content) {
-            if let (Some(start_pos), Some(end_pos)) =
+        if let (Some(content), None) = (&self.content, &self.reasoning_content)
+            && let (Some(start_pos), Some(end_pos)) =
                 (content.find("<think>"), content.find("</think>"))
-            {
-                if start_pos < end_pos {
-                    let len_start_tag = "<think>".len();
-                    let len_end_tag = "</think>".len();
-                    self.reasoning_content =
-                        Some(content[start_pos + len_start_tag..end_pos].to_owned());
-                    self.content = Some(content[end_pos + len_end_tag..].to_owned());
-                }
-            }
+            && start_pos < end_pos
+        {
+            let len_start_tag = "<think>".len();
+            let len_end_tag = "</think>".len();
+            self.reasoning_content = Some(content[start_pos + len_start_tag..end_pos].to_owned());
+            self.content = Some(content[end_pos + len_end_tag..].to_owned());
         }
     }
 }
@@ -430,7 +427,7 @@ pub struct ChatResponseReasoningContent {
 
 impl ChatResponseReasoningContent {
     pub fn extract_reasoning_from_content(&mut self) {
-        for choice in self.choices.iter_mut() {
+        for choice in &mut self.choices {
             choice.message.extract_reasoning_from_content();
         }
     }
@@ -955,7 +952,6 @@ pub mod tests {
         fn content(content: impl Into<String>) -> Self {
             Self::MessageAppend {
                 content: content.into(),
-                logprobs: vec![],
             }
         }
         fn reasoning(reasoning_content: impl Into<String>) -> Self {
@@ -969,7 +965,12 @@ pub mod tests {
             }
         }
     }
-
+    /// Extracts the reasoning content from a stream of chat events.
+    ///
+    /// With the 0.4 WIT world we introduced concept of reasoning to chat responses.
+    /// However AA inference API has not stabilized this feature yet.
+    /// To not block the release of the 0.4 WIT world we temporarily implement the missing parsing
+    /// logic until AA Inference API v2 is publicly available.
     struct ReasoningExtractor {
         is_thinking: bool,
     }
@@ -985,28 +986,58 @@ pub mod tests {
         fn extract(&mut self, event: ChatEventV2) -> Vec<ChatEventV2> {
             match (&event, self.is_thinking) {
                 (ChatEventV2::MessageAppend { content, .. }, false) => {
-                    if content.starts_with(Self::START_TAG) {
+                    let contains_reasoning = content.starts_with(Self::START_TAG);
+                    if contains_reasoning && let Some(reasoning_ends) = content.find(Self::END_TAG)
+                    {
+                        let reasoning_part =
+                            content[Self::START_TAG.len()..reasoning_ends].to_owned();
+                        let content_part =
+                            content[reasoning_ends + Self::END_TAG.len()..].to_owned();
+                        let mut events = vec![];
+                        if !reasoning_part.is_empty() {
+                            events.push(ChatEventV2::Reasoning {
+                                content: reasoning_part,
+                            });
+                        }
+                        if !content_part.is_empty() {
+                            events.push(ChatEventV2::MessageAppend {
+                                content: content_part,
+                            });
+                        }
+                        events
+                    } else if contains_reasoning {
                         self.is_thinking = true;
-                        vec![ChatEventV2::Reasoning {
-                            content: content[Self::START_TAG.len()..].to_owned(),
-                        }]
+                        let reasoning_part = content[Self::START_TAG.len()..].to_owned();
+                        if reasoning_part.is_empty() {
+                            vec![]
+                        } else {
+                            vec![ChatEventV2::Reasoning {
+                                content: reasoning_part,
+                            }]
+                        }
                     } else {
                         vec![event]
                     }
                 }
-                (ChatEventV2::MessageAppend { content, logprobs }, true) => {
-                    if let Some(start_pos) = content.find(Self::END_TAG) {
+                (ChatEventV2::MessageAppend { content, .. }, true) => {
+                    if let Some(reasoning_ends) = content.find(Self::END_TAG) {
                         self.is_thinking = false;
-                        let reasoning_part = content[..start_pos].to_owned();
-                        vec![
-                            ChatEventV2::Reasoning {
+                        let reasoning_part = content[..reasoning_ends].to_owned();
+                        let content_part =
+                            content[reasoning_ends + Self::END_TAG.len()..].to_owned();
+                        let mut events = vec![];
+
+                        if !reasoning_part.is_empty() {
+                            events.push(ChatEventV2::Reasoning {
                                 content: reasoning_part,
-                            },
-                            ChatEventV2::MessageAppend {
-                                content: content[start_pos + Self::END_TAG.len()..].to_owned(),
-                                logprobs: vec![],
-                            },
-                        ]
+                            });
+                        }
+                        if !content_part.is_empty() {
+                            events.push(ChatEventV2::MessageAppend {
+                                content: content_part,
+                            });
+                        }
+                        events
                     } else {
                         vec![ChatEventV2::Reasoning {
                             content: content.to_owned(),
@@ -1078,6 +1109,92 @@ pub mod tests {
     }
 
     #[test]
+    fn stream_split_opening_think_tag_in_own_chunk() {
+        // Given a message where no think tag is present in the content
+        let stream = vec![
+            ChatEventV2::begin(),
+            ChatEventV2::content("<think>"),
+            ChatEventV2::content("I am "),
+            ChatEventV2::content("thinking...</think>"),
+            ChatEventV2::content("The answer is 42"),
+            ChatEventV2::end(),
+        ];
+        let mut extractor = ReasoningExtractor::new();
+
+        // When proceessing the message
+        let mut stream_transformed: Vec<ChatEventV2> = vec![];
+        for event in &stream {
+            stream_transformed.extend(extractor.extract(event.clone()));
+        }
+
+        // Then the reasoning content is not set
+        let stream_expected = vec![
+            ChatEventV2::begin(),
+            ChatEventV2::reasoning("I am "),
+            ChatEventV2::reasoning("thinking..."),
+            ChatEventV2::content("The answer is 42"),
+            ChatEventV2::end(),
+        ];
+        assert_eq!(stream_transformed, stream_expected);
+    }
+
+    #[test]
+    fn stream_split_closing_think_tag_in_own_chunk() {
+        // Given a message where no think tag is present in the content
+        let stream = vec![
+            ChatEventV2::begin(),
+            ChatEventV2::content("<think>I am "),
+            ChatEventV2::content("thinking..."),
+            ChatEventV2::content("</think>"),
+            ChatEventV2::content("The answer is 42"),
+            ChatEventV2::end(),
+        ];
+        let mut extractor = ReasoningExtractor::new();
+
+        // When proceessing the message
+        let mut stream_transformed: Vec<ChatEventV2> = vec![];
+        for event in &stream {
+            stream_transformed.extend(extractor.extract(event.clone()));
+        }
+
+        // Then the reasoning content is not set
+        let stream_expected = vec![
+            ChatEventV2::begin(),
+            ChatEventV2::reasoning("I am "),
+            ChatEventV2::reasoning("thinking..."),
+            ChatEventV2::content("The answer is 42"),
+            ChatEventV2::end(),
+        ];
+        assert_eq!(stream_transformed, stream_expected);
+    }
+    #[test]
+    fn stream_split_opening_and_closing_think_tag_in_own_chunk() {
+        // Given a message where no think tag is present in the content
+        let stream = vec![
+            ChatEventV2::begin(),
+            ChatEventV2::content("<think>I am thinking...</think> The"),
+            ChatEventV2::content(" answer is 42"),
+            ChatEventV2::end(),
+        ];
+        let mut extractor = ReasoningExtractor::new();
+
+        // When proceessing the message
+        let mut stream_transformed: Vec<ChatEventV2> = vec![];
+        for event in &stream {
+            stream_transformed.extend(extractor.extract(event.clone()));
+        }
+
+        // Then the reasoning content is not set
+        let stream_expected = vec![
+            ChatEventV2::begin(),
+            ChatEventV2::reasoning("I am thinking..."),
+            ChatEventV2::content(" The"),
+            ChatEventV2::content(" answer is 42"),
+            ChatEventV2::end(),
+        ];
+        assert_eq!(stream_transformed, stream_expected);
+    }
+    #[test]
     fn stream_split_content_and_reasoning_content_on_message_with_think_tag_inside_splits() {
         // Given a message where no think tag is present in the content
         let stream = vec![
@@ -1090,6 +1207,27 @@ pub mod tests {
         let mut extractor = ReasoningExtractor::new();
 
         // When proceessing the message
+        let mut stream_transformed: Vec<ChatEventV2> = vec![];
+        for event in &stream {
+            stream_transformed.extend(extractor.extract(event.clone()));
+        }
+
+        // Then the reasoning content is not set
+        assert_eq!(stream_transformed, stream);
+    }
+
+    #[test]
+    fn stream_split_content_and_reasoning_content_has_no_effect_without_think_tag() {
+        // Given a message where no think tag is present in the content
+        let stream = vec![
+            ChatEventV2::begin(),
+            ChatEventV2::content("The answer is 42"),
+            ChatEventV2::end(),
+        ];
+
+        // When proceessing the message
+        let mut extractor = ReasoningExtractor::new();
+
         let mut stream_transformed: Vec<ChatEventV2> = vec![];
         for event in &stream {
             stream_transformed.extend(extractor.extract(event.clone()));
@@ -1137,35 +1275,6 @@ pub mod tests {
         // Then the reasoning content is not set
         assert_eq!(chat_msg.content, Some("The answer is 42".to_owned()));
         assert!(chat_msg.reasoning_content.is_none());
-    }
-
-    #[test]
-    fn stream_split_content_and_reasoning_content_has_no_effect_without_think_tag() {
-        // Given a message where no think tag is present in the content
-
-        let stream = vec![
-            ChatEventV2::MessageBegin {
-                role: "assistant".to_owned(),
-            },
-            ChatEventV2::MessageAppend {
-                content: "The answer is 42".to_owned(),
-                logprobs: vec![],
-            },
-            ChatEventV2::MessageEnd {
-                finish_reason: inference::FinishReason::Stop,
-            },
-        ];
-
-        // When proceessing the message
-        let mut extractor = ReasoningExtractor::new();
-
-        let mut stream_transformed: Vec<ChatEventV2> = vec![];
-        for event in &stream {
-            stream_transformed.extend(extractor.extract(event.clone()));
-        }
-
-        // Then the reasoning content is not set
-        assert_eq!(stream_transformed, stream);
     }
 
     #[test]
