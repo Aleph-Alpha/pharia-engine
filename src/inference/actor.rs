@@ -770,6 +770,20 @@ pub enum ChatEventV2 {
     ToolCall(Vec<ToolCallChunk>),
 }
 
+impl ChatEventV2 {
+    pub fn content(content: impl Into<String>) -> Self {
+        Self::MessageAppend {
+            content: content.into(),
+        }
+    }
+
+    pub fn reasoning(reasoning_content: impl Into<String>) -> Self {
+        Self::Reasoning {
+            content: reasoning_content.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolCallChunk {
     /// The index of the tool call in the list of tool calls.
