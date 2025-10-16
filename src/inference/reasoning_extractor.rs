@@ -90,9 +90,10 @@ impl ChatCompletionResponseMessage {
     ///
     /// Example: `"<think>I am thinking...</think> The answer is 42"`
     pub fn extract_reasoning_from_content(&mut self) {
-        if let (Some(content), None) = (&self.content, &self.reasoning_content)
-            && let (Some(start_pos), Some(end_pos)) =
-                (content.find("<think>"), content.find("</think>"))
+        if self.reasoning_content.is_none()
+            && let Some(content) = &self.content
+            && let Some(start_pos) = content.find("<think>")
+            && let Some(end_pos) = content.find("</think>")
             && start_pos < end_pos
         {
             let len_start_tag = "<think>".len();
