@@ -22,7 +22,7 @@ use crate::{
     inference::{
         ChatEventV2, FinishReason,
         actor::ChatResponseV2,
-        openai::{ChatResponseReasoningContent, ChatStreamWithReasoning},
+        openai::{ChatResponseReasoningContent, ChatStreamWithReasoning, ReasoningExtractor},
     },
     logging::TracingContext,
 };
@@ -161,31 +161,7 @@ impl AlephAlphaClient {
             backoff::ExponentialBackoff::default(),
         ))
     }
-    /// Create a new [`OpenAiClient`].
-    ///
-    /// This client targets the `/v2` endpoint of the inference API, providing support for reasoning
-    /// content.
-    ///
-    /// This client is short-lived, as it has knowledge about the particular authentication and
-    /// tracing context for a single request.
-    pub fn openai_client_v2<'a>(
-        &self,
-        auth: Authentication,
-        tracing_context: &'a TracingContext,
-    ) -> Result<OpenAiClient<AlephAlphaConfig<'a>>, InferenceError> {
-        let api_base = format!("{}/v2", self.host);
-        let token = auth
-            .into_maybe_string()
-            .ok_or(InferenceError::AlephAlphaTokenRequired)?;
-        let config = AlephAlphaConfig::new(api_base, token, tracing_context);
-        Ok(OpenAiClient::build(
-            self.client.clone(),
-            config,
-            backoff::ExponentialBackoff::default(),
-        ))
-    }
 }
-
 /// Implementing the [`async_openai::config::Config`] trait allows us to control the headers sent
 /// to the inference backend, enabling distributed tracing across our stack.
 pub struct AlephAlphaConfig<'a> {
@@ -350,13 +326,16 @@ impl InferenceClient for AlephAlphaClient {
     ) -> Result<(), InferenceError> {
         type OurStream =
             Pin<Box<dyn Stream<Item = Result<ChatStreamWithReasoning, OpenAIError>> + Send>>;
-        let client = self.openai_client_v2(auth, tracing_context)?;
+        let client = self.openai_client(auth, tracing_context)?;
         let openai_request = request.as_openai_stream_request()?;
         let mut stream: OurStream = client.chat().create_stream_byot(openai_request).await?;
+        let mut reasoning_extractor = ReasoningExtractor::new();
         while let Some(event) = stream.next().await {
             let events = ChatEventV2::from_stream(event?);
             for event in events {
-                drop(send.send(event).await);
+                for event in reasoning_extractor.extract(event) {
+                    drop(send.send(event).await);
+                }
             }
         }
 
@@ -1242,7 +1221,6 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
     }
 
     #[tokio::test]
-    #[ignore = "Reasoning for streaming not implemented yet."]
     async fn chat_stream_with_reasoning() {
         // Given
         let auth = Authentication::from_token(api_token());
@@ -1251,10 +1229,12 @@ Yes or No?<|eot_id|><|start_header_id|>assistant<|end_header_id|>".to_owned(),
 
         // When
         let chat_request = ChatRequest {
-            model: "qwen3-32b".to_owned(),
-            messages: vec![Message::user("An apple a day")],
+            model: "pharia-1-llm-7b-control".to_owned(),
+            messages: vec![Message::user(
+                "Hello, world! please start your answer with <think>I am thinking...</think> and end with </think>",
+            )],
             params: ChatParams {
-                max_tokens: Some(2),
+                max_tokens: Some(64),
                 temperature: Some(0.0),
                 ..Default::default()
             },
