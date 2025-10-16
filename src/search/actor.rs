@@ -18,9 +18,6 @@ use super::client::{
     SearchRequest as ClientSearchRequest, SearchResult as ClientSearchResult,
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 /// Handle to the search actor. Spin this up in order to use the Search API
 pub struct Search {
     send: mpsc::Sender<SearchMsg>,
@@ -69,7 +66,7 @@ impl Search {
 /// Use this to execute tasks with the Search API. The existence of this API handle implies the
 /// actor is alive and running. This means this handle must be disposed of, before the search
 /// actor can shut down.
-#[cfg_attr(test, double(SearchApiDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait SearchApi {
     fn search(
         &self,
@@ -414,7 +411,7 @@ pub mod tests {
     use tokio::{time::sleep, try_join};
 
     use crate::{
-        search::client::SearchClientDouble,
+        search::client::SearchClient,
         tests::{api_token, document_index_url},
     };
 
@@ -454,7 +451,7 @@ pub mod tests {
         }
     }
 
-    impl SearchApiDouble for SearchStub {
+    impl SearchApi for SearchStub {
         async fn document_metadata(
             &self,
             document_path: DocumentPath,
@@ -573,7 +570,7 @@ pub mod tests {
         }
     }
 
-    impl SearchClientDouble for AssertConcurrentClient {
+    impl SearchClient for AssertConcurrentClient {
         async fn search(
             &self,
             _index: IndexPath,

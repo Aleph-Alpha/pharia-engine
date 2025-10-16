@@ -35,15 +35,12 @@ use super::{
 };
 use async_openai::{Client as OpenAiClient, config::Config, error::OpenAIError};
 
-#[cfg(test)]
-use double_trait::double;
-
 /// The inference client only takes references to the tracing context. Methods like
 /// `stream_chat` return a future that in which the tracing context is dropped after
 /// making the initial request. However, the lifespan of the tracing context matches
 /// the length of the created span, so it may only be dropped after the stream is
 /// finished. By taking only a reference, we manifest this fact in the type system.
-#[cfg_attr(test, double(InferenceClientDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait InferenceClient: Send + Sync + 'static {
     fn complete(
         &self,

@@ -237,7 +237,7 @@ pub mod tests {
 
     use crate::{
         logging::TracingContext,
-        tool::{ToolDouble, ToolRuntime, actor::ToolStoreApi},
+        tool::{Tool, ToolRuntime, actor::ToolStoreApi},
     };
 
     use super::*;
@@ -294,7 +294,7 @@ pub mod tests {
         // Given a tool named search and another tool
         struct ToolStub;
         #[async_trait]
-        impl ToolDouble for ToolStub {
+        impl Tool for ToolStub {
             async fn invoke(
                 &self,
                 _: Vec<Argument>,
@@ -338,7 +338,7 @@ pub mod tests {
     async fn tools_are_listed() {
         struct ToolStub;
 
-        impl ToolDouble for ToolStub {
+        impl Tool for ToolStub {
             fn description(&self) -> ToolDescription {
                 ToolDescription::new("catch_fish", "Catch a fish", json!({}))
             }
@@ -374,7 +374,7 @@ pub mod tests {
         // Given a tool that hangs forever for some tool invocation requests
         struct PendingTool;
         #[async_trait::async_trait]
-        impl ToolDouble for PendingTool {
+        impl Tool for PendingTool {
             async fn invoke(
                 &self,
                 _arguments: Vec<Argument>,
@@ -385,7 +385,7 @@ pub mod tests {
         }
         struct SuccessfulTool;
         #[async_trait::async_trait]
-        impl ToolDouble for SuccessfulTool {
+        impl Tool for SuccessfulTool {
             async fn invoke(
                 &self,
                 _arguments: Vec<Argument>,

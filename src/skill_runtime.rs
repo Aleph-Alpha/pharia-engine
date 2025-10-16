@@ -25,9 +25,6 @@ use crate::{
     skill_store::{SkillStoreApi, SkillStoreError},
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 // It would be nice for users of this module, not to be concerned with the fact that the runtime is
 // using the driver. This may indicate that maybe driver and runtime should be part of the same top
 // level module. For now I decided to leave it like that due to the fact that I am not sure about
@@ -71,7 +68,7 @@ impl SkillRuntime {
 ///
 /// Using a trait rather than an mpsc allows for easier and more ergonomic testing, since the
 /// implementation of the test double is not required to be an actor.
-#[cfg_attr(test, double(SkillRuntimeDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait SkillRuntimeApi {
     fn run_function(
         &self,
@@ -506,11 +503,10 @@ pub mod tests {
     use std::time::Duration;
 
     use crate::{
-        csi::tests::RawCsiDouble,
         hardcoded_skills::{SkillHello, SkillSaboteur, SkillTellMeAJoke, SkillToolCaller},
         inference::{ChatEvent, ChatRequest, InferenceError},
         namespace_watcher::Namespace,
-        skill::{BoxedCsi, SkillDouble, SkillError, SkillEvent},
+        skill::{BoxedCsi, Skill, SkillError, SkillEvent},
         skill_loader::{RegistryConfig, SkillLoader},
         skill_store::{SkillStore, tests::SkillStoreStub},
         tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
@@ -615,7 +611,7 @@ pub mod tests {
         }
 
         #[async_trait]
-        impl SkillDouble for SkillAssertConcurrent {
+        impl Skill for SkillAssertConcurrent {
             async fn run_as_function(
                 &self,
                 _ctx: BoxedCsi,
@@ -675,7 +671,7 @@ pub mod tests {
     async fn tool_caller_skill() {
         #[derive(Clone)]
         struct ToolCallerCsi;
-        impl RawCsiDouble for ToolCallerCsi {
+        impl RawCsi for ToolCallerCsi {
             async fn invoke_tool(
                 &self,
                 _namespace: Namespace,
@@ -739,7 +735,7 @@ pub mod tests {
         struct ReasoningSkill;
 
         #[async_trait]
-        impl SkillDouble for ReasoningSkill {
+        impl Skill for ReasoningSkill {
             async fn run_as_message_stream(
                 &self,
                 _ctx: BoxedCsi,
@@ -928,7 +924,7 @@ pub mod tests {
         #[derive(Clone)]
         pub struct RawCsiSaboteur;
 
-        impl RawCsiDouble for RawCsiSaboteur {
+        impl RawCsi for RawCsiSaboteur {
             async fn chat_stream(
                 &self,
                 _auth: Authentication,
@@ -979,7 +975,7 @@ pub mod tests {
     struct GreetSkill;
 
     #[async_trait]
-    impl SkillDouble for GreetSkill {
+    impl Skill for GreetSkill {
         async fn run_as_function(
             &self,
             _ctx: BoxedCsi,
@@ -996,7 +992,7 @@ pub mod tests {
         struct ToolSpySkill;
 
         #[async_trait]
-        impl SkillDouble for ToolSpySkill {
+        impl Skill for ToolSpySkill {
             async fn run_as_function(
                 &self,
                 mut ctx: BoxedCsi,
@@ -1012,7 +1008,7 @@ pub mod tests {
         #[derive(Clone)]
         struct CsiWithTools;
 
-        impl RawCsiDouble for CsiWithTools {
+        impl RawCsi for CsiWithTools {
             async fn list_tools(
                 &self,
                 _namespace: Namespace,

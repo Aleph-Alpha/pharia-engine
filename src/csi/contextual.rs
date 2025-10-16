@@ -15,14 +15,12 @@ use crate::{
     search::{Document, DocumentPath, SearchRequest, SearchResult},
     tool::{InvokeRequest, ToolDescription, ToolError, ToolOutput},
 };
-#[cfg(test)]
-use double_trait::double;
 
 /// An abstraction level on top of [`crate::csi::RawCsi`] that encapsulates context about user
 /// invocation and Skill. This includes Skill namespace and authentication.
 /// This is the intermediate abstraction level between [`crate::csi::RawCsi`] and
 /// [`crate::csi::Csi`].
-#[cfg_attr(test, double(ContextualCsiDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait ContextualCsi {
     fn explain(
         &self,

@@ -21,15 +21,12 @@ pub use self::{
     toolbox::ConfiguredNativeTool,
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 /// Interface offered by individual tools.
 ///
 /// Introducing this interface allows us to introduce different tool concepts like mcp tools and
 /// native tools.
 #[async_trait]
-#[cfg_attr(test, double(ToolDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait Tool {
     async fn invoke(
         &self,

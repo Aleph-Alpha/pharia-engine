@@ -1435,7 +1435,6 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::{
-        csi::tests::RawCsiDouble,
         inference::{ChatEventV2, ChatRequest, InferenceError, ToolCallChunk},
         namespace_watcher::Namespace,
         tool::{Argument, InvokeRequest, ToolError, ToolOutput},
@@ -1451,7 +1450,7 @@ mod tests {
         // 2. returns a message with a tool call and no content
         #[derive(Clone)]
         struct RawCsiMock;
-        impl RawCsiDouble for RawCsiMock {
+        impl RawCsi for RawCsiMock {
             async fn chat_v2(
                 &self,
                 _auth: Authentication,
@@ -1561,7 +1560,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiStub;
 
-        impl RawCsiDouble for RawCsiStub {
+        impl RawCsi for RawCsiStub {
             async fn chat_stream_v2(
                 &self,
                 _auth: Authentication,
@@ -1629,7 +1628,7 @@ mod tests {
         // 2. returns tool call events
         #[derive(Clone)]
         struct RawCsiMock;
-        impl RawCsiDouble for RawCsiMock {
+        impl RawCsi for RawCsiMock {
             async fn chat_stream_v2(
                 &self,
                 _auth: Authentication,
@@ -1734,7 +1733,7 @@ mod tests {
         // Given a csi that always returns an error
         #[derive(Clone)]
         struct ToolSaboteur;
-        impl RawCsiDouble for ToolSaboteur {
+        impl RawCsi for ToolSaboteur {
             async fn invoke_tool(
                 &self,
                 _namespace: Namespace,
@@ -1786,7 +1785,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiMock;
 
-        impl RawCsiDouble for RawCsiMock {
+        impl RawCsi for RawCsiMock {
             async fn list_tools(
                 &self,
                 namespace: Namespace,
@@ -1850,7 +1849,7 @@ mod tests {
         // Given a csi mock that asserts on the input and returns a fixed output
         #[derive(Clone)]
         struct RawCsiMock;
-        impl RawCsiDouble for RawCsiMock {
+        impl RawCsi for RawCsiMock {
             async fn invoke_tool(
                 &self,
                 _namespace: Namespace,
@@ -1917,7 +1916,7 @@ mod tests {
         // Given a csi that always returns en
         #[derive(Clone)]
         struct RawCsiStub;
-        impl RawCsiDouble for RawCsiStub {
+        impl RawCsi for RawCsiStub {
             async fn select_language(
                 &self,
                 _requests: Vec<language_selection::SelectLanguageRequest>,

@@ -19,9 +19,6 @@ use crate::{
     tool::{InvokeRequest, ToolDescription, ToolOutput},
 };
 
-#[cfg(test)]
-use double_trait::double;
-
 /// `CompletionStreamId` is a unique identifier for a completion stream.
 #[derive(Debug, Clone, Constructor, Copy, From, PartialEq, Eq, Hash)]
 pub struct CompletionStreamId(usize);
@@ -34,7 +31,7 @@ pub struct ChatStreamId(usize);
 /// interface. It also assumes all authentication and authorization is handled behind the scenes.
 /// This is the CSI as passed to user defined code in WASM.
 #[async_trait]
-#[cfg_attr(test, double(CsiDouble))]
+#[cfg_attr(test, double_trait::dummies)]
 pub trait Csi {
     async fn explain(&mut self, requests: Vec<ExplanationRequest>) -> Vec<Explanation>;
     async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion>;
@@ -71,8 +68,6 @@ pub type ToolResult = Result<ToolOutput, String>;
 
 #[cfg(test)]
 pub mod tests {
-    pub use contextual::ContextualCsiDouble;
-    pub use raw::RawCsiDouble;
     use std::collections::HashMap;
 
     use crate::{
@@ -103,7 +98,7 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl CsiDouble for CsiCompleteStreamStub {
+    impl Csi for CsiCompleteStreamStub {
         async fn completion_stream_new(
             &mut self,
             _request: CompletionRequest,
@@ -144,7 +139,7 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl CsiDouble for CsiChatStreamStub {
+    impl Csi for CsiChatStreamStub {
         async fn chat_stream_new(&mut self, _request: ChatRequest) -> ChatStreamId {
             let id = ChatStreamId::new(self.current_id);
             self.streams.insert(id, self.events.clone());
@@ -165,7 +160,7 @@ pub mod tests {
     pub struct CsiCompleteWithEchoMock;
 
     #[async_trait]
-    impl CsiDouble for CsiCompleteWithEchoMock {
+    impl Csi for CsiCompleteWithEchoMock {
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests
                 .into_iter()
@@ -210,7 +205,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     }
 
     #[async_trait]
-    impl CsiDouble for CsiGreetingMock {
+    impl Csi for CsiGreetingMock {
         async fn complete(&mut self, requests: Vec<CompletionRequest>) -> Vec<Completion> {
             requests.into_iter().map(Self::complete_text).collect()
         }
@@ -220,7 +215,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     pub struct CsiChatStub;
 
     #[async_trait]
-    impl CsiDouble for CsiChatStub {
+    impl Csi for CsiChatStub {
         async fn chat(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponse> {
             requests
                 .iter()
@@ -240,7 +235,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     pub struct CsiChatStubV2;
 
     #[async_trait]
-    impl CsiDouble for CsiChatStubV2 {
+    impl Csi for CsiChatStubV2 {
         async fn chat_v2(&mut self, requests: Vec<ChatRequest>) -> Vec<ChatResponseV2> {
             requests
                 .iter()
@@ -261,7 +256,7 @@ Provide a nice greeting for the person named: Homer<|eot_id|><|start_header_id|>
     pub struct CsiSearchMock;
 
     #[async_trait]
-    impl CsiDouble for CsiSearchMock {
+    impl Csi for CsiSearchMock {
         async fn search(&mut self, requests: Vec<SearchRequest>) -> Vec<Vec<SearchResult>> {
             requests
                 .into_iter()

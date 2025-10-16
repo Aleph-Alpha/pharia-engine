@@ -13,9 +13,6 @@ pub use self::{
     subscribers::{McpSubscriber, ToolMap},
 };
 
-#[cfg(test)]
-pub use self::client::McpClientDouble;
-
 use crate::namespace_watcher::Namespace;
 use serde::{Deserialize, Serialize};
 

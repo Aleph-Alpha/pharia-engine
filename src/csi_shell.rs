@@ -181,7 +181,6 @@ mod tests {
     use crate::{
         authorization::Authentication,
         chunking::{Chunk, ChunkRequest},
-        csi::tests::RawCsiDouble,
         inference::{
             AssistantMessage, ChatEvent, ChatRequest, ChatResponse, Completion, CompletionEvent,
             CompletionRequest, Explanation, ExplanationRequest, FinishReason, InferenceError,
@@ -459,7 +458,7 @@ mod tests {
         // Given a versioned csi request
         #[derive(Clone)]
         struct CsiStub;
-        impl RawCsiDouble for CsiStub {
+        impl RawCsi for CsiStub {
             async fn complete(
                 &self,
                 _: Authentication,
@@ -510,7 +509,7 @@ mod tests {
     async fn http_csi_v1_echo_defaults_to_false() {
         #[derive(Clone)]
         struct CsiMock;
-        impl RawCsiDouble for CsiMock {
+        impl RawCsi for CsiMock {
             async fn complete(
                 &self,
                 _: Authentication,
@@ -558,7 +557,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiStub;
 
-        impl RawCsiDouble for RawCsiStub {
+        impl RawCsi for RawCsiStub {
             async fn completion_stream(
                 &self,
                 _auth: Authentication,
@@ -638,7 +637,7 @@ mod tests {
         // Given a request with echo == true
         #[derive(Clone)]
         struct CsiMock;
-        impl RawCsiDouble for CsiMock {
+        impl RawCsi for CsiMock {
             async fn complete(
                 &self,
                 _: Authentication,
@@ -686,7 +685,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiStub;
 
-        impl RawCsiDouble for RawCsiStub {
+        impl RawCsi for RawCsiStub {
             async fn chat_stream(
                 &self,
                 _auth: Authentication,
@@ -774,7 +773,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiStub;
 
-        impl RawCsiDouble for RawCsiStub {
+        impl RawCsi for RawCsiStub {
             async fn explain(
                 &self,
                 _auth: Authentication,
@@ -821,7 +820,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiStub;
 
-        impl RawCsiDouble for RawCsiStub {
+        impl RawCsi for RawCsiStub {
             async fn chat(
                 &self,
                 _auth: Authentication,
@@ -880,7 +879,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiStub;
 
-        impl RawCsiDouble for RawCsiStub {
+        impl RawCsi for RawCsiStub {
             async fn chunk(
                 &self,
                 _auth: Authentication,
@@ -929,7 +928,7 @@ mod tests {
         #[derive(Clone)]
         struct RawCsiStub;
 
-        impl RawCsiDouble for RawCsiStub {
+        impl RawCsi for RawCsiStub {
             async fn chunk(
                 &self,
                 _auth: Authentication,

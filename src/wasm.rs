@@ -527,10 +527,10 @@ pub mod tests {
 
     use crate::{
         csi::{
-            CsiDouble, CsiError, ToolResult,
+            ContextualCsi, CsiError, ToolResult,
             tests::{
-                ContextualCsiDouble, CsiChatStreamStub, CsiChatStub, CsiChatStubV2,
-                CsiCompleteStreamStub, CsiCompleteWithEchoMock, CsiGreetingMock, CsiSearchMock,
+                CsiChatStreamStub, CsiChatStub, CsiChatStubV2, CsiCompleteStreamStub,
+                CsiCompleteWithEchoMock, CsiGreetingMock, CsiSearchMock,
             },
         },
         inference::{
@@ -582,7 +582,7 @@ pub mod tests {
     #[tokio::test]
     async fn explain_skill_component() {
         struct ContextualCsiStub;
-        impl ContextualCsiDouble for ContextualCsiStub {
+        impl ContextualCsi for ContextualCsiStub {
             async fn explain(
                 &self,
                 _requests: Vec<ExplanationRequest>,
@@ -1061,7 +1061,7 @@ pub mod tests {
     struct CsiAddToolFake;
 
     #[async_trait]
-    impl CsiDouble for CsiAddToolFake {
+    impl Csi for CsiAddToolFake {
         async fn invoke_tool(&mut self, requests: Vec<InvokeRequest>) -> Vec<ToolResult> {
             requests
                 .iter()
