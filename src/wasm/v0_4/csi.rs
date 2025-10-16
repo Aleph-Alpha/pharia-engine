@@ -515,11 +515,8 @@ impl From<inference::ChatEventV2> for ChatEvent {
         match value {
             inference::ChatEventV2::MessageBegin { role } => ChatEvent::MessageBegin(role),
             inference::ChatEventV2::Reasoning { content } => ChatEvent::Reasoning(content),
-            inference::ChatEventV2::MessageAppend { content, logprobs } => {
-                ChatEvent::MessageAppend(MessageAppend {
-                    content,
-                    logprobs: logprobs.into_iter().map(Into::into).collect(),
-                })
+            inference::ChatEventV2::MessageAppend { content } => {
+                ChatEvent::MessageAppend(MessageAppend { content })
             }
             inference::ChatEventV2::MessageEnd { finish_reason } => {
                 ChatEvent::MessageEnd(finish_reason.into())

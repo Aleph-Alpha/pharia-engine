@@ -653,8 +653,7 @@ impl inference::ChatEventV2 {
         if let Some(content) = first_choice.delta.content
             && !content.is_empty()
         {
-            let logprobs = map_logprobs(first_choice.logprobs);
-            events.push(Self::MessageAppend { content, logprobs });
+            events.push(Self::MessageAppend { content });
         } else if let Some(tool_call) = first_choice.delta.tool_calls {
             events.push(Self::ToolCall(
                 tool_call.into_iter().map(Into::into).collect(),

@@ -446,12 +446,9 @@ impl From<inference::ChatEventV2> for Event {
                 .event("reasoning")
                 .json_data(ChatReasoningEvent { content })
                 .expect("`json_data` must only be called once."),
-            inference::ChatEventV2::MessageAppend { content, logprobs } => Event::default()
+            inference::ChatEventV2::MessageAppend { content } => Event::default()
                 .event("message_append")
-                .json_data(ChatMessageAppendEvent {
-                    content,
-                    logprobs: logprobs.into_iter().map(Into::into).collect(),
-                })
+                .json_data(ChatMessageAppendEvent { content })
                 .expect("`json_data` must only be called once."),
             inference::ChatEventV2::MessageEnd { finish_reason } => Event::default()
                 .event("message_end")
@@ -488,7 +485,6 @@ struct ChatReasoningEvent {
 #[derive(Serialize)]
 struct ChatMessageAppendEvent {
     content: String,
-    logprobs: Vec<Distribution>,
 }
 
 #[derive(Serialize)]
