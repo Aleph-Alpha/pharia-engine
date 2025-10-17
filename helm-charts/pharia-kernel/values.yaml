@@ -1,9 +1,9 @@
 # -- Active namespaces for PhariaKernel. e.g.:
-# playground:
-#   configUrl: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
+# example-namespace:
+#   configUrl: "https://gitlab.acme.com/api/v4/projects/<project_id>/repository/files/namespace.toml/raw?ref=main"
 #   configAccessToken: "GITLAB_CONFIG_ACCESS_TOKEN"
-#   registry: "registry.gitlab.aleph-alpha.de"
-#   baseRepository: "engineering/pharia-kernel-playground/skills"
+#   registry: "registry.gitlab.acme.com"
+#   baseRepository: "example/repository/skills"
 #   registryUser: "REGISTRY_USER"
 #   registryPassword: "REGISTRY_PASSWORD"
 # Each of the value can alternatively be provided as environment variables, which have higher precedence:
