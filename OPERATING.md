@@ -17,8 +17,13 @@ podman tag ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest pharia-kernel
 You can start the container and expose its shell at port 8081 like this
 
 ```shell
-podman run -p 8081:8081 pharia-kernel
+podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
+
+We configure the bind address and port via the environment variable `KERNEL_ADDRESS`.
+If not configured it defaults to "0.0.0.0:8081", which is necessary in the container, but locally may cause the firewall to complain.
+Note that the Kernel can be configured both from environment variables and from a `config.toml` file.
+Mounting the config file is optional.
 
 ## Deploying Skills
 
