@@ -269,7 +269,7 @@ fn given_rust_skill(package_name: &str) -> PathBuf {
 
 /// In a nutshell this executes the following commands
 ///
-/// ```shell
+/// ```sh
 /// cargo build -p greet-v0_2 --target wasm32-wasip2 --release
 /// wasm-tools strip ./skill_build_cache/greet-v0_2-rs.wasm -o ./skill_build_cache/greet-v0_2-rs.wasm
 /// ```
