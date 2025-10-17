@@ -1,20 +1,3 @@
-inferenceAddress: "https://inference-api.product.pharia.com"
-documentIndexAddress: "https://document-index.product.pharia.com"
-authorizationAddress: "https://pharia-iam.product.pharia.com"
-# -- Active namespaces for PhariaKernel.
-# The credentials can be provided via the values:
-#   configAccessToken
-#   registryUser
-#   registryPassword
-# or the environment variables:
-#   NAMESPACES__PLAYGROUND__CONFIG_ACCESS_TOKEN
-#   NAMESPACES__PLAYGROUND__REGISTRY_USER
-#   NAMESPACES__PLAYGROUND__REGISTRY_PASSWORD
-namespaces:
-  playground:
-    configUrl: "https://gitlab.aleph-alpha.de/api/v4/projects/997/repository/files/namespace.toml/raw?ref=main"
-    registry: "registry.gitlab.aleph-alpha.de"
-    baseRepository: "engineering/pharia-kernel-playground/skills"
 imagePullSecretCustom:
   create: true
   registry: alephalpha.jfrog.io

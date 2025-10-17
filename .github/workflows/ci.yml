@@ -283,6 +283,12 @@ jobs:
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
               --set "namespaces.playground.registryPassword=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
+              --set "namespaces.playground.configUrl=${{ vars.PLAYGROUND_GITLAB_CONFIG_URL }}" \
+              --set "namespaces.playground.registry=${{ vars.PLAYGROUND_GITLAB_REGISTRY }}" \
+              --set "namespaces.playground.baseRepository=${{ vars.PLAYGROUND_GITLAB_BASE_REPOSITORY }}"
+              --set "inferenceAddress=${{ vars.CI_INFERENCE_ADDRESS }}"
+              --set "documentIndexAddress=${{ vars.CI_DOCUMENT_INDEX_ADDRESS }}"
+              --set "authorizationAddress=${{ vars.CI_AUTHORIZATION_ADDRESS }}"
               --wait --timeout 3m --debug
 
           helm test pharia-kernel
@@ -357,13 +363,20 @@ jobs:
           helm dependency update helm-charts/pharia-kernel
 
           helm install pharia-kernel helm-charts/pharia-kernel \
-              -f helm-charts/pharia-kernel/values-kind.yaml \
+              -f helm-charts/pharia-kernel/
+              values-kind.yaml \
               --set "image.registry=$LOCAL_REGISTRY" \
               --set "image.repository=pharia-kernel" \
               --set "image.tag=$IMAGE_ID" \
               --set "namespaces.playground.configAccessToken=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
               --set "namespaces.playground.registryUser=${{ secrets.PLAYGROUND_GITLAB_USER }}" \
               --set "namespaces.playground.registryPassword=${{ secrets.PLAYGROUND_GITLAB_TOKEN }}" \
+              --set "namespaces.playground.configUrl=${{ vars.PLAYGROUND_GITLAB_CONFIG_URL }}" \
+              --set "namespaces.playground.registry=${{ vars.PLAYGROUND_GITLAB_REGISTRY }}" \
+              --set "namespaces.playground.baseRepository=${{ vars.PLAYGROUND_GITLAB_BASE_REPOSITORY }}"
+              --set "inferenceAddress=${{ vars.CI_INFERENCE_ADDRESS}}"
+              --set "documentIndexAddress=${{ vars.CI_DOCUMENT_INDEX_ADDRESS }}"
+              --set "authorizationAddress=${{ vars.CI_AUTHORIZATION_ADDRESS }}"
               --set "global.phariaAiFeatureSet=BETA" \
               --wait --timeout 3m --debug
 
