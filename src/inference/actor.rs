@@ -662,7 +662,7 @@ impl FromStr for FinishReason {
             "length" | "maximum_tokens" => Ok(Self::Length),
             "stop" | "end_of_text" | "stop_sequence_reached" => Ok(Self::Stop),
             "content_filter" => Ok(Self::ContentFilter),
-            _ => Err(anyhow::anyhow!("Unknown finish reason: {}", s)),
+            _ => Err(anyhow::anyhow!("Unknown finish reason: {s}")),
         }
     }
 }

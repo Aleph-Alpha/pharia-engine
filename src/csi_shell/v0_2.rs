@@ -396,7 +396,7 @@ impl Language {
             language_selection::Language(s) if s == "eng" => Self::Eng,
             language_selection::Language(s) if s == "deu" => Self::Deu,
             _ => {
-                let err = anyhow::anyhow!("Unsupported language: {:?}", value);
+                let err = anyhow::anyhow!("Unsupported language: {value:?}");
                 error!(parent: context.span(), "{}", err);
                 return Err(err);
             }

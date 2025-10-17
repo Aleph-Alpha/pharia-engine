@@ -248,8 +248,7 @@ pub mod tests {
                 Ok(Arc::new(pharia_1_llm_7b_control_tokenizer()))
             } else {
                 Err(anyhow!(
-                    "model '{}' not supported by FakeTokenizers",
-                    model_name
+                    "model '{model_name}' not supported by FakeTokenizers"
                 ))
             }
         }

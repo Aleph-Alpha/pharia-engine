@@ -504,8 +504,7 @@ impl From<OpenAIError> for InferenceError {
                 code: Some(code), ..
             }) if code == "model_not_found" => InferenceError::ModelNotFound,
             _ => InferenceError::Other(anyhow::anyhow!(
-                "Error while calling OpenAI chat completion API: {:#}",
-                error
+                "Error while calling OpenAI chat completion API: {error:#}"
             )),
         }
     }

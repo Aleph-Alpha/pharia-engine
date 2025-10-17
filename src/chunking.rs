@@ -122,8 +122,7 @@ mod tests {
             model_name: String,
         ) -> anyhow::Result<Arc<tokenizers::Tokenizer>> {
             Err(anyhow!(
-                "model '{}' not supported by FakeTokenizers",
-                model_name
+                "model '{model_name}' not supported by FakeTokenizers"
             ))
         }
     }
