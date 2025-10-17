@@ -35,6 +35,8 @@ module-name-repetitions = "allow"
 
 [package]
 name = "pharia-kernel"
+repository="https://github.com/Aleph-Alpha/pharia-kernel"
+description = "Serverless Wasm runtime for AI Skills"
 license = "Apache-2.0"
 version = "0.14.0"
 edition.workspace = true
