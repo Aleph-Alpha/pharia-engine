@@ -85,9 +85,9 @@ impl ChatCompletionResponseMessage {
 
     /// Split the content and reasoning of a message.
     ///
-    /// This scenario takes place when converting a [`inference::openai::ChatCompletionResponseMessage`]
-    /// to an [`inference::ChatResponseV2`] and the completion response API does not support the
-    /// `reasoning_content` field.
+    /// This scenario takes place when converting a
+    /// [`inference::openai::ChatCompletionResponseMessage`] to an [`inference::ChatResponseV2`]
+    /// and the completion response API does not support the `reasoning_content` field.
     /// Currently, we only support models that delimit their reasoning content with the
     /// `<think>` start tag and the `</think>` end tag like qwen-3-32b.
     ///
@@ -152,7 +152,8 @@ mod tests {
 
     #[test]
     fn split_content_and_reasoning_content_on_message() {
-        // Given a message where a content tag has a think tag and an end tag are present in the content
+        // Given a message where a content tag has a think tag and an end tag are present in the
+        // content
         let mut chat_msg = ChatCompletionResponseMessage::with_content(
             "<think>I am thinking...</think> The answer is 42",
         );
@@ -167,7 +168,8 @@ mod tests {
 
     #[test]
     fn split_content_and_reasoning_content_on_message_with_reasoning_content_already_set() {
-        // Given a message where a content tag has a think tag and an end tag are present in the content and reasoning content is already set
+        // Given a message where a content tag has a think tag and an end tag are present in the
+        // content and reasoning content is already set
         let mut chat_msg = ChatCompletionResponseMessage::with_content_and_reasoning(
             "<think>I am thinking...</think> The answer is 42",
             "I was already thinking...",
