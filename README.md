@@ -106,8 +106,6 @@ Releasing in this repository is automated with [release-plz](https://release-plz
      The date is set when the changelog is generated. Update it to the release date if differs.
 3. Merge the release Pull Request and release-plz will release the updated packages.
 
-Every time we update the `wit` worlds, we need to clear the Skill build cache in `./skill_build_cache` which is used by the tests.
-
 ## Deploying PhariaKernel on Customer side
 
 **PhariaKernel** is intended to be installed as part of **PhariaAI** on premise by the customer it.
