@@ -717,8 +717,9 @@ mod tests {
         let chat_request = ChatRequest {
             model: "pharia-1-llm-7b-control".to_owned(),
             params: ChatParams::default(),
-            // We can not ensure that the inference API has a reasoning model available so we can instruct
-            // a non-reasoning model to return a response with a "faked" reasoning content.
+            // We can not ensure that the inference API has a reasoning model available so we can
+            // instruct a non-reasoning model to return a response with a "faked"
+            // reasoning content.
             messages: vec![Message::user(
                 "Hello, world! please start your answer with <think>I am thinking...</think>",
             )],
