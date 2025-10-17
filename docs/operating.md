@@ -7,9 +7,9 @@ This manual is for Operators running PhariaKernel for their business or departme
 We deploy PhariaKernel as a container image to JFrog. You can fetch them like this:
 
 ```shell
-podman login alephalpha.jfrog.io/pharia-kernel-images
-podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest
-podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest pharia-kernel
+podman login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
+podman pull ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest
+podman tag ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest pharia-kernel
 ```
 
 ## Starting
@@ -124,22 +124,10 @@ podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 
 ### Get PhariaKernel Image
 
-1. Access JFrog Artifactory via token:
-
-   - Login to [JFrog](https://alephalpha.jfrog.io/ui/login/)
-   - Click on 'Edit Profile'
-   - Click on 'Generate an Identity Token'
-
-2. Pull PhariaKernel image
-
 ```shell
-# login in interactive mode
-podman login alephalpha.jfrog.io/pharia-kernel-images
-# login in non-interactive mode
-podman login alephalpha.jfrog.io/pharia-kernel-images -u $JFROG_USER -p $JFROG_PASSWORD
-
-podman pull alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest
-podman tag alephalpha.jfrog.io/pharia-kernel-images/pharia-kernel:latest pharia-kernel
+podman login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
+podman pull ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest
+podman tag ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest pharia-kernel
 ```
 
 ### Start PhariaKernel Container
@@ -151,7 +139,6 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
    For local skill development, you need a folder that serves as a skill registry to store all compiled Skills.
 
    ```shell
-       # create the local skills folder
        mkdir skills
    ```
 
@@ -165,12 +152,11 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
            -v ./skills:/app/skills \
            -e NAMESPACES__DEV__DIRECTORY="skills" \
            -e NAMESPACE_UPDATE_INTERVAL=1s \
-           -e LOG_LEVEL="pharia_kernel=debug" \
            -p 8081:8081 \
            pharia-kernel
    ```
 
-   You can view the Pharia-Kernel's API documentation at <http://127.0.0.1:8081/api-docs>
+   You can view the PhariaKernel's API documentation at [](http://127.0.0.1:8081/api-docs)
 
 ### Monitoring Local Skill Execution
 
@@ -192,4 +178,4 @@ podman run \
     pharia-kernel
 ```
 
-You can view the monitoring via your local Jaeger instance at <http://localhost:16686>.
+You can view the monitoring via your local Jaeger instance at [](http://localhost:16686).
