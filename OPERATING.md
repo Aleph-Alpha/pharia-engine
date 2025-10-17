@@ -6,7 +6,7 @@ This manual is for Operators running PhariaKernel for their business or departme
 
 We deploy PhariaKernel as a container image to GitHub. You can it with:
 
-```shell
+```sh
 podman login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
 podman pull ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest
 podman tag ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest pharia-kernel
@@ -16,7 +16,7 @@ podman tag ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest pharia-kernel
 
 You can start the container and expose its shell at port 8081 like this
 
-```shell
+```sh
 podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
 
@@ -84,7 +84,7 @@ With the remote configuration above, PhariaKernel will serve any skill deployed 
 
 You can provide each namespace in PhariaKernel with credentials to authenticate against the specified OCI registry. Set the environment variables that are expected from the operator config:
 
-```shell
+```sh
 NAMESPACES__MY_TEAM__REGISTRY_USER=Joe.Plumber
 NAMESPACES__MY_TEAM__REGISTRY_PASSWORD=****
 ```
@@ -93,7 +93,7 @@ NAMESPACES__MY_TEAM__REGISTRY_PASSWORD=****
 
 The environment variable `NAMESPACE_UPDATE_INTERVAL` controls how much time the kernel waits between checking for changes in namespace configurations. The default is 10 seconds.
 
-```shell
+```sh
 NAMESPACE_UPDATE_INTERVAL=10s
 ```
 
@@ -101,7 +101,7 @@ NAMESPACE_UPDATE_INTERVAL=10s
 
 By default, only logs of `ERROR` level are output. You can change this by setting the `LOG_LEVEL` environment variable to one of `trace`, `debug`, `info`, `warn`, or `error` (default).
 
-```shell
+```sh
 LOG_LEVEL=info
 ```
 
@@ -109,19 +109,19 @@ LOG_LEVEL=info
 
 PhariaKernel can be configured to use an OpenTelemetry Collector endpoint by setting the `OTEL_ENDPOINT` environment variable.
 
-```shell
+```sh
 OTEL_ENDPOINT=http://127.0.0.1:4317
 ```
 
 The ratio of traces that are being sampled can be configured by setting the `OTEL_SAMPLING_RATIO` to a value between 0.0 and 1.0, where 0.0 means no sampling and 1.0 means all traces.
 
-```shell
+```sh
 OTEL_SAMPLING_RATIO=0.1
 ```
 
 For local testing, a supported collector like the Jaeger [All in One](https://www.jaegertracing.io/docs/1.60/getting-started/#all-in-one) executable can be used:
 
-```shell
+```sh
 podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
@@ -129,7 +129,7 @@ podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 
 ### Get PhariaKernel Image
 
-```shell
+```sh
 podman login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
 podman pull ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest
 podman tag ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest pharia-kernel
@@ -143,7 +143,7 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
 
    For local skill development, you need a folder that serves as a skill registry to store all compiled Skills.
 
-   ```shell
+   ```sh
        mkdir skills
    ```
 
@@ -152,7 +152,7 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
 
 2. Start the container:
 
-   ```shell
+   ```sh
        podman run \
            -v ./skills:/app/skills \
            -e NAMESPACES__DEV__DIRECTORY="skills" \
@@ -167,13 +167,13 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
 
 You can monitor your Skill by connecting the PhariaKernel to an OpenTelemetry collector, e.g. Jaeger:
 
-```shell
+```sh
 podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
 Specify the collector endpoint via the environment variable `OTEL_ENDPOINT`:
 
-```shell
+```sh
 podman run \
     -v ./skills:/app/skills \
     -e NAMESPACES__DEV__DIRECTORY="skills" \
