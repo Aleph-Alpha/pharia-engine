@@ -62,7 +62,7 @@ cargo fmt -- --check
 cargo clippy --workspace --all-features --all-targets -- -D warnings
 ```
 
-### Running inside Container
+### Running the Container
 
 Build the image with
 
@@ -70,16 +70,13 @@ Build the image with
 podman build . --tag pharia-kernel
 ```
 
-Then, run the image with
+Then, run the container with
 
 ```sh
 podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-kernel
 ```
 
-We configure the bind address and port via the environment variable `KERNEL_ADDRESS`.
-If not configured it defaults to "0.0.0.0:8081", which is necessary in the container, but locally may cause the firewall to complain.
-Note that the Kernel can be configured both from environment variables and from a `config.toml` file.
-Mounting the config file is optional.
+You can find more details on how to configure the Kernel in the [OPERATING.md](./OPERATING.md).
 
 #### MacOS
 
@@ -105,13 +102,6 @@ Releasing in this repository is automated with [release-plz](https://release-plz
 
      The date is set when the changelog is generated. Update it to the release date if differs.
 3. Merge the release Pull Request and release-plz will release the updated packages.
-
-## Deploying PhariaKernel on Customer side
-
-**PhariaKernel** is intended to be installed as part of **PhariaAI** on premise by the customer it.
-It is deployed, as are all other modules of the **PhariaAI**, to the JFrog Artifactory.
-
-![Block Diagram Pharia OS deploy][deployment]
 
 ## Usage Examples
 
