@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*", "rust-skills/*", "resource_eval/sample_rs"]
+members = ["crates/*", "rust-skills/*"]
 resolver = "3"
 
 [workspace.package]
