@@ -4,7 +4,7 @@ This manual is for Operators running PhariaKernel for their business or departme
 
 ## How To Get The Image
 
-We deploy PhariaKernel as a container image to JFrog. You can fetch them like this:
+We deploy PhariaKernel as a container image to GitHub. You can it with:
 
 ```shell
 podman login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
