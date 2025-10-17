@@ -126,13 +126,3 @@ curl -v 127.0.0.1:8081/v1/skills/test-beta/hello/message-stream \
 -H 'Content-Type: application/json' \
 -d '"Homer"'
 ```
-
-## Helpful links for Development
-
-The current helm-chart is deployed to <https://pharia-kernel.stage.product.pharia.com/>
-
-The status page for uptime robot is found at: <https://stats.uptimerobot.com/gjXpoIPMnv>
-
-The secrets for the deployment can be added to the [Vault](https://vault.management-prod01.stackit.run/ui/vault/secrets/p-stage/list/projects/pharia-kernel/)
-
-[deployment]: ./tam/deployment.drawio.svg
