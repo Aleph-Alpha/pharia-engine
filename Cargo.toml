@@ -35,7 +35,7 @@ module-name-repetitions = "allow"
 
 [package]
 name = "pharia-kernel"
-repository="https://github.com/Aleph-Alpha/pharia-kernel"
+repository = "https://github.com/Aleph-Alpha/pharia-kernel"
 description = "Serverless Wasm runtime for AI Skills"
 license = "Apache-2.0"
 version = "0.14.0"
@@ -44,7 +44,7 @@ exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
 engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.9" }
-aleph-alpha-client = "0.29.0"
+aleph-alpha-client = "0.30.0"
 anyhow = "1.0.99"
 async-trait = "0.1.89"
 axum = { version = "0.8.4", features = ["macros"] }
@@ -93,11 +93,11 @@ wasmtime = "33.0.1"
 wit-parser = "0.237.0"
 url = "2.5.6"
 thiserror = "2.0.16"
-tokenizers = { version = "0.21.4", default-features = false, features = [
+tokenizers = { version = "0.22.1", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
-text-splitter = { version = "0.27.0", features = ["tokenizers"] }
+text-splitter = { version = "0.28.0", features = ["tokenizers"] }
 lingua = { version = "1.7.1" }
 opentelemetry = "0.30.0"
 opentelemetry_sdk = { version = "0.30.0", features = ["rt-tokio"] }
