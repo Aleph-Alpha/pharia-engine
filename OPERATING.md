@@ -1,10 +1,10 @@
-# Operating PhariaKernel
+# Operating PhariaEngine
 
-This manual is for Operators running PhariaKernel for their business or department. In case you are more interested in developing Skills or interfacing with PhariaKernel in order to invoke deployed Skills you should consider the developer or user manual instead.
+This manual is for Operators running PhariaEngine for their business or department. In case you are more interested in developing Skills or interfacing with PhariaEngine in order to invoke deployed Skills you should consider the developer or user manual instead.
 
 ## How To Get The Image
 
-We deploy PhariaKernel as a container image to GitHub. You can it with:
+We deploy PhariaEngine as a container image to GitHub. You can it with:
 
 ```sh
 podman login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
@@ -22,20 +22,20 @@ podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia
 
 We configure the bind address and port via the environment variable `KERNEL_ADDRESS`.
 If not configured it defaults to "0.0.0.0:8081", which is necessary in the container, but locally may cause the firewall to complain.
-Note that the Kernel can be configured both from environment variables and from a `config.toml` file.
+Note that the Engine can be configured both from environment variables and from a `config.toml` file.
 Mounting the config file is optional.
 
 ## Deploying Skills
 
-PhariaKernel wants to enable teams outside of the PhariaKernel Operators to deploy Skills in self service. To achieve this, Skills are organized into namespaces. The PhariaKernel Operators maintain the list of namespaces and associate each one with a configuration file, which in turn is owned by a team.
+PhariaEngine wants to enable teams outside of the PhariaEngine Operators to deploy Skills in self service. To achieve this, Skills are organized into namespaces. The PhariaEngine Operators maintain the list of namespaces and associate each one with a configuration file, which in turn is owned by a team.
 
-Each namespace configuration typically would reside in a Git repository owned by the Team which owns the namespace. Changes in this file will be automatically detected by the Kernel.
+Each namespace configuration typically would reside in a Git repository owned by the Team which owns the namespace. Changes in this file will be automatically detected by the Engine.
 
 A [namespace](skill-deployment.md#configuring-namespace) is also associated with a registry to load the Skills from. These Skill registries can either be directories in filesystem (mostly used for a development setup) or point to an OCI registry (recommended for production).
 
 ### Namespace with all Skills from Folder
 
-The Kernel provides a `directory` option for namespaces that serves all Skills from a given directory, without the need to configure them in a file.
+The Engine provides a `directory` option for namespaces that serves all Skills from a given directory, without the need to configure them in a file.
 You can activate this by setting
 
 ```toml
@@ -58,7 +58,7 @@ config-url = "file://namespace.toml"
 path = "skills"
 ```
 
-With the local configuration above, PhariaKernel will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace `my-team`. This is mostly intended for local development of Skills without a remote instance of PhariaKernel. To deploy Skills in production it is recommended to use a remote namespace.
+With the local configuration above, PhariaEngine will serve any skill deployed at the `skills` subdirectory of its working directory under the namespace `my-team`. This is mostly intended for local development of Skills without a remote instance of PhariaEngine. To deploy Skills in production it is recommended to use a remote namespace.
 
 ### Namespace With Remote Config and Remote Registry
 
@@ -66,11 +66,11 @@ With the local configuration above, PhariaKernel will serve any skill deployed a
 # `my-team` is the name of this namespace
 [namespaces.my-team]
 # The URL to the configuration listing the Skills of this namespace
-# PhariaKernel will use the contents of the `NAMESPACES__MY_TEAM__CONFIG_ACCESS_TOKEN` environment variable to access (authorize) the config
+# PhariaEngine will use the contents of the `NAMESPACES__MY_TEAM__CONFIG_ACCESS_TOKEN` environment variable to access (authorize) the config
 config-url = "https://github.com/Aleph-Alpha/my-team/blob/main/config.toml"
 
 # OCI Registry to load Skills from
-# PhariaKernel will use the contents of the `NAMESPACES__MY_TEAM__REGISTRY_USER` and `NAMESPACES__MY_TEAM__REGISTRY_PASSWORD` environment variables to access (authorize) the registry
+# PhariaEngine will use the contents of the `NAMESPACES__MY_TEAM__REGISTRY_USER` and `NAMESPACES__MY_TEAM__REGISTRY_PASSWORD` environment variables to access (authorize) the registry
 registry = "registry.acme.com"
 
 # This is the common prefix added to the skill name when composing the OCI repository.
@@ -78,11 +78,11 @@ registry = "registry.acme.com"
 base-repository = "my-org/my-team/skills"
 ```
 
-With the remote configuration above, PhariaKernel will serve any skill deployed on the specified OCI registry under the namespace `my-team`.
+With the remote configuration above, PhariaEngine will serve any skill deployed on the specified OCI registry under the namespace `my-team`.
 
 ### Authentication Against OCI Registries
 
-You can provide each namespace in PhariaKernel with credentials to authenticate against the specified OCI registry. Set the environment variables that are expected from the operator config:
+You can provide each namespace in PhariaEngine with credentials to authenticate against the specified OCI registry. Set the environment variables that are expected from the operator config:
 
 ```sh
 NAMESPACES__MY_TEAM__REGISTRY_USER=Joe.Plumber
@@ -91,7 +91,7 @@ NAMESPACES__MY_TEAM__REGISTRY_PASSWORD=****
 
 ## Update Interval
 
-The environment variable `NAMESPACE_UPDATE_INTERVAL` controls how much time the kernel waits between checking for changes in namespace configurations. The default is 10 seconds.
+The environment variable `NAMESPACE_UPDATE_INTERVAL` controls how much time the Engine waits between checking for changes in namespace configurations. The default is 10 seconds.
 
 ```sh
 NAMESPACE_UPDATE_INTERVAL=10s
@@ -107,7 +107,7 @@ LOG_LEVEL=info
 
 ## Observability
 
-PhariaKernel can be configured to use an OpenTelemetry Collector endpoint by setting the `OTEL_ENDPOINT` environment variable.
+PhariaEngine can be configured to use an OpenTelemetry Collector endpoint by setting the `OTEL_ENDPOINT` environment variable.
 
 ```sh
 OTEL_ENDPOINT=http://127.0.0.1:4317
@@ -125,9 +125,9 @@ For local testing, a supported collector like the Jaeger [All in One](https://ww
 podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
 ```
 
-## Local PhariaKernel Setup
+## Local PhariaEngine Setup
 
-### Get PhariaKernel Image
+### Get PhariaEngine Image
 
 ```sh
 podman login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
@@ -135,9 +135,9 @@ podman pull ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest
 podman tag ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:latest pharia-kernel
 ```
 
-### Start PhariaKernel Container
+### Start PhariaEngine Container
 
-In order to run PhariaKernel, you need to provide a namespace configuration:
+In order to run PhariaEngine, you need to provide a namespace configuration:
 
 1. Create a `skills` folder
 
@@ -148,7 +148,7 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
    ```
 
    All Skills in this folder are exposed in the namespace "dev" with the environment variable `NAMESPACES__DEV__DIRECTORY`.
-   Any changes in this folder will be picked up by the PhariaKernel automatically. The `config.toml` and `namespace.toml` should not be provided.
+   Any changes in this folder will be picked up by the PhariaEngine automatically. The `config.toml` and `namespace.toml` should not be provided.
 
 2. Start the container:
 
@@ -161,11 +161,11 @@ In order to run PhariaKernel, you need to provide a namespace configuration:
            pharia-kernel
    ```
 
-   You can view the PhariaKernel's API documentation at [](http://127.0.0.1:8081/api-docs)
+   You can view the PhariaEngine's API documentation at [](http://127.0.0.1:8081/api-docs)
 
 ### Monitoring Local Skill Execution
 
-You can monitor your Skill by connecting the PhariaKernel to an OpenTelemetry collector, e.g. Jaeger:
+You can monitor your Skill by connecting the PhariaEngine to an OpenTelemetry collector, e.g. Jaeger:
 
 ```sh
 podman run -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one

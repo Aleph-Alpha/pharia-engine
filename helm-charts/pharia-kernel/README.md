@@ -1,4 +1,4 @@
-# PhariaKernel Helm Chart
+# PhariaEngine Helm Chart
 
-This Helm Chart is used to deploy PhariaKernel as part of the PhariaAI platform.
-It can not be used to deploy PhariaKernel outside of PhariaAI.
+This Helm Chart is used to deploy PhariaEngine as part of the PhariaAI platform.
+It can not be used to deploy PhariaEngine outside of PhariaAI.
