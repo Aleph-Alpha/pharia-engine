@@ -17,7 +17,7 @@ In more technical terms, we aim to reduce the accidental complexity the Skill de
 > [!NOTE]
 > PhariaKernel is production ready. Until now, it has been deployed as part of the PhariaAI product suite. Making PhariaKernel independent of PhariaAI a smooth experience is currently work in progress. Opensourcing this repository is one step towards that goal. This is the beginning of a journey and we are constantly improving.
 >
-> If you are excided about the PhariaKernel idea, please reach out or start contributing.
+> If you are excited about the PhariaKernel idea, please reach out or start contributing.
 
 ## Features
 
