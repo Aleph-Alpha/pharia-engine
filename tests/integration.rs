@@ -12,7 +12,7 @@ use bytesize::ByteSize;
 use dotenvy::from_filename;
 use futures::StreamExt;
 use opentelemetry::{SpanId, TraceId};
-use pharia_kernel::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
+use pharia_engine::{AppConfig, FeatureSet, Kernel, NamespaceConfigs};
 use reqwest::{Body, header};
 use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};

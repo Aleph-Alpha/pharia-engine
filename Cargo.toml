@@ -34,8 +34,8 @@ pedantic = { level = "warn", priority = -1 }
 module-name-repetitions = "allow"
 
 [package]
-name = "pharia-kernel"
-repository = "https://github.com/Aleph-Alpha/pharia-kernel"
+name = "pharia-engine"
+repository = "https://github.com/Aleph-Alpha/pharia-engine"
 description = "Serverless Wasm runtime for AI Skills"
 license = "Apache-2.0"
 version = "0.14.0"
@@ -55,7 +55,7 @@ oci-client = "0.15.0"
 oci-wasm = "0.3.0"
 # We use `rust-tls-native-roots` instead of `rustls-tls`. `rustls-tls` is just a shorthand for
 # `rustls-tls-webkpi-roots`. `rustls-tls-webkpi-roots` is the default, because it is the best fit
-# for Saas applications, which can be frequently deployed by the dev team. Since the Kernel is
+# for Saas applications, which can be frequently deployed by the dev team. Since the Engine is
 # operated independently on premise it is not a fit for us, and the operation team on the customer
 # side need a way to inject their own Certificates roots.
 reqwest = { version = "0.12.23", features = [
