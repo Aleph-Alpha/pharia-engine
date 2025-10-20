@@ -1,5 +1,6 @@
 # PhariaKernel
 
+[![Aleph Alpha](https://img.shields.io/badge/aleph-alpha-212516.svg?labelColor=E3FF00&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+kKFA0JAyhHQSMAAAEzSURBVDjLjZO7SoNBEIU/UsUYjAErW8VOFLTKAxgbiYYgPoO+hm8Q9BG0NiB2VpGAdtrYSMoUwU2llfrbnIGTPxedZnfPXJidcwYmrQ5cAyXDSsLq/GHrQAIy4B4oAgXgTlhSzIQt6lwGugrOgAvhB8AQ6AHVXA41YAC0rN0nFfgBtoSvAmXdj5VTA+go+FsOgF29M6Cd6/bEfJ0YWrI/VhTYE/ZmyRVgJPwd2AvHkf37VNi5YSvCzgxroAkD3ACfum/qfM2x476PaL8wh1JvfW1WUBQ4NOE8TymwofPFKGyEc98Gk4AlS+wLf5gyxBTKDBq/TAthbaN4xzQwRmMIqamAskQDsC0xZcCjfbPlQnJZVsX/UPIFuDTqupL7mJRnLdOthlzUYs1dpvw6XwEL/1nnX8b7Wwgn81GqAAAAAElFTkSuQmCC)](https://aleph-alpha.com)
 [![Build Status](https://github.com/aleph-alpha/pharia-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/aleph-alpha/pharia-kernel/actions)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
