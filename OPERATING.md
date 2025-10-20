@@ -4,7 +4,7 @@ This manual is for Operators running PhariaEngine for their business or departme
 
 ## How To Get The Image
 
-We deploy PhariaEngine as a container image to GitHub. You can it with:
+We deploy PhariaEngine as a container image to GitHub. You can pull it with:
 
 ```sh
 podman login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
