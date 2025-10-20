@@ -1,5 +1,10 @@
 # PhariaKernel
 
+[![Build Status](https://github.com/aleph-alpha/pharia-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/aleph-alpha/pharia-kernel/actions)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+
 PhariaKernel allows you to execute Cognitive Business Units called Skills. These Skills can be written in any language which compiles to WebAssembly (Wasm).
 We provide a SDK and dedicated support for Python.
 PhariaKernel handles the interaction between these Skills and drivers for functionality like inference and retrieval via the Cognitive System Interface (CSI).
@@ -7,6 +12,11 @@ Writing Skills for PhariaKernel is more constrained then shipping an end to end 
 Yet these constraints allow us to make opinionated decisions for the Skill developer.
 We strive to take away only the decisions and responsibilities a Skill developer may find "boring" (such as authentication, parallelization of inference calls).
 In more technical terms, we aim to reduce the accidental complexity the Skill developer has to engage with.
+
+> [!NOTE]
+> PhariaKernel is production ready. Until now, it has been deployed as part of the PhariaAI product suite. Making PhariaKernel independent of PhariaAI a smooth experience is currently work in progress. Opensourcing this repository is one step towards that goal. This is the beginning of a journey and we are constantly improving.
+>
+> If you are excided about the PhariaKernel idea, please reach out or start contributing.
 
 ## Features
 
