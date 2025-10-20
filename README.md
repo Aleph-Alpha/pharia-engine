@@ -1,23 +1,23 @@
-# PhariaKernel
+# PhariaEngine
 
 [![Aleph Alpha](https://img.shields.io/badge/aleph-alpha-212516.svg?labelColor=E3FF00&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+kKFA0JAyhHQSMAAAEzSURBVDjLjZO7SoNBEIU/UsUYjAErW8VOFLTKAxgbiYYgPoO+hm8Q9BG0NiB2VpGAdtrYSMoUwU2llfrbnIGTPxedZnfPXJidcwYmrQ5cAyXDSsLq/GHrQAIy4B4oAgXgTlhSzIQt6lwGugrOgAvhB8AQ6AHVXA41YAC0rN0nFfgBtoSvAmXdj5VTA+go+FsOgF29M6Cd6/bEfJ0YWrI/VhTYE/ZmyRVgJPwd2AvHkf37VNi5YSvCzgxroAkD3ACfum/qfM2x476PaL8wh1JvfW1WUBQ4NOE8TymwofPFKGyEc98Gk4AlS+wLf5gyxBTKDBq/TAthbaN4xzQwRmMIqamAskQDsC0xZcCjfbPlQnJZVsX/UPIFuDTqupL7mJRnLdOthlzUYs1dpvw6XwEL/1nnX8b7Wwgn81GqAAAAAElFTkSuQmCC)](https://aleph-alpha.com)
-[![Build Status](https://github.com/aleph-alpha/pharia-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/aleph-alpha/pharia-kernel/actions)
+[![Build Status](https://github.com/aleph-alpha/pharia-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/aleph-alpha/pharia-engine/actions)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-
-PhariaKernel allows you to execute Cognitive Business Units called Skills. These Skills can be written in any language which compiles to WebAssembly (Wasm).
+PhariaEngine allows you to execute Cognitive Business Units called Skills. These Skills can be written in any language which compiles to WebAssembly (Wasm).
+PhariaEngine allows you to execute Cognitive Business Units called Skills. These Skills can be written in any language which compiles to WebAssembly (Wasm).
 We provide a SDK and dedicated support for Python.
-PhariaKernel handles the interaction between these Skills and drivers for functionality like inference and retrieval via the Cognitive System Interface (CSI).
-Writing Skills for PhariaKernel is more constrained then shipping an end to end use case in a custom Docker container.
+PhariaEngine handles the interaction between these Skills and drivers for functionality like inference and retrieval via the Cognitive System Interface (CSI).
+Writing Skills for PhariaEngine is more constrained then shipping an end to end use case in a custom Docker container.
 Yet these constraints allow us to make opinionated decisions for the Skill developer.
 We strive to take away only the decisions and responsibilities a Skill developer may find "boring" (such as authentication, parallelization of inference calls).
 In more technical terms, we aim to reduce the accidental complexity the Skill developer has to engage with.
 
 > [!NOTE]
-> PhariaKernel is production ready. Until now, it has been deployed as part of the PhariaAI product suite. Making PhariaKernel independent of PhariaAI a smooth experience is currently work in progress. Opensourcing this repository is one step towards that goal. This is the beginning of a journey and we are constantly improving.
+> PhariaEngine is production ready. Until now, it has been deployed as part of the PhariaAI product suite. Making PhariaEngine independent of PhariaAI a smooth experience is currently work in progress. Opensourcing this repository is one step towards that goal. This is the beginning of a journey and we are constantly improving.
 >
-> If you are excited about the PhariaKernel idea, please reach out or start contributing.
+> If you are excited about the PhariaEngine idea, please reach out or start contributing.
 
 ## Features
 
@@ -28,7 +28,7 @@ In more technical terms, we aim to reduce the accidental complexity the Skill de
 
 ## PhariaAI
 
-The Kernel is part of the [PhariaAI product suite](https://docs.aleph-alpha.com/products/pharia-ai/overview/).
+The Engine is part of the [PhariaAI product suite](https://docs.aleph-alpha.com/products/pharia-ai/overview/).
 However, it can also be configured to run standalone with any OpenAI-compatible inference backend.
 If operated outside of PhariaAI, some features are not available.
 These include RAG capabilities offered by the [DocumentIndex](https://docs.aleph-alpha.com/products/apis/pharia-search/aleph-alpha-document-index-api/), features like explainability that are offered by the [Aleph Alpha inference](https://docs.aleph-alpha.com/products/apis/pharia-inference/) and the integration with the [Pharia IAM service](https://docs.aleph-alpha.com/products/pharia-ai/pharia-os/user-management/).
@@ -46,7 +46,7 @@ cargo install wasm-tools
 cp .env.example .env
 ```
 
-Now, you can run the Kernel with
+Now, you can run the Engine with
 
 ```sh
 cargo run
@@ -78,21 +78,21 @@ cargo clippy --workspace --all-features --all-targets -- -D warnings
 Build the image with
 
 ```sh
-podman build . --tag pharia-kernel
+podman build . --tag pharia-Engine
 ```
 
 Then, run the container with
 
 ```sh
-podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-kernel
+podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-Engine
 ```
 
-You can find more details on how to configure the Kernel in the [OPERATING.md](./OPERATING.md).
+You can find more details on how to configure the Engine in the [OPERATING.md](./OPERATING.md).
 
 #### MacOS
 
 Podman on MacOS requires a separate virtual machine run by the user.
-To compile PhariaKernel, at least 4 GiB of RAM are needed and 8 GiB are recommended. You set this up with
+To compile PhariaEngine, at least 4 GiB of RAM are needed and 8 GiB are recommended. You set this up with
 
 ```sh
 podman machine init
@@ -116,9 +116,9 @@ Releasing in this repository is automated with [release-plz](https://release-plz
 
 ## Usage Examples
 
-The Kernel organizes Skills in [namespaces](https://docs.aleph-alpha.com/products/pharia-ai/configuration/how-to-enable-custom-skill-development/#for-operators).
+The Engine organizes Skills in [namespaces](https://docs.aleph-alpha.com/products/pharia-ai/configuration/how-to-enable-custom-skill-development/#for-operators).
 Each namespace can be configured to pull Skills from either a remote OCI registry or a local directory. Configuration examples can be found in the `.env.example` file.
-The Kernel comes configured with a `test-beta` namespace that hosts some hard-coded skills. You can invoke the `hello` skill with
+The Engine comes configured with a `test-beta` namespace that hosts some hard-coded skills. You can invoke the `hello` skill with
 
 ```sh
 curl -v 127.0.0.1:8081/v1/skills/test-beta/hello/message-stream \
