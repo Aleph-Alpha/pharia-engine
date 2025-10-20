@@ -160,17 +160,21 @@ jobs:
       IMAGE_ID: ${{ needs.build-image.outputs.image_id }}
     steps:
       - uses: actions/checkout@v5
-
       - name: Log in to GitHub
         uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Checkout shared AA trivy scanner
+        uses: actions/checkout@v5
+        with:
+          repository: Aleph-Alpha/actions
+          token: ${{ secrets.AA_ACTIONS_PAT }}
+          path: trivy
       - name: Run Trivy Scan
         id: trivy-scan
-        uses: Aleph-Alpha/actions/trivy/scan@c07a5bda5c99d704e1b8e6d75380edcd76f855f2
+        uses: ./trivy/scan/action
         with:
           toml-file: triage.toml
           image-uri: ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:${{ env.IMAGE_ID }}
@@ -548,7 +552,15 @@ jobs:
           update_dependencies: "true"
 
   dependabot-auto-merge:
-    needs: [tests, lints, security-scan, test-image, test-helm-chart, test-helm-chart-beta]
+    needs:
+      [
+        tests,
+        lints,
+        security-scan,
+        test-image,
+        test-helm-chart,
+        test-helm-chart-beta,
+      ]
     permissions:
       pull-requests: write
       contents: write
@@ -560,7 +572,7 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Enable auto-merge
         run: gh pr merge --auto --rebase "$PR_URL"
         env:
