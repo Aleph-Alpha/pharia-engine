@@ -1,6 +1,6 @@
-# Contributing to PhariaKernel
+# Contributing to PhariaEngine
 
-Thanks for your interest in the PhariaKernel, the serverless AI platform. Check out the [README](README.md) for more information on how to get started.
+Thanks for your interest in the PhariaEngine, the serverless AI platform. Check out the [README](README.md) for more information on how to get started.
 
 Note: We are currently setting up a Contributor License Agreement (CLA) before accepting external contributions.
 
@@ -22,11 +22,11 @@ In this repository we stick to Conventional Commits. See: <https://www.conventio
 PRs should be small, focused, and incremental. Consider adding a description of your change in the PR body.
 Commits should be small and change one thing. Make sure your code is formatted, linted, and all the tests pass.
 Make sure abstractions introduced are easily testable. If they are not, this likely indicates a design issue.
-The Kernel uses an actor model. Outside of tests, we avoid shared mutable state.
+The Engine uses an actor model. Outside of tests, we avoid shared mutable state.
 
 ## Testing
 
 Every change should be covered by tests. Try to stick to the [Given-When-Then](https://martinfowler.com/bliki/GivenWhenThen.html) pattern. Test names should be clear and descriptive.
 Make sure you understand the [naming conventions](https://martinfowler.com/articles/mocksArentStubs.html#TheDifferenceBetweenMocksAndStubs) around test doubles if introducing new ones.
 
-Thanks - the PhariaKernel team ❤️
+Thanks - the PhariaEngine team ❤️
