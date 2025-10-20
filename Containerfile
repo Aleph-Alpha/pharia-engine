@@ -1,5 +1,8 @@
-FROM registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/artifact-base/rust-builder as rust-builder
+FROM rust:latest AS rust-builder
 WORKDIR /build
+# We use cargo chef to cache building our dependencies.
+RUN cargo install cargo-chef
+RUN cargo install cargo-auditable
 
 FROM rust-builder AS planner
 COPY . .
@@ -16,7 +19,8 @@ COPY . .
 RUN cargo auditable build --release
 
 # Move rust binary in optimized runtime container
-FROM registry.gitlab.aleph-alpha.de/enterprise-readiness/shared-images/artifact-base/rust-runtime
+FROM debian:12 AS runtime
+RUN apt install openssl
 COPY --from=builder /build/target/release/pharia-kernel /usr/local/bin/pharia-kernel
 
 # use a random uid/gid to avoid running as root
