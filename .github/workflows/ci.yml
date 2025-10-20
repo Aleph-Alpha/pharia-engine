@@ -179,6 +179,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: Aleph-Alpha/actions
+          ref: defde8841ef8268630ffbbd88e8a329c0817cf43
           token: ${{ steps.get_token.outputs.token }}
           path: shared_actions
       - name: Run Trivy Scan
