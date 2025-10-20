@@ -542,3 +542,23 @@ jobs:
           registry_username: ${{ steps.jfrog.outputs.oidc-user }}
           registry_password: ${{ steps.jfrog.outputs.oidc-token }}
           update_dependencies: "true"
+
+  dependabot-auto-merge:
+    needs: [tests, lints, security-scan, test-image, test-helm-chart, test-helm-chart-beta]
+    permissions:
+      pull-requests: write
+      contents: write
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'}}
+    steps:
+      - name: Auto-approve
+        run: gh pr review "$PR_URL" --approve
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Enable auto-merge
+        run: gh pr merge --auto --rebase "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
