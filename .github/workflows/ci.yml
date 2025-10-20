@@ -166,21 +166,29 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Checkout shared AA trivy scanner
+      - name: Get token
+        id: get_token
+        uses: actions/create-github-app-token@v1
+        with:
+          private-key: ${{ secrets.AA_REPO_READ_ONLY_APP_PRIVATE_KEY }}
+          app-id: 1284685
+          owner: "Aleph-Alpha"
+          repositories: "actions"
+      - name: Checkout shared AA action
         uses: actions/checkout@v5
         with:
           repository: Aleph-Alpha/actions
-          token: ${{ secrets.AA_ACTIONS_PAT }}
-          path: trivy
+          token: ${{ steps.app-token.outputs.token }}
+          path: shared_actions
       - name: Run Trivy Scan
         id: trivy-scan
-        uses: ./trivy/scan/action
+        uses: ./shared_actions/trivy/scan
         with:
           toml-file: triage.toml
           image-uri: ghcr.io/aleph-alpha/pharia-kernel/pharia-kernel:${{ env.IMAGE_ID }}
 
       - name: Run CycloneDX Cargo
-        uses: Aleph-Alpha/actions/cyclonedx/cargo@c07a5bda5c99d704e1b8e6d75380edcd76f855f2
+        uses: ./shared_actions/cyclonedx/cargo
         with:
           sbom-file: ${{ steps.trivy-scan.outputs.license }}
 
