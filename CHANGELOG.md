@@ -7,6 +7,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.14.0...pharia-kernel-v0.15.0)
+
+### Features
+
+- Introduce unstable 0.5 wit world - ([87079a7](https://github.com/Aleph-Alpha/pharia-kernel/commit/87079a703480cfb657f526a9fb561aefa28fe0ee))
+- Extract reasoning events in chat stream from AA inference API v1 - ([ba819f7](https://github.com/Aleph-Alpha/pharia-kernel/commit/ba819f707aca21ae9ed7a8bc28bb507dedbc62a0))
+- Stabilize 0.4 wit world - ([99432aa](https://github.com/Aleph-Alpha/pharia-kernel/commit/99432aae642d18442796fc888c7f243cbcd75c2a))
+- Remove logprobs from chat event v2 - ([17657a1](https://github.com/Aleph-Alpha/pharia-kernel/commit/17657a128d4f473ab24b2256b5427d93fc8e019e))
+- Inject open_telemetry middleware in authorization requests - ([8f7150b](https://github.com/Aleph-Alpha/pharia-kernel/commit/8f7150b2c4a88098e7568b3f0f753a2bd46eef5c))
+- Record input and output token usage on spans - ([b4a9481](https://github.com/Aleph-Alpha/pharia-kernel/commit/b4a94811a43a8a25bd61ccd4dc7a05fa73695bf0))
+- Message stream event can emit reasoning content - ([a836117](https://github.com/Aleph-Alpha/pharia-kernel/commit/a8361176da2e1c17f2dee7106c7e7ab96d6723bb))
+- Add openai_client_v2 to inference AA client - ([636a8b0](https://github.com/Aleph-Alpha/pharia-kernel/commit/636a8b0427ff77321fc3c63bceadbbcc04db62f8))
+- Optionally serialize reasoning_content from reasoning field - ([7a16a7e](https://github.com/Aleph-Alpha/pharia-kernel/commit/7a16a7e8261c79ce5666d5303350ede7ebe8c843))
+- Accumulate content if tracing for streaming chat - ([7c36540](https://github.com/Aleph-Alpha/pharia-kernel/commit/7c36540075cf2dc4f5af19ed848c6fe7e7d46d8f))
+- Store gen_ai attributes on csi spans - ([5aa36ee](https://github.com/Aleph-Alpha/pharia-kernel/commit/5aa36ee0fb0374ab998b9d26488d2d003814e970))
+- Also support trace export via http - ([775a4f7](https://github.com/Aleph-Alpha/pharia-kernel/commit/775a4f7fabddb0611d742b0a960303d164b9a3c0))
+
+### Fixes
+
+- Extract reasoning even if not closed - ([244a146](https://github.com/Aleph-Alpha/pharia-kernel/commit/244a1462f1bcb6b2dcc61607b654b27775ec273f))
+
+### Documentation
+
+- Unify code blocks in markdown - ([01c0344](https://github.com/Aleph-Alpha/pharia-kernel/commit/01c0344bbac10e06b90bbae729434068e7dced56))
+- Upper case readme - ([4e798f1](https://github.com/Aleph-Alpha/pharia-kernel/commit/4e798f189c896a5004c5b49cfef20f3eff904e88))
+- Realign operating.md and readme.md - ([07f015b](https://github.com/Aleph-Alpha/pharia-kernel/commit/07f015bc9564fcee3cb5cf7753346a0b4050e1a2))
+- Move operating.md top level - ([b5fe65d](https://github.com/Aleph-Alpha/pharia-kernel/commit/b5fe65dd4a950b95b35bc5d7156a97fec484e8d4))
+- Remove outdated statement about skill cache - ([b184698](https://github.com/Aleph-Alpha/pharia-kernel/commit/b184698613a52fe0d5306352657be2edfc09076c))
+- Remove internal links from readme - ([515af7e](https://github.com/Aleph-Alpha/pharia-kernel/commit/515af7efd562e739376920eeaebfccdfb8ce9dfc))
+- Update example test env file docs - ([eb30d73](https://github.com/Aleph-Alpha/pharia-kernel/commit/eb30d730f0b0319c0ad78c3ca5b68fb2dc43d2bc))
+- Remove mentions of jfrog docs - ([3aeb006](https://github.com/Aleph-Alpha/pharia-kernel/commit/3aeb00688fa4539b6144a1391c3fd5e1464d969d))
+- Add repository and description to Cargo.toml - ([e3854de](https://github.com/Aleph-Alpha/pharia-kernel/commit/e3854de05de054c8b323c39f87f60790cbbf652c))
+- Specify license in Cargo.toml - ([9ff77b7](https://github.com/Aleph-Alpha/pharia-kernel/commit/9ff77b72c73df68c160e1e710578ba05937293c4))
+- Add genai otel envs to env.example - ([4ea3212](https://github.com/Aleph-Alpha/pharia-kernel/commit/4ea3212aa6d340fffe541559656309138516d4f5))
+- Add features section - ([b187428](https://github.com/Aleph-Alpha/pharia-kernel/commit/b18742822506c9dc4b0a191beb11038bd78866a9))
+
+### Builds
+
+- *(deps)* Bump the minor group across 1 directory with 9 updates - ([2f09f85](https://github.com/Aleph-Alpha/pharia-kernel/commit/2f09f85de838c7e969cd756e740536d7db74dfb9))
+- *(deps)* Bump wit parser - ([6cff714](https://github.com/Aleph-Alpha/pharia-kernel/commit/6cff714f7c73b57387e7fad9f7adb9931a2547e9))
+- *(deps)* Bump opentelemetry group - ([1d5ec09](https://github.com/Aleph-Alpha/pharia-kernel/commit/1d5ec094c29a8104d0a4a1acdd3a120ed34fa4ec))
+- *(deps)* Bump json schema - ([9848fa6](https://github.com/Aleph-Alpha/pharia-kernel/commit/9848fa63235307bd024bb2e364eac1f10fd63e9e))
+- *(deps)* Bump tokenizers - ([35e5d64](https://github.com/Aleph-Alpha/pharia-kernel/commit/35e5d64f10bdcb2f3d63c97e0ffddb99ae011a55))
+- Update lock file with removed resource eval - ([aab35ad](https://github.com/Aleph-Alpha/pharia-kernel/commit/aab35adadd6d751f1282760f704e8926c2a8dc91))
+
+### Chore
+
+- Move helm configs to repository vars - ([25de764](https://github.com/Aleph-Alpha/pharia-kernel/commit/25de76485eebcd877119fe6f237f1a64387a6d82))
+- Deactivate propagating trace headers to IAM for now - ([acc789a](https://github.com/Aleph-Alpha/pharia-kernel/commit/acc789abbd36125880f097af1d1ba7b19fd2b8ac))
+- Instrumet call to IamClient::authorize - ([b86b2fb](https://github.com/Aleph-Alpha/pharia-kernel/commit/b86b2fb868bffcd33f5600b82c3667ab23ad2842))
+
+### Ci
+
+- Restrict permissions for build-macos ci job - ([3e01ba9](https://github.com/Aleph-Alpha/pharia-kernel/commit/3e01ba9ca14fbaf62359a5be32449cbaa793859d))
+- Restrict permissions for lint ci job - ([8e46ef1](https://github.com/Aleph-Alpha/pharia-kernel/commit/8e46ef13fe8f11589b1a80b572876581bc3c1c55))
+- Fix typo - ([0961b87](https://github.com/Aleph-Alpha/pharia-kernel/commit/0961b879c0eb476350aa479468f9df76dd9bb306))
+- Automerge dependabot PRs - ([025adcd](https://github.com/Aleph-Alpha/pharia-kernel/commit/025adcdeee4b9048d633b2801c05727eac61e038))
+- Add missing backslashes to multiline helm upgrade commands - ([ff0421e](https://github.com/Aleph-Alpha/pharia-kernel/commit/ff0421ee14fbd6425639c1d2ce938fccfac9878e))
+
+### Refactor
+
+- Rm resource_eval directory - ([081e5ea](https://github.com/Aleph-Alpha/pharia-kernel/commit/081e5eab58ed0495ddbf27bb2047ff86e380a38f))
+- Replace double_trait::double with double_trait::dummies - ([1a26f6c](https://github.com/Aleph-Alpha/pharia-kernel/commit/1a26f6c14e16f05b68296834c3f969d186953452))
+- Move chat response extract logic to distinct module - ([b73be00](https://github.com/Aleph-Alpha/pharia-kernel/commit/b73be0090cda791134bc19cf5e6c636413919ae8))
+- Extract reasoning extractor into it's own module - ([e2f8f1b](https://github.com/Aleph-Alpha/pharia-kernel/commit/e2f8f1bcd09b7cdaae16024e41ef29830c4265bf))
+- Use helper constructors on chat event - ([69ab1b0](https://github.com/Aleph-Alpha/pharia-kernel/commit/69ab1b0f9f5690bd6fd7168f59fb3f6e2ace9bb8))
+- Chat_v2 of AAClient uses v1 endpoint and extracts `reasoning_content` - ([f76ac32](https://github.com/Aleph-Alpha/pharia-kernel/commit/f76ac3282ea203d5848399bc4a28cc1d7b6500f3))
+- Replace our Iam calls with the ones from pharia-common - ([c3d2c53](https://github.com/Aleph-Alpha/pharia-kernel/commit/c3d2c53019dab3e324a5414857a73a318aadfcfe))
+- Remove `reasoning_content` from chat request `message` field - ([6827db9](https://github.com/Aleph-Alpha/pharia-kernel/commit/6827db94ee1d1cc1079cd148ab73a8138f198380))
+- Add reasoning content to ChatCompletionStreamResponseDelta with conversion - ([8d89ff7](https://github.com/Aleph-Alpha/pharia-kernel/commit/8d89ff780e52093aa1c0f8ced1eb1ccc32367b53))
+- Add reasoning content to ChatEventV2 - ([13e11f1](https://github.com/Aleph-Alpha/pharia-kernel/commit/13e11f1f13e8787ab1ec86958f24b633b00cf066))
+- Introduce chat event v2 - ([85763d7](https://github.com/Aleph-Alpha/pharia-kernel/commit/85763d724171ffa87e6f63a644bec378d06c8f57))
+- Reasoning content is part of chat requests - ([425d6a0](https://github.com/Aleph-Alpha/pharia-kernel/commit/425d6a0acabaf2f30375c71681c55392659a9eab))
+- Add reasoning content to AssistantMessageV2 - ([8ba278c](https://github.com/Aleph-Alpha/pharia-kernel/commit/8ba278cb2df2d170a3cd2d2ad0157e62625bf494))
+- Add ChatResponseV2 wrapper to later add reasoning_content - ([2001d28](https://github.com/Aleph-Alpha/pharia-kernel/commit/2001d284c1abe51805c724a941d5c7caddf65e62))
+- Do not use byot for v1 chat - ([f20bc0a](https://github.com/Aleph-Alpha/pharia-kernel/commit/f20bc0aff8cb0054116ada79afb2abfff0d4b7a2))
+- Make v2 tests to use v2 endpoints - ([b04574b](https://github.com/Aleph-Alpha/pharia-kernel/commit/b04574b039a6997cd5d588de46dd957adace1c50))
+- Bubble up chat and chat_stream v2 methods from inference actor to csi - ([1067158](https://github.com/Aleph-Alpha/pharia-kernel/commit/10671583ac6d3abde48d658fece5bd1d21d73cb9))
+- Rename *with_reasoning methods to *v2 and implement v1 - ([c64bea0](https://github.com/Aleph-Alpha/pharia-kernel/commit/c64bea0271da231ec4fbf8ea25c5878ee529a767))
+- Rename chat methods to chat_with_reasoning - ([ff6380c](https://github.com/Aleph-Alpha/pharia-kernel/commit/ff6380c15d6393179564b32e02188bcd5d41dd7f))
+- Pushed reasoning for stream further - ([74b71f4](https://github.com/Aleph-Alpha/pharia-kernel/commit/74b71f4d0a1dd1d84514d5e4daabdebbdd312525))
+- Introduce ChatStreamWithReasoning wrapper - ([193c16b](https://github.com/Aleph-Alpha/pharia-kernel/commit/193c16b3d322638bdf24c1ef5bb04da8efb7decc))
+- Add own ChatResponseReasoningContent type to allow - ([851f9b3](https://github.com/Aleph-Alpha/pharia-kernel/commit/851f9b3946bbd185f017503ac24e7f45471194d3))
+- Introduce own ChatResponseReasoningContent as wrapper - ([dbff2a1](https://github.com/Aleph-Alpha/pharia-kernel/commit/dbff2a1289b5a561585a7111d434602f4d8f1dac))
+- Add reasoning content to domain message representation - ([cc737a0](https://github.com/Aleph-Alpha/pharia-kernel/commit/cc737a01892e83c1805f8d51c2730ff165169f70))
+- Enable byot types features of async_openai - ([6c4c97a](https://github.com/Aleph-Alpha/pharia-kernel/commit/6c4c97ad6aa64a6acb6adfd60747b4651d19acdf))
+- Rm gen_ai.system span attribute - ([ebdc6d4](https://github.com/Aleph-Alpha/pharia-kernel/commit/ebdc6d45f77ff16b91c8a8586fbf75d170db5791))
+- Extract completion span creation to tracing module - ([67546e7](https://github.com/Aleph-Alpha/pharia-kernel/commit/67546e7d93d9aa03a9ef140b16390e8dae3042e7))
+- Introduce inference tracing module - ([a6864c0](https://github.com/Aleph-Alpha/pharia-kernel/commit/a6864c09ed879b0bd76c0a4318e304c1b4e1de48))
+- Move gen ai tracing to inference actor - ([ec614ae](https://github.com/Aleph-Alpha/pharia-kernel/commit/ec614aee499873db8d7201e4e73b590902f80d30))
+- Optionally log message content - ([9f1b596](https://github.com/Aleph-Alpha/pharia-kernel/commit/9f1b596dac7fc46009c2c462f6252b40e646ae58))
+- Add otel_gen_ai_content_capture variable - ([6c92c90](https://github.com/Aleph-Alpha/pharia-kernel/commit/6c92c90e72c2e72905005807fc602c7f9b7d2a7c))
+
+### Style
+
+- Make clippy happy - ([5591e4d](https://github.com/Aleph-Alpha/pharia-kernel/commit/5591e4de9e90077daf29c93e99f76aa518a25173))
+- Run cargo nightly fmt - ([613fd4f](https://github.com/Aleph-Alpha/pharia-kernel/commit/613fd4f563b52a483494f74272f8729ea68d63f3))
+- Love for if let chains - ([8ada721](https://github.com/Aleph-Alpha/pharia-kernel/commit/8ada721fa61dcac347744aa5c967f2dd761b37e2))
+- Fix clippy lints - ([31648f8](https://github.com/Aleph-Alpha/pharia-kernel/commit/31648f82bcc6e6dcaeff02b7fd5bc6b442f93a10))
+- Run cargo fmt - ([2691f39](https://github.com/Aleph-Alpha/pharia-kernel/commit/2691f395d966e68e5436dad1b716c79df00da6df))
+- Reformat comment width - ([d7cb74b](https://github.com/Aleph-Alpha/pharia-kernel/commit/d7cb74b03a471ef9b974a75e3babff13cfe6f5aa))
+
+### Test
+
+- Update some document index expectations - ([2818da6](https://github.com/Aleph-Alpha/pharia-kernel/commit/2818da6f67a59e2c577b23bbbf26078ac7020258))
+- Extract reasoning events from chat events with `ReasoningExtractor` - ([931293e](https://github.com/Aleph-Alpha/pharia-kernel/commit/931293e73e550f5dea6019c80237cd3dcd5a0754))
+- Add test for reasoning extractor - ([60a74f8](https://github.com/Aleph-Alpha/pharia-kernel/commit/60a74f826dc5832db6c9ed5804bd6295c17ae8d2))
+- Thinking event from skill arives at runtime - ([becbc3e](https://github.com/Aleph-Alpha/pharia-kernel/commit/becbc3e45c465de37b67d07c6327fdcd35c5ae7d))
+- Remove unused from implementations - ([e6dc2e9](https://github.com/Aleph-Alpha/pharia-kernel/commit/e6dc2e929825354a1084e5d61b5ce1e33b6cf07b))
+
+### Wip
+
+- Working on ReasoningExtractor - ([a0b79d8](https://github.com/Aleph-Alpha/pharia-kernel/commit/a0b79d831ee861528dca76107a1843e1d1175fde))
+
+
 ## [0.14.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.24...pharia-kernel-v0.14.0)
 
 ### Features

@@ -38,12 +38,12 @@ name = "pharia-kernel"
 repository = "https://github.com/Aleph-Alpha/pharia-kernel"
 description = "Serverless Wasm runtime for AI Skills"
 license = "Apache-2.0"
-version = "0.14.0"
+version = "0.15.0"
 edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.9" }
+engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.10" }
 aleph-alpha-client = "0.30.0"
 anyhow = "1.0.99"
 async-trait = "0.1.89"
