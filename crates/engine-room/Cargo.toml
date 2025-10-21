@@ -11,7 +11,7 @@ moka = { version = "0.12.10", features = ["sync"] }
 tempfile = "3.21.0"
 tracing = "0.1.41"
 wasmtime = { version = "33.0.1", features = ["incremental-cache"] }
-wasmtime-wasi = "33.0.1"
+wasmtime-wasi = "38.0.1"
 
 [dev-dependencies]
 divan = "0.1.21"
