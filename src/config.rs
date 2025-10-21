@@ -11,6 +11,7 @@ use std::{
 };
 
 use crate::{
+    engine_room,
     feature_set::FeatureSet,
     inference::{InferenceConfig, InferenceProvider},
     namespace_watcher::NamespaceConfigs,
