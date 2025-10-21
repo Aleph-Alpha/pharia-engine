@@ -26,7 +26,7 @@ RUN cargo auditable build --release
 
 # Move rust binary in runtime container
 FROM debian:12 AS runtime
-RUN apt install openssl
+RUN apt update && apt install openssl -y
 COPY --from=builder /build/target/release/pharia-kernel /usr/local/bin/pharia-kernel
 # use a random uid/gid to avoid running as root
 USER 2000:2000
