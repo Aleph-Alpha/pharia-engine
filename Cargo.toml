@@ -43,7 +43,7 @@ edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.9" }
+engine-room = { path = "./crates/engine-room" }
 aleph-alpha-client = "0.30.0"
 anyhow = "1.0.99"
 async-trait = "0.1.89"
