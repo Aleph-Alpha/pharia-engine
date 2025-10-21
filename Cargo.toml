@@ -43,7 +43,6 @@ edition.workspace = true
 exclude = ["helm-charts", "resource_eval"]
 
 [dependencies]
-engine-room = { path = "./crates/engine-room", registry = "jfrog", version = "0.2.9" }
 aleph-alpha-client = "0.30.0"
 anyhow = "1.0.99"
 async-trait = "0.1.89"
@@ -89,7 +88,8 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "time"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.3.0" }
-wasmtime = "33.0.1"
+wasmtime = { version = "33.0.1", features = ["incremental-cache"] }
+wasmtime-wasi = "33.0.1"
 wit-parser = "0.240.0"
 url = "2.5.6"
 thiserror = "2.0.16"

@@ -25,6 +25,7 @@ use wit_parser::{
 
 use crate::{
     csi::Csi,
+    engine_room,
     logging::TracingContext,
     skill::{AnySkillManifest, BoxedCsi, Skill, SkillError, SkillEvent},
 };

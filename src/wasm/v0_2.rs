@@ -507,6 +507,7 @@ mod tests {
 
     use crate::{
         csi::{ContextualCsi, Csi},
+        engine_room,
         skill_driver::SkillInvocationCtx,
     };
 

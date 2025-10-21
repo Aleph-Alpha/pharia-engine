@@ -10,7 +10,7 @@ use tokio::{
 use tracing::{error, warn};
 
 use crate::{
-    context,
+    context, engine_room,
     logging::TracingContext,
     namespace_watcher::{Namespace, Registry, SkillDescription},
     registries::{Digest, FileRegistry, OciRegistry, RegistryError, SkillImage, SkillRegistry},

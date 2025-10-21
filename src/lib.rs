@@ -15,6 +15,7 @@ mod namespace_watcher;
 mod registries;
 mod search;
 // This is coming from the OpenAPI macro from utoipa.
+mod engine_room;
 #[allow(clippy::needless_for_each)]
 mod shell;
 mod skill;
