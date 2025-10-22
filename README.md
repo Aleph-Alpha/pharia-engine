@@ -14,7 +14,7 @@ We strive to take away only the decisions and responsibilities a Skill developer
 In more technical terms, we aim to reduce the accidental complexity the Skill developer has to engage with.
 
 > [!NOTE]
-> PhariaEngine is production ready. Until now, it has been deployed as part of the PhariaAI product suite. Making PhariaEngine independent of PhariaAI a smooth experience is currently work in progress. Opensourcing this repository is one step towards that goal. This is the beginning of a journey and we are constantly improving.
+> Until now, PhariaEngine has been deployed as part of the PhariaAI product suite. Making PhariaEngine independent of PhariaAI a smooth experience is currently work in progress. Opensourcing this repository is one step towards that goal. This is the beginning of a journey and we are constantly improving.
 >
 > If you are excited about the PhariaEngine idea, please reach out or start contributing.
 
