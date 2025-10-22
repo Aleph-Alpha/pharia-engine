@@ -6,7 +6,6 @@
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 PhariaEngine allows you to execute Cognitive Business Units called Skills. These Skills can be written in any language which compiles to WebAssembly (Wasm).
-PhariaEngine allows you to execute Cognitive Business Units called Skills. These Skills can be written in any language which compiles to WebAssembly (Wasm).
 We provide a SDK and dedicated support for Python.
 PhariaEngine handles the interaction between these Skills and drivers for functionality like inference and retrieval via the Cognitive System Interface (CSI).
 Writing Skills for PhariaEngine is more constrained then shipping an end to end use case in a custom Docker container.
