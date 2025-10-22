@@ -4,7 +4,8 @@
   "bump-patch-for-minor-pre-major": true,
   "packages": {
     ".": {
-      "release-type": "rust"
+      "release-type": "rust",
+      "component": "pharia-kernel"
     }
   }
 }
