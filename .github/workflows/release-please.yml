@@ -14,5 +14,14 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - id: get_token
+        uses: actions/create-github-app-token@v1
+        with:
+          private-key: ${{ secrets.AA_REPO_READ_ONLY_APP_PRIVATE_KEY }}
+          app-id: 1284685
+          owner: "Aleph-Alpha"
+          repositories: "pharia-engine"
       - id: release
         uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ steps.get_token.outputs.token }}
