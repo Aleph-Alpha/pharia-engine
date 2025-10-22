@@ -9,7 +9,7 @@ use opentelemetry_sdk::{
     propagation::{BaggagePropagator, TraceContextPropagator},
     trace::{SdkTracerProvider, SpanData, SpanExporter},
 };
-use pharia_kernel::tracer_provider;
+use pharia_engine::tracer_provider;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 

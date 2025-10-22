@@ -1,7 +1,7 @@
 use anyhow::Error;
 use tokio::signal;
 
-use pharia_kernel::{AppConfig, Kernel, initialize_metrics, initialize_tracing};
+use pharia_engine::{AppConfig, Kernel, initialize_metrics, initialize_tracing};
 use tracing::info;
 
 #[tokio::main]
