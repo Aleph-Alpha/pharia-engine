@@ -77,13 +77,13 @@ cargo clippy --workspace --all-features --all-targets -- -D warnings
 Build the image with
 
 ```sh
-podman build . --tag pharia-Engine
+podman build . --tag pharia-engine
 ```
 
 Then, run the container with
 
 ```sh
-podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-Engine
+podman run -v ./config.toml:/app/config.toml -p 8081:8081 --env-file .env pharia-engine
 ```
 
 You can find more details on how to configure the Engine in the [OPERATING.md](./OPERATING.md).
