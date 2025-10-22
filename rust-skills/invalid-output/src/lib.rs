@@ -1,6 +1,6 @@
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
+wit_bindgen::generate!({ path: "../../pharia-engine/wit/skill@0.3", world: "skill" });
 
 struct Skill;
 

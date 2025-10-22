@@ -158,7 +158,7 @@ mod tests {
     #[tokio::test]
     async fn chunking_splits_text() {
         // Given some text and a tokenizer
-        let text = include_str!("../tests/no_silver_bullet.txt");
+        let text = include_str!("../../tests/no_silver_bullet.txt");
         let max_tokens = 100;
         let request = ChunkRequest {
             text: text.to_owned(),

@@ -315,7 +315,11 @@ fn build_python_skill(
     venv.run(&[
         "componentize-py",
         "-d",
-        REPO_DIR.join(wit_version.path()).to_str().unwrap(),
+        REPO_DIR
+            .join("pharia-engine")
+            .join(wit_version.path())
+            .to_str()
+            .unwrap(),
         "-w",
         world,
         "componentize",

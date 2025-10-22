@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.5", world: "skill", features: ["alpha"] });
+wit_bindgen::generate!({ path: "../../pharia-engine/wit/skill@0.5", world: "skill", features: ["alpha"] });
 
 struct Skill;
 

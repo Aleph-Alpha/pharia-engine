@@ -3,7 +3,7 @@ use exports::pharia::skill::skill_handler::{Error, Guest, SkillMetadata};
 use pharia::skill::inference::{CompletionParamsV2, CompletionRequestV2, Logprobs, complete_v2};
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.3", world: "skill" });
+wit_bindgen::generate!({ path: "../../pharia-engine/wit/skill@0.3", world: "skill" });
 
 /// A skill that completes a prompt with echo enabled.
 struct Skill;

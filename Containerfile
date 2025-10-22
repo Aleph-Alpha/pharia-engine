@@ -10,7 +10,7 @@ RUN cargo install cargo-auditable
 # Not on the input (i.e. source) used to create it.
 FROM rust-builder AS planner
 COPY . .
-RUN cargo chef prepare  --recipe-path recipe.json
+RUN cargo chef prepare --recipe-path recipe.json -p pharia-kernel
 
 # Builder provides the executable binary for the runner. We are careful to sort operations from "it
 # changes less frequently" to "it changes more frequently".
@@ -18,11 +18,11 @@ FROM rust-builder AS builder
 COPY --from=planner /build/recipe.json recipe.json
 
 # Build dependencies only to cache them in a layer!
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json -p pharia-kernel
 
 # Build application
 COPY . .
-RUN cargo auditable build --release
+RUN cargo auditable build --release -p pharia-kernel
 
 # Move rust binary in runtime container
 FROM debian:12 AS runtime

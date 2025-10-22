@@ -290,7 +290,7 @@ mod tests {
         let config = NamespaceConfigs::from_toml(
             r#"
             [local]
-            directory = "skills"
+            directory = "../skills"
             mcp-servers = ["http://localhost:8000/mcp"]
             "#,
         )

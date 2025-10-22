@@ -3,7 +3,7 @@ use exports::pharia::skill::skill_handler::{Error, Guest};
 use pharia::skill::csi::{CompletionParams, complete};
 use serde_json::json;
 
-wit_bindgen::generate!({ path: "../../wit/skill@0.2", world: "skill" });
+wit_bindgen::generate!({ path: "../../pharia-engine/wit/skill@0.2", world: "skill" });
 
 struct Skill;
 
