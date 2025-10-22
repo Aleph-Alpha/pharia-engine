@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0](https://github.com/Aleph-Alpha/pharia-engine/compare/pharia-engine-v0.14.0...pharia-engine-v0.15.0) (2025-10-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* rename pharia-kernel to pharia-engine
+
+### Features
+
+* accumulate content if tracing for streaming chat ([7c36540](https://github.com/Aleph-Alpha/pharia-engine/commit/7c36540075cf2dc4f5af19ed848c6fe7e7d46d8f))
+* add openai_client_v2 to inference AA client ([636a8b0](https://github.com/Aleph-Alpha/pharia-engine/commit/636a8b0427ff77321fc3c63bceadbbcc04db62f8))
+* also support trace export via http ([775a4f7](https://github.com/Aleph-Alpha/pharia-engine/commit/775a4f7fabddb0611d742b0a960303d164b9a3c0))
+* extract reasoning events in chat stream from AA inference API v1 ([ba819f7](https://github.com/Aleph-Alpha/pharia-engine/commit/ba819f707aca21ae9ed7a8bc28bb507dedbc62a0))
+* Inject open_telemetry middleware in authorization requests ([8f7150b](https://github.com/Aleph-Alpha/pharia-engine/commit/8f7150b2c4a88098e7568b3f0f753a2bd46eef5c))
+* introduce unstable 0.5 wit world ([87079a7](https://github.com/Aleph-Alpha/pharia-engine/commit/87079a703480cfb657f526a9fb561aefa28fe0ee))
+* message stream event can emit reasoning content ([a836117](https://github.com/Aleph-Alpha/pharia-engine/commit/a8361176da2e1c17f2dee7106c7e7ab96d6723bb))
+* optionally serialize reasoning_content from reasoning field ([7a16a7e](https://github.com/Aleph-Alpha/pharia-engine/commit/7a16a7e8261c79ce5666d5303350ede7ebe8c843))
+* record input and output token usage on spans ([b4a9481](https://github.com/Aleph-Alpha/pharia-engine/commit/b4a94811a43a8a25bd61ccd4dc7a05fa73695bf0))
+* remove logprobs from chat event v2 ([17657a1](https://github.com/Aleph-Alpha/pharia-engine/commit/17657a128d4f473ab24b2256b5427d93fc8e019e))
+* stabilize 0.4 wit world ([99432aa](https://github.com/Aleph-Alpha/pharia-engine/commit/99432aae642d18442796fc888c7f243cbcd75c2a))
+* store gen_ai attributes on csi spans ([5aa36ee](https://github.com/Aleph-Alpha/pharia-engine/commit/5aa36ee0fb0374ab998b9d26488d2d003814e970))
+
+
+### Bug Fixes
+
+* extract reasoning even if not closed ([244a146](https://github.com/Aleph-Alpha/pharia-engine/commit/244a1462f1bcb6b2dcc61607b654b27775ec273f))
+
+
+### Code Refactoring
+
+* rename pharia-kernel to pharia-engine ([1d8e139](https://github.com/Aleph-Alpha/pharia-engine/commit/1d8e1393cfbecb3589fe205d821a22b48dec7b26))
+
 ## [Unreleased]
 
 ## [0.14.0](https://github.com/Aleph-Alpha/pharia-kernel/compare/pharia-kernel-v0.13.24...pharia-kernel-v0.14.0)
