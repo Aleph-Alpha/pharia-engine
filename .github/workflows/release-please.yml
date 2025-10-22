@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-      - release-pls
+      - main
 
 permissions:
   contents: write
@@ -16,5 +16,3 @@ jobs:
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
-        with:
-          target-branch: release-pls
