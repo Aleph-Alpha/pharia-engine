@@ -1,7 +1,6 @@
 on:
   push:
     branches:
-      - main
       - release-pls
 
 permissions:
@@ -17,3 +16,5 @@ jobs:
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
+        with:
+          target-branch: release-pls
