@@ -106,13 +106,6 @@ jobs:
           fi
         shell: bash
 
-      - name: Log in to GitLab to access shared images
-        uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603
-        with:
-          registry: registry.gitlab.aleph-alpha.de
-          username: ${{ secrets.GITLAB_USER }}
-          password: ${{ secrets.GITLAB_TOKEN }}
-
       - name: Build image
         id: build-image
         uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056
