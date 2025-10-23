@@ -1,3 +1,0 @@
-{{- template "pharia-common.ingress" (dict "value" (list . "pharia-kernel.ingress") "context" $) -}}
-{{- define "pharia-kernel.ingress" -}}
-{{- end -}}
