@@ -106,15 +106,18 @@ jobs:
           fi
         shell: bash
 
-      - name: Build image
-        id: build-image
-        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and export
+        uses: docker/build-push-action@v5
         with:
-          image: pharia-kernel
-          tags: latest ${{ env.IMAGE_ID }}
-          oci: true
-          containerfiles: |
-            ./Containerfile
+          context: .
+          file: ./Containerfile
+          tags: pharia-kernel:latest,pharia-kernel:${{ env.IMAGE_ID }}
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Export image to tarball
         run: podman save localhost/pharia-kernel:${{ env.IMAGE_ID }} -o /tmp/pharia-kernel.tar
