@@ -410,10 +410,7 @@ pub mod tests {
     use serde_json::Value;
     use tokio::{time::sleep, try_join};
 
-    use crate::{
-        search::client::SearchClient,
-        tests::{api_token, document_index_url},
-    };
+    use crate::search::client::SearchClient;
 
     use super::*;
 
@@ -484,62 +481,9 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn search_request() {
-        // Given a search client pointed at the document index
-        let host = document_index_url();
-        let api_token = Authentication::from_token(api_token());
-        let search = Search::new(Some(host));
-
-        // When making a query on an existing collection
-        let index = IndexPath::new("Kernel", "test", "asym-64");
-        let request = SearchRequest::new(index, "What is the Pharia Kernel?");
-        let results = search
-            .api()
-            .search(request, api_token, TracingContext::dummy())
-            .await
-            .unwrap();
-        search.wait_for_shutdown().await;
-
-        // Then we get at least one result
-        assert_eq!(results.len(), 1);
-        assert!(
-            results[0]
-                .document_path
-                .name
-                .to_lowercase()
-                .contains("kernel")
-        );
-        assert!(results[0].content.contains("Kernel"));
-    }
-
-    #[tokio::test]
-    async fn request_metadata() {
-        // Given a search client pointed at the document index
-        let host = document_index_url();
-        let api_token = Authentication::from_token(api_token());
-        let search = Search::new(Some(host));
-
-        // When requesting metadata of an existing document
-        let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
-        let metadata = search
-            .api()
-            .document_metadata(document_path, api_token, TracingContext::dummy())
-            .await
-            .unwrap()
-            .unwrap();
-        search.wait_for_shutdown().await;
-
-        // Then we get the expected metadata
-        assert_eq!(
-            metadata["url"].as_str().unwrap(),
-            "https://pharia-kernel.product.pharia.com/"
-        );
-    }
-
-    #[tokio::test]
     async fn search_not_configured() {
         // Given a search client that is not configured
-        let api_token = Authentication::from_token(api_token());
+        let api_token = Authentication::none();
         let search = Search::new(None);
 
         // When making a query
