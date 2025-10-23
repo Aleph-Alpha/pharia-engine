@@ -405,7 +405,7 @@ impl SearchClient for Client {
 
 #[cfg(test)]
 pub mod tests {
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use reqwest_vcr::VCRMode;
 
@@ -454,9 +454,18 @@ pub mod tests {
     }
 
     /// Create a search client with a cassette for the given cassette name and VCR mode
-    fn client_with_cassette(cassette: &str, vcr_mode: VCRMode) -> Client {
+    ///
+    /// To rerecord a cassette, delete the file and run the test again.
+    fn client_with_cassette(cassette: &str) -> Client {
         let mut cassette_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        cassette_path.push(format!("tests/cassettes/{cassette}.vcr.json"));
+        let path = format!("tests/cassettes/{cassette}.vcr.json");
+        cassette_path.push(path);
+        let vcr_mode = if Path::new(&cassette_path).exists() {
+            VCRMode::Replay
+        } else {
+            VCRMode::Record
+        };
+
         let http = HttpClient::with_vcr(cassette_path, vcr_mode);
         let host = document_index_url();
         Client::with_http_client(host, http)
@@ -467,7 +476,7 @@ pub mod tests {
     async fn document_exists() {
         // Given a search client pointed at the document index
         let cassette = "document_exists";
-        let client = client_with_cassette(cassette, VCRMode::Replay);
+        let client = client_with_cassette(cassette);
 
         // When requesting a document
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
@@ -486,7 +495,7 @@ pub mod tests {
     async fn document_not_found_is_err() {
         // Given a search client pointed at the document index
         let cassette = "document_not_found_is_err";
-        let client = client_with_cassette(cassette, VCRMode::Replay);
+        let client = client_with_cassette(cassette);
 
         // When requesting a document that does not exist
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs-not-found");
@@ -504,7 +513,7 @@ pub mod tests {
     async fn search_request() {
         // Given a search client pointed at the document index
         let cassette = "search_request";
-        let client = client_with_cassette(cassette, VCRMode::Replay);
+        let client = client_with_cassette(cassette);
 
         // When making a query on an existing collection
         let index = IndexPath::new("Kernel", "test", "asym-64");
@@ -543,7 +552,7 @@ pub mod tests {
     async fn request_metadata() {
         // Given a search client pointed at the document index
         let cassette = "request_metadata";
-        let client = client_with_cassette(cassette, VCRMode::Replay);
+        let client = client_with_cassette(cassette);
 
         // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel/docs");
@@ -566,7 +575,7 @@ pub mod tests {
     async fn min_score() {
         // Given a search client pointed at the document index
         let cassette = "min_score";
-        let client = client_with_cassette(cassette, VCRMode::Replay);
+        let client = client_with_cassette(cassette);
 
         let max_results = 5;
         let min_score = 0.99;
@@ -597,7 +606,7 @@ pub mod tests {
     async fn filter_for_metadata() {
         // Given a search request with a metadata filter for a created field
         let cassette = "filter_for_metadata";
-        let client = client_with_cassette(cassette, VCRMode::Replay);
+        let client = client_with_cassette(cassette);
 
         // When filtering for documents with metadata field created after 2100-01-01
         let index = IndexPath::new("Kernel", "test", "asym-64");
@@ -630,7 +639,7 @@ pub mod tests {
     async fn filter_for_without_metadata() {
         // Given a search request with a metadata filter for a created field
         let cassette = "filter_for_without_metadata";
-        let client = client_with_cassette(cassette, VCRMode::Replay);
+        let client = client_with_cassette(cassette);
 
         let index = IndexPath::new("Kernel", "test", "asym-64");
 
