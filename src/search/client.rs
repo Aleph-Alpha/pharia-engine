@@ -232,9 +232,13 @@ pub struct Client {
 
 impl Client {
     pub fn new(host: impl Into<String>) -> Self {
+        Self::with_http_client(host, HttpClient::default())
+    }
+
+    pub fn with_http_client(host: impl Into<String>, http: HttpClient) -> Self {
         Self {
             host: host.into(),
-            http: HttpClient::default(),
+            http,
         }
     }
 }
@@ -401,6 +405,10 @@ impl SearchClient for Client {
 
 #[cfg(test)]
 pub mod tests {
+    use std::path::PathBuf;
+
+    use reqwest_vcr::VCRMode;
+
     use super::*;
 
     use crate::tests::{api_token, document_index_url};
@@ -445,15 +453,25 @@ pub mod tests {
         }
     }
 
+    /// Create a search client with a cassette for the given cassette name and VCR mode
+    fn client_with_cassette(cassette: &str, vcr_mode: VCRMode) -> Client {
+        let mut cassette_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        cassette_path.push(format!("tests/cassettes/{cassette}.vcr.json"));
+        let http = HttpClient::with_vcr(cassette_path, vcr_mode);
+        let host = document_index_url();
+        Client::with_http_client(host, http)
+    }
+
     #[tokio::test]
+    #[cfg_attr(not(feature = "test_document_index"), ignore)]
     async fn document_exists() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
-        let auth = Authentication::from_token(api_token());
-        let client = Client::new(host);
+        let cassette = "document_exists";
+        let client = client_with_cassette(cassette, VCRMode::Replay);
 
         // When requesting a document
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs");
+        let auth = Authentication::from_token(api_token());
         let document = client
             .document(document_path, auth, &TracingContext::dummy())
             .await
@@ -464,14 +482,15 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(not(feature = "test_document_index"), ignore)]
     async fn document_not_found_is_err() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
-        let auth = Authentication::from_token(api_token());
-        let client = Client::new(host);
+        let cassette = "document_not_found_is_err";
+        let client = client_with_cassette(cassette, VCRMode::Replay);
 
         // When requesting a document that does not exist
         let document_path = DocumentPath::new("Kernel", "test", "kernel-docs-not-found");
+        let auth = Authentication::from_token(api_token());
         let maybe_document = client
             .document(document_path, auth, &TracingContext::dummy())
             .await;
@@ -481,11 +500,11 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(not(feature = "test_document_index"), ignore)]
     async fn search_request() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
-        let auth = Authentication::from_token(api_token());
-        let client = Client::new(host);
+        let cassette = "search_request";
+        let client = client_with_cassette(cassette, VCRMode::Replay);
 
         // When making a query on an existing collection
         let index = IndexPath::new("Kernel", "test", "asym-64");
@@ -498,6 +517,7 @@ pub mod tests {
             true,
             Vec::new(),
         );
+        let auth = Authentication::from_token(api_token());
         let results = client
             .search(index, request, auth, &TracingContext::dummy())
             .await
@@ -519,14 +539,15 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(not(feature = "test_document_index"), ignore)]
     async fn request_metadata() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
-        let auth = Authentication::from_token(api_token());
-        let client = Client::new(host);
+        let cassette = "request_metadata";
+        let client = client_with_cassette(cassette, VCRMode::Replay);
 
         // When requesting metadata of an existing document
         let document_path = DocumentPath::new("Kernel", "test", "kernel/docs");
+        let auth = Authentication::from_token(api_token());
         let metadata = client
             .document_metadata(document_path, auth, &TracingContext::dummy())
             .await
@@ -541,11 +562,12 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(not(feature = "test_document_index"), ignore)]
     async fn min_score() {
         // Given a search client pointed at the document index
-        let host = document_index_url().to_owned();
-        let auth = Authentication::from_token(api_token());
-        let client = Client::new(host);
+        let cassette = "min_score";
+        let client = client_with_cassette(cassette, VCRMode::Replay);
+
         let max_results = 5;
         let min_score = 0.99;
 
@@ -560,6 +582,7 @@ pub mod tests {
             true,
             Vec::new(),
         );
+        let auth = Authentication::from_token(api_token());
         let results = client
             .search(index, request, auth, &TracingContext::dummy())
             .await
@@ -570,14 +593,14 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(not(feature = "test_document_index"), ignore)]
     async fn filter_for_metadata() {
         // Given a search request with a metadata filter for a created field
-        let index = IndexPath::new("Kernel", "test", "asym-64");
-        let host = document_index_url().to_owned();
-        let auth = Authentication::from_token(api_token());
-        let client = Client::new(host);
+        let cassette = "filter_for_metadata";
+        let client = client_with_cassette(cassette, VCRMode::Replay);
 
         // When filtering for documents with metadata field created after 2100-01-01
+        let index = IndexPath::new("Kernel", "test", "asym-64");
         let filter_condition = FilterCondition::Metadata(MetadataFilter {
             field: "created".to_owned(),
             condition: MetadataFilterCondition::After("2100-01-01T14:10:11Z".to_owned()),
@@ -592,6 +615,7 @@ pub mod tests {
             true,
             vec![filter],
         );
+        let auth = Authentication::from_token(api_token());
         let results = client
             .search(index, request, auth, &TracingContext::dummy())
             .await
@@ -602,12 +626,13 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(not(feature = "test_document_index"), ignore)]
     async fn filter_for_without_metadata() {
         // Given a search request with a metadata filter for a created field
+        let cassette = "filter_for_without_metadata";
+        let client = client_with_cassette(cassette, VCRMode::Replay);
+
         let index = IndexPath::new("Kernel", "test", "asym-64");
-        let host = document_index_url().to_owned();
-        let auth = Authentication::from_token(api_token());
-        let client = Client::new(host);
 
         // When filtering for documents with metadata field created after 1970-07-01
         let filter_condition = FilterCondition::Metadata(MetadataFilter {
@@ -624,6 +649,7 @@ pub mod tests {
             true,
             vec![filter],
         );
+        let auth = Authentication::from_token(api_token());
         let results = client
             .search(index, request, auth, &TracingContext::dummy())
             .await

@@ -1,0 +1,49 @@
+{
+  "http_interactions": [
+    {
+      "response": {
+        "body": {
+          "encoding": null,
+          "string": "Resource document with ID Kernel/test/docs/kernel-docs-not-found does not exist."
+        },
+        "http_version": "2",
+        "status": {
+          "code": 404,
+          "message": "Not Found"
+        },
+        "headers": {
+          "strict-transport-security": [
+            "max-age=31536000; includeSubDomains"
+          ],
+          "content-type": [
+            "text/plain; charset=utf-8"
+          ],
+          "access-control-allow-credentials": [
+            "true"
+          ],
+          "vary": [
+            "accept-encoding"
+          ],
+          "date": [
+            "Thu, 23 Oct 2025 08:27:56 GMT"
+          ]
+        }
+      },
+      "request": {
+        "uri": "https://document-index.product.pharia.com/collections/Kernel/test/docs/kernel-docs-not-found",
+        "body": {
+          "encoding": null,
+          "string": ""
+        },
+        "method": "get",
+        "headers": {
+          "authorization": [
+            "TOKEN_REMOVED"
+          ]
+        }
+      },
+      "recorded_at": "Thu, 23 Oct 2025 08:27:56 +0000"
+    }
+  ],
+  "recorded_with": "rVCR 0.3.0"
+}

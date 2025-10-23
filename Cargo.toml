@@ -175,6 +175,7 @@ metrics-util = "0.20.0"
 reqwest = { version = "0.12.23", features = ["stream"] }
 opentelemetry-stdout = "0.31.0"
 double-trait = "0.2.5"
+reqwest-vcr = "0.3.0"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"

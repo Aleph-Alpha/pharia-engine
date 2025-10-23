@@ -14,29 +14,60 @@ use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 pub struct HttpClient(ClientWithMiddleware);
 
 impl HttpClient {
-    pub fn new(retry: bool) -> Self {
-        // Make retry optional, as it is not needed for namespace observing where we do it
-        // continuously anyway.
-        let client = Client::builder()
+    /// Create an `HttpClient` with retry middleware (standard configuration).
+    pub fn with_retry() -> Self {
+        let retry_middleware = RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(3),
+        );
+        let client = Self::client();
+        let with_middleware = ClientBuilder::new(client).with(retry_middleware).build();
+        Self(with_middleware)
+    }
+
+    /// Create an `HttpClient` without any middleware.
+    pub fn without_retry() -> Self {
+        let client = Self::client();
+        Self(ClientBuilder::new(client).build())
+    }
+
+    fn client() -> Client {
+        Client::builder()
             .use_rustls_tls()
-            // Reasonable default (not used for inference)
             .timeout(Duration::from_secs(10))
             .build()
-            .expect("Invalid reqwest client");
-
-        let mut client = ClientBuilder::new(client);
-        if retry {
-            let retry_middleware = RetryTransientMiddleware::new_with_policy(
-                ExponentialBackoff::builder().build_with_max_retries(3),
-            );
-            client = client.with(retry_middleware);
-        }
-        Self(client.build())
+            .expect("Invalid reqwest client")
     }
 }
 
 impl Default for HttpClient {
     fn default() -> Self {
-        Self::new(true)
+        Self::with_retry()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HttpClient;
+    use reqwest_middleware::ClientBuilder;
+    use reqwest_vcr::VCRMiddleware;
+
+    impl HttpClient {
+        pub fn with_vcr(
+            path_to_cassette: std::path::PathBuf,
+            vcr_mode: reqwest_vcr::VCRMode,
+        ) -> Self {
+            let vcr_middleware = VCRMiddleware::try_from(path_to_cassette)
+                .unwrap()
+                .with_mode(vcr_mode)
+                .with_modify_request(|request| {
+                    if let Some(header) = request.headers.get_mut("authorization") {
+                        *header = vec!["TOKEN_REMOVED".to_owned()];
+                    }
+                });
+
+            let client = Self::client();
+            let with_middleware = ClientBuilder::new(client).with(vcr_middleware).build();
+            Self(with_middleware)
+        }
     }
 }

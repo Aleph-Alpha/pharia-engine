@@ -178,7 +178,7 @@ impl HttpLoader {
     pub fn from_url(namespace: &Namespace, url: &str, token: Option<String>) -> Self {
         Self {
             // We do not need retries for namespace observing, as we do it continuously anyway.
-            client: HttpClient::new(false),
+            client: HttpClient::without_retry(),
             url: url.to_owned(),
             token,
             namespace: namespace.clone(),

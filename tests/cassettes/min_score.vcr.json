@@ -1,0 +1,55 @@
+{
+  "http_interactions": [
+    {
+      "response": {
+        "body": {
+          "encoding": null,
+          "string": "[]"
+        },
+        "http_version": "2",
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "headers": {
+          "access-control-allow-credentials": [
+            "true"
+          ],
+          "strict-transport-security": [
+            "max-age=31536000; includeSubDomains"
+          ],
+          "date": [
+            "Thu, 23 Oct 2025 08:27:56 GMT"
+          ],
+          "content-length": [
+            "2"
+          ],
+          "vary": [
+            "origin, access-control-request-method, access-control-request-headers"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        }
+      },
+      "request": {
+        "uri": "https://document-index.product.pharia.com/collections/Kernel/test/indexes/asym-64/search",
+        "body": {
+          "encoding": null,
+          "string": "{\"filters\":[{\"with\":[{\"modality\":\"text\"}]}],\"max_results\":5,\"min_score\":0.99,\"query\":[{\"modality\":\"text\",\"text\":\"tomato?\"}]}"
+        },
+        "method": "post",
+        "headers": {
+          "authorization": [
+            "TOKEN_REMOVED"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        }
+      },
+      "recorded_at": "Thu, 23 Oct 2025 08:27:56 +0000"
+    }
+  ],
+  "recorded_with": "rVCR 0.3.0"
+}

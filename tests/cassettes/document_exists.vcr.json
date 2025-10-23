@@ -1,0 +1,49 @@
+{
+  "http_interactions": [
+    {
+      "response": {
+        "body": {
+          "encoding": null,
+          "string": "{\"schema_version\":\"V1\",\"contents\":[{\"modality\":\"text\",\"text\":\"You might be wondering what the Kernel is. It's a product primarly aimed at fishermen, and provides the needed AI capabilities for them to optimize their fishing operations.\"}],\"metadata\":{\"created\":\"2025-01-01T00:00:00Z\",\"url\":\"https://pharia-kernel.product.pharia.com/\"}}"
+        },
+        "http_version": "2",
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "headers": {
+          "access-control-allow-credentials": [
+            "true"
+          ],
+          "date": [
+            "Thu, 23 Oct 2025 08:27:56 GMT"
+          ],
+          "content-type": [
+            "application/json"
+          ],
+          "strict-transport-security": [
+            "max-age=31536000; includeSubDomains"
+          ],
+          "vary": [
+            "accept-encoding"
+          ]
+        }
+      },
+      "request": {
+        "uri": "https://document-index.product.pharia.com/collections/Kernel/test/docs/kernel-docs",
+        "body": {
+          "encoding": null,
+          "string": ""
+        },
+        "method": "get",
+        "headers": {
+          "authorization": [
+            "TOKEN_REMOVED"
+          ]
+        }
+      },
+      "recorded_at": "Thu, 23 Oct 2025 08:27:56 +0000"
+    }
+  ],
+  "recorded_with": "rVCR 0.3.0"
+}

@@ -1,0 +1,55 @@
+{
+  "http_interactions": [
+    {
+      "response": {
+        "body": {
+          "encoding": null,
+          "string": "[]"
+        },
+        "http_version": "2",
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "headers": {
+          "access-control-allow-credentials": [
+            "true"
+          ],
+          "date": [
+            "Thu, 23 Oct 2025 08:27:56 GMT"
+          ],
+          "content-length": [
+            "2"
+          ],
+          "content-type": [
+            "application/json"
+          ],
+          "strict-transport-security": [
+            "max-age=31536000; includeSubDomains"
+          ],
+          "vary": [
+            "origin, access-control-request-method, access-control-request-headers"
+          ]
+        }
+      },
+      "request": {
+        "uri": "https://document-index.product.pharia.com/collections/Kernel/test/indexes/asym-64/search",
+        "body": {
+          "encoding": null,
+          "string": "{\"filters\":[{\"without\":[{\"metadata\":{\"after\":\"1970-07-01T14:10:11Z\",\"field\":\"created\"}}]},{\"with\":[{\"modality\":\"text\"}]}],\"max_results\":1,\"min_score\":null,\"query\":[{\"modality\":\"text\",\"text\":\"What is the Pharia Kernel?\"}]}"
+        },
+        "method": "post",
+        "headers": {
+          "content-type": [
+            "application/json"
+          ],
+          "authorization": [
+            "TOKEN_REMOVED"
+          ]
+        }
+      },
+      "recorded_at": "Thu, 23 Oct 2025 08:27:56 +0000"
+    }
+  ],
+  "recorded_with": "rVCR 0.3.0"
+}
