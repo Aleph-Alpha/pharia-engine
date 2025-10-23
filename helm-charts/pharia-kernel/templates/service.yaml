@@ -1,3 +1,0 @@
-{{- template "pharia-common.service" (dict "customTemplate" "pharia-kernel.service" "rootContext" $ "resourceContextName" "") -}}
-{{- define "pharia-kernel.service" -}}
-{{- end -}}

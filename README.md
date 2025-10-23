@@ -101,17 +101,11 @@ podman machine start
 
 ## Release
 
-Releasing in this repository is automated with [release-plz](https://release-plz.ieni.dev/).
+Releasing in this repository is automated with [release-pls](https://github.com/googleapis/release-please).
 
-1. For every commit to the `main` branch, release-plz creates a release Pull Request.
+1. For every commit to the `main` branch, release-pls creates a release Pull Request.
 2. Review the release Pull Request and add new changes, if necessary, by amending the commit directly.
-   - Helm chart version:
-
-     By default, only the patch version is incremented.
-   - Helm chart changelog date:
-
-     The date is set when the changelog is generated. Update it to the release date if differs.
-3. Merge the release Pull Request and release-plz will release the updated packages.
+3. Merge the release Pull Request and release-pls will release the updated packages.
 
 ## Usage Examples
 

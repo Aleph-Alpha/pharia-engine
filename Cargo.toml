@@ -40,7 +40,7 @@ description = "Serverless Wasm runtime for AI Skills"
 license = "Apache-2.0"
 version = "0.15.0"
 edition.workspace = true
-exclude = ["helm-charts", "resource_eval"]
+exclude =  ["resource_eval"]
 
 [dependencies]
 aleph-alpha-client = "0.30.0"
