@@ -91,6 +91,7 @@ jobs:
     # 8c-32gb brought this down to 7:20 minutes while being billed at $0.032/minute (~$0.23/build)
     # 16c-64gb comes in at 6:18 minutes while being billed at $0.064/minute (~$0.40/build)
     runs-on: cpu-runner-16c-64gb-01
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-please--')
     permissions:
       contents: read
       packages: write
@@ -145,6 +146,7 @@ jobs:
   test-image:
     # We are not time bound by this job, so ubuntu-latest is fine.
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-please--')
     needs: [build-image]
     permissions:
       contents: read
