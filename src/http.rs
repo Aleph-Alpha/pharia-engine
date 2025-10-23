@@ -5,6 +5,9 @@ use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 
+#[cfg(test)]
+use reqwest_vcr::VCRMiddleware;
+
 /// A common implementation of an HTTP Client.
 /// A wrapper around a reqwest client with common middleware applicable to most services.
 /// Includes:
@@ -30,6 +33,22 @@ impl HttpClient {
         Self(ClientBuilder::new(client).build())
     }
 
+    #[cfg(test)]
+    pub fn with_vcr(path_to_cassette: std::path::PathBuf, vcr_mode: reqwest_vcr::VCRMode) -> Self {
+        let vcr_middleware = VCRMiddleware::try_from(path_to_cassette)
+            .unwrap()
+            .with_mode(vcr_mode)
+            .with_modify_request(|request| {
+                if let Some(header) = request.headers.get_mut("authorization") {
+                    *header = vec!["TOKEN_REMOVED".to_owned()];
+                }
+            });
+
+        let client = Self::client();
+        let with_middleware = ClientBuilder::new(client).with(vcr_middleware).build();
+        Self(with_middleware)
+    }
+
     fn client() -> Client {
         Client::builder()
             .use_rustls_tls()
@@ -42,32 +61,5 @@ impl HttpClient {
 impl Default for HttpClient {
     fn default() -> Self {
         Self::with_retry()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::HttpClient;
-    use reqwest_middleware::ClientBuilder;
-    use reqwest_vcr::VCRMiddleware;
-
-    impl HttpClient {
-        pub fn with_vcr(
-            path_to_cassette: std::path::PathBuf,
-            vcr_mode: reqwest_vcr::VCRMode,
-        ) -> Self {
-            let vcr_middleware = VCRMiddleware::try_from(path_to_cassette)
-                .unwrap()
-                .with_mode(vcr_mode)
-                .with_modify_request(|request| {
-                    if let Some(header) = request.headers.get_mut("authorization") {
-                        *header = vec!["TOKEN_REMOVED".to_owned()];
-                    }
-                });
-
-            let client = Self::client();
-            let with_middleware = ClientBuilder::new(client).with(vcr_middleware).build();
-            Self(with_middleware)
-        }
     }
 }
