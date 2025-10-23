@@ -113,6 +113,7 @@ jobs:
           image: pharia-kernel
           tags: latest ${{ env.IMAGE_ID }}
           oci: true
+          layers: true
           containerfiles: |
             ./Containerfile
 
