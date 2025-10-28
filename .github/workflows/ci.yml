@@ -121,7 +121,7 @@ jobs:
         run: podman save localhost/pharia-kernel:${{ env.IMAGE_ID }} -o /tmp/pharia-kernel.tar
 
       - name: Upload image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pharia-kernel-image
           path: /tmp/pharia-kernel.tar
