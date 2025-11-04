@@ -149,7 +149,7 @@ bytesize = { version = "2.0.1", features = ["serde"] }
 # The `tracing_level_info` feature determines the level at which spans are created by the middleware.
 # If this feature is emitted, the default span level is `trace`, which will not be picked up, as the minimum
 # log level for external crates is `info`.
-axum-tracing-opentelemetry = { version = "0.32.1", features = [
+axum-tracing-opentelemetry = { version = "0.32.2", features = [
     "tracing_level_info",
 ] }
 bytes = "1.10.1"
@@ -174,7 +174,7 @@ wat = "1.237.0"
 metrics-util = "0.20.0"
 reqwest = { version = "0.12.23", features = ["stream"] }
 opentelemetry-stdout = "0.31.0"
-double-trait = "0.2.5"
+double-trait = "0.2.8"
 reqwest-vcr = "0.3.0"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
