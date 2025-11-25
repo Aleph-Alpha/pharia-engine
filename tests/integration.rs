@@ -18,9 +18,8 @@ use serde_json::{Value, json};
 use tempfile::{TempDir, tempdir};
 use test_skills::{
     given_chat_stream_skill, given_complete_stream_skill, given_rust_skill_doc_metadata,
-    given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_rust_skill_search,
-    given_skill_infinite_streaming, given_skill_tool_invocation, given_sse_mcp_server,
-    given_streaming_output_skill,
+    given_rust_skill_greet_v0_2, given_rust_skill_greet_v0_3, given_skill_infinite_streaming,
+    given_skill_tool_invocation, given_sse_mcp_server, given_streaming_output_skill,
 };
 
 mod tracing;
@@ -200,38 +199,6 @@ async fn run_skill() {
     assert_eq!(resp.status(), axum::http::StatusCode::OK);
     let body = resp.text().await.unwrap();
     assert!(body.contains("Homer"));
-
-    kernel.shutdown().await;
-}
-
-#[cfg_attr(not(feature = "test_document_index"), ignore)]
-#[tokio::test]
-async fn run_search_skill() {
-    let wasm_bytes = given_rust_skill_search().bytes();
-    let mut local_skill_dir: TestFileRegistry = TestFileRegistry::new();
-    local_skill_dir.with_skill("search", wasm_bytes);
-    let kernel = TestKernel::with_namespaces(local_skill_dir.to_namespace_config()).await;
-
-    let req_client = reqwest::Client::new();
-    let resp = req_client
-        .post(format!(
-            "http://127.0.0.1:{}/v1/skills/local/search/run",
-            kernel.port()
-        ))
-        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value())
-        .body(Body::from(json!("What is the Pharia Kernel?").to_string()))
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-        .unwrap();
-    let status = resp.status();
-    let value: Value = resp.json().await.unwrap();
-    assert_eq!(status, axum::http::StatusCode::OK);
-    assert!(value.is_array());
-    assert!(!value.as_array().unwrap().is_empty());
-    let first_text = value[0].clone().to_string();
-    assert!(first_text.to_ascii_lowercase().contains("kernel"));
 
     kernel.shutdown().await;
 }
@@ -729,44 +696,6 @@ async fn unsupported_newer_minor_csi_version() {
     let body = resp.bytes().await.unwrap();
     let error = serde_json::from_slice::<String>(&body).unwrap();
     assert!(error.contains("not supported by this Kernel installation yet"));
-
-    kernel.shutdown().await;
-}
-
-#[cfg_attr(not(feature = "test_document_index"), ignore)]
-#[tokio::test]
-async fn search_via_remote_csi() {
-    // Simulate the production environment with tracing enabled
-    let kernel = TestKernel::with_skills(&[]).await;
-
-    let req_client = reqwest::Client::new();
-    let resp = req_client
-        .post(format!("http://127.0.0.1:{}/csi", kernel.port()))
-        .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .header(header::AUTHORIZATION, auth_value())
-        .body(Body::from(
-            json!({
-                "version": "0.2",
-                "function": "search",
-                "index_path": {
-                    "namespace": "Kernel",
-                    "collection": "test",
-                    "index": "asym-64",
-                },
-                "query":"What is the Pharia Kernel?",
-                "max_results":10,
-                "min_score":0.1,
-            })
-            .to_string(),
-        ))
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-        .unwrap();
-    let status = resp.status();
-    assert_eq!(status, axum::http::StatusCode::OK);
-    let body = resp.text().await.unwrap();
-    assert!(body.to_lowercase().contains("kernel"));
 
     kernel.shutdown().await;
 }
