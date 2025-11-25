@@ -94,7 +94,7 @@ impl crate::wasm::SkillComponent for SkillPre<LinkedCtx> {
                 }
                 exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
                     info!(parent: tracing_context.span(), "Skill received invalid input: {}", e);
-                    return Err(SkillError::InvalidInput(e.to_string()));
+                    return Err(SkillError::InvalidInput(e.clone()));
                 }
             },
         };

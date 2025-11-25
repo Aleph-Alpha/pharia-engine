@@ -383,7 +383,7 @@ where
                     name: name.clone(),
                     result: match result {
                         Ok(_) => Ok(()),
-                        Err(error) => Err(error.to_string()),
+                        Err(error) => Err(error.clone()),
                     },
                 })
                 .await

@@ -55,10 +55,10 @@ impl super::SkillComponent for SkillPre<LinkedCtx> {
             Ok(result) => result,
             Err(e) => match e {
                 exports::pharia::skill::skill_handler::Error::Internal(e) => {
-                    return Err(SkillError::UserCode(e.to_string()));
+                    return Err(SkillError::UserCode(e.clone()));
                 }
                 exports::pharia::skill::skill_handler::Error::InvalidInput(e) => {
-                    return Err(SkillError::InvalidInput(e.to_string()));
+                    return Err(SkillError::InvalidInput(e.clone()));
                 }
             },
         };
