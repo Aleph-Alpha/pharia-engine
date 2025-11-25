@@ -88,7 +88,7 @@ impl Skill for SkillToolCaller {
             .into_iter()
             .nth(0)
             .ok_or(SkillError::UserCode("Tool invocation failed".to_owned()))?
-            .map_err(|e| SkillError::UserCode(e.to_string()))?;
+            .map_err(|e| SkillError::UserCode(e.clone()))?;
 
         sender.send(SkillEvent::MessageBegin).await.unwrap();
         sender

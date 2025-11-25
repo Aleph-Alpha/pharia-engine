@@ -79,7 +79,7 @@ impl crate::wasm::SkillComponent for MessageStreamSkillPre<LinkedCtx> {
                     SkillError::UserCode(e)
                 }
                 exports::pharia::skill::message_stream::Error::InvalidInput(e) => {
-                    SkillError::InvalidInput(e.to_string())
+                    SkillError::InvalidInput(e.clone())
                 }
             })
     }
