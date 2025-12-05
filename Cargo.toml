@@ -46,7 +46,7 @@ exclude =  ["resource_eval"]
 aleph-alpha-client = "0.30.0"
 anyhow = "1.0.99"
 async-trait = "0.1.89"
-axum = { version = "0.8.4", features = ["macros"] }
+axum = { version = "0.8.7", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
 dotenvy = "0.15.7"
 futures = "0.3.31"
@@ -76,7 +76,7 @@ tokio = { version = "1.47.1", features = [
     "signal",
 ] }
 tower = { version = "0.5.2", features = ["util"] }
-tower-http = { version = "0.6.4", features = [
+tower-http = { version = "0.6.7", features = [
     "compression-full",
     "cors",
     "decompression-full",
@@ -84,8 +84,8 @@ tower-http = { version = "0.6.4", features = [
     "sensitive-headers",
     "trace",
 ] }
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter", "time"] }
+tracing = "0.1.43"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "time"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.3.0" }
 wasmtime = { version = "33.0.1", features = ["incremental-cache"] }
@@ -93,7 +93,7 @@ wasmtime-wasi = "33.0.1"
 wit-parser = "0.240.0"
 url = "2.5.6"
 thiserror = "2.0.16"
-tokenizers = { version = "0.22.1", default-features = false, features = [
+tokenizers = { version = "0.22.2", default-features = false, features = [
     "onig",
     "esaxx_fast",
 ] }
@@ -113,15 +113,15 @@ opentelemetry-otlp = { version = "0.31.0", features = [
 opentelemetry-semantic-conventions = { version = "0.31.0", features = [
     "semconv_experimental",
 ] }
-metrics = "0.24.2"
+metrics = "0.24.3"
 metrics-exporter-prometheus = { version = "0.17.2", default-features = false, features = [
     "http-listener",
 ] }
 itertools = "0.14.0"
 urlencoding = "2.1.3"
-config = "0.15.14"
+config = "0.15.19"
 heck = "0.5.0"
-derive_more = { version = "2.0.1", features = [
+derive_more = { version = "2.1.0", features = [
     "constructor",
     "deref",
     "deref_mut",
@@ -142,21 +142,21 @@ jsonschema = "0.33.0"
 rayon = "1.11.0"
 serde-bool = "0.1.3"
 async-stream = "0.3.6"
-jiff = { version = "0.2.15", features = ["serde"] }
+jiff = { version = "0.2.16", features = ["serde"] }
 moka = { version = "0.12.10", features = ["sync"] }
-bytesize = { version = "2.0.1", features = ["serde"] }
+bytesize = { version = "2.3.1", features = ["serde"] }
 # We use this middleware to extract tracing information in our shell and start spans for each incoming request.
 # The `tracing_level_info` feature determines the level at which spans are created by the middleware.
 # If this feature is emitted, the default span level is `trace`, which will not be picked up, as the minimum
 # log level for external crates is `info`.
-axum-tracing-opentelemetry = { version = "0.32.1", features = [
+axum-tracing-opentelemetry = { version = "0.32.2", features = [
     "tracing_level_info",
 ] }
-bytes = "1.10.1"
+bytes = "1.11.0"
 tracing-core = "0.1.34"
 eventsource-stream = "0.2.3"
 async-openai = { version = "0.30.1", features = ["byot", "native-tls"] }
-http = "1.3.1"
+http = "1.4.0"
 secrecy = "0.10.3"
 backoff = "0.4.0"
 pharia-common = { version = "0.4.1", features = ["opentelemetry"] }
@@ -170,11 +170,11 @@ tempfile = "3.21.0"
 # Pinned because of opentelemetry crates
 tokio = { version = "1.47.1", features = ["test-util"] }
 tokio-test = "0.4.4"
-wat = "1.237.0"
-metrics-util = "0.20.0"
+wat = "1.243.0"
+metrics-util = "0.20.1"
 reqwest = { version = "0.12.23", features = ["stream"] }
 opentelemetry-stdout = "0.31.0"
-double-trait = "0.2.5"
+double-trait = "0.2.8"
 reqwest-vcr = "0.3.0"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
