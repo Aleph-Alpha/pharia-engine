@@ -152,7 +152,7 @@ bytesize = { version = "2.0.1", features = ["serde"] }
 axum-tracing-opentelemetry = { version = "0.32.1", features = [
     "tracing_level_info",
 ] }
-bytes = "1.10.1"
+bytes = "1.11.1"
 tracing-core = "0.1.34"
 eventsource-stream = "0.2.3"
 async-openai = { version = "0.30.1", features = ["byot", "native-tls"] }
