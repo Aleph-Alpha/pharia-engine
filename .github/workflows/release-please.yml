@@ -22,6 +22,6 @@ jobs:
           owner: "Aleph-Alpha"
           repositories: "pharia-engine"
       - id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           token: ${{ steps.get_token.outputs.token }}
